@@ -95,7 +95,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
           <!-- BILL DEBUGGER (The Weapon) -->
           <td>
             <a href="https://nodalpoint.io/bill-debugger" style="color: #002FA7; text-decoration: none; font-weight: 700;">
-              [ RUN_FORENSIC_AUDIT ]
+              [ RUN_AUDIT ]
             </a>
           </td>
         </tr>

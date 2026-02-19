@@ -62,9 +62,9 @@ export default function FoundryTemplate({
                         <Row>
                             <Column style={headerLeft}>
                                 <Img
-                                    src="https://nodalpoint.io/images/nodalpoint.png"
-                                    width="18"
-                                    height="18"
+                                    src="https://nodalpoint.io/images/nodalpoint-webicon.png"
+                                    width="20"
+                                    height="20"
                                     alt="Nodal Point"
                                     style={logo}
                                 />
@@ -286,17 +286,15 @@ export default function FoundryTemplate({
                                     <Text style={contactLine}>{location}</Text>
                                 </Section>
 
-                                <Row style={footerLinks}>
-                                    <Column style={footerLinkCol}>
+                                <Section style={footerLinksContainer}>
+                                    <Text style={footerLinks}>
                                         <a href={linkedinUrl} style={linkStyle}>LINKEDIN</a>
-                                    </Column>
-                                    <Column style={footerLinkCol}>
-                                        <a href="https://nodalpoint.io" style={linkStyle}>NETWORK</a>
-                                    </Column>
-                                    <Column style={footerLinkCol}>
+                                        <span style={linkSeparator}>//</span>
+                                        <a href="https://nodalpoint.io" style={linkStyle}>HQ</a>
+                                        <span style={linkSeparator}>//</span>
                                         <a href="https://nodalpoint.io/bill-debugger" style={linkStyle}>[ RUN_AUDIT ]</a>
-                                    </Column>
-                                </Row>
+                                    </Text>
+                                </Section>
                             </Section>
                         </Section>
                     )}
@@ -341,7 +339,9 @@ const headerRight = {
 const logo = {
     display: 'inline-block',
     verticalAlign: 'middle',
-    marginRight: '8px',
+    marginRight: '12px',
+    width: '20px',
+    height: '20px',
 }
 
 const brandText = {
@@ -363,7 +363,7 @@ const refText = {
 }
 
 const contentSection = {
-    padding: '24px',
+    padding: '32px 40px',
 }
 
 const blockMargin = {
@@ -642,7 +642,7 @@ const footer = {
 }
 
 const footerContent = {
-    padding: '32px 24px',
+    padding: '40px 40px',
 }
 
 const footerPhotoCol = {
@@ -692,17 +692,23 @@ const contactLine = {
     margin: 0,
 }
 
+const footerLinksContainer = {
+    width: '100%',
+    marginTop: '0px',
+}
+
 const footerLinks = {
     fontFamily: 'monospace',
     fontSize: '10px',
     fontWeight: 'bold',
     textTransform: 'uppercase' as const,
     letterSpacing: '0.12em',
-    width: '100%',
+    margin: 0,
 }
 
-const footerLinkCol = {
-    paddingRight: '20px',
+const linkSeparator = {
+    color: '#d4d4d8',
+    padding: '0 8px',
 }
 
 const linkStyle = {

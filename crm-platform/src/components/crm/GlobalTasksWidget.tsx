@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { CheckSquare, Circle, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTasks, type Task } from '@/hooks/useTasks'
@@ -21,11 +22,30 @@ function TaskRow({
   isCompleted: boolean
   onComplete: () => void
 }) {
+  const router = useRouter()
+
+  const handleNavigate = () => {
+    if (task.contactId) {
+      router.push(`/network/contacts/${task.contactId}`)
+    } else if (task.accountId) {
+      router.push(`/network/accounts/${task.accountId}`)
+    }
+  }
+
   return (
-    <div className="group flex items-start gap-3 p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-colors">
+    <div
+      onClick={handleNavigate}
+      className={cn(
+        "group flex items-start gap-3 p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-colors",
+        (task.contactId || task.accountId) && "cursor-pointer"
+      )}
+    >
       <button
         type="button"
-        onClick={onComplete}
+        onClick={(e) => {
+          e.stopPropagation()
+          onComplete()
+        }}
         className={cn(
           'flex-shrink-0 mt-0.5 rounded-full p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20',
           isCompleted ? 'text-emerald-500 cursor-default' : 'text-zinc-600 hover:text-zinc-400 cursor-pointer'

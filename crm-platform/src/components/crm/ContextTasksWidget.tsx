@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { ListTodo, Circle, CheckCircle2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTasks, type Task } from '@/hooks/useTasks'
@@ -17,6 +18,7 @@ interface ContextTasksWidgetProps {
 }
 
 export default function ContextTasksWidget({ entityId, entityName }: ContextTasksWidgetProps) {
+  const router = useRouter()
   const { data: tasksData, updateTask } = useTasks()
   const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -66,6 +68,14 @@ export default function ContextTasksWidget({ entityId, entityName }: ContextTask
     }, EXIT_DELAY_MS)
   }
 
+  const handleNavigate = (task: Task) => {
+    if (task.contactId) {
+      router.push(`/network/contacts/${task.contactId}`)
+    } else if (task.accountId) {
+      router.push(`/network/accounts/${task.accountId}`)
+    }
+  }
+
   return (
     <div className="space-y-2 overflow-hidden">
       <AnimatePresence initial={false} mode="popLayout">
@@ -83,10 +93,19 @@ export default function ContextTasksWidget({ entityId, entityName }: ContextTask
                 transition={layoutTransition}
                 className="rounded-xl"
               >
-                <div className="group flex items-start gap-3 p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-colors">
+                <div 
+                  onClick={() => handleNavigate(task)}
+                  className={cn(
+                    "group flex items-start gap-3 p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-colors",
+                    (task.contactId || task.accountId) && "cursor-pointer"
+                  )}
+                >
                   <button
                     type="button"
-                    onClick={() => !isCompleted && handleComplete(task, i)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      !isCompleted && handleComplete(task, i)
+                    }}
                     className={cn(
                       'flex-shrink-0 mt-0.5 rounded-full p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-white/20',
                       isCompleted ? 'text-emerald-500 cursor-default' : 'text-zinc-600 hover:text-zinc-400 cursor-pointer'
