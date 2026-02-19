@@ -113,13 +113,19 @@ export default async function handler(req, res) {
         }
 
         const CallSid = src.CallSid || '';
-        const From = src.From || '';
-        const To = src.To || '';
-        const Direction = src.Direction || 'outbound';
+        const RawFrom = src.From || '';
+        const RawTo = src.To || '';
 
-        // Identity of the caller (for browser calls, this is 'client:agent')
-        const callerIdentity = src.Caller || src.From || '';
-        const isBrowserCall = callerIdentity.startsWith('client:');
+        // ---- CRITICAL: Destination resolution ----
+        // When the Twilio JS SDK places an outbound call, it sends our custom
+        // VoiceContext params in the request. The custom key is 'targetNumber'
+        // (set in VoiceContext.tsx line ~556). For browser-originated calls,
+        // Twilio sets 'To' = the TwiML App SID (e.g. 'APxxxxxx') — NOT the
+        // dialed phone number. For true PSTN inbound calls, 'To' IS our
+        // Twilio phone number. We must prioritize 'targetNumber' over 'To'.
+        const isBrowserCall = (src.Caller || RawFrom || '').startsWith('client:');
+        const To = src.targetNumber || src.target || (RawTo.startsWith('AP') ? '' : RawTo) || '';
+        const From = src.callerId || RawFrom || '';
 
         let meta = {};
         try {
@@ -131,24 +137,26 @@ export default async function handler(req, res) {
         }
 
         logger.log(`[Voice Webhook] Processing call ${CallSid}:`, {
-            from: From,
-            to: To,
-            isBrowser: isBrowserCall,
-            meta: JSON.stringify(meta)
+            rawFrom: RawFrom, rawTo: RawTo, resolvedTo: To, resolvedFrom: From,
+            isBrowser: isBrowserCall, meta: JSON.stringify(meta)
         });
 
         const contactId = meta.contactId || '';
         const accountId = meta.accountId || '';
-        const agentId = meta.agentId || '';
+        const agentId = meta.agentId || meta.userId || '';
         const agentEmail = meta.agentEmail || '';
-        const targetPhone = meta.targetPhone || To || '';
+        const targetPhone = To || meta.targetPhone || '';
 
         const inboundPhoneNumbers = await resolveInboundPhoneNumbers();
         const primaryBusinessNumber = inboundPhoneNumbers[0] || DEFAULT_TWILIO_BUSINESS_NUMBER;
 
-        // Logical check for inbound vs outbound
-        const isInboundToBusiness = Boolean(inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(To)));
-        const businessNumber = isInboundToBusiness ? (inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(To)) || primaryBusinessNumber) : primaryBusinessNumber;
+        // Logical check for inbound vs outbound.
+        // Browser-initiated calls are NEVER inbound even if targetNumber happens to
+        // match our number — that would be a self-call and must be routed as outbound.
+        const isInboundToBusiness = !isBrowserCall && Boolean(inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(RawTo)));
+        const businessNumber = isInboundToBusiness
+            ? (inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(RawTo)) || primaryBusinessNumber)
+            : primaryBusinessNumber;
 
         // For outbound calls, use From as callerId (this is the selected Twilio number from settings)
         // For inbound calls, use businessNumber as callerId when dialing to browser client
