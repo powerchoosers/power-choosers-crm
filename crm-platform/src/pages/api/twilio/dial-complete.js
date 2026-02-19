@@ -53,6 +53,12 @@ export default async function handler(req, res) {
       body = req.query || {};
     }
 
+    // If body is empty but query has Twilio params, use query (redirect lost POST body)
+    if (Object.keys(body).length === 0 && req.query && Object.keys(req.query).length > 0) {
+      logger.warn('[DialComplete] POST body was empty, falling back to query params');
+      body = req.query;
+    }
+
     const { CallSid, DialCallStatus, DialCallDuration, DialCallSid } = body;
 
     logger.log('[DialComplete] Call completed:', {

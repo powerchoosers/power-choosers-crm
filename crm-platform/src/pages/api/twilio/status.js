@@ -61,18 +61,23 @@ export default async function handler(req, res) {
         logger.log('[Status] Event:', CallStatus, '| CallSid:', CallSid, '| To:', To, '| From:', From, '| agentEmail:', agentEmail);
 
         // ================================================================
-        // Skip browser parent legs entirely.
-        // When an agent calls via Twilio JS SDK, two legs fire:
-        //   1) Parent "client:agent" leg (browser) — skip this
-        //   2) Child PSTN leg (real phone) — dial-status.js handles this
+        // For browser-originated calls (From=client:agent), this status
+        // callback is the MOST RELIABLE completion event because:
+        //   1) It arrives as POST with full body data
+        //   2) dial-status/dial-complete callbacks lose POST body due to
+        //      domain redirects (nodalpoint.io → www.nodalpoint.io)
+        // So we NEVER skip browser parent legs — we LOG them.
+        //
+        // For the phone number fields: the parent leg has From=client:agent
+        // and To="" (TwiML App SID was stripped). We rely on the query
+        // params (targetPhone, contactId, etc.) that voice.js appended
+        // to the callback URL.
         // ================================================================
         const isBrowserParentLeg = (From || '').startsWith('client:') || (To || '').startsWith('client:');
         if (isBrowserParentLeg) {
-            logger.log(`[Status] Skipping browser parent leg ${CallSid} (From=${From}, To=${To})`);
-            res.writeHead(200, { 'Content-Type': 'text/plain' });
-            res.end('OK');
-            return;
+            logger.log(`[Status] Browser parent leg detected — will log using query params. targetPhone=${targetPhoneFromQuery}, agentEmail=${agentEmail}`);
         }
+
 
         // ================================================================
         // STEP 1: LOG TO SUPABASE — Do this BEFORE res.end()
@@ -85,8 +90,10 @@ export default async function handler(req, res) {
 
                 const bodyPayload = {
                     callSid: CallSid,
-                    to: To,
-                    from: From,
+                    // For browser parent legs: To="" and From="client:agent" in the body
+                    // Use query params (targetPhone) for the actual dialed number
+                    to: (isBrowserParentLeg ? targetPhoneFromQuery : To) || targetPhoneFromQuery || To || '',
+                    from: (isBrowserParentLeg && (!From || From.startsWith('client:'))) ? '' : From,
                     status: event,
                     duration: correctedDuration,
                     targetPhone: targetPhoneFromQuery || undefined,
@@ -94,7 +101,7 @@ export default async function handler(req, res) {
                     accountId,
                     agentId,
                     agentEmail,
-                    source: 'status-v2'
+                    source: 'status-v3'
                 };
 
                 if (RecordingUrl) {
