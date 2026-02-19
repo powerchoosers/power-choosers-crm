@@ -224,13 +224,20 @@ export default async function handler(req, res) {
 
         // ================================================================
         // BUILD CALLBACK URLS
+        // CRITICAL: Use the canonical www.nodalpoint.io domain directly.
+        // nodalpoint.io → 307 redirect → www.nodalpoint.io, which causes
+        // Twilio POST callbacks to lose their body during the redirect.
         // ================================================================
-        const envBase = process.env.PUBLIC_BASE_URL || '';
+        let envBase = process.env.PUBLIC_BASE_URL || '';
+        // Fix the redirect problem: always use the www canonical domain
+        if (envBase === 'https://nodalpoint.io') {
+            envBase = 'https://www.nodalpoint.io';
+        }
         const proto = req.headers['x-forwarded-proto'] || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
         const base = envBase
             ? envBase.replace(/\/$/, '')
-            : (host ? `${proto}://${host}` : 'https://nodal-point-network.vercel.app');
+            : (host ? `${proto}://${host}` : 'https://www.nodalpoint.io');
 
         const callbackParams = new URLSearchParams();
         if (contactId) callbackParams.append('contactId', contactId);
