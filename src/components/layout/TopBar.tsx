@@ -3,6 +3,7 @@
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, Mic, PhoneOff, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { GlobalSearch } from '@/components/search/GlobalSearch'
@@ -17,6 +18,7 @@ import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat
 import { useGeminiStore } from '@/store/geminiStore'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
+import { useAccount } from '@/hooks/useAccounts'
 
 function getDaysUntilJune() {
   const now = new Date();
@@ -35,6 +37,59 @@ function getDaysUntilJune() {
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
+/**
+ * Dedicated icon for the active call bar.
+ * - Company call (logoUrl or domain set): shows logo img → Clearbit fallback → Building2
+ * - Contact call (no logoUrl, no domain): shows ContactAvatar with the contact's name
+ */
+function CallBarIcon({ logoUrl, domain, name, contactName }: { logoUrl?: string; domain?: string; name: string; contactName?: string }) {
+  const clearbitUrl = domain ? `https://logo.clearbit.com/${domain.replace(/^https?:\/\//i, '').split('/')[0].toLowerCase()}` : null
+  const [src, setSrc] = useState<string | null>(logoUrl || clearbitUrl)
+  const [failed, setFailed] = useState(false)
+
+  // Reset whenever the call changes (key prop handles this, but also guard here)
+  useEffect(() => {
+    setSrc(logoUrl || clearbitUrl)
+    setFailed(false)
+  }, [logoUrl, domain]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleError = () => {
+    if (src === logoUrl && clearbitUrl && src !== clearbitUrl) {
+      setSrc(clearbitUrl)
+    } else {
+      setFailed(true)
+    }
+  }
+
+  // No company branding at all — show contact avatar
+  if (!logoUrl && !domain) {
+    return (
+      <ContactAvatar
+        name={contactName || name}
+        size={32}
+        className="rounded-[14px] shrink-0"
+      />
+    )
+  }
+
+  if (failed || !src) {
+    return (
+      <div className="w-8 h-8 rounded-[14px] nodal-glass bg-zinc-900/80 border border-white/20 flex items-center justify-center shrink-0">
+        <Building2 size={16} className="text-zinc-400" />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={name}
+      onError={handleError}
+      className="w-8 h-8 rounded-[14px] object-cover border border-white/20 shrink-0 bg-zinc-900/80"
+    />
+  )
+}
+
 export function TopBar() {
   const {
     isActive,
@@ -48,7 +103,8 @@ export function TopBar() {
     callTriggered,
     clearCallTrigger,
     isCallHUDOpen,
-    setIsCallHUDOpen
+    setIsCallHUDOpen,
+    callSessionId,
   } = useCallStore()
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
@@ -127,8 +183,28 @@ export function TopBar() {
     return { strategy, statusColor, pulseColor, windowText };
   }, [marketPulse, isMarketError])
 
-  // Use voiceMetadata if active, otherwise use storeMetadata if it exists (for dialer display)
-  const displayMetadata = isActive ? voiceMetadata : storeMetadata
+  // Aggressive merge of dossier vs voice metadata to prevent branding loss
+  const displayMetadata = useMemo(() => {
+    const s = (storeMetadata || {}) as any;
+    const v = (voiceMetadata || {}) as any;
+    const c = (storeContext?.data || {}) as any;
+
+    // Coalesce: Dossier Props (s) > Active Context (c) > Voice API (v)
+    const logoUrl = s.logoUrl || c.logoUrl || v.logoUrl || s.logo_url || c.logo_url || v.logo_url || '';
+    const domain = s.domain || c.domain || v.domain || '';
+    const accountId = s.accountId || c.id || v.accountId || '';
+    const isAccountOnly = v.isAccountOnly ?? s.isAccountOnly ?? (storeContext?.type === 'account');
+
+    return {
+      ...s,
+      ...v,
+      logoUrl,
+      domain,
+      accountId,
+      isAccountOnly,
+      metadata: { ...(c.metadata || {}), ...(s.metadata || {}), ...(v.metadata || {}) }
+    };
+  }, [voiceMetadata, storeMetadata, storeContext]);
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
@@ -173,6 +249,14 @@ export function TopBar() {
 
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
   const callStartRef = useRef<number | null>(null)
+  // Directly resolve the account from DB using accountId — hard guarantee for logo/domain
+  const callbarAccountId = isActive ? (displayMetadata?.accountId || '') : ''
+  const { data: callbarAccount } = useAccount(callbarAccountId)
+
+  // Merge: direct DB data wins over whatever came through metadata chain
+  const callbarLogoUrl = callbarAccount?.logoUrl || displayMetadata?.logoUrl || ''
+  const callbarDomain = callbarAccount?.domain || displayMetadata?.domain || ''
+
 
   // Listen for scroll on the main content container (passive + rAF throttle for smooth scroll)
   useEffect(() => {
@@ -433,23 +517,13 @@ export function TopBar() {
               >
                 <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
                   <div className="flex items-center gap-3">
-                    {displayMetadata?.isAccountOnly ? (
-                      <CompanyIcon
-                        key={`callbar-icon-${phoneNumber || 'unknown'}`}
-                        logoUrl={displayMetadata?.logoUrl}
-                        domain={displayMetadata?.domain}
-                        name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
-                        size={32}
-                        roundedClassName="rounded-[14px]"
-                      />
-                    ) : (
-                      <ContactAvatar
-                        key={`callbar-avatar-${phoneNumber || 'unknown'}`}
-                        name={displayMetadata?.name || phoneNumber || 'Caller'}
-                        size={32}
-                        className="rounded-[14px]"
-                      />
-                    )}
+                    <CallBarIcon
+                      key={`callbar-icon-${callSessionId}`}
+                      logoUrl={callbarLogoUrl || undefined}
+                      domain={callbarDomain || undefined}
+                      name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
+                      contactName={displayMetadata?.name || undefined}
+                    />
                     <div>
                       <div className="text-sm font-medium text-white leading-none mb-1">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>
                       <div className="text-[10px] text-signal font-mono uppercase tracking-tighter flex items-center gap-2">
