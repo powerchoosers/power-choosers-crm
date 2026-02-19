@@ -106,7 +106,8 @@ export default async function handler(req, res) {
         .or(orQuery);
 
       if (!isAdmin) {
-        query = query.eq('ownerId', user.email);
+        // Use user.id (UUID), not user.email, to match the ownerId column format
+        query = query.eq('ownerId', user.id);
       }
 
       const { data: contacts, error } = await query.limit(1);
@@ -143,20 +144,23 @@ export default async function handler(req, res) {
       logger.error('[Search] Error searching contacts:', e.message);
     }
 
-    // Search Accounts (if no contact found, or even if found? Legacy logic searched both but prioritized contact return)
-    // Legacy logic: if contactResult -> return it. If not -> return accountResult.
-
+    // Search Accounts (if no contact found)
     if (!contactResult) {
       try {
         logger.log('[Search] Querying accounts by phone fields...');
 
         const orQueryAccount = `phone.eq.${searchDigits}`;
 
-        const { data: accounts, error } = await supabaseAdmin
+        let accountQuery = supabaseAdmin
           .from('accounts')
           .select('id, name, phone, city, state, domain, logo_url, metadata')
-          .or(orQueryAccount)
-          .limit(1);
+          .or(orQueryAccount);
+
+        if (!isAdmin) {
+          accountQuery = accountQuery.eq('ownerId', user.id);
+        }
+
+        const { data: accounts, error } = await accountQuery.limit(1);
 
         if (!error && accounts && accounts.length > 0) {
           const data = accounts[0];
