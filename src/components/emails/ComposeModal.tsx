@@ -2,9 +2,11 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import DOMPurify from 'dompurify'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useEmails } from '@/hooks/useEmails'
 import { useAuth } from '@/context/AuthContext'
 import { generateNodalSignature } from '@/lib/signature'
@@ -471,6 +473,8 @@ function ComposePanel({
 
   // Foundry template state
   const [selectedFoundryId, setSelectedFoundryId] = useState<string | null>(null)
+  const [contentBeforeFoundry, setContentBeforeFoundry] = useState('')
+  const [subjectBeforeFoundry, setSubjectBeforeFoundry] = useState('')
   const foundrySelectValue = selectedFoundryId || 'none'
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false)
 
@@ -497,6 +501,21 @@ function ComposePanel({
 
   const { data: toResults = [], isLoading: isToSearching } = useSearchContacts(toQuery)
   const { data: ccResults = [], isLoading: isCcSearching } = useSearchContacts(ccQuery)
+
+  const handleFoundrySelect = useCallback((id: string | null) => {
+    if (id) {
+      // Backup current manual draft before applying template
+      if (!selectedFoundryId) {
+        setContentBeforeFoundry(content)
+        setSubjectBeforeFoundry(subject)
+      }
+    } else {
+      // Revert to manual draft when template is removed
+      setContent(contentBeforeFoundry)
+      setSubject(subjectBeforeFoundry)
+    }
+    setSelectedFoundryId(id)
+  }, [selectedFoundryId, content, subject, contentBeforeFoundry, subjectBeforeFoundry])
 
   // Suppress signature when using foundry template
   const shouldShowSignature = !selectedFoundryId
@@ -849,7 +868,7 @@ OUTPUT FORMAT:
         toast.success('Foundry template loaded')
       } catch (err: any) {
         toast.error(err?.message || 'Failed to load template')
-        setSelectedFoundryId(null)
+        handleFoundrySelect(null)
       } finally {
         setIsLoadingTemplate(false)
       }
@@ -1162,7 +1181,7 @@ OUTPUT FORMAT:
               <button
                 type="button"
                 title="Remove Template"
-                onClick={() => setSelectedFoundryId(null)}
+                onClick={() => handleFoundrySelect(null)}
                 className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
               >
                 <X className="w-3 h-3" />
@@ -1173,11 +1192,28 @@ OUTPUT FORMAT:
           <div className="flex flex-col relative">
             <div className="relative">
               {selectedFoundryId ? (
-                // Show HTML preview for Foundry templates
-                <div
-                  className="w-full min-h-[150px] bg-white/5 rounded-lg p-4 border border-white/10"
-                  dangerouslySetInnerHTML={{ __html: content }}
-                />
+                // Show HTML preview for Foundry templates - Refined for inbox parity
+                <div className="w-full min-h-[300px] bg-zinc-100 rounded-xl p-4 md:p-12 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
+                  <div className="w-full max-w-[600px] bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] overflow-hidden rounded-sm ring-1 ring-zinc-200 flex flex-col">
+                    <div className="h-8 border-b border-zinc-100 bg-zinc-50 flex items-center px-4 justify-between shrink-0">
+                      <div className="flex gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
+                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
+                        <div className="w-2 h-2 rounded-full bg-zinc-200" />
+                      </div>
+                      <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-[0.2em]">Live_Transmission_Preview</span>
+                    </div>
+                    <div
+                      className="flex-1 overflow-x-hidden"
+                      dangerouslySetInnerHTML={{
+                        __html: DOMPurify.sanitize(content, {
+                          ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br', 'ul', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+                          ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title']
+                        })
+                      }}
+                    />
+                  </div>
+                </div>
               ) : (
                 // Show textarea for regular emails
                 <textarea
@@ -1202,7 +1238,7 @@ OUTPUT FORMAT:
             {aiError && (
               <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
             )}
-            {signatureHtml && (
+            {signatureHtml && !selectedFoundryId && (
               <div className="mt-4 pt-4 border-t border-white/5 opacity-90">
                 <div
                   className="rounded-lg overflow-hidden"
@@ -1384,24 +1420,48 @@ OUTPUT FORMAT:
             >
               <Sparkles className={cn("h-4 w-4", aiRailOpen && "fill-current")} />
             </Button>
-            {/* Foundry Template Selector */}
-            <div className="h-6 w-px bg-white/10" />
-            <Select value={foundrySelectValue} onValueChange={(v) => setSelectedFoundryId(v === 'none' ? null : v)}>
-              <SelectTrigger className="h-8 w-auto min-w-[140px] bg-white/5 border-white/10 text-[10px] font-mono text-zinc-400 uppercase tracking-wider rounded-lg">
-                <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
-                <SelectValue placeholder="Foundry Template" />
-              </SelectTrigger>
-              <SelectContent className="bg-zinc-950 nodal-monolith-edge z-[200]">
-                <SelectItem value="none" className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+            {/* Foundry Template Selector - Refactored to Circle Button */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className={cn(
+                    "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
+                    selectedFoundryId && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
+                  )}
+                  title="Foundry Template (Zap)"
+                >
+                  <Zap className={cn("h-4 w-4", selectedFoundryId && "fill-current")} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                side="top"
+                align="center"
+                className="bg-zinc-950 nodal-monolith-edge z-[200] min-w-[200px]"
+              >
+                <div className="px-2 py-1.5 text-[10px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1">
+                  Foundry Templates
+                </div>
+                <DropdownMenuItem
+                  onClick={() => handleFoundrySelect(null)}
+                  className="text-[10px] font-mono focus:bg-[#002FA7]/20 flex items-center justify-between"
+                >
                   None (Standard Email)
-                </SelectItem>
+                  {!selectedFoundryId && <Check className="w-3 h-3 text-[#002FA7]" />}
+                </DropdownMenuItem>
                 {foundryAssets?.map((asset: any) => (
-                  <SelectItem key={asset.id} value={asset.id} className="text-[10px] font-mono focus:bg-[#002FA7]/20">
+                  <DropdownMenuItem
+                    key={asset.id}
+                    onClick={() => handleFoundrySelect(asset.id)}
+                    className="text-[10px] font-mono focus:bg-[#002FA7]/20 flex items-center justify-between"
+                  >
                     {asset.name}
-                  </SelectItem>
+                    {selectedFoundryId === asset.id && <Check className="w-3 h-3 text-[#002FA7]" />}
+                  </DropdownMenuItem>
                 ))}
-              </SelectContent>
-            </Select>
+              </DropdownMenuContent>
+            </DropdownMenu>
             {isLoadingTemplate && <Loader2 className="w-4 h-4 animate-spin text-[#002FA7]" />}
           </div>
           <div className="flex items-center gap-2">

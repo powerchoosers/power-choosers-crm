@@ -1407,22 +1407,22 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           </div>
 
           <div className="flex-1 overflow-y-auto bg-zinc-100 p-4 md:p-8 flex justify-center items-start np-scroll">
-            <div className={`w-full max-w-[600px] flex flex-col mb-8 overflow-hidden ${!previewHtml ? 'bg-white border border-zinc-200 shadow-2xl' : ''}`}>
+            <div className="w-full max-w-[600px] bg-white border border-zinc-200 shadow-2xl flex flex-col mb-8 overflow-hidden">
               {previewHtml ? (
                 <div
-                  className="foundry-preview w-full"
+                  className="foundry-preview w-full min-h-[400px]"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(previewHtml, { ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'figure', 'img', 'figcaption', 'br', 'ul', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'], ALLOWED_ATTR: ['href', 'src', 'alt', 'style', 'title'] }) }}
                 />
               ) : (
                 <>
-                  <div className="border-b border-zinc-200 px-5 py-4 flex justify-between items-center gap-4 bg-white shrink-0">
-                    <div className="flex items-center gap-2 min-width-0 flex-1">
+                  <div className="border-b border-zinc-200 px-10 py-5 flex justify-between items-center gap-4 bg-white shrink-0">
+                    <div className="flex items-center gap-3 min-width-0 flex-1">
                       <Image
-                        src="/images/nodalpoint.png"
+                        src="/images/nodalpoint-webicon.png"
                         alt="Nodal Point Logo"
-                        width={24}
-                        height={24}
-                        className="h-4.5 w-auto shrink-0"
+                        width={20}
+                        height={20}
+                        className="h-5 w-auto shrink-0"
                       />
                       <span className="text-[9px] font-mono text-zinc-900 font-bold tracking-[0.2em] uppercase truncate">NODAL_POINT // INTELLIGENCE</span>
                     </div>
@@ -1639,9 +1639,11 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                     </span>
                   )}
                 </div>
-                <div className="flex gap-4 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">
+                <div className="flex items-center gap-2 font-mono text-[10px] text-[#002FA7] font-bold uppercase tracking-widest">
                   <a href={profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point'} target="_blank" rel="noopener noreferrer" className="hover:underline">LINKEDIN</a>
-                  <a href="https://nodalpoint.io" target="_blank" rel="noopener noreferrer" className="hover:underline">NETWORK</a>
+                  <span className="text-zinc-300 font-normal">//</span>
+                  <a href="https://nodalpoint.io" target="_blank" rel="noopener noreferrer" className="hover:underline">HQ</a>
+                  <span className="text-zinc-300 font-normal">//</span>
                   <a href="https://nodalpoint.io/bill-debugger" target="_blank" rel="noopener noreferrer" className="hover:underline">[ RUN_AUDIT ]</a>
                 </div>
               </div>
