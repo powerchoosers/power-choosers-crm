@@ -9,9 +9,6 @@
 import { cors, formatPhoneForContact } from './_utils.js';
 import { supabaseAdmin } from '@/lib/supabase';
 
-// In-memory fallback (only for local dev or temporary cache)
-const memoryStore = new Map();
-
 // Store phone data for 30 minutes
 const PHONE_DATA_TTL_MS = 30 * 60 * 1000;
 
@@ -58,12 +55,17 @@ export default async function handler(req, res) {
       expiresAt: new Date(Date.now() + PHONE_DATA_TTL_MS).toISOString()
     };
 
-    // Store in memory (temporary cache for active sessions)
-    memoryStore.set(personId, payload);
-
     // Link phones to contact in Supabase (background: works even if user left the page)
     if (personId && Array.isArray(phones) && phones.length > 0 && supabaseAdmin) {
       try {
+        // 1. Store in Supabase persistent cache for polling (fixes Vercel statelessness)
+        await supabaseAdmin.from('apollo_searches').upsert({
+          key: `webhook_phone_${personId}`,
+          data: payload,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+
+        // 2. Direct update to contact record
         const { data: contactRow } = await supabaseAdmin
           .from('contacts')
           .select('id')
@@ -91,7 +93,7 @@ export default async function handler(req, res) {
           }
         }
       } catch (dbErr) {
-        console.error('[phone-webhook] Supabase contact update failed:', dbErr);
+        console.error('[phone-webhook] Supabase operations failed:', dbErr);
       }
     }
 
@@ -110,11 +112,27 @@ export default async function handler(req, res) {
 }
 
 // Export function to retrieve phone data (asynchronous)
+// Now queries Supabase instead of memory to support Vercel serverless
 export async function getPhoneData(personId) {
-  const data = memoryStore.get(personId);
-  if (data && new Date(data.expiresAt) > new Date()) {
-    return data;
+  if (!supabaseAdmin) return null;
+
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('apollo_searches')
+      .select('data')
+      .eq('key', `webhook_phone_${personId}`)
+      .maybeSingle();
+
+    if (error || !data?.data) return null;
+
+    const payload = data.data;
+    if (payload.expiresAt && new Date(payload.expiresAt) > new Date()) {
+      return payload;
+    }
+    return null;
+  } catch (err) {
+    console.error('[phone-webhook] getPhoneData failed:', err);
+    return null;
   }
-  return null;
 }
 
