@@ -132,21 +132,83 @@ export default async function handler(req, res) {
             const envBase = process.env.PUBLIC_BASE_URL || '';
             const base = host ? `${proto}://${host}` : (envBase || 'https://nodal-point-network.vercel.app');
 
+            // Log the full body so we can debug what Twilio sends
+            logger.log('[Dial-Status] Completed event body:', JSON.stringify({
+              ParentCallSid: body.ParentCallSid,
+              CallSid: body.CallSid,
+              DialCallSid: body.DialCallSid,
+              To: body.To,
+              From: body.From,
+              Direction: body.Direction,
+              DialCallStatus: body.DialCallStatus,
+              DialCallDuration: body.DialCallDuration,
+              CallDuration: body.CallDuration
+            }));
+
+            // Derive real phone numbers.
+            // For dial-status callbacks, body.To is the number dialed (PSTN target)
+            // and body.From is the caller ID (Twilio number). If these are empty or 
+            // look like client: identifiers, fetch from Twilio REST API.
+            let resolvedTo = body.To || '';
+            let resolvedFrom = body.From || '';
+            let resolvedDuration = parseInt(body.DialCallDuration || body.CallDuration || '0', 10);
+
+            const isClientId = (v) => !v || String(v).startsWith('client:') || String(v).startsWith('AP');
+
+            // If To/From are missing or not real phone numbers, fetch them from Twilio
+            if ((isClientId(resolvedTo) || isClientId(resolvedFrom)) && childSid) {
+              try {
+                const accountSid = process.env.TWILIO_ACCOUNT_SID;
+                const authToken = process.env.TWILIO_AUTH_TOKEN;
+                if (accountSid && authToken) {
+                  const client = twilio(accountSid, authToken);
+                  // Fetch the child (PSTN) leg - it has the real To/From numbers
+                  const childCall = await client.calls(childSid).fetch();
+                  if (childCall && !isClientId(childCall.to)) {
+                    resolvedTo = childCall.to;
+                    resolvedFrom = childCall.from;
+                    const childDuration = parseInt(childCall.duration || '0', 10);
+                    if (childDuration > resolvedDuration) resolvedDuration = childDuration;
+                    logger.log(`[Dial-Status] Fetched child leg ${childSid}: to=${resolvedTo}, from=${resolvedFrom}, duration=${resolvedDuration}`);
+                  } else if (parentSid) {
+                    // Try parent leg as fallback
+                    const parentCall = await client.calls(parentSid).fetch();
+                    if (parentCall && !isClientId(parentCall.to)) {
+                      resolvedTo = parentCall.to;
+                      resolvedFrom = parentCall.from;
+                      logger.log(`[Dial-Status] Fetched parent leg ${parentSid}: to=${resolvedTo}, from=${resolvedFrom}`);
+                    }
+                  }
+                }
+              } catch (fetchErr) {
+                logger.warn('[Dial-Status] Failed to fetch call details from Twilio:', fetchErr?.message);
+              }
+            }
+
+            // Use targetPhone from query params if To is still not a real number
+            if (isClientId(resolvedTo) && targetPhoneFromQuery) {
+              resolvedTo = targetPhoneFromQuery;
+            }
+
+            // Use the child SID (PSTN leg) as the call SID for logging when available
+            // because this is the leg with the real phone numbers
+            const logCallSid = childSid || parentSid;
+
             const payload = {
-              callSid: parentSid || childSid,
-              to: body.To,
-              from: body.From,
+              callSid: logCallSid,
+              to: resolvedTo,
+              from: resolvedFrom,
               status: 'completed',
-              duration: parseInt(body.DialCallDuration || body.CallDuration || '0', 10),
+              duration: resolvedDuration,
               contactId,
               accountId,
               agentId,
               agentEmail,
-              targetPhone: targetPhoneFromQuery || body.To || '',
+              targetPhone: targetPhoneFromQuery || resolvedTo || '',
               source: 'dial-status'
             };
 
-            logger.log(`[Dial-Status] Posting completed call to /api/calls: ${payload.callSid}`);
+            logger.log(`[Dial-Status] Posting completed call to DB: sid=${logCallSid}, to=${resolvedTo}, from=${resolvedFrom}, agent=${agentEmail}`);
 
             await upsertCallInSupabase(payload).catch(err => {
               logger.warn('[Dial-Status] Failed saving to DB via upsertCallInSupabase:', err?.message);
