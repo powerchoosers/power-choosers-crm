@@ -621,6 +621,11 @@ OUTPUT FORMAT:
           ],
           model: selectedModel,
           userProfile: { firstName: profile?.firstName || 'Trey' },
+          context: context ? {
+            type: context.contactId ? 'contact' : (context.accountId ? 'account' : 'general'),
+            id: context.contactId || context.accountId,
+            ...context
+          } : undefined
         }),
       })
       const data = await response.json()
@@ -898,7 +903,7 @@ OUTPUT FORMAT:
       : selectedFoundryId
         ? content // Foundry template is already complete HTML
         : `
-      <div style="font-family: sans-serif; white-space: pre-wrap; margin-bottom: 24px; color: #18181b;">${content}</div>
+      <div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content.replace(/\n/g, '<br />')}</div>
       ${outgoingSignatureHtml}
     `
 
@@ -939,7 +944,7 @@ OUTPUT FORMAT:
         cc: showCc ? cc : undefined,
         subject,
         content: coldPlaintextBody ?? content,
-        html: fullHtml ?? (coldPlaintextBody ?? content),
+        html: fullHtml ?? (coldPlaintextBody ?? content).replace(/\n/g, '<br />'),
         attachments: attachmentsData.length > 0 ? attachmentsData : undefined,
       },
       {
