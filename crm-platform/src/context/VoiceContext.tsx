@@ -94,6 +94,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             meta.state = data.contact.state
             meta.logoUrl = data.contact.logoUrl
             meta.domain = data.contact.domain
+            meta.isAccountOnly = false
           } else if (data.account) {
             meta.name = data.account.name
             meta.logoUrl = data.account.logoUrl
@@ -101,6 +102,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             meta.accountId = data.account.id
             meta.city = data.account.city
             meta.state = data.account.state
+            meta.isAccountOnly = true
           }
           return meta
         }

@@ -178,6 +178,7 @@ type AccountJoin = {
   service_addresses?: unknown[] | null
   description?: string | null
   phone?: string | null
+  metadata?: any | null
 }
 
 function getFirstServiceAddressAddress(serviceAddresses: unknown[] | null | undefined) {
@@ -396,7 +397,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         let query = supabase
           .from('contacts')
-          .select('*, accounts(name, domain, logo_url, industry, city, state)', { count: 'exact' });
+          .select('*, accounts(name, domain, logo_url, metadata, industry, city, state)', { count: 'exact' });
 
         if (listId) {
           // Fetch targetIds from list_members first due to lack of FK for inner join
@@ -515,15 +516,15 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             otherPhone: item.otherPhone || metadata?.otherPhone || '',
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.general?.company || '',
-            companyDomain: account?.domain || metadata?.domain || metadata?.general?.domain || '',
-            logoUrl: account?.logo_url || '',
+            companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
+            logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
             status: item.status || 'Lead',
             lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
             accountId: item.accountId || undefined,
             industry: account?.industry || undefined,
             title: item.title || metadata?.title || metadata?.job_title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
             location: item.city ? `${item.city}, ${item.state || ''}` : (metadata?.city ? `${metadata.city}, ${metadata.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (metadata?.address || account?.address || ''))),
-            website: item.website || account?.domain || metadata?.website || undefined,
+            website: item.website || account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.website || undefined,
             metadata: metadata
           }
         }) as Contact[];
@@ -647,7 +648,7 @@ export function useContact(id: string) {
         .select(`
           *, 
           accounts (
-            name, domain, logo_url, city, state, industry,
+            name, domain, logo_url, metadata, city, state, industry,
             electricity_supplier, annual_usage, current_rate, contract_end_date,
             service_addresses, description, phone
           )
@@ -683,7 +684,7 @@ export function useContact(id: string) {
         if (companyName) {
           const { data: foundAccount } = await supabase
             .from('accounts')
-            .select('name, domain, logo_url, city, state, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, id')
+            .select('name, domain, logo_url, metadata, city, state, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, id')
             .ilike('name', companyName)
             .limit(1)
             .maybeSingle()
@@ -713,8 +714,8 @@ export function useContact(id: string) {
         notes: typedData.notes || '',
         phone: typedData.phone || typedData.mobile || typedData.workPhone || typedData.otherPhone || '',
         company: account?.name || '',
-        companyDomain: account?.domain || undefined,
-        logoUrl: account?.logo_url || '',
+        companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || undefined,
+        logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
         status: typedData.status || 'Lead',
         lastContact: typedData.lastContactedAt || new Date().toISOString(),
 
@@ -728,7 +729,7 @@ export function useContact(id: string) {
         location: typedData.city ? `${typedData.city}, ${typedData.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (account?.address || '')),
         industry: account?.industry,
         linkedinUrl: typedData.linkedinUrl || metadata?.linkedin_url || undefined,
-        website: account?.domain,
+        website: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain,
         accountId: typedData.accountId || undefined,
         linkedAccountId: typedData.accountId || undefined,
 

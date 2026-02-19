@@ -101,7 +101,7 @@ export default async function handler(req, res) {
           accountId,
           city,
           state,
-          accounts ( name, domain, logo_url )
+          accounts ( name, domain, logo_url, metadata )
         `)
         .or(orQuery);
 
@@ -131,8 +131,8 @@ export default async function handler(req, res) {
           accountId: data.accountId || '',
           city: data.city || '',
           state: data.state || '',
-          domain: data.accounts?.domain || '',
-          logoUrl: data.accounts?.logo_url || ''
+          domain: data.accounts?.domain || data.accounts?.metadata?.domain || data.accounts?.metadata?.general?.domain || '',
+          logoUrl: data.accounts?.logo_url || data.accounts?.metadata?.logo_url || data.accounts?.metadata?.logoUrl || ''
         };
       } else if (error) {
         // If error is likely due to missing columns, we might try a fallback or just log it.
@@ -154,7 +154,7 @@ export default async function handler(req, res) {
 
         const { data: accounts, error } = await supabaseAdmin
           .from('accounts')
-          .select('id, name, phone, city, state, domain, logo_url')
+          .select('id, name, phone, city, state, domain, logo_url, metadata')
           .or(orQueryAccount)
           .limit(1);
 
@@ -169,8 +169,8 @@ export default async function handler(req, res) {
             companyPhone: data.phone || '',
             city: data.city || '',
             state: data.state || '',
-            domain: data.domain || '',
-            logoUrl: data.logo_url || ''
+            domain: data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
+            logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || ''
           };
         }
       } catch (e) {
