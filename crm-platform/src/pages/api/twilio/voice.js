@@ -1,6 +1,5 @@
 import twilio from 'twilio';
 import logger from '../_logger.js';
-import { upsertCallInSupabase } from '../calls.js';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const DEFAULT_TWILIO_BUSINESS_NUMBER = '+18176630380';
@@ -95,11 +94,13 @@ export default async function handler(req, res) {
 
     try {
         // Read params from body (POST) or query (GET)
-        const src = req.method === 'POST' ? (req.body || {}) : (req.query || {});
+        const body = req.body || {};
+        const query = req.query || {};
+        const src = { ...query, ...body };
+
+        logger.log('[Voice Webhook] RAW SRC:', JSON.stringify(src));
 
         // LOOP DETECTION: Check if this request is a fallback from a previous error
-        // If "ErrorCode" or "ErrorUrl" is present, it means Twilio hit an error and is falling back to this URL
-        // We must STOP the loop by hanging up, otherwise it creates an infinite call cycle
         if (src.ErrorCode || src.ErrorUrl) {
             logger.warn(`[Voice] Fallback loop detected! ErrorCode: ${src.ErrorCode}, ErrorUrl: ${src.ErrorUrl}`);
             const twiml = new VoiceResponse();
@@ -111,20 +112,47 @@ export default async function handler(req, res) {
             return;
         }
 
-        const To = src.targetNumber || src.target || src.To || src.to;
-        const From = src.callerId || src.From || src.from;
-        const CallSid = src.CallSid || src.callSid;
+        const CallSid = src.CallSid || '';
+        const From = src.From || '';
+        const To = src.To || '';
+        const Direction = src.Direction || 'outbound';
+
+        // Identity of the caller (for browser calls, this is 'client:agent')
+        const callerIdentity = src.Caller || src.From || '';
+        const isBrowserCall = callerIdentity.startsWith('client:');
+
+        let meta = {};
+        try {
+            if (src.metadata) {
+                meta = typeof src.metadata === 'string' ? JSON.parse(src.metadata) : src.metadata;
+            }
+        } catch (e) {
+            logger.warn('[Voice Webhook] Failed to parse metadata:', e.message);
+        }
+
+        logger.log(`[Voice Webhook] Processing call ${CallSid}:`, {
+            from: From,
+            to: To,
+            isBrowser: isBrowserCall,
+            meta: JSON.stringify(meta)
+        });
+
+        const contactId = meta.contactId || '';
+        const accountId = meta.accountId || '';
+        const agentId = meta.agentId || '';
+        const agentEmail = meta.agentEmail || '';
+        const targetPhone = meta.targetPhone || To || '';
 
         const inboundPhoneNumbers = await resolveInboundPhoneNumbers();
         const primaryBusinessNumber = inboundPhoneNumbers[0] || DEFAULT_TWILIO_BUSINESS_NUMBER;
 
         // Logical check for inbound vs outbound
-        const isInboundToBusiness = Boolean(inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(src.To || src.to)));
-        const businessNumber = isInboundToBusiness ? (inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(src.To || src.to)) || primaryBusinessNumber) : primaryBusinessNumber;
+        const isInboundToBusiness = Boolean(inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(To)));
+        const businessNumber = isInboundToBusiness ? (inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(To)) || primaryBusinessNumber) : primaryBusinessNumber;
 
         // For outbound calls, use From as callerId (this is the selected Twilio number from settings)
         // For inbound calls, use businessNumber as callerId when dialing to browser client
-        const sanitizedFrom = normalizePhoneNumber(src.From || src.from);
+        const sanitizedFrom = normalizePhoneNumber(From);
         const callerIdForDial = isInboundToBusiness ? businessNumber : (sanitizedFrom || businessNumber);
 
         // Ensure absolute base URL
@@ -132,34 +160,6 @@ export default async function handler(req, res) {
         const proto = req.headers['x-forwarded-proto'] || (req.connection && req.connection.encrypted ? 'https' : 'http') || 'https';
         const host = req.headers['x-forwarded-host'] || req.headers.host || '';
         const base = envBase ? envBase.replace(/\/$/, '') : (host ? `${proto}://${host}` : 'https://nodal-point-network.vercel.app');
-
-        // Extract metadata and create initial call record to ensure it appears in CRM immediately
-        let contactId = '';
-        let accountId = '';
-        let agentId = '';
-        let agentEmail = '';
-        let targetPhone = '';
-
-        if (CallSid && src.metadata) {
-            try {
-                const meta = typeof src.metadata === 'string' ? JSON.parse(src.metadata) : src.metadata;
-
-                // Extract IDs for propagation to dial status callbacks
-                contactId = meta.contactId || '';
-                accountId = meta.accountId || '';
-                agentId = meta.agentId || '';
-                agentEmail = meta.agentEmail || '';
-                targetPhone = meta.targetPhone || To || '';
-
-                // Create initial call record as 'initiated'
-                // [REMOVED] This ensures the transmission log only shows calls when complete
-                /*
-                if (meta.contactId || meta.accountId) { ... }
-                */
-            } catch (e) {
-                logger.warn('[Voice] Failed to process call metadata:', e);
-            }
-        }
 
         const callbackParams = new URLSearchParams();
         if (contactId) callbackParams.append('contactId', contactId);
@@ -169,55 +169,39 @@ export default async function handler(req, res) {
         if (targetPhone) callbackParams.append('targetPhone', targetPhone);
         const callbackQuery = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
-        logger.log(`[Voice Webhook] From: ${From || 'N/A'} To: ${To || 'N/A'} CallSid: ${CallSid || 'N/A'} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
+        logger.log(`[Voice Webhook] Summary: From=${From} To=${To} SID=${CallSid} inbound=${isInboundToBusiness} callerId=${callerIdForDial}`);
 
         // Create TwiML response
         const twiml = new VoiceResponse();
 
         if (isInboundToBusiness) {
             // INBOUND CALL: Ring the browser client (identity: agent)
-            // Enable dual-channel dial recording so Twilio produces 2-channel recordings directly
             const dial = twiml.dial({
-                callerId: From || businessNumber, // Use caller's number, fallback to business number
+                callerId: From || businessNumber,
                 timeout: 30,
                 answerOnBridge: true,
-                hangupOnStar: false,
-                timeLimit: 14400,
-                // action must return TwiML; use dial-complete endpoint
                 action: `${base}/api/twilio/dial-complete${callbackQuery}`,
-                // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
             });
-            // Small prompt to keep caller informed
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
 
-            // Pass the original caller's number as a custom parameter
             const client = dial.client({
                 statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
                 statusCallbackEvent: 'initiated ringing answered completed'
             }, 'agent');
 
             if (From && From !== businessNumber) {
-                client.parameter({
-                    name: 'originalCaller',
-                    value: From
-                });
+                client.parameter({ name: 'originalCaller', value: From });
             }
-
-            logger.log(`[Voice] Generated TwiML to dial <Client>agent</Client> with callerId: ${From || businessNumber}, originalCaller: ${From}`);
         } else if (To) {
-            // OUTBOUND CALLBACK SCENARIO: Dial specific number provided
-            // Use dynamic caller ID from From parameter (selected Twilio number from settings)
+            // OUTBOUND CALLBACK SCENARIO
             const dial = twiml.dial({
-                callerId: callerIdForDial, // Use selected number from settings, fallback to businessNumber
+                callerId: callerIdForDial,
                 timeout: 30,
                 answerOnBridge: true,
-                hangupOnStar: false,
-                timeLimit: 14400,
                 action: `${base}/api/twilio/dial-complete${callbackQuery}`,
-                // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
@@ -227,46 +211,33 @@ export default async function handler(req, res) {
                 statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
                 statusCallbackEvent: 'initiated ringing answered completed'
             }, To);
-
-            logger.log(`[Voice] Generated TwiML to dial number: ${To} with callerId: ${callerIdForDial}`);
         } else {
-            // Fallback: no specific target
+            // Fallback
             twiml.say('Please hold while we try to connect you.');
             const dial = twiml.dial({
-                callerId: callerIdForDial, // Use selected number from settings, fallback to businessNumber
-                timeout: 30,
-                answerOnBridge: true,
-                hangupOnStar: false,
-                timeLimit: 14400,
-                // action must return TwiML; use dial-complete endpoint
+                callerId: callerIdForDial,
                 action: `${base}/api/twilio/dial-complete${callbackQuery}`,
-                // Dual-channel from answer
                 record: 'record-from-answer-dual',
                 recordingStatusCallback: `${base}/api/twilio/recording${callbackQuery}`,
                 recordingStatusCallbackMethod: 'POST'
             });
-
             dial.client({
                 statusCallback: `${base}/api/twilio/dial-status${callbackQuery}`,
                 statusCallbackEvent: 'initiated ringing answered completed'
             }, 'agent');
         }
 
-        // Send TwiML response
         const xml = twiml.toString();
-        try { logger.log('[Voice TwiML]', xml); } catch (_) { }
+        logger.log('[Voice TwiML]', xml);
         res.setHeader('Content-Type', 'text/xml');
         res.writeHead(200);
         res.end(xml);
         return;
 
     } catch (error) {
-        logger.error('Voice webhook error:', error);
-
-        // Return error TwiML
+        logger.error('[Voice Webhook] ERROR:', error);
         const twiml = new VoiceResponse();
         twiml.say('Sorry, there was an error processing your call.');
-
         res.setHeader('Content-Type', 'text/xml');
         res.writeHead(500);
         res.end(twiml.toString());

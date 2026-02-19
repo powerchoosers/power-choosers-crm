@@ -53,14 +53,13 @@ export default async function handler(req, res) {
 
     // Full raw body dump for debugging
     logger.log('[Dial-Status] RAW BODY:', JSON.stringify(body));
-    logger.log('[Dial-Status] Event:', event, '| logCallSid:', logCallSid, '| childSid:', childSid, '| parentSid:', parentSid, '| To:', body.To, '| From:', body.From, '| agentEmail:', agentEmail);
+    logger.log('[Dial-Status] Event:', event, '| logCallSid:', logCallSid, '| To:', body.To, '| From:', body.From, '| agent:', agentEmail);
 
     // ================================================================
     // STEP 1: LOG TO SUPABASE *BEFORE* responding to Twilio.
-    // We must finish the upsert before calling res.end(), because
-    // Vercel can kill the function immediately after the response ends.
+    // We log all states to ensure the call appears in the CRM immediately.
     // ================================================================
-    if (event === 'completed' && logCallSid) {
+    if (logCallSid) {
       try {
         let resolvedTo = body.To || '';
         let resolvedFrom = body.From || '';
@@ -68,9 +67,8 @@ export default async function handler(req, res) {
 
         const isClientId = (v) => !v || String(v).startsWith('client:') || String(v).startsWith('AP');
 
-        // Only fetch from Twilio if phone numbers are missing (rare case)
-        if (isClientId(resolvedTo) || isClientId(resolvedFrom)) {
-          logger.warn('[Dial-Status] Phone numbers not in body, attempting Twilio REST fetch fallback');
+        // Only fetch from Twilio if phone numbers are missing and it's a completion event
+        if (event === 'completed' && (isClientId(resolvedTo) || isClientId(resolvedFrom))) {
           try {
             const accountSid = process.env.TWILIO_ACCOUNT_SID;
             const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -84,9 +82,7 @@ export default async function handler(req, res) {
                 if (d > resolvedDuration) resolvedDuration = d;
               }
             }
-          } catch (fetchErr) {
-            logger.warn('[Dial-Status] Twilio fetch fallback failed:', fetchErr?.message);
-          }
+          } catch (_) { }
         }
 
         // Last resort: use targetPhone from query string
@@ -98,31 +94,27 @@ export default async function handler(req, res) {
           callSid: logCallSid,
           to: resolvedTo,
           from: resolvedFrom,
-          status: 'completed',
+          status: event || 'initiated',
           duration: resolvedDuration,
           contactId: contactId || null,
           accountId: accountId || null,
           agentId: agentId || null,
           agentEmail: agentEmail || null,
           targetPhone: targetPhoneFromQuery || resolvedTo || '',
-          source: 'dial-status'
+          source: 'dial-status-v3'
         };
 
-        logger.log('[Dial-Status] Upserting completed call:', {
-          sid: logCallSid,
-          to: resolvedTo,
-          from: resolvedFrom,
-          duration: resolvedDuration,
-          agentEmail,
-          contactId,
-          accountId
-        });
+        // If it's a completion event, mark it as completed
+        if (['completed', 'busy', 'no-answer', 'failed', 'canceled'].includes(event)) {
+          payload.status = 'completed';
+          // Store the actual outcome in metadata if needed, though deriveOutcome handles it
+        }
 
         await upsertCallInSupabase(payload).catch(err => {
           logger.error('[Dial-Status] upsertCallInSupabase failed:', err?.message);
         });
 
-        logger.log('[Dial-Status] ✅ Call logged to Supabase:', logCallSid);
+        logger.log(`[Dial-Status] ✅ Call state [${event}] logged:`, logCallSid);
       } catch (logErr) {
         logger.error('[Dial-Status] Error logging call:', logErr?.message);
       }
