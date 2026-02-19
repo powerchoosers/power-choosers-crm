@@ -47,40 +47,42 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
     if (!phone.value || isEditing) return
 
     const isCompany = phone.id === 'companyPhone'
-    const metadata = isCompany 
-      ? { 
-          name: contact.companyName || contact.company,
-          account: contact.companyName || contact.company,
-          isAccountOnly: true,
-          logoUrl: contact.logoUrl,
-          domain: contact.companyDomain,
-          industry: contact.industry,
-          location: contact.location,
-          annualUsage: contact.annualUsage,
-          supplier: contact.electricitySupplier,
-          currentRate: contact.currentRate,
-          contractEnd: contact.contractEnd,
-          accountId: contact.accountId,
-          contactId: contact.id
-        }
-      : { 
-          name: contact.name, 
-          account: contact.companyName || contact.company,
-          title: contact.title,
-          logoUrl: contact.logoUrl,
-          domain: contact.companyDomain,
-          // Expanded Context for AI Script Generation
-          industry: contact.industry,
-          description: contact.accountDescription,
-          linkedinUrl: contact.linkedinUrl,
-          annualUsage: contact.annualUsage,
-          supplier: contact.electricitySupplier,
-          currentRate: contact.currentRate,
-          contractEnd: contact.contractEnd,
-          location: contact.location,
-          accountId: contact.accountId,
-          contactId: contact.id
-        }
+    const metadata = isCompany
+      ? {
+        name: contact.companyName || contact.company,
+        account: contact.companyName || contact.company,
+        isAccountOnly: true,
+        logoUrl: contact.logoUrl,
+        domain: contact.companyDomain,
+        industry: contact.industry,
+        location: contact.location,
+        annualUsage: contact.annualUsage,
+        supplier: contact.electricitySupplier,
+        currentRate: contact.currentRate,
+        contractEnd: contact.contractEnd,
+        accountId: contact.accountId,
+        contactId: contact.id,
+        metadata: contact.metadata
+      }
+      : {
+        name: contact.name,
+        account: contact.companyName || contact.company,
+        title: contact.title,
+        logoUrl: contact.logoUrl,
+        domain: contact.companyDomain,
+        // Expanded Context for AI Script Generation
+        industry: contact.industry,
+        description: contact.accountDescription,
+        linkedinUrl: contact.linkedinUrl,
+        annualUsage: contact.annualUsage,
+        supplier: contact.electricitySupplier,
+        currentRate: contact.currentRate,
+        contractEnd: contact.contractEnd,
+        location: contact.location,
+        accountId: contact.accountId,
+        contactId: contact.id,
+        metadata: contact.metadata
+      }
 
     initiateCall(phone.value, metadata)
   }
@@ -126,14 +128,14 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
     const formattedValue = formatPhoneNumber(value)
     const updated = phones.map(p => p.id === id ? { ...p, value: formattedValue } : p)
     setPhones(updated)
-    
+
     // Prepare updates for parent
     const updates: Partial<ContactDetail> = {}
     if (id === 'mobile') updates.mobile = formattedValue
     else if (id === 'workDirectPhone') updates.workDirectPhone = formattedValue
     else if (id === 'otherPhone') updates.otherPhone = formattedValue
     else if (id === 'companyPhone') updates.companyPhone = formattedValue
-    
+
     onUpdate(updates)
   }
 
@@ -150,14 +152,14 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
 
   const addPhoneField = (type: PhoneType) => {
     if (phones.find(p => p.id === type)) return // Already exists
-    
+
     const labels: Record<PhoneType, string> = {
       mobile: 'Mobile',
       workDirectPhone: 'Work Direct',
       otherPhone: 'Other',
       companyPhone: 'Company'
     }
-    
+
     const icons: Record<PhoneType, typeof Smartphone> = {
       mobile: Smartphone,
       workDirectPhone: Landmark,
@@ -183,7 +185,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
 
   return (
     <div className={`nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg ${isEditing ? 'border-[#002FA7]/30 ring-1 ring-[#002FA7]/20' : ''}`}>
-      
+
       <div className="flex items-center justify-between mb-6">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Uplinks</h3>
         {isEditing && <Sparkles className="w-3 h-3 text-white animate-pulse" />}
@@ -196,14 +198,14 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
             <div className="px-2">
               <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Voice Channels</span>
             </div>
-            
+
             {phones.map((phone) => (
               <div key={phone.id} className="group relative">
                 <div className="flex items-center gap-2 mb-1 px-2">
                   <phone.icon className="w-3 h-3 text-zinc-500" />
                   <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{phone.label}</span>
                   {phone.id !== 'companyPhone' && (
-                    <button 
+                    <button
                       onClick={() => togglePrimary(phone.id)}
                       className={`ml-auto transition-colors ${primaryField === phone.id ? 'text-yellow-500' : 'text-zinc-700 hover:text-zinc-500'}`}
                     >
@@ -220,7 +222,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                     placeholder="+1 (000) 000-0000"
                   />
                   {phones.length > 1 && (
-                    <button 
+                    <button
                       onClick={() => removePhoneField(phone.id)}
                       className="p-2 text-zinc-600 hover:text-red-400 transition-colors"
                     >
@@ -234,7 +236,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
             {/* Add Phone Buttons */}
             <div className="grid grid-cols-2 gap-2 pt-2">
               {(!phones.find(p => p.id === 'mobile')) && (
-                <button 
+                <button
                   onClick={() => addPhoneField('mobile')}
                   className="py-2 border border-dashed border-white/10 rounded-xl text-[9px] font-mono text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
                 >
@@ -242,7 +244,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                 </button>
               )}
               {(!phones.find(p => p.id === 'workDirectPhone')) && (
-                <button 
+                <button
                   onClick={() => addPhoneField('workDirectPhone')}
                   className="py-2 border border-dashed border-white/10 rounded-xl text-[9px] font-mono text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
                 >
@@ -250,7 +252,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                 </button>
               )}
               {(!phones.find(p => p.id === 'otherPhone')) && (
-                <button 
+                <button
                   onClick={() => addPhoneField('otherPhone')}
                   className="py-2 border border-dashed border-white/10 rounded-xl text-[9px] font-mono text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
                 >
@@ -258,7 +260,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                 </button>
               )}
               {(!phones.find(p => p.id === 'companyPhone')) && (
-                <button 
+                <button
                   onClick={() => addPhoneField('companyPhone')}
                   className="py-2 border border-dashed border-white/10 rounded-xl text-[9px] font-mono text-zinc-500 hover:text-zinc-300 hover:border-white/20 transition-all uppercase tracking-wider flex items-center justify-center gap-1.5"
                 >

@@ -19,41 +19,42 @@ interface CompanyIconProps {
   roundedClassName?: string
   /** When true, plays a brief "deleting" animation for visual feedback after purge. */
   isDeleting?: boolean
+  /** Raw metadata object for deep fallback resolution. */
+  metadata?: any
 }
 
 const DEFAULT_ROUNDED = 'rounded-[14px]'
 
-/** Whether the URL is external (use native img to avoid Next Image CORS/timeouts). */
-function isExternalUrl(src: string): boolean {
-  try {
-    return /^https?:\/\//i.test(src) || src.startsWith('//')
-  } catch {
-    return true
-  }
-}
-
-/** Build ordered list of candidate URLs: logoUrl first, then domain-based fallbacks. */
+/**
+ * Build the candidate URL list.
+ *
+ * Rule: if a logo_url is explicitly stored, use ONLY that URL.
+ * Domain-based fallbacks (Clearbit, favicons) are only used when no logo_url exists.
+ * This ensures we always show the exact logo the user set, never a different one.
+ */
 function buildCandidateUrls(logoUrl: string | undefined, domain: string | undefined): string[] {
-  const candidates: string[] = []
+  // Explicit logo set → use it exclusively; don't mix in domain guesses
   if (logoUrl && logoUrl.trim()) {
-    candidates.push(logoUrl.trim())
+    return [logoUrl.trim()]
   }
+
+  // No explicit logo → derive from domain as best-effort
   if (domain && domain.trim()) {
     const d = domain.trim().replace(/^https?:\/\//i, '').split('/')[0].toLowerCase()
     if (d) {
-      // Clearbit company logos (often higher quality than favicons)
-      candidates.push(`https://logo.clearbit.com/${d}`)
-      // Google favicons
-      candidates.push(`https://www.google.com/s2/favicons?domain=${d}&sz=128`)
-      // DuckDuckGo favicons (reliable fallback when Google 404s)
-      candidates.push(`https://icons.duckduckgo.com/ip3/${encodeURIComponent(d)}.ico`)
+      return [
+        `https://logo.clearbit.com/${d}`,
+        `https://www.google.com/s2/favicons?domain=${d}&sz=128`,
+        `https://icons.duckduckgo.com/ip3/${encodeURIComponent(d)}.ico`,
+      ]
     }
   }
-  return candidates
+
+  return []
 }
 
-const LOAD_TIMEOUT_MS = 2000
-const PRIMARY_LOGO_TIMEOUT_MS = 3500
+/** Timeout for secondary fallbacks (Clearbit, favicons) — skip quickly if they stall. */
+const LOAD_TIMEOUT_MS = 5000
 
 function CompanyIconInner({
   logoUrl,
@@ -63,15 +64,28 @@ function CompanyIconInner({
   size = 32,
   className,
   roundedClassName = DEFAULT_ROUNDED,
-  isDeleting = false
+  isDeleting = false,
+  metadata
 }: CompanyIconProps) {
-  // Prioritize logoUrl, fallback to logo_url
-  const activeLogoUrl = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() :
-    (typeof logo_url === 'string' && logo_url.trim()) ? logo_url.trim() : undefined
-  const effectiveDomain = (typeof domain === 'string' && domain.trim()) ? domain.trim() : undefined
+  // Prioritize direct props, then fallback to metadata paths
+  const m = metadata || {}
+  const activeLogoUrl = useMemo(() => {
+    const candidate = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() :
+      (m.logoUrl && typeof m.logoUrl === 'string' && m.logoUrl.trim() !== '') ? m.logoUrl.trim() :
+        (m.logo_url && typeof m.logo_url === 'string' && m.logo_url.trim() !== '') ? m.logo_url.trim() :
+          undefined;
+    return candidate;
+  }, [logoUrl, m.logoUrl, m.logo_url]);
+
+  const effectiveDomain = useMemo(() => {
+    const candidate = (typeof domain === 'string' && domain.trim()) ? domain.trim() :
+      (m.domain && typeof m.domain === 'string' && m.domain.trim() !== '') ? m.domain.trim() :
+        undefined;
+    return candidate;
+  }, [domain, m.domain]);
 
   const candidates = useMemo(
-    () => buildCandidateUrls(activeLogoUrl, effectiveDomain), // Use activeLogoUrl
+    () => buildCandidateUrls(activeLogoUrl, effectiveDomain),
     [activeLogoUrl, effectiveDomain]
   )
 
@@ -114,28 +128,28 @@ function CompanyIconInner({
       timeoutRef.current = null
     }
 
-    const isPrimaryLogo = candidates[0] === currentSrc
-    const timeoutMs = isPrimaryLogo ? PRIMARY_LOGO_TIMEOUT_MS : LOAD_TIMEOUT_MS
-    timeoutRef.current = setTimeout(() => {
-      setFailedSet((prev) => new Set(prev).add(currentSrc))
-    }, timeoutMs)
+    // Stored logo_url: no timeout — let it load; onerror fires if it genuinely 404/403s.
+    // Domain-derived fallbacks (Clearbit, favicon): 5s cutoff to skip stalled guesses quickly.
+    const isStoredLogo = candidates.length === 1
+    if (!isStoredLogo) {
+      timeoutRef.current = setTimeout(() => {
+        setFailedSet((prev) => new Set(prev).add(currentSrc))
+      }, LOAD_TIMEOUT_MS)
+    }
 
     return () => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [currentSrc])
+  }, [currentSrc, candidates])
 
   const handleError = () => {
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
-    if (retryCount < 1) {
-      setRetryCount((c) => c + 1)
-      return
-    }
+    // Definitive browser failure: immediately move to next candidate
     if (currentSrc) {
       setFailedSet((prev) => new Set(prev).add(currentSrc))
     }
@@ -217,17 +231,12 @@ function CompanyIconInner({
         transition={{ duration: 0.2, ease: 'easeOut' }}
         className="absolute inset-0 w-full h-full"
       >
-        {isExternalUrl(currentSrc) ? (
-          <img
-            src={currentSrc}
-            {...imgCommon}
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <img src={currentSrc} {...imgCommon} loading="lazy" decoding="async" />
-        )}
+        <img
+          src={currentSrc}
+          {...imgCommon}
+          loading="lazy"
+          decoding="async"
+        />
       </motion.div>
 
       <div className={cn('absolute inset-0 pointer-events-none ring-1 ring-white/20', roundedClassName)} />
