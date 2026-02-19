@@ -56,13 +56,6 @@ export default async function handler(req, res) {
             DialCallSid
         } = body;
 
-        // ================================================================
-        // RESPOND 200 TO TWILIO IMMEDIATELY — before any async work.
-        // This guarantees Twilio gets its ack regardless of what we do next.
-        // ================================================================
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
-        res.end('OK');
-
         // Full raw body dump for debugging
         logger.log('[Status] RAW BODY:', JSON.stringify(body));
         logger.log('[Status] Event:', CallStatus, '| CallSid:', CallSid, '| To:', To, '| From:', From, '| agentEmail:', agentEmail);
@@ -76,11 +69,16 @@ export default async function handler(req, res) {
         const isBrowserParentLeg = (From || '').startsWith('client:') || (To || '').startsWith('client:');
         if (isBrowserParentLeg) {
             logger.log(`[Status] Skipping browser parent leg ${CallSid} (From=${From}, To=${To})`);
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('OK');
             return;
         }
 
         // ================================================================
-        // STEP 1: LOG COMPLETED CALL TO SUPABASE — Do this FIRST
+        // STEP 1: LOG COMPLETED CALL TO SUPABASE — Do this BEFORE res.end()
+        // Vercel can kill the function immediately after res.end(), so we
+        // must finish the upsert while the response is still pending.
+        // Twilio allows 15s for webhook responses; our upsert takes < 2s.
         // ================================================================
         if (CallStatus === 'completed' && CallSid) {
             try {
@@ -119,20 +117,16 @@ export default async function handler(req, res) {
                 });
 
                 logger.log('[Status] ✅ Call logged to Supabase:', CallSid);
-
-                // Auto-trigger transcription if recording is available
-                if (RecordingUrl) {
-                    const envBase = process.env.PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app';
-                    fetch(`${envBase}/api/process-call`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ callSid: CallSid })
-                    }).catch(() => { });
-                }
             } catch (logErr) {
                 logger.error('[Status] Error logging call:', logErr?.message);
             }
         }
+
+        // ================================================================
+        // NOW respond 200 to Twilio — after the upsert is complete.
+        // ================================================================
+        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.end('OK');
 
         // ================================================================
         // STEP 2: Recording fallback — if call completed without recording,
@@ -149,7 +143,6 @@ export default async function handler(req, res) {
                     let foundUrl = '';
                     let foundRecSid = '';
 
-                    // Try direct recordings on this call
                     try {
                         const recs = await client.recordings.list({ callSid: CallSid, limit: 5 });
                         const best = (recs || []).find(r => (Number(r.channels) || 0) === 2) || (recs || [])[0];
@@ -159,7 +152,6 @@ export default async function handler(req, res) {
                         }
                     } catch (_) { }
 
-                    // Try child call recordings if parent had none
                     if (!foundUrl) {
                         try {
                             const kids = await client.calls.list({ parentCallSid: CallSid, limit: 5 });
@@ -211,7 +203,6 @@ export default async function handler(req, res) {
                     const client = twilio(accountSid, authToken);
                     const baseUrl = process.env.PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app';
 
-                    // Check candidates: DialCallSid (child) first, then CallSid
                     const candidates = [];
                     if (DialCallSid && /^CA[0-9a-f]{32}$/i.test(DialCallSid)) candidates.push(DialCallSid);
                     if (/^CA[0-9a-f]{32}$/i.test(CallSid)) candidates.push(CallSid);
@@ -230,13 +221,23 @@ export default async function handler(req, res) {
                                 recordingStatusCallbackMethod: 'POST'
                             });
                             logger.log('[Status] Started dual recording on:', sid);
-                            return; // Stop after first success
+                            return;
                         } catch (_) { }
                     }
                 } catch (e) {
                     logger.warn('[Status] Recording start error:', e?.message);
                 }
             }, 3000);
+        }
+
+        // Auto-trigger transcription for completed calls with recordings
+        if (CallStatus === 'completed' && RecordingUrl) {
+            const envBase = process.env.PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app';
+            fetch(`${envBase}/api/process-call`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ callSid: CallSid })
+            }).catch(() => { });
         }
 
         return;
