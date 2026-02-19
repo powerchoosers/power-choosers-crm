@@ -62,6 +62,20 @@ export default async function handler(req, res) {
         let targetPhone = targetPhoneFromQuery || '';
         let businessPhone = '';
 
+        // CRITICAL: Skip browser-side parent call legs.
+        // When an agent makes an outbound call via the Twilio JS SDK, Twilio fires status
+        // callbacks for TWO legs: (1) the parent "client:agent" leg (browser connection),
+        // and (2) the child PSTN leg (real phone call). The parent leg has From=client:agent
+        // and To="" with no useful context. We must skip it here. The child PSTN leg is
+        // correctly logged by dial-status.js via the DialCallSid/DialCallStatus events.
+        const isBrowserParentLeg = (From || '').startsWith('client:') || (To || '').startsWith('client:') || (!To && (From || '').startsWith('client:'));
+        if (CallStatus === 'completed' && isBrowserParentLeg) {
+            logger.log(`[Status] Skipping browser parent leg ${CallSid} (From=${From}, To=${To}) - will be logged by dial-status on PSTN child leg`);
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('OK');
+            return;
+        }
+
         // #region agent log
         if (CallStatus === 'completed') {
             console.log(`[Status] Completed event for ${CallSid}:`, {
@@ -71,7 +85,9 @@ export default async function handler(req, res) {
                 DialCallSid,
                 DialCallStatus,
                 agentId,
-                agentEmail
+                agentEmail,
+                From,
+                To
             });
         }
         // #endregion
