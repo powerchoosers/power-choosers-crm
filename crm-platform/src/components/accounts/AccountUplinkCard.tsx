@@ -24,7 +24,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
 
   const handleCallClick = () => {
     if (!account.companyPhone || isEditing) return
-    initiateCall(account.companyPhone, { 
+    initiateCall(account.companyPhone, {
       name: account.name,
       account: account.name,
       logoUrl: account.logoUrl,
@@ -37,7 +37,8 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
       currentRate: account.currentRate,
       contractEnd: account.contractEnd,
       isAccountOnly: true,
-      accountId: account.id
+      accountId: account.id,
+      metadata: account.metadata
     })
   }
 
@@ -48,38 +49,38 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
     try {
       // Build search query: Company name + city + state for better results
       let searchQuery = account.name
-      
+
       // Add location context if available
       if (account.city || account.state) {
         const locationParts = [account.city, account.state].filter(Boolean)
         searchQuery = `${account.name} ${locationParts.join(' ')}`
       }
-      
+
       toast.info('Initiating Satellite Scan...', { description: `Searching for ${account.name}` })
-      
+
       // Search for the address using the Maps API with enhanced query
       const searchRes = await fetch(`/api/maps/search?q=${encodeURIComponent(searchQuery)}`)
       const searchData = await searchRes.json()
-      
+
       if (searchData.found && searchData.address) {
         // Update the database
         const { error } = await supabase
           .from('accounts')
           .update({ address: searchData.address })
           .eq('id', account.id)
-          
+
         if (!error) {
           // Trigger the animation
           setJustUpdated(true)
           setTimeout(() => setJustUpdated(false), 2000)
-          
+
           // Update local state
           onUpdate?.({ address: searchData.address })
-          
+
           toast.success('Asset Intelligence Acquired', {
             description: `Location coordinates synced`
           })
-          
+
           // Open the map with the found address
           setTimeout(() => {
             window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchData.address)}`, '_blank')
@@ -101,7 +102,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
 
   return (
     <div className={`nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg ${isEditing ? 'border-[#002FA7]/30 ring-1 ring-[#002FA7]/20' : ''}`}>
-      
+
       <div className="flex items-center justify-between mb-6 relative z-10">
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Uplinks</h3>
         {isEditing && <Sparkles className="w-3 h-3 text-white animate-pulse" />}
@@ -160,7 +161,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
             <div className="px-2">
               <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Digital Infrastructure</span>
             </div>
-            
+
             {/* Domain */}
             <div className="group relative">
               <div className="flex items-center gap-2 mb-1 px-2">
@@ -218,8 +219,8 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
               type="button"
               className={cn(
                 "w-full group flex items-center justify-between p-3 nodal-glass rounded-xl transition-all border",
-                account.address 
-                  ? "nodal-glass-hover border-white/5" 
+                account.address
+                  ? "nodal-glass-hover border-white/5"
                   : "border-[#4D88FF]/30 hover:border-[#4D88FF]/50 hover:bg-[#4D88FF]/10 cursor-pointer",
                 justUpdated && "animate-in fade-in slide-in-from-right-4 duration-500 border-green-500/50 bg-green-500/10"
               )}
@@ -238,8 +239,8 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                 ) : (
                   <MapPin className={cn(
                     "w-4 h-4 transition-colors shrink-0",
-                    account.address 
-                      ? "text-zinc-500 group-hover:text-zinc-300" 
+                    account.address
+                      ? "text-zinc-500 group-hover:text-zinc-300"
                       : "text-[#4D88FF] group-hover:text-[#4D88FF]",
                     justUpdated && "text-green-500"
                   )} />
@@ -251,8 +252,8 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                     copyValue={account.address || undefined}
                     valueClassName={cn(
                       "text-xs tracking-tight truncate w-full text-left transition-all",
-                      account.address 
-                        ? "text-zinc-400 group-hover:text-zinc-200" 
+                      account.address
+                        ? "text-zinc-400 group-hover:text-zinc-200"
                         : "text-[#4D88FF] group-hover:text-white font-mono",
                       isSearching && "animate-pulse",
                       justUpdated && "text-green-400 font-semibold"

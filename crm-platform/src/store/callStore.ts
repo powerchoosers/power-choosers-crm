@@ -4,6 +4,8 @@ interface CallState {
   isActive: boolean
   status: 'idle' | 'dialing' | 'connected' | 'ended' | 'error'
   phoneNumber: string
+  /** Increments every time initiateCall fires — use as key to force fresh component instances */
+  callSessionId: number
   metadata: {
     name?: string
     account?: string
@@ -21,6 +23,7 @@ interface CallState {
     isAccountOnly?: boolean
     contactId?: string
     accountId?: string
+    metadata?: any
   } | null
   setActive: (active: boolean) => void
   setStatus: (status: CallState['status']) => void
@@ -37,22 +40,24 @@ export const useCallStore = create<CallState>((set) => ({
   isActive: false,
   status: 'idle',
   phoneNumber: '',
+  callSessionId: 0,
   metadata: null,
   callTriggered: false,
   isCallHUDOpen: false,
-  setActive: (active) => set((state) => ({ 
+  setActive: (active) => set((state) => ({
     isActive: active,
     // Auto-close HUD when call ends
-    isCallHUDOpen: active ? state.isCallHUDOpen : false 
+    isCallHUDOpen: active ? state.isCallHUDOpen : false
   })),
   setStatus: (status) => set({ status }),
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
   setMetadata: (metadata) => set({ metadata }),
   setIsCallHUDOpen: (isCallHUDOpen) => set({ isCallHUDOpen }),
-  initiateCall: (phoneNumber, metadata = null) => set({ 
-    phoneNumber, 
-    metadata, 
-    callTriggered: true 
-  }),
+  initiateCall: (phoneNumber, metadata = null) => set((state) => ({
+    phoneNumber,
+    metadata,
+    callTriggered: true,
+    callSessionId: state.callSessionId + 1,
+  })),
   clearCallTrigger: () => set({ callTriggered: false }),
 }))

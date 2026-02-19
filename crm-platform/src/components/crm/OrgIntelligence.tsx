@@ -157,7 +157,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           .from('apollo_searches')
           .select('data, created_at')
           .eq('key', key)
-          .single();
+          .maybeSingle();
 
         if (supabaseData && supabaseData.data) {
           const { company, contacts, timestamp } = supabaseData.data;
