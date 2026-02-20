@@ -244,6 +244,29 @@ const tools = [
         }
       },
       {
+        name: 'update_account',
+        description: 'Update account (company) information, such as phone number, industry, or contract details.',
+        parameters: {
+          type: 'object',
+          properties: {
+            account_id: { type: 'string', description: 'The unique ID of the account' },
+            updates: {
+              type: 'object',
+              properties: {
+                name: { type: 'string' },
+                phone: { type: 'string' },
+                industry: { type: 'string' },
+                domain: { type: 'string' },
+                status: { type: 'string' },
+                contract_end_date: { type: 'string', description: 'YYYY-MM-DD' },
+                metadata: { type: 'object' }
+              }
+            }
+          },
+          required: ['account_id', 'updates']
+        }
+      },
+      {
         name: 'get_market_pulse',
         description: 'Get real-time ERCOT market data: zonal settlement prices (LZ_HOUSTON, LZ_NORTH, LZ_SOUTH, LZ_WEST), hub average, grid load/capacity/reserves, and scarcity. ALWAYS call this when the user asks about market prices, volatility, whether the market is volatile, or conditions in a specific load zone (e.g. "how is LZ_WEST?", "volatility in Houston"). The UI will show the live telemetry card.',
         parameters: {
@@ -708,6 +731,11 @@ const toolHandlers = {
     data.zip = data.zip || metadata.zip || metadata.billing_zip || metadata.general?.zip;
     data.service_addresses = data.service_addresses || metadata.service_addresses || [];
 
+    return data;
+  },
+  update_account: async ({ account_id, updates }) => {
+    const { data, error } = await supabaseAdmin.from('accounts').update(updates).eq('id', account_id).select().single();
+    if (error) throw error;
     return data;
   },
   update_contact: async ({ contact_id, updates }) => {
@@ -1212,11 +1240,25 @@ export default async function handler(req, res) {
         const contactId = String(requestContext.id).trim();
         const [contactRes, callsRes] = await Promise.all([
           supabaseAdmin.from('contacts').select('*').eq('id', contactId).single(),
-          supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp').eq('contactId', contactId).order('timestamp', { ascending: false }).limit(2)
+          supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp, type, direction').eq('contactId', contactId).order('timestamp', { ascending: false }).limit(6)
         ]);
         const contact = contactRes?.data;
         const calls = callsRes?.data || [];
         const lines = [];
+
+        // Calculate Momentum
+        const lastCall = calls[0];
+        let momentumStatus = 'COLD - No contact records';
+        if (lastCall?.timestamp) {
+          const days = Math.floor((new Date() - new Date(lastCall.timestamp)) / (1000 * 60 * 60 * 24));
+          const hasTranscript = !!lastCall.transcript;
+          if (days < 7 && hasTranscript) momentumStatus = 'WARM';
+          else if (days < 21) momentumStatus = 'STAGNANT';
+          else momentumStatus = 'COLD';
+          lines.push(`MOMENTUM_DATA: ${momentumStatus} (${days} days since last contact)`);
+        } else {
+          lines.push(`MOMENTUM_DATA: ${momentumStatus}`);
+        }
         if (contact) {
           const name = contact.name || [contact.firstName ?? contact.first_name, contact.lastName ?? contact.last_name].filter(Boolean).join(' ') || 'Unknown';
           lines.push(`CURRENT CONTACT (Log_Stream / dossier): ${name}`);
@@ -1231,10 +1273,11 @@ export default async function handler(req, res) {
           lines.push('RECENT CALLS (transmission log):');
           calls.forEach((c, i) => {
             const date = c.timestamp ? new Date(c.timestamp).toISOString().split('T')[0] : '';
+            const type = c.direction || c.type || 'call';
             const sum = String(c.ai_summary ?? c.summary ?? '').trim();
             const trans = String(c.transcript ?? '').trim();
-            if (sum) lines.push(`  Call ${i + 1} (${date}): ${sum.slice(0, 400)}${sum.length > 400 ? '…' : ''}`);
-            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 600)}${trans.length > 600 ? '…' : ''}`);
+            lines.push(`  ${type.toUpperCase()} ${i + 1} (${date}): ${sum || 'No summary available.'}`);
+            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 400)}${trans.length > 400 ? '…' : ''}`);
           });
         }
         // Apollo company news for contact's account domain (or contact website-derived domain)
@@ -1269,11 +1312,25 @@ export default async function handler(req, res) {
         const accountId = String(requestContext.id).trim();
         const [accountRes, callsRes] = await Promise.all([
           supabaseAdmin.from('accounts').select('*').eq('id', accountId).single(),
-          supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp').eq('accountId', accountId).order('timestamp', { ascending: false }).limit(2)
+          supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp, type, direction').eq('accountId', accountId).order('timestamp', { ascending: false }).limit(6)
         ]);
         const account = accountRes?.data;
         const calls = callsRes?.data || [];
         const lines = [];
+
+        // Calculate Momentum
+        const lastCall = calls[0];
+        let momentumStatus = 'COLD - No contact records';
+        if (lastCall?.timestamp) {
+          const days = Math.floor((new Date() - new Date(lastCall.timestamp)) / (1000 * 60 * 60 * 24));
+          const hasTranscript = !!lastCall.transcript;
+          if (days < 7 && hasTranscript) momentumStatus = 'WARM';
+          else if (days < 21) momentumStatus = 'STAGNANT';
+          else momentumStatus = 'COLD';
+          lines.push(`MOMENTUM_DATA: ${momentumStatus} (${days} days since last contact)`);
+        } else {
+          lines.push(`MOMENTUM_DATA: ${momentumStatus}`);
+        }
         if (account) {
           lines.push(`CURRENT ACCOUNT: ${account.name || 'Unknown'}`);
           if (account.industry) lines.push(`Industry: ${account.industry}`);
@@ -1286,10 +1343,11 @@ export default async function handler(req, res) {
           lines.push('RECENT CALLS (this account):');
           calls.forEach((c, i) => {
             const date = c.timestamp ? new Date(c.timestamp).toISOString().split('T')[0] : '';
+            const type = c.direction || c.type || 'call';
             const sum = String(c.ai_summary ?? c.summary ?? '').trim();
             const trans = String(c.transcript ?? '').trim();
-            if (sum) lines.push(`  Call ${i + 1} (${date}): ${sum.slice(0, 400)}${sum.length > 400 ? '…' : ''}`);
-            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 600)}${trans.length > 600 ? '…' : ''}`);
+            lines.push(`  ${type.toUpperCase()} ${i + 1} (${date}): ${sum || 'No summary available.'}`);
+            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 400)}${trans.length > 400 ? '…' : ''}`);
           });
         }
         const accountDomain = account.domain?.trim();
@@ -1860,6 +1918,35 @@ export default async function handler(req, res) {
         - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
 
+        FORENSIC_INTELLIGENCE_PROTOCOL:
+        - Your mission is to provide strategic sales intelligence. Move beyond simple data retrieval.
+        - **LEAD_TEMPERATURE (Momentum Awareness)**:
+          - **WARM**: Contacted < 7 days ago, transcript summary available.
+          - **STAGNANT**: Last contact 7-21 days ago, or contact made but "No Transcript Generated".
+          - **COLD**: No contact in >21 days.
+        - **INDUSTRY_SPECIFIC_HOOKS**: Avoid generic "fixed rate" advice. Use these instead:
+          - **Manufacturing**: Focus on **4CP Coincident Peak** reduction and **Load Factor** optimization to lower demand charges.
+          - **Nonprofits**: Focus on **Budget Certainty** to protect donor-restricted grants from market volatility.
+          - **Real Estate/Property Mgmt**: Focus on **Bill Pass-Through** efficiency and **Tenant Utility Management**.
+          - **Education/Churches**: Focus on **Off-Peak Usage** benefits and **Seasonal Budget Alignment**.
+        - **TIERED_RESEARCH_STRATEGY**:
+          - TIER 1: Specific Company News (Apollo).
+          - TIER 2: If TIER 1 is thin, search for **Sector Challenges** (e.g., "Texas manufacturing energy costs 2026").
+          - TIER 3: If TIER 2 is thin, report on **Location Pulse** (LZ Zone volatility, ERCOT reserve alerts).
+        - **FORENSIC_PHONE_DISCOVERY**:
+          - If a corporate/office number is missing or questioned, ALWAYS perform a multi-tier search:
+            1. CRM & Apollo Enrichment (\`enrich_organization\`).
+            2. **Deep Web Search**: If Apollo is missing or inconsistent, pivot to your internal web search (grounding) to check the company's official website or public directories.
+            3. Comparison: Compare your findings with the CRM record (\`phone\` field).
+          - Reporting: Use the \`identity_card\` to display "Forensic Discovery" results with the source.
+        - **BLUE BULLET PROTOCOL**: When providing situation reports or selling points, use the raw bullet character '•' for automatic styled blue rendering.
+        
+        CONTACT_DOSSIER_STRATEGY (When on a Contact page):
+        - **Acknowledge Momentum**: Start with "Since your last outreach..." or "This lead has gone cold..." based on the Interaction Trace.
+        - **Next-Step Discovery**: Based on missing data (Data Voids), suggest a **NEPQ-style question**.
+          - *Example for missing expiration*: "Tonie, when you look at your current energy agreement, is the expiration date something that's actively monitored, or is it one of those things that usually just rolls over without much review?"
+          - *Example for missing usage*: "How does the seasonal change in your production schedule typically affect your energy budget expectations?"
+
         PERSON vs COMPANY (CRITICAL):
         - If the user asks to find a PERSON (e.g. "find a Louis", "someone named X", "who works at this company", "a person that works for this company"), you MUST use \`list_contacts\` with the person's name in \`search\` and, when the user is on an account page, \`accountId\` from context. Do NOT use \`list_accounts\` for person names.
         - If the user asks for "phone number", "contact info", or "number for the [X] location" for "this company" or the current account: use the context \`account_id\` (when on an account page), then \`get_account_details\` and \`list_contacts({ accountId })\`; then \`get_contact_details\` for contacts that have phone data. Return the actual phone from the CRM; if none, say so.
@@ -1942,7 +2029,7 @@ export default async function handler(req, res) {
 
         HYBRID_RESPONSE_MODE:
         - You are capable of providing BOTH narrative analysis AND forensic components in a single response.
-        - MANDATORY: Every response MUST begin with a concise, high-agency narrative (2-4 sentences) addressing ${firstName} directly.
+        - MANDATORY: Every response MUST begin with a high-agency narrative addressing ${firstName} directly. For standard queries, keep this to 2-4 sentences. For "Deep-Dive Forensic Analysis" or "Situation Reports", provide 2-3 focused paragraphs covering industry, interactions, and strategy.
         - LEAD WITH THE ANSWER: Start with the direct result (e.g. "Here are the 8 accounts expiring in 2026" or "Camp Fire First Texas expires December 2026"). Do NOT open with "I have retrieved..." or "I found...".
         - When returning a list (grid or identity cards), include one short line that echoes the filter (e.g. "Filter: contract end in 2026" or "Manufacturers only") so the response is clearly scoped.
         - When returning a SINGLE contact or account (one identity_card), optionally end the narrative with a short line like "Open the card to see the full dossier" or "I can pull the contract next if you'd like."
@@ -1971,8 +2058,10 @@ export default async function handler(req, res) {
         - When providing document/bill lists (Evidence Locker), use:
           JSON_DATA:{"type": "forensic_documents", "data": {"accountName": "...", "documents": [{"id": "...", "name": "...", "type": "...", "size": "...", "url": "...", "created_at": "..."}]}}END_JSON
         - When the user asks "Who is [name]?" or "Show me [company]" and you return a SINGLE contact or account, use an Identity Node (clickable card) instead of a table:
-          JSON_DATA:{"type": "identity_card", "data": {"type": "contact"|"account", "id": "...", "name": "...", "title": "...", "company": "...", "industry": "...", "status": "active"|"risk", "initials": "XX", "logoUrl": "...", "domain": "...", "contractEndDate": "YYYY-MM-DD or Dec 2026", "contactCount": 3, "subtitle": "optional one-line"}}END_JSON
-        - For identity_card, when data is available from tools: include optional contractEndDate (for accounts), contactCount (number of contacts for an account), or subtitle so the card shows a second line (e.g. "Contract: Dec 2026" or "3 contacts").
+          JSON_DATA:{"type": "identity_card", "data": {"type": "contact"|"account", "id": "...", "name": "...", "title": "...", "company": "...", "industry": "...", "status": "active"|"risk", "initials": "XX", "logoUrl": "...", "domain": "...", "contractEndDate": "YYYY-MM-DD or Dec 2026", "contactCount": 3, "subtitle": "...", "discoveredPhone": "...", "discoveredSource": "...", "sourceReliability": "..."}}END_JSON
+        - For identity_card:
+          - Use \`discoveredPhone\` and \`discoveredSource\` when you find a new number during FORENSIC_PHONE_DISCOVERY.
+          - \`subtitle\` can be used for secondary context (e.g. "Contract: Dec 2026" or "3 contacts").
         - LIST OF ACCOUNTS OR CONTACTS (manufacturers, expiring in 2026, accounts with contract end dates, list accounts, etc.): You MUST return structured data, not only prose bullets. Either: (A) Emit one identity_card per account/contact (up to a reasonable limit, e.g. 15–20) so the user gets clickable cards that open the dossier, or (B) Emit one forensic_grid with one row per item so every result is visible and clickable. Never respond with only a bullet list in the narrative—always include a JSON_DATA block. If the list is very long (e.g. 20+), use a single forensic_grid. When the user asked about contract end dates or expirations, the grid MUST include an "expiration" or "contract_end_date" column in \`columns\` and in each row.
         - When using forensic_grid for accounts (any list of accounts), ALWAYS include "expiration" or "contract_end_date" in \`columns\` when the user asked about contract end dates, expirations, or expiring in a year—so the container shows that data. Put every account/contact from the tool result into \`rows\` (do not summarize to fewer items); the grid will scroll if needed.
         - When suggesting a short protocol or checklist (e.g. "1. Email the CFO. 2. Pull the 4CP report."), use Flight Check so the user can copy or execute steps:
