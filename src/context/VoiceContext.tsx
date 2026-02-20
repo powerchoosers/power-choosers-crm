@@ -206,9 +206,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       const newDevice = new Device(data.token, {
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
         enableImprovedSignalingErrorPrecision: true,
-        // Twilio suggests these for better reliability in browser environments
+        logLevel: 1, // Enable debug logging to catch silent drops
         edge: ['ashburn', 'roaming'],
         maxCallSignalingTimeoutMs: 30000,
+        tokenRefreshMs: 30000, // Refresh 30s before expiry
       })
 
       // Ported from legacy phone.js: Set audio constraints for better quality
@@ -286,10 +287,18 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       newDevice.on('warning', (name, data) => {
         console.warn('[Voice] Device warning:', name, data || {})
-        // Specifically check for audio warnings
+
+        // Signal user if we detect quality issues
         if (name === 'audio-level-sample' && data && data.inputLevel === 0) {
-          // Subtle hint if mic seems dead
-          console.log('[Voice] Low input volume detected')
+          // Input level 0 means the mic is either muted or failing
+          if (currentCall) {
+            console.log('[Voice] Local silence detected (Mic volume 0)')
+          }
+        }
+
+        if (name === 'constant-audio-input-level') {
+          console.log('[Voice] Warning: Constant audio input detected. Possible hardware issue.')
+          toast('Voice Warning', { description: 'Microphone signal appears frozen. Please check your mic.' })
         }
       })
 
