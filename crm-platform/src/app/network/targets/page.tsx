@@ -109,11 +109,12 @@ export default function TargetOverviewPage() {
   const filteredTargets = targets?.filter(l => {
     if (!l.kind) return false
     const normalizedKind = l.kind.toLowerCase()
+    
+    const isPeopleKind = ['people', 'person', 'contact', 'contacts'].includes(normalizedKind)
+    const isAccountKind = ['account', 'accounts', 'company', 'companies'].includes(normalizedKind)
 
     // Mode filtering
-    const matchesMode = activeMode === 'account'
-      ? normalizedKind.includes('account')
-      : normalizedKind === activeMode
+    const matchesMode = activeMode === 'account' ? isAccountKind : isPeopleKind
 
     if (!matchesMode) return false
 

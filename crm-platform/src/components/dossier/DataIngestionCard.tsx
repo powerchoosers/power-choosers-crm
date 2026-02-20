@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { UploadCloud, FileText, X, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
@@ -365,39 +365,51 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             </p>
           </div>
         ) : (
-          files.map((file) => (
-            <motion.div
-              key={file.id}
-              initial={{ filter: 'blur(6px)', opacity: 0.6 }}
-              animate={{ filter: 'blur(0px)', opacity: 1 }}
-              transition={{ duration: 0.35, ease: 'easeOut' }}
-              className="group flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5"
-            >
-              <div
-                className="flex items-center gap-3 overflow-hidden flex-1"
-                onClick={() => handleDownload(file)}
-              >
-                <div className="p-2 rounded-lg bg-zinc-950/40 border border-white/5 text-zinc-400 group-hover:text-[#002FA7] transition-colors">
-                  <FileText className="w-4 h-4" />
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-sm text-zinc-300 font-mono truncate">{file.name}</span>
-                  <span className="text-[10px] text-zinc-600 font-mono flex gap-2">
-                    {file.size} • {formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDelete(file);
+          <AnimatePresence initial={false} mode="popLayout">
+            {files.map((file) => (
+              <motion.div
+                key={file.id}
+                layout
+                initial={{ opacity: 0, height: 0, x: -10 }}
+                animate={{ opacity: 1, height: 'auto', x: 0 }}
+                exit={{ opacity: 0, height: 0, x: 10 }}
+                transition={{
+                  opacity: { duration: 0.2 },
+                  height: { duration: 0.3 },
+                  layout: { type: 'spring', stiffness: 500, damping: 35 }
                 }}
-                className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
+                className="group overflow-hidden"
               >
-                <X className="w-3 h-3" />
-              </button>
-            </motion.div>
-          ))
+                <div
+                  className="flex items-center justify-between p-3 rounded-xl hover:bg-white/5 transition-colors cursor-pointer border border-transparent hover:border-white/5"
+                >
+                  <div
+                    className="flex items-center gap-3 overflow-hidden flex-1"
+                    onClick={() => handleDownload(file)}
+                  >
+                    <div className="p-2 rounded-lg bg-zinc-950/40 border border-white/5 text-zinc-400 group-hover:text-[#002FA7] transition-colors">
+                      <FileText className="w-4 h-4" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm text-zinc-300 font-mono truncate">{file.name}</span>
+                      <span className="text-[10px] text-zinc-600 font-mono flex gap-2">
+                        {file.size} • {formatDistanceToNow(new Date(file.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(file);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
 
