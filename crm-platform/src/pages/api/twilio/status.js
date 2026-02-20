@@ -61,21 +61,18 @@ export default async function handler(req, res) {
         logger.log('[Status] Event:', CallStatus, '| CallSid:', CallSid, '| To:', To, '| From:', From, '| agentEmail:', agentEmail);
 
         // ================================================================
-        // For browser-originated calls (From=client:agent), this status
-        // callback is the MOST RELIABLE completion event because:
-        //   1) It arrives as POST with full body data
-        //   2) dial-status/dial-complete callbacks lose POST body due to
-        //      domain redirects (nodalpoint.io → www.nodalpoint.io)
-        // So we NEVER skip browser parent legs — we LOG them.
-        //
-        // For the phone number fields: the parent leg has From=client:agent
-        // and To="" (TwiML App SID was stripped). We rely on the query
-        // params (targetPhone, contactId, etc.) that voice.js appended
-        // to the callback URL.
+        // Skip browser parent legs. These have From=client:agent and To=""
+        // which creates duplicate records with no useful phone data.
+        // The CHILD leg (actual PSTN call) is logged by dial-complete.js
+        // and dial-status.js, which now receive proper POST data via the
+        // www.nodalpoint.io canonical domain (no more 307 redirect).
         // ================================================================
         const isBrowserParentLeg = (From || '').startsWith('client:') || (To || '').startsWith('client:');
         if (isBrowserParentLeg) {
-            logger.log(`[Status] Browser parent leg detected — will log using query params. targetPhone=${targetPhoneFromQuery}, agentEmail=${agentEmail}`);
+            logger.log(`[Status] Skipping browser parent leg ${CallSid} (From=${From}, To=${To})`);
+            res.writeHead(200, { 'Content-Type': 'text/plain' });
+            res.end('OK');
+            return;
         }
 
 
