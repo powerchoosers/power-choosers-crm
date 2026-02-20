@@ -148,7 +148,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       isInitializing.current = true
       console.log('[Voice] Fetching new access token...')
 
-      const response = await fetch('/api/twilio/token?identity=agent')
+      const identity = 'agent'
+      const response = await fetch(`/api/twilio/token?identity=${encodeURIComponent(identity)}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch token: ${response.statusText}`)
       }
@@ -158,16 +159,33 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No token received from server')
       }
 
-      // Cleanup existing device before creating new one
+      // If we already have a device, try to update the token instead of destroying it
+      // This is CRITICAL for not dropping calls mid-call during a refresh.
+      if (deviceRef.current && deviceRef.current.state !== 'destroyed') {
+        const d = deviceRef.current
+
+        if (currentCall || d.state === 'busy') {
+          console.log('[Voice] Call in progress, updating token instead of re-initializing device')
+          try {
+            d.updateToken(data.token)
+            // Still set the refresh timer for next time
+            if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current)
+            tokenRefreshTimer.current = setInterval(initDevice, 50 * 60 * 1000)
+            return
+          } catch (updateError) {
+            console.error('[Voice] Failed to update token, will attempt full re-init:', updateError)
+            // Fall through to full re-init if update fails
+          }
+        }
+      }
+
+      // Cleanup existing device before creating new one if we get here
       if (deviceRef.current) {
         const d = deviceRef.current
         console.log('[Voice] Cleaning up existing device... State:', d.state)
 
         try {
-          // Only unregister if in a valid state
           if (d.state === 'registered' || d.state === 'registering') {
-            // Note: Twilio SDK might throw if we unregister while registering, 
-            // but we'll wrap it in try-catch to be safe
             if (d.state === 'registered') {
               await d.unregister()
             }
@@ -203,29 +221,41 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           channelCount: 2
         })
 
-        // Set initial input/output devices
+        // Set initial input/output devices - check if they exist first
         try {
-          const inputDevices = newDevice.audio.availableInputDevices
-          let inputDeviceId = 'default'
-          if (inputDevices && inputDevices.size > 0) {
-            const deviceIds = Array.from(inputDevices.keys())
-            if (!deviceIds.includes('default') && deviceIds.length > 0) {
-              inputDeviceId = deviceIds[0] as string
-            }
-          }
-          await newDevice.audio.setInputDevice(inputDeviceId)
-
-          if (newDevice.audio.isOutputSelectionSupported) {
-            const outputDevices = newDevice.audio.availableOutputDevices
-            let outputDeviceId = 'default'
-            if (outputDevices && outputDevices.size > 0) {
-              const deviceIds = Array.from(outputDevices.keys())
+          const setupAudio = async () => {
+            // Wait briefly for media devices to be detected by the SDK
+            const inputDevices = newDevice.audio.availableInputDevices
+            if (inputDevices && inputDevices.size > 0) {
+              const deviceIds = Array.from(inputDevices.keys())
+              let inputDeviceId = 'default'
               if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                outputDeviceId = deviceIds[0] as string
+                inputDeviceId = deviceIds[0] as string
+              }
+
+              try {
+                await newDevice.audio.setInputDevice(inputDeviceId)
+              } catch (e) {
+                console.warn('[Voice] Specifically failed to set input device:', inputDeviceId, e)
               }
             }
-            newDevice.audio.speakerDevices.set(outputDeviceId)
+
+            if (newDevice.audio.isOutputSelectionSupported) {
+              const outputDevices = newDevice.audio.availableOutputDevices
+              if (outputDevices && outputDevices.size > 0) {
+                const deviceIds = Array.from(outputDevices.keys())
+                let outputDeviceId = 'default'
+                if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                  outputDeviceId = deviceIds[0] as string
+                }
+                newDevice.audio.speakerDevices.set(outputDeviceId)
+              }
+            }
           }
+
+          // Run audio setup but don't block registration on it
+          setupAudio().catch(e => console.warn('[Voice] Async audio setup failed:', e))
+
         } catch (audioInitError) {
           console.warn('[Voice] Initial audio device setup failed:', audioInitError)
         }
@@ -249,6 +279,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       newDevice.on('warning', (name, data) => {
         console.warn('[Voice] Device warning:', name, data || {})
+        // Specifically check for audio warnings
+        if (name === 'audio-level-sample' && data && data.inputLevel === 0) {
+          // Subtle hint if mic seems dead
+          console.log('[Voice] Low input volume detected')
+        }
       })
 
       newDevice.on('error', (error) => {
