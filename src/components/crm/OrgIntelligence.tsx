@@ -1,6 +1,6 @@
 'use client'
 import { useState, useMemo, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail } from 'lucide-react';
 import Image from 'next/image';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
@@ -1205,175 +1205,187 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Searching...</span>
                 </div>
               ) : paginatedData.length > 0 ? (
-                paginatedData.map((person) => (
-                  <div
-                    key={person.id}
-                    className="group flex flex-col p-2.5 rounded-xl hover:bg-zinc-950/40 transition-all border border-transparent hover:border-white/5 space-y-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex flex-col min-w-0 flex-1 mr-2">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
-                            {person.isMonitored
-                              ? person.name
-                              : `${person.firstName} ${person.lastName?.charAt(0) || ''}.`
-                            }
+                <AnimatePresence initial={false} mode="popLayout">
+                  {paginatedData.map((person) => (
+                    <motion.div
+                      key={person.id}
+                      layout
+                      initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.98, y: -10 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 400,
+                        damping: 30,
+                        layout: { duration: 0.3 }
+                      }}
+                      className="group flex flex-col p-2.5 rounded-xl hover:bg-zinc-950/40 transition-all border border-transparent hover:border-white/5 space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex flex-col min-w-0 flex-1 mr-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
+                              {person.isMonitored
+                                ? person.name
+                                : `${person.firstName} ${person.lastName?.charAt(0) || ''}.`
+                              }
+                            </span>
+                            {person.isMonitored && (
+                              <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" aria-label="Synced" />
+                            )}
+                          </div>
+                          <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
+                            {person.title || 'Nodal Analyst'}
                           </span>
-                          {person.isMonitored && (
-                            <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" aria-label="Synced" />
-                          )}
                         </div>
-                        <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
-                          {person.title || 'Nodal Analyst'}
-                        </span>
-                      </div>
 
-                      <div className="flex items-center gap-1.5">
-                        {person.isMonitored ? (
-                          person.linkedin ? (
-                            <a
-                              href={person.linkedin}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="icon-button-forensic w-7 h-7 flex items-center justify-center"
-                            >
-                              <Linkedin className="w-2.5 h-2.5" />
-                            </a>
-                          ) : null
-                        ) : (
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleAcquire(person, 'email')}
-                              disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                              title="Reveal Email"
-                            >
-                              {acquiringEmail === person.id ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                              ) : (
-                                <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                              )}
-                              Email
-                            </button>
-                            <button
-                              onClick={() => handleAcquire(person, 'phone')}
-                              disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                              title="Reveal Phone"
-                            >
-                              {acquiringEmail === person.id ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                              ) : (
-                                <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                              )}
-                              Phone
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* GATED DETAILS */}
-                    {person.isMonitored ? (
-                      <div className="flex flex-col gap-y-1.5 pt-1 border-t border-white/5">
-                        {/* Email & Phone Row - Fixed Two-Column Layout */}
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-center">
-                          {/* Email Column */}
-                          {person.email !== 'N/A' ? (
-                            <div
-                              className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter min-w-0"
-                              title={person.email}
-                            >
-                              <Globe className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
-                              <span className="truncate">{person.email}</span>
-                            </div>
+                        <div className="flex items-center gap-1.5">
+                          {person.isMonitored ? (
+                            person.linkedin ? (
+                              <a
+                                href={person.linkedin}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="icon-button-forensic w-7 h-7 flex items-center justify-center"
+                              >
+                                <Linkedin className="w-2.5 h-2.5" />
+                              </a>
+                            ) : null
                           ) : (
-                            <button
-                              onClick={() => handleAcquire(person, 'email')}
-                              disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                              title="Reveal Email"
-                            >
-                              {acquiringEmail === person.id ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                              ) : (
-                                <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                              )}
-                              Email
-                            </button>
-                          )}
-
-                          {/* Phone Column — W: Work direct, M: Mobile, O: Other */}
-                          {person.phones && person.phones.length > 0 ? (
-                            <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
-                              {person.phones.map((entry, idx) => {
-                                const num = phoneDisplayNumber(entry);
-                                const prefix = phoneTypePrefix(entry, idx);
-                                return (
-                                  <button
-                                    key={num}
-                                    onClick={() => {
-                                      const callName = person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact';
-                                      const logoUrl = (accountLogoUrl && accountLogoUrl.trim()) || companySummary?.logoUrl;
-                                      const domainForCall = (accountDomain && accountDomain.trim()) || companySummary?.domain || domain;
-                                      initiateCall(num, {
-                                        name: callName,
-                                        account: companyName,
-                                        title: person.title,
-                                        logoUrl: logoUrl || undefined,
-                                        domain: domainForCall || undefined,
-                                      });
-                                      toast.info(`Calling ${callName}...`);
-                                    }}
-                                    className="flex items-center gap-1 text-[9px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-tighter"
-                                    title={num}
-                                  >
-                                    <Phone className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
-                                    <span className="text-zinc-500 font-semibold">{prefix}:</span>
-                                    {num}
-                                  </button>
-                                );
-                              })}
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleAcquire(person, 'email')}
+                                disabled={acquiringEmail === person.id}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                                title="Reveal Email"
+                              >
+                                {acquiringEmail === person.id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                ) : (
+                                  <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                )}
+                                Email
+                              </button>
+                              <button
+                                onClick={() => handleAcquire(person, 'phone')}
+                                disabled={acquiringEmail === person.id}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                                title="Reveal Phone"
+                              >
+                                {acquiringEmail === person.id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                ) : (
+                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                )}
+                                Phone
+                              </button>
                             </div>
-                          ) : (
-                            <button
-                              onClick={() => handleAcquire(person, 'phone')}
-                              disabled={acquiringEmail === person.id}
-                              className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
-                              title="Reveal Phone"
-                            >
-                              {acquiringEmail === person.id ? (
-                                <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                              ) : (
-                                <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                              )}
-                              Phone
-                            </button>
                           )}
                         </div>
+                      </div>
 
-                        {/* Location Row */}
-                        {person.location && (
-                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
-                            <MapPin className="w-2.5 h-2.5" />
-                            {person.location}
+                      {/* GATED DETAILS */}
+                      {person.isMonitored ? (
+                        <div className="flex flex-col gap-y-1.5 pt-1 border-t border-white/5">
+                          {/* Email & Phone Row - Fixed Two-Column Layout */}
+                          <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-center">
+                            {/* Email Column */}
+                            {person.email !== 'N/A' ? (
+                              <div
+                                className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter min-w-0"
+                                title={person.email}
+                              >
+                                <Globe className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
+                                <span className="truncate">{person.email}</span>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleAcquire(person, 'email')}
+                                disabled={acquiringEmail === person.id}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                                title="Reveal Email"
+                              >
+                                {acquiringEmail === person.id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                ) : (
+                                  <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                )}
+                                Email
+                              </button>
+                            )}
+
+                            {/* Phone Column — W: Work direct, M: Mobile, O: Other */}
+                            {person.phones && person.phones.length > 0 ? (
+                              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                                {person.phones.map((entry, idx) => {
+                                  const num = phoneDisplayNumber(entry);
+                                  const prefix = phoneTypePrefix(entry, idx);
+                                  return (
+                                    <button
+                                      key={num}
+                                      onClick={() => {
+                                        const callName = person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact';
+                                        const logoUrl = (accountLogoUrl && accountLogoUrl.trim()) || companySummary?.logoUrl;
+                                        const domainForCall = (accountDomain && accountDomain.trim()) || companySummary?.domain || domain;
+                                        initiateCall(num, {
+                                          name: callName,
+                                          account: companyName,
+                                          title: person.title,
+                                          logoUrl: logoUrl || undefined,
+                                          domain: domainForCall || undefined,
+                                        });
+                                        toast.info(`Calling ${callName}...`);
+                                      }}
+                                      className="flex items-center gap-1 text-[9px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-tighter"
+                                      title={num}
+                                    >
+                                      <Phone className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
+                                      <span className="text-zinc-500 font-semibold">{prefix}:</span>
+                                      {num}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() => handleAcquire(person, 'phone')}
+                                disabled={acquiringEmail === person.id}
+                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
+                                title="Reveal Phone"
+                              >
+                                {acquiringEmail === person.id ? (
+                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                ) : (
+                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                )}
+                                Phone
+                              </button>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-4 opacity-40 select-none pointer-events-none">
-                        <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
-                          <Globe className="w-2.5 h-2.5" />
-                          ••••••••••••
+
+                          {/* Location Row */}
+                          {person.location && (
+                            <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
+                              <MapPin className="w-2.5 h-2.5" />
+                              {person.location}
+                            </div>
+                          )}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
-                          <Phone className="w-2.5 h-2.5" />
-                          ••••••••••••
+                      ) : (
+                        <div className="flex items-center gap-4 opacity-40 select-none pointer-events-none">
+                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                            <Globe className="w-2.5 h-2.5" />
+                            ••••••••••••
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                            <Phone className="w-2.5 h-2.5" />
+                            ••••••••••••
+                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                ))
+                      )}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               ) : (
                 <div className="py-8 text-center">
                   <p className="text-[9px] text-zinc-700 font-mono uppercase tracking-widest">

@@ -375,183 +375,193 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
         )}
       </AnimatePresence>
 
-      {isExpanded && (
-        <div className="mt-6 pt-6 border-t border-white/5 space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-          {/* AI Insights Section */}
-          {insights && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-3 h-3 text-current" /> AI Forensic Analysis
-                </div>
-                <span className={cn(
-                  "px-2 py-0.5 rounded text-[10px] font-mono uppercase shrink-0",
-                  insights.sentiment === 'Positive' ? "bg-emerald-500/10 text-emerald-500" :
-                    insights.sentiment === 'Negative' ? "bg-rose-500/10 text-rose-500" :
-                      "bg-zinc-500/10 text-zinc-400"
-                )}>
-                  {insights.sentiment || 'Neutral'}
-                </span>
-              </div>
-
-              <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
-                <div className="text-[9px] font-mono text-zinc-500 uppercase mb-2">Executive Summary</div>
-                <p className="text-xs text-zinc-300 leading-relaxed">
-                  {insights.summary || 'No summary available.'}
-                </p>
-              </div>
-
-              {insights.nextSteps && insights.nextSteps.length > 0 && (
-                <div className="p-4 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/10">
-                  <div className="text-[9px] font-mono text-[#002FA7] uppercase mb-2 flex items-center gap-1.5">
-                    <Zap className="w-3 h-3" /> Recommended Next Steps
+      <AnimatePresence>
+        {isExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="mt-6 pt-6 border-t border-white/5 space-y-6">
+              {/* AI Insights Section */}
+              {insights && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-3 h-3 text-current" /> AI Forensic Analysis
+                    </div>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded text-[10px] font-mono uppercase shrink-0",
+                      insights.sentiment === 'Positive' ? "bg-emerald-500/10 text-emerald-500" :
+                        insights.sentiment === 'Negative' ? "bg-rose-500/10 text-rose-500" :
+                          "bg-zinc-500/10 text-zinc-400"
+                    )}>
+                      {insights.sentiment || 'Neutral'}
+                    </span>
                   </div>
-                  <ul className="space-y-2">
-                    {insights.nextSteps.map((step: string, i: number) => (
-                      <li key={i} className="text-xs text-zinc-300 flex items-start gap-2">
-                        <span className="text-[#002FA7]">•</span> {step}
-                      </li>
-                    ))}
-                  </ul>
+
+                  <div className="p-4 rounded-xl bg-white/[0.03] border border-white/5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase mb-2">Executive Summary</div>
+                    <p className="text-xs text-zinc-300 leading-relaxed">
+                      {insights.summary || 'No summary available.'}
+                    </p>
+                  </div>
+
+                  {insights.nextSteps && insights.nextSteps.length > 0 && (
+                    <div className="p-4 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/10">
+                      <div className="text-[9px] font-mono text-[#002FA7] uppercase mb-2 flex items-center gap-1.5">
+                        <Zap className="w-3 h-3" /> Recommended Next Steps
+                      </div>
+                      <ul className="space-y-2">
+                        {insights.nextSteps.map((step: string, i: number) => (
+                          <li key={i} className="text-xs text-zinc-300 flex items-start gap-2">
+                            <span className="text-[#002FA7]">•</span> {step}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Transcript Section — use CI sentences/speakerTurns (backend channel mapping) like legacy account-detail */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
+                  <MessageSquare className="w-3 h-3 text-current" /> Two-Channel Transcript
+                </div>
+
+                <div className="max-h-80 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
+                  {(() => {
+                    // 1. Prefer conversationalIntelligence.sentences (backend maps Agent/Customer by channel)
+                    const ci = insights?.conversationalIntelligence
+                    const sentences = Array.isArray(ci?.sentences) ? ci.sentences : []
+                    const speakerTurns = Array.isArray(insights?.speakerTurns) ? insights.speakerTurns : []
+                    type Turn = { role: 'agent' | 'customer'; text: string }
+                    let turns: Turn[] = []
+                    if (sentences.length > 0) {
+                      turns = sentences
+                        .filter((s: { text?: string }) => (s.text || '').trim())
+                        .map((s: { speaker?: string; text?: string }) => ({
+                          role: (s.speaker || '').toLowerCase() === 'customer' ? 'customer' : 'agent',
+                          text: (s.text || '').trim(),
+                        }))
+                    } else if (speakerTurns.length > 0) {
+                      turns = speakerTurns
+                        .filter((t: { text?: string }) => (t.text || '').trim())
+                        .map((t: { role?: string; text?: string }) => ({
+                          role: (t.role || 'agent').toLowerCase() === 'customer' ? 'customer' : 'agent',
+                          text: (t.text || '').trim(),
+                        }))
+                    } else if (call.transcript) {
+                      // 2. Fallback: parse transcript lines; only trust explicit "Agent:" / "Customer:" (from backend)
+                      turns = call.transcript
+                        .split('\n')
+                        .map((line) => {
+                          const trimmed = line.trim()
+                          if (!trimmed) return null
+                          const match = trimmed.match(/^(Agent|Customer):\s*(.*)$/i)
+                          if (match) {
+                            return {
+                              role: match[1].toLowerCase() as 'agent' | 'customer',
+                              text: match[2].trim(),
+                            }
+                          }
+                          const generic = trimmed.match(/^([^:]+):\s*(.*)$/)
+                          if (generic) return { role: 'customer' as const, text: generic[2].trim() }
+                          return { role: 'customer' as const, text: trimmed }
+                        })
+                        .filter((t): t is Turn => t != null && t.text !== '')
+                    }
+                    if (turns.length === 0) return null
+                    return turns.map((turn, i) => {
+                      const isAgent = turn.role === 'agent'
+                      const agentPhotoUrl = hostedAvatarUrl || profile.hostedPhotoUrl || user?.user_metadata?.avatar_url || null
+                      return (
+                        <div key={i} className={cn(
+                          "flex gap-3",
+                          isAgent ? "flex-row-reverse" : "flex-row"
+                        )}>
+                          {isAgent ? (
+                            <div className={cn(
+                              "w-6 h-6 flex items-center justify-center mt-1 text-[10px] font-mono",
+                              squircleAvatar,
+                              "bg-[#002FA7]/20 border-[#002FA7]/30"
+                            )}>
+                              {agentPhotoUrl ? (
+                                <img src={agentPhotoUrl} alt="Agent" className="w-full h-full object-cover !rounded-[14px]" />
+                              ) : (
+                                <Zap className="w-3 h-3 text-[#002FA7]" />
+                              )}
+                            </div>
+                          ) : customerAvatar === 'contact' && contactName ? (
+                            <div className="mt-1 shrink-0">
+                              <ContactAvatar name={contactName} size={24} className="rounded-[8px]" />
+                            </div>
+                          ) : (accountLogoUrl || accountDomain) ? (
+                            <div className="mt-1 shrink-0">
+                              <CompanyIcon
+                                logoUrl={accountLogoUrl}
+                                domain={accountDomain}
+                                name={accountName || 'Customer'}
+                                size={24}
+                                roundedClassName="rounded-[8px]"
+                              />
+                            </div>
+                          ) : (
+                            <div className={cn(
+                              "w-6 h-6 flex items-center justify-center mt-1 text-[10px] font-mono",
+                              squircleAvatar,
+                              "bg-zinc-900/80 text-zinc-400 border-white/20"
+                            )}>
+                              <Building2 className="w-3 h-3" />
+                            </div>
+                          )}
+                          <div className={cn(
+                            "p-3 rounded-2xl text-xs leading-relaxed max-w-[85%] relative group/bubble",
+                            isAgent
+                              ? "bg-[#002FA7]/10 text-zinc-200 border border-[#002FA7]/20 rounded-tr-none"
+                              : "bg-white/[0.03] text-zinc-400 border border-white/5 rounded-tl-none"
+                          )}>
+                            <div className={cn(
+                              "text-[9px] font-mono uppercase opacity-40 mb-1",
+                              isAgent ? "text-right" : "text-left"
+                            )}>
+                              {isAgent ? 'AGENT' : 'CUSTOMER'}
+                            </div>
+                            {turn.text}
+                          </div>
+                        </div>
+                      )
+                    })
+                  })() ?? (
+                      !call.transcript && !insights?.conversationalIntelligence?.sentences?.length && !insights?.speakerTurns?.length ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-zinc-600">
+                          <MessageSquare className="w-8 h-8 mb-2 opacity-20" />
+                          <p className="text-[10px] font-mono uppercase tracking-widest">Transcript_Not_Found</p>
+                          <Button
+                            variant="link"
+                            className="text-[#002FA7] text-[10px] font-mono uppercase p-0 h-auto mt-2"
+                            onClick={processCall}
+                          >
+                            Generate Now
+                          </Button>
+                        </div>
+                      ) : null
+                    )}
+                </div>
+              </div>
+
+              {error && (
+                <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center gap-2 text-xs text-rose-500">
+                  <AlertCircle className="w-4 h-4" /> {error}
                 </div>
               )}
             </div>
-          )}
-
-          {/* Transcript Section — use CI sentences/speakerTurns (backend channel mapping) like legacy account-detail */}
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 uppercase tracking-widest">
-              <MessageSquare className="w-3 h-3 text-current" /> Two-Channel Transcript
-            </div>
-
-            <div className="max-h-80 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-              {(() => {
-                // 1. Prefer conversationalIntelligence.sentences (backend maps Agent/Customer by channel)
-                const ci = insights?.conversationalIntelligence
-                const sentences = Array.isArray(ci?.sentences) ? ci.sentences : []
-                const speakerTurns = Array.isArray(insights?.speakerTurns) ? insights.speakerTurns : []
-                type Turn = { role: 'agent' | 'customer'; text: string }
-                let turns: Turn[] = []
-                if (sentences.length > 0) {
-                  turns = sentences
-                    .filter((s: { text?: string }) => (s.text || '').trim())
-                    .map((s: { speaker?: string; text?: string }) => ({
-                      role: (s.speaker || '').toLowerCase() === 'customer' ? 'customer' : 'agent',
-                      text: (s.text || '').trim(),
-                    }))
-                } else if (speakerTurns.length > 0) {
-                  turns = speakerTurns
-                    .filter((t: { text?: string }) => (t.text || '').trim())
-                    .map((t: { role?: string; text?: string }) => ({
-                      role: (t.role || 'agent').toLowerCase() === 'customer' ? 'customer' : 'agent',
-                      text: (t.text || '').trim(),
-                    }))
-                } else if (call.transcript) {
-                  // 2. Fallback: parse transcript lines; only trust explicit "Agent:" / "Customer:" (from backend)
-                  turns = call.transcript
-                    .split('\n')
-                    .map((line) => {
-                      const trimmed = line.trim()
-                      if (!trimmed) return null
-                      const match = trimmed.match(/^(Agent|Customer):\s*(.*)$/i)
-                      if (match) {
-                        return {
-                          role: match[1].toLowerCase() as 'agent' | 'customer',
-                          text: match[2].trim(),
-                        }
-                      }
-                      const generic = trimmed.match(/^([^:]+):\s*(.*)$/)
-                      if (generic) return { role: 'customer' as const, text: generic[2].trim() }
-                      return { role: 'customer' as const, text: trimmed }
-                    })
-                    .filter((t): t is Turn => t != null && t.text !== '')
-                }
-                if (turns.length === 0) return null
-                return turns.map((turn, i) => {
-                  const isAgent = turn.role === 'agent'
-                  const agentPhotoUrl = hostedAvatarUrl || profile.hostedPhotoUrl || user?.user_metadata?.avatar_url || null
-                  return (
-                    <div key={i} className={cn(
-                      "flex gap-3",
-                      isAgent ? "flex-row-reverse" : "flex-row"
-                    )}>
-                      {isAgent ? (
-                        <div className={cn(
-                          "w-6 h-6 flex items-center justify-center mt-1 text-[10px] font-mono",
-                          squircleAvatar,
-                          "bg-[#002FA7]/20 border-[#002FA7]/30"
-                        )}>
-                          {agentPhotoUrl ? (
-                            <img src={agentPhotoUrl} alt="Agent" className="w-full h-full object-cover !rounded-[14px]" />
-                          ) : (
-                            <Zap className="w-3 h-3 text-[#002FA7]" />
-                          )}
-                        </div>
-                      ) : customerAvatar === 'contact' && contactName ? (
-                        <div className="mt-1 shrink-0">
-                          <ContactAvatar name={contactName} size={24} className="rounded-[8px]" />
-                        </div>
-                      ) : (accountLogoUrl || accountDomain) ? (
-                        <div className="mt-1 shrink-0">
-                          <CompanyIcon
-                            logoUrl={accountLogoUrl}
-                            domain={accountDomain}
-                            name={accountName || 'Customer'}
-                            size={24}
-                            roundedClassName="rounded-[8px]"
-                          />
-                        </div>
-                      ) : (
-                        <div className={cn(
-                          "w-6 h-6 flex items-center justify-center mt-1 text-[10px] font-mono",
-                          squircleAvatar,
-                          "bg-zinc-900/80 text-zinc-400 border-white/20"
-                        )}>
-                          <Building2 className="w-3 h-3" />
-                        </div>
-                      )}
-                      <div className={cn(
-                        "p-3 rounded-2xl text-xs leading-relaxed max-w-[85%] relative group/bubble",
-                        isAgent
-                          ? "bg-[#002FA7]/10 text-zinc-200 border border-[#002FA7]/20 rounded-tr-none"
-                          : "bg-white/[0.03] text-zinc-400 border border-white/5 rounded-tl-none"
-                      )}>
-                        <div className={cn(
-                          "text-[9px] font-mono uppercase opacity-40 mb-1",
-                          isAgent ? "text-right" : "text-left"
-                        )}>
-                          {isAgent ? 'AGENT' : 'CUSTOMER'}
-                        </div>
-                        {turn.text}
-                      </div>
-                    </div>
-                  )
-                })
-              })() ?? (
-                  !call.transcript && !insights?.conversationalIntelligence?.sentences?.length && !insights?.speakerTurns?.length ? (
-                    <div className="flex flex-col items-center justify-center py-8 text-zinc-600">
-                      <MessageSquare className="w-8 h-8 mb-2 opacity-20" />
-                      <p className="text-[10px] font-mono uppercase tracking-widest">Transcript_Not_Found</p>
-                      <Button
-                        variant="link"
-                        className="text-[#002FA7] text-[10px] font-mono uppercase p-0 h-auto mt-2"
-                        onClick={processCall}
-                      >
-                        Generate Now
-                      </Button>
-                    </div>
-                  ) : null
-                )}
-            </div>
-          </div>
-
-          {error && (
-            <div className="p-3 rounded-lg bg-rose-500/10 border border-rose-500/20 flex items-center gap-2 text-xs text-rose-500">
-              <AlertCircle className="w-4 h-4" /> {error}
-            </div>
-          )}
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

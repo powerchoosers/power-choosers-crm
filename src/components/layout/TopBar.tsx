@@ -340,6 +340,7 @@ export function TopBar() {
     } else {
       if (durationInterval.current) clearInterval(durationInterval.current)
       callStartRef.current = null
+      setCallDuration(0)
     }
     return () => {
       if (durationInterval.current) clearInterval(durationInterval.current)

@@ -76,9 +76,9 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   const chips: VectorChip[] = isAccountMode
     ? listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName }))
     : [
-        ...listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName })),
-        ...protocolMemberships.map(m => ({ type: 'protocol' as const, id: m.sequenceId, membershipId: m.id, name: m.sequenceName }))
-      ]
+      ...listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName })),
+      ...protocolMemberships.map(m => ({ type: 'protocol' as const, id: m.sequenceId, membershipId: m.id, name: m.sequenceName }))
+    ]
   const hasAnyAssignments = chips.length > 0
   const isLoading = isAccountMode
     ? (isLoadingAccountLists || isLoadingTargets)
@@ -94,7 +94,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
       }
       setIsPopoverOpen(false)
       setSearchQuery('')
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const handleAddToProtocol = async (sequenceId: string) => {
@@ -103,7 +103,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
       await addContactToProtocol.mutateAsync({ contactId, sequenceId })
       setIsPopoverOpen(false)
       setSearchQuery('')
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const handleRemoveList = async (membershipId: string) => {
@@ -114,21 +114,21 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
       } else {
         await removeContactFromList.mutateAsync({ contactId: entityId, membershipId })
       }
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const handleRemoveProtocol = async (membershipId: string) => {
     if (!contactId) return
     try {
       await removeContactFromProtocol.mutateAsync({ contactId, membershipId })
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const handleCreateTarget = async () => {
     const name = searchQuery.trim()
     if (!name || !user || !entityId) return
     try {
-      const kind = isAccountMode ? 'account' : 'contact'
+      const kind = isAccountMode ? 'account' : 'people'
       const newList = await createTarget.mutateAsync({ name, kind })
       if (isAccountMode) {
         await addAccountToList.mutateAsync({ accountId: entityId, listId: newList.id })
@@ -139,7 +139,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
       }
       setIsPopoverOpen(false)
       setSearchQuery('')
-    } catch (_) {}
+    } catch (_) { }
   }
 
   const handleCreateProtocol = async () => {
@@ -156,7 +156,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
       toast.success(`Protocol "${name}" created and contact added`)
       setIsPopoverOpen(false)
       setSearchQuery('')
-    } catch (_) {}
+    } catch (_) { }
   }
 
   if (!contactId && !accountId) return null
