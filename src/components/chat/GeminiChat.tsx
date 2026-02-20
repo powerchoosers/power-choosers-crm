@@ -12,7 +12,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useContact } from '@/hooks/useContacts'
-import { useAccount } from '@/hooks/useAccounts'
+import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -139,15 +139,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
-/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText (word-stagger reveal) for first segment. Supports multiple artifacts per line and content with asterisks (non-greedy match). */
+/** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText (word-stagger reveal) for first segment. Supports multiple artifacts per line and content with asterisks (non-greedy match). Supports blue bullets (•). */
 function ProseWithArtifacts({ text, revealFirstWords }: { text: string; revealFirstWords?: number }) {
-  const parts = text.split(/(\*\*(?:.+?)\*\*)/g)
-  const firstTextPart = parts.find((s) => s && !s.match(/^\*\*(.+)\*\*$/))
+  // Regex: matches **bold** OR the bullet character •
+  const parts = text.split(/(\*\*(?:.+?)\*\*|•)/g)
+  const firstTextPart = parts.find((s) => s && !s.match(/^\*\*(.+)\*\*$/) && s !== '•')
   const useReveal = typeof revealFirstWords === 'number' && revealFirstWords > 0 && firstTextPart && firstTextPart.length > 0
 
   return (
     <p className="font-sans whitespace-pre-wrap text-zinc-400 text-sm leading-7 break-words [overflow-wrap:anywhere]">
       {parts.map((segment, i) => {
+        if (segment === '•') {
+          return (
+            <span key={i} className="text-[#002FA7] font-bold mr-1 drop-shadow-[0_0_3px_rgba(0,47,167,0.5)]">
+              •
+            </span>
+          )
+        }
         const match = segment.match(/^\*\*(.+)\*\*$/)
         if (match) {
           return (
@@ -312,10 +320,53 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
         contractEndDate?: string
         contactCount?: number
         subtitle?: string
+        discoveredPhone?: string
+        discoveredSource?: string
+        sourceReliability?: string
       }
       const path = card.type === 'contact' ? '/network/people' : '/network/accounts'
       const initials = card.initials ?? (card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?')
       const secondLine = card.subtitle ?? (card.contractEndDate ? `Contract: ${card.contractEndDate}` : (typeof card.contactCount === 'number' ? `${card.contactCount} contacts` : null))
+      const { mutateAsync: updateAccount } = useUpdateAccount()
+      const [isEnriching, setIsEnriching] = useState(false)
+      const [enriched, setEnriched] = useState(false)
+
+      const handleEnrich = async (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (!card.discoveredPhone || card.type !== 'account' || isEnriching || enriched) return
+
+        setIsEnriching(true)
+        try {
+          const updates: any = { companyPhone: card.discoveredPhone }
+          // Log discrepancy in metadata
+          updates.metadata = {
+            discrepancy_log: [
+              {
+                field: 'phone',
+                old_value: 'N/A or Outdated',
+                new_value: card.discoveredPhone,
+                source: card.discoveredSource || 'Forensic Discovery',
+                timestamp: new Date().toISOString()
+              }
+            ]
+          }
+          await updateAccount({ id: card.id, ...updates })
+          setEnriched(true)
+        } catch (err) {
+          console.error('Enrichment failed:', err)
+        } finally {
+          setIsEnriching(false)
+        }
+      }
+
+      const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        if (card.discoveredPhone) {
+          navigator.clipboard.writeText(card.discoveredPhone)
+          // Simple local feedback would be better but let's stick to core logic
+        }
+      }
+
       return (
         <motion.div
           initial={{ opacity: 0, y: 4 }}
@@ -339,6 +390,54 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
               <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">{[card.title, card.company ?? card.industry].filter(Boolean).join(' · ')}</p>
             </div>
           </div>
+
+          {/* Forensic Data Discovery Block */}
+          {card.discoveredPhone && (
+            <div className="mx-4 mb-4 p-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex flex-col gap-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] font-bold">Forensic Discovery</span>
+                <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest bg-black/40 px-1.5 py-0.5 rounded border border-white/5">
+                  Source: {card.discoveredSource || 'Deep Web'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
+                    <Phone size={12} />
+                  </div>
+                  <span className="text-sm font-mono font-bold text-white tabular-nums truncate">
+                    {card.discoveredPhone}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 rounded-lg hover:bg-white/5 text-zinc-400"
+                    onClick={handleCopy}
+                  >
+                    <Copy size={12} />
+                  </Button>
+                  <Button
+                    size="sm"
+                    className={cn(
+                      "h-7 font-mono text-[9px] uppercase tracking-widest px-3 transition-all",
+                      enriched
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        : "bg-[#002FA7] hover:bg-blue-600 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                    )}
+                    onClick={handleEnrich}
+                    disabled={isEnriching || enriched}
+                  >
+                    {isEnriching ? <Loader2 size={10} className="animate-spin" /> : enriched ? "ENRICHED" : "ENRICH"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="px-4 py-2 border-t border-white/5 group-hover:bg-[#002FA7]/10 transition-colors flex flex-col gap-0.5">
             {secondLine && <span className="text-[10px] font-mono text-zinc-500 truncate">{secondLine}</span>}
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Open dossier →</span>
@@ -1165,8 +1264,18 @@ export function GeminiChatPanel() {
     proactiveReportTriggered.current = true
     const syntheticPrompt =
       contextInfo.type === 'contact'
-        ? `Give a one-paragraph situation report for this contact. Include contract status, key risks, and next steps. Be concise.`
-        : `Give a one-paragraph situation report for this account. Include contract status, key risks, and next steps. Be concise.`
+        ? `Perform a deep-dive forensic analysis for this contact. Use '•' for all points and organize into:
+           • INDUSTRY_INTEL: Analyze their title/company.
+           • INTERACTION_TRACE: Review calls/transcripts for momentum.
+           • STRATEGY: Role-specific selling points and NEPQ-style next steps.
+           • RISK_ASSESSMENT: Actual business risks.
+           Provide a high-agency situation report. Be concise but strategic.`
+        : `Perform a deep-dive forensic analysis for this account. Use '•' for all points and organize into:
+           • INDUSTRY_INTEL: Sector-specific energy pressure points.
+           • INTERACTION_TRACE: Current sales cycle stage based on calls.
+           • STRATEGY: Top selling points based on profile/news.
+           • RISK_ASSESSMENT: Actual business risks.
+           Provide a high-agency situation report. Be concise but strategic.`
     sendWithMessageRef.current?.(syntheticPrompt)
   }, [isOpen, messages.length, isAccountOrContact, hasContextId, contextInfo.type])
 
