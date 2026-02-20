@@ -164,7 +164,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       if (deviceRef.current && deviceRef.current.state !== 'destroyed') {
         const d = deviceRef.current
 
-        if (currentCall || d.state === 'busy') {
+        if (currentCall) {
           console.log('[Voice] Call in progress, updating token instead of re-initializing device')
           try {
             d.updateToken(data.token)
@@ -224,6 +224,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         // Set initial input/output devices - check if they exist first
         try {
           const setupAudio = async () => {
+            if (!newDevice.audio) return;
             // Wait briefly for media devices to be detected by the SDK
             const inputDevices = newDevice.audio.availableInputDevices
             if (inputDevices && inputDevices.size > 0) {
