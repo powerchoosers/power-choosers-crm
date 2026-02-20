@@ -393,6 +393,29 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
                 setActive(true)
                 setStatus('connected')
                 toast.dismiss(toastId)
+
+                // Track Health Monitor: Check for silence via WebRTC getStats()
+                const monitorMediaHealth = async () => {
+                  if (call.status() !== 'open') return;
+                  try {
+                    const stats = await (call as any).getStats();
+                    stats.forEach((report: any) => {
+                      if (report.localAudioTrackStats) {
+                        report.localAudioTrackStats.forEach((stat: any) => {
+                          if (stat.audioLevel === 0 && !call.isMuted()) {
+                            console.warn('[Voice] Diagnostic: No local audio energy detected (Inbound). Check Mic.');
+                          }
+                        });
+                      }
+                    });
+                    if (call.status() === 'open') {
+                      setTimeout(monitorMediaHealth, 5000);
+                    }
+                  } catch (err) {
+                    console.error('[Voice] Media monitor error (Inbound):', err);
+                  }
+                };
+                monitorMediaHealth();
               }
             },
             duration: 30000, // Longer duration for incoming call
@@ -515,12 +538,32 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
+    const handleDeviceChange = () => {
+      console.log('[Voice] Hardware device change detected (Mic/Speaker plugged or unplugged)')
+      // If we are in a call, this might be why it went silent.
+      if (deviceRef.current && currentCall) {
+        toast.info('Hardware change detected', {
+          description: 'Your audio device were updated. Re-connecting audio path...'
+        })
+      }
+      // Re-initialize to pick up new default icons/paths
+      initDevice()
+    }
+
     if (typeof window === 'undefined') return
     window.addEventListener('offline', handleOffline)
     window.addEventListener('online', handleOnline)
+
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+      navigator.mediaDevices.addEventListener('devicechange', handleDeviceChange)
+    }
+
     return () => {
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
+      if (navigator.mediaDevices && navigator.mediaDevices.removeEventListener) {
+        navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
+      }
     }
   }, [initDevice, setActive, setStatus, user])
 
@@ -631,6 +674,29 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setCurrentCall(call)
         setStatus('connected')
         setActive(true)
+
+        // Track Health Monitor: Check for silence via WebRTC getStats()
+        const monitorMediaHealth = async () => {
+          if (call.status() !== 'open') return;
+          try {
+            const stats = await (call as any).getStats();
+            stats.forEach((report: any) => {
+              if (report.localAudioTrackStats) {
+                report.localAudioTrackStats.forEach((stat: any) => {
+                  if (stat.audioLevel === 0 && !call.isMuted()) {
+                    console.warn('[Voice] Diagnostic: No local audio energy detected. Check Mic.');
+                  }
+                });
+              }
+            });
+            if (call.status() === 'open') {
+              setTimeout(monitorMediaHealth, 5000);
+            }
+          } catch (err) {
+            console.error('[Voice] Media monitor error:', err);
+          }
+        };
+        monitorMediaHealth();
       })
 
       call.on('disconnect', () => {
