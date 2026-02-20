@@ -1430,15 +1430,15 @@ export default function AccountDossierPage() {
                               <motion.div
                                 key={call.id}
                                 layout
-                                initial={{ opacity: 0, x: 20, scale: 0.98 }}
-                                animate={{ opacity: 1, x: 0, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.98 }}
+                                initial={{ opacity: 0, height: 0, x: -10 }}
+                                animate={{ opacity: 1, height: 'auto', x: 0 }}
+                                exit={{ opacity: 0, height: 0, x: 10 }}
                                 transition={{
-                                  type: "spring",
-                                  stiffness: 400,
-                                  damping: 30
+                                  opacity: { duration: 0.2 },
+                                  height: { duration: 0.3 },
+                                  layout: { type: 'spring', stiffness: 500, damping: 35, mass: 1 }
                                 }}
-                                className="hover:translate-x-1 transition-transform"
+                                className="overflow-hidden"
                               >
                                 <CallListItem
                                   call={call}
