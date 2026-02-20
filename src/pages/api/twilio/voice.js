@@ -267,10 +267,30 @@ export default async function handler(req, res) {
             });
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
 
+            // Resolve which agent identity to ring based on the business number dialed
+            let targetIdentity = 'agent';
+            try {
+                const { supabaseAdmin } = await import('../../../lib/supabase.ts');
+                // Check for user who has this number selected or in their Twilio Numbers
+                const { data: userData } = await supabaseAdmin
+                    .from('users')
+                    .select('id, settings')
+                    .or(`settings->>selectedPhoneNumber.eq.${businessNumber},settings->twilioNumbers.cs.[{"number":"${businessNumber}"}]`)
+                    .limit(1)
+                    .maybeSingle();
+
+                if (userData?.id) {
+                    targetIdentity = `agent-${userData.id}`;
+                    logger.log(`[Voice] Resolved inbound target user: ${userData.id} for number ${businessNumber}`);
+                }
+            } catch (err) {
+                logger.warn('[Voice] Failed to resolve target agent identity, falling back to "agent":', err.message);
+            }
+
             const client = dial.client({
                 statusCallback: `${base}/api/twilio/dial-status${cbq}`,
                 statusCallbackEvent: 'initiated ringing answered completed'
-            }, 'agent');
+            }, targetIdentity);
 
             if (RawFrom && RawFrom !== businessNumber) {
                 client.parameter({ name: 'originalCaller', value: RawFrom });

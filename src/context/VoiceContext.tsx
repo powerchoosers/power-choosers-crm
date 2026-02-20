@@ -148,7 +148,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       isInitializing.current = true
       console.log('[Voice] Fetching new access token...')
 
-      const identity = 'agent'
+      const identity = user?.id ? `agent-${user.id}` : 'agent'
       const response = await fetch(`/api/twilio/token?identity=${encodeURIComponent(identity)}`)
       if (!response.ok) {
         throw new Error(`Failed to fetch token: ${response.statusText}`)
@@ -275,7 +275,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         tokenRefreshTimer.current = setTimeout(() => {
           console.log('[Voice] Proactive token refresh (before expiry)')
           initDevice()
-        }, 23 * 60 * 60 * 1000) // 23 hours
+        }, 22 * 60 * 60 * 1000) // Refresh after 22 hours
+      })
+
+      // Twilio Best Practice: Listen for token expiration and update proactively
+      newDevice.on('tokenWillExpire', () => {
+        console.log('[Voice] Token will expire soon, refreshing...')
+        initDevice()
       })
 
       newDevice.on('warning', (name, data) => {
