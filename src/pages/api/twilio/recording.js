@@ -112,6 +112,34 @@ export default async function handler(req, res) {
                     finalCallSid = await resolveToCallSid({ callSid: CallSid, recordingSid: effectiveRecordingSid || RecordingSid });
                 } catch (_) { }
             }
+
+            // ================================================================
+            // CRITICAL: The recording callback receives the PARENT CallSid
+            // (the browser client:agent leg). But dial-complete.js logs with
+            // the CHILD CallSid (the actual PSTN leg). If we upsert with the
+            // parent SID, we create a duplicate record.
+            //
+            // Fix: Look up child calls of this parent and merge the recording
+            // onto the child call record instead.
+            // ================================================================
+            if (finalCallSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+                try {
+                    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+                    const childCalls = await client.calls.list({ parentCallSid: finalCallSid, limit: 5 });
+                    if (childCalls && childCalls.length > 0) {
+                        // Use the first child call (the PSTN leg) as the target for recording
+                        const childSid = childCalls[0].sid;
+                        logger.log(`[Recording] Mapping recording from parent ${finalCallSid} to child ${childSid}`);
+                        finalCallSid = childSid;
+                    } else {
+                        // No child calls found — check if this CallSid already exists in Supabase
+                        // If not, check if there's a recent call record that matches by timing
+                        logger.log(`[Recording] No child calls found for ${finalCallSid}, using as-is`);
+                    }
+                } catch (childErr) {
+                    logger.warn('[Recording] Failed to look up child calls:', childErr?.message);
+                }
+            }
             // Ensure we have a direct mp3 URL for playback with dual-channel support
             const rawUrl = effectiveRecordingUrl || RecordingUrl;
             let baseMp3;
