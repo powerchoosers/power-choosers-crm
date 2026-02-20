@@ -100,9 +100,14 @@ export default function SignalStream({ accountId }: SignalStreamProps) {
               <div className="flex items-center min-w-0 flex-1 gap-3">
                 {signalIcon(item.event_categories)}
                 <div className="flex flex-col ml-0 flex-1 min-w-0">
-                  <span className="text-xs text-zinc-200 truncate font-medium block">
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-zinc-200 font-medium block hover:text-[#002FA7] transition-colors cursor-pointer"
+                  >
                     {item.title}
-                  </span>
+                  </a>
                   <span className="text-[10px] text-zinc-600 font-mono mt-0.5">
                     {item.domain ? `${item.domain} · ` : ''}
                     {formatRelativeTime(item.published_at)}
