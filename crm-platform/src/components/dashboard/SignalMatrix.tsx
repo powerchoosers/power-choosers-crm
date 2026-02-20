@@ -428,13 +428,13 @@ export function SignalMatrix() {
             </div>
 
             {/* Actions Footer */}
-            <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-end gap-3">
+            <div className={`mt-6 pt-6 border-t border-white/5 grid ${selectedSignal.source_url ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
               {selectedSignal.source_url && (
                 <a
                   href={selectedSignal.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-white/5 border border-white/5 text-[10px] font-mono text-zinc-400 hover:text-white hover:border-white/20 transition-all uppercase tracking-widest"
+                  className="flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-white/5 border border-white/5 text-[10px] font-mono text-zinc-400 hover:text-white hover:border-white/20 transition-all uppercase tracking-widest"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   Source
@@ -445,7 +445,7 @@ export function SignalMatrix() {
                   handleIngestNode(selectedSignal);
                   setSelectedSignal(null);
                 }}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-[#002FA7] text-white text-[10px] font-mono hover:bg-[#002FA7]/90 transition-all uppercase tracking-widest shadow-[0_0_20px_-5px_rgba(0,47,167,0.5)]"
+                className="flex items-center justify-center gap-2 h-11 px-6 rounded-xl bg-[#002FA7] text-white text-[10px] font-mono hover:bg-[#002FA7]/90 transition-all uppercase tracking-widest shadow-[0_0_20px_-5px_rgba(0,47,167,0.5)]"
               >
                 <Plus className="w-3.5 h-3.5" />
                 {selectedSignal.crm_account_id ? 'OPEN_DOSSIER' : 'INGEST_NODE'}
