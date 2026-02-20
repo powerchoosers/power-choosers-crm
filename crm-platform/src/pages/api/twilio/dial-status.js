@@ -62,9 +62,21 @@ export default async function handler(req, res) {
     logger.log('[Dial-Status] Event:', event, '| logCallSid:', logCallSid, '| To:', body.To, '| From:', body.From, '| agent:', agentEmail);
 
     // ================================================================
-    // STEP 1: LOG TO SUPABASE *BEFORE* responding to Twilio.
-    // We log all states to ensure the call appears in the CRM immediately.
+    // Only log TERMINAL events to Supabase (completed, busy, no-answer,
+    // failed, canceled). Intermediate states (initiated, ringing, answered)
+    // are logged to console for debugging but NOT persisted — this prevents
+    // the call showing at 0:00 in the Transmission Log before it's done.
     // ================================================================
+    const terminalEvents = ['completed', 'busy', 'no-answer', 'failed', 'canceled'];
+    const isTerminal = terminalEvents.includes(event);
+
+    if (!isTerminal) {
+      logger.log(`[Dial-Status] Skipping non-terminal event "${event}" for ${logCallSid}`);
+      res.writeHead(200, { 'Content-Type': 'text/plain' });
+      res.end('OK');
+      return;
+    }
+
     if (logCallSid) {
       try {
         let resolvedTo = body.To || '';
