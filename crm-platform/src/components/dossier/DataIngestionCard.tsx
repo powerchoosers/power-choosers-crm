@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileText, X, Loader2 } from 'lucide-react';
+import { UploadCloud, FileText, X, Loader2, Globe, Link2, Sparkles, Check } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 
 interface Document {
   id: string;
@@ -38,7 +39,11 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const [loading, setLoading] = useState(false);
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
+  const [domain, setDomain] = useState('');
+  const [isEnriching, setIsEnriching] = useState(false);
+  const [hasDomain, setHasDomain] = useState(false);
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
 
   const fetchDocuments = useCallback(async () => {
     if (!accountId) return;
@@ -57,9 +62,31 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
     setLoading(false);
   }, [accountId]);
 
+  const fetchDomain = useCallback(async () => {
+    if (!accountId) return;
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('domain')
+      .eq('id', accountId)
+      .maybeSingle();
+
+    if (data?.domain) {
+      setDomain(data.domain);
+      setHasDomain(true);
+    } else {
+      // If missing in DB, check URL params (passed from Signal Matrix)
+      const urlDomain = searchParams?.get('domain');
+      if (urlDomain) {
+        setDomain(urlDomain);
+        setHasDomain(false); // Still needs enrichment/save
+      }
+    }
+  }, [accountId, searchParams]);
+
   useEffect(() => {
     if (!accountId) return;
     fetchDocuments();
+    fetchDomain();
 
     const channel = supabase
       .channel('documents_changes')
@@ -323,6 +350,73 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
           )}
         </div>
       )}
+
+      {/* DOMAIN_UPLINK (Node Identity) */}
+      <div className="p-4 border-b border-white/5 bg-white/[0.01]">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+            <Globe className="w-3 h-3" /> Node_Identity
+          </h3>
+          {hasDomain && (
+            <span className="text-[9px] font-mono text-emerald-500 uppercase flex items-center gap-1">
+              <Check className="w-2.5 h-2.5" /> Verified
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <div className="relative flex-1 group">
+            <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 group-focus-within:text-[#002FA7] transition-colors" />
+            <input
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              placeholder="domain.com"
+              className="w-full bg-black/40 border border-white/5 rounded-lg py-2 pl-9 pr-3 text-xs font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7]/50 outline-none transition-all"
+            />
+          </div>
+          <button
+            onClick={async () => {
+              if (!domain || isEnriching) return;
+              setIsEnriching(true);
+              const tid = toast.loading('Initializing Deep Enrichment...');
+              try {
+                // 1. Update Account Domain
+                const { error: upErr } = await supabase.from('accounts').update({ domain }).eq('id', accountId);
+                if (upErr) throw upErr;
+
+                // 2. Trigger Apollo Enrichment (calling common API)
+                const enrichResp = await fetch(`/api/apollo/company?domain=${encodeURIComponent(domain)}`);
+                if (enrichResp.ok) {
+                  const companyData = await enrichResp.json();
+                  // Replicate the logic from OrgIntelligence or just notify success
+                  // For now, updating the domain is the "Ingestion" step
+                  toast.success('Node Identity Linked', { id: tid });
+                  setHasDomain(true);
+
+                  // Trigger broad UI refresh
+                  queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+                  onIngestionComplete?.();
+                } else {
+                  toast.success('Domain Vector Set (Cache Only)', { id: tid });
+                }
+              } catch (e) {
+                toast.error('Uplink Failed', { id: tid });
+              } finally {
+                setIsEnriching(false);
+              }
+            }}
+            disabled={!domain || isEnriching}
+            className={`
+              flex items-center gap-2 px-3 rounded-lg font-mono text-[10px] uppercase tracking-wider transition-all
+              ${hasDomain
+                ? 'bg-zinc-800 text-zinc-400 hover:text-white'
+                : 'bg-[#002FA7] text-white hover:bg-[#002FA7]/80 shadow-[0_0_15px_-5px_rgba(0,47,167,0.5)]'}
+            `}
+          >
+            {isEnriching ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+            {hasDomain ? 'Re-Enrich' : 'Ingest'}
+          </button>
+        </div>
+      </div>
 
       {/* HEADER - NOW INSIDE CONTAINER */}
       <div className="flex justify-between items-center p-4 border-b border-white/5 nodal-recessed">

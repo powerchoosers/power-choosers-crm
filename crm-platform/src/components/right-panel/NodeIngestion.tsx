@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Search, Building2, User, Link2, MapPin, 
+import {
+  Search, Building2, User, Link2, MapPin,
   Sparkles, AlertTriangle, CheckCircle, ArrowRight, Loader2, Lock, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -21,7 +21,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
       const response = await fetch(`/api/apollo/company?domain=${encodeURIComponent(identifier)}`);
       if (!response.ok) return null;
       const data = await response.json();
-      
+
       return {
         id: data.id,
         name: data.name,
@@ -60,7 +60,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
 
       if (!response.ok) return null;
       const data = await response.json();
-      
+
       if (data.contacts && data.contacts.length > 0) {
         const person = data.contacts[0];
         return {
@@ -88,18 +88,28 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
 export function NodeIngestion() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { rightPanelMode, setRightPanelMode, ingestionContext, setIngestionContext } = useUIStore();
+  const { rightPanelMode, setRightPanelMode, ingestionContext, setIngestionContext, ingestionIdentifier, setIngestionIdentifier } = useUIStore();
   const type = rightPanelMode === 'INGEST_ACCOUNT' ? 'ACCOUNT' : 'CONTACT';
   const isRapidContactInjection = type === 'CONTACT' && !!ingestionContext?.accountId;
-  
+
   const [step, setStep] = useState<'SIGNAL' | 'VERIFY' | 'COMMIT'>('SIGNAL');
-  const [identifier, setIdentifier] = useState('');
+  const [identifier, setIdentifier] = useState(ingestionIdentifier || '');
   const [isScanning, setIsScanning] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
   const [isManual, setIsManual] = useState(false);
+
+  // Auto-scan if identifier is pre-filled from external signal
+  useEffect(() => {
+    if (ingestionIdentifier && step === 'SIGNAL') {
+      handleScan();
+      // Clear after one-time use to prevent loops/stale data on next open
+      setIngestionIdentifier(null);
+    }
+  }, [ingestionIdentifier]);
+
   const firstNameInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Form State
   const [entityName, setEntityName] = useState('');
   const [description, setDescription] = useState('');
@@ -140,7 +150,7 @@ export function NodeIngestion() {
             .select('name, website, industry')
             .eq('id', ingestionContext.accountId)
             .single();
-          
+
           if (data && !error) {
             setAccountData(data);
           }
@@ -159,14 +169,14 @@ export function NodeIngestion() {
     const timer = setTimeout(async () => {
       setIsSearching(true);
       setPotentialMatches([]);
-      
+
       try {
         // Extract domain from website URL
         let domain = null;
         if (accountData.website) {
           try {
-            const url = accountData.website.startsWith('http') 
-              ? accountData.website 
+            const url = accountData.website.startsWith('http')
+              ? accountData.website
               : `https://${accountData.website}`;
             domain = new URL(url).hostname.replace('www.', '');
           } catch (e) {
@@ -197,19 +207,19 @@ export function NodeIngestion() {
         if (response.ok) {
           const data = await response.json();
           const people = data.people || [];
-          
+
           // Filter to matches where first name matches (case insensitive)
-          const matches = people.filter((p: any) => 
+          const matches = people.filter((p: any) =>
             p.firstName?.toLowerCase() === firstName.toLowerCase()
           );
 
           // If we have lastName input, further filter by last name initial
           if (lastName && matches.length > 0) {
             const lastInitial = lastName.charAt(0).toLowerCase();
-            const filteredByInitial = matches.filter((p: any) => 
+            const filteredByInitial = matches.filter((p: any) =>
               p.lastName?.charAt(0).toLowerCase() === lastInitial
             );
-            
+
             if (filteredByInitial.length > 0) {
               setPotentialMatches(filteredByInitial);
               setShowVerifyModal(true);
@@ -234,7 +244,7 @@ export function NodeIngestion() {
   const handleSelectMatch = async (match: any) => {
     setShowVerifyModal(false);
     setIsEnriching(true);
-    
+
     try {
       // Enrich using the person's ID to reveal email
       const enrichBody = {
@@ -253,7 +263,7 @@ export function NodeIngestion() {
         const data = await response.json();
         if (data.contacts && data.contacts.length > 0) {
           const contact = data.contacts[0];
-          
+
           // Auto-populate all fields with enriched data
           setFirstName(contact.firstName || firstName);
           setLastName(contact.lastName || lastName);
@@ -261,7 +271,7 @@ export function NodeIngestion() {
           setEmail(contact.email || email);
           setCity(contact.city || city);
           setState(contact.state || state);
-          
+
           toast.success(`Enriched ${contact.firstName} ${contact.lastName}`, {
             description: contact.email ? `Email: ${contact.email}` : contact.jobTitle
           });
@@ -387,7 +397,7 @@ export function NodeIngestion() {
         description: `${entityName || firstName + ' ' + lastName} has been committed to the database.`,
         className: "bg-zinc-950 nodal-monolith-edge text-white font-mono",
       });
-      
+
       // Invalidate queries to refresh the lists immediately
       if (type === 'ACCOUNT') {
         queryClient.invalidateQueries({ queryKey: ['accounts'] });
@@ -399,7 +409,7 @@ export function NodeIngestion() {
         }
         router.push(`/network/contacts/${id}`);
       }
-      
+
       resetProtocol();
     } catch (error: any) {
       console.error('Commit error:', error);
@@ -435,7 +445,7 @@ export function NodeIngestion() {
 
   return (
     <div className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden">
-      
+
       {/* HEADER - Forensic Style */}
       <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 nodal-recessed">
         <div className="flex items-center gap-2">
@@ -451,13 +461,13 @@ export function NodeIngestion() {
 
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         <AnimatePresence mode="wait">
-          
+
           {/* STEP 1: SIGNAL ACQUISITION (or Rapid Contact Injection with Context Lock) */}
           {step === 'SIGNAL' && (
-            <motion.div 
+            <motion.div
               key="signal"
-              initial={{ opacity: 0, x: 20 }} 
-              animate={{ opacity: 1, x: 0 }} 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
@@ -471,7 +481,7 @@ export function NodeIngestion() {
                         {ingestionContext?.accountName ?? 'Account'}
                       </span>
                     </div>
-                    
+
                     {/* Apollo Search/Enrichment Indicator */}
                     {(isSearching || isEnriching) && (
                       <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30">
@@ -486,7 +496,7 @@ export function NodeIngestion() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase">First Name</label>
-                        <input 
+                        <input
                           ref={firstNameInputRef}
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
@@ -496,7 +506,7 @@ export function NodeIngestion() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase">Last Name</label>
-                        <input 
+                        <input
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
                           className="nodal-input w-full"
@@ -506,7 +516,7 @@ export function NodeIngestion() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Job Title</label>
-                      <input 
+                      <input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         className="nodal-input w-full"
@@ -516,7 +526,7 @@ export function NodeIngestion() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase">Email</label>
-                        <input 
+                        <input
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="nodal-input w-full"
@@ -525,7 +535,7 @@ export function NodeIngestion() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase">Phone</label>
-                        <input 
+                        <input
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           className="nodal-input w-full"
@@ -535,7 +545,7 @@ export function NodeIngestion() {
                     </div>
                   </div>
                   <div className="pt-4 border-t border-white/10">
-                    <Button 
+                    <Button
                       onClick={handleCommit}
                       disabled={isCommitting || (!firstName && !lastName)}
                       className="w-full bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold h-10 tracking-tight flex items-center justify-center gap-2"
@@ -558,7 +568,7 @@ export function NodeIngestion() {
                     Signal Source
                   </label>
                   <div className="relative group">
-                    <input 
+                    <input
                       value={identifier}
                       onChange={(e) => setIdentifier(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleScan()}
@@ -588,8 +598,8 @@ export function NodeIngestion() {
           {step === 'VERIFY' && (
             <motion.div
               key="verify"
-              initial={{ opacity: 0, x: 20 }} 
-              animate={{ opacity: 1, x: 0 }} 
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               className="space-y-6"
             >
@@ -602,7 +612,7 @@ export function NodeIngestion() {
                       SIGNAL_LOST // DARK_NODE
                     </div>
                     <div className="text-xs text-zinc-400 mt-1">
-                      Target has no digital footprint. 
+                      Target has no digital footprint.
                       <span className="text-amber-200/70 block mt-1">Initiating Manual Override Protocol.</span>
                     </div>
                   </div>
@@ -627,7 +637,7 @@ export function NodeIngestion() {
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Entity Name</label>
-                      <input 
+                      <input
                         value={entityName}
                         onChange={(e) => setEntityName(e.target.value)}
                         className="nodal-input w-full"
@@ -636,7 +646,7 @@ export function NodeIngestion() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Description</label>
-                      <textarea 
+                      <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         className="nodal-input w-full min-h-[60px] resize-none"
@@ -649,7 +659,7 @@ export function NodeIngestion() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">First Name</label>
-                      <input 
+                      <input
                         value={firstName}
                         onChange={(e) => setFirstName(e.target.value)}
                         className="nodal-input w-full"
@@ -658,7 +668,7 @@ export function NodeIngestion() {
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Last Name</label>
-                      <input 
+                      <input
                         value={lastName}
                         onChange={(e) => setLastName(e.target.value)}
                         className="nodal-input w-full"
@@ -672,7 +682,7 @@ export function NodeIngestion() {
                   <>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Job Title</label>
-                      <input 
+                      <input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         className="nodal-input w-full"
@@ -682,7 +692,7 @@ export function NodeIngestion() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase">Email</label>
-                        <input 
+                        <input
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           className="nodal-input w-full"
@@ -691,7 +701,7 @@ export function NodeIngestion() {
                       </div>
                       <div className="space-y-1">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase">Phone</label>
-                        <input 
+                        <input
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
                           className="nodal-input w-full"
@@ -706,20 +716,20 @@ export function NodeIngestion() {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Revenue</label>
-                      <input 
+                      <input
                         value={revenue}
                         onChange={(e) => setRevenue(e.target.value)}
-                        className="nodal-input w-full" 
-                        placeholder="Unknown" 
+                        className="nodal-input w-full"
+                        placeholder="Unknown"
                       />
                     </div>
                     <div className="space-y-1">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Headcount</label>
-                      <input 
+                      <input
                         value={employees}
                         onChange={(e) => setEmployees(e.target.value)}
-                        className="nodal-input w-full" 
-                        placeholder="Unknown" 
+                        className="nodal-input w-full"
+                        placeholder="Unknown"
                       />
                     </div>
                   </div>
@@ -729,13 +739,13 @@ export function NodeIngestion() {
                   <div className="pt-4 border-t border-white/5">
                     <span className="text-[10px] font-mono text-zinc-500 uppercase block mb-3">Node Topology</span>
                     <div className="grid grid-cols-2 gap-2 mb-4">
-                      <button 
+                      <button
                         onClick={() => setNodeTopology('PARENT')}
                         className={`text-xs font-mono py-2 rounded border transition-all ${nodeTopology === 'PARENT' ? 'bg-[#002FA7]/20 border-[#002FA7] text-white shadow-[0_0_10px_-3px_#002FA7]' : 'border-white/10 text-zinc-500 hover:bg-white/5'}`}
                       >
                         [ PARENT ]
                       </button>
-                      <button 
+                      <button
                         onClick={() => setNodeTopology('SUBSIDIARY')}
                         className={`text-xs font-mono py-2 rounded border transition-all ${nodeTopology === 'SUBSIDIARY' ? 'bg-[#002FA7]/20 border-[#002FA7] text-white shadow-[0_0_10px_-3px_#002FA7]' : 'border-white/10 text-zinc-500 hover:bg-white/5'}`}
                       >
@@ -749,7 +759,7 @@ export function NodeIngestion() {
                           <Link2 className="w-3 h-3 text-zinc-500" />
                           <span className="text-[10px] text-zinc-400 font-mono">LINK PARENT NODE</span>
                         </div>
-                        <input 
+                        <input
                           placeholder="Search existing database..."
                           className="w-full bg-transparent border-b border-white/10 text-xs font-mono text-white focus:border-[#002FA7] outline-none pb-1"
                         />
@@ -770,7 +780,7 @@ export function NodeIngestion() {
                     </div>
                     <div className="relative group">
                       <MapPin className="absolute left-3 top-2.5 w-4 h-4 text-zinc-600 group-focus-within:text-white transition-colors" />
-                      <input 
+                      <input
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                         placeholder="Service Address (Meter Location)"
@@ -783,7 +793,7 @@ export function NodeIngestion() {
 
               {/* ACTION FOOTER */}
               <div className="pt-6 mt-6 border-t border-white/10">
-                <Button 
+                <Button
                   onClick={handleCommit}
                   disabled={isCommitting || (type === 'ACCOUNT' ? !entityName : (!firstName && !lastName))}
                   className="w-full bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold h-10 tracking-tight flex items-center justify-center gap-2"
