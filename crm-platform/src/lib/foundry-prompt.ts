@@ -216,7 +216,9 @@ export function generateSystemPrompt(
     5. BULLET LENGTH: Bullet points MUST be one single, short sentence. Max 15 words per bullet.
     6. SPECIFICITY: You MUST reference the lead's company name and their industry context if available. Avoid being generic.
     7. GREETINGS: If you include a greeting (e.g. "${greeting}"), it MUST be followed by EXACTLY TWO newline characters (\n\n). NEVER put a greeting on the same line as the body text.
-    8. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
+    8. NO CITATIONS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
+    9. TEXAS MARKET (ERCOT): Nodal Point operates in the Texas deregulated energy market. Use Texas terminology (4CP, TDSP, Load Zones). Forbid UK references.
+    10. FORMATTING: Return ONLY a valid JSON object: { "text": "...", "bullets": [...] }.
   `
 
     if (blockType === 'TEXT_MODULE' && (userPrompt.toLowerCase().includes('intro') || !userPrompt)) {
