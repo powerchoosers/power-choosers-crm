@@ -16,6 +16,9 @@ interface UIState {
   /** Pre-filled context when opening INGEST_CONTACT from Account Dossier (Rapid Contact Injection) */
   ingestionContext: IngestionContext | null
   setIngestionContext: (ctx: IngestionContext | null) => void
+  /** Initial identifier (domain/url) for ingestion from external signals */
+  ingestionIdentifier: string | null
+  setIngestionIdentifier: (id: string | null) => void
   /** Set when Org Intelligence enriches an account – dossier uses this to trigger blur-in */
   lastEnrichedAccountId: string | null
   setLastEnrichedAccountId: (id: string | null) => void
@@ -32,6 +35,8 @@ export const useUIStore = create<UIState>((set) => ({
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
   ingestionContext: null,
   setIngestionContext: (ctx) => set({ ingestionContext: ctx }),
+  ingestionIdentifier: null,
+  setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
   lastEnrichedAccountId: null,
   setLastEnrichedAccountId: (id) => set({ lastEnrichedAccountId: id }),
   lastEnrichedContactId: null,
