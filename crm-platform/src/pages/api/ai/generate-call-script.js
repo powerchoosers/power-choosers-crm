@@ -214,6 +214,13 @@ RULES:
 - In other states, assume they might be on the utility's default "Price to Compare" rate unless a supplier is listed.
 - Ensure the Problem section always ends with a conversation-opening question.
 
+HIGH_AGENCY_ANALYSIS:
+- Treat the "CLIENT CONTEXT" as a mandatory part of the script's identity. 
+- When the user asks to "mention their company", do not use a placeholder. Use "${company}".
+- When the user asks to "mention their industry", use "${industry}".
+- If the prompt is generic, you MUST override it with the specific details of the target to make the call feel like it's specifically for ${name} at ${company}.
+- A high-agency analyst doesn't read scripts; they have conversations based on facts.
+
 Generate the script now:
 `;
 

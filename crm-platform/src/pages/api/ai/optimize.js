@@ -33,10 +33,12 @@ export default async function handler(req, res) {
       let userContent = '';
 
       const dataVectors = [
-        vectors.includes('firmographics') && `- CONTACT: ${contact?.name || 'Unknown'} at ${contact?.company || 'Unknown'} (${contact?.industry || 'Unknown'})`,
-        vectors.includes('energy_intel') && `- ENERGY_INTEL: Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.load_factor || 'Unknown'}, Annual Usage ${contact?.annual_usage || 'Unknown'}, Contract Exp ${contact?.contractEndDate || 'Unknown'}`,
+        `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contact?.industry || 'Unknown'}) at ${contact?.company || 'Unknown'}`,
+        contact?.location && `- LOCATION: ${contact.location}`,
+        `- ENERGY_INTEL: Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.load_factor || 'Unknown'}, Annual Usage ${contact?.annual_usage || 'Unknown'}, Contract Exp ${contact?.contractEndDate || 'Unknown'}`,
         vectors.includes('recent_news') && `- SIGNALS: ${contact?.news || 'No news signals.'}`,
-        vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${contact?.transcript || 'No previous call transcripts.'}`
+        vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${contact?.transcript || 'No previous call transcripts.'}`,
+        contact?.metadata && `- EXTENDED_METADATA: ${JSON.stringify(contact.metadata)}`
       ].filter(Boolean).join('\n');
 
       if (mode === 'optimize_prompt') {
@@ -61,25 +63,38 @@ export default async function handler(req, res) {
           4. NO em-dashes (—). Use commas or periods.
           5. Start with first name and a comma only. No "Hi" or "Hello."
           6. If you use bullets, this email fails. Use paragraphs only.
+          7. NO CITATIONS OR LINKS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
+          8. TEXAS DEREGULATED MARKET (ERCOT): We operate in Texas. Use only Texas energy terminology (4CP tags, TDUs, Co-op risks). Forbid UK references (like "Citizens Advice").
+
+          HIGH_AGENCY_IDENTITY_RESOLUTION:
+          - NEVER wait for bracketed variables like {{company}} or {{industry}}.
+          - You possess the target's full identity in NEURAL_CONTEXT. Use it proactively to make the email feel manual and researched.
+          - ALIAS_MAPPING: 
+            - If STRATEGY says "the prospect" or "them" -> Use ${contact?.name || 'the contact'}.
+            - If STRATEGY says "their company" or "the business" -> Use ${contact?.company || 'the business'}.
+            - If STRATEGY says "their industry" -> Use ${contact?.industry || 'their industry'}.
+            - If STRATEGY says "their location" -> Use ${contact?.location || contact?.city || 'their area'}.
+          - WEAVE DATA NATURALLY: A high-agency analyst doesn't use placeholders; they use facts. If you know they are in 'Manufacturing', don't just say 'your industry'. Say 'the manufacturing sector' or 'your production facility'.
+
+          INTELLIGENT_CONTEXT_MAPPING:
+          - Use the NEURAL_CONTEXT and EXTENDED_METADATA to personalize the email proactively.
+          - RESOLVE PLACEHOLDERS: If the STRATEGY *does* contain variables like {{company}}, {{industry}}, etc., resolve them.
+          - If a field is missing (e.g., no asset_type), infer it logically (e.g., "facilities" or "operation nodes") or use a natural, professional phrase.
+          - Do not wait for explicit instructions; if you see a relevant data point (like a recent call or a news signal), weave it in.
 
           NEURAL_CONTEXT:
-          ${dataVectors || '- No specific data vectors provided.'}
-
-          CONTACT_COMPANY:
-          ${contact?.company || 'Unknown'}
+          ${dataVectors}
 
           STRATEGY (follow this above all else):
           ${prompt}
 
           INSTRUCTIONS:
           - Generate a sequence step (type: ${type}) based on the STRATEGY.
-          - If news or transcript data exists in NEURAL_CONTEXT, reference it directly.
-
-          Output MUST be a valid JSON object:
+          - Output MUST be a valid JSON object:
           {
             "subject_line": "Direct, non-salesy subject",
             "body_html": "<p>FirstName,</p><p>Paragraph 1.</p><p>Paragraph 2.</p>",
-            "logic_reasoning": "Explain why this fits a human, 6th-grade tone and Nodal diagnostic posture."
+            "logic_reasoning": "Explain how you resolved the target's identity and applied the Nodal diagnostic posture without relying on static templates."
           }
         `;
         userContent = `STRATEGY: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
@@ -93,6 +108,19 @@ export default async function handler(req, res) {
           3. Tone: Professional, human, direct.
           4. Formatting: NO EM-DASHES (—).
           5. NO bullet points. Use short paragraphs.
+          6. NO CITATIONS OR LINKS: Do not include any external URLs or bracketed sources.
+          7. TEXAS/ERCOT CONTEXT: Only use Texas energy market references. No UK references.
+
+          INTELLIGENT_CONTEXT_MAPPING:
+          - Use the NEURAL_CONTEXT and EXTENDED_METADATA to personalize the draft proactively.
+          - RESOLVE PLACEHOLDERS: If the draft or strategy contains variables like {{company}}, {{industry}}, {{city}}, {{asset_type}}, etc., you MUST resolve them using the provided context.
+          
+          HIGH_AGENCY_IDENTITY_RESOLUTION:
+          - DO NOT wait for bracketed variables. If the draft is generic (e.g. "your company", "your industry"), you MUST replace those with specific data from NEURAL_CONTEXT (e.g. "${contact?.company || 'your business'}", "${contact?.industry || 'your industry'}").
+          - When optimizing, make the text feel manual and researched. A high-agency analyst doesn't use placeholders; they use facts.
+
+          NEURAL_CONTEXT:
+          ${dataVectors}
           
           INSTRUCTIONS:
           - Optimize the provided draft (type: ${type}) using the Strategy: ${prompt || '(None)'}.
@@ -100,10 +128,10 @@ export default async function handler(req, res) {
             {
               "subject_line": "Forensic and direct subject",
               "body_html": "Optimized body with HTML tags.",
-              "logic_reasoning": "Explanation of optimization choices."
+              "logic_reasoning": "Explanation of optimization choices and high-agency identity resolution."
             }
         `;
-        userContent = `Optimize this draft: ${draft}`;
+        userContent = `Draft to optimize: ${draft}`;
       }
 
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -192,6 +220,8 @@ export default async function handler(req, res) {
       - No em-dashes (—). No en-dashes (–). Use commas or colons.
       - Bullet points must be one single, short sentence. Max 15 words per bullet.
       - Highlight the financial variance, market volatility, or technical risk.
+      - NO CITATIONS OR LINKS: Forbid external URLs or bracketed sources.
+      - TEXAS/ERCOT SPECIFIC: Avoid UK or non-US energy market references.
       
       INSTRUCTIONS:
       - Rewrite the draft to be more impactful and aligned with the Nodal Point philosophy.
