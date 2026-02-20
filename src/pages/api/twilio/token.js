@@ -117,7 +117,7 @@ export default async function handler(req, res) {
       apiKeySecret,
       {
         identity: identity,
-        ttl: 86400, // 24 hours
+        ttl: 82800, // 23 hours
       }
     );
 
@@ -159,7 +159,7 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({
       token: tokenJwt,
       identity: identity,
-      ttl: 86400
+      ttl: 82800
     }));
     return;
 
