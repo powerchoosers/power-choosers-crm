@@ -86,7 +86,7 @@ export default async function handler(req, res) {
         const timeoutPromise = new Promise((_, reject) =>
           setTimeout(() => reject(new Error('Supabase timeout')), 5000)
         );
-        const readPromise = supabaseAdmin.from('calls').select('metadata, recordingSid').eq('id', callSid).maybeSingle();
+        const readPromise = supabaseAdmin.from('calls').select('*').eq('id', callSid).maybeSingle();
 
         const { data: snap, error: readError } = await Promise.race([readPromise, timeoutPromise]);
         if (readError) throw readError;
@@ -94,12 +94,14 @@ export default async function handler(req, res) {
         if (snap) {
           const metadata = snap.metadata || {};
           if (metadata.ciTranscriptSid) ciTranscriptSid = String(metadata.ciTranscriptSid);
-          if (snap.recordingSid) existingRecordingSid = String(snap.recordingSid);
+          existingRecordingSid = String(snap.recordingSid || snap.recording_sid || '');
+
           // Try to parse from recordingUrl if present
-          if (!existingRecordingSid && metadata.recordingUrl) {
+          if (!existingRecordingSid && (snap.recordingUrl || snap.recording_url || metadata.recordingUrl)) {
             try {
+              const rUrl = snap.recordingUrl || snap.recording_url || metadata.recordingUrl;
               // Match Recording SID from URL - handles both .mp3 and query string formats
-              const m = String(metadata.recordingUrl).match(/Recordings\/(RE[A-Z0-9]+)/i);
+              const m = String(rUrl).match(/Recordings\/(RE[A-Z0-9]+)/i);
               if (m && m[1]) existingRecordingSid = m[1];
             } catch (_) { }
           }
