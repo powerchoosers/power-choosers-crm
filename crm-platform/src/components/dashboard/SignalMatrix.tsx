@@ -5,6 +5,7 @@ import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, Tr
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
 
 type TabId = 'recon' | 'monitor';
@@ -94,41 +95,27 @@ function formatRelativeTime(iso: string): string {
 export function SignalMatrix() {
   const { setRightPanelMode, setIngestionIdentifier } = useUIStore();
   const [activeTab, setActiveTab] = useState<TabId>('recon');
-  const [signals, setSignals] = useState<IntelSignal[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [selectedSignal, setSelectedSignal] = useState<IntelSignal | null>(null);
   const router = useRouter();
 
   const [isScraping, setIsScraping] = useState(false);
 
-  // Fetch from DB
-  const fetchSignals = useCallback(async (showRefreshing = false) => {
-    if (showRefreshing) setIsRefreshing(true);
-    else setIsLoading(true);
-    setError(null);
-
-    try {
-      // Add timestamp to foil client-side caching if needed
+  // Fetch signals autonomously using TanStack Query
+  const { data: qData, isLoading, isFetching, error, refetch } = useQuery({
+    queryKey: ['market-recon-signals'],
+    queryFn: async () => {
+      // Add t param to force cache bust on Vercel Edge Cache during background refetches
       const res = await fetch(`/api/intelligence/signals?type=recon&limit=20&t=${Date.now()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setSignals(data.signals || []);
-      setLastUpdated(data.last_updated || new Date().toISOString());
-    } catch (err: any) {
-      setError('Signal feed offline');
-      console.error('[SignalMatrix] fetch error:', err);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+      return res.json();
+    },
+    refetchInterval: 300000, // Background poll every 5m as a fallback
+    refetchOnWindowFocus: true, // Auto-update when returning to tab/dashboard
+  });
 
-  useEffect(() => {
-    fetchSignals();
-  }, [fetchSignals]);
+  const signals: IntelSignal[] = qData?.signals || [];
+  const lastUpdated = qData?.last_updated || null;
+  const isRefreshing = isFetching && !isLoading;
 
   // Trigger Edge Function directly
   const triggerScrape = async () => {
@@ -145,7 +132,7 @@ export function SignalMatrix() {
       toast.success(`Scan complete. ${data.count || 0} new anomalies detected.`, { id: toastId });
 
       // Pull fresh data & animate refresh
-      await fetchSignals(true);
+      await refetch();
     } catch (err: any) {
       console.error('[SignalMatrix] manual scrape error:', err);
       toast.error('Scan failed to initialize.', { id: toastId });
