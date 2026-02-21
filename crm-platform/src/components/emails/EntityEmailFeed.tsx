@@ -60,22 +60,8 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: Entity
                                     >
                                         <button
                                             onClick={() => toggleExpand(email.id)}
-                                            className="w-full text-left p-4 flex items-start gap-4 focus:outline-none focus:bg-white/[0.02] transition-colors"
+                                            className="w-full text-left p-4 flex items-start focus:outline-none transition-colors"
                                         >
-                                            {/* Icon */}
-                                            <div className="shrink-0 mt-0.5 relative">
-                                                <div className={cn(
-                                                    "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border",
-                                                    isExpanded ? "bg-[#002FA7]/20 border-[#002FA7]/30 text-[#002FA7]" : "bg-black/40 border-white/5 text-zinc-500 group-hover:text-zinc-400"
-                                                )}>
-                                                    {email.type === 'sent' ? (
-                                                        <ArrowUpRight className="w-4 h-4" />
-                                                    ) : (
-                                                        <ArrowDownLeft className="w-4 h-4" />
-                                                    )}
-                                                </div>
-                                            </div>
-
                                             {/* Header Content */}
                                             <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                 <div className="flex items-center justify-between gap-2">
