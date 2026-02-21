@@ -141,6 +141,16 @@ export function SignalMatrix() {
     }
   };
 
+  // Auto-sync selectedSignal when background fetch updates the list
+  useEffect(() => {
+    if (selectedSignal) {
+      const updatedMatch = signals.find((s) => s.id === selectedSignal.id);
+      if (updatedMatch && updatedMatch.crm_account_id !== selectedSignal.crm_account_id) {
+        setSelectedSignal(updatedMatch);
+      }
+    }
+  }, [signals, selectedSignal]);
+
   const handleIngestNode = (signal: IntelSignal) => {
     if (signal.crm_account_id) {
       router.push(`/network/accounts/${signal.crm_account_id}?domain=${encodeURIComponent(signal.entity_domain || '')}`);
