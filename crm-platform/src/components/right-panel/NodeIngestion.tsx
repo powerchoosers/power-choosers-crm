@@ -88,7 +88,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
 export function NodeIngestion() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { rightPanelMode, setRightPanelMode, ingestionContext, setIngestionContext, ingestionIdentifier, setIngestionIdentifier } = useUIStore();
+  const { rightPanelMode, setRightPanelMode, ingestionContext, setIngestionContext, ingestionIdentifier, setIngestionIdentifier, ingestionSignal, setIngestionSignal } = useUIStore();
   const type = rightPanelMode === 'INGEST_ACCOUNT' ? 'ACCOUNT' : 'CONTACT';
   const isRapidContactInjection = type === 'CONTACT' && !!ingestionContext?.accountId;
 
@@ -393,6 +393,41 @@ export function NodeIngestion() {
         if (error) throw error;
       }
 
+      // If we initialized from an intelligence signal (Account), persist it to the News Vector
+      if (type === 'ACCOUNT' && ingestionSignal) {
+        try {
+          const domainKey = identifier.includes('.') ? identifier : scanResult?.domain;
+          if (domainKey) {
+            await supabase.from('apollo_news_articles').upsert({
+              domain: domainKey,
+              apollo_article_id: ingestionSignal.id || crypto.randomUUID(),
+              title: ingestionSignal.headline || '',
+              url: ingestionSignal.source_url || null,
+              source_domain: ingestionSignal.entity_domain || domainKey,
+              snippet: ingestionSignal.summary || null,
+              published_at: ingestionSignal.created_at || now,
+              event_categories: ingestionSignal.signal_type ? [ingestionSignal.signal_type] : [],
+              updated_at: now
+            }, { onConflict: 'domain,apollo_article_id' });
+          }
+        } catch (e) {
+          console.error('Failed to commit signal to news vector', e);
+        }
+
+        try {
+          if (ingestionSignal.id) {
+            await supabase.from('market_intelligence').update({
+              crm_account_id: id,
+              crm_match_type: 'exact_domain'
+            }).eq('id', ingestionSignal.id);
+            // Invalidate signals so the matrix updates automatically
+            queryClient.invalidateQueries({ queryKey: ['market-recon-signals'] });
+          }
+        } catch (e) {
+          console.error('Failed to update intelligence signal', e);
+        }
+      }
+
       toast.success(`${type} Node Initialized`, {
         description: `${entityName || firstName + ' ' + lastName} has been committed to the database.`,
         className: "bg-zinc-950 nodal-monolith-edge text-white font-mono",
@@ -425,6 +460,7 @@ export function NodeIngestion() {
   const resetProtocol = () => {
     setRightPanelMode('DEFAULT');
     setIngestionContext(null);
+    setIngestionSignal(null);
     setStep('SIGNAL');
     setIdentifier('');
     setScanResult(null);
