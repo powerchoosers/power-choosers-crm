@@ -516,12 +516,12 @@ export function TopBar() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="flex justify-center"
+                className="w-full flex"
               >
-                <div className="w-full max-w-[1000px] h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6 transition-all duration-300">
+                <div className="w-full h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6 transition-all duration-300">
 
                   {/* Left Sector: Identity */}
-                  <div className="flex items-center gap-3 w-[25%] flex-shrink-0">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
                     <CallBarIcon
                       key={`callbar-icon-${callSessionId}`}
                       logoUrl={callbarLogoUrl || undefined}
@@ -540,7 +540,7 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex items-center justify-center gap-4 w-[35%]">
+                  <div className="flex items-center justify-center gap-4 flex-shrink-0 px-4">
                     {status === 'connected' && (
                       <div className="flex items-center gap-0.5 opacity-80">
                         {[...Array(5)].map((_, i) => (
@@ -572,7 +572,7 @@ export function TopBar() {
                   </div>
 
                   {/* Right Sector: Intervention Triggers */}
-                  <div className="flex items-center justify-end gap-1.5 w-[40%] flex-shrink-0">
+                  <div className="flex items-center justify-end gap-1.5 flex-1 min-w-0">
                     <button
                       onClick={() => setSentiment(sentiment === 'connect' ? null : 'connect')}
                       className={cn(
@@ -682,7 +682,7 @@ export function TopBar() {
                         setSentiment('hangup');
                         handleHangup();
                       }}
-                      className="group flex items-center justify-center w-[36px] h-[36px] ml-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all duration-300 hover:scale-[1.12]"
+                      className="group flex items-center justify-center min-w-[36px] min-h-[36px] w-[36px] h-[36px] shrink-0 ml-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all duration-300 hover:scale-[1.12]"
                     >
                       <Phone size={16} className="transition-transform duration-300 group-hover:rotate-[135deg]" />
                     </button>
