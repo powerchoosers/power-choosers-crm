@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore';
 import { supabase } from '@/lib/supabase';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -11,10 +11,21 @@ import { Plug, Zap, ShieldCheck, Target } from 'lucide-react';
 export function VelocityTrackerV3() {
   const { status, sentiment } = useCallStore();
   const [mounted, setMounted] = useState(false);
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     setMounted(true);
-  }, []);
+
+    const channel = supabase.channel('velocity-metrics-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['velocity-metrics'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Fetch real-time metrics
   const { data: metrics } = useQuery({
