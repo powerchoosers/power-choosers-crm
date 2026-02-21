@@ -25,10 +25,10 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: Entity
     const validEmails = fetchEmails && fetchEmails.length > 0 ? fetchEmails : []
 
     return (
-        <div className="nodal-void-card p-6 shadow-xl mt-6">
-            <div className="flex items-center justify-between mb-4">
+        <div className="space-y-4 mt-4">
+            <div className="flex items-center justify-between px-1">
                 <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Mail className="w-3.5 h-3.5" /> {title}
+                    {title}
                 </h3>
                 <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">
                     {validEmails.length} MESSAGES
@@ -138,8 +138,7 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: Entity
                         </AnimatePresence>
                     </div>
                 ) : (
-                    <div className="p-8 rounded-2xl border border-dashed border-white/5 bg-zinc-950/20 flex flex-col items-center justify-center gap-3">
-                        <Mail className="w-12 h-12 text-zinc-600 opacity-20" />
+                    <div className="p-8 rounded-2xl border border-dashed border-white/5 bg-zinc-950/20 flex flex-col items-center justify-center gap-3 group/empty">
                         <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No email transmissions detected</p>
                     </div>
                 )}
