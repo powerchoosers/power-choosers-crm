@@ -257,7 +257,7 @@ export function useCalls(searchQuery?: string) {
         const type = item.direction === 'inbound' ? 'Inbound' : 'Outbound'
         // Capitalize status
         const status = item.status ? item.status.charAt(0).toUpperCase() + item.status.slice(1) : 'Completed'
-        
+
         // Format duration (seconds to HH:MM:SS)
         const hours = Math.floor((item.duration || 0) / 3600)
         const minutes = Math.floor(((item.duration || 0) % 3600) / 60)
@@ -277,8 +277,8 @@ export function useCalls(searchQuery?: string) {
           duration: durationStr,
           date: item.timestamp || item.createdAt || '',
           note: item.summary,
-          recordingUrl: item.recordingUrl,
-          recordingSid: item.callSid || item.id,
+          recordingUrl: item.recordingUrl || item.recording_url || undefined,
+          recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
           aiInsights: item.aiInsights,
           contactId: item.contactId,
@@ -379,8 +379,8 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
           duration: durationStr,
           date: item.timestamp ?? item.createdAt ?? '',
           note: item.summary,
-          recordingUrl: item.recordingUrl,
-          recordingSid: item.callSid || item.id,
+          recordingUrl: item.recordingUrl || item.recording_url || undefined,
+          recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
           aiInsights: item.aiInsights,
           contactId: item.contactId,
@@ -489,8 +489,8 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
           duration: durationStr,
           date: item.timestamp ?? item.createdAt ?? '',
           note: item.summary,
-          recordingUrl: item.recordingUrl,
-          recordingSid: item.callSid || item.id,
+          recordingUrl: item.recordingUrl || item.recording_url || undefined,
+          recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
           aiInsights: item.aiInsights,
           contactId: item.contactId,
