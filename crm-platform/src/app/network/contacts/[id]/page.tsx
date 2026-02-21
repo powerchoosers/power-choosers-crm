@@ -21,6 +21,7 @@ import { useEntityTasks } from '@/hooks/useEntityTasks'
 import { useTasks, useAllPendingTasks } from '@/hooks/useTasks'
 import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import { CallListItem } from '@/components/calls/CallListItem'
+import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
@@ -1566,6 +1567,12 @@ export default function ContactDossierPage() {
                     </div>
                   )}
                 </div>
+
+                {/* Email Intelligence */}
+                <EntityEmailFeed
+                  emails={[editEmail].filter(Boolean) as string[]}
+                  title="Email Intelligence"
+                />
               </div>
             </div>
           </div>
