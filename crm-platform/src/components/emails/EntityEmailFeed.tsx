@@ -54,8 +54,8 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: Entity
                                         initial={{ opacity: 0, y: 10 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         className={cn(
-                                            "rounded-xl border transition-all duration-300 overflow-hidden",
-                                            isExpanded ? "border-[#002FA7]/50 bg-black/40 shadow-[0_0_15px_rgba(0,47,167,0.1)]" : "border-white/5 bg-zinc-950/20 hover:border-white/10 hover:bg-zinc-900/30"
+                                            "group rounded-xl border transition-all duration-300 overflow-hidden nodal-recessed",
+                                            isExpanded ? "bg-zinc-950/90 border-white/10 shadow-2xl" : "bg-zinc-950/40 border-white/5 hover:bg-zinc-950/80 hover:border-white/10"
                                         )}
                                     >
                                         <button
@@ -100,17 +100,12 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: Entity
                                                 </div>
 
                                                 {!isExpanded && email.snippet && (
-                                                    <div className="text-xs text-zinc-500 mt-1 truncate">
+                                                    <div className="text-xs text-zinc-500 mt-1 truncate max-w-full">
                                                         {email.snippet}
                                                     </div>
                                                 )}
                                             </div>
 
-                                            <div className="shrink-0 mt-1">
-                                                <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} className={cn("transition-colors", isExpanded ? "text-white" : "text-zinc-600")}>
-                                                    <ChevronDown className="w-4 h-4" />
-                                                </motion.div>
-                                            </div>
                                         </button>
 
                                         <AnimatePresence>

@@ -3,6 +3,19 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Email } from './useEmails'
 
+function stripHtml(html: string | undefined | null) {
+    if (!html) return ''
+    let text = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    text = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    text = text.replace(/<[^>]+>/g, ' ')
+    const entities: Record<string, string> = {
+        '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+        '&quot;': '"', '&#39;': "'", '&shy;': '', '&zwnj;': ''
+    }
+    text = text.replace(/&[a-z0-9#]+;/gi, m => entities[m.toLowerCase()] || ' ')
+    return text.replace(/\s+/g, ' ').trim()
+}
+
 export function useEntityEmails(emailAddresses: string[]) {
     const { user, role, loading } = useAuth()
 
@@ -79,7 +92,7 @@ export function useEntityEmails(emailAddresses: string[]) {
                         to: item.to,
                         html: item.html,
                         text: item.text,
-                        snippet: item.text?.slice(0, 100) || item.snippet,
+                        snippet: stripHtml(item.text || item.html || item.snippet).slice(0, 100),
                         date: date,
                         timestamp: date ? new Date(date).getTime() : Date.now(),
                         unread: !item.is_read,
