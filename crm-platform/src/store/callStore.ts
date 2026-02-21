@@ -25,10 +25,12 @@ interface CallState {
     accountId?: string
     metadata?: any
   } | null
+  sentiment: 'connect' | 'interest' | 'lock' | 'hangup' | null
   setActive: (active: boolean) => void
   setStatus: (status: CallState['status']) => void
   setPhoneNumber: (phone: string) => void
   setMetadata: (metadata: CallState['metadata']) => void
+  setSentiment: (sentiment: CallState['sentiment']) => void
   initiateCall: (phone: string, metadata?: CallState['metadata']) => void
   clearCallTrigger: () => void
   callTriggered: boolean
@@ -42,22 +44,26 @@ export const useCallStore = create<CallState>((set) => ({
   phoneNumber: '',
   callSessionId: 0,
   metadata: null,
+  sentiment: null,
   callTriggered: false,
   isCallHUDOpen: false,
   setActive: (active) => set((state) => ({
     isActive: active,
     // Auto-close HUD when call ends
-    isCallHUDOpen: active ? state.isCallHUDOpen : false
+    isCallHUDOpen: active ? state.isCallHUDOpen : false,
+    sentiment: active ? state.sentiment : null // Reset sentiment on call end
   })),
   setStatus: (status) => set({ status }),
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
   setMetadata: (metadata) => set({ metadata }),
+  setSentiment: (sentiment) => set({ sentiment }),
   setIsCallHUDOpen: (isCallHUDOpen) => set({ isCallHUDOpen }),
   initiateCall: (phoneNumber, metadata = null) => set((state) => ({
     phoneNumber,
     metadata,
     callTriggered: true,
     callSessionId: state.callSessionId + 1,
+    sentiment: null, // Reset on new call
   })),
   clearCallTrigger: () => set({ callTriggered: false }),
 }))
