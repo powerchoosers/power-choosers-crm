@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Mic, PhoneOff, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap } from 'lucide-react'
+import { Phone, Mic, PhoneOff, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap, Handshake, FileSignature } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -521,7 +521,7 @@ export function TopBar() {
                 <div className="w-full h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6 transition-all duration-300">
 
                   {/* Left Sector: Identity */}
-                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="flex items-center gap-3 w-max max-w-[30%] flex-shrink-0">
                     <CallBarIcon
                       key={`callbar-icon-${callSessionId}`}
                       logoUrl={callbarLogoUrl || undefined}
@@ -540,7 +540,7 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex items-center justify-center gap-4 flex-shrink-0 px-4">
+                  <div className="flex-1 flex items-center justify-center gap-4 px-4 min-w-[200px]">
                     {status === 'connected' && (
                       <div className="flex items-center gap-0.5 opacity-80">
                         {[...Array(5)].map((_, i) => (
@@ -572,39 +572,42 @@ export function TopBar() {
                   </div>
 
                   {/* Right Sector: Intervention Triggers */}
-                  <div className="flex items-center justify-end gap-1.5 flex-1 min-w-0">
+                  <div className="flex items-center justify-end gap-1.5 flex-shrink-0">
                     <button
                       onClick={() => setSentiment(sentiment === 'connect' ? null : 'connect')}
                       className={cn(
-                        "px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
+                        "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'connect'
-                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-[#002FA7] shadow-[0_0_10px_rgba(0,47,167,0.3)]"
-                          : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
+                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                          : "bg-zinc-950/50 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-zinc-300"
                       )}
                     >
-                      Connect
+                      <Handshake size={14} className={sentiment === 'connect' ? "text-blue-400" : "text-zinc-500"} />
+                      <span>Connect</span>
                     </button>
                     <button
                       onClick={() => setSentiment(sentiment === 'interest' ? null : 'interest')}
                       className={cn(
-                        "px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
+                        "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'interest'
-                          ? "bg-amber-500/20 border-amber-500/50 text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
-                          : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
+                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                          : "bg-zinc-950/50 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-zinc-300"
                       )}
                     >
-                      Interest
+                      <Zap size={14} className={sentiment === 'interest' ? "text-blue-400" : "text-zinc-500"} />
+                      <span>Interest</span>
                     </button>
                     <button
                       onClick={() => setSentiment(sentiment === 'lock' ? null : 'lock')}
                       className={cn(
-                        "px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
+                        "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'lock'
-                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-                          : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
+                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                          : "bg-zinc-950/50 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-zinc-300"
                       )}
                     >
-                      Lock
+                      <FileSignature size={14} className={sentiment === 'lock' ? "text-blue-400" : "text-zinc-500"} />
+                      <span>Lock</span>
                     </button>
 
                     <div className="w-px h-6 bg-white/10 mx-1" />
