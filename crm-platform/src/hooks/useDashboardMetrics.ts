@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useMarketPulse } from './useMarketPulse'
+import { useEffect } from 'react'
 
 export interface DashboardMetrics {
   liabilityKWh: number // Annual volume protected (sum of annualUsage in kWh)
@@ -20,6 +21,27 @@ export interface DashboardMetrics {
 export function useDashboardMetrics() {
   const { user, role, loading } = useAuth()
   const { data: marketPulse } = useMarketPulse()
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (!user) return
+
+    const channel = supabase.channel('dashboard-metrics-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'calls' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'emails' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] })
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] })
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user, queryClient])
 
   return useQuery<DashboardMetrics>({
     queryKey: ['dashboard-metrics', user?.email, role],
