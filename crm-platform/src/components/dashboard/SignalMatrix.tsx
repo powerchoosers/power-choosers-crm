@@ -93,7 +93,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function SignalMatrix() {
-  const { setRightPanelMode, setIngestionIdentifier } = useUIStore();
+  const { setRightPanelMode, setIngestionIdentifier, setIngestionSignal } = useUIStore();
   const [activeTab, setActiveTab] = useState<TabId>('recon');
   const [selectedSignal, setSelectedSignal] = useState<IntelSignal | null>(null);
   const router = useRouter();
@@ -147,6 +147,7 @@ export function SignalMatrix() {
     } else {
       // Open the ingestion panel and pre-fill the domain
       setIngestionIdentifier(signal.entity_domain || signal.entity_name || '');
+      setIngestionSignal(signal);
       setRightPanelMode('INGEST_ACCOUNT');
     }
   };
@@ -224,8 +225,8 @@ export function SignalMatrix() {
 
             {!isLoading && error && (
               <div className="flex flex-col items-center justify-center h-32 gap-2">
-                <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest">{error}</span>
-                <button onClick={() => fetchSignals()} className="text-[9px] font-mono text-zinc-500 hover:text-white uppercase tracking-widest underline">
+                <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest">{error.message}</span>
+                <button onClick={() => refetch()} className="text-[9px] font-mono text-zinc-500 hover:text-white uppercase tracking-widest underline">
                   Retry
                 </button>
               </div>

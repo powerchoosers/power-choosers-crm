@@ -19,6 +19,9 @@ interface UIState {
   /** Initial identifier (domain/url) for ingestion from external signals */
   ingestionIdentifier: string | null
   setIngestionIdentifier: (id: string | null) => void
+  /** The full signal object that triggered this ingestion, to be committed to apollo_news_articles */
+  ingestionSignal: any | null
+  setIngestionSignal: (signal: any | null) => void
   /** Set when Org Intelligence enriches an account – dossier uses this to trigger blur-in */
   lastEnrichedAccountId: string | null
   setLastEnrichedAccountId: (id: string | null) => void
@@ -37,6 +40,8 @@ export const useUIStore = create<UIState>((set) => ({
   setIngestionContext: (ctx) => set({ ingestionContext: ctx }),
   ingestionIdentifier: null,
   setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
+  ingestionSignal: null,
+  setIngestionSignal: (signal) => set({ ingestionSignal: signal }),
   lastEnrichedAccountId: null,
   setLastEnrichedAccountId: (id) => set({ lastEnrichedAccountId: id }),
   lastEnrichedContactId: null,
