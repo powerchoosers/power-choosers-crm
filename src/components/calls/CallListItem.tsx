@@ -435,7 +435,8 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                 <div className="max-h-80 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
                   {(() => {
                     // 1. Prefer conversationalIntelligence.sentences (backend maps Agent/Customer by channel)
-                    const ci = insights?.conversationalIntelligence
+                    // Prioritize top-level conversationalIntelligence from useCalls hook, fallback to nested aiInsights
+                    const ci = (call.conversationalIntelligence || insights?.conversationalIntelligence) as any
                     const sentences = Array.isArray(ci?.sentences) ? ci.sentences : []
                     const speakerTurns = Array.isArray(insights?.speakerTurns) ? insights.speakerTurns : []
                     type Turn = { role: 'agent' | 'customer'; text: string }
@@ -454,9 +455,9 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                           role: (t.role || 'agent').toLowerCase() === 'customer' ? 'customer' : 'agent',
                           text: (t.text || '').trim(),
                         }))
-                    } else if (call.transcript) {
+                    } else if (call.formattedTranscript || call.transcript) {
                       // 2. Fallback: parse transcript lines; only trust explicit "Agent:" / "Customer:" (from backend)
-                      turns = call.transcript
+                      turns = (call.formattedTranscript || call.transcript || '')
                         .split('\n')
                         .map((line) => {
                           const trimmed = line.trim()
