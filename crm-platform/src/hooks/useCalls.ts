@@ -14,18 +14,20 @@ export interface Call {
   date: string
   note?: string
   recordingUrl?: string
-  recordingSid?: string
-  transcript?: string
-  aiInsights?: Record<string, unknown> | null
-  contactId?: string
-  accountId?: string
+  recordingSid?: string;
+  transcript?: string;
+  formattedTranscript?: string;
+  aiInsights?: Record<string, unknown> | null;
+  conversationalIntelligence?: Record<string, unknown> | null;
+  contactId?: string;
+  accountId?: string;
   /** Company/account for display: name, location, industry, logo */
-  accountName?: string
-  accountCity?: string
-  accountState?: string
-  accountIndustry?: string
-  accountLogoUrl?: string
-  accountDomain?: string
+  accountName?: string;
+  accountCity?: string;
+  accountState?: string;
+  accountIndustry?: string;
+  accountLogoUrl?: string;
+  accountDomain?: string;
 }
 
 export function useSearchCalls(queryTerm: string) {
@@ -168,8 +170,11 @@ type CallRow = {
   recording_sid?: string | null
   recordingSid?: string | null
   transcript?: string | null
+  formatted_transcript?: string | null
+  formattedTranscript?: string | null
   ai_insights?: Record<string, unknown> | null
   aiInsights?: Record<string, unknown> | null
+  conversationalIntelligence?: Record<string, unknown> | null
   contact_id?: string | null
   contactId?: string | null
   account_id?: string | null
@@ -277,12 +282,13 @@ export function useCalls(searchQuery?: string) {
           duration: durationStr,
           date: item.timestamp || item.createdAt || '',
           note: item.summary,
-          recordingUrl: item.recordingUrl || item.recording_url || undefined,
           recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
-          aiInsights: item.aiInsights,
-          contactId: item.contactId,
-          accountId: item.accountId,
+          formattedTranscript: item.formattedTranscript || item.formatted_transcript || undefined,
+          aiInsights: item.aiInsights || item.ai_insights || null,
+          conversationalIntelligence: item.conversationalIntelligence || null,
+          contactId: item.contactId || item.contact_id || undefined,
+          accountId: item.accountId || item.account_id || undefined,
           accountName: account?.name || undefined,
           accountCity: account?.city ?? undefined,
           accountState: account?.state ?? undefined,
@@ -382,9 +388,11 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
           recordingUrl: item.recordingUrl || item.recording_url || undefined,
           recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
-          aiInsights: item.aiInsights,
-          contactId: item.contactId,
-          accountId: item.accountId
+          formattedTranscript: item.formattedTranscript || item.formatted_transcript || undefined,
+          aiInsights: item.aiInsights || item.ai_insights || null,
+          conversationalIntelligence: item.conversationalIntelligence || null,
+          contactId: item.contactId || item.contact_id,
+          accountId: item.accountId || item.account_id
         }
       }) as Call[]
     },
@@ -492,9 +500,11 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
           recordingUrl: item.recordingUrl || item.recording_url || undefined,
           recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
-          aiInsights: item.aiInsights,
-          contactId: item.contactId,
-          accountId: item.accountId
+          formattedTranscript: item.formattedTranscript || item.formatted_transcript || undefined,
+          aiInsights: item.aiInsights || item.ai_insights || null,
+          conversationalIntelligence: item.conversationalIntelligence || null,
+          contactId: item.contactId || item.contact_id,
+          accountId: item.accountId || item.account_id
         }
       }) as Call[]
     },

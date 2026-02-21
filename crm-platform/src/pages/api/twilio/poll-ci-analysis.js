@@ -508,7 +508,10 @@ export default async function handler(req, res) {
             });
 
             if (transcriptText || sentences.length > 0) {
-                const base = process.env.PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app';
+                // Better base URL detection (works for local and Vercel)
+                const protocol = req.headers['x-forwarded-proto'] || (req.headers.host?.includes('localhost') ? 'http' : 'https');
+                const host = req.headers.host;
+                const base = process.env.PUBLIC_BASE_URL || `${protocol}://${host}`;
 
                 // Use Twilio-generated summary if available, otherwise create a basic one
                 const wordCount = transcriptText.split(/\s+/).filter(Boolean).length;
@@ -608,7 +611,8 @@ export default async function handler(req, res) {
         }
 
         const elapsed = Date.now() - _start;
-        try { logger.log('[Poll CI Analysis] Done', { transcriptSid, callSid, elapsedMs: elapsed, sentenceCount: sentences.length }); } catch (_) { }
+        const finalCallSidFlag = resolvedCallSid || callSidInput || 'unknown';
+        try { logger.log('[Poll CI Analysis] Done', { transcriptSid, callSid: finalCallSidFlag, elapsedMs: elapsed, sentenceCount: sentences.length }); } catch (_) { }
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             success: true,
