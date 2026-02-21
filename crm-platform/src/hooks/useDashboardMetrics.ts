@@ -35,11 +35,11 @@ export function useDashboardMetrics() {
 
       try {
         // 1. LIABILITY_UNDER_MGMT: Sum annualUsage from current customers only (in kWh)
-        // Only count accounts with status 'CUSTOMER' or 'ACTIVE_LOAD' (active contracts)
+        // Only count accounts with status 'CUSTOMER' (actual customers, not just active load)
         let liabilityQuery = supabase
           .from('accounts')
           .select('annual_usage')
-          .in('status', ['CUSTOMER', 'ACTIVE_LOAD', 'active']) // Include 'active' for legacy data
+          .in('status', ['CUSTOMER'])
 
         if (role !== 'admin' && user?.email) {
           liabilityQuery = liabilityQuery.eq('ownerId', user.email)
@@ -85,23 +85,29 @@ export function useDashboardMetrics() {
           console.error('Error fetching open positions:', positionsError)
         }
 
-        // 3. OPERATIONAL_VELOCITY: Count calls + emails in last 24 hours
-        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()
+        // 3. OPERATIONAL_VELOCITY: Count calls + emails for the day between 8 AM and 5 PM
+        const startOfWorkDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0)
+        const endOfWorkDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0, 0)
+        const startTimeISO = startOfWorkDay.toISOString()
+        const endTimeISO = endOfWorkDay.toISOString()
 
-        // Count calls in last 24h (no owner filter - calls are global)
+        // Count calls (inbound and outbound) between 8 AM and 5 PM
         const { count: callsCount = 0, error: callsError } = await supabase
           .from('calls')
           .select('id', { count: 'exact', head: true })
-          .gte('timestamp', twentyFourHoursAgo)
+          .gte('timestamp', startTimeISO)
+          .lte('timestamp', endTimeISO)
         if (callsError) {
           console.error('Error fetching calls count:', callsError)
         }
 
-        // Count emails in last 24h (emails table uses camelCase: createdAt)
+        // Count outbound emails between 8 AM and 5 PM
         let emailsQuery = supabase
           .from('emails')
           .select('id', { count: 'exact', head: true })
-          .gte('createdAt', twentyFourHoursAgo)
+          .gte('createdAt', startTimeISO)
+          .lte('createdAt', endTimeISO)
+          .in('type', ['sent', 'uplink_out'])
           .not('subject', 'ilike', '%mailwarming%')
           .not('subject', 'ilike', '%mail warming%')
           .not('subject', 'ilike', '%test email%')

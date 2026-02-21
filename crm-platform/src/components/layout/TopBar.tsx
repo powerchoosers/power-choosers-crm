@@ -105,6 +105,8 @@ export function TopBar() {
     isCallHUDOpen,
     setIsCallHUDOpen,
     callSessionId,
+    sentiment,
+    setSentiment,
   } = useCallStore()
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
@@ -516,8 +518,10 @@ export function TopBar() {
                 exit={{ opacity: 0, y: -20 }}
                 className="flex justify-center"
               >
-                <div className="w-full max-w-2xl h-[50px] nodal-glass border-signal/50 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6">
-                  <div className="flex items-center gap-3">
+                <div className="w-full max-w-[1000px] h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6 transition-all duration-300">
+
+                  {/* Left Sector: Identity */}
+                  <div className="flex items-center gap-3 w-[30%]">
                     <CallBarIcon
                       key={`callbar-icon-${callSessionId}`}
                       logoUrl={callbarLogoUrl || undefined}
@@ -525,40 +529,95 @@ export function TopBar() {
                       name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
                       contactName={displayMetadata?.name || undefined}
                     />
-                    <div>
-                      <div className="text-sm font-medium text-white leading-none mb-1">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</div>
-                      <div className="text-[10px] text-signal font-mono uppercase tracking-tighter flex items-center gap-2">
-                        {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
-                        {selectedNumberName && (
-                          <span className="text-[10px] text-zinc-500 lowercase">via {selectedNumberName}</span>
-                        )}
+                    <div className="flex flex-col min-w-0">
+                      <div className="text-sm font-medium text-white leading-none mb-1 flex items-center gap-2 truncate">
+                        <span className="truncate">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 whitespace-nowrap">
+                          {status === 'connected' ? '[RISK_NODE]' : '[CONNECTING]'}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-zinc-500 lowercase truncate">
+                        {selectedNumberName ? `via ${selectedNumberName}` : 'via Default'}
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  {/* Center Sector: Dynamics */}
+                  <div className="flex items-center justify-center gap-4 w-[40%]">
+                    {status === 'connected' && (
+                      <div className="flex items-center gap-0.5 opacity-80">
+                        {[...Array(5)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="w-[3px] bg-zinc-500 rounded-full"
+                            animate={{ height: ["4px", "14px", "4px"] }}
+                            transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                    <div className="text-[14px] text-signal font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
+                      {status === 'connected' && <span className="w-1.5 h-1.5 bg-signal rounded-full animate-pulse" />}
+                      {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
+                    </div>
+                    {status === 'connected' && (
+                      <div className="flex items-center gap-0.5 opacity-80">
+                        {[...Array(5)].map((_, i) => (
+                          <motion.div
+                            key={i}
+                            className="w-[3px] bg-zinc-500 rounded-full"
+                            animate={{ height: ["4px", "14px", "4px"] }}
+                            transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Sector: Intervention Triggers */}
+                  <div className="flex items-center justify-end gap-1.5 w-[30%]">
                     <button
-                      onClick={() => setIsShowingCallBar(false)}
-                      className="icon-button-forensic p-1.5"
-                      title="Search while on call"
-                    >
-                      <Search size={16} />
-                    </button>
-                    <button
-                      onClick={() => mute(!isMuted)}
+                      onClick={() => setSentiment(sentiment === 'connect' ? null : 'connect')}
                       className={cn(
-                        "icon-button-forensic p-1.5",
-                        isMuted ? "text-red-500 hover:text-red-400" : ""
+                        "px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
+                        sentiment === 'connect'
+                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-[#002FA7] shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                          : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
                       )}
                     >
-                      <Mic size={16} />
+                      Connect
                     </button>
+                    <button
+                      onClick={() => setSentiment(sentiment === 'interest' ? null : 'interest')}
+                      className={cn(
+                        "px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
+                        sentiment === 'interest'
+                          ? "bg-amber-500/20 border-amber-500/50 text-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]"
+                          : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
+                      )}
+                    >
+                      Interest
+                    </button>
+                    <button
+                      onClick={() => setSentiment(sentiment === 'lock' ? null : 'lock')}
+                      className={cn(
+                        "px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
+                        sentiment === 'lock'
+                          ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                          : "bg-white/5 border-white/10 text-zinc-400 hover:bg-white/10"
+                      )}
+                    >
+                      Lock
+                    </button>
+
+                    <div className="w-px h-6 bg-white/10 mx-1" />
+
                     <div className="relative" ref={dialpadContainerRef}>
                       <button
                         type="button"
                         onClick={() => setIsDialpadOpen(!isDialpadOpen)}
                         className={cn(
-                          "icon-button-forensic p-1.5 rounded-[14px] focus:outline-none focus-visible:ring-0",
+                          "icon-button-forensic p-1.5 rounded-[12px] focus:outline-none focus-visible:ring-0",
                           isDialpadOpen && "text-white [&_svg]:scale-[1.15]"
                         )}
                         title="Dialpad (DTMF)"
@@ -574,7 +633,7 @@ export function TopBar() {
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 glass-panel rounded-2xl p-4 z-50"
+                            className="absolute top-full mt-3 right-0 w-48 glass-panel rounded-2xl p-4 z-50"
                           >
                             <div className="grid grid-cols-3 gap-2">
                               {[
@@ -610,9 +669,23 @@ export function TopBar() {
                         )}
                       </AnimatePresence>
                     </div>
+
                     <button
-                      onClick={handleHangup}
-                      className="icon-button-forensic p-1.5 text-red-500 hover:text-red-400"
+                      onClick={() => mute(!isMuted)}
+                      className={cn(
+                        "icon-button-forensic p-1.5",
+                        isMuted ? "text-amber-500 hover:text-amber-400" : ""
+                      )}
+                    >
+                      <Mic size={16} />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setSentiment('hangup');
+                        handleHangup();
+                      }}
+                      className="icon-button-forensic p-1.5 ml-1 rounded-[12px] bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)]"
                     >
                       <PhoneOff size={16} />
                     </button>

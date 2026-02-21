@@ -1,5 +1,5 @@
 import { KPIGrid } from "@/components/dashboard/KPIGrid";
-import { ActivityChart } from "@/components/dashboard/ActivityChart";
+import { VelocityTrackerV3 } from "@/components/dashboard/ActivityChart";
 import { SignalMatrix } from "@/components/dashboard/SignalMatrix";
 import { ForensicLogStream } from "@/components/dashboard/ForensicLogStream";
 import { TaskManagement } from "@/components/dashboard/TaskManagement";
@@ -28,10 +28,10 @@ export default function Home() {
       {/* Zone 1: Telemetry header (physics-based metrics) */}
       <KPIGrid />
 
-      {/* Zone 2 + 3: Response Physics chart | Active Signal Matrix */}
+      {/* Zone 2 + 3: Dial Quota Engine | Active Signal Matrix */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 min-h-[380px]">
-          <ActivityChart />
+          <VelocityTrackerV3 />
         </div>
         <div className="h-[420px] min-h-[420px]">
           <SignalMatrix />
