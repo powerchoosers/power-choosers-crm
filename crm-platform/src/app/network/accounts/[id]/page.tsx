@@ -33,6 +33,7 @@ import { MeterArray } from '@/components/accounts/MeterArray'
 import { StakeholderMap } from '@/components/accounts/StakeholderMap'
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
 import { CallListItem } from '@/components/calls/CallListItem'
+import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
 
 function parseContractEndDate(raw: unknown): Date | null {
   if (!raw) return null
@@ -1463,6 +1464,12 @@ export default function AccountDossierPage() {
                     )}
                   </div>
                 </div>
+
+                {/* Email Intelligence */}
+                <EntityEmailFeed
+                  emails={contacts?.map(c => c.email).filter(Boolean) as string[] || []}
+                  title="Email Intelligence"
+                />
               </div>
             </div>
 

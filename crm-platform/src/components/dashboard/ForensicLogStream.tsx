@@ -1,21 +1,13 @@
 'use client';
 
 import React from 'react';
-import { Terminal } from 'lucide-react';
-
-// Placeholder — wire to ai_insights / forensic_log / tasks later
-const LOG_ENTRIES = [
-  { id: '1', time: '10:42', action: 'ANALYSIS_COMPLETE', detail: '12th Man Tech Bill Audit -> Variance Found ($402).' },
-  { id: '2', time: '10:45', action: 'SIGNAL_DETECTED', detail: 'Camp Fire Texas -> New CFO Hired.' },
-  { id: '3', time: '10:38', action: 'PROTOCOL_TRIGGERED', detail: '4CP curtailment window opened for LZ_NORTH.' },
-  { id: '4', time: '10:31', action: 'ANALYSIS_COMPLETE', detail: 'Nexus Logistics contract review -> Renewal opportunity.' },
-  { id: '5', time: '10:22', action: 'SIGNAL_DETECTED', detail: 'Acme Corp -> Energy Manager role posted.' },
-  { id: '6', time: '10:18', action: 'TASK_COMPLETE', detail: 'Follow-up email sent to Downtown Office Complex.' },
-  { id: '7', time: '10:12', action: 'VOLATILITY_ALERT', detail: 'LZ_HOUSTON > $100 — 3 accounts in zone.' },
-  { id: '8', time: '10:05', action: 'ANALYSIS_COMPLETE', detail: 'Big Steel Inc Bill Audit -> No variance.' },
-];
+import { Terminal, Activity } from 'lucide-react';
+import { useForensicLog } from '@/hooks/useForensicLog';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export function ForensicLogStream() {
+  const { logEntries } = useForensicLog();
+
   return (
     <div className="nodal-void-card overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
@@ -25,21 +17,44 @@ export function ForensicLogStream() {
             FORENSIC_LOG_STREAM
           </span>
         </div>
-        <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
-          Placeholder — API pending
-        </span>
+        <div className="flex items-center gap-1.5 text-[#002FA7] animate-pulse">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#002FA7]" />
+          <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+            Stream_Active
+          </span>
+        </div>
       </div>
-      <div className="max-h-64 overflow-y-auto np-scroll p-4 space-y-1 bg-black/40 font-mono text-[11px]">
-        {LOG_ENTRIES.map((entry) => (
-          <div
-            key={entry.id}
-            className="flex gap-3 items-baseline py-1.5 border-b border-white/5 last:border-0 text-emerald-400/90 hover:text-emerald-300 transition-colors"
-          >
-            <span className="text-zinc-500 tabular-nums shrink-0">[{entry.time}]</span>
-            <span className="text-amber-400/90 shrink-0">{entry.action}</span>
-            <span className="text-zinc-400 truncate">{entry.detail}</span>
-          </div>
-        ))}
+      <div className="h-64 overflow-y-auto np-scroll p-4 space-y-1 bg-black/40 font-mono text-[11px] relative">
+        <AnimatePresence initial={false}>
+          {logEntries.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="text-zinc-600 italic py-2"
+            >
+              Listening for network signals...
+            </motion.div>
+          ) : (
+            logEntries.map((entry) => (
+              <motion.div
+                key={entry.id}
+                layout
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+                className="flex gap-3 items-baseline py-1.5 border-b border-white/5 last:border-0 text-emerald-400/90 hover:text-emerald-300 transition-colors"
+                title={entry.detail}
+              >
+                <span className="text-zinc-500 tabular-nums shrink-0">[{entry.time}]</span>
+                <span className="text-amber-400/90 shrink-0">{entry.action}</span>
+                <span className="text-zinc-400 truncate">{entry.detail}</span>
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );
