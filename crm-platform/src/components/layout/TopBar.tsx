@@ -540,7 +540,7 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex-1 flex items-center justify-center gap-4 px-4 min-w-[200px]">
+                  <div className="flex-1 flex items-center justify-center gap-3 px-2 min-w-0">
                     {status === 'connected' && (
                       <div className="flex items-center gap-0.5 opacity-80">
                         {[...Array(5)].map((_, i) => (
