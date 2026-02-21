@@ -154,7 +154,14 @@ export function useForensicLog() {
         // Inject Signals
         signals?.forEach(sig => {
             const ts = new Date(sig.published_at || sig.created_at).getTime();
-            const accountName = sig._accountName || sig.metadata?.accountName || 'Unknown Entity';
+
+            let accountName = sig._accountName || sig.metadata?.accountName;
+            if (!accountName && sig.domain) {
+                const raw = sig.domain.replace(/^www\./i, '').split('.')[0];
+                accountName = raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : 'Unknown Entity';
+            }
+            accountName = accountName || 'Unknown Entity';
+
             entries.push({
                 id: `sig-${sig.id}`,
                 timestamp: ts,
