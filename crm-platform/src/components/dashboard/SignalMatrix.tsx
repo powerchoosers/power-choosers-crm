@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { useUIStore } from '@/store/uiStore';
 
 type TabId = 'recon' | 'monitor';
@@ -101,13 +102,17 @@ export function SignalMatrix() {
   const [selectedSignal, setSelectedSignal] = useState<IntelSignal | null>(null);
   const router = useRouter();
 
+  const [isScraping, setIsScraping] = useState(false);
+
+  // Fetch from DB
   const fetchSignals = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setIsRefreshing(true);
     else setIsLoading(true);
     setError(null);
 
     try {
-      const res = await fetch('/api/intelligence/signals?type=recon&limit=20');
+      // Add timestamp to foil client-side caching if needed
+      const res = await fetch(`/api/intelligence/signals?type=recon&limit=20&t=${Date.now()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setSignals(data.signals || []);
@@ -124,6 +129,30 @@ export function SignalMatrix() {
   useEffect(() => {
     fetchSignals();
   }, [fetchSignals]);
+
+  // Trigger Edge Function directly
+  const triggerScrape = async () => {
+    if (isScraping) return;
+    setIsScraping(true);
+    const toastId = toast.loading('Initiating deep recon scan...');
+    try {
+      const res = await fetch('/api/intelligence/trigger-scrape', {
+        method: 'POST'
+      });
+      if (!res.ok) throw new Error(`Scrape trigger failed`);
+      const data = await res.json();
+
+      toast.success(`Scan complete. ${data.count || 0} new anomalies detected.`, { id: toastId });
+
+      // Pull fresh data & animate refresh
+      await fetchSignals(true);
+    } catch (err: any) {
+      console.error('[SignalMatrix] manual scrape error:', err);
+      toast.error('Scan failed to initialize.', { id: toastId });
+    } finally {
+      setIsScraping(false);
+    }
+  };
 
   const handleIngestNode = (signal: IntelSignal) => {
     if (signal.crm_account_id) {
@@ -148,12 +177,12 @@ export function SignalMatrix() {
           </h3>
         </div>
         <button
-          onClick={() => fetchSignals(true)}
-          disabled={isRefreshing}
+          onClick={triggerScrape}
+          disabled={isScraping || isRefreshing}
           className="w-7 h-7 rounded-lg flex items-center justify-center border border-white/10 bg-black/30 text-zinc-500 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/10 transition-all disabled:opacity-40"
-          title="Refresh signals"
+          title="Initiate Deep Scan"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${(isScraping || isRefreshing) ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
