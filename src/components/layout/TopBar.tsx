@@ -521,7 +521,7 @@ export function TopBar() {
                 <div className="w-full max-w-[1000px] h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6 transition-all duration-300">
 
                   {/* Left Sector: Identity */}
-                  <div className="flex items-center gap-3 w-[30%]">
+                  <div className="flex items-center gap-3 w-[25%] flex-shrink-0">
                     <CallBarIcon
                       key={`callbar-icon-${callSessionId}`}
                       logoUrl={callbarLogoUrl || undefined}
@@ -532,9 +532,6 @@ export function TopBar() {
                     <div className="flex flex-col min-w-0">
                       <div className="text-sm font-medium text-white leading-none mb-1 flex items-center gap-2 truncate">
                         <span className="truncate">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 border border-zinc-700 whitespace-nowrap">
-                          {status === 'connected' ? '[RISK_NODE]' : '[CONNECTING]'}
-                        </span>
                       </div>
                       <div className="text-[10px] text-zinc-500 lowercase truncate">
                         {selectedNumberName ? `via ${selectedNumberName}` : 'via Default'}
@@ -543,7 +540,7 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex items-center justify-center gap-4 w-[40%]">
+                  <div className="flex items-center justify-center gap-4 w-[35%]">
                     {status === 'connected' && (
                       <div className="flex items-center gap-0.5 opacity-80">
                         {[...Array(5)].map((_, i) => (
@@ -575,7 +572,7 @@ export function TopBar() {
                   </div>
 
                   {/* Right Sector: Intervention Triggers */}
-                  <div className="flex items-center justify-end gap-1.5 w-[30%]">
+                  <div className="flex items-center justify-end gap-1.5 w-[40%] flex-shrink-0">
                     <button
                       onClick={() => setSentiment(sentiment === 'connect' ? null : 'connect')}
                       className={cn(
