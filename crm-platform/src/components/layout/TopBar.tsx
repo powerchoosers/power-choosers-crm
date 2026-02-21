@@ -553,8 +553,8 @@ export function TopBar() {
                         ))}
                       </div>
                     )}
-                    <div className="text-[14px] text-signal font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
-                      {status === 'connected' && <span className="w-1.5 h-1.5 bg-signal rounded-full animate-pulse" />}
+                    <div className="text-[14px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
+                      {status === 'connected' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />}
                       {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
                     </div>
                     {status === 'connected' && (
@@ -682,9 +682,9 @@ export function TopBar() {
                         setSentiment('hangup');
                         handleHangup();
                       }}
-                      className="icon-button-forensic p-1.5 ml-1 rounded-[12px] bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)]"
+                      className="group flex items-center justify-center w-[36px] h-[36px] ml-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all duration-300 hover:scale-[1.12]"
                     >
-                      <PhoneOff size={16} />
+                      <Phone size={16} className="transition-transform duration-300 group-hover:rotate-[135deg]" />
                     </button>
                   </div>
                 </div>
