@@ -39,8 +39,9 @@ export function useEntityEmails(emailAddresses: string[]) {
                 // Build OR condition for all provided email addresses
                 // Using ilike.%email% for substring match in `to` and `from`
                 // Supabase `or` structure requires a comma-separated list of conditions
+                // Note: `to` is a JSONB array, so we must use `.cs.` (contains) instead of `.ilike.`
                 const orConditions = validEmails.map(email =>
-                    `from.ilike.%${email}%,to.ilike.%${email}%`
+                    `from.ilike.%${email}%,to.cs.["${email}"]`
                 ).join(',')
 
                 query = query.or(orConditions)
