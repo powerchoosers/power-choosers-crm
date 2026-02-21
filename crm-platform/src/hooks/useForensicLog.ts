@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/context/AuthContext';
 import { useMarketPulse } from './useMarketPulse';
 import { useMemo } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 
 export type LogEntryAction =
     | 'EMAIL_DISPATCHED'
@@ -16,7 +17,7 @@ export type LogEntryAction =
 export interface LogEntry {
     id: string;
     timestamp: number;
-    time: string; // HH:mm format
+    time: string; // Relative format (e.g. "5 minutes ago")
     action: LogEntryAction;
     detail: string;
 }
@@ -29,12 +30,28 @@ export function useForensicLog() {
     const { data: signals } = useQuery({
         queryKey: ['forensic-signals'],
         queryFn: async () => {
-            const { data } = await supabase
+            const { data: articles } = await supabase
                 .from('apollo_news_articles')
                 .select('*')
-                .order('published_at', { ascending: false })
+                .order('published_at', { ascending: false, nullsFirst: false })
                 .limit(10);
-            return data || [];
+
+            if (!articles || articles.length === 0) return [];
+
+            const domains = Array.from(new Set(articles.map(a => a.domain).filter(Boolean)));
+            if (domains.length === 0) return articles;
+
+            const { data: accounts } = await supabase
+                .from('accounts')
+                .select('domain, name')
+                .in('domain', domains);
+
+            const domainToName = new Map((accounts || []).map(a => [a.domain, a.name]));
+
+            return articles.map(a => {
+                a._accountName = domainToName.get(a.domain);
+                return a;
+            });
         },
         refetchInterval: 60000,
     });
@@ -137,11 +154,11 @@ export function useForensicLog() {
         // Inject Signals
         signals?.forEach(sig => {
             const ts = new Date(sig.published_at || sig.created_at).getTime();
-            const accountName = sig.metadata?.accountName || 'Unknown Entity';
+            const accountName = sig._accountName || sig.metadata?.accountName || 'Unknown Entity';
             entries.push({
                 id: `sig-${sig.id}`,
                 timestamp: ts,
-                time: new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+                time: formatDistanceToNow(ts, { addSuffix: true }),
                 action: 'SIGNAL_DETECTED',
                 detail: `[${accountName}] -> ${sig.title}`
             });
@@ -154,7 +171,7 @@ export function useForensicLog() {
             entries.push({
                 id: `task-${task.id}`,
                 timestamp: ts,
-                time: new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }),
+                time: formatDistanceToNow(ts, { addSuffix: true }),
                 action: 'TASK_COMPLETE',
                 detail: `${task.title}${target}`
             });
@@ -163,7 +180,7 @@ export function useForensicLog() {
         // Inject CRM Emails
         crmEmails?.forEach((email: any) => {
             const ts = new Date(email.timestamp || email.createdAt).getTime();
-            const timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            const timeStr = formatDistanceToNow(ts, { addSuffix: true });
             const contactName = email._contactName || 'Contact';
 
             if (email.type === 'sent' || email.type === 'uplink_out') {
@@ -199,7 +216,7 @@ export function useForensicLog() {
         // Inject Live Market Pricing Alerts (calculated on the fly using marketPulse)
         if (marketPulse) {
             const ts = new Date(marketPulse.timestamp).getTime();
-            const timeStr = new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+            const timeStr = formatDistanceToNow(ts, { addSuffix: true });
 
             if ((marketPulse.grid?.scarcity_prob || 0) > 15) {
                 entries.push({
