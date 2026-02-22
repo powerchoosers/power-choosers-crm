@@ -176,8 +176,10 @@ async function fetchFromOfficialApi(type, keys) {
         latestByZone[zone] = row;
       } else {
         const current = latestByZone[zone];
-        // Compare hour and interval (Date is already desc from API)
-        if (row[1] > current[1] || (row[1] === current[1] && row[2] > current[2])) {
+        // Compare date, then hour, then interval (Date is YYYY-MM-DD string)
+        if (row[0] > current[0] ||
+          (row[0] === current[0] && row[1] > current[1]) ||
+          (row[0] === current[0] && row[1] === current[1] && row[2] > current[2])) {
           latestByZone[zone] = row;
         }
       }
