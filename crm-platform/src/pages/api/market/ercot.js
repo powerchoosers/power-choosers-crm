@@ -211,34 +211,9 @@ async function fetchFromOfficialApi(type, keys) {
       }
     };
   } else {
-    const gridData = await fetchOne('https://api.ercot.com/api/public-reports/np6-345-cd/act_sys_load_by_wzn?size=5', {
-      headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-    });
-    const g = gridData.data?.[0] || [];
-    const actualLoad = parseFloat(g[10]) || 0;
-    const forecastLoad = actualLoad * 1.05;
-    const totalCapacity = actualLoad * 1.15;
-    const reserves = totalCapacity - actualLoad;
-    const scarcityProb = Math.max(0, (1 - (reserves / (actualLoad * 0.1))) * 10).toFixed(1);
-
-    return {
-      source: 'ERCOT Official API',
-      timestamp: `${g[0]} ${g[1]}`,
-      metrics: {
-        actual_load: actualLoad,
-        forecast_load: forecastLoad,
-        total_capacity: totalCapacity,
-        reserves: Math.floor(reserves),
-        scarcity_prob: parseFloat(scarcityProb),
-        wind_gen: actualLoad * 0.15,
-        pv_gen: actualLoad * 0.08,
-        frequency: 60.0
-      },
-      metadata: {
-        last_updated: new Date().toISOString(),
-        report_id: 'NP6-345-CD'
-      }
-    };
+    // Report NP6-345-CD is only for local load. System capacity/reserves are best scraped 
+    // from the dashboard for real-time accuracy until a proper system-wide API report is mapped.
+    return scrapeGridConditions();
   }
 }
 
@@ -277,8 +252,8 @@ async function scrapeRealTimePrices() {
   const north = parseFloat(cells[13]) || 0;
   const south = parseFloat(cells[15]) || 0;
   const west = parseFloat(cells[16]) || 0;
-  const hubFromCell = parseFloat(cells[4]) || 0;
-  const hub_avg = hubFromCell > 0 ? hubFromCell : (houston + north + south + west) / 4;
+  const hubFromCell = parseFloat(cells[4]);
+  const hub_avg = !isNaN(hubFromCell) ? hubFromCell : (houston + north + south + west) / 4;
 
   return {
     timestamp: (cells[0] || '') + ' ' + (cells[1] || ''),
@@ -331,7 +306,14 @@ async function scrapeGridConditions() {
   const frequencyMatch = html.match(/Current Frequency<\/td>\s*<td[^>]*>([\d,.-]+)<\/td>/);
   if (frequencyMatch) metrics.frequency = parseFloat(frequencyMatch[1]);
 
+  if (metrics.total_capacity && metrics.actual_load) {
+    metrics.reserves = Math.max(0, metrics.total_capacity - metrics.actual_load);
+    metrics.forecast_load = metrics.actual_load * 1.02; // Better estimate if missing
+    metrics.scarcity_prob = Math.max(0, (1 - (metrics.reserves / (metrics.actual_load * 0.1 || 1))) * 10).toFixed(1);
+  }
+
   return {
+    source: 'ERCOT Public CDR (Scraper)',
     timestamp: new Date().toISOString(),
     metrics,
     metadata: {
