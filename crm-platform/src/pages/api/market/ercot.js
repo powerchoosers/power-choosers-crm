@@ -162,36 +162,31 @@ async function fetchFromOfficialApi(type, keys) {
   };
 
   if (type === 'prices') {
-    const [houstonData, northData, southData, westData] = await Promise.all([
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_HOUSTON&size=200&sort=deliveryDate&dir=desc', {
-        headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-      }),
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_NORTH&size=200&sort=deliveryDate&dir=desc', {
-        headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-      }),
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_SOUTH&size=200&sort=deliveryDate&dir=desc', {
-        headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-      }),
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_WEST&size=200&sort=deliveryDate&dir=desc', {
-        headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
-      })
-    ]);
+    const rawData = await fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPointType=LZEW&size=200&sort=deliveryDate&dir=desc', {
+      headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
+    });
 
-    // Map data (Indices: 0:date, 1:hour, 2:interval, 3:point, 5:price)
-    // Local sort to find newest (Date desc, Hour desc, Interval desc)
-    const sortLatest = (dataArray) => {
-      if (!dataArray || !Array.isArray(dataArray) || dataArray.length === 0) return [];
-      return dataArray.sort((a, b) => {
-        if (a[0] !== b[0]) return a[0] > b[0] ? -1 : 1; // Date desc
-        if (a[1] !== b[1]) return b[1] - a[1]; // Hour desc
-        return b[2] - a[2]; // Interval desc
-      })[0];
-    };
+    // Group by zone and find latest (Indices: 0:date, 1:hour, 2:interval, 3:point, 5:price)
+    const data = rawData.data || [];
+    const latestByZone = {};
 
-    const h = sortLatest(houstonData.data) || [];
-    const n = sortLatest(northData.data) || [];
-    const s = sortLatest(southData.data) || [];
-    const w = sortLatest(westData.data) || [];
+    for (const row of data) {
+      const zone = row[3];
+      if (!latestByZone[zone]) {
+        latestByZone[zone] = row;
+      } else {
+        const current = latestByZone[zone];
+        // Compare hour and interval (Date is already desc from API)
+        if (row[1] > current[1] || (row[1] === current[1] && row[2] > current[2])) {
+          latestByZone[zone] = row;
+        }
+      }
+    }
+
+    const h = latestByZone['LZ_HOUSTON'] || [];
+    const n = latestByZone['LZ_NORTH'] || [];
+    const s = latestByZone['LZ_SOUTH'] || [];
+    const w = latestByZone['LZ_WEST'] || [];
 
     const houstonPrice = parseFloat(h[5]) || 0;
     const northPrice = parseFloat(n[5]) || 0;
@@ -199,7 +194,7 @@ async function fetchFromOfficialApi(type, keys) {
     const westPrice = parseFloat(w[5]) || 0;
 
     return {
-      source: 'ERCOT Official API',
+      source: 'ERCOT Official API (Unified)',
       timestamp: h.length ? `${h[0]} ${h[1]}:${(h[2] - 1) * 15}` : new Date().toISOString(),
       prices: {
         houston: houstonPrice,

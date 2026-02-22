@@ -65,14 +65,21 @@ export default async function handler(req, res) {
       .limit(1);
 
     if (!existing || existing.length === 0) {
-      await supabaseAdmin.from('market_telemetry').insert({
+      console.log('[ERCOT Snapshot] No existing block for today. Inserting...');
+      const { error: insertError } = await supabaseAdmin.from('market_telemetry').insert({
         timestamp: combinedData.timestamp,
         prices: combinedData.prices,
         grid: combinedData.grid,
         metadata: combinedData.metadata
       });
+      if (insertError) {
+        console.error('[ERCOT Snapshot] Insert failed:', insertError);
+        throw insertError;
+      }
       saved = true;
       logger.info(`[ERCOT Snapshot] Logged market_telemetry for ${isAM ? 'AM' : 'PM'} block`, 'MarketData');
+    } else {
+      console.log('[ERCOT Snapshot] Block already exists for today. Skipping insert.');
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });

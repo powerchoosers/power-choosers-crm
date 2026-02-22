@@ -102,9 +102,9 @@ export default function TelemetryPage() {
 
   // Request a snapshot save on mount (server throttles to 2x/day so we get today's data)
   useEffect(() => {
-    fetch('/api/market/ercot/snapshot', { method: 'POST' })
+    fetch('/api/market/ercot-snapshot', { method: 'POST' })
       .then((r) => r.ok && r.json().then((body) => body.saved && refetchHistory()))
-      .catch(() => {})
+      .catch(() => { })
   }, [refetchHistory])
 
   const prices: MarketPulseData['prices'] = marketData?.prices ?? ({} as MarketPulseData['prices'])
