@@ -132,6 +132,12 @@ export function NodeIngestion() {
   const [potentialMatches, setPotentialMatches] = useState<any[]>([]);
   const [showVerifyModal, setShowVerifyModal] = useState(false);
 
+  // Account Name Search State
+  const [isNameSearchMode, setIsNameSearchMode] = useState(true);
+  const [accountSearchQuery, setAccountSearchQuery] = useState('');
+  const [isSearchingName, setIsSearchingName] = useState(false);
+  const [accountSearchResults, setAccountSearchResults] = useState<any[]>([]);
+
   // Rapid Contact Injection: focus First Name when context is set
   useEffect(() => {
     if (isRapidContactInjection && step === 'SIGNAL') {
@@ -316,6 +322,64 @@ export function NodeIngestion() {
     } finally {
       setIsScanning(false);
     }
+  };
+
+  const handleAccountNameSearch = async () => {
+    if (!accountSearchQuery) return;
+    setIsSearchingName(true);
+    setAccountSearchResults([]);
+
+    try {
+      const response = await fetch('/api/apollo/search-organizations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          q_organization_name: accountSearchQuery,
+          per_page: 5
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setAccountSearchResults(data.organizations || []);
+      }
+    } catch (error) {
+      console.error('Failed to search organizations by name:', error);
+      toast.error('Search failed');
+    } finally {
+      setIsSearchingName(false);
+    }
+  };
+
+  const handleSelectOrganization = (org: any) => {
+    setScanResult(org);
+    setEntityName(org.name || '');
+    setDescription(org.description || '');
+    setPhone(org.phone || '');
+    setRevenue(''); // Apollo mixed_companies doesn't usually return exact revenue directly
+    setEmployees(org.employees ? String(org.employees) : '');
+    setAddress(org.location || '');
+
+    // Attempt to parse city/state from location string if it exists
+    if (org.location) {
+      const parts = org.location.split(',').map((p: string) => p.trim());
+      if (parts.length >= 2) {
+        setCity(parts[0]);
+        setState(parts[1].split(' ')[0]); // try to grab state abbreviation before zip
+      } else {
+        setCity(org.location);
+      }
+    }
+
+    setIdentifier(org.domain || ''); // Sets the identifier so it saves correctly
+    setStep('VERIFY');
+    setIsManual(false);
+  };
+
+  const handleManualFallback = () => {
+    setEntityName(accountSearchQuery);
+    setStep('VERIFY');
+    setIsManual(true);
   };
 
   const handleCommit = async () => {
@@ -586,33 +650,131 @@ export function NodeIngestion() {
                   </div>
                 </>
               ) : (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
-                    <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
-                    Signal Source
-                  </label>
-                  <div className="relative group">
-                    <input
-                      value={identifier}
-                      onChange={(e) => setIdentifier(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-                      placeholder={type === 'ACCOUNT' ? "company.com" : "linkedin.com/in/..."}
-                      className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
-                      autoFocus
-                    />
-                    <div className="absolute right-4 top-4">
-                      {isScanning ? (
-                        <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
-                      ) : (
-                        <button onClick={handleScan} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
-                          <ArrowRight className="w-4 h-4" />
-                        </button>
+                <div className="space-y-4">
+                  {type === 'ACCOUNT' && (
+                    <div className="flex bg-black/40 rounded-lg p-1 border border-white/5">
+                      <button
+                        onClick={() => setIsNameSearchMode(true)}
+                        className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all rounded ${isNameSearchMode ? 'bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        Search by Name
+                      </button>
+                      <button
+                        onClick={() => setIsNameSearchMode(false)}
+                        className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all rounded ${!isNameSearchMode ? 'bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30' : 'text-zinc-500 hover:text-zinc-300'}`}
+                      >
+                        Search by Domain
+                      </button>
+                    </div>
+                  )}
+
+                  {!isNameSearchMode || type === 'CONTACT' ? (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
+                        Signal Source
+                      </label>
+                      <div className="relative group">
+                        <input
+                          value={identifier}
+                          onChange={(e) => setIdentifier(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleScan()}
+                          placeholder={type === 'ACCOUNT' ? "company.com" : "linkedin.com/in/..."}
+                          className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
+                          autoFocus={!isNameSearchMode || type === 'CONTACT'}
+                        />
+                        <div className="absolute right-4 top-4">
+                          {isScanning ? (
+                            <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
+                          ) : (
+                            <button onClick={handleScan} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-zinc-600 pl-1">
+                        Input vector required for probabilistic enrichment.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
+                          <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
+                          Account Name
+                        </label>
+                        <div className="relative group">
+                          <input
+                            value={accountSearchQuery}
+                            onChange={(e) => setAccountSearchQuery(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleAccountNameSearch()}
+                            placeholder="Type exact legal entity name..."
+                            className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
+                            autoFocus
+                          />
+                          <div className="absolute right-4 top-4">
+                            {isSearchingName ? (
+                              <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
+                            ) : (
+                              <button onClick={handleAccountNameSearch} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
+                                <Search className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {accountSearchResults.length > 0 && (
+                        <div className="space-y-2 mt-4">
+                          <label className="text-[10px] font-mono text-zinc-500 uppercase">Suggested Targets</label>
+                          <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                            {accountSearchResults.map((org: any) => (
+                              <button
+                                key={org.id}
+                                onClick={() => handleSelectOrganization(org)}
+                                className="w-full text-left bg-zinc-900 border border-white/5 hover:border-[#002FA7]/50 rounded-lg p-3 transition-colors group"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="w-10 h-10 rounded overflow-hidden bg-black/60 shrink-0 border border-white/10 flex items-center justify-center">
+                                    {org.logoUrl ? (
+                                      <img src={org.logoUrl} alt={org.name} className="w-full h-full object-contain" />
+                                    ) : (
+                                      <Building2 className="w-5 h-5 text-zinc-700" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">
+                                        {org.name}
+                                      </h4>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-[10px] text-zinc-500 mt-1">
+                                      <span className="truncate max-w-[120px]">{org.domain}</span>
+                                      <span>•</span>
+                                      <span className="truncate">{org.industry || 'Unknown Sector'}</span>
+                                    </div>
+                                    {org.location && (
+                                      <div className="flex items-center gap-1 mt-1.5 text-[10px] text-zinc-600">
+                                        <MapPin className="w-3 h-3" />
+                                        <span className="truncate">{org.location}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                            <Button
+                              onClick={handleManualFallback}
+                              className="w-full bg-transparent border border-amber-500/20 text-amber-500 hover:bg-amber-500/10 font-mono text-xs h-10"
+                            >
+                              [ PROCEED_WITHOUT_DIGITAL_FOOTPRINT ]
+                            </Button>
+                          </div>
+                        </div>
                       )}
                     </div>
-                  </div>
-                  <p className="text-[10px] text-zinc-600 pl-1">
-                    Input vector required for probabilistic enrichment.
-                  </p>
+                  )}
                 </div>
               )}
             </motion.div>
