@@ -22,9 +22,9 @@ export default async function handler(req, res) {
   } catch (error) {
     logger.error(`[ERCOT] Request failed for type ${type}:`, 'MarketData', error.message);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    return res.end(JSON.stringify({ 
-      error: 'Failed to fetch ERCOT data', 
-      message: error.message 
+    return res.end(JSON.stringify({
+      error: 'Failed to fetch ERCOT data',
+      message: error.message
     }));
   }
 }
@@ -163,25 +163,35 @@ async function fetchFromOfficialApi(type, keys) {
 
   if (type === 'prices') {
     const [houstonData, northData, southData, westData] = await Promise.all([
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_HOUSTON&size=5', {
+      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_HOUSTON&size=200&sort=deliveryDate&dir=desc', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       }),
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_NORTH&size=5', {
+      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_NORTH&size=200&sort=deliveryDate&dir=desc', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       }),
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_SOUTH&size=5', {
+      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_SOUTH&size=200&sort=deliveryDate&dir=desc', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       }),
-      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_WEST&size=5', {
+      fetchOne('https://api.ercot.com/api/public-reports/np6-905-cd/spp_node_zone_hub?settlementPoint=LZ_WEST&size=200&sort=deliveryDate&dir=desc', {
         headers: { 'Ocp-Apim-Subscription-Key': primaryKey, 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' }
       })
     ]);
-    
+
     // Map data (Indices: 0:date, 1:hour, 2:interval, 3:point, 5:price)
-    const h = houstonData.data?.[0] || [];
-    const n = northData.data?.[0] || [];
-    const s = southData.data?.[0] || [];
-    const w = westData.data?.[0] || [];
+    // Local sort to find newest (Date desc, Hour desc, Interval desc)
+    const sortLatest = (dataArray) => {
+      if (!dataArray || !Array.isArray(dataArray) || dataArray.length === 0) return [];
+      return dataArray.sort((a, b) => {
+        if (a[0] !== b[0]) return a[0] > b[0] ? -1 : 1; // Date desc
+        if (a[1] !== b[1]) return b[1] - a[1]; // Hour desc
+        return b[2] - a[2]; // Interval desc
+      })[0];
+    };
+
+    const h = sortLatest(houstonData.data) || [];
+    const n = sortLatest(northData.data) || [];
+    const s = sortLatest(southData.data) || [];
+    const w = sortLatest(westData.data) || [];
 
     const houstonPrice = parseFloat(h[5]) || 0;
     const northPrice = parseFloat(n[5]) || 0;
@@ -190,7 +200,7 @@ async function fetchFromOfficialApi(type, keys) {
 
     return {
       source: 'ERCOT Official API',
-      timestamp: `${h[0]} ${h[1]}:${(h[2]-1)*15}`, 
+      timestamp: h.length ? `${h[0]} ${h[1]}:${(h[2] - 1) * 15}` : new Date().toISOString(),
       prices: {
         houston: houstonPrice,
         north: northPrice,
@@ -209,8 +219,8 @@ async function fetchFromOfficialApi(type, keys) {
     });
     const g = gridData.data?.[0] || [];
     const actualLoad = parseFloat(g[10]) || 0;
-    const forecastLoad = actualLoad * 1.05; 
-    const totalCapacity = actualLoad * 1.15; 
+    const forecastLoad = actualLoad * 1.05;
+    const totalCapacity = actualLoad * 1.15;
     const reserves = totalCapacity - actualLoad;
     const scarcityProb = Math.max(0, (1 - (reserves / (actualLoad * 0.1))) * 10).toFixed(1);
 
@@ -258,7 +268,7 @@ async function scrapeRealTimePrices() {
 
   const rows = html.match(/<tr[^>]*>([\s\S]*?)<\/tr>/g) || [];
   const dataRows = rows.filter(row => row.includes('<td') && !row.includes('class="label"'));
-  
+
   if (dataRows.length === 0) {
     throw new Error('No data rows found in ERCOT price table');
   }
@@ -305,7 +315,7 @@ async function scrapeGridConditions() {
   }
 
   const metrics = {};
-  
+
   const demandMatch = html.match(/Actual System Demand<\/td>\s*<td[^>]*>([\d,.-]+)<\/td>/);
   if (demandMatch) metrics.actual_load = parseFloat(demandMatch[1].replace(/,/g, ''));
 
