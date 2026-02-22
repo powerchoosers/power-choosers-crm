@@ -393,38 +393,26 @@ export function NodeIngestion() {
         if (error) throw error;
       }
 
-      // If we initialized from an intelligence signal (Account), persist it to the News Vector
+      // If we initialized from an intelligence signal (Account), persist it to the News Vector via API (bypasses RLS)
       if (type === 'ACCOUNT' && ingestionSignal) {
         try {
           const domainKey = identifier.includes('.') ? identifier : scanResult?.domain;
-          if (domainKey) {
-            await supabase.from('apollo_news_articles').upsert({
-              domain: domainKey,
-              apollo_article_id: ingestionSignal.id || crypto.randomUUID(),
-              title: ingestionSignal.headline || '',
-              url: ingestionSignal.source_url || null,
-              source_domain: ingestionSignal.entity_domain || domainKey,
-              snippet: ingestionSignal.summary || null,
-              published_at: ingestionSignal.created_at || now,
-              event_categories: ingestionSignal.signal_type ? [ingestionSignal.signal_type] : [],
-              updated_at: now
-            }, { onConflict: 'domain,apollo_article_id' });
-          }
-        } catch (e) {
-          console.error('Failed to commit signal to news vector', e);
-        }
 
-        try {
-          if (ingestionSignal.id) {
-            await supabase.from('market_intelligence').update({
-              crm_account_id: id,
-              crm_match_type: 'exact_domain'
-            }).eq('id', ingestionSignal.id);
-            // Invalidate signals so the matrix updates automatically
-            queryClient.invalidateQueries({ queryKey: ['market-recon-signals'] });
-          }
+          await fetch('/api/intelligence/link-signal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              signal: ingestionSignal,
+              accountId: id,
+              domainKey: domainKey || ''
+            })
+          });
+
+          // Invalidate signals so the matrix updates automatically
+          queryClient.invalidateQueries({ queryKey: ['market-recon-signals'] });
+
         } catch (e) {
-          console.error('Failed to update intelligence signal', e);
+          console.error('Failed to link intelligence signal', e);
         }
       }
 
