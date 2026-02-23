@@ -174,11 +174,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 await zohoService.sendEmail({
                     to: contact.email,
+                    fromName: sender.name,
                     subject: `Energy Briefing Invite // ${contactName}`,
                     html: emailHtml,
                     userEmail: userEmail,
-                    uploadedAttachments: uploadedAttachments,
-                    calendarInvite: icsContent
+                    uploadedAttachments: uploadedAttachments
                 });
             }
         }
