@@ -1,6 +1,6 @@
 'use client';
 
-import { Gauge, Layers, Zap, Activity, FileText } from 'lucide-react';
+import { Gauge, Layers, Zap, Activity } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useEffect, useState } from 'react';
 
@@ -33,10 +33,6 @@ export function KPIGrid() {
   const volatilityValue = isHydrating
     ? '—'
     : metrics?.gridVolatilityIndex?.toString() ?? '0';
-
-  const billsValue = isHydrating
-    ? '—'
-    : metrics?.dailyBillsIngested?.toString() ?? '0';
 
   const volatilityNum = isHydrating ? 0 : (metrics?.gridVolatilityIndex ?? 0);
   const gaugeLow = !isHydrating && volatilityNum < 30;
@@ -76,18 +72,10 @@ export function KPIGrid() {
       pulse: false,
       gauge: true, // < 30 green, > 70 red
     },
-    {
-      key: 'bills',
-      label: 'DAILY_BILLS_INGESTED',
-      value: billsValue,
-      sub: '8AM–5PM intake',
-      icon: FileText,
-      pulse: (metrics?.dailyBillsIngested ?? 0) > 0,
-    },
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {METRICS.map((m) => {
         const num = m.gauge ? (typeof volatilityNum === 'number' ? volatilityNum : parseInt(m.value, 10) || 0) : 0;
         const positionsNum = m.key === 'positions' ? parseInt(m.value, 10) || 0 : 0;

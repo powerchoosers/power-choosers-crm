@@ -7,11 +7,13 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Plug, Zap, ShieldCheck, Target } from 'lucide-react';
+import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 
 export function VelocityTrackerV3() {
   const { status, sentiment } = useCallStore();
   const [mounted, setMounted] = useState(false);
   const queryClient = useQueryClient();
+  const { data: dashboardMetrics } = useDashboardMetrics();
 
   useEffect(() => {
     setMounted(true);
@@ -49,13 +51,10 @@ export function VelocityTrackerV3() {
       const currentDials = dialsCount || 0;
       const connectRate = currentDials ? Math.round((connects / currentDials) * 100) : 0;
 
-      const targetBills = Math.floor(Math.random() * 5) + 2;
-
       return {
         dials: currentDials,
         connectRate,
         signalEfficiency: Math.floor(connectRate * 0.4),
-        assetCapture: targetBills
       };
     },
     refetchInterval: 10000,
@@ -156,7 +155,7 @@ export function VelocityTrackerV3() {
           </div>
           <div>
             <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-0.5">Asset Capture</div>
-            <div className="text-xl font-mono text-white tabular-nums leading-none tracking-tight">{metrics?.assetCapture || 0} BILLS</div>
+            <div className="text-xl font-mono text-white tabular-nums leading-none tracking-tight">{(dashboardMetrics?.dailyBillsIngested ?? 0)} BILLS</div>
           </div>
         </div>
       </div>
