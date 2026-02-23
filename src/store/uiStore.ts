@@ -11,6 +11,8 @@ export interface TaskContext {
   entityId: string
   entityName?: string
   entityType: 'contact' | 'account'
+  entityLogoUrl?: string
+  entityDomain?: string
   contactId?: string
   accountId?: string
 }

@@ -748,7 +748,7 @@ export default function AccountDossierPage() {
                     </AnimatePresence>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-xs text-zinc-500 font-mono mb-2 w-full">
+                <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mb-2 w-full">
                   {isEditing ? (
                     <div className="flex items-center gap-4 w-full">
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -776,37 +776,37 @@ export default function AccountDossierPage() {
                   ) : (
                     <>
                       {recentlyUpdatedFields.has('industry') ? (
-                        <motion.span
+                        <motion.div
                           initial={{ filter: 'blur(6px)', opacity: 0.6 }}
                           animate={{ filter: 'blur(0px)', opacity: 1 }}
                           transition={{ duration: 0.4, ease: 'easeOut' }}
                           className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400"
                         >
                           <Activity className="w-3.5 h-3.5 text-white shrink-0" />
-                          <ForensicDataPoint value={account.industry || 'Unknown Sector'} copyValue={account.industry || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
-                        </motion.span>
+                          <ForensicDataPoint value={account.industry || 'Unknown Sector'} copyValue={account.industry || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline compact />
+                        </motion.div>
                       ) : (
-                        <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                        <div className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
                           <Activity className="w-3.5 h-3.5 text-white shrink-0" />
-                          <ForensicDataPoint value={account.industry || 'Unknown Sector'} copyValue={account.industry || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
-                        </span>
+                          <ForensicDataPoint value={account.industry || 'Unknown Sector'} copyValue={account.industry || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline compact />
+                        </div>
                       )}
                       <span className="w-1 h-1 rounded-full bg-zinc-800" />
                       {recentlyUpdatedFields.has('location') ? (
-                        <motion.span
+                        <motion.div
                           initial={{ filter: 'blur(6px)', opacity: 0.6 }}
                           animate={{ filter: 'blur(0px)', opacity: 1 }}
                           transition={{ duration: 0.4, ease: 'easeOut' }}
                           className="flex items-center gap-1.5 text-zinc-400"
                         >
                           <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
-                          <ForensicDataPoint value={account.location || 'Unknown Location'} copyValue={account.location || undefined} valueClassName="text-zinc-400" inline />
-                        </motion.span>
+                          <ForensicDataPoint value={account.location || 'Unknown Location'} copyValue={account.location || undefined} valueClassName="text-zinc-400" inline compact />
+                        </motion.div>
                       ) : (
-                        <span className="flex items-center gap-1.5 text-zinc-400">
+                        <div className="flex items-center gap-1.5 text-zinc-400">
                           <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
-                          <ForensicDataPoint value={account.location || 'Unknown Location'} copyValue={account.location || undefined} valueClassName="text-zinc-400" inline />
-                        </span>
+                          <ForensicDataPoint value={account.location || 'Unknown Location'} copyValue={account.location || undefined} valueClassName="text-zinc-400" inline compact />
+                        </div>
                       )}
                     </>
                   )}
