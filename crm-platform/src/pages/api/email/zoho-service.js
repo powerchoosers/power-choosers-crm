@@ -76,7 +76,7 @@ export class ZohoMailService {
      * Send an email via Zoho Mail API
      */
     async sendEmail(emailData) {
-        const { to, subject, html, text, from, fromName, attachments, uploadedAttachments, userEmail } = emailData;
+        const { to, subject, html, text, from, fromName, attachments, uploadedAttachments, userEmail, calendarInvite } = emailData;
 
         if (!userEmail) {
             throw new Error('userEmail is required for Zoho sending');
@@ -104,6 +104,11 @@ export class ZohoMailService {
                     content: html || text || '',
                     mailFormat: html ? 'html' : 'plaintext',
                 };
+
+                // Add native calendar invite if provided
+                if (calendarInvite) {
+                    payload.calendarInvite = calendarInvite;
+                }
 
                 // Add optional fields only if they have values
                 if (emailData.cc) {
