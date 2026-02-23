@@ -16,7 +16,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
       {Array.from({ length: rows }).map((_, i) => (
         <TableRow key={i} className="border-white/5 hover:bg-transparent" data-type={type}>
           {Array.from({ length: columns }).map((_, j) => (
-            <TableCell key={j} className="py-4">
+            <TableCell key={j} className="py-3">
               {j === 0 ? (
                 // Checkbox/Selection area
                 <Skeleton className="h-4 w-4 rounded" />
@@ -24,7 +24,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
                 // Primary identity area (Avatar + Name + Subtitle)
                 <div className="flex items-center gap-3">
                   <Skeleton className={cn(
-                    "h-9 w-9",
+                    "h-10 w-10",
                     "rounded-[14px]"
                   )} />
                   <div className="space-y-2">
