@@ -1200,18 +1200,18 @@ export function GeminiChatPanel() {
 
       setIsAvatarLoading(true)
 
-      // If it's already an imgur link or not a google link, use it directly
-      if (photoURL.includes('imgur.com') || (!photoURL.includes('googleusercontent.com') && !photoURL.includes('ggpht.com'))) {
+      // If it's already an imgur link, use it directly. Otherwise host it.
+      if (photoURL.includes('imgur.com')) {
         setHostedAvatarUrl(photoURL)
         setIsAvatarLoading(false)
         return
       }
 
       try {
-        const response = await fetch('/api/upload/host-google-avatar', {
+        const response = await fetch('/api/upload/host-avatar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ googlePhotoURL: photoURL })
+          body: JSON.stringify({ url: photoURL })
         })
         if (response.ok) {
           const data = await response.json()

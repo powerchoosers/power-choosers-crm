@@ -35,6 +35,11 @@ export async function requireUser(req: any) {
 
     const token = authHeader.replace('Bearer ', '');
 
+    // Sanity check: prevent 'undefined' or 'null' strings from being treated as tokens
+    if (!token || token === 'undefined' || token === 'null') {
+      return { email: null, user: null, isAdmin: false };
+    }
+
     // Dev Bypass Check
     if (process.env.NODE_ENV === 'development' && token === 'dev-bypass-token') {
       return {
