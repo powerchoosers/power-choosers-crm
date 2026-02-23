@@ -26,6 +26,9 @@ import { useTasks, type Task } from '@/hooks/useTasks'
 import { useUIStore } from '@/store/uiStore'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
+import { useQueryClient } from '@tanstack/react-query'
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const PRIORITIES = ['Low', 'Medium', 'High'] as const
@@ -61,6 +64,7 @@ function parseTimeToDate(date: Date, timeStr: string): Date {
 export function TaskCreationPanel() {
     const { taskContext, setRightPanelMode, setTaskContext } = useUIStore()
     const { entityId, entityName, entityType, entityLogoUrl, entityDomain } = taskContext || { entityId: '', entityType: 'account' }
+    const queryClient = useQueryClient()
 
     const [isReady, setIsReady] = useState(false)
     const now = new Date()
@@ -78,6 +82,7 @@ export function TaskCreationPanel() {
 
     const [priority, setPriority] = useState<Priority>('Medium')
     const [taskType, setTaskType] = useState<TaskType>('Call')
+    const [sendCalendarInvite, setSendCalendarInvite] = useState(false)
     const [notes, setNotes] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
 
@@ -155,11 +160,38 @@ export function TaskCreationPanel() {
                 accountId: entityType === 'account' ? entityId : undefined,
                 relatedTo: entityName,
                 relatedType: entityType === 'contact' ? 'Person' : 'Account',
-                metadata: { taskType }
+                metadata: {
+                    taskType,
+                    ...(sendCalendarInvite ? { syncCalendar: true, inviteContext: 'forensic_diagnostic' } : {})
+                }
             }
-            await addTaskAsync(payload)
+
+            if (sendCalendarInvite) {
+                const { data: { session } } = await supabase.auth.getSession()
+                const res = await fetch('/api/tasks/create-task-with-invite', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${session?.access_token}`
+                    },
+                    body: JSON.stringify(payload)
+                })
+
+                if (!res.ok) {
+                    const err = await res.json()
+                    throw new Error(err.error || 'Failed to initialize transmission')
+                }
+
+                queryClient.invalidateQueries({ queryKey: ['tasks'] })
+                toast.success('TRANSMISSION_COMPLETE // INVITE_SENT')
+            } else {
+                await addTaskAsync(payload)
+            }
+
             setRightPanelMode('DEFAULT')
             setTaskContext(null)
+        } catch (error: any) {
+            toast.error(error.message || 'System error during initialization')
         } finally {
             setIsCommitting(false)
         }
@@ -320,6 +352,33 @@ export function TaskCreationPanel() {
                             </button>
                         </div>
                     </div>
+
+                    {/* CALENDAR INVITE TOGGLE (Contacts Only) */}
+                    {entityType === 'contact' && (
+                        <div className="space-y-4">
+                            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
+                                Transmit_Calendar_Invite
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setSendCalendarInvite(!sendCalendarInvite)}
+                                className={cn(
+                                    "w-full h-12 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all flex items-center justify-between px-4 relative group",
+                                    sendCalendarInvite
+                                        ? "bg-[#002FA7]/10 border-[#002FA7]/50 text-white shadow-[0_0_20px_-10px_#002FA7]"
+                                        : "bg-black/20 border-white/5 text-zinc-500 hover:text-white/80"
+                                )}
+                            >
+                                <span className="tracking-[0.2em]">
+                                    {sendCalendarInvite ? '[ PAYLOAD_ATTACHED ]' : '[ STANDBY ]'}
+                                </span>
+                                {sendCalendarInvite && (
+                                    <div className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse shadow-[0_0_10px_2px_#002FA7]" />
+                                )}
+                            </button>
+                        </div>
+                    )}
 
                     {/* PRIORITY */}
                     <div className="space-y-4">
