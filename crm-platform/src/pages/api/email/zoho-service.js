@@ -76,7 +76,7 @@ export class ZohoMailService {
      * Send an email via Zoho Mail API
      */
     async sendEmail(emailData) {
-        const { to, subject, html, text, from, fromName, attachments, uploadedAttachments, userEmail, calendarInvite } = emailData;
+        const { to, subject, html, text, from, fromName, attachments, uploadedAttachments, userEmail } = emailData;
 
         if (!userEmail) {
             throw new Error('userEmail is required for Zoho sending');
@@ -105,11 +105,6 @@ export class ZohoMailService {
                     mailFormat: html ? 'html' : 'plaintext',
                 };
 
-                // Add native calendar invite if provided
-                if (calendarInvite) {
-                    payload.calendarInvite = calendarInvite;
-                }
-
                 // Add optional fields only if they have values
                 if (emailData.cc) {
                     payload.ccAddress = Array.isArray(emailData.cc) ? emailData.cc.join(',') : emailData.cc;
@@ -122,7 +117,6 @@ export class ZohoMailService {
                 if (uploadedAttachments && uploadedAttachments.length > 0) {
                     payload.attachments = uploadedAttachments.map(att => ({
                         storeName: att.storeName,
-                        attachmentPath: att.attachmentPath || att.storeName,
                         attachmentName: att.attachmentName,
                     }));
                 }
