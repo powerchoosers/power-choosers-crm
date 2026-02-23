@@ -115,11 +115,16 @@ export class ZohoMailService {
 
                 // Handle Pre-Uploaded Attachments (Standard Zoho Flow)
                 if (uploadedAttachments && uploadedAttachments.length > 0) {
-                    payload.attachments = uploadedAttachments.map(att => ({
-                        storeName: att.storeName,
-                        attachmentPath: att.attachmentPath || att.storeName,
-                        attachmentName: att.attachmentName,
-                    }));
+                    payload.attachments = uploadedAttachments.map(att => {
+                        const isCalendar = att.attachmentName?.endsWith('.ics');
+                        return {
+                            storeName: att.storeName,
+                            attachmentPath: att.attachmentPath || att.storeName,
+                            attachmentName: att.attachmentName,
+                            isInline: isCalendar,
+                            contentType: isCalendar ? 'text/calendar; method=REQUEST' : undefined
+                        };
+                    });
                 }
 
                 logger.debug(`[Zoho Mail] Sending payload to ${this.baseUrl}/accounts/${accountId}/messages: ${JSON.stringify({ ...payload, content: '...' })}`, 'zoho-service');
