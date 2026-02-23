@@ -148,17 +148,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 try {
                     const uploadResult = await zohoService.uploadAttachment(
                         userEmail,
-                        Buffer.from(icsContent),
+                        icsContent,
                         'invite.ics',
                         true // isInline
                     );
                     if (uploadResult) {
                         uploadedAttachments.push(uploadResult);
                     }
-                } catch (uploadError) {
+                } catch (uploadError: any) {
                     console.error('[Create Task Invite] Attachment upload failed:', uploadError);
-                    // Continue without attachment if upload fails? Or fail? Probably fail to be safe.
-                    throw new Error('Signal Interrupted: Failed to uplink calendar payload');
+                    throw new Error(`Signal Interrupted: Failed to uplink calendar payload. Orbit error: ${uploadError.message}`);
                 }
 
                 const emailHtml = await render(
