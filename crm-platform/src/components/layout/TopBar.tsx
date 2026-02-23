@@ -540,35 +540,37 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex-1 flex items-center justify-start gap-3 px-2 min-w-0">
-                    {status === 'connected' && (
-                      <div className="flex items-center gap-0.5 opacity-60">
-                        {[...Array(5)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            className="w-[2px] bg-zinc-500 rounded-full"
-                            animate={{ height: ["3px", "10px", "3px"] }}
-                            transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
-                          />
-                        ))}
+                  <div className="flex-1 flex items-center justify-start min-w-0 ml-6">
+                    <div className="flex items-center gap-3 px-3 py-1 border border-dotted border-white/20 rounded-lg bg-white/[0.01]">
+                      {status === 'connected' && (
+                        <div className="flex items-center gap-0.5 opacity-60">
+                          {[...Array(5)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="w-[2px] bg-zinc-500 rounded-full"
+                              animate={{ height: ["3px", "10px", "3px"] }}
+                              transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <div className="text-[12px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
+                        {status === 'connected' && <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />}
+                        {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
                       </div>
-                    )}
-                    <div className="text-[12px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
-                      {status === 'connected' && <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />}
-                      {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
+                      {status === 'connected' && (
+                        <div className="flex items-center gap-0.5 opacity-60">
+                          {[...Array(5)].map((_, i) => (
+                            <motion.div
+                              key={i}
+                              className="w-[2px] bg-zinc-500 rounded-full"
+                              animate={{ height: ["3px", "10px", "3px"] }}
+                              transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    {status === 'connected' && (
-                      <div className="flex items-center gap-0.5 opacity-60">
-                        {[...Array(5)].map((_, i) => (
-                          <motion.div
-                            key={i}
-                            className="w-[2px] bg-zinc-500 rounded-full"
-                            animate={{ height: ["3px", "10px", "3px"] }}
-                            transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
-                          />
-                        ))}
-                      </div>
-                    )}
                   </div>
 
                   {/* Right Sector: Intervention Triggers */}
