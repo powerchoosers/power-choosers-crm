@@ -63,12 +63,12 @@ export default function ForensicInvite({
 
                     {/* Briefing Payload */}
                     <Text style={bodyText}>
-                        {description || `Diagnostic session initialized for ${contactName}. Automated load analysis identifies a pending variance in the sector. This session will calibrate mitigation protocols to stabilize the ${companyName} profile against structural leakage.`}
+                        {description || `Operational session initialized for ${contactName}. Analysis identifies a scheduled update in the sector. This session will review management protocols to optimize the ${companyName} profile.`}
                     </Text>
 
                     {/* Data Grid */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// {companyName.toUpperCase()} // FORENSIC_DIAGNOSTIC</Text>
+                        <Text style={cardLabel}>// {companyName.toUpperCase()} // PERFORMANCE_REVIEW</Text>
 
                         <div style={gridRow}>
                             <div style={gridItem}>
