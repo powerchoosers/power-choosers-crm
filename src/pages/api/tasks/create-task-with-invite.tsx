@@ -149,7 +149,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     const uploadResult = await zohoService.uploadAttachment(
                         userEmail,
                         Buffer.from(icsContent),
-                        'invite.ics'
+                        'invite.ics',
+                        true // isInline
                     );
                     if (uploadResult) {
                         uploadedAttachments.push(uploadResult);
