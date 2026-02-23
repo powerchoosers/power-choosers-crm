@@ -540,14 +540,14 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex-1 flex items-center justify-start min-w-0 ml-6">
-                    <div className="flex items-center gap-3 px-3 py-1 border border-dotted border-white/20 rounded-lg bg-white/[0.01]">
+                  <div className="flex-1 flex items-center justify-start min-w-0 ml-2">
+                    <div className="flex items-center gap-3 px-3 py-1 border border-dotted border-emerald-500/40 rounded-lg bg-emerald-500/10">
                       {status === 'connected' && (
                         <div className="flex items-center gap-0.5 opacity-60">
                           {[...Array(5)].map((_, i) => (
                             <motion.div
                               key={i}
-                              className="w-[2px] bg-zinc-500 rounded-full"
+                              className="w-[2px] bg-emerald-500/50 rounded-full"
                               animate={{ height: ["3px", "10px", "3px"] }}
                               transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
                             />
@@ -563,7 +563,7 @@ export function TopBar() {
                           {[...Array(5)].map((_, i) => (
                             <motion.div
                               key={i}
-                              className="w-[2px] bg-zinc-500 rounded-full"
+                              className="w-[2px] bg-emerald-500/50 rounded-full"
                               animate={{ height: ["3px", "10px", "3px"] }}
                               transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
                             />
