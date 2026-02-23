@@ -195,8 +195,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       // 2. Fallback to LocalStorage
-      const cacheKey = `apollo_cache_${key}`;
-      const cached = localStorage.getItem(cacheKey);
+      const cacheKey = domainKey ? `apollo_cache_${domainKey}` : null;
+      const cached = cacheKey ? localStorage.getItem(cacheKey) : null;
 
       if (cached) {
         try {
@@ -206,7 +206,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             setData(contacts);
             setCompanySummary(company);
             setScanStatus('complete');
-            saveToSupabase(key, parsed);
+            if (domainKey) saveToSupabase(domainKey, parsed);
             return;
           }
         } catch (e) {
