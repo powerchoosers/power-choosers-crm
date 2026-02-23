@@ -117,14 +117,19 @@ export default function ForensicInvite({
 
                     {/* Signature */}
                     <Section style={signatureContainer}>
-                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                             {sender.avatarUrl && (
                                 <Img
                                     src={sender.avatarUrl}
                                     alt={sender.name}
-                                    width="48"
-                                    height="48"
-                                    style={{ borderRadius: '12px', border: '1px solid #1a1a1a', objectFit: 'cover' as const }}
+                                    width="44"
+                                    height="44"
+                                    style={{
+                                        borderRadius: '10px',
+                                        border: '1px solid #1a1a1a',
+                                        objectFit: 'cover' as const,
+                                        marginRight: '20px'
+                                    }}
                                 />
                             )}
                             <div style={{ flex: 1 }}>
