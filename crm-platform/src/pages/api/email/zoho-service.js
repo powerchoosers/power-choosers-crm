@@ -93,19 +93,27 @@ export class ZohoMailService {
                     ? `${fromName} <${senderEmail}>`
                     : senderEmail;
 
+                // Construct payload with ONLY supported keys
                 const payload = {
                     fromAddress: fromAddress,
-                    toAddress: to,
-                    ccAddress: emailData.cc || undefined,
+                    toAddress: Array.isArray(to) ? to.join(',') : to,
                     subject: subject,
-                    content: html || text,
+                    content: html || text || '',
                     mailFormat: html ? 'html' : 'plaintext',
                 };
+
+                // Add optional fields only if they have values
+                if (emailData.cc) {
+                    payload.ccAddress = Array.isArray(emailData.cc) ? emailData.cc.join(',') : emailData.cc;
+                }
+                if (emailData.bcc) {
+                    payload.bccAddress = Array.isArray(emailData.bcc) ? emailData.bcc.join(',') : emailData.bcc;
+                }
 
                 // Handle Inline/Content Attachments (Legacy/Small files)
                 if (attachments && attachments.length > 0) {
                     payload.attachments = attachments.map(att => ({
-                        attachmentName: att.filename,
+                        attachmentName: att.filename || att.attachmentName,
                         content: att.content,
                     }));
                 }
@@ -120,6 +128,8 @@ export class ZohoMailService {
                     }));
                     payload.attachments = [...existingAtts, ...newAtts];
                 }
+
+                logger.debug(`[Zoho Mail] Sending payload to ${this.baseUrl}/accounts/${accountId}/messages: ${JSON.stringify({ ...payload, content: '...' })}`, 'zoho-service');
 
                 const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages`, {
                     method: 'POST',
