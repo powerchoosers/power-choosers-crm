@@ -71,11 +71,12 @@ function CompanyIconInner({
   const m = metadata || {}
   const activeLogoUrl = useMemo(() => {
     const candidate = (typeof logoUrl === 'string' && logoUrl.trim()) ? logoUrl.trim() :
-      (m.logoUrl && typeof m.logoUrl === 'string' && m.logoUrl.trim() !== '') ? m.logoUrl.trim() :
-        (m.logo_url && typeof m.logo_url === 'string' && m.logo_url.trim() !== '') ? m.logo_url.trim() :
-          undefined;
+      (typeof logo_url === 'string' && logo_url.trim()) ? logo_url.trim() :
+        (m.logoUrl && typeof m.logoUrl === 'string' && m.logoUrl.trim() !== '') ? m.logoUrl.trim() :
+          (m.logo_url && typeof m.logo_url === 'string' && m.logo_url.trim() !== '') ? m.logo_url.trim() :
+            undefined;
     return candidate;
-  }, [logoUrl, m.logoUrl, m.logo_url]);
+  }, [logoUrl, logo_url, m.logoUrl, m.logo_url]);
 
   const effectiveDomain = useMemo(() => {
     const candidate = (typeof domain === 'string' && domain.trim()) ? domain.trim() :
@@ -105,11 +106,14 @@ function CompanyIconInner({
 
   useEffect(() => {
     if (propsKey !== propsKeyRef.current) {
+      const isInitial = propsKeyRef.current === ''
       propsKeyRef.current = propsKey
-      // Reset failure state ONLY if the source identifiers actually changed
-      // This prevents flickering on minor prop updates that don't change the origin
-      setFailedSet(new Set())
-      setIsLoaded(false)
+      if (!isInitial) {
+        // Reset failure state ONLY if the source identifiers actually changed
+        // This prevents flickering on minor prop updates that don't change the origin
+        setFailedSet(new Set())
+        setIsLoaded(false)
+      }
     }
   }, [propsKey])
 
@@ -118,9 +122,12 @@ function CompanyIconInner({
 
     const srcChanged = lastSrcRef.current !== currentSrc
     if (srcChanged) {
+      const isInitial = lastSrcRef.current === null
       lastSrcRef.current = currentSrc
-      setIsLoaded(false)
-      setRetryCount(0)
+      if (!isInitial) {
+        setIsLoaded(false)
+        setRetryCount(0)
+      }
     }
 
     if (timeoutRef.current) {

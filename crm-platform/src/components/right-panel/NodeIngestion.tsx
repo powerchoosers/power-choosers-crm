@@ -30,7 +30,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
         employees: data.employees,
         revenue: data.revenue,
         description: data.description, // Apollo returns short_description
-        logo: data.logoUrl,
+        logoUrl: data.logoUrl,
         address: data.address, // Full raw_address from Apollo
         city: data.city,
         state: data.state,
@@ -424,7 +424,7 @@ export function NodeIngestion() {
           state: state,
           country: scanResult?.country,
           service_addresses: serviceAddresses, // Save to service_addresses JSONB array
-          logo_url: scanResult?.logo,
+          logo_url: scanResult?.logoUrl || scanResult?.logo,
           phone: formatPhoneNumber(phone || scanResult?.phone) || null,
           linkedin_url: scanResult?.linkedin,
           status: 'active',
