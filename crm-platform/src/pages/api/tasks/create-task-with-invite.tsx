@@ -117,6 +117,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 const zohoService = new ZohoMailService();
 
+                // 1. Upload the ICS attachment first (Zoho requires pre-upload for sent items)
+                let uploadedAttachments: any[] = [];
+                try {
+                    const uploadResult = await zohoService.uploadAttachment(
+                        userEmail,
+                        Buffer.from(icsContent),
+                        'invite.ics'
+                    );
+                    if (uploadResult) {
+                        uploadedAttachments.push(uploadResult);
+                    }
+                } catch (uploadError) {
+                    console.error('[Create Task Invite] Attachment upload failed:', uploadError);
+                    // Continue without attachment if upload fails? Or fail? Probably fail to be safe.
+                    throw new Error('Signal Interrupted: Failed to uplink calendar payload');
+                }
+
                 const emailHtml = await render(
                     <ForensicInvite
                         contactName={contactName}
@@ -134,13 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     subject: `Energy Briefing Invite // ${contactName}`,
                     html: emailHtml,
                     userEmail: userEmail,
-                    attachments: [
-                        {
-                            filename: 'invite.ics',
-                            content: Buffer.from(icsContent).toString('base64'),
-                            contentType: 'text/calendar; charset=utf-8; method=REQUEST'
-                        }
-                    ]
+                    uploadedAttachments: uploadedAttachments
                 });
             }
         }
