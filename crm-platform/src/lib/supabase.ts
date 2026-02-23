@@ -45,11 +45,24 @@ export async function requireUser(req: any) {
       };
     }
 
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    let { data: { user }, error } = await supabase.auth.getUser(token);
+
+    // Fallback: Try with Admin Client if Anon Client fails (sometimes needed in server environments)
+    if (!user || error) {
+      const { data: adminData, error: adminError } = await supabaseAdmin.auth.getUser(token);
+      if (adminData?.user) {
+        user = adminData.user;
+        error = null;
+      } else {
+        console.warn('[requireUser] Token verification failure:', {
+          anonError: error?.message,
+          adminError: adminError?.message,
+          tokenPrefix: token?.substring(0, 15)
+        });
+      }
+    }
 
     if (error || !user) {
-      // Internal Auth Log
-      console.warn('[requireUser] Auth failed for token:', token ? `${token.substring(0, 10)}...` : 'none', error?.message);
       return { email: null, user: null, isAdmin: false };
     }
 
