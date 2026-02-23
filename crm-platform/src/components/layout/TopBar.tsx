@@ -540,30 +540,30 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex-1 flex items-center justify-center gap-3 px-2 min-w-0">
+                  <div className="flex-1 flex items-center justify-start gap-4 px-8 min-w-0 border-l border-white/5 ml-4">
                     {status === 'connected' && (
-                      <div className="flex items-center gap-0.5 opacity-80">
+                      <div className="flex items-center gap-0.5 opacity-60">
                         {[...Array(5)].map((_, i) => (
                           <motion.div
                             key={i}
-                            className="w-[3px] bg-zinc-500 rounded-full"
-                            animate={{ height: ["4px", "14px", "4px"] }}
+                            className="w-[2px] bg-zinc-500 rounded-full"
+                            animate={{ height: ["3px", "10px", "3px"] }}
                             transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
                           />
                         ))}
                       </div>
                     )}
-                    <div className="text-[14px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
-                      {status === 'connected' && <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />}
+                    <div className="text-[12px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
+                      {status === 'connected' && <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />}
                       {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
                     </div>
                     {status === 'connected' && (
-                      <div className="flex items-center gap-0.5 opacity-80">
+                      <div className="flex items-center gap-0.5 opacity-60">
                         {[...Array(5)].map((_, i) => (
                           <motion.div
                             key={i}
-                            className="w-[3px] bg-zinc-500 rounded-full"
-                            animate={{ height: ["4px", "14px", "4px"] }}
+                            className="w-[2px] bg-zinc-500 rounded-full"
+                            animate={{ height: ["3px", "10px", "3px"] }}
                             transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
                           />
                         ))}
