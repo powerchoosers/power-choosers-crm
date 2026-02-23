@@ -1,10 +1,18 @@
 import { create } from 'zustand'
 
-export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT';
+export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK';
 
 export interface IngestionContext {
   accountId: string
   accountName: string
+}
+
+export interface TaskContext {
+  entityId: string
+  entityName?: string
+  entityType: 'contact' | 'account'
+  contactId?: string
+  accountId?: string
 }
 
 interface UIState {
@@ -16,6 +24,9 @@ interface UIState {
   /** Pre-filled context when opening INGEST_CONTACT from Account Dossier (Rapid Contact Injection) */
   ingestionContext: IngestionContext | null
   setIngestionContext: (ctx: IngestionContext | null) => void
+  /** Pre-filled context when opening CREATE_TASK mode */
+  taskContext: TaskContext | null
+  setTaskContext: (ctx: TaskContext | null) => void
   /** Initial identifier (domain/url) for ingestion from external signals */
   ingestionIdentifier: string | null
   setIngestionIdentifier: (id: string | null) => void
@@ -38,6 +49,8 @@ export const useUIStore = create<UIState>((set) => ({
   setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
   ingestionContext: null,
   setIngestionContext: (ctx) => set({ ingestionContext: ctx }),
+  taskContext: null,
+  setTaskContext: (ctx) => set({ taskContext: ctx }),
   ingestionIdentifier: null,
   setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
   ingestionSignal: null,
