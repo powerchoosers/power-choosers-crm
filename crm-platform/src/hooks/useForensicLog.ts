@@ -23,7 +23,7 @@ export interface LogEntry {
 }
 
 export function useForensicLog() {
-    const { user } = useAuth();
+    const { user, role } = useAuth();
     const { data: marketPulse } = useMarketPulse();
 
     // 1. Fetch recent signals (Apollo News)
@@ -80,49 +80,41 @@ export function useForensicLog() {
         queryFn: async () => {
             if (!user?.email) return [];
 
-            // Get recent 100 emails to ensure we catch human interactions over noise
+            // 1. Get all valid contact emails first
+            let contactQuery = supabase.from('contacts').select('email')
+            if (role !== 'admin' && role !== 'dev') {
+                contactQuery = contactQuery.eq('ownerId', user.email)
+            }
+            const { data: contactList } = await contactQuery
+            const validAddresses = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
+
+            if (validAddresses.length === 0) return []
+
+            // 2. Fetch recent emails specifically for these contacts
+            const conditions: string[] = []
+            validAddresses.forEach(e => {
+                conditions.push(`from.ilike.*${e}*`)
+                conditions.push(`to.cs.{"${e}"}`)
+            })
+
             const { data: recentEmails } = await supabase
                 .from('emails')
                 .select('id, subject, from, to, type, timestamp, createdAt, openCount')
-                .not('subject', 'ilike', '%mail warming%')
-                .not('subject', 'ilike', '%mailwarming%')
-                .not('subject', 'ilike', '%Report domain:%')
-                .not('subject', 'ilike', '%Report-ID:%')
+                .or(conditions.join(','))
                 .order('timestamp', { ascending: false })
-                .limit(100);
+                .limit(60);
 
             if (!recentEmails || recentEmails.length === 0) return [];
 
-            // Extract unique email addresses to cross-reference with contacts
-            const addressSet = new Set<string>();
-            recentEmails.forEach(e => {
-                if (e.from) {
-                    const match = e.from.match(/<([^>]+)>/);
-                    addressSet.add((match ? match[1] : e.from).toLowerCase().trim());
-                }
-                if (e.to) {
-                    const toStr = Array.isArray(e.to) ? e.to[0] : e.to;
-                    if (toStr) {
-                        const match = toStr.match(/<([^>]+)>/);
-                        addressSet.add((match ? match[1] : toStr).toLowerCase().trim());
-                    }
-                }
-            });
-
-            const addresses = Array.from(addressSet).filter(a => a && a !== user.email?.toLowerCase());
-
-            if (addresses.length === 0) return [];
-
-            // Find which of these addresses exist in contacts
+            // Map contact names for display
             const { data: contacts } = await supabase
                 .from('contacts')
                 .select('email, name')
-                .in('email', addresses);
+                .in('email', validAddresses);
 
             const validContactEmails = new Map((contacts || []).map(c => [c.email.toLowerCase().trim(), c.name]));
 
-            // Filter emails that involve a known contact
-            const verifiedEmails = recentEmails.filter(e => {
+            return recentEmails.map(e => {
                 const fromMatch = e.from?.match(/<([^>]+)>/);
                 const fromAddr = (fromMatch ? fromMatch[1] : e.from)?.toLowerCase().trim();
 
@@ -135,15 +127,9 @@ export function useForensicLog() {
                     }
                 }
 
-                const contactName = validContactEmails.get(fromAddr) || validContactEmails.get(toAddr);
-                if (contactName) {
-                    (e as any)._contactName = contactName;
-                    return true;
-                }
-                return false;
+                (e as any)._contactName = validContactEmails.get(fromAddr) || validContactEmails.get(toAddr) || 'Contact';
+                return e;
             });
-
-            return verifiedEmails;
         },
         enabled: !!user?.email,
         refetchInterval: 15000,
