@@ -540,7 +540,7 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex-1 flex items-center justify-start gap-4 px-8 min-w-0 border-l border-white/5 ml-4">
+                  <div className="flex-1 flex items-center justify-start gap-3 px-2 min-w-0">
                     {status === 'connected' && (
                       <div className="flex items-center gap-0.5 opacity-60">
                         {[...Array(5)].map((_, i) => (
@@ -685,7 +685,7 @@ export function TopBar() {
                         setSentiment('hangup');
                         handleHangup();
                       }}
-                      className="group flex items-center justify-center min-w-[36px] min-h-[36px] w-[36px] h-[36px] shrink-0 ml-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all duration-300 hover:scale-[1.12]"
+                      className="group flex items-center justify-center min-w-[32px] min-h-[32px] w-[32px] h-[32px] shrink-0 ml-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all duration-300 hover:scale-[1.12]"
                     >
                       <Phone size={16} className="transition-transform duration-300 group-hover:rotate-[135deg]" />
                     </button>
