@@ -518,10 +518,10 @@ export function TopBar() {
                 exit={{ opacity: 0, y: -20 }}
                 className="w-full flex"
               >
-                <div className="w-full h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-6 transition-all duration-300">
+                <div className="w-full h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-3 transition-all duration-300">
 
                   {/* Left Sector: Identity */}
-                  <div className="flex items-center gap-3 w-max max-w-[30%] flex-shrink-0">
+                  <div className="flex items-center gap-2 w-max max-w-[35%] flex-shrink-0">
                     <CallBarIcon
                       key={`callbar-icon-${callSessionId}`}
                       logoUrl={callbarLogoUrl || undefined}
@@ -572,7 +572,7 @@ export function TopBar() {
                   </div>
 
                   {/* Right Sector: Intervention Triggers */}
-                  <div className="flex items-center justify-end gap-1.5 flex-shrink-0">
+                  <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-2">
                     <button
                       onClick={() => setSentiment(sentiment === 'connect' ? null : 'connect')}
                       className={cn(
