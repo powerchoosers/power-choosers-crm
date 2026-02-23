@@ -15,6 +15,7 @@ import { useMemo } from 'react'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { useUIStore } from '@/store/uiStore'
 import { NodeIngestion } from '../right-panel/NodeIngestion'
+import { TaskCreationPanel } from '../right-panel/TaskCreationPanel'
 
 /** When on dossier: 'context' = Active Context widgets, 'scanning' = Scanning Mode widgets. Only used when isActiveContext. */
 type DossierPanelView = 'context' | 'scanning'
@@ -36,7 +37,7 @@ import { mapLocationToZone } from '@/lib/market-mapping'
 import { useWeather } from '@/hooks/useWeather'
 
 export function RightPanel() {
-  const { rightPanelMode } = useUIStore()
+  const { rightPanelMode, setRightPanelMode, setTaskContext } = useUIStore()
   const pathname = usePathname()
   const params = useParams()
 
@@ -151,7 +152,11 @@ export function RightPanel() {
   if (rightPanelMode !== 'DEFAULT') {
     return (
       <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 flex flex-col overflow-hidden hidden lg:flex">
-        <NodeIngestion />
+        {rightPanelMode === 'CREATE_TASK' ? (
+          <TaskCreationPanel />
+        ) : (
+          <NodeIngestion />
+        )}
       </aside>
     )
   }
@@ -297,18 +302,22 @@ export function RightPanel() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
-                    <TaskInjectionPopover
-                      entityId={entityId}
-                      entityName={entityName}
-                      entityType={isContactPage ? 'contact' : 'account'}
-                      contactId={isContactPage ? entityId : undefined}
-                      accountId={isAccountPage ? entityId : undefined}
-                      trigger={
-                        <button className="icon-button-forensic p-1 flex items-center justify-center" type="button">
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
-                      }
-                    />
+                    <button
+                      className="icon-button-forensic p-1 flex items-center justify-center"
+                      type="button"
+                      onClick={() => {
+                        setTaskContext({
+                          entityId,
+                          entityName,
+                          entityType: isContactPage ? 'contact' : 'account',
+                          contactId: isContactPage ? entityId : undefined,
+                          accountId: isAccountPage ? entityId : undefined,
+                        })
+                        setRightPanelMode('CREATE_TASK')
+                      }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                   <ContextTasksWidget entityId={entityId} entityName={entityName} />
                 </div>
