@@ -375,9 +375,21 @@ export default function SatelliteUplink({
               zoom: 16
             }}
             style={{ width: '100%', height: '100%', minHeight: '384px' }}
-            mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+            mapStyle="mapbox://styles/mapbox/standard"
             mapboxAccessToken={mapboxToken}
             attributionControl={false}
+            onStyleData={(e: any) => {
+              const map = e.target;
+              // Mapbox Standard configuration for Mapbox GL JS v3+
+              // We want satellite basemap but with maximum labels
+              if (map.getLayer('basemap')) {
+                map.setConfigProperty('basemap', 'config', {
+                  preset: 'satellite'
+                });
+                map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
+                map.setConfigProperty('basemap', 'densityPointOfInterestLabels', 5);
+              }
+            }}
           >
             <Marker longitude={stableCoordinates.lng} latitude={stableCoordinates.lat} anchor="bottom">
               <MapPin className="text-red-500 w-8 h-8 drop-shadow-lg" fill="currentColor" />

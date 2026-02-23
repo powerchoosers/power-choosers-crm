@@ -91,10 +91,20 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                         zoom: 17,
                         pitch: 45
                     }}
-                    mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+                    mapStyle="mapbox://styles/mapbox/standard"
                     mapboxAccessToken={mapboxToken}
                     attributionControl={false}
                     reuseMaps
+                    onStyleData={(e: any) => {
+                        const map = e.target;
+                        if (map.getLayer('basemap')) {
+                            map.setConfigProperty('basemap', 'config', {
+                                preset: 'satellite'
+                            });
+                            map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
+                            map.setConfigProperty('basemap', 'densityPointOfInterestLabels', 5);
+                        }
+                    }}
                 >
                     <Marker longitude={stableCoordinates.lng} latitude={stableCoordinates.lat} anchor="bottom">
                         <motion.div
