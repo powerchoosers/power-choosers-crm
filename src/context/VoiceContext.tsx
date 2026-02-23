@@ -398,6 +398,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
                 const monitorMediaHealth = async () => {
                   if (call.status() !== 'open') return;
                   try {
+                    if (typeof (call as any).getStats !== 'function') {
+                      console.warn('[Voice] getStats is not supported in this environment');
+                      return;
+                    }
                     const stats = await (call as any).getStats();
                     stats.forEach((report: any) => {
                       if (report.localAudioTrackStats) {
@@ -679,6 +683,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         const monitorMediaHealth = async () => {
           if (call.status() !== 'open') return;
           try {
+            if (typeof (call as any).getStats !== 'function') {
+              console.warn('[Voice] getStats is not supported in this environment');
+              return;
+            }
             const stats = await (call as any).getStats();
             stats.forEach((report: any) => {
               if (report.localAudioTrackStats) {
