@@ -80,14 +80,16 @@ export function useForensicLog() {
         queryFn: async () => {
             if (!user?.email) return [];
 
-            // Get recent 30 emails
+            // Get recent 100 emails to ensure we catch human interactions over noise
             const { data: recentEmails } = await supabase
                 .from('emails')
                 .select('id, subject, from, to, type, timestamp, createdAt, openCount')
                 .not('subject', 'ilike', '%mail warming%')
                 .not('subject', 'ilike', '%mailwarming%')
+                .not('subject', 'ilike', '%Report domain:%')
+                .not('subject', 'ilike', '%Report-ID:%')
                 .order('timestamp', { ascending: false })
-                .limit(30);
+                .limit(100);
 
             if (!recentEmails || recentEmails.length === 0) return [];
 
@@ -257,7 +259,7 @@ export function useForensicLog() {
         }
 
         // Sort descending by timestamp
-        return entries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 40);
+        return entries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 60);
     }, [signals, completedTasks, crmEmails, marketPulse]);
 
     return { logEntries };
