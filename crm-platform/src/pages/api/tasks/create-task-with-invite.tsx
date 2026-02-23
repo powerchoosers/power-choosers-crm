@@ -150,7 +150,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         userEmail,
                         icsContent,
                         'invite.ics',
-                        true // isInline
+                        false // isInline - Zoho only supports images as inline
                     );
                     if (uploadResult) {
                         uploadedAttachments.push(uploadResult);
