@@ -113,16 +113,16 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   useEffect(() => {
     const photoURL = user?.user_metadata?.avatar_url || profile.hostedPhotoUrl
     if (!photoURL) return
-    // Non-Google URLs (e.g. imgur) can be used directly
-    if (photoURL.includes('imgur.com') || (!photoURL.includes('googleusercontent.com') && !photoURL.includes('ggpht.com'))) {
+    // If it's already an imgur link, use it directly. Otherwise host it.
+    if (photoURL.includes('imgur.com')) {
       setHostedAvatarUrl(photoURL)
       return
     }
     let cancelled = false
-    fetch('/api/upload/host-google-avatar', {
+    fetch('/api/upload/host-avatar', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ googlePhotoURL: photoURL }),
+      body: JSON.stringify({ url: photoURL }),
     })
       .then((res) => res.json())
       .then((data) => {

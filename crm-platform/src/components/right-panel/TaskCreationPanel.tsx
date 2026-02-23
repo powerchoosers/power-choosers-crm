@@ -180,13 +180,20 @@ export function TaskCreationPanel() {
                     throw new Error('Authentication session expired. Please refresh.')
                 }
 
+                // Get current user email for identity fallback
+                const { data: { user } } = await supabase.auth.getUser()
+                const currentUserEmail = user?.email
+
                 const res = await fetch('/api/tasks/create-task-with-invite', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify({
+                        ...payload,
+                        userEmail: currentUserEmail
+                    })
                 })
 
                 if (!res.ok) {
