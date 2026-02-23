@@ -169,10 +169,18 @@ export default async function handler(req, res) {
               return;
             }
 
+            const callbackParams = new URLSearchParams();
+            if (contactId) callbackParams.append('contactId', contactId);
+            if (accountId) callbackParams.append('accountId', accountId);
+            if (agentId) callbackParams.append('agentId', agentId);
+            if (agentEmail) callbackParams.append('agentEmail', agentEmail);
+            if (targetPhoneFromQuery) callbackParams.append('targetPhone', targetPhoneFromQuery);
+            const cbq = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
+
             const rec = await client.calls(targetSid).recordings.create({
               recordingChannels: 'dual',
               recordingTrack: 'both',
-              recordingStatusCallback: baseUrl + '/api/twilio/recording',
+              recordingStatusCallback: baseUrl + '/api/twilio/recording' + cbq,
               recordingStatusCallbackMethod: 'POST'
             });
             logger.log('[Dial-Status] Started recording:', rec.sid, 'on:', targetSid);

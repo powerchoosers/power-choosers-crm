@@ -77,12 +77,6 @@ export default async function handler(req, res) {
                     RecordingDuration: body.RecordingDuration
                 });
             }
-
-            if (RecordingStatus === 'completed' && src === 'dialverb' && !isDual) {
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, ignored: true, reason: 'mono_dialverb' }));
-                return;
-            }
         } catch (_) { }
 
         // If the recording is completed but RecordingUrl is missing, attempt to fetch it by CallSid
