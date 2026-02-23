@@ -91,18 +91,17 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                         zoom: 17,
                         pitch: 45
                     }}
-                    mapStyle="mapbox://styles/mapbox/standard"
+                    mapStyle="mapbox://styles/mapbox/standard-satellite"
                     mapboxAccessToken={mapboxToken}
                     attributionControl={false}
                     reuseMaps
                     onStyleData={(e: any) => {
                         const map = e.target;
-                        if (map.getLayer('basemap')) {
-                            map.setConfigProperty('basemap', 'config', {
-                                preset: 'satellite'
-                            });
+                        try {
                             map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
                             map.setConfigProperty('basemap', 'densityPointOfInterestLabels', 5);
+                        } catch (err) {
+                            console.warn('Mapbox config error:', err);
                         }
                     }}
                 >

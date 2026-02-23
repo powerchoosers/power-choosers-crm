@@ -375,19 +375,18 @@ export default function SatelliteUplink({
               zoom: 16
             }}
             style={{ width: '100%', height: '100%', minHeight: '384px' }}
-            mapStyle="mapbox://styles/mapbox/standard"
+            mapStyle="mapbox://styles/mapbox/standard-satellite"
             mapboxAccessToken={mapboxToken}
             attributionControl={false}
             onStyleData={(e: any) => {
               const map = e.target;
-              // Mapbox Standard configuration for Mapbox GL JS v3+
-              // We want satellite basemap but with maximum labels
-              if (map.getLayer('basemap')) {
-                map.setConfigProperty('basemap', 'config', {
-                  preset: 'satellite'
-                });
+              // Mapbox Standard Satellite configuration
+              // We want maximum label density for companies/POIs
+              try {
                 map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
                 map.setConfigProperty('basemap', 'densityPointOfInterestLabels', 5);
+              } catch (err) {
+                console.warn('Mapbox config error:', err);
               }
             }}
           >
