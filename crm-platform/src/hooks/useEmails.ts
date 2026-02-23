@@ -55,6 +55,29 @@ export function useEmails(searchQuery?: string) {
           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
 
+        // --- NEW CONTACT-ONLY FILTERING ---
+        // Fetch valid contact emails for this user/org
+        let contactQuery = supabase.from('contacts').select('email')
+        if (role !== 'admin' && role !== 'dev') {
+          contactQuery = contactQuery.eq('ownerId', user.email)
+        }
+        const { data: contactList } = await contactQuery
+        const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
+
+        if (validEmails.length > 0) {
+          // Filter: From a contact OR To a contact
+          const conditions: string[] = []
+          validEmails.forEach(e => {
+            conditions.push(`from.ilike.*${e}*`)
+            conditions.push(`to.cs.{"${e}"}`)
+          })
+          query = query.or(conditions.join(','))
+        } else {
+          // If no contacts exist, return empty to avoid showing random system mail
+          return { emails: [], nextCursor: null }
+        }
+        // ----------------------------------
+
         // Filter out mailwarming and automated emails
         query = query
           .not('subject', 'ilike', '%mailwarming%')
@@ -282,6 +305,26 @@ export function useEmailsCount(searchQuery?: string) {
         if (role !== 'admin') {
           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
         }
+
+        // --- CONTACT-ONLY FILTERING ---
+        let contactQuery = supabase.from('contacts').select('email')
+        if (role !== 'admin' && role !== 'dev') {
+          contactQuery = contactQuery.eq('ownerId', user.email)
+        }
+        const { data: contactList } = await contactQuery
+        const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
+
+        if (validEmails.length > 0) {
+          const conditions: string[] = []
+          validEmails.forEach(e => {
+            conditions.push(`from.ilike.*${e}*`)
+            conditions.push(`to.cs.{"${e}"}`)
+          })
+          query = query.or(conditions.join(','))
+        } else {
+          return 0
+        }
+        // -----------------------------
 
         // Filter out mailwarming emails
         query = query
