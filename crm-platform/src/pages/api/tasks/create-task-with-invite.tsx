@@ -132,10 +132,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
                     'LOCATION:Remote (Nodal Point Forensic Engine)',
                     `ORGANIZER;CN="${sender.name}":MAILTO:${sender.email}`,
-                    `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN="${contactName}":MAILTO:${contact.email}`,
+                    `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN="${contactName}":MAILTO:${contact.email}`,
                     'SEQUENCE:0',
                     'STATUS:CONFIRMED',
                     'TRANSP:OPAQUE',
+                    'X-MICROSOFT-CDO-BUSYSTATUS:BUSY',
                     'END:VEVENT',
                     'END:VCALENDAR'
                 ].join('\r\n');
