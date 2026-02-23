@@ -95,7 +95,7 @@ export function useForensicLog() {
             const conditions: string[] = []
             validAddresses.forEach(e => {
                 conditions.push(`from.ilike.*${e}*`)
-                conditions.push(`to.cs.{"${e}"}`)
+                conditions.push(`to.cs.["${e}"]`)
             })
 
             const { data: recentEmails } = await supabase

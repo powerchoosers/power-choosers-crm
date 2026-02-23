@@ -69,7 +69,7 @@ export function useEmails(searchQuery?: string) {
           const conditions: string[] = []
           validEmails.forEach(e => {
             conditions.push(`from.ilike.*${e}*`)
-            conditions.push(`to.cs.{"${e}"}`)
+            conditions.push(`to.cs.["${e}"]`)
           })
           query = query.or(conditions.join(','))
         } else {
@@ -318,7 +318,7 @@ export function useEmailsCount(searchQuery?: string) {
           const conditions: string[] = []
           validEmails.forEach(e => {
             conditions.push(`from.ilike.*${e}*`)
-            conditions.push(`to.cs.{"${e}"}`)
+            conditions.push(`to.cs.["${e}"]`)
           })
           query = query.or(conditions.join(','))
         } else {
