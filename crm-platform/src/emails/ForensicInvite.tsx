@@ -59,20 +59,7 @@ export default function ForensicInvite({
                         </Text>
                     </Section>
 
-                    {/* Transmission Controls */}
-                    <Section style={controlGrid}>
-                        <div style={controlItem}>
-                            <Text style={controlLabel}>TRANSMISSION_CONTROL</Text>
-                            <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-                                <div style={forensicButtonSuccess}>
-                                    ACCEPT_INVITE
-                                </div>
-                                <div style={forensicButtonDanger}>
-                                    DECLINE_INVITE
-                                </div>
-                            </div>
-                        </div>
-                    </Section>
+
 
                     {/* Briefing Payload */}
                     <Text style={bodyText}>
@@ -281,45 +268,4 @@ const locationText = {
     letterSpacing: "1px",
 };
 
-const controlGrid = {
-    marginBottom: "32px",
-    borderLeft: "2px solid #1a1a1a",
-    paddingLeft: "16px",
-};
 
-const controlItem = {
-    flex: 1,
-};
-
-const controlLabel = {
-    color: "#444",
-    fontSize: "9px",
-    fontFamily: "monospace",
-    letterSpacing: "2px",
-    fontWeight: "bold",
-};
-
-const forensicButtonBase = {
-    fontSize: "10px",
-    fontFamily: "monospace",
-    fontWeight: "bold",
-    letterSpacing: "1px",
-    padding: "8px 16px",
-    borderRadius: "4px",
-    display: "inline-block",
-    border: "1px solid",
-};
-
-const forensicButtonSuccess = {
-    ...forensicButtonBase,
-    backgroundColor: "rgba(16, 185, 129, 0.1)",
-    borderColor: "rgba(16, 185, 129, 0.2)",
-    color: "#10b981",
-};
-
-const forensicButtonDanger = {
-    ...forensicButtonBase,
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderColor: "rgba(239, 68, 68, 0.2)",
-    color: "#ef4444",
-};
