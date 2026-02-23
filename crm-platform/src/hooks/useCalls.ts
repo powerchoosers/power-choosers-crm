@@ -282,6 +282,7 @@ export function useCalls(searchQuery?: string) {
           duration: durationStr,
           date: item.timestamp || item.createdAt || '',
           note: item.summary,
+          recordingUrl: item.recordingUrl || item.recording_url || undefined,
           recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
           formattedTranscript: item.formattedTranscript || item.formatted_transcript || undefined,
