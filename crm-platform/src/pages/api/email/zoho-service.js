@@ -1,8 +1,6 @@
-
 // Zoho Mail service for sending and syncing emails via Zoho Mail API
 import { getValidAccessTokenForUser, clearTokenCache } from './zoho-token-manager.js';
 import logger from '../_logger.js';
-import { FormData } from 'formdata-node'; // Ensure you have this or use native FormData in Node 18+
 
 export class ZohoMailService {
     constructor() {
@@ -18,19 +16,23 @@ export class ZohoMailService {
     /**
      * Upload an attachment to Zoho Mail File Store
      * @param {string} userEmail - The user sending the email
-     * @param {Buffer|Blob} fileData - The file content
+     * @param {string|Buffer|Blob} fileData - The file content
      * @param {string} fileName - The name of the file
      */
     async uploadAttachment(userEmail, fileData, fileName, isInline = false) {
         try {
             const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
-            logger.info(`[Zoho Mail] Uploading attachment '${fileName}' for ${userEmail}...`, 'zoho-service');
+            if (!accountId) {
+                throw new Error(`Cloud sync error: No accountId found for ${userEmail}. Verify Zoho connection.`);
+            }
+
+            logger.info(`[Zoho Mail] Uploading attachment '${fileName}' for ${userEmail} (Account: ${accountId})...`, 'zoho-service');
 
             const formData = new FormData();
 
-            // Explicitly set MIME type for calendar invitations to trigger native UI
-            const mimeType = fileName.endsWith('.ics') ? 'text/calendar; method=REQUEST' : undefined;
+            // Base MIME type only for upload part. method=REQUEST is in the ICS payload itself.
+            const mimeType = fileName.endsWith('.ics') ? 'text/calendar' : undefined;
             const blob = mimeType ? new Blob([fileData], { type: mimeType }) : new Blob([fileData]);
 
             formData.append('attach', blob, fileName);
@@ -94,7 +96,11 @@ export class ZohoMailService {
                 // Get valid access token for this specific user
                 const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
-                logger.info(`[Zoho Mail] Sending email from ${userEmail} to: ${to} (attempt ${attempt})`, 'zoho-service');
+                if (!accountId) {
+                    throw new Error(`Cloud sync error: No accountId found for ${userEmail}. Verify Zoho connection.`);
+                }
+
+                logger.info(`[Zoho Mail] Sending email from ${userEmail} to: ${to} (Account: ${accountId}, attempt ${attempt})`, 'zoho-service');
 
                 const senderEmail = from || userEmail;
                 const fromAddress = fromName
