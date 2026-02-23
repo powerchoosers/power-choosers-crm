@@ -141,7 +141,10 @@ export function useForensicLog() {
 
         // Inject Signals
         signals?.forEach(sig => {
-            const ts = new Date(sig.published_at || sig.created_at).getTime();
+            const dateVal = sig.published_at || sig.created_at;
+            if (!dateVal) return;
+            const ts = new Date(dateVal).getTime();
+            if (isNaN(ts)) return;
 
             let accountName = sig._accountName || sig.metadata?.accountName;
             if (!accountName && sig.domain) {
@@ -161,7 +164,11 @@ export function useForensicLog() {
 
         // Inject Tasks
         completedTasks?.forEach(task => {
-            const ts = new Date(task.updatedAt || task.createdAt).getTime();
+            const dateVal = task.updatedAt || task.createdAt;
+            if (!dateVal) return;
+            const ts = new Date(dateVal).getTime();
+            if (isNaN(ts)) return;
+
             const target = task.relatedTo ? ` for ${task.relatedTo}` : '';
             entries.push({
                 id: `task-${task.id}`,
@@ -174,7 +181,10 @@ export function useForensicLog() {
 
         // Inject CRM Emails
         crmEmails?.forEach((email: any) => {
-            const ts = new Date(email.timestamp || email.createdAt).getTime();
+            const dateVal = email.timestamp || email.createdAt;
+            const ts = dateVal ? new Date(dateVal).getTime() : Date.now();
+            if (isNaN(ts)) return;
+
             const timeStr = formatDistanceToNow(ts, { addSuffix: true });
             const contactName = email._contactName || 'Contact';
 
@@ -211,36 +221,38 @@ export function useForensicLog() {
         // Inject Live Market Pricing Alerts (calculated on the fly using marketPulse)
         if (marketPulse) {
             const ts = new Date(marketPulse.timestamp).getTime();
-            const timeStr = formatDistanceToNow(ts, { addSuffix: true });
+            if (!isNaN(ts)) {
+                const timeStr = formatDistanceToNow(ts, { addSuffix: true });
 
-            if ((marketPulse.grid?.scarcity_prob || 0) > 15) {
-                entries.push({
-                    id: `alert-scarcity-${ts}`,
-                    timestamp: ts,
-                    time: timeStr,
-                    action: 'VOLATILITY_ALERT',
-                    detail: `Grid Scarcity Risk Spike -> ${marketPulse.grid.scarcity_prob.toFixed(1)}%`
-                });
-            }
+                if ((marketPulse.grid?.scarcity_prob || 0) > 15) {
+                    entries.push({
+                        id: `alert-scarcity-${ts}`,
+                        timestamp: ts,
+                        time: timeStr,
+                        action: 'VOLATILITY_ALERT',
+                        detail: `Grid Scarcity Risk Spike -> ${marketPulse.grid.scarcity_prob.toFixed(1)}%`
+                    });
+                }
 
-            if ((marketPulse.prices?.houston || 0) > 75) {
-                entries.push({
-                    id: `alert-houston-${ts}`,
-                    timestamp: ts,
-                    time: timeStr,
-                    action: 'PRICE_SPIKE',
-                    detail: `LZ_HOUSTON Active Print -> $${marketPulse.prices.houston.toFixed(2)}/MWh`
-                });
-            }
+                if ((marketPulse.prices?.houston || 0) > 75) {
+                    entries.push({
+                        id: `alert-houston-${ts}`,
+                        timestamp: ts,
+                        time: timeStr,
+                        action: 'PRICE_SPIKE',
+                        detail: `LZ_HOUSTON Active Print -> $${marketPulse.prices.houston.toFixed(2)}/MWh`
+                    });
+                }
 
-            if ((marketPulse.prices?.north || 0) > 75) {
-                entries.push({
-                    id: `alert-north-${ts}`,
-                    timestamp: ts,
-                    time: timeStr,
-                    action: 'PRICE_SPIKE',
-                    detail: `LZ_NORTH Active Print -> $${marketPulse.prices.north.toFixed(2)}/MWh`
-                });
+                if ((marketPulse.prices?.north || 0) > 75) {
+                    entries.push({
+                        id: `alert-north-${ts}`,
+                        timestamp: ts,
+                        time: timeStr,
+                        action: 'PRICE_SPIKE',
+                        detail: `LZ_NORTH Active Print -> $${marketPulse.prices.north.toFixed(2)}/MWh`
+                    });
+                }
             }
         }
 

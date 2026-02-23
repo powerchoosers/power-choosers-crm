@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, X, Clock, Calendar, AlertTriangle, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, X, Clock, Calendar, AlertTriangle, CheckCircle, Building2 } from 'lucide-react'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import {
     startOfMonth,
     endOfMonth,
@@ -65,7 +66,15 @@ export function TaskCreationPanel() {
     const nextBusiness = getNextBusinessDay()
     const [viewMonth, setViewMonth] = useState(nextBusiness)
     const [selectedDate, setSelectedDate] = useState(nextBusiness)
-    const [timeStr, setTimeStr] = useState(getNextHour())
+
+    // Initialize with 12-hour format
+    const initialTime = getNextHour() // This returns HH:mm (24h)
+    const [h24, m24] = initialTime.split(':').map(Number)
+    const initialH12 = h24 % 12 || 12
+    const initialTimeStr = `${String(initialH12).padStart(2, '0')}:${String(m24).padStart(2, '0')}`
+    const [timeStr, setTimeStr] = useState(initialTimeStr)
+    const [ampm, setAmpm] = useState<'AM' | 'PM'>(h24 >= 12 ? 'PM' : 'AM')
+
     const [priority, setPriority] = useState<Priority>('Medium')
     const [taskType, setTaskType] = useState<TaskType>('Call')
     const [notes, setNotes] = useState('')
@@ -91,28 +100,23 @@ export function TaskCreationPanel() {
     const isPast = (d: Date) => isBefore(d, startOfDay(now))
 
     const handleTimeChange = (v: string) => {
-        const cleaned = v.replace(/\D/g, '').slice(0, 4)
-        if (cleaned.length <= 2) {
-            setTimeStr(cleaned ? `${cleaned.padStart(2, '0')}:00` : '00:00')
-            return
+        // Allow more flexible typing
+        let cleaned = v.replace(/[^\d:]/g, '')
+        if (cleaned.length === 2 && !cleaned.includes(':') && v.length > timeStr.length) {
+            cleaned += ':'
         }
-        const h = cleaned.slice(0, 2)
-        const m = cleaned.slice(2, 4).padEnd(2, '0')
-        setTimeStr(`${h}:${m}`)
-    }
-
-    const handleAmPm = (ampm: 'AM' | 'PM') => {
-        const [h, m] = timeStr.split(':').map(Number)
-        let h24 = h ?? 12
-        if (ampm === 'AM' && h24 >= 12) h24 -= 12
-        if (ampm === 'PM' && h24 < 12) h24 += 12
-        setTimeStr(`${String(h24).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`)
+        if (cleaned.length > 5) cleaned = cleaned.slice(0, 5)
+        setTimeStr(cleaned)
     }
 
     const handleNextHr = () => {
         const [h, m] = timeStr.split(':').map(Number)
-        const next = (h ?? 0) + 1
-        setTimeStr(`${String(next % 24).padStart(2, '0')}:${String(m ?? 0).padStart(2, '0')}`)
+        let nextH = (h || 12) + 1
+        if (nextH > 12) nextH = 1
+        if (nextH === 12) {
+            setAmpm(prev => prev === 'AM' ? 'PM' : 'AM')
+        }
+        setTimeStr(`${String(nextH).padStart(2, '0')}:${String(m || 0).padStart(2, '0')}`)
     }
 
     const formatTaskTitle = (due: Date): string => {
@@ -128,7 +132,17 @@ export function TaskCreationPanel() {
         if (!entityId) return
         setIsCommitting(true)
         try {
-            const due = parseTimeToDate(selectedDate, timeStr)
+            // Parse 12h time back to 24h for Date object
+            let [h, m] = timeStr.split(':').map(Number)
+            if (isNaN(h)) h = 12
+            if (isNaN(m)) m = 0
+
+            let finalH = h
+            if (ampm === 'PM' && h < 12) finalH += 12
+            if (ampm === 'AM' && h === 12) finalH = 0
+
+            const time24Str = `${String(finalH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+            const due = parseTimeToDate(selectedDate, time24Str)
             const title = formatTaskTitle(due)
             const payload: Omit<Task, 'id' | 'createdAt'> = {
                 title,
@@ -158,7 +172,13 @@ export function TaskCreationPanel() {
     if (!isReady) return null
 
     return (
-        <div className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden">
+        <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
+            className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden"
+        >
             {/* HEADER */}
             <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 nodal-recessed">
                 <div className="flex items-center gap-2">
@@ -172,15 +192,22 @@ export function TaskCreationPanel() {
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-8">
+            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-0 custom-scrollbar space-y-8">
                 {/* ENTITY CONTEXT */}
                 <div className="space-y-2">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
                         Node_Context
                     </div>
-                    <div className="px-4 py-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center justify-between">
-                        <div className="flex flex-col">
+                    <div className="px-4 py-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center gap-4">
+                        {entityType === 'contact' ? (
+                            <ContactAvatar name={entityName || 'Contact'} size={40} />
+                        ) : (
+                            <div className="w-10 h-10 rounded-[14px] nodal-glass flex items-center justify-center border border-white/20 bg-zinc-900/80 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
+                                <Building2 className="w-5 h-5 text-zinc-400" />
+                            </div>
+                        )}
+                        <div className="flex flex-col min-w-0">
                             <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">{entityType}</span>
                             <span className="text-sm font-semibold text-white truncate">{entityName || 'Unlabeled Node'}</span>
                         </div>
@@ -259,23 +286,23 @@ export function TaskCreationPanel() {
                                     value={timeStr}
                                     onChange={(e) => handleTimeChange(e.target.value)}
                                     placeholder="09:00"
-                                    className="w-32 bg-black/40 border border-white/5 rounded-xl p-3 text-lg font-mono text-white text-center focus:border-[#002FA7] outline-none transition-all"
+                                    className="w-32 h-12 bg-black/40 border border-white/5 rounded-xl p-3 text-lg font-mono text-white text-center focus:border-[#002FA7] outline-none transition-all"
                                     maxLength={5}
                                 />
                                 <div className="flex flex-1 gap-2">
-                                    {(['AM', 'PM'] as const).map((ampm) => (
+                                    {(['AM', 'PM'] as const).map((mode) => (
                                         <button
-                                            key={ampm}
+                                            key={mode}
                                             type="button"
-                                            onClick={() => handleAmPm(ampm)}
+                                            onClick={() => setAmpm(mode)}
                                             className={cn(
-                                                "flex-1 py-3 rounded-xl text-xs font-mono border transition-all",
-                                                timeStr.startsWith('12') || (parseInt(timeStr.split(':')[0]) < 12 && ampm === 'AM') || (parseInt(timeStr.split(':')[0]) >= 12 && ampm === 'PM')
+                                                "flex-1 h-12 rounded-xl text-xs font-mono border transition-all",
+                                                ampm === mode
                                                     ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white"
                                                     : "bg-black/20 border-white/5 text-zinc-500 hover:text-zinc-300"
                                             )}
                                         >
-                                            {ampm}
+                                            {mode}
                                         </button>
                                     ))}
                                 </div>
@@ -319,23 +346,22 @@ export function TaskCreationPanel() {
                 {/* TASK TYPE */}
                 <div className="space-y-4">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Operational_Vector</div>
-                    <div className="grid grid-cols-2 gap-2">
-                        {taskTypeOptions.map((type) => (
-                            <button
-                                key={type}
-                                onClick={() => setTaskType(type as TaskType)}
-                                className={cn(
-                                    "p-3 rounded-xl border text-xs font-mono transition-all text-left flex items-center justify-between",
-                                    taskType === type
-                                        ? "bg-[#002FA7]/10 border-[#002FA7] text-[#002FA7]"
-                                        : "bg-black/20 border-white/5 text-zinc-500 hover:border-white/10 hover:text-zinc-300"
-                                )}
-                            >
-                                {type.toUpperCase()}
-                                {taskType === type && <CheckCircle className="w-3 h-3" />}
-                            </button>
-                        ))}
-                    </div>
+                    <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
+                        <SelectTrigger className="w-full h-12 bg-black/40 border-white/5 text-zinc-300 font-mono text-xs rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
+                            <SelectValue placeholder="Select Vector" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-950 border-white/10">
+                            {taskTypeOptions.map((type) => (
+                                <SelectItem
+                                    key={type}
+                                    value={type}
+                                    className="text-xs font-mono text-zinc-300 focus:bg-[#002FA7]/10 focus:text-white"
+                                >
+                                    {type.toUpperCase()}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 {/* INTEL_NOTES */}
@@ -350,11 +376,11 @@ export function TaskCreationPanel() {
                 </div>
 
                 {/* ACTION */}
-                <div className="pt-4 pb-12">
+                <div className="pt-2 pb-8">
                     <Button
                         onClick={handleSubmit}
                         disabled={isCommitting || !entityId}
-                        className="w-full h-14 bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
+                        className="w-full h-11 bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
                     >
                         {isCommitting ? (
                             <>
@@ -367,6 +393,6 @@ export function TaskCreationPanel() {
                     </Button>
                 </div>
             </div>
-        </div>
+        </motion.div>
     )
 }
