@@ -9,6 +9,7 @@ export interface DashboardMetrics {
   openPositions: number // Contracts expiring in 90 days
   operationalVelocity: number // Calls + emails in last 24h
   gridVolatilityIndex: number // 0-100 market stress (from ERCOT scarcity_prob)
+  dailyBillsIngested: number // Bills (INVOICE) ingested between 8 AM and 5 PM
 }
 
 /**
@@ -36,6 +37,9 @@ export function useDashboardMetrics() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'accounts' }, () => {
         queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] })
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] })
+      })
       .subscribe()
 
     return () => {
@@ -52,6 +56,7 @@ export function useDashboardMetrics() {
           openPositions: 0,
           operationalVelocity: 0,
           gridVolatilityIndex: 0,
+          dailyBillsIngested: 0,
         }
       }
 
@@ -154,7 +159,19 @@ export function useDashboardMetrics() {
 
         const operationalVelocity = (callsCount || 0) + (emailsCount || 0)
 
-        // 4. GRID_VOLATILITY_INDEX: Use ERCOT scarcity_prob (0-100)
+        // 4. DAILY_BILLS_INGESTED: Count documents with document_type 'INVOICE' between 8 AM and 5 PM
+        const { count: billsCount = 0, error: billsError } = await supabase
+          .from('documents')
+          .select('id', { count: 'exact', head: true })
+          .eq('document_type', 'INVOICE')
+          .gte('created_at', startTimeISO)
+          .lte('created_at', endTimeISO)
+
+        if (billsError) {
+          console.error('Error fetching bills count:', billsError)
+        }
+
+        // 5. GRID_VOLATILITY_INDEX: Use ERCOT scarcity_prob (0-100)
         const gridVolatilityIndex = marketPulse?.grid?.scarcity_prob ?? 0
 
         return {
@@ -162,6 +179,7 @@ export function useDashboardMetrics() {
           openPositions: openPositions || 0,
           operationalVelocity: operationalVelocity,
           gridVolatilityIndex: Math.round(gridVolatilityIndex),
+          dailyBillsIngested: billsCount || 0,
         }
       } catch (error: any) {
         console.error('Error fetching dashboard metrics:', error)
@@ -170,6 +188,7 @@ export function useDashboardMetrics() {
           openPositions: 0,
           operationalVelocity: 0,
           gridVolatilityIndex: marketPulse?.grid?.scarcity_prob ?? 0,
+          dailyBillsIngested: 0,
         }
       }
     },

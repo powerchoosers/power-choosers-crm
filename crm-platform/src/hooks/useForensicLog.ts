@@ -12,7 +12,8 @@ export type LogEntryAction =
     | 'SIGNAL_DETECTED'
     | 'VOLATILITY_ALERT'
     | 'PRICE_SPIKE'
-    | 'TASK_COMPLETE';
+    | 'TASK_COMPLETE'
+    | 'BILL_INGESTED';
 
 export interface LogEntry {
     id: string;
@@ -133,6 +134,36 @@ export function useForensicLog() {
         },
         enabled: !!user?.email,
         refetchInterval: 15000,
+    });
+
+    // 4. Fetch recent ingested bills
+    const { data: recentBills } = useQuery({
+        queryKey: ['forensic-bills'],
+        queryFn: async () => {
+            const { data } = await supabase
+                .from('documents')
+                .select('id, name, created_at, account_id, document_type')
+                .eq('document_type', 'INVOICE')
+                .order('created_at', { ascending: false })
+                .limit(10);
+
+            if (!data || data.length === 0) return [];
+
+            // Fetch account names
+            const accountIds = Array.from(new Set(data.map(d => d.account_id).filter(Boolean)));
+            const { data: accounts } = await supabase
+                .from('accounts')
+                .select('id, name')
+                .in('id', accountIds);
+
+            const idToName = new Map(accounts?.map(a => [a.id, a.name]) || []);
+
+            return data.map(d => ({
+                ...d,
+                _accountName: idToName.get(d.account_id) || 'Unknown Account'
+            }));
+        },
+        refetchInterval: 60000,
     });
 
     // Combine and sort all streams
@@ -256,9 +287,23 @@ export function useForensicLog() {
             }
         }
 
+        // Inject Ingested Bills
+        recentBills?.forEach(bill => {
+            const ts = new Date(bill.created_at).getTime();
+            if (isNaN(ts)) return;
+
+            entries.push({
+                id: `bill-${bill.id}`,
+                timestamp: ts,
+                time: formatDistanceToNow(ts, { addSuffix: true }),
+                action: 'BILL_INGESTED',
+                detail: `[${bill._accountName}] Bill ingested -> ${bill.name}`
+            });
+        });
+
         // Sort descending by timestamp
         return entries.sort((a, b) => b.timestamp - a.timestamp).slice(0, 60);
-    }, [signals, completedTasks, crmEmails, marketPulse]);
+    }, [signals, completedTasks, crmEmails, marketPulse, recentBills]);
 
     return { logEntries };
 }
