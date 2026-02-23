@@ -122,6 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     'VERSION:2.0',
                     'PRODID:-//Nodal Point//CRM//EN',
                     'METHOD:REQUEST',
+                    'CALSCALE:GREGORIAN',
                     'BEGIN:VEVENT',
                     `UID:${task.id}`,
                     `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss'Z'")}`,
@@ -130,8 +131,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     `SUMMARY:Energy Briefing // ${contactName}`,
                     `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
                     'LOCATION:Remote (Nodal Point Forensic Engine)',
-                    `ORGANIZER;CN=${sender.name}:MAILTO:${sender.email}`,
-                    `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN=${contactName}:MAILTO:${contact.email}`,
+                    `ORGANIZER;CN="${sender.name}":MAILTO:${sender.email}`,
+                    `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN="${contactName}":MAILTO:${contact.email}`,
+                    'SEQUENCE:0',
+                    'STATUS:CONFIRMED',
+                    'TRANSP:OPAQUE',
                     'END:VEVENT',
                     'END:VCALENDAR'
                 ].join('\r\n');

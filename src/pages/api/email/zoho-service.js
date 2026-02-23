@@ -28,8 +28,11 @@ export class ZohoMailService {
             logger.info(`[Zoho Mail] Uploading attachment '${fileName}' for ${userEmail}...`, 'zoho-service');
 
             const formData = new FormData();
-            // Create a Blob from buffer if needed, or pass directly
-            const blob = new Blob([fileData]);
+
+            // Explicitly set MIME type for calendar invitations to trigger native UI
+            const mimeType = fileName.endsWith('.ics') ? 'text/calendar; method=REQUEST' : undefined;
+            const blob = mimeType ? new Blob([fileData], { type: mimeType }) : new Blob([fileData]);
+
             formData.append('attach', blob, fileName);
 
             const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages/attachments?uploadType=multipart`, {
