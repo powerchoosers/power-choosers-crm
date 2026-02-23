@@ -158,10 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const photoURL = currentUser.user_metadata?.avatar_url
       const isExternalPhoto = photoURL && !photoURL.includes('imgur.com')
       if (isExternalPhoto && !data.hosted_photo_url) {
-        fetch('/api/upload/host-google-avatar', {
+        fetch('/api/upload/host-avatar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ googlePhotoURL: photoURL }),
+          body: JSON.stringify({ url: photoURL }),
         })
           .then((res) => res.json())
           .then((payload) => {
