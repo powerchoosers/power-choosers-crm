@@ -168,11 +168,23 @@ export function TaskCreationPanel() {
 
             if (sendCalendarInvite) {
                 const { data: { session } } = await supabase.auth.getSession()
+
+                // Dev Bypass Logic
+                let token = session?.access_token
+                const isDev = process.env.NODE_ENV === 'development'
+                if (!token && isDev) {
+                    token = 'dev-bypass-token'
+                }
+
+                if (!token) {
+                    throw new Error('Authentication session expired. Please refresh.')
+                }
+
                 const res = await fetch('/api/tasks/create-task-with-invite', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${session?.access_token}`
+                        'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify(payload)
                 })

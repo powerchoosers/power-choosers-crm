@@ -34,9 +34,22 @@ export async function requireUser(req: any) {
     if (!authHeader) return { email: null, user: null, isAdmin: false };
 
     const token = authHeader.replace('Bearer ', '');
+
+    // Dev Bypass Check
+    if (process.env.NODE_ENV === 'development' && token === 'dev-bypass-token') {
+      return {
+        email: 'dev@nodalpoint.io',
+        user: { id: 'dev-bypass-uid', email: 'dev@nodalpoint.io' } as any,
+        id: 'dev-bypass-uid',
+        isAdmin: true
+      };
+    }
+
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
+      // Internal Auth Log
+      console.warn('[requireUser] Auth failed for token:', token ? `${token.substring(0, 10)}...` : 'none', error?.message);
       return { email: null, user: null, isAdmin: false };
     }
 
