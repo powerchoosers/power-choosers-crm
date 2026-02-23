@@ -16,7 +16,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
   const jobTitle = profile.jobTitle || 'Market Architect'
   const email = profile.email || user?.email || 'contact@nodalpoint.io'
   const linkedinUrl = profile.linkedinUrl || 'https://linkedin.com/company/nodal-point'
-  // Use hosted avatar (from host-google-avatar) for email reliability, fallback to Supabase user_metadata
+  // Use hosted avatar (from host-avatar) for email reliability, fallback to Supabase user_metadata
   const avatarUrl = profile.hostedPhotoUrl || user?.user_metadata?.avatar_url || ''
 
   // Theme-aware colors
