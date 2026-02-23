@@ -858,7 +858,7 @@ export default function ContactDossierPage() {
                     </AnimatePresence>
                   </div>
 
-                  <div className="flex items-center gap-4 text-xs text-zinc-500 font-mono mb-2 w-full">
+                  <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mb-2 w-full">
                     {isEditing ? (
                       <div className="flex items-center gap-4 w-full">
                         <div className="flex items-center gap-1.5 flex-1 min-w-0">
@@ -893,16 +893,16 @@ export default function ContactDossierPage() {
                     ) : (
                       <>
                         {(recentlyUpdatedFields.has('title') || recentlyUpdatedFields.has('company')) ? (
-                          <motion.span
+                          <motion.div
                             initial={{ filter: 'blur(6px)', opacity: 0.6 }}
                             animate={{ filter: 'blur(0px)', opacity: 1 }}
                             transition={{ duration: 0.4, ease: 'easeOut' }}
-                            className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400"
+                            className="flex items-center gap-0.5 uppercase tracking-widest text-zinc-400"
                           >
                             {editTitle && (
                               <>
-                                <ForensicDataPoint value={editTitle} copyValue={editTitle} valueClassName="uppercase tracking-widest text-zinc-400" inline />
-                                <span className="text-zinc-600 lowercase mx-1">at</span>
+                                <ForensicDataPoint value={editTitle} copyValue={editTitle} valueClassName="uppercase tracking-widest text-zinc-400" inline compact />
+                                <span className="text-zinc-600 lowercase mx-0.5">at</span>
                               </>
                             )}
                             {contact?.linkedAccountId ? (
@@ -910,18 +910,18 @@ export default function ContactDossierPage() {
                                 href={`/network/accounts/${contact.linkedAccountId}`}
                                 className="hover:text-white transition-colors cursor-pointer"
                               >
-                                <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400 hover:text-white" inline />
+                                <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400 hover:text-white" inline compact />
                               </Link>
                             ) : (
-                              <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
+                              <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline compact />
                             )}
-                          </motion.span>
+                          </motion.div>
                         ) : (
-                          <span className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                          <div className="flex items-center gap-0.5 uppercase tracking-widest text-zinc-400">
                             {editTitle && (
                               <>
-                                <ForensicDataPoint value={editTitle} copyValue={editTitle} valueClassName="uppercase tracking-widest text-zinc-400" inline />
-                                <span className="text-zinc-600 lowercase mx-1">at</span>
+                                <ForensicDataPoint value={editTitle} copyValue={editTitle} valueClassName="uppercase tracking-widest text-zinc-400" inline compact />
+                                <span className="text-zinc-600 lowercase mx-0.5">at</span>
                               </>
                             )}
                             {contact?.linkedAccountId ? (
@@ -929,29 +929,29 @@ export default function ContactDossierPage() {
                                 href={`/network/accounts/${contact.linkedAccountId}`}
                                 className="hover:text-white transition-colors cursor-pointer"
                               >
-                                <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400 hover:text-white" inline />
+                                <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400 hover:text-white" inline compact />
                               </Link>
                             ) : (
-                              <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline />
+                              <ForensicDataPoint value={editCompany || 'Unknown Entity'} copyValue={editCompany || undefined} valueClassName="uppercase tracking-widest text-zinc-400" inline compact />
                             )}
-                          </span>
+                          </div>
                         )}
                         <span className="w-1 h-1 rounded-full bg-zinc-800" />
                         {recentlyUpdatedFields.has('location') ? (
-                          <motion.span
+                          <motion.div
                             initial={{ filter: 'blur(6px)', opacity: 0.6 }}
                             animate={{ filter: 'blur(0px)', opacity: 1 }}
                             transition={{ duration: 0.4, ease: 'easeOut' }}
                             className="flex items-center gap-1.5 text-zinc-400"
                           >
                             <MapPin className="w-3.5 h-3.5 text-white" />
-                            <ForensicDataPoint value={editLocation || 'Unknown Location'} copyValue={editLocation || undefined} valueClassName="text-zinc-400" inline />
-                          </motion.span>
+                            <ForensicDataPoint value={editLocation || 'Unknown Location'} copyValue={editLocation || undefined} valueClassName="text-zinc-400" inline compact />
+                          </motion.div>
                         ) : (
-                          <span className="flex items-center gap-1.5 text-zinc-400">
+                          <div className="flex items-center gap-1.5 text-zinc-400">
                             <MapPin className="w-3.5 h-3.5 text-white" />
-                            <ForensicDataPoint value={editLocation || 'Unknown Location'} copyValue={editLocation || undefined} valueClassName="text-zinc-400" inline />
-                          </span>
+                            <ForensicDataPoint value={editLocation || 'Unknown Location'} copyValue={editLocation || undefined} valueClassName="text-zinc-400" inline compact />
+                          </div>
                         )}
                       </>
                     )}

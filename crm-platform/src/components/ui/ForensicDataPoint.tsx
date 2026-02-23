@@ -55,7 +55,7 @@ export function ForensicDataPoint({
           setCopied(true)
           setTimeout(() => setCopied(false), COPIED_DURATION_MS)
         },
-        () => {}
+        () => { }
       )
     },
     [toCopy, isEmpty]
@@ -98,20 +98,21 @@ export function ForensicDataPoint({
   return (
     <Wrapper
       className={cn(
-        'group/dp relative flex items-center gap-2',
+        'group/dp relative flex items-center',
+        compact ? 'gap-0' : 'gap-2',
         compact ? 'w-max max-w-full shrink-0' : 'w-full min-w-0',
         inline && 'inline-flex',
         className
       )}
     >
       {label && (
-        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest shrink-0">{label}</span>
+        <span className={cn("text-[10px] font-mono text-zinc-500 uppercase tracking-widest shrink-0", compact && "mr-1.5")}>{label}</span>
       )}
       <span className={cn(compact ? 'shrink-0' : 'min-w-0 truncate', valueClassName)}>
         {children !== undefined ? children : value || '—'}
       </span>
       {compact ? (
-        <span className="relative flex min-h-6 w-0 shrink-0 self-stretch items-center overflow-hidden transition-[width] duration-200 ease-out group-hover/dp:w-6">
+        <span className="relative flex min-h-6 w-0 shrink-0 self-stretch items-center overflow-hidden transition-all duration-200 ease-out group-hover/dp:w-6 group-hover/dp:ml-1.5">
           {copyControl}
         </span>
       ) : (

@@ -532,7 +532,13 @@ export function NodeIngestion() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
+      className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden"
+    >
 
       {/* HEADER - Forensic Style */}
       <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 nodal-recessed">
@@ -1081,6 +1087,6 @@ export function NodeIngestion() {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }

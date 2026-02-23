@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, X, Clock, Calendar, AlertTriangle, CheckCircle, Building2 } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import {
     startOfMonth,
     endOfMonth,
@@ -59,7 +60,7 @@ function parseTimeToDate(date: Date, timeStr: string): Date {
 
 export function TaskCreationPanel() {
     const { taskContext, setRightPanelMode, setTaskContext } = useUIStore()
-    const { entityId, entityName, entityType } = taskContext || { entityId: '', entityType: 'account' }
+    const { entityId, entityName, entityType, entityLogoUrl, entityDomain } = taskContext || { entityId: '', entityType: 'account' }
 
     const [isReady, setIsReady] = useState(false)
     const now = new Date()
@@ -203,9 +204,12 @@ export function TaskCreationPanel() {
                         {entityType === 'contact' ? (
                             <ContactAvatar name={entityName || 'Contact'} size={40} />
                         ) : (
-                            <div className="w-10 h-10 rounded-[14px] nodal-glass flex items-center justify-center border border-white/20 bg-zinc-900/80 shadow-[0_0_10px_rgba(0,0,0,0.5)]">
-                                <Building2 className="w-5 h-5 text-zinc-400" />
-                            </div>
+                            <CompanyIcon
+                                logoUrl={entityLogoUrl}
+                                domain={entityDomain}
+                                name={entityName || 'Account'}
+                                size={40}
+                            />
                         )}
                         <div className="flex flex-col min-w-0">
                             <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">{entityType}</span>
@@ -376,7 +380,7 @@ export function TaskCreationPanel() {
                 </div>
 
                 {/* ACTION */}
-                <div className="pt-2 pb-8">
+                <div className="-mt-2 pb-8">
                     <Button
                         onClick={handleSubmit}
                         disabled={isCommitting || !entityId}
@@ -388,7 +392,7 @@ export function TaskCreationPanel() {
                                 INITIATING...
                             </>
                         ) : (
-                            '[ INITIATE_TASK_SEQUENCE ]'
+                            '[ INITIATE_TASK ]'
                         )}
                     </Button>
                 </div>
