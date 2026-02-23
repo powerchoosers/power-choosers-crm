@@ -34,10 +34,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             metadata
         } = taskData;
 
+        const id = crypto.randomUUID();
+        const now = new Date().toISOString();
+
         // 1. Create Task in Supabase
         const { data: task, error: taskError } = await supabaseAdmin
             .from('tasks')
             .insert([{
+                id,
                 title,
                 description,
                 priority,
@@ -46,12 +50,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 contactId,
                 accountId,
                 ownerId: userEmail,
-                metadata
+                metadata,
+                createdAt: now,
+                updatedAt: now
             }])
             .select()
             .single();
 
-        if (taskError) throw taskError;
+        if (taskError) {
+            console.error('[Create Task Invite] Database error:', taskError);
+            throw taskError;
+        }
 
         // 2. If calendar invite requested, send email
         if (metadata?.syncCalendar && contactId) {
