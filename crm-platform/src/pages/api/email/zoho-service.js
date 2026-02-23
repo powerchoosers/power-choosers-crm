@@ -104,7 +104,7 @@ export class ZohoMailService {
 
                 const senderEmail = from || userEmail;
                 const fromAddress = fromName
-                    ? `${fromName} <${senderEmail}>`
+                    ? `"${fromName.replace(/"/g, '')}" <${senderEmail}>`
                     : senderEmail;
 
                 // Construct payload with ONLY supported keys
