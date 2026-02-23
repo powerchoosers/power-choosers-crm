@@ -177,7 +177,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     subject: `Energy Briefing Invite // ${contactName}`,
                     html: emailHtml,
                     userEmail: userEmail,
-                    uploadedAttachments: uploadedAttachments
+                    uploadedAttachments: uploadedAttachments,
+                    calendarInvite: icsContent
                 });
             }
         }
