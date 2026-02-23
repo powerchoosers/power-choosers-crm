@@ -152,30 +152,43 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       setSearchTerm('');
       setCurrentPage(1);
 
-      const key = cacheKeyFromDomainOrName(domain, companyName);
-      if (!key) return;
+      const keysToCheck: string[] = [];
+      if (accountId) keysToCheck.push(`ACCOUNT_${accountId}`);
+      const domainKey = cacheKeyFromDomainOrName(domain, companyName);
+      if (domainKey) keysToCheck.push(domainKey);
+      if (companyName && !keysToCheck.includes(companyName)) keysToCheck.push(companyName);
 
-      // 1. Try Supabase first (Persistent Cloud Cache)
+      if (keysToCheck.length === 0) return;
+
+      // 1. Try Supabase first (Persistent Cloud Cache) with prioritized keys
       try {
-        const { data: supabaseData, error } = await supabase
+        const { data: supabaseItems, error } = await supabase
           .from('apollo_searches')
-          .select('data, created_at')
-          .eq('key', key)
-          .maybeSingle();
+          .select('key, data, created_at')
+          .in('key', keysToCheck);
 
-        if (supabaseData && supabaseData.data) {
-          const { company, contacts, timestamp } = supabaseData.data;
-          setData(contacts);
-          setCompanySummary(company);
-          setScanStatus('complete');
+        if (supabaseItems && supabaseItems.length > 0) {
+          // Prioritize ACCOUNT_ key, then domain key, then others
+          let bestMatch = supabaseItems.find(item => item.key === `ACCOUNT_${accountId}`);
+          if (!bestMatch && domainKey) bestMatch = supabaseItems.find(item => item.key === domainKey);
+          if (!bestMatch) bestMatch = supabaseItems[0];
 
-          const cacheKey = `apollo_cache_${key}`;
-          localStorage.setItem(cacheKey, JSON.stringify({
-            company,
-            contacts,
-            timestamp: timestamp || new Date(supabaseData.created_at).getTime()
-          }));
-          return;
+          if (bestMatch && bestMatch.data) {
+            const { company, contacts, timestamp } = bestMatch.data;
+            setData(contacts);
+            setCompanySummary(company);
+            setScanStatus('complete');
+
+            // Save back to local storage for speed
+            if (domainKey) {
+              localStorage.setItem(`apollo_cache_${domainKey}`, JSON.stringify({
+                company,
+                contacts,
+                timestamp: timestamp || new Date(bestMatch.created_at).getTime()
+              }));
+            }
+            return;
+          }
         }
       } catch (err) {
         console.warn('Supabase cache fetch failed:', err);
@@ -206,7 +219,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
 
     loadCache();
-  }, [domain, companyName]);
+  }, [domain, companyName, accountId]);
 
   const handleEnrichAccount = async () => {
     if (!accountId || !companySummary) {
@@ -334,7 +347,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     if (typeof window === 'undefined') return;
 
     const key = cacheKeyFromDomainOrName(domain, companyName);
-    if (!key) return;
 
     const cacheData = {
       company,
@@ -342,12 +354,17 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       timestamp: Date.now()
     };
 
-    // Local Storage
-    const cacheKey = `apollo_cache_${key}`;
-    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    // Save by Account ID if available for maximum stability
+    if (accountId) {
+      saveToSupabase(`ACCOUNT_${accountId}`, cacheData);
+    }
 
-    // Supabase Persistence
-    saveToSupabase(key, cacheData);
+    // Save by Domain/Name for global caching
+    if (key) {
+      const cacheKey = `apollo_cache_${key}`;
+      localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+      saveToSupabase(key, cacheData);
+    }
   };
 
   const handleAcquire = async (person: ApolloContactRow, type: 'email' | 'phone' | 'both' = 'both') => {

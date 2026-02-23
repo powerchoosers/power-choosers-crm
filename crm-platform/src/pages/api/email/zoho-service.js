@@ -21,7 +21,7 @@ export class ZohoMailService {
      * @param {Buffer|Blob} fileData - The file content
      * @param {string} fileName - The name of the file
      */
-    async uploadAttachment(userEmail, fileData, fileName) {
+    async uploadAttachment(userEmail, fileData, fileName, isInline = false) {
         try {
             const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
@@ -35,7 +35,12 @@ export class ZohoMailService {
 
             formData.append('attach', blob, fileName);
 
-            const response = await fetch(`${this.baseUrl}/accounts/${accountId}/messages/attachments?uploadType=multipart`, {
+            let url = `${this.baseUrl}/accounts/${accountId}/messages/attachments?uploadType=multipart`;
+            if (isInline) {
+                url += '&isInline=true';
+            }
+
+            const response = await fetch(url, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Zoho-oauthtoken ${accessToken}`,
@@ -117,6 +122,7 @@ export class ZohoMailService {
                 if (uploadedAttachments && uploadedAttachments.length > 0) {
                     payload.attachments = uploadedAttachments.map(att => ({
                         storeName: att.storeName,
+                        attachmentPath: att.attachmentPath || att.storeName,
                         attachmentName: att.attachmentName,
                     }));
                 }
