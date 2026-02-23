@@ -31,8 +31,8 @@ export class ZohoMailService {
 
             const formData = new FormData();
 
-            // Base MIME type only for upload part. method=REQUEST is in the ICS payload itself.
-            const mimeType = fileName.endsWith('.ics') ? 'text/calendar' : undefined;
+            // Trigger native RSVP bar by specifying method=REQUEST in the MIME type
+            const mimeType = fileName.endsWith('.ics') ? 'text/calendar; method=REQUEST' : undefined;
             const blob = mimeType ? new Blob([fileData], { type: mimeType }) : new Blob([fileData]);
 
             formData.append('attach', blob, fileName);
