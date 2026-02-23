@@ -110,23 +110,13 @@ export class ZohoMailService {
                     payload.bccAddress = Array.isArray(emailData.bcc) ? emailData.bcc.join(',') : emailData.bcc;
                 }
 
-                // Handle Inline/Content Attachments (Legacy/Small files)
-                if (attachments && attachments.length > 0) {
-                    payload.attachments = attachments.map(att => ({
-                        attachmentName: att.filename || att.attachmentName,
-                        content: att.content,
-                    }));
-                }
-
-                // Handle Pre-Uploaded Attachments (Recommended for documents)
+                // Handle Pre-Uploaded Attachments (Standard Zoho Flow)
                 if (uploadedAttachments && uploadedAttachments.length > 0) {
-                    const existingAtts = payload.attachments || [];
-                    const newAtts = uploadedAttachments.map(att => ({
+                    payload.attachments = uploadedAttachments.map(att => ({
                         storeName: att.storeName,
-                        attachmentPath: att.attachmentPath,
+                        attachmentPath: att.attachmentPath || att.storeName,
                         attachmentName: att.attachmentName,
                     }));
-                    payload.attachments = [...existingAtts, ...newAtts];
                 }
 
                 logger.debug(`[Zoho Mail] Sending payload to ${this.baseUrl}/accounts/${accountId}/messages: ${JSON.stringify({ ...payload, content: '...' })}`, 'zoho-service');
