@@ -219,7 +219,7 @@ export default function TargetDetailPage() {
         const index = row.index + 1 + pageIndex * pageSize
         const isSelected = row.getIsSelected()
         return (
-          <div className="flex items-center justify-center px-2 relative group/select">
+          <div className="flex items-center justify-center px-2 relative group/select h-full min-h-[40px]">
             <span className={cn(
               "font-mono text-[10px] text-zinc-700 transition-opacity",
               isSelected ? "opacity-0" : "group-hover/select:opacity-0"
@@ -385,7 +385,7 @@ export default function TargetDetailPage() {
         const index = row.index + 1 + pageIndex * pageSize
         const isSelected = row.getIsSelected()
         return (
-          <div className="flex items-center justify-center px-2 relative group/select">
+          <div className="flex items-center justify-center px-2 relative group/select h-full min-h-[40px]">
             <span className={cn(
               "font-mono text-[10px] text-zinc-700 transition-opacity",
               isSelected ? "opacity-0" : "group-hover/select:opacity-0"
@@ -616,7 +616,7 @@ export default function TargetDetailPage() {
                 <ForensicTableSkeleton columns={tableColumns.length} rows={12} type={isPeopleList ? 'people' : 'account'} />
               ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <tr
+                  <TableRow
                     key={row.id}
                     onClick={(e) => {
                       // Don't trigger row click if clicking a link or button
@@ -626,14 +626,14 @@ export default function TargetDetailPage() {
                       saveScroll()
                       router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)
                     }}
-                    className="border-b border-white/5 hover:bg-white/5 transition-colors group cursor-pointer"
+                    className="cursor-pointer"
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3 align-middle">
+                      <TableCell key={cell.id} className="py-3">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+                      </TableCell>
                     ))}
-                  </tr>
+                  </TableRow>
                 ))
               ) : (
                 <tr>

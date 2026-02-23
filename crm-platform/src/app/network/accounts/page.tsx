@@ -546,8 +546,8 @@ export default function AccountsPage() {
                   {table.getRowModel().rows.map((row, index) => (
                     <motion.tr
                       key={row.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       exit={{ opacity: 0, scale: 0.98 }}
                       transition={{
                         duration: 0.3,
@@ -568,13 +568,7 @@ export default function AccountsPage() {
                     >
                       {row.getVisibleCells().map((cell) => (
                         <TableCell key={cell.id} className="py-3">
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.4, delay: 0.1 }}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </motion.div>
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}
                     </motion.tr>

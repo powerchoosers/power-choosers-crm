@@ -563,8 +563,8 @@ export default function PeoplePage() {
                   {rows.map((row, index) => (
                     <motion.tr
                       key={row.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       exit={{ opacity: 0, scale: 0.98 }}
                       transition={{
                         duration: 0.3,
