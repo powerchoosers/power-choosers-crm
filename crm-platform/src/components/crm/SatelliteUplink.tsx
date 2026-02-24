@@ -45,6 +45,7 @@ export default function SatelliteUplink({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
   const [selectedPOI, setSelectedPOI] = useState<any | null>(null);
+  const [nearbyBusinesses, setNearbyBusinesses] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
@@ -70,7 +71,22 @@ export default function SatelliteUplink({
     }
   }, [latitude, longitude]);
 
-  // Cleanup: removed nearby fetching logic to keep it simple as per user request
+  // Shadow Intelligence: Fetch POIs from the Search API to find businesses with missing labels
+  useEffect(() => {
+    const fetchShadowIntel = async () => {
+      if (!isActive || !coordinates) return;
+      try {
+        const res = await fetch(`/api/maps/nearby?lat=${coordinates.lat}&lng=${coordinates.lng}&limit=25`);
+        const data = await res.json();
+        if (data.results) {
+          setNearbyBusinesses(data.results);
+        }
+      } catch (error) {
+        console.error('Shadow Intel failed:', error);
+      }
+    };
+    fetchShadowIntel();
+  }, [isActive, coordinates]);
 
   const handleCopyNamed = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -442,6 +458,33 @@ export default function SatelliteUplink({
               </button>
             </Marker>
 
+            {/* SHADOW INTELLIGENCE LAYER: Invisible hotspots for buildings with no labels */}
+            {nearbyBusinesses.map((biz) => (
+              <Marker
+                key={biz.id}
+                longitude={biz.lng}
+                latitude={biz.lat}
+                anchor="center"
+              >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedPOI({
+                      ...biz,
+                      isShadow: true
+                    });
+                  }}
+                  className="w-10 h-10 rounded-full bg-transparent hover:bg-[#002FA7]/5 border border-transparent hover:border-[#002FA7]/20 transition-all cursor-crosshair group/shadow"
+                  title={biz.name}
+                >
+                  {/* Subtle target indicator only on hover */}
+                  <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/shadow:opacity-100 transition-opacity">
+                    <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
+                  </div>
+                </button>
+              </Marker>
+            ))}
+
             {/* POPUP FOR SELECTED POI (From click on Map or Pin) */}
             {selectedPOI && (
               <Popup
@@ -481,7 +524,7 @@ export default function SatelliteUplink({
                     </button>
                   </div>
                   <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-1 italic tracking-widest opacity-60">
-                    {selectedPOI.address === activeAddress ? 'Target_Center' : selectedPOI.address}
+                    {selectedPOI.address === activeAddress ? 'Target_Center' : (selectedPOI.isShadow ? 'Shadow_Intel' : selectedPOI.address)}
                   </div>
 
                   <button
