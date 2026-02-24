@@ -33,12 +33,10 @@ export default async function handler(req, res) {
     }
 
     try {
-        // Search for POIs around the given coordinates
-        // We use categories like 'business', 'office', 'industrial' if we want company labels
-        // Or just generic POI
-        const query = 'business';
+        // Broad search for POIs around the given coordinates
+        const query = 'company'; // Using 'company' instead of 'business' for potentially better business results
         const response = await fetch(
-            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${apiKey}&proximity=${lng},${lat}&types=poi&limit=${limit}`
+            `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${apiKey}&proximity=${lng},${lat}&types=poi&limit=25`
         );
 
         const data = await response.json();

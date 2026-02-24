@@ -73,7 +73,7 @@ export default function SatelliteUplink({
 
   const fetchNearby = async (lat: number, lng: number) => {
     try {
-      const res = await fetch(`/api/maps/nearby?lat=${lat}&lng=${lng}&limit=15`);
+      const res = await fetch(`/api/maps/nearby?lat=${lat}&lng=${lng}&limit=25`);
       const data = await res.json();
       if (data.results) {
         setNearbyPOIs(data.results);
@@ -430,16 +430,18 @@ export default function SatelliteUplink({
                 longitude={poi.lng}
                 latitude={poi.lat}
                 anchor="bottom"
-                onClick={e => {
-                  e.originalEvent.stopPropagation();
-                  setSelectedPOI(poi);
-                }}
               >
-                <div className="group relative cursor-pointer">
-                  <div className="w-4 h-4 rounded-full bg-[#002FA7]/40 border border-[#002FA7]/60 group-hover:scale-125 group-hover:bg-[#002FA7] transition-all flex items-center justify-center">
-                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    setSelectedPOI(poi);
+                  }}
+                  className="group relative cursor-pointer outline-none focus:outline-none"
+                >
+                  <div className="w-6 h-6 rounded-full bg-white/90 border-2 border-[#002FA7] group-hover:scale-125 group-hover:bg-[#002FA7] group-hover:border-white transition-all flex items-center justify-center shadow-[0_0_15px_rgba(0,47,167,0.4)]">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] group-hover:bg-white animate-pulse" />
                   </div>
-                </div>
+                </button>
               </Marker>
             ))}
 
@@ -453,21 +455,27 @@ export default function SatelliteUplink({
                 closeButton={false}
                 className="z-50"
               >
-                <div className="nodal-module-glass nodal-monolith-edge p-3 min-w-[180px] rounded-xl shadow-2xl border border-white/10 backdrop-blur-xl bg-black/80">
-                  <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest mb-1">Asset_Identity</div>
-                  <div className="text-xs font-mono font-bold text-white mb-2 leading-tight uppercase">{selectedPOI.name}</div>
-                  <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2">{selectedPOI.address}</div>
+                <div className="nodal-module-glass nodal-monolith-edge p-3 min-w-[200px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-3xl bg-black/90 ring-1 ring-white/10">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <div className="text-[10px] font-mono text-[#4D88FF] uppercase tracking-widest leading-none">POI_Entry</div>
+                      <div className="text-xs font-mono font-bold text-white mt-1 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
+                    </div>
+                    <button
+                      onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
+                      className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-[#002FA7]/20 transition-all"
+                      title="Direct Copy"
+                    >
+                      {copiedId === selectedPOI.id ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    </button>
+                  </div>
+                  <div className="text-[9px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2 italic">{selectedPOI.address}</div>
 
                   <button
                     onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                    className="w-full h-8 px-3 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/40 hover:bg-[#002FA7] hover:text-white transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest text-[#4D88FF]"
+                    className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-[#4D88FF]/30 hover:brightness-125 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(0,47,167,0.3)]"
                   >
-                    {copiedId === selectedPOI.id ? (
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                    {copiedId === selectedPOI.id ? 'Copied' : 'Copy Name'}
+                    {copiedId === selectedPOI.id ? 'Identity_Copied' : 'Transfer_Name'}
                   </button>
                 </div>
               </Popup>
