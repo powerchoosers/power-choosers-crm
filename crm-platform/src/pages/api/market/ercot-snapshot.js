@@ -46,6 +46,7 @@ export default async function handler(req, res) {
       metadata: {
         price_source: priceData.source || priceData.metadata?.source,
         grid_source: gridData.source || gridData.metadata?.source,
+        transmission_rates: priceData.transmission_rates,
         last_updated: new Date().toISOString(),
         source: 'ercot_snapshot'
       }

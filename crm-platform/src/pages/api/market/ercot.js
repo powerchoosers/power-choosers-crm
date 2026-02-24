@@ -205,6 +205,12 @@ async function fetchFromOfficialApi(type, keys) {
         west: westPrice,
         hub_avg: (houstonPrice + northPrice + southPrice + westPrice) / 4
       },
+      transmission_rates: {
+        houston: 0.6597,
+        north: 0.7234,
+        south: 0.5821,
+        west: 0.8943
+      },
       metadata: {
         last_updated: new Date().toISOString(),
         report_id: 'NP6-905-CD'
@@ -263,6 +269,12 @@ async function scrapeRealTimePrices() {
       south,
       west,
       hub_avg
+    },
+    transmission_rates: {
+      houston: 0.6597,
+      north: 0.7234,
+      south: 0.5821,
+      west: 0.8943
     },
     metadata: {
       source: 'ERCOT Public CDR (Scraper)',
