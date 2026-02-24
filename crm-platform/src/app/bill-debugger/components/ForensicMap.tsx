@@ -48,7 +48,7 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
 
     const fetchNearby = async (lat: number, lng: number) => {
         try {
-            const res = await fetch(`/api/maps/nearby?lat=${lat}&lng=${lng}&limit=15`);
+            const res = await fetch(`/api/maps/nearby?lat=${lat}&lng=${lng}&limit=25`);
             const data = await res.json();
             if (data.results) {
                 setNearbyPOIs(data.results);
@@ -154,16 +154,18 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                             longitude={poi.lng}
                             latitude={poi.lat}
                             anchor="bottom"
-                            onClick={e => {
-                                e.originalEvent.stopPropagation();
-                                setSelectedPOI(poi);
-                            }}
                         >
-                            <div className="group relative cursor-pointer">
-                                <div className="w-4 h-4 rounded-full bg-[#002FA7]/40 border border-[#002FA7]/60 group-hover:scale-125 group-hover:bg-[#002FA7] transition-all flex items-center justify-center">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />
+                            <button
+                                onClick={e => {
+                                    e.stopPropagation();
+                                    setSelectedPOI(poi);
+                                }}
+                                className="group relative cursor-pointer outline-none focus:outline-none"
+                            >
+                                <div className="w-6 h-6 rounded-full bg-white/90 border-2 border-[#002FA7] group-hover:scale-125 group-hover:bg-[#002FA7] group-hover:border-white transition-all flex items-center justify-center shadow-lg shadow-blue-500/20">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] group-hover:bg-white animate-pulse" />
                                 </div>
-                            </div>
+                            </button>
                         </Marker>
                     ))}
 
@@ -177,21 +179,26 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                             closeButton={false}
                             className="z-50"
                         >
-                            <div className="bg-white/95 backdrop-blur-md p-3 min-w-[180px] rounded-xl shadow-xl border border-zinc-200">
-                                <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest mb-1">Asset_Identity</div>
-                                <div className="text-xs font-mono font-bold text-zinc-900 mb-1 leading-tight uppercase">{selectedPOI.name}</div>
-                                <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2">{selectedPOI.address}</div>
+                            <div className="bg-white/95 backdrop-blur-md p-3 min-w-[200px] rounded-xl shadow-2xl border border-zinc-200">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest leading-none">POI_Identity</div>
+                                        <div className="text-xs font-mono font-bold text-zinc-900 mt-1 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
+                                    </div>
+                                    <button
+                                        onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
+                                        className="p-1.5 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-500 hover:text-[#002FA7] hover:bg-white transition-all"
+                                    >
+                                        {copiedId === selectedPOI.id ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                    </button>
+                                </div>
+                                <div className="text-[9px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2 italic">{selectedPOI.address}</div>
 
                                 <button
                                     onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                                    className="w-full h-8 px-3 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/20 hover:bg-[#002FA7] hover:text-white transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:shadow-lg shadow-blue-500/20"
+                                    className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-blue-600 hover:brightness-110 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest shadow-md shadow-blue-500/20"
                                 >
-                                    {copiedId === selectedPOI.id ? (
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                    ) : (
-                                        <Copy className="w-3.5 h-3.5" />
-                                    )}
-                                    {copiedId === selectedPOI.id ? 'Copied' : 'Copy Name'}
+                                    {copiedId === selectedPOI.id ? 'Copied' : 'Copy Business Name'}
                                 </button>
                             </div>
                         </Popup>
