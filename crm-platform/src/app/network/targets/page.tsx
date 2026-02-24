@@ -14,11 +14,13 @@ import {
   Loader2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useTargets, useCreateTarget } from '@/hooks/useTargets'
+import { useTargets, useCreateTarget, useDeleteTarget } from '@/hooks/useTargets'
 import { formatDistanceToNow } from 'date-fns'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
+import DestructModal from '@/components/network/DestructModal'
+import { Target } from '@/types/targets'
 import {
   Dialog,
   DialogContent,
@@ -102,14 +104,17 @@ export default function TargetOverviewPage() {
   // DATA FETCHING
   const { data: targets, isLoading, error } = useTargets()
   const createTarget = useCreateTarget()
+  const deleteTarget = useDeleteTarget()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
+  const [targetToDelete, setTargetToDelete] = useState<Target | null>(null)
   const [newTargetName, setNewTargetName] = useState('')
 
   // Filter based on toggle and search
   const filteredTargets = targets?.filter(l => {
     if (!l.kind) return false
     const normalizedKind = l.kind.toLowerCase()
-    
+
     const isPeopleKind = ['people', 'person', 'contact', 'contacts'].includes(normalizedKind)
     const isAccountKind = ['account', 'accounts', 'company', 'companies'].includes(normalizedKind)
 
@@ -138,6 +143,14 @@ export default function TargetOverviewPage() {
       toast.success('Target initialized successfully')
     } catch {
       toast.error('Failed to initialize target')
+    }
+  }
+
+  const handleConfirmPurge = async () => {
+    if (targetToDelete) {
+      await deleteTarget.mutateAsync(targetToDelete.id)
+      setIsDestructModalOpen(false)
+      setTargetToDelete(null)
     }
   }
 
@@ -304,7 +317,15 @@ export default function TargetOverviewPage() {
                           <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-500">
                             <Edit3 className="w-4 h-4" />
                           </button>
-                          <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-500">
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setTargetToDelete(target)
+                              setIsDestructModalOpen(true)
+                            }}
+                            className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-500"
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -376,6 +397,16 @@ export default function TargetOverviewPage() {
           </div>
         </div>
       </div>
+
+      <DestructModal
+        isOpen={isDestructModalOpen}
+        onClose={() => {
+          setIsDestructModalOpen(false)
+          setTargetToDelete(null)
+        }}
+        onConfirm={handleConfirmPurge}
+        count={targetToDelete?.count || 0}
+      />
     </div>
   );
 }

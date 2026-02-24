@@ -11,14 +11,14 @@ export function useTargets() {
       const { data, error } = await supabase
         .from('lists')
         .select('*, list_members!list_members_listid_fkey(count)')
-      
+
       if (error) {
         if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
           throw error;
         }
         throw error
       }
-      
+
       // Transform data to include count
       return (data as (Target & { list_members: { count: number }[] })[]).map((list) => ({
         ...list,
@@ -70,20 +70,20 @@ export function useTarget(id: string) {
     queryKey: ['target', id],
     queryFn: async () => {
       if (!id) return null
-      
+
       const { data, error } = await supabase
         .from('lists')
         .select('*, list_members!list_members_listid_fkey(count)')
         .eq('id', id)
         .single()
-      
+
       if (error) {
         if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
           throw error;
         }
         throw error
       }
-      
+
       const target = data as (Target & { list_members: { count: number }[] })
       return {
         ...target,
@@ -136,5 +136,28 @@ export function useSearchTargets(queryTerm: string) {
     },
     enabled: queryTerm.length >= 2 && !loading && !!user,
     staleTime: 1000 * 60 * 1,
+  })
+}
+
+export function useDeleteTarget() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('lists')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
+      toast.success('Target purged successfully')
+    },
+    onError: (error) => {
+      console.error('Error deleting target:', error)
+      toast.error('Failed to purge target')
+    }
   })
 }

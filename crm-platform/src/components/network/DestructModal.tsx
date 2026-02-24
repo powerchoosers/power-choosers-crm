@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, X } from 'lucide-react';
 
@@ -15,12 +16,17 @@ const HOLD_DURATION_MS = 1500;
 const TICK_MS = 16; // ~60fps for smooth progress
 
 export default function DestructModal({ isOpen, onClose, onConfirm, count }: DestructModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isHolding, setIsHolding] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
   const onConfirmRef = useRef(onConfirm);
   const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     onConfirmRef.current = onConfirm;
@@ -64,7 +70,9 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
     };
   }, [isHolding]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <motion.div
@@ -72,7 +80,7 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4"
         >
           <motion.div
             key="destruct-modal-content"
@@ -150,6 +158,7 @@ export default function DestructModal({ isOpen, onClose, onConfirm, count }: Des
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 }
