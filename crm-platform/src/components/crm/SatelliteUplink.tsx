@@ -44,7 +44,6 @@ export default function SatelliteUplink({
   );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
-  const [nearbyPOIs, setNearbyPOIs] = useState<any[]>([]);
   const [selectedPOI, setSelectedPOI] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -71,24 +70,7 @@ export default function SatelliteUplink({
     }
   }, [latitude, longitude]);
 
-  const fetchNearby = async (lat: number, lng: number) => {
-    try {
-      const res = await fetch(`/api/maps/nearby?lat=${lat}&lng=${lng}&limit=25`);
-      const data = await res.json();
-      if (data.results) {
-        setNearbyPOIs(data.results);
-      }
-    } catch (error) {
-      console.error('Failed to fetch nearby POIs:', error);
-    }
-  };
-
-  // Sync coordinates and fetch nearby when coordinates change
-  useEffect(() => {
-    if (isActive && coordinates) {
-      fetchNearby(coordinates.lat, coordinates.lng);
-    }
-  }, [isActive, coordinates]);
+  // Cleanup: removed nearby fetching logic to keep it simple as per user request
 
   const handleCopyNamed = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -409,8 +391,6 @@ export default function SatelliteUplink({
             attributionControl={false}
             onStyleData={(e: any) => {
               const map = e.target;
-              // Mapbox Standard Satellite configuration
-              // We want maximum label density for companies/POIs
               try {
                 map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
                 map.setConfigProperty('basemap', 'densityPointOfInterestLabels', 5);
@@ -418,34 +398,47 @@ export default function SatelliteUplink({
                 console.warn('Mapbox config error:', err);
               }
             }}
+            onClick={(e) => {
+              const map = e.target;
+              // Query POIs in the vicinity of the click
+              const features = map.queryRenderedFeatures(e.point, {
+                // POI layers in Standard style are usually within these categories
+                layers: ['poi-label', 'settlement-label', 'airport-label']
+              });
+
+              if (features.length > 0) {
+                const poi = features[0];
+                setSelectedPOI({
+                  id: poi.id || Math.random().toString(),
+                  name: poi.properties?.name || 'Unknown Entity',
+                  address: poi.properties?.address || 'Satellite Metadata Extraction',
+                  lat: e.lngLat.lat,
+                  lng: e.lngLat.lng
+                });
+              } else {
+                setSelectedPOI(null);
+              }
+            }}
           >
             <Marker longitude={stableCoordinates.lng} latitude={stableCoordinates.lat} anchor="bottom">
-              <MapPin className="text-red-500 w-8 h-8 drop-shadow-lg" fill="currentColor" />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setSelectedPOI({
+                    id: 'target-pin',
+                    name: name || activeAddress,
+                    address: activeAddress,
+                    lat: stableCoordinates.lat,
+                    lng: stableCoordinates.lng
+                  });
+                }}
+                className="cursor-pointer hover:scale-110 transition-transform"
+              >
+                <MapPin className="text-red-500 w-9 h-9 drop-shadow-[0_0_10px_rgba(239,68,68,0.5)]" fill="currentColor" />
+              </button>
             </Marker>
 
-            {/* NEARBY POI MARKERS */}
-            {nearbyPOIs.map((poi) => (
-              <Marker
-                key={poi.id}
-                longitude={poi.lng}
-                latitude={poi.lat}
-                anchor="bottom"
-              >
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    setSelectedPOI(poi);
-                  }}
-                  className="group relative cursor-pointer outline-none focus:outline-none"
-                >
-                  <div className="w-6 h-6 rounded-full bg-white/90 border-2 border-[#002FA7] group-hover:scale-125 group-hover:bg-[#002FA7] group-hover:border-white transition-all flex items-center justify-center shadow-[0_0_15px_rgba(0,47,167,0.4)]">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] group-hover:bg-white animate-pulse" />
-                  </div>
-                </button>
-              </Marker>
-            ))}
-
-            {/* POPUP FOR SELECTED POI */}
+            {/* POPUP FOR SELECTED POI (From click on Map or Pin) */}
             {selectedPOI && (
               <Popup
                 longitude={selectedPOI.lng}
@@ -456,24 +449,23 @@ export default function SatelliteUplink({
                 className="z-50"
               >
                 <div className="nodal-module-glass nodal-monolith-edge p-3 min-w-[200px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-3xl bg-black/90 ring-1 ring-white/10">
-                  <div className="flex justify-between items-start mb-2">
+                  <div className="flex justify-between items-start mb-1">
                     <div>
-                      <div className="text-[10px] font-mono text-[#4D88FF] uppercase tracking-widest leading-none">POI_Entry</div>
-                      <div className="text-xs font-mono font-bold text-white mt-1 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
+                      <div className="text-[10px] font-mono text-[#4D88FF] uppercase tracking-widest leading-none">Identity_Acquired</div>
+                      <div className="text-xs font-mono font-bold text-white mt-1.5 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
                     </div>
                     <button
                       onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                      className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-[#002FA7]/20 transition-all"
-                      title="Direct Copy"
+                      className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-[#002FA7]/20 transition-all flex-shrink-0"
                     >
                       {copiedId === selectedPOI.id ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
-                  <div className="text-[9px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2 italic">{selectedPOI.address}</div>
+                  <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-2 line-clamp-1 italic">{selectedPOI.address === activeAddress ? 'Target Center' : 'POI Sector'}</div>
 
                   <button
                     onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                    className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-[#4D88FF]/30 hover:brightness-125 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(0,47,167,0.3)]"
+                    className="w-full h-8 rounded-lg bg-[#002FA7] text-white border border-[#4D88FF]/30 hover:brightness-125 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(0,47,167,0.3)]"
                   >
                     {copiedId === selectedPOI.id ? 'Identity_Copied' : 'Transfer_Name'}
                   </button>
