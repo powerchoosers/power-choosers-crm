@@ -539,22 +539,22 @@ export function TopBar() {
                     </div>
                   </div>
 
-                  {/* Center Sector: Dynamics */}
-                  <div className="flex-1 flex items-center justify-center min-w-0">
-                    <div className="flex items-center gap-3 px-3 py-1 border border-dotted border-emerald-500/40 rounded-lg bg-emerald-500/10">
+                  {/* Center Sector: Dynamics (Reduced Size & Left-Aligned) */}
+                  <div className="flex-1 flex items-center justify-start min-w-0 ml-4">
+                    <div className="flex items-center gap-2 px-2 py-0.5 border border-dotted border-emerald-500/40 rounded-lg bg-emerald-500/10">
                       {status === 'connected' && (
                         <div className="flex items-center gap-0.5 opacity-60">
                           {[...Array(5)].map((_, i) => (
                             <motion.div
                               key={i}
-                              className="w-[2px] bg-emerald-500/50 rounded-full"
-                              animate={{ height: ["3px", "10px", "3px"] }}
+                              className="w-[1.5px] bg-emerald-500/50 rounded-full"
+                              animate={{ height: ["2px", "8px", "2px"] }}
                               transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
                             />
                           ))}
                         </div>
                       )}
-                      <div className="text-[12px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-2">
+                      <div className="text-[10px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-1.5">
                         {status === 'connected' && <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />}
                         {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
                       </div>
@@ -563,8 +563,8 @@ export function TopBar() {
                           {[...Array(5)].map((_, i) => (
                             <motion.div
                               key={i}
-                              className="w-[2px] bg-emerald-500/50 rounded-full"
-                              animate={{ height: ["3px", "10px", "3px"] }}
+                              className="w-[1.5px] bg-emerald-500/50 rounded-full"
+                              animate={{ height: ["2px", "8px", "2px"] }}
                               transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
                             />
                           ))}
