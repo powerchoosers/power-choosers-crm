@@ -1,7 +1,7 @@
 'use client'
 import React, { useState, useEffect, useMemo } from 'react';
-import { MapPin, Satellite, Loader2, ShieldCheck } from 'lucide-react';
-import Map, { Marker } from 'react-map-gl/mapbox';
+import { MapPin, Satellite, Loader2, ShieldCheck, Copy, CheckCircle2 } from 'lucide-react';
+import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -14,6 +14,9 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
     const [isLoading, setIsLoading] = useState(false);
     const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [nearbyPOIs, setNearbyPOIs] = useState<any[]>([]);
+    const [selectedPOI, setSelectedPOI] = useState<any | null>(null);
+    const [copiedId, setCopiedId] = useState<string | null>(null);
 
     const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -42,6 +45,30 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
 
         geocodeAddress();
     }, [address]);
+
+    const fetchNearby = async (lat: number, lng: number) => {
+        try {
+            const res = await fetch(`/api/maps/nearby?lat=${lat}&lng=${lng}&limit=15`);
+            const data = await res.json();
+            if (data.results) {
+                setNearbyPOIs(data.results);
+            }
+        } catch (error) {
+            console.error('Failed to fetch nearby POIs:', error);
+        }
+    };
+
+    useEffect(() => {
+        if (coordinates) {
+            fetchNearby(coordinates.lat, coordinates.lng);
+        }
+    }, [coordinates]);
+
+    const handleCopyNamed = (text: string, id: string) => {
+        navigator.clipboard.writeText(text);
+        setCopiedId(id);
+        setTimeout(() => setCopiedId(null), 2000);
+    };
 
     const stableCoordinates = useMemo(() => coordinates, [coordinates?.lat, coordinates?.lng]);
 
@@ -119,6 +146,56 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                             </div>
                         </motion.div>
                     </Marker>
+
+                    {/* NEARBY POI MARKERS */}
+                    {nearbyPOIs.map((poi) => (
+                        <Marker
+                            key={poi.id}
+                            longitude={poi.lng}
+                            latitude={poi.lat}
+                            anchor="bottom"
+                            onClick={e => {
+                                e.originalEvent.stopPropagation();
+                                setSelectedPOI(poi);
+                            }}
+                        >
+                            <div className="group relative cursor-pointer">
+                                <div className="w-4 h-4 rounded-full bg-[#002FA7]/40 border border-[#002FA7]/60 group-hover:scale-125 group-hover:bg-[#002FA7] transition-all flex items-center justify-center">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />
+                                </div>
+                            </div>
+                        </Marker>
+                    ))}
+
+                    {/* POPUP FOR SELECTED POI */}
+                    {selectedPOI && (
+                        <Popup
+                            longitude={selectedPOI.lng}
+                            latitude={selectedPOI.lat}
+                            anchor="top"
+                            onClose={() => setSelectedPOI(null)}
+                            closeButton={false}
+                            className="z-50"
+                        >
+                            <div className="bg-white/95 backdrop-blur-md p-3 min-w-[180px] rounded-xl shadow-xl border border-zinc-200">
+                                <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest mb-1">Asset_Identity</div>
+                                <div className="text-xs font-mono font-bold text-zinc-900 mb-1 leading-tight uppercase">{selectedPOI.name}</div>
+                                <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2">{selectedPOI.address}</div>
+
+                                <button
+                                    onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
+                                    className="w-full h-8 px-3 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/20 hover:bg-[#002FA7] hover:text-white transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:shadow-lg shadow-blue-500/20"
+                                >
+                                    {copiedId === selectedPOI.id ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                    ) : (
+                                        <Copy className="w-3.5 h-3.5" />
+                                    )}
+                                    {copiedId === selectedPOI.id ? 'Copied' : 'Copy Name'}
+                                </button>
+                            </div>
+                        </Popup>
+                    )}
                 </Map>
             ) : (
                 <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-[0.03] pointer-events-none" />

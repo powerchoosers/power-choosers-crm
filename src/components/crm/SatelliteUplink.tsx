@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react';
-import { MapPin, Satellite, Wifi, Loader2, Search } from 'lucide-react';
-import Map, { Marker } from 'react-map-gl/mapbox';
+import { MapPin, Satellite, Wifi, Loader2, Search, Copy, CheckCircle2 } from 'lucide-react';
+import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -44,6 +44,9 @@ export default function SatelliteUplink({
   );
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const [nearbyPOIs, setNearbyPOIs] = useState<any[]>([]);
+  const [selectedPOI, setSelectedPOI] = useState<any | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -67,6 +70,32 @@ export default function SatelliteUplink({
       });
     }
   }, [latitude, longitude]);
+
+  const fetchNearby = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(`/api/maps/nearby?lat=${lat}&lng=${lng}&limit=15`);
+      const data = await res.json();
+      if (data.results) {
+        setNearbyPOIs(data.results);
+      }
+    } catch (error) {
+      console.error('Failed to fetch nearby POIs:', error);
+    }
+  };
+
+  // Sync coordinates and fetch nearby when coordinates change
+  useEffect(() => {
+    if (isActive && coordinates) {
+      fetchNearby(coordinates.lat, coordinates.lng);
+    }
+  }, [isActive, coordinates]);
+
+  const handleCopyNamed = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    toast.success('Copied to Clipboard', { description: text });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   // Geocode address to coordinates – use server API (works in production + localhost)
   const geocodeAddress = async (addressToGeocode: string): Promise<{ lat: number; lng: number } | null> => {
@@ -393,6 +422,56 @@ export default function SatelliteUplink({
             <Marker longitude={stableCoordinates.lng} latitude={stableCoordinates.lat} anchor="bottom">
               <MapPin className="text-red-500 w-8 h-8 drop-shadow-lg" fill="currentColor" />
             </Marker>
+
+            {/* NEARBY POI MARKERS */}
+            {nearbyPOIs.map((poi) => (
+              <Marker
+                key={poi.id}
+                longitude={poi.lng}
+                latitude={poi.lat}
+                anchor="bottom"
+                onClick={e => {
+                  e.originalEvent.stopPropagation();
+                  setSelectedPOI(poi);
+                }}
+              >
+                <div className="group relative cursor-pointer">
+                  <div className="w-4 h-4 rounded-full bg-[#002FA7]/40 border border-[#002FA7]/60 group-hover:scale-125 group-hover:bg-[#002FA7] transition-all flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_white]" />
+                  </div>
+                </div>
+              </Marker>
+            ))}
+
+            {/* POPUP FOR SELECTED POI */}
+            {selectedPOI && (
+              <Popup
+                longitude={selectedPOI.lng}
+                latitude={selectedPOI.lat}
+                anchor="top"
+                onClose={() => setSelectedPOI(null)}
+                closeButton={false}
+                className="z-50"
+              >
+                <div className="nodal-module-glass nodal-monolith-edge p-3 min-w-[180px] rounded-xl shadow-2xl border border-white/10 backdrop-blur-xl bg-black/80">
+                  <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest mb-1">Asset_Identity</div>
+                  <div className="text-xs font-mono font-bold text-white mb-2 leading-tight uppercase">{selectedPOI.name}</div>
+                  <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-2">{selectedPOI.address}</div>
+
+                  <button
+                    onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
+                    className="w-full h-8 px-3 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/40 hover:bg-[#002FA7] hover:text-white transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest text-[#4D88FF]"
+                  >
+                    {copiedId === selectedPOI.id ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5" />
+                    )}
+                    {copiedId === selectedPOI.id ? 'Copied' : 'Copy Name'}
+                  </button>
+                </div>
+              </Popup>
+            )}
           </Map>
         )}
       </motion.div>
