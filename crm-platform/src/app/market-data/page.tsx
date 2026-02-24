@@ -29,8 +29,10 @@ export default function MarketData() {
   };
 
   const stress = getStressLevel();
+  type LoadZone = 'houston' | 'north' | 'south' | 'west';
+  const [selectedZone, setSelectedZone] = useState<LoadZone>('houston');
 
-  const currentPrice = marketLoading ? 0 : (prices.hub_avg ?? prices.houston ?? 0);
+  const currentPrice = marketLoading ? 0 : (prices[selectedZone] ?? prices.hub_avg ?? prices.houston ?? 0);
   const displayPrice = marketLoading ? "---" : currentPrice.toFixed(2);
 
   // Grid Calculations
@@ -41,6 +43,14 @@ export default function MarketData() {
   const fourWeekLow = Math.min(8.92, currentPrice > 0 ? currentPrice * 0.72 : 8.92);
   const fourWeekHigh = Math.max(18.43, currentPrice > 0 ? currentPrice * 1.48 : 18.43);
   const thirtyDayAvg = currentPrice > 0 ? currentPrice * 1.12 : 12.37;
+
+  const transRates = marketData?.transmission_rates ?? {
+    houston: 0.6597,
+    north: 0.7234,
+    south: 0.5821,
+    west: 0.8943
+  };
+  const currentTransRate = transRates[selectedZone]; // Dynamic based on selection
 
   // Personalization State
   const [peakLoad, setPeakLoad] = useState(5000); // 5,000 kW default
@@ -173,6 +183,24 @@ export default function MarketData() {
                 <div className="text-[#002FA7] font-mono text-xs uppercase tracking-[0.3em] font-bold">Forensic Intelligence</div>
                 <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Your Facility Risk Score</h2>
 
+                {/* LOAD ZONE TOGGLE (Improvement #3) */}
+                <div className="flex items-center gap-2 mb-8 bg-white/5 p-1 rounded-full border border-white/10 w-fit mx-auto">
+                  {(['houston', 'north', 'south', 'west'] as const).map((zone) => (
+                    <button
+                      key={zone}
+                      onClick={() => setSelectedZone(zone)}
+                      className={cn(
+                        "px-4 py-1.5 rounded-full text-[10px] font-mono uppercase tracking-widest transition-all",
+                        selectedZone === zone
+                          ? "bg-[#002FA7] text-white shadow-[0_0_20px_rgba(0,47,167,0.4)]"
+                          : "text-zinc-500 hover:text-zinc-300"
+                      )}
+                    >
+                      {zone}
+                    </button>
+                  ))}
+                </div>
+
                 {/* PERSONALIZATION SLIDER */}
                 <div className="mt-6 w-full max-w-xl mx-auto p-6 rounded-2xl bg-white/[0.02] border border-white/5 shadow-2xl">
                   <div className="flex justify-between items-center mb-4">
@@ -254,8 +282,7 @@ export default function MarketData() {
                         <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3">
                           {(() => {
                             const effectiveRate = parseFloat(energyRate) >= 1 ? parseFloat(energyRate) / 100 : (parseFloat(energyRate) || 0);
-                            const tPrice = currentPrice > 0 ? currentPrice : 10.85;
-                            const tCost = peakLoad * 0.8 * tPrice * 730 / 12 / 1000;
+                            const tCost = peakLoad * 0.8 * currentTransRate;
                             const eCost = monthlyKWh * effectiveRate;
                             return (
                               <>
@@ -288,9 +315,9 @@ export default function MarketData() {
                   <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest mb-4">Monthly Liability</div>
                   <div>
                     <div className="text-4xl font-bold font-mono text-rose-500">
-                      ${Math.round((peakLoad * 0.8 * 10.85 * 730 / 12) / 1000).toLocaleString()}
+                      ${Math.round(peakLoad * 0.8 * currentTransRate).toLocaleString()}
                     </div>
-                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">80% FLOOR × {peakLoad.toLocaleString()} kW × ${currentPrice > 0 ? (currentPrice / 1000).toFixed(4) : '0.0108'}/kWh</div>
+                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">80% FLOOR × {peakLoad.toLocaleString()} kW × ${currentTransRate.toFixed(4)}/kW-mo</div>
                     <div className="text-[8px] text-zinc-600 font-mono mt-2 uppercase tracking-tighter">As of {marketData?.metadata.last_updated ? new Date(marketData.metadata.last_updated).toLocaleTimeString() : '---'} CST</div>
                   </div>
                 </div>
@@ -561,7 +588,7 @@ export default function MarketData() {
                     </div>
                     <div className="flex justify-between items-center text-xs font-mono font-bold border-t border-white/5 pt-4">
                       <span className="text-zinc-500">YOUR FACILITY RATCHET</span>
-                      <span className="text-rose-500">${Math.round(peakLoad * 0.8 * 10.85 * 730 / 12 / 1000).toLocaleString()} /MO</span>
+                      <span className="text-rose-500">${Math.round(peakLoad * 0.8 * currentTransRate).toLocaleString()} /MO</span>
                     </div>
                     <p className="text-[10px] text-zinc-500 leading-relaxed italic">
                       The 4 highest-demand hours in June–Sept determine your transmission cost floor based on your {peakLoad.toLocaleString()} kW peak.
@@ -717,7 +744,7 @@ export default function MarketData() {
                 <div className="col-span-2">
                   <div className="text-[8px] font-mono text-[#002FA7] uppercase mb-2">Architectural Verdict</div>
                   <p className="text-[10px] text-zinc-400 font-mono uppercase tracking-tight leading-relaxed">
-                    Risk shifting from thermal to renewable intermittency. Current nodal pricing indicates a 22% probability of a &gt;$25/MWh spike in the next 60 days. <span className="text-white">Hedge recommendation remains at 50% for LZ_HOUSTON.</span>
+                    Risk shifting from thermal to renewable intermittency. Current nodal pricing indicates a 22% probability of a &gt;$25/MWh spike in the next 60 days. <span className="text-white">Hedge recommendation remains at 50% for LZ_{selectedZone.toUpperCase()}.</span>
                   </p>
                 </div>
               </div>
@@ -770,7 +797,7 @@ export default function MarketData() {
           {/* System Status Line - The "Trap Door" */}
           <div className="w-full border-t border-zinc-800/50 mt-8 pt-8 flex justify-center text-center">
             <p className="text-zinc-600 text-xs font-mono tracking-wider">
-              ERCOT NODE: LZ_HOUSTON // LATENCY: 24ms // CONNECTION: SECURE
+              ERCOT NODE: LZ_{selectedZone.toUpperCase()} // LATENCY: 24ms // CONNECTION: SECURE
             </p>
           </div>
         </div>
