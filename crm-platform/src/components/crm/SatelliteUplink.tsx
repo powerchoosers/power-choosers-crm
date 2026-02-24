@@ -400,18 +400,22 @@ export default function SatelliteUplink({
             }}
             onClick={(e) => {
               const map = e.target;
-              // Query POIs in the vicinity of the click
-              const features = map.queryRenderedFeatures(e.point, {
-                // POI layers in Standard style are usually within these categories
-                layers: ['poi-label', 'settlement-label', 'airport-label']
-              });
+              // Query features at the clicked point
+              const features = map.queryRenderedFeatures(e.point);
 
-              if (features.length > 0) {
-                const poi = features[0];
+              // Find the best candidate for a label (POI, street name, etc)
+              // We prioritize things with a name and a 'poi' or 'label' category if possible
+              const poi = features.find(f =>
+                f.properties?.name ||
+                f.properties?.['name:en'] ||
+                f.properties?.title
+              );
+
+              if (poi) {
                 setSelectedPOI({
                   id: poi.id || Math.random().toString(),
-                  name: poi.properties?.name || 'Unknown Entity',
-                  address: poi.properties?.address || 'Satellite Metadata Extraction',
+                  name: poi.properties?.name || poi.properties?.['name:en'] || poi.properties?.title || 'Unknown Entity',
+                  address: poi.properties?.address || poi.properties?.type || poi.properties?.category || 'Satellite Metadata Extraction',
                   lat: e.lngLat.lat,
                   lng: e.lngLat.lng
                 });
@@ -446,26 +450,43 @@ export default function SatelliteUplink({
                 anchor="top"
                 onClose={() => setSelectedPOI(null)}
                 closeButton={false}
-                className="z-50"
+                maxWidth="none"
+                style={{ padding: 0 }}
               >
-                <div className="nodal-module-glass nodal-monolith-edge p-3 min-w-[200px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-3xl bg-black/90 ring-1 ring-white/10">
-                  <div className="flex justify-between items-start mb-1">
+                {/* Global CSS override for this specific popup instance to kill the white box */}
+                <style dangerouslySetInnerHTML={{
+                  __html: `
+                  .mapboxgl-popup-content {
+                    background: transparent !important;
+                    box-shadow: none !important;
+                    padding: 0 !important;
+                    border: none !important;
+                  }
+                  .mapboxgl-popup-tip {
+                    border-bottom-color: rgba(10, 10, 10, 0.95) !important;
+                    filter: drop-shadow(0 -1px 1px rgba(0,47,167,0.3));
+                  }
+                `}} />
+                <div className="nodal-module-glass nodal-monolith-edge p-3 min-w-[220px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-3xl bg-black/95 ring-1 ring-white/10 group/popup animate-in fade-in zoom-in duration-200">
+                  <div className="flex justify-between items-start mb-1.5">
                     <div>
-                      <div className="text-[10px] font-mono text-[#4D88FF] uppercase tracking-widest leading-none">Identity_Acquired</div>
-                      <div className="text-xs font-mono font-bold text-white mt-1.5 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
+                      <div className="text-[9px] font-mono text-[#4D88FF] uppercase tracking-[0.2em] leading-none opacity-80">Identity_Acquired</div>
+                      <div className="text-[11px] font-mono font-bold text-white mt-2 leading-tight uppercase line-clamp-2 tracking-wide">{selectedPOI.name}</div>
                     </div>
                     <button
                       onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                      className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-[#002FA7]/20 transition-all flex-shrink-0"
+                      className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-[#002FA7]/20 transition-all flex-shrink-0 ml-3"
                     >
-                      {copiedId === selectedPOI.id ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      {copiedId === selectedPOI.id ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                     </button>
                   </div>
-                  <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-2 line-clamp-1 italic">{selectedPOI.address === activeAddress ? 'Target Center' : 'POI Sector'}</div>
+                  <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-1 italic tracking-widest opacity-60">
+                    {selectedPOI.address === activeAddress ? 'Target_Center' : selectedPOI.address}
+                  </div>
 
                   <button
                     onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                    className="w-full h-8 rounded-lg bg-[#002FA7] text-white border border-[#4D88FF]/30 hover:brightness-125 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] shadow-[0_0_20px_rgba(0,47,167,0.3)]"
+                    className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-[#4D88FF]/30 hover:brightness-125 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] shadow-[0_4px_20px_rgba(0,47,167,0.4)] font-bold"
                   >
                     {copiedId === selectedPOI.id ? 'Identity_Copied' : 'Transfer_Name'}
                   </button>
