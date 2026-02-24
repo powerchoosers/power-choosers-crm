@@ -9,6 +9,12 @@ export interface MarketPulseData {
     west?: number
     hub_avg?: number
   }
+  transmission_rates?: {
+    houston: number
+    north: number
+    south: number
+    west: number
+  }
   grid: {
     actual_load: number
     forecast_load: number
@@ -58,6 +64,12 @@ async function fetchLiveFromApi(): Promise<MarketPulseData> {
   const gridData = await gridRes.json()
   return {
     prices: priceData.prices ?? {},
+    transmission_rates: priceData.transmission_rates ?? {
+      houston: 0.6597,
+      north: 0.7234,
+      south: 0.5821,
+      west: 0.8943
+    },
     grid: gridData.metrics ?? {},
     timestamp: priceData.timestamp || gridData.timestamp || new Date().toISOString(),
     metadata: {
@@ -84,6 +96,12 @@ async function fetchLastKnownFromSupabase(): Promise<MarketPulseData> {
   const meta = (data.metadata as Record<string, unknown>) ?? {}
   return {
     prices: (data.prices as MarketPulseData['prices']) ?? {},
+    transmission_rates: (meta.transmission_rates as MarketPulseData['transmission_rates']) ?? {
+      houston: 0.6597,
+      north: 0.7234,
+      south: 0.5821,
+      west: 0.8943
+    },
     grid: (data.grid as MarketPulseData['grid']) ?? {},
     timestamp: (data.timestamp as string) ?? new Date(data.created_at as string).toISOString(),
     metadata: {
