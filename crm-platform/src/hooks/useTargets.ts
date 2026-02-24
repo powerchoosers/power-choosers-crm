@@ -161,3 +161,30 @@ export function useDeleteTarget() {
     }
   })
 }
+
+export function useUpdateTarget() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ id, name }: { id: string; name: string }) => {
+      const { data, error } = await supabase
+        .from('lists')
+        .update({ name })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) throw error
+      return data as Target
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
+      queryClient.invalidateQueries({ queryKey: ['target', data.id] })
+      toast.success('Target updated successfully')
+    },
+    onError: (error) => {
+      console.error('Error updating target:', error)
+      toast.error('Failed to update target')
+    }
+  })
+}

@@ -216,6 +216,7 @@ export default function AccountDossierPage() {
   const [editContractEnd, setEditContractEnd] = useState('')
   const [editCompanyPhone, setEditCompanyPhone] = useState('')
   const [editAddress, setEditAddress] = useState('')
+  const [editAccountName, setEditAccountName] = useState('')
 
   // Refraction Event State (for field glow animations)
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
@@ -247,6 +248,7 @@ export default function AccountDossierPage() {
           electricity_supplier: account.electricitySupplier || account.metadata?.electricity_supplier,
         } as any
       })
+      setEditAccountName(account.name || '')
       setEditNotes(account.description || '')
       setEditAnnualUsage(account.annualUsage?.toString() || '')
       setEditStrikePrice(account.currentRate || '')
@@ -292,6 +294,7 @@ export default function AccountDossierPage() {
 
           await updateAccount.mutateAsync({
             id,
+            name: editAccountName,
             description: editNotes,
             annualUsage: cleanedUsage.toString(), // Send as string to match interface
             currentRate: editStrikePrice,
@@ -321,7 +324,7 @@ export default function AccountDossierPage() {
       }
       triggerSave()
     }
-  }, [isEditing, id, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
+  }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
 
   // Uplink fields update local state only; persisted when user locks dossier (padlock)
   const handleUpdate = (updates: Partial<{ companyPhone: string; domain: string; address: string }>) => {
@@ -576,7 +579,13 @@ export default function AccountDossierPage() {
                         compact
                       />
                     ) : (
-                      account.name
+                      <input
+                        type="text"
+                        value={editAccountName}
+                        onChange={(e) => setEditAccountName(e.target.value)}
+                        className="bg-transparent border-b border-white/10 text-white text-2xl font-semibold tracking-tighter w-full focus:outline-none focus:border-[#002FA7] transition-colors"
+                        placeholder="ACCOUNT NAME"
+                      />
                     )}
                   </h1>
 
