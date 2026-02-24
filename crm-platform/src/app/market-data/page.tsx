@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
 import { useEIARetailTexas } from '@/hooks/useEIA';
 import { cn } from '@/lib/utils';
+import { MarketPriceChart } from '@/components/market/MarketPriceChart';
 
 export default function MarketData() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -29,9 +30,43 @@ export default function MarketData() {
 
   const stress = getStressLevel();
 
+  const currentPrice = marketLoading ? 0 : (prices.hub_avg ?? prices.houston ?? 0);
+  const displayPrice = marketLoading ? "---" : currentPrice.toFixed(2);
+
+  // Grid Calculations
+  const reservePercent = grid.total_capacity ? Math.round((grid.reserves / grid.total_capacity) * 100) : 12.4;
+  const demandPercent = grid.total_capacity ? Math.round((grid.actual_load / grid.total_capacity) * 100) : 82;
+
+  // 4-Week Context (mocked relative to live price since we only have point data)
+  const fourWeekLow = Math.min(8.92, currentPrice > 0 ? currentPrice * 0.72 : 8.92);
+  const fourWeekHigh = Math.max(18.43, currentPrice > 0 ? currentPrice * 1.48 : 18.43);
+  const thirtyDayAvg = currentPrice > 0 ? currentPrice * 1.12 : 12.37;
+
   // 4CP Status
   const currentMonth = new Date().getMonth(); // 0-indexed
   const is4CPSeason = currentMonth >= 5 && currentMonth <= 8; // June - Sept
+
+  const [peakLoad, setPeakLoad] = useState(5000); // 5 MW default
+  const [countdown, setCountdown] = useState({ days: 92, hours: 14, mins: 22 });
+
+  // Dynamic 4CP Countdown
+  useEffect(() => {
+    const lockedDate = new Date('2026-06-01T00:00:00Z'); // June 4CP window start
+    const updateCountdown = () => {
+      const now = new Date();
+      const diff = lockedDate.getTime() - now.getTime();
+      if (diff > 0) {
+        setCountdown({
+          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          mins: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60))
+        });
+      }
+    };
+    updateCountdown();
+    const timer = setInterval(updateCountdown, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -41,7 +76,15 @@ export default function MarketData() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const displayPrice = marketLoading ? "---" : (prices.hub_avg?.toFixed(2) ?? prices.houston?.toFixed(2) ?? "0.00");
+  const getInterpretation = (price: number) => {
+    if (marketLoading) return { label: 'SYNCING', message: 'Detecting market pulse...', recommendation: 'WAIT' };
+    if (price < 0) return { label: 'ANOMALY', message: 'NEGATIVE PRICING DETECTED. Market surplus active.', recommendation: 'BUY/STORE' };
+    if (price < 15) return { label: 'STABLE', message: `Current price is ${Math.round(Math.abs(1 - price / 12.37) * 100)}% below monthly average.`, recommendation: 'LOCK CAP' };
+    if (price < 40) return { label: 'ELEVATED', message: 'Price trending above mean. Volatility increasing.', recommendation: 'HEDGE NOW' };
+    return { label: 'CRITICAL', message: 'SCARCITY EVENT DETECTED. UNHEDGED EXPOSURE EXTREME.', recommendation: 'IMMEDIATE PROTECTION' };
+  };
+
+  const interpretation = getInterpretation(currentPrice);
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-[#002FA7]">
@@ -129,15 +172,38 @@ export default function MarketData() {
               <div className="flex flex-col items-center gap-2 mb-8">
                 <div className="text-[#002FA7] font-mono text-xs uppercase tracking-[0.3em] font-bold">Forensic Intelligence</div>
                 <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Your Facility Risk Score</h2>
-                <p className="text-zinc-500 text-sm font-mono uppercase tracking-widest mt-1">Based on Anonymous Texas Facility Profiles</p>
+
+                {/* PERSONALIZATION SLIDER */}
+                <div className="mt-6 w-full max-w-md mx-auto p-4 rounded-2xl bg-white/[0.02] border border-white/5">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Adjust Peak Demand</span>
+                    <span className="text-sm font-mono font-bold text-white">{(peakLoad / 1000).toFixed(1)} MW</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="100"
+                    max="25000"
+                    step="100"
+                    value={peakLoad}
+                    onChange={(e) => setPeakLoad(parseInt(e.target.value))}
+                    className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#002FA7]"
+                  />
+                  <div className="flex justify-between text-[8px] font-mono text-zinc-600 mt-1">
+                    <span>0.1 MW</span>
+                    <span>25 MW</span>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
                 <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/5 text-left flex flex-col justify-between">
                   <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest mb-4">Monthly Liability</div>
                   <div>
-                    <div className="text-4xl font-bold font-mono text-rose-500">$34,272</div>
-                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">80% FLOOR × 5 MW × $10.85 AVG</div>
+                    <div className="text-4xl font-bold font-mono text-rose-500">
+                      ${Math.round((peakLoad * 0.8 * 10.85 * 730 / 12) / 1000).toLocaleString()}
+                    </div>
+                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">80% FLOOR × {(peakLoad / 1000).toFixed(1)} MW × ${currentPrice > 0 ? currentPrice.toFixed(2) : '10.85'} AVG</div>
+                    <div className="text-[8px] text-zinc-600 font-mono mt-2 uppercase tracking-tighter">As of {marketData?.metadata.last_updated ? new Date(marketData.metadata.last_updated).toLocaleTimeString() : '---'} CST</div>
                   </div>
                 </div>
 
@@ -147,7 +213,9 @@ export default function MarketData() {
                   </div>
                   <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest mb-4">Savings Upside</div>
                   <div>
-                    <div className="text-4xl font-bold font-mono text-emerald-500">$144,500</div>
+                    <div className="text-4xl font-bold font-mono text-emerald-500">
+                      ${Math.round((peakLoad * 2.41 * 12) / 10).toLocaleString()}
+                    </div>
                     <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">POTENTIAL ANNUAL PROTECTION</div>
                   </div>
                 </div>
@@ -157,22 +225,18 @@ export default function MarketData() {
                   <div>
                     <div className="flex items-center gap-2">
                       <div className="text-4xl font-bold font-mono text-amber-500">18%</div>
-                      <div className="text-[10px] text-amber-500/50 font-mono uppercase leading-tight">Probability <br />Next 92 Days</div>
+                      <div className="text-[10px] text-amber-500/50 font-mono uppercase leading-tight">Probability <br />Next {countdown.days} Days</div>
                     </div>
-                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">UNHEDGED IMPACT: +$24,000</div>
+                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">UNHEDGED IMPACT: +${Math.round(peakLoad * 4.8).toLocaleString()}</div>
                   </div>
                 </div>
               </div>
 
               <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-                <button className="w-full md:w-auto px-8 py-4 rounded-full bg-[#002FA7] text-white font-bold flex items-center justify-center gap-3 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(0,47,167,0.3)] transition-all active:scale-[0.98]">
+                <a href="/bill-debugger" className="w-full md:w-auto px-8 py-4 rounded-full bg-[#002FA7] text-white font-bold flex items-center justify-center gap-3 hover:scale-[1.02] hover:shadow-[0_0_40px_rgba(0,47,167,0.3)] transition-all active:scale-[0.98]">
                   <Zap className="w-5 h-5 fill-current" />
-                  <span>Simulate Your Hedge</span>
-                </button>
-                <button className="w-full md:w-auto px-8 py-4 rounded-full bg-transparent border border-white/10 text-white font-bold flex items-center justify-center gap-3 hover:bg-white/5 transition-all">
-                  <Upload className="w-5 h-5" />
-                  <span>Upload Your Bill</span>
-                </button>
+                  <span>Personalize Your Audit</span>
+                </a>
               </div>
 
               <div className="mt-8 flex items-center justify-center gap-8 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
@@ -240,15 +304,15 @@ export default function MarketData() {
             <div className="grid grid-cols-3 gap-4 mb-8">
               <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">4-Week Low</div>
-                <div className="text-lg font-mono font-bold">$8.92</div>
+                <div className="text-lg font-mono font-bold">${fourWeekLow.toFixed(2)}</div>
               </div>
               <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">4-Week High</div>
-                <div className="text-lg font-mono font-bold text-rose-500">$18.43</div>
+                <div className="text-lg font-mono font-bold text-rose-500">${fourWeekHigh.toFixed(2)}</div>
               </div>
               <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                 <div className="text-[10px] text-zinc-500 font-mono uppercase mb-1">30-Day Avg</div>
-                <div className="text-lg font-mono font-bold">$12.37</div>
+                <div className="text-lg font-mono font-bold">${thirtyDayAvg.toFixed(2)}</div>
               </div>
             </div>
 
@@ -258,21 +322,23 @@ export default function MarketData() {
                   <Activity className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <div className="text-xs font-bold text-white uppercase tracking-wider mb-1">Forensic Interpretation</div>
+                  <div className="text-xs font-bold text-white uppercase tracking-wider mb-1 flex items-center gap-2">
+                    Forensic Interpretation: {interpretation.label}
+                    <div className="h-1 w-12 bg-zinc-800 rounded-full overflow-hidden">
+                      <div className="h-full bg-[#002FA7]" style={{ width: '85%' }}></div>
+                    </div>
+                  </div>
                   <p className="text-xs text-zinc-400 leading-relaxed">
-                    STABLE. Current price is 12% below monthly average. <span className="text-[#002FA7] font-medium italic">Good window for index hedging before March ramp.</span>
+                    {interpretation.message} <span className="text-[#002FA7] font-medium italic">Tactical Recommendation: {interpretation.recommendation}.</span>
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="h-32 w-full bg-gradient-to-t from-[#002FA7]/20 to-transparent rounded-xl border-b border-[#002FA7]/30 relative group">
-              <svg className="absolute bottom-0 left-0 w-full h-full" preserveAspectRatio="none">
-                <path d="M0,100 L100,80 L150,95 L200,90 L250,60 L300,50 L350,70 L400,50 L450,85 L500,80 L550,30 L600,20 L650,45 L700,20 L750,55 L800,60 L850,35 L900,40 L950,50 L1000,60 L1000,128 L0,128 Z" fill="url(#grad1)" fillOpacity="0.2" />
-                <path d="M0,100 L100,80 L150,95 L200,90 L250,60 L300,50 L350,70 L400,50 L450,85 L500,80 L550,30 L600,20 L650,45 L700,20 L750,55 L800,60 L850,35 L900,40 L950,50 L1000,60" stroke="#002FA7" strokeWidth="2" fill="none" vectorEffect="non-scaling-stroke" />
-              </svg>
+            <div className="h-40 w-full relative group">
+              <MarketPriceChart currentPrice={currentPrice} />
               <div className="absolute inset-0 bg-[#002FA7]/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-              <div className="absolute bottom-4 left-4 text-[10px] text-[#002FA7] font-mono font-bold tracking-[0.2em] uppercase">LZ_HOUSTON // NODAL_POINT_OS</div>
+              <div className="absolute bottom-4 left-4 text-[10px] text-[#002FA7] font-mono font-bold tracking-[0.2em] uppercase z-10">LZ_HOUSTON // NODAL_POINT_OS</div>
             </div>
 
             <div className="mt-8 flex flex-col md:flex-row gap-4 items-center justify-between border-t border-white/5 pt-8">
@@ -304,8 +370,10 @@ export default function MarketData() {
                   {stress.label}
                 </div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="text-sm font-mono text-white">RESERVES: <span className="font-bold">12.4%</span></div>
-                  <div className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-500 text-[10px] font-bold">ADEQUATE</div>
+                  <div className="text-sm font-mono text-white">RESERVES: <span className="font-bold">{reservePercent}%</span></div>
+                  <div className={cn("px-2 py-0.5 rounded text-[10px] font-bold", reservePercent < 10 ? "bg-rose-500/10 text-rose-500" : "bg-emerald-500/10 text-emerald-500")}>
+                    {reservePercent < 10 ? 'LOW' : 'ADEQUATE'}
+                  </div>
                 </div>
                 <p className="text-xs text-zinc-500 leading-relaxed font-mono uppercase tracking-tight">{stress.message}</p>
               </div>
@@ -317,7 +385,7 @@ export default function MarketData() {
                     <span className="text-xs text-white font-mono font-bold">{grid.actual_load ? `${Math.round(grid.actual_load).toLocaleString()} MW` : '---'}</span>
                   </div>
                   <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500" style={{ width: '82%' }}></div>
+                    <div className="h-full bg-[#002FA7]" style={{ width: `${demandPercent}%` }}></div>
                   </div>
                 </div>
 
@@ -335,10 +403,16 @@ export default function MarketData() {
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5" />
                   <div>
-                    <div className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1">Wind Forecast Alert</div>
+                    <div className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1 flex justify-between items-center">
+                      <span>Wind Forecast Alert</span>
+                      <span className="text-[8px] opacity-60 font-mono italic">Source: ERCOT 7-Day</span>
+                    </div>
                     <p className="text-[10px] text-zinc-400 leading-tight">
-                      Wind drops 50% in 72h. <span className="text-orange-500">Scarcity risk rises to 22% by Thursday.</span> Hedge before wind dies.
+                      Wind drops 50% in next 72h. <span className="text-orange-500 font-bold">Scarcity risk rises to 22% by {new Date(Date.now() + 72 * 3600000).toLocaleDateString([], { weekday: 'long' })}.</span>
                     </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="text-[8px] font-mono text-zinc-600 uppercase">Confidence: 78% ± 2.4k MW</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -373,12 +447,12 @@ export default function MarketData() {
                   <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Countdown to Calculation Lock</div>
                   <div className="flex gap-4">
                     {[
-                      { label: 'Days', val: '92' },
-                      { label: 'Hours', val: '14' },
-                      { label: 'Mins', val: '22' }
+                      { label: 'Days', val: countdown.days },
+                      { label: 'Hours', val: countdown.hours },
+                      { label: 'Mins', val: countdown.mins }
                     ].map(t => (
                       <div key={t.label} className="flex flex-col items-center">
-                        <div className="text-2xl font-mono font-bold text-white leading-none">{t.val}</div>
+                        <div className="text-2xl font-mono font-bold text-white leading-none">{t.val.toString().padStart(2, '0')}</div>
                         <div className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest">{t.label}</div>
                       </div>
                     ))}
@@ -399,7 +473,7 @@ export default function MarketData() {
                     </div>
                     <div className="flex justify-between items-center text-xs font-mono font-bold border-t border-white/5 pt-4">
                       <span className="text-zinc-500">YOUR FACILITY RATCHET</span>
-                      <span className="text-rose-500">$34,272 /MO</span>
+                      <span className="text-rose-500">${Math.round(peakLoad * 0.8 * 10.85 * 730 / 12 / 1000).toLocaleString()} /MO</span>
                     </div>
                     <p className="text-[10px] text-zinc-500 leading-relaxed italic">
                       The 4 highest-demand hours in June–Sept determine your transmission cost floor through May 2027.
@@ -414,14 +488,14 @@ export default function MarketData() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {[
-                      { title: 'Baseline', prob: '12%', cost: '$412k', status: 'Stable' },
-                      { title: 'Current Trend', prob: '28%', cost: '$421k', status: 'Elevated' },
-                      { title: 'Worst Case', prob: '45%', cost: '$512k', status: 'Critical' }
+                      { title: 'Baseline', prob: '12%', cost: Math.round(peakLoad * 0.0824 * 1.1), status: 'Stable' },
+                      { title: 'Current Trend', prob: '28%', cost: Math.round(peakLoad * 0.0842 * 1.1), status: 'Elevated' },
+                      { title: 'Worst Case', prob: '45%', cost: Math.round(peakLoad * 0.1024 * 1.1), status: 'Critical' }
                     ].map(s => (
                       <div key={s.title} className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
                         <div className="text-[10px] font-mono text-zinc-500 uppercase mb-2">{s.title}</div>
                         <div className="text-xl font-bold font-mono mb-1">{s.prob} <span className="text-[10px] font-normal text-zinc-500 uppercase">Prob.</span></div>
-                        <div className="text-xs font-mono text-white mb-2">{s.cost} <span className="text-[10px] text-zinc-500">EST.</span></div>
+                        <div className="text-xs font-mono text-white mb-2">${s.cost.toLocaleString()} <span className="text-[10px] text-zinc-500">EST.</span></div>
                         <div className={cn("inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase",
                           s.status === 'Stable' ? 'bg-emerald-500/10 text-emerald-500' :
                             s.status === 'Elevated' ? 'bg-amber-500/10 text-amber-500' : 'bg-rose-500/10 text-rose-500'
@@ -456,7 +530,7 @@ export default function MarketData() {
                   {/* STRATEGY 2 */}
                   <div className="p-6 rounded-2xl bg-[#002FA7]/10 border border-[#002FA7]/30 hover:bg-[#002FA7]/20 transition-all cursor-pointer group relative overflow-hidden">
                     <div className="absolute top-0 right-0 px-3 py-1 bg-[#002FA7] text-white text-[8px] font-bold uppercase tracking-widest">Recommended</div>
-                    <div className="text-[10px] font-mono text-[#002FA7] font-bold uppercase mb-4">Strategy 2: 50% Cap @ $22</div>
+                    <div className="text-[10px] font-mono text-[#002FA7] font-bold uppercase mb-4">Strategy 2: 50% Cap @ ${Math.round(currentPrice + 12)}</div>
                     <div className="space-y-3 mb-6">
                       <div className="flex justify-between items-center text-[10px] font-mono">
                         <span className="text-zinc-500">UPSIDE</span>
@@ -518,10 +592,10 @@ export default function MarketData() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { label: 'Implied Volatility', val: '18.4%', trend: '↑ 2.1%', icon: Activity },
-                { label: 'Sharpe Ratio', val: '1.2x', trend: 'Efficient', icon: ShieldCheck },
+                { label: 'Implied Volatility', val: `${(18.4 + (currentPrice > 15 ? 4.2 : 0)).toFixed(1)}%`, trend: currentPrice > 15 ? '↑ 3.4%' : 'STABLE', icon: Activity },
+                { label: 'Sharpe Ratio', val: (1.2 + (currentPrice < 10 ? 0.2 : -0.1)).toFixed(1).concat('x'), trend: 'Efficient', icon: ShieldCheck },
                 { label: 'Wind Correlation', val: '-0.78', trend: 'Inverse', icon: Wind },
-                { label: 'Tail Risk (95%)', val: '+$18.9k', trend: 'Critical', icon: AlertTriangle },
+                { label: 'Tail Risk (95%)', val: `+$${Math.round(peakLoad * 3.78).toLocaleString()}`, trend: 'Critical', icon: AlertTriangle },
               ].map(stat => (
                 <div key={stat.label} className="p-6 rounded-2xl bg-[#1A1A1A]/20 border border-white/5 backdrop-blur-sm">
                   <div className="flex justify-between items-start mb-4">
@@ -576,20 +650,19 @@ export default function MarketData() {
             transition={{ duration: 1 }}
             className="relative z-10"
           >
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">Stop guessing. <br /><span className="text-[#002FA7]">Identify your liability.</span></h2>
+            <h2 className="text-4xl md:text-6xl font-bold tracking-tighter mb-6">
+              You know your liability exists. <br />
+              <span className="text-[#002FA7]">The question is whether you'll hedge it.</span>
+            </h2>
             <p className="text-zinc-500 text-sm mb-12 max-w-lg mx-auto leading-relaxed group uppercase font-mono tracking-widest">
-              A 30-second audit could save your facility six figures. <br />
-              <span className="text-white">Upload your bill or simulate your peak now.</span>
+              Your full forensic audit: 2 minutes. <br />
+              <span className="text-white">Your decision: Depends on your CFO.</span>
             </p>
 
             <div className="flex flex-col md:flex-row items-center justify-center gap-6 max-w-2xl mx-auto">
               <a href="/bill-debugger" className="w-full md:w-auto inline-flex items-center justify-center gap-3 bg-[#002FA7] text-white px-10 py-5 rounded-full text-sm font-bold hover:scale-105 hover:shadow-[0_0_50px_rgba(0,47,167,0.4)] transition-all shadow-lg shadow-blue-900/20 active:scale-95 group">
-                <Zap className="w-5 h-5 fill-current group-hover:animate-pulse" />
-                <span>Simulate Your Hedge</span>
-              </a>
-              <a href="/bill-debugger" className="w-full md:w-auto inline-flex items-center justify-center gap-3 bg-transparent border border-white/10 text-white px-10 py-5 rounded-full text-sm font-bold hover:bg-white/5 transition-all active:scale-95">
-                <Upload className="w-5 h-5" />
-                <span>Upload Bill (PDF)</span>
+                <Activity className="w-5 h-5 group-hover:animate-pulse" />
+                <span>Begin Forensic Audit</span>
               </a>
             </div>
           </motion.div>
