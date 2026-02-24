@@ -42,11 +42,11 @@ export default function MarketData() {
   const fourWeekHigh = Math.max(18.43, currentPrice > 0 ? currentPrice * 1.48 : 18.43);
   const thirtyDayAvg = currentPrice > 0 ? currentPrice * 1.12 : 12.37;
 
-  // 4CP Status
-  const currentMonth = new Date().getMonth(); // 0-indexed
-  const is4CPSeason = currentMonth >= 5 && currentMonth <= 8; // June - Sept
-
-  const [peakLoad, setPeakLoad] = useState(5000); // 5 MW default
+  // Personalization State
+  const [peakLoad, setPeakLoad] = useState(5000); // 5,000 kW default
+  const [monthlyKWh, setMonthlyKWh] = useState(400000); // 400,000 kWh default
+  const [energyRate, setEnergyRate] = useState('0.085'); // $0.085 default
+  const [isCalcExpanded, setIsCalcExpanded] = useState(false);
   const [countdown, setCountdown] = useState({ days: 92, hours: 14, mins: 22 });
 
   // Dynamic 4CP Countdown
@@ -174,23 +174,111 @@ export default function MarketData() {
                 <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Your Facility Risk Score</h2>
 
                 {/* PERSONALIZATION SLIDER */}
-                <div className="mt-6 w-full max-w-md mx-auto p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Adjust Peak Demand</span>
-                    <span className="text-sm font-mono font-bold text-white">{(peakLoad / 1000).toFixed(1)} MW</span>
+                <div className="mt-6 w-full max-w-xl mx-auto p-6 rounded-2xl bg-white/[0.02] border border-white/5 shadow-2xl">
+                  <div className="flex justify-between items-center mb-4">
+                    <div className="text-left">
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest block mb-1">Adjust Peak Demand (kW)</span>
+                      <p className="text-[10px] text-[#002FA7] font-mono italic">Match the "Actual Peak Demand" on your ERCOT bill</p>
+                    </div>
+                    <span className="text-xl font-mono font-bold text-white">{peakLoad.toLocaleString()} kW <span className="text-xs text-zinc-500 font-normal">({(peakLoad / 1000).toFixed(1)} MW)</span></span>
                   </div>
                   <input
                     type="range"
-                    min="100"
+                    min="10"
                     max="25000"
-                    step="100"
+                    step="50"
                     value={peakLoad}
                     onChange={(e) => setPeakLoad(parseInt(e.target.value))}
-                    className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#002FA7]"
+                    className="w-full h-1 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-[#002FA7] mb-8"
                   />
-                  <div className="flex justify-between text-[8px] font-mono text-zinc-600 mt-1">
-                    <span>0.1 MW</span>
-                    <span>25 MW</span>
+
+                  {/* IMPROVEMENT #2: ENERGY CALCULATOR TOGGLE */}
+                  <div className="border-t border-white/5 pt-4">
+                    <button
+                      onClick={() => setIsCalcExpanded(!isCalcExpanded)}
+                      className="w-full flex items-center justify-between group/calc"
+                    >
+                      <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+                        {isCalcExpanded ? <TrendingDown className="w-3 h-3 text-[#002FA7]" /> : <TrendingUp className="w-3 h-3" />}
+                        {isCalcExpanded ? 'Collapse Energy Audit' : 'Calculate Total Monthly Cost'}
+                      </span>
+                      <div className="h-px flex-1 mx-4 bg-white/5 group-hover/calc:bg-[#002FA7]/20 transition-colors"></div>
+                      <span className="text-[10px] font-mono text-[#002FA7]">{isCalcExpanded ? 'CLOSE' : 'EXPAND API'}</span>
+                    </button>
+
+                    {isCalcExpanded && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6 text-left"
+                      >
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-mono text-zinc-500 uppercase">Monthly kWh Usage</label>
+                            <div className="relative">
+                              <input
+                                type="number"
+                                value={monthlyKWh}
+                                onChange={(e) => setMonthlyKWh(parseInt(e.target.value) || 0)}
+                                className="w-full bg-black/40 border border-white/10 rounded-lg p-3 font-mono text-sm text-white focus:outline-none focus:border-[#002FA7]/50"
+                              />
+                              <span className="absolute right-3 top-3 text-[10px] font-mono text-zinc-600">kWh</span>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-mono text-zinc-500 uppercase">Energy Rate ($/kWh)</label>
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={energyRate}
+                                onChange={(e) => {
+                                  const val = e.target.value.replace(/[^0-9.]/g, '');
+                                  setEnergyRate(val);
+                                }}
+                                className="w-full bg-black/40 border border-white/10 rounded-lg p-3 font-mono text-sm text-white focus:outline-none focus:border-[#002FA7]/50"
+                              />
+                              <span className="absolute right-3 top-3 text-[10px] font-mono text-zinc-600">
+                                {(() => {
+                                  const num = parseFloat(energyRate);
+                                  if (!num) return '$0.000';
+                                  if (num >= 0.01 && num <= 1) return `$${num.toFixed(3)}`;
+                                  if (num >= 1 && num <= 100) return `$${(num / 100).toFixed(3)}`;
+                                  return `$${(num / 1000).toFixed(3)}`;
+                                })()}
+                              </span>
+                            </div>
+                            <p className="text-[8px] text-zinc-600 font-mono uppercase">Tip: 8.5¢ = 0.085</p>
+                          </div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-3">
+                          {(() => {
+                            const effectiveRate = parseFloat(energyRate) >= 1 ? parseFloat(energyRate) / 100 : (parseFloat(energyRate) || 0);
+                            const tPrice = currentPrice > 0 ? currentPrice : 10.85;
+                            const tCost = peakLoad * 0.8 * tPrice * 730 / 12 / 1000;
+                            const eCost = monthlyKWh * effectiveRate;
+                            return (
+                              <>
+                                <div className="flex justify-between text-[10px] font-mono uppercase">
+                                  <span className="text-zinc-500">Transmission Fee</span>
+                                  <span className="text-white">${Math.round(tCost).toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-[10px] font-mono uppercase">
+                                  <span className="text-zinc-500">Energy Cost</span>
+                                  <span className="text-white">${Math.round(eCost).toLocaleString()}</span>
+                                </div>
+                                <div className="pt-3 border-t border-white/5 flex justify-between items-baseline">
+                                  <span className="text-[10px] font-bold font-mono text-[#002FA7] uppercase">Est. Total Bill</span>
+                                  <span className="text-xl font-bold font-mono text-white">
+                                    ${Math.round(tCost + eCost).toLocaleString()}
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -202,7 +290,7 @@ export default function MarketData() {
                     <div className="text-4xl font-bold font-mono text-rose-500">
                       ${Math.round((peakLoad * 0.8 * 10.85 * 730 / 12) / 1000).toLocaleString()}
                     </div>
-                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">80% FLOOR × {(peakLoad / 1000).toFixed(1)} MW × ${currentPrice > 0 ? currentPrice.toFixed(2) : '10.85'} AVG</div>
+                    <div className="text-[10px] text-zinc-500 font-mono mt-1 uppercase">80% FLOOR × {peakLoad.toLocaleString()} kW × ${currentPrice > 0 ? (currentPrice / 1000).toFixed(4) : '0.0108'}/kWh</div>
                     <div className="text-[8px] text-zinc-600 font-mono mt-2 uppercase tracking-tighter">As of {marketData?.metadata.last_updated ? new Date(marketData.metadata.last_updated).toLocaleTimeString() : '---'} CST</div>
                   </div>
                 </div>
@@ -476,7 +564,7 @@ export default function MarketData() {
                       <span className="text-rose-500">${Math.round(peakLoad * 0.8 * 10.85 * 730 / 12 / 1000).toLocaleString()} /MO</span>
                     </div>
                     <p className="text-[10px] text-zinc-500 leading-relaxed italic">
-                      The 4 highest-demand hours in June–Sept determine your transmission cost floor through May 2027.
+                      The 4 highest-demand hours in June–Sept determine your transmission cost floor based on your {peakLoad.toLocaleString()} kW peak.
                     </p>
                   </div>
                 </div>
