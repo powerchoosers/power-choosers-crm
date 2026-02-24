@@ -540,7 +540,7 @@ export function TopBar() {
                   </div>
 
                   {/* Center Sector: Dynamics */}
-                  <div className="flex-1 flex items-center justify-start min-w-0 ml-2">
+                  <div className="flex-1 flex items-center justify-center min-w-0">
                     <div className="flex items-center gap-3 px-3 py-1 border border-dotted border-emerald-500/40 rounded-lg bg-emerald-500/10">
                       {status === 'connected' && (
                         <div className="flex items-center gap-0.5 opacity-60">
