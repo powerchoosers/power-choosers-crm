@@ -405,6 +405,14 @@ export default function SatelliteUplink({
             mapStyle="mapbox://styles/mapbox/standard-satellite"
             mapboxAccessToken={mapboxToken}
             attributionControl={false}
+            onMouseEnter={() => {
+              const canvas = document.querySelector('.mapboxgl-canvas') as HTMLCanvasElement;
+              if (canvas) canvas.style.cursor = 'pointer';
+            }}
+            onMouseLeave={() => {
+              const canvas = document.querySelector('.mapboxgl-canvas') as HTMLCanvasElement;
+              if (canvas) canvas.style.cursor = '';
+            }}
             onStyleData={(e: any) => {
               const map = e.target;
               try {
@@ -474,12 +482,12 @@ export default function SatelliteUplink({
                       isShadow: true
                     });
                   }}
-                  className="w-10 h-10 rounded-full bg-transparent hover:bg-[#002FA7]/5 border border-transparent hover:border-[#002FA7]/20 transition-all cursor-crosshair group/shadow"
+                  className="w-16 h-16 rounded-full bg-transparent hover:bg-[#002FA7]/5 border border-transparent hover:border-[#002FA7]/20 transition-all cursor-pointer group/shadow"
                   title={biz.name}
                 >
                   {/* Subtle target indicator only on hover */}
                   <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/shadow:opacity-100 transition-opacity">
-                    <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-[#002FA7] rounded-full shadow-[0_0_10px_#002FA7]" />
                   </div>
                 </button>
               </Marker>
