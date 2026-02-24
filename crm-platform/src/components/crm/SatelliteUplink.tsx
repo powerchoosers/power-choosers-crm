@@ -413,6 +413,17 @@ export default function SatelliteUplink({
               const canvas = document.querySelector('.mapboxgl-canvas') as HTMLCanvasElement;
               if (canvas) canvas.style.cursor = '';
             }}
+            onMouseMove={(e) => {
+              const map = e.target;
+              const features = map.queryRenderedFeatures(e.point);
+              const hasLabel = features.some(f => f.properties?.name || f.properties?.['name:en']);
+              const canvas = map.getCanvas();
+              if (hasLabel) {
+                canvas.style.cursor = 'pointer';
+              } else {
+                canvas.style.cursor = '';
+              }
+            }}
             onStyleData={(e: any) => {
               const map = e.target;
               try {
@@ -424,11 +435,10 @@ export default function SatelliteUplink({
             }}
             onClick={(e) => {
               const map = e.target;
-              // Query features at the clicked point
-              const features = map.queryRenderedFeatures(e.point);
+              // Clear previous selection first to ensure the new one takes over immediately
+              setSelectedPOI(null);
 
-              // Find the best candidate for a label (POI, street name, etc)
-              // We prioritize things with a name and a 'poi' or 'label' category if possible
+              const features = map.queryRenderedFeatures(e.point);
               const poi = features.find(f =>
                 f.properties?.name ||
                 f.properties?.['name:en'] ||
@@ -436,15 +446,16 @@ export default function SatelliteUplink({
               );
 
               if (poi) {
-                setSelectedPOI({
-                  id: poi.id || Math.random().toString(),
-                  name: poi.properties?.name || poi.properties?.['name:en'] || poi.properties?.title || 'Unknown Entity',
-                  address: poi.properties?.address || poi.properties?.type || poi.properties?.category || 'Satellite Metadata Extraction',
-                  lat: e.lngLat.lat,
-                  lng: e.lngLat.lng
-                });
-              } else {
-                setSelectedPOI(null);
+                // Use setTimeout to ensure the state transition is detected as a fresh event
+                setTimeout(() => {
+                  setSelectedPOI({
+                    id: poi.id || Math.random().toString(),
+                    name: poi.properties?.name || poi.properties?.['name:en'] || poi.properties?.title || 'Unknown Entity',
+                    address: poi.properties?.address || poi.properties?.type || poi.properties?.category || 'Satellite Metadata Extraction',
+                    lat: e.lngLat.lat,
+                    lng: e.lngLat.lng
+                  });
+                }, 10);
               }
             }}
           >
@@ -477,10 +488,13 @@ export default function SatelliteUplink({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedPOI({
-                      ...biz,
-                      isShadow: true
-                    });
+                    setSelectedPOI(null);
+                    setTimeout(() => {
+                      setSelectedPOI({
+                        ...biz,
+                        isShadow: true
+                      });
+                    }, 10);
                   }}
                   className="w-16 h-16 rounded-full bg-transparent hover:bg-[#002FA7]/5 border border-transparent hover:border-[#002FA7]/20 transition-all cursor-pointer group/shadow"
                   title={biz.name}
@@ -493,7 +507,7 @@ export default function SatelliteUplink({
               </Marker>
             ))}
 
-            {/* POPUP FOR SELECTED POI (From click on Map or Pin) */}
+            {/* POPUP FOR SELECTED POI */}
             {selectedPOI && (
               <Popup
                 longitude={selectedPOI.lng}
@@ -504,7 +518,7 @@ export default function SatelliteUplink({
                 maxWidth="none"
                 style={{ padding: 0 }}
               >
-                {/* Global CSS override for this specific popup instance to kill the white box */}
+                {/* Kill the default pointer tip completely */}
                 <style dangerouslySetInnerHTML={{
                   __html: `
                   .mapboxgl-popup-content {
@@ -514,33 +528,51 @@ export default function SatelliteUplink({
                     border: none !important;
                   }
                   .mapboxgl-popup-tip {
-                    border-bottom-color: rgba(10, 10, 10, 0.95) !important;
-                    filter: drop-shadow(0 -1px 1px rgba(0,47,167,0.3));
+                    display: none !important;
                   }
                 `}} />
-                <div className="nodal-module-glass nodal-monolith-edge p-3 min-w-[220px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-3xl bg-black/95 ring-1 ring-white/10 group/popup animate-in fade-in zoom-in duration-200">
-                  <div className="flex justify-between items-start mb-1.5">
-                    <div>
-                      <div className="text-[9px] font-mono text-[#4D88FF] uppercase tracking-[0.2em] leading-none opacity-80">Identity_Acquired</div>
-                      <div className="text-[11px] font-mono font-bold text-white mt-2 leading-tight uppercase line-clamp-2 tracking-wide">{selectedPOI.name}</div>
+
+                <div className="flex flex-col items-center">
+                  {/* CUSTOM ANIMATED POINTER: Shows up second */}
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 16, opacity: 1 }}
+                    transition={{ delay: 0.3, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                    className="w-0.5 bg-gradient-to-t from-[#002FA7] to-transparent relative z-0"
+                  >
+                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1 h-1 bg-[#4D88FF] rounded-full blur-[2px]" />
+                  </motion.div>
+
+                  {/* ACQUISITION CARD: Shows up first */}
+                  <motion.div
+                    initial={{ scale: 0.8, opacity: 0, y: -10 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                    className="nodal-module-glass nodal-monolith-edge p-3 min-w-[220px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-3xl bg-black/95 ring-1 ring-white/10 group/popup relative z-10"
+                  >
+                    <div className="flex justify-between items-start mb-1.5">
+                      <div>
+                        <div className="text-[9px] font-mono text-[#4D88FF] uppercase tracking-[0.2em] leading-none opacity-80">Identity_Acquired</div>
+                        <div className="text-[11px] font-mono font-bold text-white mt-2 leading-tight uppercase line-clamp-2 tracking-wide">{selectedPOI.name}</div>
+                      </div>
+                      <button
+                        onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
+                        className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-[#002FA7]/20 transition-all flex-shrink-0 ml-3"
+                      >
+                        {copiedId === selectedPOI.id ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      </button>
                     </div>
+                    <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-1 italic tracking-widest opacity-60">
+                      {selectedPOI.address === activeAddress ? 'Target_Center' : (selectedPOI.isShadow ? 'Shadow_Intel' : selectedPOI.address)}
+                    </div>
+
                     <button
                       onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                      className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-zinc-400 hover:text-white hover:bg-[#002FA7]/20 transition-all flex-shrink-0 ml-3"
+                      className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-[#4D88FF]/30 hover:brightness-125 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] shadow-[0_4px_20px_rgba(0,47,167,0.4)] font-bold"
                     >
-                      {copiedId === selectedPOI.id ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+                      {copiedId === selectedPOI.id ? 'Identity_Copied' : 'Transfer_Name'}
                     </button>
-                  </div>
-                  <div className="text-[8px] font-mono text-zinc-500 leading-tight mb-3 line-clamp-1 italic tracking-widest opacity-60">
-                    {selectedPOI.address === activeAddress ? 'Target_Center' : (selectedPOI.isShadow ? 'Shadow_Intel' : selectedPOI.address)}
-                  </div>
-
-                  <button
-                    onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
-                    className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-[#4D88FF]/30 hover:brightness-125 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-[0.25em] shadow-[0_4px_20px_rgba(0,47,167,0.4)] font-bold"
-                  >
-                    {copiedId === selectedPOI.id ? 'Identity_Copied' : 'Transfer_Name'}
-                  </button>
+                  </motion.div>
                 </div>
               </Popup>
             )}
