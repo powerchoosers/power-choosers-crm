@@ -99,20 +99,46 @@ export default async function handler(req, res) {
       logger.error('[Unsubscribe] Error updating contacts:', err);
     }
 
-    // 3. Pause active sequences
-    // TODO: Implement sequence pausing for Supabase architecture.
-    // The legacy code paused 'sequenceExecutions' in Firestore.
-    // In the new architecture, we rely on the 'suppressions' table check during sending,
-    // or need to update 'sequence_members' / 'sequence_activations'.
-    // For now, we log this as a pending action.
-    logger.warn(`[Unsubscribe] Sequence pausing skipped for ${email} - Logic pending migration to Supabase sequences`);
+    // 3. Pause active sequences by setting skipEmailSteps = true for all
+    //    sequence_members records where the contact matches this email
+    let pausedSequences = 0;
+
+    try {
+      // Find all contacts with this email
+      const { data: matchingContacts } = await supabaseAdmin
+        .from('contacts')
+        .select('id')
+        .eq('email', email);
+
+      if (matchingContacts && matchingContacts.length > 0) {
+        const contactIds = matchingContacts.map(c => c.id);
+
+        // Set skipEmailSteps = true for all their sequence memberships
+        const { data: updated, error: seqError } = await supabaseAdmin
+          .from('sequence_members')
+          .update({
+            skipEmailSteps: true,
+            updatedAt: new Date().toISOString()
+          })
+          .in('targetId', contactIds);
+
+        if (seqError) {
+          logger.error('[Unsubscribe] Error pausing sequences:', seqError);
+        } else {
+          pausedSequences = Array.isArray(updated) ? updated.length : contactIds.length;
+          logger.log(`[Unsubscribe] Paused email steps for ${contactIds.length} contact(s) in sequences`);
+        }
+      }
+    } catch (seqErr) {
+      logger.error('[Unsubscribe] Error during sequence pausing:', seqErr);
+    }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
       message: 'Successfully unsubscribed',
       email: email,
-      pausedSequences: 0 // Placeholder
+      pausedSequences
     }));
 
   } catch (error) {

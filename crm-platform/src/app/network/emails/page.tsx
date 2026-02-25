@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
 import { ComposeModal } from '@/components/emails/ComposeModal'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
+import DestructModal from '@/components/network/DestructModal'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Search, Plus, RefreshCw, Mail, Filter } from 'lucide-react'
@@ -16,6 +17,8 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
+import { supabase } from '@/lib/supabase'
+import { useQueryClient } from '@tanstack/react-query'
 
 const AUTO_SYNC_DELAY_MS = 5 * 1000 // 5 seconds after load
 
@@ -40,12 +43,14 @@ export default function EmailsPage() {
   const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch)
   const { data: totalEmails } = useEmailsCount(debouncedSearch)
   const { performSync, isSyncing } = useZohoSync()
+  const queryClient = useQueryClient()
   const router = useRouter()
 
   // No manual sync trigger needed here as GlobalSync handles it, 
   // but we keep the manual button for forced refresh.
 
   const [isComposeOpen, setIsComposeOpen] = useState(false)
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
 
   const emails = data?.pages.flatMap(page => page.emails) || []
   const effectiveTotal = totalEmails ?? emails.length
@@ -65,10 +70,26 @@ export default function EmailsPage() {
   }
   const handleBulkAction = (action: string) => {
     if (action === 'delete') {
-      toast.info('Bulk delete for emails is not available yet.')
+      if (selectedIds.size === 0) return
+      setIsDestructModalOpen(true)
       return
     }
     toast.info(`Bulk action "${action}" for ${selectedIds.size} emails — coming soon.`)
+  }
+
+  const handleConfirmDelete = async () => {
+    const ids = Array.from(selectedIds)
+    const { error } = await supabase
+      .from('emails')
+      .update({ is_deleted: true })
+      .in('id', ids)
+    if (error) {
+      toast.error('Failed to delete emails')
+      return
+    }
+    toast.success(`${ids.length} email${ids.length > 1 ? 's' : ''} deleted`)
+    setSelectedIds(new Set())
+    queryClient.invalidateQueries({ queryKey: ['emails'] })
   }
 
   return (
@@ -130,6 +151,13 @@ export default function EmailsPage() {
       <ComposeModal
         isOpen={isComposeOpen}
         onClose={() => setIsComposeOpen(false)}
+      />
+
+      <DestructModal
+        isOpen={isDestructModalOpen}
+        onClose={() => setIsDestructModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        count={selectedIds.size}
       />
     </div>
   )

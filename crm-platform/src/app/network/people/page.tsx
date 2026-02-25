@@ -19,7 +19,7 @@ import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreH
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
-import { useContacts, useContactsCount, useDeleteContacts, Contact } from '@/hooks/useContacts'
+import { useContacts, useContactsCount, useDeleteContacts, useCreateContact, Contact } from '@/hooks/useContacts'
 import { useContactsInTargetLists } from '@/hooks/useListMemberships'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -53,6 +53,7 @@ import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
+import { toast } from 'sonner'
 
 const PAGE_SIZE = 50
 
@@ -87,11 +88,14 @@ export default function PeoplePage() {
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useContacts(debouncedFilter, contactFilters)
   const { data: totalContacts } = useContactsCount(debouncedFilter, contactFilters)
   const { mutateAsync: deleteContacts } = useDeleteContacts()
+  const createContact = useCreateContact()
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [newPerson, setNewPerson] = useState({ firstName: '', lastName: '', email: '', phone: '', company: '', title: '' })
   const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [composeTarget, setComposeTarget] = useState<{ email: string; name: string; company: string } | null>(null)
   const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
@@ -493,9 +497,35 @@ export default function PeoplePage() {
     setIsFilterOpen(prev => !prev)
   }, [])
 
+  const handleCreatePerson = async () => {
+    if (!newPerson.firstName.trim() && !newPerson.lastName.trim()) {
+      toast.error('First or last name is required')
+      return
+    }
+    try {
+      const fullName = [newPerson.firstName.trim(), newPerson.lastName.trim()].filter(Boolean).join(' ')
+      await createContact.mutateAsync({
+        name: fullName,
+        firstName: newPerson.firstName.trim(),
+        lastName: newPerson.lastName.trim(),
+        email: newPerson.email.trim(),
+        phone: newPerson.phone.trim(),
+        company: newPerson.company.trim(),
+        status: 'Lead',
+        lastContact: new Date().toISOString(),
+        metadata: { title: newPerson.title.trim() },
+      } as any)
+      toast.success(`${fullName} added`)
+      setNewPerson({ firstName: '', lastName: '', email: '', phone: '', company: '', title: '' })
+      setIsCreateOpen(false)
+    } catch {
+      toast.error('Failed to create contact')
+    }
+  }
+
   const primaryAction = useMemo(() => ({
     label: "Add Person",
-    onClick: () => { },
+    onClick: () => setIsCreateOpen(true),
     icon: <Plus size={18} className="mr-2" />
   }), [])
 
@@ -680,6 +710,108 @@ export default function PeoplePage() {
         subject=""
         context={composeTarget ? { contactName: composeTarget.name, companyName: composeTarget.company || undefined } : null}
       />
+
+      {/* Add Person Modal */}
+      <AnimatePresence>
+        {isCreateOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setIsCreateOpen(false) }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              className="w-full max-w-md nodal-void-card rounded-2xl p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-widest">New Contact // Add_Person</span>
+                <button onClick={() => setIsCreateOpen(false)} className="icon-button-forensic w-8 h-8">
+                  <Plus size={16} className="rotate-45" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">First Name</label>
+                  <Input
+                    value={newPerson.firstName}
+                    onChange={e => setNewPerson(p => ({ ...p, firstName: e.target.value }))}
+                    placeholder="Jane"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Last Name</label>
+                  <Input
+                    value={newPerson.lastName}
+                    onChange={e => setNewPerson(p => ({ ...p, lastName: e.target.value }))}
+                    placeholder="Smith"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Email</label>
+                <Input
+                  value={newPerson.email}
+                  onChange={e => setNewPerson(p => ({ ...p, email: e.target.value }))}
+                  placeholder="jane@company.com"
+                  type="email"
+                  className="nodal-recessed border-white/10 text-sm font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Phone</label>
+                  <Input
+                    value={newPerson.phone}
+                    onChange={e => setNewPerson(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="+1 (555) 000-0000"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Title</label>
+                  <Input
+                    value={newPerson.title}
+                    onChange={e => setNewPerson(p => ({ ...p, title: e.target.value }))}
+                    placeholder="Energy Manager"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Company</label>
+                <Input
+                  value={newPerson.company}
+                  onChange={e => setNewPerson(p => ({ ...p, company: e.target.value }))}
+                  placeholder="Acme Corp"
+                  className="nodal-recessed border-white/10 text-sm font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400 font-mono text-xs">Cancel</Button>
+                <Button
+                  onClick={handleCreatePerson}
+                  disabled={createContact.isPending || (!newPerson.firstName.trim() && !newPerson.lastName.trim())}
+                  className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-5"
+                >
+                  {createContact.isPending ? 'Adding...' : 'Add Person'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

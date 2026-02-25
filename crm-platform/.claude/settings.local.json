@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "mcp__mcp-registry__search_mcp_registry",
+      "Bash(claude mcp list)",
+      "Bash(node -e \":*)",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__list_tables",
+      "Bash(node -e \"const d=require\\(''fs''\\).readFileSync\\(''/dev/stdin'',''utf8''\\); const parsed=JSON.parse\\(d\\); const tables=JSON.parse\\(parsed[0].text\\); console.log\\(tables.map\\(t=>t.name\\).join\\(''\\\\n''\\)\\);\")",
+      "mcp__supabase__execute_sql",
+      "Bash(npm run typecheck)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(npx tsc --noEmit --skipLibCheck)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/network/people)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/network/emails)",
+      "Bash(curl -s http://localhost:3000/network/people)",
+      "Bash(curl -s http://localhost:3000/network/emails)"
+    ]
+  }
+}
