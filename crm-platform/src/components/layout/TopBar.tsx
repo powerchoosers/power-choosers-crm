@@ -19,6 +19,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
 import { useAccount } from '@/hooks/useAccounts'
+import { useQueryClient } from '@tanstack/react-query'
 
 function getDaysUntilJune() {
   const now = new Date();
@@ -116,6 +117,7 @@ export function TopBar() {
   const params = useParams()
 
   const { data: marketPulse, isError: isMarketError } = useMarketPulse()
+  const queryClient = useQueryClient()
   const storeContext = useGeminiStore((state) => state.activeContext)
   const [mounted, setMounted] = useState(false)
 
@@ -386,8 +388,8 @@ export function TopBar() {
 
   const handleRefresh = () => {
     toast.info("Refreshing Data...")
-    // In a real app, this would invalidate React Query queries
-    setTimeout(() => toast.success("Data Synced"), 1000)
+    queryClient.invalidateQueries()
+    setTimeout(() => toast.success("Data Synced"), 600)
   }
 
   const formatPhoneNumber = (value: string) => {
