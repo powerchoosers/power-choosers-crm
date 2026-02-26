@@ -196,12 +196,17 @@ export default async function handler(req, res) {
             cc,
             subject,
             html: trackedContent,
-            text: textContent,
+            text: textContent || undefined,
             from: from,
             fromName: fromName,
+            // Reply-To: when sending from an alias, direct replies to the owner's real inbox
+            replyTo: (from && from !== ownerEmail) ? ownerEmail : undefined,
+            // Threading: preserve inReplyTo for reply chains
+            inReplyTo: inReplyTo || undefined,
             uploadedAttachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
             userEmail: ownerEmail,
-            priority: deliverability.includePriorityHeaders ? 1 : 2 // 1=High, 2=Normal
+            // Priority headers (X-Priority): only when enabled in deliverability settings
+            priority: deliverability.includePriorityHeaders ? 1 : undefined,
         });
 
         // Update email record with sent status and Zoho message ID
