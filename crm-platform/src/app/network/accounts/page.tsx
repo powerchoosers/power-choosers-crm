@@ -647,6 +647,7 @@ export default function AccountsPage() {
                       index={index}
                       router={router}
                       saveScroll={saveScroll}
+                      columnOrder={columnOrder}
                     />
                   ))}
                 </AnimatePresence>

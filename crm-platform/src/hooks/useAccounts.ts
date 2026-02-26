@@ -286,7 +286,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
   })
 }
 
-export function useAccount(id: string) {
+export function useAccount(id: string, initialData?: Account | null) {
   const { user, loading } = useAuth()
 
   return useQuery({
@@ -364,6 +364,7 @@ export function useAccount(id: string) {
     },
     enabled: !!id && !loading && !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    initialData: initialData ?? undefined
   })
 }
 
