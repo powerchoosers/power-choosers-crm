@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, memo } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,7 +31,7 @@ const COPIED_DURATION_MS = 2000
  * Stealth copy: hover reveals a copy icon; click copies without triggering parent (e.g. Call button).
  * Use when dossier is in active (non-editing) mode so all editable fields are copyable.
  */
-export function ForensicDataPoint({
+export const ForensicDataPoint = memo(function ForensicDataPoint({
   value,
   copyValue,
   label,
@@ -120,4 +120,4 @@ export function ForensicDataPoint({
       )}
     </Wrapper>
   )
-}
+})

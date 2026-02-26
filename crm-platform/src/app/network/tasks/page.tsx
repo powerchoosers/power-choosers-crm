@@ -43,6 +43,7 @@ import { PriorityBadge, priorityColorClasses } from '@/components/ui/PriorityBad
 import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
+import { TaskTableRow } from '@/components/network/TaskTableRow'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import { toast } from 'sonner'
@@ -386,47 +387,12 @@ export default function TasksPage() {
               ) : table.getRowModel().rows?.length ? (
                 <AnimatePresence mode="popLayout">
                   {table.getRowModel().rows.map((row, index) => (
-                    <motion.tr
+                    <TaskTableRow
                       key={row.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.98 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: Math.min(index * 0.02, 0.4),
-                        ease: [0.23, 1, 0.32, 1]
-                      }}
-                      data-state={row.getIsSelected() ? "selected" : undefined}
-                      onClick={(e) => {
-                        const task = row.original
-                        if (task.contactId) {
-                          router.push(`/network/contacts/${task.contactId}`)
-                        } else if (task.accountId) {
-                          router.push(`/network/accounts/${task.accountId}`)
-                        }
-                      }}
-                      className={cn(
-                        "border-b border-white/5 transition-colors group relative z-10",
-                        (row.original.contactId || row.original.accountId)
-                          ? "cursor-pointer hover:bg-white/[0.02]"
-                          : "",
-                        row.getIsSelected()
-                          ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
-                          : ""
-                      )}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3">
-                          <motion.div
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.4, delay: 0.1 }}
-                          >
-                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </motion.div>
-                        </TableCell>
-                      ))}
-                    </motion.tr>
+                      row={row}
+                      index={index}
+                      router={router}
+                    />
                   ))}
                 </AnimatePresence>
               ) : (

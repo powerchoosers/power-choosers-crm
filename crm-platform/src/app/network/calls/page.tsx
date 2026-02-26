@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { 
+import {
   flexRender,
   getCoreRowModel,
   useReactTable,
@@ -39,6 +39,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
+import { CallTableRow } from '@/components/network/CallTableRow'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import { toast } from 'sonner'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -223,22 +224,22 @@ export default function CallsPage() {
         const isCompleted = status === 'Completed'
         const isMissed = status === 'Missed'
         const isVoicemail = status === 'Voicemail'
-        
+
         return (
           <div className="flex items-center gap-2">
             <div className={cn(
               "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(0,0,0,0.4)]",
-              isCompleted ? "bg-green-500 animate-pulse shadow-green-500/50" : 
-              isMissed ? "bg-red-500 shadow-red-500/50" : 
-              isVoicemail ? "bg-yellow-500 shadow-yellow-500/50" :
-              "bg-zinc-600 shadow-zinc-600/50"
+              isCompleted ? "bg-green-500 animate-pulse shadow-green-500/50" :
+                isMissed ? "bg-red-500 shadow-red-500/50" :
+                  isVoicemail ? "bg-yellow-500 shadow-yellow-500/50" :
+                    "bg-zinc-600 shadow-zinc-600/50"
             )} />
             <span className={cn(
               "text-[10px] font-mono uppercase tracking-wider",
-              isCompleted ? "text-green-500/80" : 
-              isMissed ? "text-red-500/80" : 
-              isVoicemail ? "text-yellow-500/80" :
-              "text-zinc-500"
+              isCompleted ? "text-green-500/80" :
+                isMissed ? "text-red-500/80" :
+                  isVoicemail ? "text-yellow-500/80" :
+                    "text-zinc-500"
             )}>
               {status}
             </span>
@@ -257,17 +258,17 @@ export default function CallsPage() {
       cell: ({ row }) => {
         const val = row.getValue('date') as string
         if (!val) return <span className="text-zinc-600 font-mono text-xs">--</span>
-        
+
         try {
           const date = new Date(val)
           const threeMonthsAgo = subMonths(new Date(), 3)
           const isRecent = isAfter(date, threeMonthsAgo)
-          
+
           return (
             <div className="flex items-center gap-2 text-zinc-500 font-mono text-xs tabular-nums">
               <Clock size={12} className="text-zinc-600" />
               <span>
-                {isRecent 
+                {isRecent
                   ? formatDistanceToNow(date, { addSuffix: true })
                   : format(date, 'MMM d, yyyy')}
               </span>
@@ -354,93 +355,83 @@ export default function CallsPage() {
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
-            <Table>
+          <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-                {table.getHeaderGroups().map((headerGroup) => (
+              {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                    {headerGroup.headers.map((header) => {
+                  {headerGroup.headers.map((header) => {
                     return (
-                        <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
+                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
                         {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                            )}
-                        </TableHead>
+                          ? null
+                          : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      </TableHead>
                     )
-                    })}
+                  })}
                 </TableRow>
-                ))}
+              ))}
             </TableHeader>
             <TableBody>
-                {table.getRowModel().rows?.length ? (
+              {table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
-                    <TableRow
+                  <CallTableRow
                     key={row.id}
-                    data-state={row.getIsSelected() ? "selected" : undefined}
-                    className={cn(
-                      "border-white/5 transition-colors group",
-                      row.getIsSelected() ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" : "hover:bg-white/[0.02]"
-                    )}
-                    >
-                    {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                    ))}
-                    </TableRow>
+                    row={row}
+                  />
                 ))
-                ) : (
+              ) : (
                 <TableRow>
-                    <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+                  <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
                     {queryLoading ? 'Loading calls...' : 'No calls found.'}
-                    </TableCell>
+                  </TableCell>
                 </TableRow>
-                )}
+              )}
             </TableBody>
-            </Table>
+          </Table>
         </div>
-        
+
         <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-                  <span>Sync_Block {showingStart.toString().padStart(2, '0')}–{showingEnd.toString().padStart(2, '0')}</span>
-                  <div className="h-1 w-1 rounded-full bg-black/40" />
-                  <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalRecords}</span></span>
-                </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+              <span>Sync_Block {showingStart.toString().padStart(2, '0')}–{showingEnd.toString().padStart(2, '0')}</span>
+              <div className="h-1 w-1 rounded-full bg-black/40" />
+              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalRecords}</span></span>
             </div>
-            <div className="flex items-center gap-2">
-                <button
-                    onClick={() => setPage(Math.max(0, pageIndex - 1))}
-                    disabled={pageIndex === 0}
-                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Previous page"
-                >
-                    <ChevronLeft className="h-3.5 w-3.5" />
-                </button>
-                <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-                  {(pageIndex + 1).toString().padStart(2, '0')}
-                </div>
-                <button
-                    onClick={async () => {
-                      const nextPageIndex = pageIndex + 1
-                      if (nextPageIndex >= displayTotalPages) return
-
-                      const needed = (nextPageIndex + 1) * PAGE_SIZE
-                      if (calls.length < needed && hasNextPage && !isFetchingNextPage) {
-                        await fetchNextPage()
-                      }
-
-                      setPage(nextPageIndex)
-                    }}
-                    disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && calls.length < (pageIndex + 2) * PAGE_SIZE)}
-                    className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                    aria-label="Next page"
-                >
-                    <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, pageIndex - 1))}
+              disabled={pageIndex === 0}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+            </button>
+            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+              {(pageIndex + 1).toString().padStart(2, '0')}
             </div>
+            <button
+              onClick={async () => {
+                const nextPageIndex = pageIndex + 1
+                if (nextPageIndex >= displayTotalPages) return
+
+                const needed = (nextPageIndex + 1) * PAGE_SIZE
+                if (calls.length < needed && hasNextPage && !isFetchingNextPage) {
+                  await fetchNextPage()
+                }
+
+                setPage(nextPageIndex)
+              }}
+              disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && calls.length < (pageIndex + 2) * PAGE_SIZE)}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+              aria-label="Next page"
+            >
+              <ChevronRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
