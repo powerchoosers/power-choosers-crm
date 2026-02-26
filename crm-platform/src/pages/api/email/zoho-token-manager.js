@@ -3,8 +3,8 @@
 import { createClient } from '@supabase/supabase-js';
 import logger from '../_logger.js';
 
-// Initialize Supabase Admin
-const supabaseAdmin = createClient(
+// Initialize Supabase Admin (named distinctly to avoid webpack scope-hoisting collision with @/lib/supabase's supabaseTokenAdmin)
+const supabaseTokenAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 );
@@ -67,7 +67,7 @@ export async function refreshAccessTokenForUser(userEmail, refreshToken) {
         });
 
         // Save to Supabase (Check secondary connections first, then primary users)
-        const { data: connection, error: connError } = await supabaseAdmin
+        const { data: connection, error: connError } = await supabaseTokenAdmin
             .from('zoho_connections')
             .update({
                 access_token: data.access_token,
@@ -85,7 +85,7 @@ export async function refreshAccessTokenForUser(userEmail, refreshToken) {
 
         if (!updated) {
             // Fallback to users table (Primary Identity)
-            const { error: userError } = await supabaseAdmin
+            const { error: userError } = await supabaseTokenAdmin
                 .from('users')
                 .update({
                     zoho_access_token: data.access_token,
@@ -133,7 +133,7 @@ export async function getValidAccessTokenForUser(userEmail) {
     }
 
     // 2. Lookup in `zoho_connections` (Secondary)
-    const { data: connection } = await supabaseAdmin
+    const { data: connection } = await supabaseTokenAdmin
         .from('zoho_connections')
         .select('access_token, refresh_token, token_expires_at, account_id')
         .eq('email', lowerEmail)
@@ -149,7 +149,7 @@ export async function getValidAccessTokenForUser(userEmail) {
     }
 
     // 3. Lookup in `users` (Primary)
-    const { data: user } = await supabaseAdmin
+    const { data: user } = await supabaseTokenAdmin
         .from('users')
         .select('zoho_access_token, zoho_refresh_token, zoho_token_expires_at, zoho_account_id')
         .eq('email', lowerEmail)
@@ -242,9 +242,9 @@ async function fetchZohoAccountId(userEmail, accessToken, type) {
 
     if (accountId) {
         if (type === 'secondary') {
-            await supabaseAdmin.from('zoho_connections').update({ account_id: accountId }).eq('email', userEmail);
+            await supabaseTokenAdmin.from('zoho_connections').update({ account_id: accountId }).eq('email', userEmail);
         } else {
-            await supabaseAdmin.from('users').update({ zoho_account_id: accountId }).eq('email', userEmail);
+            await supabaseTokenAdmin.from('users').update({ zoho_account_id: accountId }).eq('email', userEmail);
         }
         logger.info(`[Zoho Token] Auto-discovered and saved Account ID ${accountId} for ${userEmail}`);
         return accountId;
