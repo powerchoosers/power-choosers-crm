@@ -11,13 +11,13 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 
-export function useContactDossierState(id: string, initialData?: { contact: any, account: any, tasks: any[] }) {
+export function useContactDossierState(id: string) {
     const params = useParams()
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    const { data: contact, isLoading, isFetched } = useContact(id, initialData?.contact)
-    const { data: account } = useAccount((contact as any)?.linkedAccountId ?? '', initialData?.account)
+    const { data: contact, isLoading, isFetched } = useContact(id)
+    const { data: account } = useAccount((contact as any)?.linkedAccountId ?? '')
 
     const domain = account?.domain?.trim() || (() => {
         try {
@@ -160,15 +160,6 @@ export function useContactDossierState(id: string, initialData?: { contact: any,
         }
     }, [isEditing, id, editFirstName, editLastName, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editLocation, editLogoUrl, editWebsite, editLinkedinUrl, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editContractEnd, updateContact])
 
-    // Maturity Logic
-    const contractEndDate = (() => {
-        if (!editContractEnd) return null
-        const d = new Date(editContractEnd)
-        return isNaN(d.getTime()) ? null : d
-    })()
-
-    const daysRemaining = contractEndDate ? Math.ceil((contractEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)) : null
-
     return {
         // Data
         contact,
@@ -177,9 +168,6 @@ export function useContactDossierState(id: string, initialData?: { contact: any,
         isLoading: isLoading || (!!id && contact == null && !isFetched),
         isLoadingCalls,
         isFetched,
-        daysRemaining,
-        apolloNewsSignals,
-        domain,
 
         // UI State
         isEditing,
@@ -195,22 +183,6 @@ export function useContactDossierState(id: string, initialData?: { contact: any,
         setActiveEditField,
         recentlyUpdatedFields,
         setRecentlyUpdatedFields,
-
-        // Handlers
-        onEmailClick: () => setIsComposeOpen(true),
-        onIngestionComplete: () => {
-            setIsEditing(false)
-            toast.success('Data Ingestion Complete')
-        },
-        onWipe: async () => {
-            try {
-                await updateContact.mutateAsync({ id, notes: '' })
-                setEditNotes('')
-                toast.success('Dossier wiped')
-            } catch (err) {
-                toast.error('Wipe failed')
-            }
-        },
 
         // Field States
         editName,
@@ -258,6 +230,10 @@ export function useContactDossierState(id: string, initialData?: { contact: any,
         setEditPrimaryField,
         setEditContractEnd,
         setEditServiceAddresses,
+
+        // Dependency collections for downstream
+        apolloNewsSignals,
+        domain,
 
         // Tasks
         pendingTasks,
