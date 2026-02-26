@@ -13,13 +13,15 @@ interface AccountTableRowProps {
     index: number
     router: AppRouterInstance
     saveScroll: () => void
+    columnOrder?: string[]
 }
 
 export const AccountTableRow = memo(function AccountTableRow({
     row,
     index,
     router,
-    saveScroll
+    saveScroll,
+    columnOrder
 }: AccountTableRowProps) {
     return (
         <motion.tr
@@ -50,4 +52,10 @@ export const AccountTableRow = memo(function AccountTableRow({
             ))}
         </motion.tr>
     )
+}, (prev, next) => {
+    // Custom comparison to include columnOrder
+    return prev.row.id === next.row.id &&
+        prev.index === next.index &&
+        prev.columnOrder === next.columnOrder &&
+        prev.row.getIsSelected() === next.row.getIsSelected()
 })

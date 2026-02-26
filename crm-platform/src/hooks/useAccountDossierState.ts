@@ -34,11 +34,11 @@ function clamp01(n: number) {
     return n
 }
 
-export function useAccountDossierState(id: string) {
+export function useAccountDossierState(id: string, initialData?: { account: any, contacts: any[], calls: any[], tasks: any[] }) {
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    const { data: account, isLoading, isFetched } = useAccount(id)
+    const { data: account, isLoading, isFetched } = useAccount(id, initialData?.account)
     const { data: contacts, isLoading: isLoadingContacts } = useAccountContacts(id)
     const contactIds = contacts?.map(c => c.id).filter(Boolean) || []
     const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds)
