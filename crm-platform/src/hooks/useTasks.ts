@@ -38,7 +38,7 @@ export function useTasks(searchQuery?: string) {
         let query = supabase
           .from('tasks')
           .select('*', { count: 'exact' })
-        
+
         if (role !== 'admin' && user.email) {
           query = query.eq('ownerId', user.email)
         }
@@ -52,15 +52,16 @@ export function useTasks(searchQuery?: string) {
 
         const { data, error, count } = await query
           .range(from, to)
+          .order('dueDate', { ascending: true, nullsFirst: false })
           .order('createdAt', { ascending: false })
-        
+
         if (error) {
           if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
             throw error;
           }
           throw error
         }
-        
+
         return {
           tasks: (data || []) as Task[],
           nextCursor: count && (pageParam + 1) * PAGE_SIZE < count ? pageParam + 1 : null
@@ -105,7 +106,7 @@ export function useTasks(searchQuery?: string) {
         .insert(row)
         .select()
         .single()
-      
+
       if (error) throw error
       return { ...data, relatedTo: newTask.relatedTo, relatedType: newTask.relatedType } as Task
     },
@@ -131,7 +132,7 @@ export function useTasks(searchQuery?: string) {
         .eq('id', id)
         .select()
         .single()
-      
+
       if (error) throw error
       return data as Task
     },
@@ -151,7 +152,7 @@ export function useTasks(searchQuery?: string) {
         .from('tasks')
         .delete()
         .eq('id', id)
-      
+
       if (error) throw error
       return id
     },
@@ -285,6 +286,7 @@ export function useAllPendingTasks() {
           .from('tasks')
           .select('*')
           .neq('status', 'Completed')
+          .order('dueDate', { ascending: true, nullsFirst: false })
           .order('createdAt', { ascending: false })
           .limit(ALL_PENDING_LIMIT)
 

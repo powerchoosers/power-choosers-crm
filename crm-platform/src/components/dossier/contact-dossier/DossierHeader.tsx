@@ -170,6 +170,7 @@ export const DossierHeader = memo(function DossierHeader({
                                             type="text"
                                             value={editFirstName}
                                             onChange={(e) => setEditFirstName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                             className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 -ml-1 flex-1 min-w-0"
                                             placeholder="First name"
                                             autoFocus
@@ -178,6 +179,7 @@ export const DossierHeader = memo(function DossierHeader({
                                             type="text"
                                             value={editLastName}
                                             onChange={(e) => setEditLastName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                             className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 flex-1 min-w-0"
                                             placeholder="Last name"
                                         />
@@ -369,6 +371,7 @@ export const DossierHeader = memo(function DossierHeader({
                                                 type="text"
                                                 value={editTitle}
                                                 onChange={(e) => setEditTitle(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                                 className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="TITLE"
                                             />
@@ -377,6 +380,7 @@ export const DossierHeader = memo(function DossierHeader({
                                                 type="text"
                                                 value={editCompany}
                                                 onChange={(e) => setEditCompany(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                                 className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="COMPANY"
                                             />
@@ -388,6 +392,7 @@ export const DossierHeader = memo(function DossierHeader({
                                                 type="text"
                                                 value={editLocation}
                                                 onChange={(e) => setEditLocation(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                                 className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="CITY, STATE"
                                             />

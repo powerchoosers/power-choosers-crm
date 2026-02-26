@@ -87,6 +87,8 @@ export default function AccountDossierPage() {
               editAddress={state.editAddress}
               setEditAddress={state.setEditAddress}
               editLogoUrl={state.editLogoUrl}
+              editSupplier={state.editSupplier}
+              setEditSupplier={state.setEditSupplier}
               editContractEnd={state.editContractEnd}
               setEditContractEnd={state.setEditContractEnd}
               editStrikePrice={state.editStrikePrice}
@@ -97,6 +99,7 @@ export default function AccountDossierPage() {
               daysRemaining={state.daysRemaining}
               maturityPct={state.maturityPct}
               maturityColor={state.maturityColor}
+              toggleEditing={state.toggleEditing}
             />
 
             <AccountInfrastructurePanel

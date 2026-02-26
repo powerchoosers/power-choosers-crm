@@ -50,33 +50,34 @@ export function useEmails(searchQuery?: string) {
           .from('emails')
           .select('*', { count: 'exact' })
 
-        if (role !== 'admin') {
+        if (role === 'admin') {
+          // Admin sees all emails across all connected inboxes (nodalpoint.io, getnodalpoint.com, signal@)
+          // No ownership filter — unified inbox across all 3 Zoho addresses
+        } else {
+          // Non-admin: scope to emails owned by this user
           if (!user.email) return { emails: [], nextCursor: null }
           query = query.eq('metadata->>ownerId', user.email.toLowerCase())
-        }
 
-        // --- NEW CONTACT-ONLY FILTERING ---
-        // Fetch valid contact emails for this user/org
-        let contactQuery = supabase.from('contacts').select('email')
-        if (role !== 'admin' && role !== 'dev') {
-          contactQuery = contactQuery.eq('ownerId', user.email)
-        }
-        const { data: contactList } = await contactQuery
-        const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
+          // Also apply contact-based filter: only show emails from/to their contacts
+          // contacts.ownerId is the user's UUID (user.id), NOT user.email
+          const { data: contactList } = await supabase
+            .from('contacts')
+            .select('email')
+            .eq('ownerId', user.id)
 
-        if (validEmails.length > 0) {
-          // Filter: From a contact OR To a contact
-          const conditions: string[] = []
-          validEmails.forEach(e => {
-            conditions.push(`from.ilike.*${e}*`)
-            conditions.push(`to.cs.["${e}"]`)
-          })
-          query = query.or(conditions.join(','))
-        } else {
-          // If no contacts exist, return empty to avoid showing random system mail
-          return { emails: [], nextCursor: null }
+          const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
+
+          if (validEmails.length > 0) {
+            const conditions: string[] = []
+            validEmails.forEach(e => {
+              conditions.push(`from.ilike.*${e}*`)
+              conditions.push(`to.cs.["${e}"]`)
+            })
+            query = query.or(conditions.join(','))
+          }
+          // If no contacts yet, still show all owned emails (don't blank the inbox)
         }
-        // ----------------------------------
+        // -----------------------------------------------
 
         // Filter out mailwarming and automated emails
         query = query
@@ -302,29 +303,29 @@ export function useEmailsCount(searchQuery?: string) {
           .from('emails')
           .select('id', { count: 'exact', head: true })
 
-        if (role !== 'admin') {
-          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
-        }
-
-        // --- CONTACT-ONLY FILTERING ---
-        let contactQuery = supabase.from('contacts').select('email')
-        if (role !== 'admin' && role !== 'dev') {
-          contactQuery = contactQuery.eq('ownerId', user.email)
-        }
-        const { data: contactList } = await contactQuery
-        const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
-
-        if (validEmails.length > 0) {
-          const conditions: string[] = []
-          validEmails.forEach(e => {
-            conditions.push(`from.ilike.*${e}*`)
-            conditions.push(`to.cs.["${e}"]`)
-          })
-          query = query.or(conditions.join(','))
+        if (role === 'admin') {
+          // Admin: count across all inboxes, no filtering
         } else {
-          return 0
+          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
+
+          // Contact-based scoping for non-admin
+          const { data: contactList } = await supabase
+            .from('contacts')
+            .select('email')
+            .eq('ownerId', user.id)
+
+          const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
+
+          if (validEmails.length > 0) {
+            const conditions: string[] = []
+            validEmails.forEach(e => {
+              conditions.push(`from.ilike.*${e}*`)
+              conditions.push(`to.cs.["${e}"]`)
+            })
+            query = query.or(conditions.join(','))
+          }
         }
-        // -----------------------------
+        // -----------------------------------------------
 
         // Filter out mailwarming emails
         query = query
