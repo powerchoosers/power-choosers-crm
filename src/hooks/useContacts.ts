@@ -633,7 +633,7 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
   })
 }
 
-export function useContact(id: string, initialData?: ContactDetail | null) {
+export function useContact(id: string) {
   const { user, loading } = useAuth()
 
   return useQuery({
@@ -758,7 +758,6 @@ export function useContact(id: string, initialData?: ContactDetail | null) {
     enabled: !!id && !loading && !!user,
     staleTime: 1000 * 60 * 5,
     gcTime: 1000 * 60 * 60 * 24,
-    initialData: initialData ?? undefined
   })
 }
 
