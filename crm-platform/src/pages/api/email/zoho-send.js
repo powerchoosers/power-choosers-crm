@@ -42,10 +42,15 @@ export default async function handler(req, res) {
         // Explicit boolean conversion
         const isHtmlEmailBoolean = Boolean(isHtmlEmail);
 
+        // Detect self-send or internal testing to strengthen deliverability
+        const toAddress = Array.isArray(to) ? to[0] : to;
+        const isSelfSend = toAddress?.toLowerCase().trim() === ownerEmail.toLowerCase().trim();
+        const isInternalTest = toAddress?.toLowerCase().endsWith('@nodalpoint.io') || toAddress?.toLowerCase().endsWith('@getnodalpoint.com');
+
         // Merge emailSettings with _deliverability
         const deliverability = {
-            enableTracking: true,
-            enableClickTracking: true,
+            enableTracking: !isSelfSend, // Disable by default for self-tests
+            enableClickTracking: !isSelfSend,
             includeBulkHeaders: false,
             includeListUnsubscribe: false,
             includePriorityHeaders: false,
@@ -61,6 +66,10 @@ export default async function handler(req, res) {
                 includePriorityHeaders: emailSettings.deliverability.priorityHeaders || false
             } : {})
         };
+
+        if (isSelfSend || isInternalTest) {
+            logger.info(`[Zoho] Internal/Self-send detected. Adjusting deliverability settings: tracking=${deliverability.enableTracking}`, 'zoho-send');
+        }
 
         // Inject tracking pixel and wrap links for click tracking
         let trackedContent = content;
@@ -191,7 +200,8 @@ export default async function handler(req, res) {
             from: from,
             fromName: fromName,
             uploadedAttachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
-            userEmail: ownerEmail
+            userEmail: ownerEmail,
+            priority: deliverability.includePriorityHeaders ? 1 : 2 // 1=High, 2=Normal
         });
 
         // Update email record with sent status and Zoho message ID

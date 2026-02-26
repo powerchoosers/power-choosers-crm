@@ -123,6 +123,9 @@ export class ZohoMailService {
                 if (emailData.bcc) {
                     payload.bccAddress = Array.isArray(emailData.bcc) ? emailData.bcc.join(',') : emailData.bcc;
                 }
+                if (emailData.priority) {
+                    payload.priority = emailData.priority;
+                }
 
                 // Handle Pre-Uploaded Attachments (Standard Zoho Flow)
                 if (uploadedAttachments && uploadedAttachments.length > 0) {

@@ -64,7 +64,8 @@ DELIVERABILITY RULES:
 - Avoid promotional spam language ("free", "act now", "discount", "save big", "limited time offer", "urgent").
 - No em dashes (—) or en dashes (–). They look too machine-generated. Use commas or colons.
 - Bullet points must be one single, short sentence. Max 15 words per bullet.
-- For cold first-touch: do not include any links. Plain text only.`
+- For cold first-touch: do not include any links. Plain text only.
+- TESTING: Do not send to yourself repeatedly. Email providers flag high-frequency same-domain traffic with tracking links as suspicious.`
 
 /** Maps industry to vertical-specific pain points and angles. Used to automatically inject context into prompts. */
 function getIndustryAngle(industry: string | undefined): string | null {
@@ -1046,6 +1047,23 @@ OUTPUT FORMAT:
       >
         {/* Fixed Header Section */}
         <div className="flex-none px-6 py-2 border-b border-white/5 bg-zinc-950/50 backdrop-blur-md space-y-1 z-20">
+          {/* Deliverability Alert */}
+          {to && user?.email && to.toLowerCase().trim() === user.email.toLowerCase().trim() && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              className="mb-2 p-2 rounded bg-amber-500/10 border border-amber-500/20 flex items-center gap-2 overflow-hidden"
+            >
+              <Zap className="w-3 h-3 text-amber-500 shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">Internal Test Mode</span>
+                <span className="text-[9px] text-zinc-400 leading-tight">
+                  Tracking is disabled for self-sends to protect domain reputation. Avoid repetitive testing to same-root addresses.
+                </span>
+              </div>
+            </motion.div>
+          )}
+
           <div className="flex items-center gap-2 relative">
             <span className="text-xs font-mono text-zinc-500 w-8">To</span>
             <div className="flex-1 relative">
