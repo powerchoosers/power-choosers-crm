@@ -15,7 +15,21 @@ import {
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, Clock, Plus, Phone, Mail, MoreHorizontal, Check, Radar, Users, Building2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { ArrowUpDown, Clock, Plus, Phone, Mail, MoreHorizontal, Check, Radar, Users, Building2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
@@ -34,6 +48,8 @@ import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
 import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
 import Link from 'next/link'
+import { DraggableTableHeader } from '@/components/network/DraggableTableHeader'
+import { useTableColumnOrder } from '@/hooks/useTableColumnOrder'
 import {
   Table,
   TableBody,
@@ -150,6 +166,36 @@ export default function TargetDetailPage() {
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor)
+  )
+
+  const initialPeopleOrder = useMemo(() => [
+    'select', 'name', 'title', 'company', 'industry', 'location', 'phone', 'status', 'actions'
+  ], [])
+
+  const initialAccountOrder = useMemo(() => [
+    'select', 'name', 'industry', 'location', 'companyPhone', 'status', 'actions'
+  ], [])
+
+  const [peopleColumnOrder, setPeopleColumnOrder] = useTableColumnOrder('targets_people', initialPeopleOrder)
+  const [accountColumnOrder, setAccountColumnOrder] = useTableColumnOrder('targets_accounts', initialAccountOrder)
+
+  const columnOrder = isPeopleList ? peopleColumnOrder : accountColumnOrder
+  const setColumnOrder = isPeopleList ? setPeopleColumnOrder : setAccountColumnOrder
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string)
+        const newIndex = items.indexOf(over.id as string)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
 
   const handleFilterChange = (columnId: string, value: any) => {
     setColumnFilters(prev => {
@@ -510,25 +556,21 @@ export default function TargetDetailPage() {
   const table = useReactTable({
     data,
     columns: tableColumns as ColumnDef<any>[],
+    onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
+    manualPagination: false,
+    pageCount,
+    getRowId: (row: any) => row.id,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     state: {
       pagination: {
         pageIndex,
         pageSize
       },
       rowSelection,
-    },
-    onPaginationChange: (updater) => {
-      if (typeof updater === 'function') {
-        const newState = updater({ pageIndex, pageSize })
-        setPage(newState.pageIndex)
-      }
-    },
-    onRowSelectionChange: setRowSelection,
-    manualPagination: false,
-    pageCount,
-    getRowId: (row) => row.id,
-    getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+      columnOrder,
+    }
   })
 
   const filteredRowCount = totalRecords || data.length
@@ -600,17 +642,26 @@ export default function TargetDetailPage() {
 
         <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
-            <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
-                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
+                    <SortableContext
+                      items={columnOrder}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {headerGroup.headers.map((header) => (
+                        <DraggableTableHeader key={header.id} header={header} />
+                      ))}
+                    </SortableContext>
+                  </TableRow>
+                ))}
+              </TableHeader>
+            </DndContext>
             <TableBody>
               {showTableLoading ? (
                 <ForensicTableSkeleton columns={tableColumns.length} rows={12} type={isPeopleList ? 'people' : 'account'} />
