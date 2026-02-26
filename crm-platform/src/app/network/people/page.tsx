@@ -39,7 +39,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Badge } from '@/components/ui/badge'
-import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { ContactAvatar, type ContactHealthScore } from '@/components/ui/ContactAvatar'
 import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeModal'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
@@ -312,15 +312,39 @@ export default function PeoplePage() {
           return (
             <button
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium"
+              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium gap-2"
             >
               Name
-              <ArrowUpDown className="ml-2 h-4 w-4" />
+              <ArrowUpDown className="ml-1 h-4 w-4" />
+              {/* Health legend — 3 dots showing what top-left badge means */}
+              <span
+                className="flex items-center gap-0.5 ml-1"
+                title="Relationship health: green <30d · amber 30–90d · rose >90d since last touch"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+              </span>
             </button>
           )
         },
         cell: ({ row }) => {
           const contact = row.original
+
+          // Compute health score from lastContact
+          const healthScore: ContactHealthScore | undefined = (() => {
+            if (!contact.lastContact) return 'cold'
+            try {
+              const last = new Date(contact.lastContact)
+              const now = new Date()
+              if (isAfter(last, subMonths(now, 1))) return 'active'
+              if (isAfter(last, subMonths(now, 3))) return 'warming'
+              return 'cold'
+            } catch {
+              return undefined
+            }
+          })()
+
           return (
             <Link
               href={`/network/contacts/${contact.id}`}
@@ -332,6 +356,7 @@ export default function PeoplePage() {
                 size={36}
                 className="w-9 h-9 transition-all"
                 showListBadge={contactIdsInListRef.current?.has(contact.id)}
+                healthScore={healthScore}
               />
               <div>
                 <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
