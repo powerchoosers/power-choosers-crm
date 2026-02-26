@@ -116,32 +116,12 @@ export class ZohoMailService {
                     mailFormat: html ? 'html' : 'plaintext',
                 };
 
-                // Plain text alternative — critical for deliverability (HTML-only emails are flagged as spam)
-                if (html && text) {
-                    payload.altContent = text;
-                }
-
                 // Add optional fields only if they have values
                 if (emailData.cc) {
                     payload.ccAddress = Array.isArray(emailData.cc) ? emailData.cc.join(',') : emailData.cc;
                 }
                 if (emailData.bcc) {
                     payload.bccAddress = Array.isArray(emailData.bcc) ? emailData.bcc.join(',') : emailData.bcc;
-                }
-
-                // Reply-To — important when sending from an alias (signal@, noreply@, etc.)
-                if (emailData.replyTo) {
-                    payload.replyTo = emailData.replyTo;
-                }
-
-                // Threading headers — preserve conversation threads and improve reply deliverability
-                if (emailData.inReplyTo) {
-                    payload.inReplyTo = emailData.inReplyTo;
-                }
-
-                // Priority — X-Priority header (1=High, 3=Normal, 5=Low)
-                if (emailData.priority) {
-                    payload.priority = emailData.priority;
                 }
 
                 // Handle Pre-Uploaded Attachments (Standard Zoho Flow)
