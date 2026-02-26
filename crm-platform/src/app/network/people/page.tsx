@@ -34,7 +34,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, useDeleteContacts, useCreateContact, Contact } from '@/hooks/useContacts'
-import { useContactsInTargetLists } from '@/hooks/useListMemberships'
+import { TargetListBadges } from '@/components/ui/TargetListBadges'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -119,10 +119,6 @@ export default function PeoplePage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
-  const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
-  const { data: contactIdsInList } = useContactsInTargetLists(contactIds)
-  const contactIdsInListRef = useRef<Set<string> | undefined>(contactIdsInList)
-  contactIdsInListRef.current = contactIdsInList
   const pendingSelectCountRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -169,6 +165,7 @@ export default function PeoplePage() {
     'location',
     'phone',
     'status',
+    'targetLists',
     'actions'
   ], [])
 
@@ -355,7 +352,6 @@ export default function PeoplePage() {
                 name={contact.name}
                 size={36}
                 className="w-9 h-9 transition-all"
-                showListBadge={contactIdsInListRef.current?.has(contact.id)}
                 healthScore={healthScore}
               />
               <div>
@@ -476,6 +472,16 @@ export default function PeoplePage() {
             return <span className="text-zinc-600 font-mono text-xs">{val}</span>
           }
         },
+      },
+      {
+        id: 'targetLists',
+        header: 'Target Lists',
+        cell: ({ row }) => (
+          <TargetListBadges
+            entityId={row.original.id}
+            entityType="contact"
+          />
+        ),
       },
       {
         id: "actions",
