@@ -166,7 +166,21 @@ export default async function handler(req, res) {
         // Prepare email data for Zoho
         const zohoService = new ZohoMailService();
 
-        logger.debug('[Zoho] Sending email:', { to, subject, trackingId, userEmail, attachments: attachments?.length || 0 });
+        // Upload raw base64 attachments to Zoho file store first, then pass references
+        let uploadedAttachments = [];
+        if (attachments && attachments.length > 0) {
+            for (const att of attachments) {
+                try {
+                    const buffer = Buffer.from(att.content, 'base64');
+                    const zohoAtt = await zohoService.uploadAttachment(ownerEmail, buffer, att.filename);
+                    if (zohoAtt) uploadedAttachments.push(zohoAtt);
+                } catch (attErr) {
+                    logger.warn(`[Zoho] Failed to upload attachment '${att.filename}':`, attErr.message);
+                }
+            }
+        }
+
+        logger.debug('[Zoho] Sending email:', { to, subject, trackingId, userEmail, attachments: attachments?.length || 0, uploaded: uploadedAttachments.length });
 
         const result = await zohoService.sendEmail({
             to,
@@ -176,7 +190,7 @@ export default async function handler(req, res) {
             text: textContent,
             from: from,
             fromName: fromName,
-            attachments: attachments || undefined,
+            uploadedAttachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined,
             userEmail: ownerEmail
         });
 
