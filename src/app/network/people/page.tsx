@@ -659,6 +659,7 @@ export default function PeoplePage() {
                       index={index}
                       router={router}
                       saveScroll={saveScroll}
+                      columnOrder={columnOrder}
                     />
                   ))}
                 </AnimatePresence>
