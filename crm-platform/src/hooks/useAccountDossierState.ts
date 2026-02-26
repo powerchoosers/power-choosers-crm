@@ -58,6 +58,7 @@ export function useAccountDossierState(id: string) {
     const [editIndustry, setEditIndustry] = useState('')
     const [editLocation, setEditLocation] = useState('')
     const [editLogoUrl, setEditLogoUrl] = useState('')
+    const [editSupplier, setEditSupplier] = useState('')
     const [editDomain, setEditDomain] = useState('')
     const [editLinkedinUrl, setEditLinkedinUrl] = useState('')
     const [editMeters, setEditMeters] = useState<any[]>([])
@@ -95,6 +96,7 @@ export function useAccountDossierState(id: string) {
             setEditIndustry(account.industry || '')
             setEditLocation(account.location || '')
             setEditLogoUrl(account.logoUrl || '')
+            setEditSupplier(account.electricitySupplier || '')
             setEditDomain(account.domain || '')
             setEditLinkedinUrl(account.linkedinUrl || '')
             setEditCompanyPhone(account.companyPhone || '')
@@ -136,6 +138,7 @@ export function useAccountDossierState(id: string) {
                         industry: editIndustry,
                         location: editLocation,
                         logoUrl: editLogoUrl,
+                        electricitySupplier: editSupplier,
                         domain: editDomain,
                         linkedinUrl: editLinkedinUrl,
                         meters: editMeters,
@@ -154,7 +157,7 @@ export function useAccountDossierState(id: string) {
             }
             triggerSave()
         }
-    }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
+    }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editSupplier, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
 
     useEffect(() => {
         if (account) {
@@ -281,7 +284,7 @@ export function useAccountDossierState(id: string) {
         recentlyUpdatedFields, glowingFields, isRecalibrating,
         editAccountName, setEditAccountName, editNotes, setEditNotes, editAnnualUsage, setEditAnnualUsage,
         editStrikePrice, setEditStrikePrice, editIndustry, setEditIndustry, editLocation, setEditLocation,
-        editLogoUrl, setEditLogoUrl, editDomain, setEditDomain, editLinkedinUrl, setEditLinkedinUrl,
+        editLogoUrl, setEditLogoUrl, editSupplier, setEditSupplier, editDomain, setEditDomain, editLinkedinUrl, setEditLinkedinUrl,
         editMeters, setEditMeters, editContractEnd, setEditContractEnd, editCompanyPhone, setEditCompanyPhone,
         editAddress, setEditAddress,
         pendingTasks, hasTasks, displayTaskIndex, globalTotal, globalPosition, useGlobalPagination,

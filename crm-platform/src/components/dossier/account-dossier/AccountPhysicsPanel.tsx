@@ -21,6 +21,8 @@ interface AccountPhysicsPanelProps {
     editAddress: string
     setEditAddress: (v: string) => void
     editLogoUrl: string
+    editSupplier: string
+    setEditSupplier: (v: string) => void
     editContractEnd: string
     setEditContractEnd: (v: string) => void
     editStrikePrice: string
@@ -32,6 +34,7 @@ interface AccountPhysicsPanelProps {
     daysRemaining: number | null
     maturityPct: number
     maturityColor: string
+    toggleEditing: () => void
 }
 
 export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
@@ -47,6 +50,8 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
     editAddress,
     setEditAddress,
     editLogoUrl,
+    editSupplier,
+    setEditSupplier,
     editContractEnd,
     setEditContractEnd,
     editStrikePrice,
@@ -56,7 +61,8 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
     contractEndDate,
     daysRemaining,
     maturityPct,
-    maturityColor
+    maturityColor,
+    toggleEditing
 }: AccountPhysicsPanelProps) {
 
     const handleUpdate = (updates: Partial<{ companyPhone: string; domain: string; address: string }>) => {
@@ -97,6 +103,7 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                         type="date"
                                         value={editContractEnd}
                                         onChange={(e) => setEditContractEnd(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                         className="bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-xs font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                                     />
                                 ) : (
@@ -138,12 +145,23 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
 
                     <div>
                         <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Current Supplier</div>
-                        <div className={cn(
-                            "text-xl font-semibold tracking-tighter text-white transition-all duration-800",
-                            glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
-                        )}>
-                            <ForensicDataPoint value={account.electricitySupplier || '--'} valueClassName="text-xl font-semibold tracking-tighter text-white" inline />
-                        </div>
+                        {isEditing ? (
+                            <input
+                                type="text"
+                                value={editSupplier}
+                                onChange={(e) => setEditSupplier(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
+                                className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#002FA7]/50 transition-all uppercase placeholder:text-zinc-700"
+                                placeholder="SUPPLIER NAME"
+                            />
+                        ) : (
+                            <div className={cn(
+                                "text-xl font-semibold tracking-tighter text-white transition-all duration-800",
+                                glowingFields.has('currentSupplier') && "text-[#002FA7] drop-shadow-[0_0_8px_rgba(0,47,167,0.8)]"
+                            )}>
+                                <ForensicDataPoint value={editSupplier || account.electricitySupplier || '--'} valueClassName="text-xl font-semibold tracking-tighter text-white" inline />
+                            </div>
+                        )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -154,6 +172,7 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                     type="text"
                                     value={editStrikePrice}
                                     onChange={(e) => setEditStrikePrice(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                     className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 transition-all"
                                     placeholder="0.000"
                                 />
@@ -181,6 +200,7 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                 type="text"
                                 value={editAnnualUsage}
                                 onChange={(e) => setEditAnnualUsage(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                 className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#002FA7]/50 transition-all"
                                 placeholder="0"
                             />
