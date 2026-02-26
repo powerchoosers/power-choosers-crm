@@ -16,8 +16,13 @@ export default async function handler(req, res) {
         return;
     }
 
-    // Use user-based lookup instead of environment variables
-    const ownerEmail = (req.body.userEmail || req.body.from || '').toLowerCase().trim();
+    // Consolidate owner email resolution from request body
+    const { userEmail, from } = req.body;
+    const ownerEmail = (userEmail && typeof userEmail === 'string' && userEmail.trim())
+        ? userEmail.toLowerCase().trim()
+        : (from && typeof from === 'string' && from.includes('@'))
+            ? from.toLowerCase().trim()
+            : (req.body.userEmail || req.body.from || '').toLowerCase().trim();
 
     if (!ownerEmail) {
         logger.error('[Zoho] Missing user identity (userEmail or from address)', 'zoho-send');
@@ -101,13 +106,7 @@ export default async function handler(req, res) {
                 .trim();
         }
 
-        // Determine owner email
-        const ownerEmail = (userEmail && typeof userEmail === 'string' && userEmail.trim())
-            ? userEmail.toLowerCase().trim()
-            : (from && typeof from === 'string' && from.includes('@'))
-                ? from.toLowerCase().trim()
-                : null;
-
+        // Owner email is already determined at the top of the handler
         if (!ownerEmail) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Missing user identity (userEmail or from address)' }));
