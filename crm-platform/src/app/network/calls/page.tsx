@@ -12,11 +12,12 @@ import {
   ColumnFiltersState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, PhoneIncoming, PhoneOutgoing, Plus, Search, Filter, MoreHorizontal, Check } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, PhoneIncoming, PhoneOutgoing, Plus, MoreHorizontal, Check } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
-import { useCalls, useCallsCount, Call } from '@/hooks/useCalls'
+import { useCalls, useCallsCount, useLogCall, Call } from '@/hooks/useCalls'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -60,10 +61,13 @@ export default function CallsPage() {
 
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useCalls(debouncedFilter)
   const { data: totalCallsCount } = useCallsCount(debouncedFilter)
+  const logCall = useLogCall()
   const calls = useMemo(() => data?.pages.flatMap(page => page.calls) || [], [data])
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [isLogCallOpen, setIsLogCallOpen] = useState(false)
+  const [newCall, setNewCall] = useState({ contactName: '', phoneNumber: '', direction: 'outbound' as 'inbound' | 'outbound', status: 'completed', duration: '', note: '' })
 
   useEffect(() => {
     const needed = (pageIndex + 2) * PAGE_SIZE
@@ -85,6 +89,32 @@ export default function CallsPage() {
       return
     }
     toast.info(`Bulk action "${action}" for ${selectedCount} calls — coming soon.`)
+  }
+
+  const handleLogCall = async () => {
+    if (!newCall.phoneNumber.trim()) {
+      toast.error('Phone number is required')
+      return
+    }
+    const durationMatch = newCall.duration.match(/^(?:(\d+):)?(\d{1,2})$/)
+    const durationSeconds = durationMatch
+      ? (parseInt(durationMatch[1] || '0') * 60) + parseInt(durationMatch[2])
+      : 0
+    try {
+      await logCall.mutateAsync({
+        contactName: newCall.contactName.trim() || 'Unknown',
+        phoneNumber: newCall.phoneNumber.trim(),
+        direction: newCall.direction,
+        status: newCall.status,
+        durationSeconds,
+        note: newCall.note.trim() || undefined,
+      })
+      toast.success('Call logged')
+      setNewCall({ contactName: '', phoneNumber: '', direction: 'outbound', status: 'completed', duration: '', note: '' })
+      setIsLogCallOpen(false)
+    } catch {
+      toast.error('Failed to log call')
+    }
   }
 
   const columns: ColumnDef<Call>[] = [
@@ -317,7 +347,7 @@ export default function CallsPage() {
         }}
         primaryAction={{
           label: "Log Call",
-          onClick: () => {},
+          onClick: () => setIsLogCallOpen(true),
           icon: <Plus size={18} className="mr-2" />
         }}
       />
@@ -421,6 +451,112 @@ export default function CallsPage() {
         onAction={handleBulkAction}
         onSelectCount={handleSelectCount}
       />
+
+      {/* Log Call Modal */}
+      <AnimatePresence>
+        {isLogCallOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setIsLogCallOpen(false) }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              className="w-full max-w-md nodal-void-card rounded-2xl p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-widest">Log Call // Manual_Entry</span>
+                <button onClick={() => setIsLogCallOpen(false)} className="icon-button-forensic w-8 h-8">
+                  <Plus size={16} className="rotate-45" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Contact Name</label>
+                  <Input
+                    value={newCall.contactName}
+                    onChange={e => setNewCall(p => ({ ...p, contactName: e.target.value }))}
+                    placeholder="Jane Smith"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Phone *</label>
+                  <Input
+                    value={newCall.phoneNumber}
+                    onChange={e => setNewCall(p => ({ ...p, phoneNumber: e.target.value }))}
+                    placeholder="+1 (555) 000-0000"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Direction</label>
+                  <select
+                    value={newCall.direction}
+                    onChange={e => setNewCall(p => ({ ...p, direction: e.target.value as 'inbound' | 'outbound' }))}
+                    className="nodal-recessed border border-white/10 text-sm font-mono bg-zinc-900 text-zinc-300 rounded-md px-3 py-2"
+                  >
+                    <option value="outbound">Outbound</option>
+                    <option value="inbound">Inbound</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Status</label>
+                  <select
+                    value={newCall.status}
+                    onChange={e => setNewCall(p => ({ ...p, status: e.target.value }))}
+                    className="nodal-recessed border border-white/10 text-sm font-mono bg-zinc-900 text-zinc-300 rounded-md px-3 py-2"
+                  >
+                    <option value="completed">Completed</option>
+                    <option value="no-answer">No Answer</option>
+                    <option value="busy">Busy</option>
+                    <option value="voicemail">Voicemail</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Duration</label>
+                  <Input
+                    value={newCall.duration}
+                    onChange={e => setNewCall(p => ({ ...p, duration: e.target.value }))}
+                    placeholder="3:45"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Note</label>
+                <Input
+                  value={newCall.note}
+                  onChange={e => setNewCall(p => ({ ...p, note: e.target.value }))}
+                  placeholder="Call summary..."
+                  className="nodal-recessed border-white/10 text-sm font-mono"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => setIsLogCallOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400 font-mono text-xs">Cancel</Button>
+                <Button
+                  onClick={handleLogCall}
+                  disabled={logCall.isPending || !newCall.phoneNumber.trim()}
+                  className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-5"
+                >
+                  {logCall.isPending ? 'Logging...' : 'Log Call'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

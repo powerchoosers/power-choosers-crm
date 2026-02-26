@@ -45,6 +45,7 @@ import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
+import { toast } from 'sonner'
 
 const PAGE_SIZE = 50
 
@@ -63,13 +64,16 @@ export default function TasksPage() {
     return () => clearTimeout(timer)
   }, [globalFilter, setSearch])
 
-  const { data, isLoading: queryLoading, isError, updateTask, deleteTask, fetchNextPage, hasNextPage, isFetchingNextPage } = useTasks(debouncedFilter)
+  const { data, isLoading: queryLoading, isError, addTaskAsync, updateTask, deleteTask, fetchNextPage, hasNextPage, isFetchingNextPage } = useTasks(debouncedFilter)
   const { data: totalTasks } = useTasksCount(debouncedFilter)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
+  const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
+  const [isAddingTask, setIsAddingTask] = useState(false)
+  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'Medium' as 'Low' | 'Medium' | 'High', dueDate: '' })
 
   useEffect(() => {
     setIsMounted(true)
@@ -104,9 +108,30 @@ export default function TasksPage() {
   const handleBulkAction = async (action: string) => {
     if (action === 'delete') {
       setIsDestructModalOpen(true)
+    }
+  }
+
+  const handleCreateTask = async () => {
+    if (!newTask.title.trim()) {
+      toast.error('Task title is required')
       return
     }
-    // Other actions: list, sequence, enrich — placeholder
+    setIsAddingTask(true)
+    try {
+      await addTaskAsync({
+        title: newTask.title.trim(),
+        description: newTask.description.trim() || undefined,
+        priority: newTask.priority,
+        status: 'Pending',
+        dueDate: newTask.dueDate || undefined,
+      })
+      setNewTask({ title: '', description: '', priority: 'Medium', dueDate: '' })
+      setIsAddTaskOpen(false)
+    } catch {
+      // toast handled in hook
+    } finally {
+      setIsAddingTask(false)
+    }
   }
   const handleConfirmPurge = async () => {
     // rowSelection keys are row ids when getRowId is set
@@ -323,7 +348,7 @@ export default function TasksPage() {
         onSearchChange={setGlobalFilter}
         primaryAction={{
           label: "Add Task",
-          onClick: () => { },
+          onClick: () => setIsAddTaskOpen(true),
           icon: <Plus size={18} className="mr-2" />
         }}
       />
@@ -471,6 +496,90 @@ export default function TasksPage() {
         onConfirm={handleConfirmPurge}
         count={selectedCount}
       />
+
+      {/* Add Task Modal */}
+      <AnimatePresence>
+        {isAddTaskOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setIsAddTaskOpen(false) }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              className="w-full max-w-md nodal-void-card rounded-2xl p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-widest">New Task // Add_Action</span>
+                <button onClick={() => setIsAddTaskOpen(false)} className="icon-button-forensic w-8 h-8">
+                  <Plus size={16} className="rotate-45" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Title *</label>
+                <Input
+                  value={newTask.title}
+                  onChange={e => setNewTask(p => ({ ...p, title: e.target.value }))}
+                  placeholder="Follow up with client"
+                  className="nodal-recessed border-white/10 text-sm font-mono"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') handleCreateTask() }}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Description</label>
+                <Input
+                  value={newTask.description}
+                  onChange={e => setNewTask(p => ({ ...p, description: e.target.value }))}
+                  placeholder="Optional details..."
+                  className="nodal-recessed border-white/10 text-sm font-mono"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Priority</label>
+                  <select
+                    value={newTask.priority}
+                    onChange={e => setNewTask(p => ({ ...p, priority: e.target.value as 'Low' | 'Medium' | 'High' }))}
+                    className="nodal-recessed border border-white/10 text-sm font-mono bg-zinc-900 text-zinc-300 rounded-md px-3 py-2"
+                  >
+                    <option value="Low">Low</option>
+                    <option value="Medium">Medium</option>
+                    <option value="High">High</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Due Date</label>
+                  <Input
+                    type="date"
+                    value={newTask.dueDate}
+                    onChange={e => setNewTask(p => ({ ...p, dueDate: e.target.value }))}
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => setIsAddTaskOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400 font-mono text-xs">Cancel</Button>
+                <Button
+                  onClick={handleCreateTask}
+                  disabled={isAddingTask || !newTask.title.trim()}
+                  className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-5"
+                >
+                  {isAddingTask ? 'Adding...' : 'Add Task'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
