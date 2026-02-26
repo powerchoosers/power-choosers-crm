@@ -4,6 +4,13 @@ import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import { Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { type ContactHealthScore } from '@/components/ui/ContactAvatar'
+
+const HEALTH_DOT: Record<ContactHealthScore, { bg: string; shadow: string; label: string }> = {
+  active: { bg: 'bg-emerald-500', shadow: 'shadow-[0_0_6px_rgba(16,185,129,0.8)]', label: 'Last touch <30d — Active' },
+  warming: { bg: 'bg-amber-500', shadow: 'shadow-[0_0_6px_rgba(245,158,11,0.8)]', label: 'Last touch 30–90d — Warming' },
+  cold: { bg: 'bg-rose-500', shadow: 'shadow-[0_0_6px_rgba(244,63,94,0.8)]', label: 'Last touch >90d — Cold' },
+}
 
 interface CompanyIconProps {
   /** Account/company logo URL. Always prioritized; only when this is blank or fails do we use fallbacks. */
@@ -21,6 +28,11 @@ interface CompanyIconProps {
   isDeleting?: boolean
   /** Raw metadata object for deep fallback resolution. */
   metadata?: any
+  /**
+   * Relationship health indicator — top-left corner of icon.
+   * 'active' (<30d) → emerald | 'warming' (31–90d) → amber | 'cold' (>90d) → rose
+   */
+  healthScore?: ContactHealthScore
 }
 
 const DEFAULT_ROUNDED = 'rounded-[14px]'
@@ -58,15 +70,17 @@ const LOAD_TIMEOUT_MS = 5000
 
 function CompanyIconInner({
   logoUrl,
-  logo_url, // Added logo_url
+  logo_url,
   domain,
   name,
   size = 32,
   className,
   roundedClassName = DEFAULT_ROUNDED,
   isDeleting = false,
-  metadata
+  metadata,
+  healthScore,
 }: CompanyIconProps) {
+  const health = healthScore ? HEALTH_DOT[healthScore] : null
   // Prioritize direct props, then fallback to metadata paths
   const m = metadata || {}
   const activeLogoUrl = useMemo(() => {
@@ -172,25 +186,40 @@ function CompanyIconInner({
 
   if (!currentSrc) {
     return (
-      <motion.div
-        layout
-        initial={{ opacity: 0 }}
-        animate={
-          isDeleting
-            ? { scale: 0.88, opacity: 0.6, transition: { duration: 0.35, ease: 'easeOut' } }
-            : { opacity: 1, scale: 1, transition: { duration: 0.25, ease: 'easeOut' } }
-        }
-        className={cn(
-          'nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] shrink-0',
-          roundedClassName,
-          className,
-          isDeleting && 'ring-2 ring-red-500/70'
+      <div className="relative inline-block shrink-0">
+        <motion.div
+          layout
+          initial={{ opacity: 0 }}
+          animate={
+            isDeleting
+              ? { scale: 0.88, opacity: 0.6, transition: { duration: 0.35, ease: 'easeOut' } }
+              : { opacity: 1, scale: 1, transition: { duration: 0.25, ease: 'easeOut' } }
+          }
+          className={cn(
+            'nodal-glass bg-zinc-900/80 flex items-center justify-center text-zinc-400 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
+            roundedClassName,
+            className,
+            isDeleting && 'ring-2 ring-red-500/70'
+          )}
+          style={{ width: size, height: size }}
+          title={name}
+        >
+          <Building2 size={size * 0.5} />
+        </motion.div>
+        {health && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.12 }}
+            className={cn(
+              'absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
+              health.bg,
+              health.shadow
+            )}
+            title={health.label}
+          />
         )}
-        style={{ width: size, height: size }}
-        title={name}
-      >
-        <Building2 size={size * 0.5} />
-      </motion.div>
+      </div>
     )
   }
 
@@ -203,62 +232,77 @@ function CompanyIconInner({
   }
 
   return (
-    <motion.div
-      layout
-      className={cn(
-        'relative shrink-0 overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
-        roundedClassName,
-        className
-      )}
-      style={{ width: size, height: size }}
-      title={name}
-      animate={
-        isDeleting
-          ? { scale: 0.88, opacity: 0.6, transition: { duration: 0.35, ease: 'easeOut' } }
-          : { scale: 1, opacity: 1, transition: { duration: 0.25, ease: 'easeOut' } }
-      }
-    >
-      <AnimatePresence mode="wait">
-        {!isLoaded && (
-          <motion.div
-            key="skeleton"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            className="absolute inset-0 bg-white/5 flex items-center justify-center"
-          >
-            <Building2 size={size * 0.4} className="text-zinc-700" />
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <div className="relative inline-block shrink-0">
       <motion.div
-        initial={false}
-        animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.98 }}
-        transition={{ duration: 0.2, ease: 'easeOut' }}
-        className="absolute inset-0 w-full h-full"
-      >
-        <img
-          src={currentSrc}
-          {...imgCommon}
-          loading="lazy"
-          decoding="async"
-        />
-      </motion.div>
-
-      <div className={cn('absolute inset-0 pointer-events-none ring-1 ring-white/20', roundedClassName)} />
-      <AnimatePresence>
-        {isDeleting && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className={cn('absolute inset-0 pointer-events-none ring-2 ring-red-500/70', roundedClassName)}
-          />
+        layout
+        className={cn(
+          'relative overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
+          roundedClassName,
+          className
         )}
-      </AnimatePresence>
-    </motion.div>
+        style={{ width: size, height: size }}
+        title={name}
+        animate={
+          isDeleting
+            ? { scale: 0.88, opacity: 0.6, transition: { duration: 0.35, ease: 'easeOut' } }
+            : { scale: 1, opacity: 1, transition: { duration: 0.25, ease: 'easeOut' } }
+        }
+      >
+        <AnimatePresence mode="wait">
+          {!isLoaded && (
+            <motion.div
+              key="skeleton"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="absolute inset-0 bg-white/5 flex items-center justify-center"
+            >
+              <Building2 size={size * 0.4} className="text-zinc-700" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        <motion.div
+          initial={false}
+          animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.98 }}
+          transition={{ duration: 0.2, ease: 'easeOut' }}
+          className="absolute inset-0 w-full h-full"
+        >
+          <img
+            src={currentSrc}
+            {...imgCommon}
+            loading="lazy"
+            decoding="async"
+          />
+        </motion.div>
+
+        <div className={cn('absolute inset-0 pointer-events-none ring-1 ring-white/20', roundedClassName)} />
+        <AnimatePresence>
+          {isDeleting && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className={cn('absolute inset-0 pointer-events-none ring-2 ring-red-500/70', roundedClassName)}
+            />
+          )}
+        </AnimatePresence>
+      </motion.div>
+      {health && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.12 }}
+          className={cn(
+            'absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
+            health.bg,
+            health.shadow
+          )}
+          title={health.label}
+        />
+      )}
+    </div>
   )
 }
 

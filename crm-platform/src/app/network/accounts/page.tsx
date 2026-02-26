@@ -37,6 +37,7 @@ import { useAccounts, useAccountsCount, useDeleteAccounts, useCreateAccount, Acc
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { type ContactHealthScore } from '@/components/ui/ContactAvatar'
 import { Badge } from '@/components/ui/badge'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
@@ -331,15 +332,39 @@ export default function AccountsPage() {
           return (
             <button
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium"
+              className="icon-button-forensic flex items-center -ml-1 text-sm font-medium gap-2"
             >
               Account Name
-              <ArrowUpDown className="ml-2 h-4 w-4" />
+              <ArrowUpDown className="ml-1 h-4 w-4" />
+              {/* Health legend */}
+              <span
+                className="flex items-center gap-0.5 ml-1"
+                title="Relationship health: green <30d · amber 30–90d · rose >90d since last update"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+              </span>
             </button>
           )
         },
         cell: ({ row }) => {
           const account = row.original
+
+          // Compute health from last account update
+          const healthScore: ContactHealthScore | undefined = (() => {
+            if (!account.updated) return undefined
+            try {
+              const last = new Date(account.updated)
+              const now = new Date()
+              if (isAfter(last, subMonths(now, 1))) return 'active'
+              if (isAfter(last, subMonths(now, 3))) return 'warming'
+              return 'cold'
+            } catch {
+              return undefined
+            }
+          })()
+
           return (
             <Link
               href={`/network/accounts/${account.id}`}
@@ -353,6 +378,7 @@ export default function AccountsPage() {
                   size={36}
                   className="w-9 h-9 transition-all"
                   isDeleting={deletingAccountIds.has(account.id)}
+                  healthScore={healthScore}
                 />
               </div>
               <div>
