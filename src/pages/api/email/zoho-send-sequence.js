@@ -112,12 +112,23 @@ export default async function handler(req, res) {
             }
         }
 
-        if (htmlContent && trackOpens && !hasTrackingPixel(htmlContent)) {
+        // Detect self-send or internal testing for sequences
+        const isSelfSend = toEmail.toLowerCase().trim() === fromEmail.toLowerCase().trim();
+        const isInternalTest = toEmail.toLowerCase().endsWith('@nodalpoint.io') || toEmail.toLowerCase().endsWith('@getnodalpoint.com');
+
+        const finalTrackOpens = isSelfSend ? false : trackOpens;
+        const finalTrackClicks = isSelfSend ? false : trackClicks;
+
+        if (htmlContent && finalTrackOpens && !hasTrackingPixel(htmlContent)) {
             htmlContent = injectTracking(htmlContent, trackingId, {
-                enableOpenTracking: trackOpens,
-                enableClickTracking: trackClicks
+                enableOpenTracking: finalTrackOpens,
+                enableClickTracking: finalTrackClicks
             });
-            logger.debug('[Zoho Sequence] Injected tracking into email', { trackingId });
+            logger.debug('[Zoho Sequence] Injected tracking into email', { trackingId, finalTrackOpens });
+        }
+
+        if (isSelfSend || isInternalTest) {
+            logger.info(`[Zoho Sequence] Internal/Self-send detected. Tracking: opens=${finalTrackOpens}, clicks=${finalTrackClicks}`, 'zoho-send-sequence');
         }
 
         // Prepare text content (use provided text or convert HTML)
