@@ -15,7 +15,21 @@ import {
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, Filter } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, Filter, GripVertical } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
@@ -32,6 +46,9 @@ import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
 import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
 import Link from 'next/link'
+import { ContactTableRow } from '@/components/network/ContactTableRow'
+import { DraggableTableHeader } from '@/components/network/DraggableTableHeader'
+import { useTableColumnOrder } from '@/hooks/useTableColumnOrder'
 import { SequenceAssignmentModal } from '@/components/network/SequenceAssignmentModal'
 import {
   Table,
@@ -133,6 +150,40 @@ export default function PeoplePage() {
   const displayTotalPages = totalContacts == null && hasNextPage
     ? Math.max(totalPages, pagination.pageIndex + 2)
     : totalPages
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  )
+
+  const initialColumnOrder = useMemo(() => [
+    'select',
+    'name',
+    'title',
+    'company',
+    'industry',
+    'location',
+    'phone',
+    'status',
+    'actions'
+  ], [])
+
+  const [columnOrder, setColumnOrder] = useTableColumnOrder('people', initialColumnOrder)
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string)
+        const newIndex = items.indexOf(over.id as string)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
 
   const handleFilterChange = useCallback((columnId: string, value: any) => {
     setColumnFilters(prev => {
@@ -485,6 +536,7 @@ export default function PeoplePage() {
     onGlobalFilterChange: setGlobalFilter,
     onPaginationChange,
     onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
     autoResetPageIndex: false,
     state: {
       sorting,
@@ -492,6 +544,7 @@ export default function PeoplePage() {
       globalFilter,
       pagination,
       rowSelection,
+      columnOrder,
     },
   })
 
@@ -568,24 +621,26 @@ export default function PeoplePage() {
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
-            <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
+                    <SortableContext
+                      items={columnOrder}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {headerGroup.headers.map((header) => (
+                        <DraggableTableHeader key={header.id} header={header} />
+                      ))}
+                    </SortableContext>
+                  </TableRow>
+                ))}
+              </TableHeader>
+            </DndContext>
             <TableBody>
               {isLoading ? (
                 <ForensicTableSkeleton columns={columns.length} rows={12} type="people" />
@@ -598,38 +653,13 @@ export default function PeoplePage() {
               ) : rows?.length ? (
                 <AnimatePresence mode="popLayout">
                   {rows.map((row, index) => (
-                    <motion.tr
+                    <ContactTableRow
                       key={row.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0, scale: 0.98 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: Math.min(index * 0.02, 0.4),
-                        ease: [0.23, 1, 0.32, 1]
-                      }}
-                      data-state={row.getIsSelected() && "selected"}
-                      className={cn(
-                        "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
-                        row.getIsSelected()
-                          ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
-                          : "hover:bg-white/[0.02]"
-                      )}
-                      onClick={(e) => {
-                        // Don't trigger row click if clicking a link or button
-                        if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
-                          return;
-                        }
-                        saveScroll()
-                        router.push(`/network/contacts/${row.original.id}`)
-                      }}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </motion.tr>
+                      row={row}
+                      index={index}
+                      router={router}
+                      saveScroll={saveScroll}
+                    />
                   ))}
                 </AnimatePresence>
               ) : (

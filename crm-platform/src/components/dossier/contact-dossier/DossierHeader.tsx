@@ -1,5 +1,6 @@
 'use client'
 
+import { memo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -53,7 +54,7 @@ interface DossierHeaderProps {
     handleCompleteAndAdvance: () => void
 }
 
-export function DossierHeader({
+export const DossierHeader = memo(function DossierHeader({
     contact,
     isEditing,
     toggleEditing,
@@ -94,16 +95,16 @@ export function DossierHeader({
     return (
         <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 nodal-recessed relative z-10">
             <div className="flex items-center justify-between gap-6">
-                <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0 flex items-center gap-3">
                     <button
                         onClick={() => router.back()}
-                        className="icon-button-forensic w-10 h-10 flex items-center justify-center -ml-2"
+                        className="flex-none icon-button-forensic w-10 h-10 flex items-center justify-center -ml-2"
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </button>
 
-                    <div className="flex items-center gap-3 relative group/avatar">
-                        <div onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
+                    <div className="flex-1 min-w-0 flex items-center gap-3 relative group/avatar">
+                        <div className="flex-none" onClick={() => isEditing && setActiveEditField(activeEditField === 'logo' ? null : 'logo')}>
                             <AnimatePresence mode="wait">
                                 {recentlyUpdatedFields.has('logoUrl') ? (
                                     <motion.div
@@ -161,7 +162,7 @@ export function DossierHeader({
                             )}
                         </AnimatePresence>
 
-                        <div className="flex flex-col">
+                        <div className="flex-1 min-w-0 flex flex-col">
                             <div className="flex items-center gap-3 mb-0.5">
                                 {isEditing ? (
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -461,7 +462,7 @@ export function DossierHeader({
                     </div>
                 </div>
 
-                <div className="text-right">
+                <div className="flex-none shrink-0 text-right">
                     <div className="flex flex-col items-end gap-0.5">
                         <div className="flex items-center gap-2">
                             {!hasTasks && <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>}
@@ -500,4 +501,4 @@ export function DossierHeader({
             </div>
         </header>
     )
-}
+})

@@ -15,7 +15,21 @@ import {
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreHorizontal, ArrowUpRight, Check, GripVertical } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
@@ -29,6 +43,9 @@ import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
 import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
 import Link from 'next/link'
+import { AccountTableRow } from '@/components/network/AccountTableRow'
+import { DraggableTableHeader } from '@/components/network/DraggableTableHeader'
+import { useTableColumnOrder } from '@/hooks/useTableColumnOrder'
 import {
   Table,
   TableBody,
@@ -123,6 +140,38 @@ export default function AccountsPage() {
   const displayTotalPages = totalAccounts == null && hasNextPage
     ? Math.max(totalPages, pagination.pageIndex + 2)
     : totalPages
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor)
+  )
+
+  const initialColumnOrder = useMemo(() => [
+    'select',
+    'name',
+    'industry',
+    'location',
+    'companyPhone',
+    'status',
+    'actions'
+  ], [])
+
+  const [columnOrder, setColumnOrder] = useTableColumnOrder('accounts', initialColumnOrder)
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (active && over && active.id !== over.id) {
+      setColumnOrder((items) => {
+        const oldIndex = items.indexOf(active.id as string)
+        const newIndex = items.indexOf(over.id as string)
+        return arrayMove(items, oldIndex, newIndex)
+      })
+    }
+  }
 
   const handleFilterChange = (columnId: string, value: any) => {
     setColumnFilters(prev => {
@@ -516,6 +565,7 @@ export default function AccountsPage() {
       }
     },
     onRowSelectionChange: setRowSelection,
+    onColumnOrderChange: setColumnOrder,
     autoResetPageIndex: false,
     state: {
       sorting,
@@ -523,6 +573,7 @@ export default function AccountsPage() {
       globalFilter,
       pagination,
       rowSelection,
+      columnOrder,
     },
   })
 
@@ -564,58 +615,39 @@ export default function AccountsPage() {
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
-            <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
+                    <SortableContext
+                      items={columnOrder}
+                      strategy={horizontalListSortingStrategy}
+                    >
+                      {headerGroup.headers.map((header) => (
+                        <DraggableTableHeader key={header.id} header={header} />
+                      ))}
+                    </SortableContext>
+                  </TableRow>
+                ))}
+              </TableHeader>
+            </DndContext>
             <TableBody>
               {isLoading ? (
                 <ForensicTableSkeleton columns={columns.length} rows={12} />
               ) : table.getRowModel().rows?.length ? (
                 <AnimatePresence mode="popLayout">
                   {table.getRowModel().rows.map((row, index) => (
-                    <motion.tr
+                    <AccountTableRow
                       key={row.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0, scale: 0.98 }}
-                      transition={{
-                        duration: 0.3,
-                        delay: Math.min(index * 0.02, 0.4),
-                        ease: [0.23, 1, 0.32, 1]
-                      }}
-                      data-state={row.getIsSelected() && "selected"}
-                      className={cn(
-                        "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
-                        row.getIsSelected()
-                          ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
-                          : "hover:bg-white/[0.02]"
-                      )}
-                      onClick={() => {
-                        saveScroll()
-                        router.push(`/network/accounts/${row.original.id}`)
-                      }}
-                    >
-                      {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3">
-                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                        </TableCell>
-                      ))}
-                    </motion.tr>
+                      row={row}
+                      index={index}
+                      router={router}
+                      saveScroll={saveScroll}
+                    />
                   ))}
                 </AnimatePresence>
               ) : (
