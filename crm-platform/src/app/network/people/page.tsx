@@ -35,6 +35,7 @@ import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, useDeleteContacts, useCreateContact, Contact } from '@/hooks/useContacts'
 import { TargetListBadges } from '@/components/ui/TargetListBadges'
+import { useContactLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -119,6 +120,8 @@ export default function PeoplePage() {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
+  const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
+  const { data: lastTouchMap } = useContactLastTouch(contactIds)
   const pendingSelectCountRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -328,19 +331,8 @@ export default function PeoplePage() {
         cell: ({ row }) => {
           const contact = row.original
 
-          // Compute health score from lastContact
-          const healthScore: ContactHealthScore | undefined = (() => {
-            if (!contact.lastContact) return 'cold'
-            try {
-              const last = new Date(contact.lastContact)
-              const now = new Date()
-              if (isAfter(last, subMonths(now, 1))) return 'active'
-              if (isAfter(last, subMonths(now, 3))) return 'warming'
-              return 'cold'
-            } catch {
-              return undefined
-            }
-          })()
+          // Health score from REAL last call or email — never from sync timestamps
+          const healthScore = computeHealthScore(lastTouchMap?.get(contact.id))
 
           return (
             <Link

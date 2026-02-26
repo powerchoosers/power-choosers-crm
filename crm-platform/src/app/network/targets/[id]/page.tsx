@@ -43,6 +43,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar, type ContactHealthScore } from '@/components/ui/ContactAvatar'
+import { useContactLastTouch, useAccountLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
@@ -151,6 +152,16 @@ export default function TargetDetailPage() {
 
   const totalRecords = (isPeopleList ? contactCount.data : isAccountList ? accountCount.data : 0) || 0
   const pageCount = Math.ceil(totalRecords / pageSize)
+
+  // Entity IDs for the last-touch hooks
+  const contactIds = useMemo(() =>
+    isPeopleList ? (data as Contact[]).map(c => c.id) : [], [isPeopleList, data]
+  )
+  const entityAccountIds = useMemo(() =>
+    isAccountList ? (data as Account[]).map(a => a.id) : [], [isAccountList, data]
+  )
+  const { data: contactLastTouchMap } = useContactLastTouch(contactIds)
+  const { data: accountLastTouchMap } = useAccountLastTouch(entityAccountIds)
 
   // Fetch next page when table state changes
   useEffect(() => {
@@ -310,18 +321,8 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const contact = row.original
 
-        const healthScore: ContactHealthScore | undefined = (() => {
-          if (!contact.lastContact) return 'cold'
-          try {
-            const last = new Date(contact.lastContact)
-            const now = new Date()
-            if (isAfter(last, subMonths(now, 1))) return 'active'
-            if (isAfter(last, subMonths(now, 3))) return 'warming'
-            return 'cold'
-          } catch {
-            return undefined
-          }
-        })()
+        // Health score from REAL last call or email
+        const healthScore = computeHealthScore(contactLastTouchMap?.get(contact.id))
 
         return (
           <Link
@@ -491,7 +492,7 @@ export default function TargetDetailPage() {
           Account Name
           <span
             className="flex items-center gap-0.5"
-            title="Relationship health: green <30d · amber 30–90d · rose >90d since last update"
+            title="Relationship health: green <30d · amber 30–90d · rose >90d since last call or email"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
@@ -502,18 +503,8 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const account = row.original
 
-        const healthScore: ContactHealthScore | undefined = (() => {
-          if (!account.updated) return undefined
-          try {
-            const last = new Date(account.updated)
-            const now = new Date()
-            if (isAfter(last, subMonths(now, 1))) return 'active'
-            if (isAfter(last, subMonths(now, 3))) return 'warming'
-            return 'cold'
-          } catch {
-            return undefined
-          }
-        })()
+        // Health score from REAL last call or email
+        const healthScore = computeHealthScore(accountLastTouchMap?.get(account.id))
 
         return (
           <Link

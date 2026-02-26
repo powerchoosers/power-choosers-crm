@@ -39,6 +39,7 @@ import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { type ContactHealthScore } from '@/components/ui/ContactAvatar'
 import { TargetListBadges } from '@/components/ui/TargetListBadges'
+import { useAccountLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
 import { Badge } from '@/components/ui/badge'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
@@ -116,6 +117,8 @@ export default function AccountsPage() {
   const pendingSelectCountRef = useRef<number | null>(null)
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
+  const accountIds = useMemo(() => accounts.map(a => a.id), [accounts])
+  const { data: lastTouchMap } = useAccountLastTouch(accountIds)
 
   useEffect(() => {
     setIsMounted(true)
@@ -341,7 +344,7 @@ export default function AccountsPage() {
               {/* Health legend */}
               <span
                 className="flex items-center gap-0.5 ml-1"
-                title="Relationship health: green <30d · amber 30–90d · rose >90d since last update"
+                title="Relationship health: green <30d · amber 30–90d · rose >90d since last call or email"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
@@ -353,19 +356,8 @@ export default function AccountsPage() {
         cell: ({ row }) => {
           const account = row.original
 
-          // Compute health from last account update
-          const healthScore: ContactHealthScore | undefined = (() => {
-            if (!account.updated) return undefined
-            try {
-              const last = new Date(account.updated)
-              const now = new Date()
-              if (isAfter(last, subMonths(now, 1))) return 'active'
-              if (isAfter(last, subMonths(now, 3))) return 'warming'
-              return 'cold'
-            } catch {
-              return undefined
-            }
-          })()
+          // Health score from REAL last call or email — never from sync/Apollo timestamps
+          const healthScore = computeHealthScore(lastTouchMap?.get(account.id))
 
           return (
             <Link
