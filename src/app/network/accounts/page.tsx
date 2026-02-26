@@ -19,7 +19,7 @@ import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, Plus, Phone, Mail, MoreH
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
-import { useAccounts, useAccountsCount, useDeleteAccounts, Account } from '@/hooks/useAccounts'
+import { useAccounts, useAccountsCount, useDeleteAccounts, useCreateAccount, Account } from '@/hooks/useAccounts'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -49,6 +49,7 @@ import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
+import { toast } from 'sonner'
 
 const PAGE_SIZE = 50
 
@@ -83,12 +84,16 @@ export default function AccountsPage() {
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useAccounts(debouncedFilter, accountFilters)
   const { data: totalAccounts } = useAccountsCount(debouncedFilter, accountFilters)
   const { mutateAsync: deleteAccounts } = useDeleteAccounts()
+  const createAccount = useCreateAccount()
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [deletingAccountIds, setDeletingAccountIds] = useState<Set<string>>(new Set())
+  const [isCreateOpen, setIsCreateOpen] = useState(false)
+  const [newAccount, setNewAccount] = useState({ name: '', industry: '', domain: '', phone: '', city: '', state: '', employees: '' })
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const pendingSelectCountRef = useRef<number | null>(null)
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
@@ -170,14 +175,20 @@ export default function AccountsPage() {
 
     if (action === 'delete') {
       setIsDestructModalOpen(true)
-    } else {
-      console.log(`Executing ${action} for ${selectedCount} nodes`)
-      // Implement other actions as needed
     }
   }
 
   const handleConfirmPurge = async () => {
-    // With getRowId: (row) => row.id, rowSelection keys are account IDs
+    if (deleteTargetId) {
+      setDeletingAccountIds(new Set([deleteTargetId]))
+      try {
+        await deleteAccounts([deleteTargetId])
+      } finally {
+        setDeleteTargetId(null)
+        setDeletingAccountIds(new Set())
+      }
+      return
+    }
     const selectedIds = Object.keys(rowSelection).filter(Boolean)
     if (selectedIds.length === 0) return
     setDeletingAccountIds(new Set(selectedIds))
@@ -187,6 +198,30 @@ export default function AccountsPage() {
       setRowSelection({})
       setIsDestructModalOpen(false)
       setDeletingAccountIds(new Set())
+    }
+  }
+
+  const handleCreateAccount = async () => {
+    if (!newAccount.name.trim()) {
+      toast.error('Account name is required')
+      return
+    }
+    try {
+      await createAccount.mutateAsync({
+        name: newAccount.name.trim(),
+        industry: newAccount.industry.trim(),
+        domain: newAccount.domain.trim(),
+        companyPhone: newAccount.phone.trim(),
+        location: [newAccount.city, newAccount.state].filter(Boolean).join(', '),
+        city: newAccount.city.trim(),
+        state: newAccount.state.trim(),
+        employees: newAccount.employees.trim(),
+      } as any)
+      toast.success(`${newAccount.name} added`)
+      setNewAccount({ name: '', industry: '', domain: '', phone: '', city: '', state: '', employees: '' })
+      setIsCreateOpen(false)
+    } catch {
+      toast.error('Failed to create account')
     }
   }
 
@@ -439,10 +474,19 @@ export default function AccountsPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
                   <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                  <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">View Details</DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">Edit Account</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="hover:bg-white/5 cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); router.push(`/network/accounts/${account.id}`) }}
+                  >View Details</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="hover:bg-white/5 cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); router.push(`/network/accounts/${account.id}`) }}
+                  >Edit Account</DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuItem className="text-red-400 hover:bg-red-500/10 cursor-pointer">Delete</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); setDeleteTargetId(account.id) }}
+                  >Delete</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -504,7 +548,7 @@ export default function AccountsPage() {
         isFilterActive={isFilterOpen || columnFilters.length > 0}
         primaryAction={{
           label: "Add Account",
-          onClick: () => { },
+          onClick: () => setIsCreateOpen(true),
           icon: <Plus size={18} className="mr-2" />
         }}
       />
@@ -638,11 +682,123 @@ export default function AccountsPage() {
       />
 
       <DestructModal
-        isOpen={isDestructModalOpen}
-        onClose={() => setIsDestructModalOpen(false)}
+        isOpen={isDestructModalOpen || !!deleteTargetId}
+        onClose={() => { setIsDestructModalOpen(false); setDeleteTargetId(null) }}
         onConfirm={handleConfirmPurge}
-        count={selectedCount}
+        count={deleteTargetId ? 1 : selectedCount}
       />
+
+      {/* Add Account Modal */}
+      <AnimatePresence>
+        {isCreateOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+            onClick={(e) => { if (e.target === e.currentTarget) setIsCreateOpen(false) }}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 8 }}
+              className="w-full max-w-md nodal-void-card rounded-2xl p-6 flex flex-col gap-5"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-zinc-500 uppercase tracking-widest">New Account // Add_Node</span>
+                <button onClick={() => setIsCreateOpen(false)} className="icon-button-forensic w-8 h-8">
+                  <Plus size={16} className="rotate-45" />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Company Name *</label>
+                <Input
+                  value={newAccount.name}
+                  onChange={e => setNewAccount(p => ({ ...p, name: e.target.value }))}
+                  placeholder="Acme Energy Corp"
+                  className="nodal-recessed border-white/10 text-sm font-mono"
+                  autoFocus
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Industry</label>
+                  <Input
+                    value={newAccount.industry}
+                    onChange={e => setNewAccount(p => ({ ...p, industry: e.target.value }))}
+                    placeholder="Manufacturing"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Domain</label>
+                  <Input
+                    value={newAccount.domain}
+                    onChange={e => setNewAccount(p => ({ ...p, domain: e.target.value }))}
+                    placeholder="acme.com"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Phone</label>
+                  <Input
+                    value={newAccount.phone}
+                    onChange={e => setNewAccount(p => ({ ...p, phone: e.target.value }))}
+                    placeholder="+1 (555) 000-0000"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Employees</label>
+                  <Input
+                    value={newAccount.employees}
+                    onChange={e => setNewAccount(p => ({ ...p, employees: e.target.value }))}
+                    placeholder="250"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">City</label>
+                  <Input
+                    value={newAccount.city}
+                    onChange={e => setNewAccount(p => ({ ...p, city: e.target.value }))}
+                    placeholder="Houston"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">State</label>
+                  <Input
+                    value={newAccount.state}
+                    onChange={e => setNewAccount(p => ({ ...p, state: e.target.value }))}
+                    placeholder="TX"
+                    className="nodal-recessed border-white/10 text-sm font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-1">
+                <Button variant="ghost" onClick={() => setIsCreateOpen(false)} className="hover:bg-white/10 hover:text-white text-zinc-400 font-mono text-xs">Cancel</Button>
+                <Button
+                  onClick={handleCreateAccount}
+                  disabled={createAccount.isPending || !newAccount.name.trim()}
+                  className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-5"
+                >
+                  {createAccount.isPending ? 'Adding...' : 'Add Account'}
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

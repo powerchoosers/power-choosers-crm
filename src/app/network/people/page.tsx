@@ -99,6 +99,7 @@ export default function PeoplePage() {
   const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [composeTarget, setComposeTarget] = useState<{ email: string; name: string; company: string } | null>(null)
   const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
@@ -186,16 +187,16 @@ export default function PeoplePage() {
       setIsDestructModalOpen(true)
     } else if (action === 'sequence') {
       setIsSequenceModalOpen(true)
-    } else {
-      console.log(`Executing ${action} for ${selectedCount} nodes`)
-      // Implement other actions as needed
     }
   }
 
   const handleConfirmPurge = async () => {
-    // With getRowId: (row) => row.id, rowSelection keys are contact IDs
+    if (deleteTargetId) {
+      await deleteContacts([deleteTargetId])
+      setDeleteTargetId(null)
+      return
+    }
     const selectedIds = Object.keys(rowSelection).filter(Boolean)
-
     if (selectedIds.length > 0) {
       await deleteContacts(selectedIds)
       setRowSelection({})
@@ -445,9 +446,15 @@ export default function PeoplePage() {
                   >
                     View Details
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-white/5 cursor-pointer">Edit Person</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="hover:bg-white/5 cursor-pointer"
+                    onClick={() => { saveScroll(); router.push(`/network/contacts/${contact.id}`) }}
+                  >Edit Person</DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-white/10" />
-                  <DropdownMenuItem className="text-red-400 hover:bg-red-500/10 cursor-pointer">Delete</DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                    onClick={() => setDeleteTargetId(contact.id)}
+                  >Delete</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -687,10 +694,10 @@ export default function PeoplePage() {
       />
 
       <DestructModal
-        isOpen={isDestructModalOpen}
-        onClose={() => setIsDestructModalOpen(false)}
+        isOpen={isDestructModalOpen || !!deleteTargetId}
+        onClose={() => { setIsDestructModalOpen(false); setDeleteTargetId(null) }}
         onConfirm={handleConfirmPurge}
-        count={selectedCount}
+        count={deleteTargetId ? 1 : selectedCount}
       />
 
       <SequenceAssignmentModal

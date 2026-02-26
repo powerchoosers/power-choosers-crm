@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useEffect } from 'react'
@@ -515,5 +515,42 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
     refetchInterval: 20_000, // Poll every 20s so new calls show without refresh (fallback if Realtime misses)
     refetchIntervalInBackground: false,
     gcTime: 1000 * 60 * 60, // 1 hour
+  })
+}
+
+export function useLogCall() {
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
+  return useMutation({
+    mutationFn: async (call: {
+      contactName: string
+      phoneNumber: string
+      direction: 'inbound' | 'outbound'
+      status: string
+      durationSeconds: number
+      note?: string
+    }) => {
+      const { data, error } = await supabase
+        .from('calls')
+        .insert({
+          id: crypto.randomUUID(),
+          direction: call.direction,
+          status: call.status,
+          to: call.direction === 'outbound' ? call.phoneNumber : null,
+          from: call.direction === 'inbound' ? call.phoneNumber : null,
+          duration: call.durationSeconds,
+          summary: call.note || null,
+          timestamp: new Date().toISOString(),
+          ownerId: user?.email || null,
+        })
+        .select()
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['calls'] })
+      queryClient.invalidateQueries({ queryKey: ['calls-count'] })
+    },
   })
 }
