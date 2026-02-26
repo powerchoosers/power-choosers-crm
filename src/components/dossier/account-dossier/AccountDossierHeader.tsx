@@ -186,6 +186,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                             type="text"
                                             value={editAccountName}
                                             onChange={(e) => setEditAccountName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                             className="bg-transparent border-b border-white/10 text-white text-2xl font-semibold tracking-tighter w-full focus:outline-none focus:border-[#002FA7] transition-colors"
                                             placeholder="ACCOUNT NAME"
                                             autoFocus
@@ -357,6 +358,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                                 type="text"
                                                 value={editIndustry}
                                                 onChange={(e) => setEditIndustry(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                                 className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="INDUSTRY SECTOR"
                                             />
@@ -368,6 +370,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                                 type="text"
                                                 value={editLocation}
                                                 onChange={(e) => setEditLocation(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                                 className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="CITY, STATE"
                                             />
