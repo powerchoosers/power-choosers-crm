@@ -38,6 +38,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { type ContactHealthScore } from '@/components/ui/ContactAvatar'
+import { TargetListBadges } from '@/components/ui/TargetListBadges'
 import { Badge } from '@/components/ui/badge'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
@@ -158,6 +159,7 @@ export default function AccountsPage() {
     'location',
     'companyPhone',
     'status',
+    'targetLists',
     'actions'
   ], [])
 
@@ -524,6 +526,16 @@ export default function AccountsPage() {
             return <span className="text-zinc-600 font-mono text-xs">{val}</span>
           }
         },
+      },
+      {
+        id: 'targetLists',
+        header: 'Target Lists',
+        cell: ({ row }) => (
+          <TargetListBadges
+            entityId={row.original.id}
+            entityType="account"
+          />
+        ),
       },
       {
         id: 'actions',

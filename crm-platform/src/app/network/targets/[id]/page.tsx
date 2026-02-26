@@ -42,7 +42,7 @@ import { useDebounce } from '@/hooks/useDebounce'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
-import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { ContactAvatar, type ContactHealthScore } from '@/components/ui/ContactAvatar'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
@@ -294,9 +294,35 @@ export default function TargetDetailPage() {
     },
     {
       accessorKey: 'name',
-      header: 'Name',
+      header: () => (
+        <span className="flex items-center gap-2 text-sm font-medium">
+          Name
+          <span
+            className="flex items-center gap-0.5"
+            title="Relationship health: green <30d · amber 30–90d · rose >90d since last touch"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+          </span>
+        </span>
+      ),
       cell: ({ row }) => {
         const contact = row.original
+
+        const healthScore: ContactHealthScore | undefined = (() => {
+          if (!contact.lastContact) return 'cold'
+          try {
+            const last = new Date(contact.lastContact)
+            const now = new Date()
+            if (isAfter(last, subMonths(now, 1))) return 'active'
+            if (isAfter(last, subMonths(now, 3))) return 'warming'
+            return 'cold'
+          } catch {
+            return undefined
+          }
+        })()
+
         return (
           <Link
             href={`/network/contacts/${contact.id}`}
@@ -308,7 +334,7 @@ export default function TargetDetailPage() {
               size={36}
               className="w-9 h-9 transition-all"
               textClassName="text-[10px]"
-              showListBadge={isPeopleList}
+              healthScore={healthScore}
             />
             <div>
               <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
@@ -460,9 +486,35 @@ export default function TargetDetailPage() {
     },
     {
       accessorKey: 'name',
-      header: 'Account Name',
+      header: () => (
+        <span className="flex items-center gap-2 text-sm font-medium">
+          Account Name
+          <span
+            className="flex items-center gap-0.5"
+            title="Relationship health: green <30d · amber 30–90d · rose >90d since last update"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 opacity-60" />
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-500 opacity-60" />
+          </span>
+        </span>
+      ),
       cell: ({ row }) => {
         const account = row.original
+
+        const healthScore: ContactHealthScore | undefined = (() => {
+          if (!account.updated) return undefined
+          try {
+            const last = new Date(account.updated)
+            const now = new Date()
+            if (isAfter(last, subMonths(now, 1))) return 'active'
+            if (isAfter(last, subMonths(now, 3))) return 'warming'
+            return 'cold'
+          } catch {
+            return undefined
+          }
+        })()
+
         return (
           <Link
             href={`/network/accounts/${account.id}`}
@@ -475,6 +527,7 @@ export default function TargetDetailPage() {
               name={account.name}
               size={36}
               className="w-9 h-9"
+              healthScore={healthScore}
             />
             <div>
               <div className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
