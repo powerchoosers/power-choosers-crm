@@ -204,7 +204,7 @@ export function useEmails(searchQuery?: string) {
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.message || 'Failed to send email');
+        throw new Error(err.error || err.message || 'Failed to send email');
       }
 
       return response.json();
