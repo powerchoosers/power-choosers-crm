@@ -85,6 +85,7 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                         logoUrl: editLogoUrl || account.logoUrl
                     }}
                     isEditing={isEditing}
+                    onEnter={toggleEditing}
                     onUpdate={handleUpdate}
                 />
 

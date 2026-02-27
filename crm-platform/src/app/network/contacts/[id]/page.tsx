@@ -227,6 +227,7 @@ export default function ContactDossierPage() {
                 setEditAnnualUsage={s.setEditAnnualUsage}
                 onEmailClick={() => s.setIsComposeOpen(true)}
                 onIngestionComplete={handleIngestionComplete}
+                toggleEditing={s.toggleEditing}
               />
             </div>
 

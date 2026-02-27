@@ -18,6 +18,7 @@ interface AccountInfrastructurePanelProps {
     setEditMeters: (v: any[]) => void
     handleIngestionComplete: () => void
     updateAccountMutation: any
+    toggleEditing: () => void
 }
 
 export const AccountInfrastructurePanel = memo(function AccountInfrastructurePanel({
@@ -29,7 +30,8 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
     editMeters,
     setEditMeters,
     handleIngestionComplete,
-    updateAccountMutation
+    updateAccountMutation,
+    toggleEditing
 }: AccountInfrastructurePanelProps) {
     const [isTyping, setIsTyping] = useState(false)
     const [terminalInput, setTerminalInput] = useState('')
@@ -219,7 +221,7 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
                     </div>
                 </div>
 
-                <MeterArray meters={editMeters} isEditing={isEditing} onUpdate={setEditMeters} />
+                <MeterArray meters={editMeters} isEditing={isEditing} onEnter={toggleEditing} onUpdate={setEditMeters} />
                 <DataIngestionCard accountId={id} onIngestionComplete={handleIngestionComplete} />
             </div>
         </div>

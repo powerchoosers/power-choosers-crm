@@ -112,6 +112,7 @@ export default function AccountDossierPage() {
               setEditMeters={state.setEditMeters}
               handleIngestionComplete={state.handleIngestionComplete}
               updateAccountMutation={state.updateAccountMutation}
+              toggleEditing={state.toggleEditing}
             />
 
             <AccountNetworkPanel

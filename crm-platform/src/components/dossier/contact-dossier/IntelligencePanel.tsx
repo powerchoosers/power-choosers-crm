@@ -41,6 +41,7 @@ interface IntelligencePanelProps {
     // Handlers
     onEmailClick: () => void
     onIngestionComplete: () => void
+    toggleEditing: () => void
 }
 
 export function IntelligencePanel({
@@ -72,7 +73,8 @@ export function IntelligencePanel({
     editAnnualUsage,
     setEditAnnualUsage,
     onEmailClick,
-    onIngestionComplete
+    onIngestionComplete,
+    toggleEditing
 }: IntelligencePanelProps) {
 
     const contractEndDate = useMemo(() => {
@@ -139,6 +141,7 @@ export function IntelligencePanel({
                             else if (updates.primaryPhoneField === 'otherPhone') setEditPhone(editOther)
                         }
                     }}
+                    onEnter={toggleEditing}
                 />
             )}
 
@@ -159,6 +162,7 @@ export function IntelligencePanel({
                                     type="date"
                                     value={editContractEnd}
                                     onChange={(e) => setEditContractEnd(e.target.value)}
+                                    onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                     className="bg-black/40 border border-white/5 rounded-lg px-2 py-1 text-xs font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50"
                                 />
                             ) : (
@@ -208,6 +212,7 @@ export function IntelligencePanel({
                             type="text"
                             value={editSupplier}
                             onChange={(e) => setEditSupplier(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                             className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-semibold text-white focus:outline-none focus:border-[#002FA7]/50"
                             placeholder="Supplier Name"
                         />
@@ -226,6 +231,7 @@ export function IntelligencePanel({
                                 type="text"
                                 value={editStrikePrice}
                                 onChange={(e) => setEditStrikePrice(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                 className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50"
                                 placeholder="0.000"
                             />
@@ -243,6 +249,7 @@ export function IntelligencePanel({
                                 type="text"
                                 value={editAnnualUsage}
                                 onChange={(e) => setEditAnnualUsage(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                 className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#002FA7]/50"
                                 placeholder="0"
                             />

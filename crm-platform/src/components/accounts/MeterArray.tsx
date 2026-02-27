@@ -15,10 +15,11 @@ interface Meter {
 interface MeterArrayProps {
   meters?: Meter[]
   isEditing?: boolean
+  onEnter?: () => void
   onUpdate?: (meters: Meter[]) => void
 }
 
-export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing = false, onUpdate }) => {
+export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing = false, onEnter, onUpdate }) => {
   const [localMeters, setLocalMeters] = useState<Meter[]>(meters)
 
   useEffect(() => {
@@ -106,6 +107,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                       type="text"
                       value={meter.esiId}
                       onChange={(e) => handleUpdateMeter(meter.id, 'esiId', e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                       className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-xs font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                       placeholder="10000000000000000000"
                     />
@@ -116,6 +118,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                         type="text"
                         value={meter.address}
                         onChange={(e) => handleUpdateMeter(meter.id, 'address', e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                         className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-[10px] text-zinc-400 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                         placeholder="123 Main St, Dallas, TX 75201"
                       />
@@ -128,6 +131,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                           type="text"
                           value={meter.rate}
                           onChange={(e) => handleUpdateMeter(meter.id, 'rate', e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                           className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-white tabular-nums focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                           placeholder="0.045"
                         />
@@ -138,6 +142,7 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                           type="text"
                           value={meter.endDate}
                           onChange={(e) => handleUpdateMeter(meter.id, 'endDate', e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                           className="w-full bg-zinc-950/50 border border-white/5 rounded-lg px-3 py-2 text-[9px] font-mono text-emerald-500 uppercase focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                           placeholder="03/25"
                         />
