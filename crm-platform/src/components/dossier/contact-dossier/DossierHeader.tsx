@@ -486,8 +486,8 @@ export const DossierHeader = memo(function DossierHeader({
                             <button
                                 onClick={toggleEditing}
                                 className={cn(
-                                    "w-7 h-7 flex items-center justify-center transition-all duration-300",
-                                    isEditing ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 rounded-lg shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" : "text-zinc-500 hover:text-white"
+                                    "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
+                                    isEditing ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" : "text-zinc-500 hover:text-white"
                                 )}
                             >
                                 {isEditing ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
