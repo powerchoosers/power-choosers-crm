@@ -14,7 +14,7 @@ function generateId() {
 interface SignalEntry {
     id: string
     time: Date
-    type: 'MARKET' | 'INTEL' | 'CALL' | 'EMAIL' | 'TASK'
+    type: 'MARKET' | 'INTEL' | 'CALL' | 'EMAIL' | 'TASK' | 'LIVE'
     message: string
 }
 
@@ -31,6 +31,7 @@ const TYPE_STYLE: Record<SignalEntry['type'], { label: string; color: string; ic
     CALL: { label: 'CALL', color: 'text-zinc-400', icon: <Phone className="w-2.5 h-2.5" /> },
     EMAIL: { label: 'EMAIL', color: 'text-zinc-400', icon: <Mail className="w-2.5 h-2.5" /> },
     TASK: { label: 'TASK', color: 'text-emerald-400', icon: <CheckSquare className="w-2.5 h-2.5" /> },
+    LIVE: { label: 'LIVE', color: 'text-zinc-500', icon: <Activity className="w-2.5 h-2.5" /> },
 }
 
 function formatTime(d: Date) {
