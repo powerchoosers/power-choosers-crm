@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback, useState } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWarRoomStore } from '@/store/warRoomStore'
 import { useCallStore } from '@/store/callStore'
@@ -30,6 +30,7 @@ export function WarRoomOverlay() {
     const [prevReserves, setPrevReserves] = useState<number | null>(null)
     const [currentTime, setCurrentTime] = useState(new Date())
     const [prevCallActive, setPrevCallActive] = useState(false)
+    const lastPriceAlertRef = useRef<number>(0)
 
     // Keyboard: Esc closes
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -38,12 +39,15 @@ export function WarRoomOverlay() {
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown)
-        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
-        return () => {
-            window.removeEventListener('keydown', handleKeyDown)
-            clearInterval(timer)
-        }
+        return () => window.removeEventListener('keydown', handleKeyDown)
     }, [handleKeyDown])
+
+    // Clock only ticks when the overlay is open
+    useEffect(() => {
+        if (!isOpen) return
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+        return () => clearInterval(timer)
+    }, [isOpen])
 
     useEffect(() => {
         if (isCallActive && !prevCallActive) {
@@ -90,14 +94,18 @@ export function WarRoomOverlay() {
             }
         }
 
-        // Fire when price spikes significantly
+        // Fire when price spikes significantly — 60s cooldown to prevent flooding
         if (data.hubPrice !== null && data.hubPrice > 200) {
-            addSignal({
-                id: generateId(),
-                time: new Date(),
-                type: 'MARKET',
-                message: `RT Hub price elevated: $${data.hubPrice.toFixed(2)}/MWh — scarcity adder active`,
-            })
+            const now = Date.now()
+            if (now - lastPriceAlertRef.current > 60_000) {
+                addSignal({
+                    id: generateId(),
+                    time: new Date(),
+                    type: 'MARKET',
+                    message: `RT Hub price elevated: $${data.hubPrice.toFixed(2)}/MWh — scarcity adder active`,
+                })
+                lastPriceAlertRef.current = now
+            }
         }
 
         setPrevReserves(data.reserves)
@@ -108,7 +116,7 @@ export function WarRoomOverlay() {
         close()
     }, [router, close])
 
-    const handleQuickCall = useCallback((accountId: string, name: string) => {
+    const handleQuickCall = useCallback((accountId: string) => {
         router.push(`/network/accounts/${accountId}`)
         close()
     }, [router, close])
@@ -138,7 +146,6 @@ export function WarRoomOverlay() {
                         exit={{ opacity: 0, scale: 0.98, y: 8 }}
                         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
                         className="fixed inset-4 z-[100] flex flex-col rounded-xl overflow-hidden border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.8)] bg-[#09090b]"
-                        style={{ backgroundColor: '#09090b', backgroundImage: 'radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.02), transparent)' }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}

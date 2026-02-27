@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin } from '@/lib/supabase'
+import type { Signal } from '@/store/warRoomStore'
 
 /**
  * POST /api/ai/war-room-brief
@@ -24,8 +25,16 @@ interface GridContext {
 interface BriefRequest {
     topAccounts: AccountContext[]
     grid: GridContext
-    signalHistory: any[]
+    signalHistory: Signal[]
 }
+
+// Row types for Supabase query results
+interface AccountRow { id: string; industry?: string; load_factor?: string; electricity_supplier?: string; contract_end_date?: string }
+interface ContactRow { accountId: string; firstName?: string; lastName?: string; title?: string; email?: string }
+interface CallRow { accountId: string; timestamp: string; summary?: string; transcript?: string }
+interface EmailRow { accountId: string; timestamp: string; subject?: string; text?: string }
+interface TaskRow { accountId: string; title?: string; priority?: string }
+interface DocRow { account_id: string; name?: string }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST') {
@@ -46,31 +55,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const accountIds = topAccounts.slice(0, 5).map(a => a.id)
 
     try {
-        // Parallel fetch of deep intelligence
+        // Parallel fetch of deep intelligence — documents fetch is best-effort
         const [
             { data: fullAccounts },
             { data: contacts },
             { data: calls },
             { data: emails },
             { data: tasks },
-            { data: docs }
+            docsResult
         ] = await Promise.all([
             supabaseAdmin.from('accounts').select('*').in('id', accountIds),
             supabaseAdmin.from('contacts').select('*').in('accountId', accountIds),
             supabaseAdmin.from('calls').select('*').in('accountId', accountIds).order('timestamp', { ascending: false }).limit(20),
             supabaseAdmin.from('emails').select('*').in('accountId', accountIds).order('timestamp', { ascending: false }).limit(20),
             supabaseAdmin.from('tasks').select('*').in('accountId', accountIds).eq('status', 'overdue'),
-            supabaseAdmin.from('documents').select('*').in('account_id', accountIds)
+            // Best-effort: documents table may not exist in all environments
+            Promise.resolve(supabaseAdmin.from('documents').select('*').in('account_id', accountIds)).catch(() => ({ data: null }))
         ])
+
+        const docs = docsResult.data
 
         // Build Intelligence Dossiers
         const dossiers = topAccounts.slice(0, 5).map(a => {
-            const acc = fullAccounts?.find(f => f.id === a.id)
-            const accContacts = contacts?.filter(c => c.accountId === a.id) || []
-            const accCalls = calls?.filter(c => c.accountId === a.id).slice(0, 3) || []
-            const accEmails = emails?.filter(c => c.accountId === a.id).slice(0, 3) || []
-            const accTasks = tasks?.filter(t => t.accountId === a.id) || []
-            const accDocs = docs?.filter(d => d.account_id === a.id) || []
+            const acc = (fullAccounts as AccountRow[] | null)?.find((f: AccountRow) => f.id === a.id)
+            const accContacts = (contacts as ContactRow[] | null)?.filter((c: ContactRow) => c.accountId === a.id) || []
+            const accCalls = (calls as CallRow[] | null)?.filter((c: CallRow) => c.accountId === a.id).slice(0, 3) || []
+            const accEmails = (emails as EmailRow[] | null)?.filter((c: EmailRow) => c.accountId === a.id).slice(0, 3) || []
+            const accTasks = (tasks as TaskRow[] | null)?.filter((t: TaskRow) => t.accountId === a.id) || []
+            const accDocs = (docs as DocRow[] | null)?.filter((d: DocRow) => d.account_id === a.id) || []
 
             return `
 [DOSSIER: ${a.name}]
@@ -82,19 +94,19 @@ Electricity Supplier: ${acc?.electricity_supplier || 'Unknown'}
 Contract End: ${acc?.contract_end_date || 'Unknown'}
 
 STAKEHOLDER MAP:
-${accContacts.map(c => `- ${c.firstName} ${c.lastName} (${c.title || 'No Title'}): ${c.email || 'No Email'}`).join('\n') || 'No contacts found'}
+${accContacts.map((c: ContactRow) => `- ${c.firstName} ${c.lastName} (${c.title || 'No Title'}): ${c.email || 'No Email'}`).join('\n') || 'No contacts found'}
 
 RECENT CALL TRANSCRIPTS & SYNOPSIS:
-${accCalls.map(c => `* ${new Date(c.timestamp).toLocaleDateString()}: ${c.summary || 'No summary'}
+${accCalls.map((c: CallRow) => `* ${new Date(c.timestamp).toLocaleDateString()}: ${c.summary || 'No summary'}
   TRANSCRIPT SNIPPET: ${c.transcript?.slice(0, 300) || 'None'}`).join('\n\n') || 'No recent call history'}
 
 RECENT EMAIL COMMUNICATIONS:
-${accEmails.map(e => `* ${new Date(e.timestamp).toLocaleDateString()}: Subject: ${e.subject}
+${accEmails.map((e: EmailRow) => `* ${new Date(e.timestamp).toLocaleDateString()}: Subject: ${e.subject}
   SNIPPET: ${e.text?.slice(0, 200)}`).join('\n\n') || 'No recent email communications'}
 
 CRITICAL ACTION TRACE:
-${accTasks.map(t => `- OVERDUE: ${t.title} (Priority: ${t.priority})`).join('\n') || 'No overdue tasks'}
-DOCUMENTS ON FILE: ${accDocs.map(d => d.name).join(', ') || 'None'}
+${accTasks.map((t: TaskRow) => `- OVERDUE: ${t.title} (Priority: ${t.priority})`).join('\n') || 'No overdue tasks'}
+DOCUMENTS ON FILE: ${accDocs.map((d: DocRow) => d.name).join(', ') || 'None'}
             `.trim()
         }).join('\n\n---\n\n')
 
@@ -138,7 +150,7 @@ Tone: Forensic, urgent but measured, professional. No conversational filler. Exa
             body: JSON.stringify({
                 model: 'google/gemini-2.5-flash',
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 800,
+                max_tokens: 1400,
                 temperature: 0.2,
             }),
         })
@@ -147,6 +159,7 @@ Tone: Forensic, urgent but measured, professional. No conversational filler. Exa
         const responseText = orData.choices?.[0]?.message?.content ?? ''
 
         if (!responseText) {
+            console.error('AI Brief: empty response from OpenRouter', orData)
             return res.status(502).json({ error: 'AI returned empty response' })
         }
 
@@ -157,4 +170,3 @@ Tone: Forensic, urgent but measured, professional. No conversational filler. Exa
         return res.status(500).json({ error: 'AI brief generation failed', detail: msg })
     }
 }
-
