@@ -30,17 +30,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Last call per account
         const { data: callRows } = await supabaseAdmin
             .from('calls')
-            .select('accountId, timestamp, outcome')
+            .select('accountId, timestamp')
             .in('accountId', accountIds)
             .not('timestamp', 'is', null)
             .order('timestamp', { ascending: false })
 
         // Build last-call map
-        const lastCallMap = new Map<string, { timestamp: string; outcome: string | null }>()
+        const lastCallMap = new Map<string, { timestamp: string }>()
         for (const c of callRows ?? []) {
             if (!c.accountId || !c.timestamp) continue
             if (!lastCallMap.has(c.accountId)) {
-                lastCallMap.set(c.accountId, { timestamp: c.timestamp, outcome: c.outcome })
+                lastCallMap.set(c.accountId, { timestamp: c.timestamp })
             }
         }
 
@@ -80,7 +80,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const call = lastCallMap.get(acct.id)
             const emailTs = lastEmailMap.get(acct.id)
             const lastCallTs = call?.timestamp ?? null
-            const lastCallOutcome = call?.outcome ?? null
+            const lastCallOutcome = null
             const lastTouchTs =
                 lastCallTs && emailTs
                     ? lastCallTs > emailTs ? lastCallTs : emailTs
