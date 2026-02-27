@@ -695,6 +695,7 @@ export default function PeoplePage() {
                       columnOrder={columnOrder}
                       healthLoading={lastTouchLoading}
                       healthUpdatedAt={lastTouchUpdatedAt}
+                      isSelected={row.getIsSelected()}
                     />
                   ))}
                 </AnimatePresence>

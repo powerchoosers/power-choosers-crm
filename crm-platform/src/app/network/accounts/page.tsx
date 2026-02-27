@@ -688,6 +688,7 @@ export default function AccountsPage() {
                       columnOrder={columnOrder}
                       healthLoading={lastTouchLoading}
                       healthUpdatedAt={lastTouchUpdatedAt}
+                      isSelected={row.getIsSelected()}
                     />
                   ))}
                 </AnimatePresence>

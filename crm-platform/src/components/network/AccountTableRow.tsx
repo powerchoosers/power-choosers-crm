@@ -16,6 +16,7 @@ interface AccountTableRowProps {
     columnOrder?: string[]
     healthLoading?: boolean
     healthUpdatedAt?: number
+    isSelected: boolean
 }
 
 export const AccountTableRow = memo(function AccountTableRow({
@@ -25,7 +26,8 @@ export const AccountTableRow = memo(function AccountTableRow({
     saveScroll,
     columnOrder,
     healthLoading,
-    healthUpdatedAt
+    healthUpdatedAt,
+    isSelected
 }: AccountTableRowProps) {
     return (
         <motion.tr
@@ -37,10 +39,10 @@ export const AccountTableRow = memo(function AccountTableRow({
                 delay: Math.min(index * 0.02, 0.4),
                 ease: [0.23, 1, 0.32, 1]
             }}
-            data-state={row.getIsSelected() && "selected"}
+            data-state={isSelected && "selected"}
             className={cn(
                 "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
-                row.getIsSelected()
+                isSelected
                     ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
                     : "hover:bg-white/[0.02]"
             )}
@@ -63,5 +65,5 @@ export const AccountTableRow = memo(function AccountTableRow({
         prev.columnOrder === next.columnOrder &&
         prev.healthLoading === next.healthLoading &&
         prev.healthUpdatedAt === next.healthUpdatedAt &&
-        prev.row.getIsSelected() === next.row.getIsSelected()
+        prev.isSelected === next.isSelected
 })
