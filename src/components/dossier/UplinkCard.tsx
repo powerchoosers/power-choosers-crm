@@ -12,6 +12,7 @@ interface UplinkCardProps {
   contact: ContactDetail
   isEditing: boolean
   onEmailClick?: () => void
+  onEnter?: () => void
   onUpdate: (updates: Partial<ContactDetail>) => void
 }
 
@@ -25,7 +26,7 @@ interface PhoneEntry {
   icon: typeof Smartphone
 }
 
-export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEmailClick, onUpdate }) => {
+export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEmailClick, onEnter, onUpdate }) => {
   const initiateCall = useCallStore((state) => state.initiateCall)
   // Local state for editing phones
   const [phones, setPhones] = useState<PhoneEntry[]>([])
@@ -218,6 +219,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                     type="text"
                     value={phone.value}
                     onChange={(e) => handlePhoneChange(phone.id, e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                     className="flex-1 bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm font-mono tabular-nums text-white focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                     placeholder="+1 (000) 000-0000"
                   />
@@ -280,6 +282,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
               type="text"
               value={email}
               onChange={(e) => handleEmailChange(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
               className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
               placeholder="analyst@nodalpoint.io"
             />

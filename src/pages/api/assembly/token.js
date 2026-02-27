@@ -13,8 +13,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        // v3 streaming token — GET request with query param
-        const response = await fetch('https://streaming.assemblyai.com/v3/token?expires_in_seconds=3600', {
+        // v3 streaming token — GET request with query param (max 600 seconds)
+        const response = await fetch('https://streaming.assemblyai.com/v3/token?expires_in_seconds=600', {
             method: 'GET',
             headers: {
                 'Authorization': apiKey,
