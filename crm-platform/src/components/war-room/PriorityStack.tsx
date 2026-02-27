@@ -60,14 +60,18 @@ function scoreAccount(acct: AccountRecord, reservesTight: boolean): ScoredAccoun
         contractDaysLeft = Math.round(
             (new Date(acct.contractEndDate).getTime() - now) / 86400000
         )
+        // Bonus for having any contract date
+        score += 10
         if (contractDaysLeft <= 0) {
-            score += 55; reasons.push('CONTRACT EXPIRED')
-        } else if (contractDaysLeft <= 30) {
-            score += 50; reasons.push(`CONTRACT IN ${contractDaysLeft}D`)
-        } else if (contractDaysLeft <= 90) {
-            score += 30; reasons.push(`CONTRACT IN ${contractDaysLeft}D`)
-        } else if (contractDaysLeft <= 180) {
-            score += 15; reasons.push(`CONTRACT IN ${contractDaysLeft}D`)
+            score += 65; reasons.push('CONTRACT EXPIRED')
+        } else if (contractDaysLeft <= 60) {
+            score += 55; reasons.push(`RENEWAL DANGER (${contractDaysLeft}D)`)
+        } else if (contractDaysLeft <= 120) {
+            score += 45; reasons.push(`WINDOW OPEN (${contractDaysLeft}D)`)
+        } else if (contractDaysLeft <= 365) {
+            score += 25; reasons.push(`MONITOR (${contractDaysLeft}D)`)
+        } else {
+            score += 10; reasons.push(`FAR OUT (${contractDaysLeft}D)`)
         }
     }
 
@@ -272,7 +276,7 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                         ))}
                     </div>
                 ) : (
-                    <AnimatePresence initial={false}>
+                    <div className="animate-in fade-in duration-300">
                         {accounts.map((acct, idx) => (
                             <AccountCard
                                 key={acct.id}
@@ -286,7 +290,7 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                                 isActiveCall={acct.id === activeAccountId}
                             />
                         ))}
-                    </AnimatePresence>
+                    </div>
                 )}
             </div>
         </div>
@@ -316,10 +320,7 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
             : ''
 
     return (
-        <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.15 }}
+        <div
             className={cn(
                 'group flex items-center gap-4 px-5 py-3.5 border-b border-white/[0.04]',
                 'hover:bg-white/[0.025] hover:border-white/10 transition-all duration-200 cursor-pointer',
@@ -413,6 +414,6 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
                     <CheckSquare className="w-3.5 h-3.5" />
                 </button>
             </div>
-        </motion.div>
+        </div>
     )
 }
