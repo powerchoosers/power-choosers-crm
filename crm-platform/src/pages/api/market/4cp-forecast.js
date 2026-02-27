@@ -56,14 +56,14 @@ export default async function handler(req, res) {
         const isTimeWindow = centralHour >= 14 && centralHour < 18 // 2pm–6pm CDT
 
         let probability = 0
-        const signals: string[] = []
+        const signals = []
 
         if (!isPeakSeason) {
             // Off-season: return baseline
             res.writeHead(200, { 'Content-Type': 'application/json' })
             return res.end(JSON.stringify({
                 probability: 0,
-                riskLevel: 'OFF_SEASON' as const,
+                riskLevel: 'OFF_SEASON',
                 isPeakSeason: false,
                 isTimeWindow: false,
                 peaksRecorded: 0,
@@ -129,7 +129,7 @@ export default async function handler(req, res) {
 
         probability = Math.min(100, Math.round(probability))
 
-        let riskLevel: 'LOW' | 'MODERATE' | 'HIGH' | 'CRITICAL' | 'BATTLE_STATIONS' = 'LOW'
+        let riskLevel = 'LOW'
         if (probability >= 80) riskLevel = 'BATTLE_STATIONS'
         else if (probability >= 65) riskLevel = 'CRITICAL'
         else if (probability >= 45) riskLevel = 'HIGH'
