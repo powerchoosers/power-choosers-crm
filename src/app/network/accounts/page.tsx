@@ -366,17 +366,16 @@ export default function AccountsPage() {
               href={`/network/accounts/${account.id}`}
               className="flex items-center gap-3 group/acc cursor-pointer"
             >
-              <div className="relative">
-                <CompanyIcon
-                  logoUrl={account.logoUrl}
-                  domain={account.domain}
-                  name={account.name}
-                  size={36}
-                  className="w-9 h-9 transition-all"
-                  isDeleting={deletingAccountIds.has(account.id)}
-                  healthScore={healthScore}
-                />
-              </div>
+              <CompanyIcon
+                logoUrl={account.logoUrl}
+                domain={account.domain}
+                name={account.name}
+                size={36}
+                className="w-9 h-9 transition-all"
+                isDeleting={deletingAccountIds.has(account.id)}
+                healthScore={healthScore}
+                healthLoading={lastTouchLoading || lastTouchMap === undefined}
+              />
               <div>
                 <div className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all flex items-center gap-1.5 origin-left">
                   {account.name}
@@ -575,7 +574,7 @@ export default function AccountsPage() {
         },
       },
     ]
-  }, [pageIndex, deletingAccountIds])
+  }, [pageIndex, deletingAccountIds, lastTouchMap, lastTouchLoading])
 
   const table = useReactTable({
     data: accounts,

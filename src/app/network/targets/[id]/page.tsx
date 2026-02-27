@@ -339,6 +339,7 @@ export default function TargetDetailPage() {
               className="w-9 h-9 transition-all"
               textClassName="text-[10px]"
               healthScore={healthScore}
+              healthLoading={contactTouchLoading || contactLastTouchMap === undefined}
             />
             <div>
               <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
@@ -438,7 +439,7 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pageIndex, pageSize, isPeopleList])
+  ], [pageIndex, pageSize, isPeopleList, contactLastTouchMap, contactTouchLoading])
 
   // Column definitions for Accounts
   const accountColumns = useMemo<ColumnDef<Account>[]>(() => [
@@ -524,6 +525,7 @@ export default function TargetDetailPage() {
               size={36}
               className="w-9 h-9"
               healthScore={healthScore}
+              healthLoading={accountTouchLoading || accountLastTouchMap === undefined}
             />
             <div>
               <div className="font-medium text-zinc-200 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
@@ -598,7 +600,7 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pageIndex, pageSize, router])
+  ], [pageIndex, pageSize, router, accountLastTouchMap, accountTouchLoading])
 
   const tableColumns = useMemo(() => isPeopleList ? peopleColumns : accountColumns, [isPeopleList, peopleColumns, accountColumns])
 
