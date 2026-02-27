@@ -44,49 +44,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
         }
 
-        // Last email per account — via contacts at the account
-        const { data: contactEmailRows } = await supabaseAdmin
-            .from('contacts')
-            .select('accountId, email')
+        // Last email per account
+        const { data: emailRows } = await supabaseAdmin
+            .from('emails')
+            .select('accountId, timestamp')
             .in('accountId', accountIds)
-            .not('email', 'is', null)
-
-        const emailToAccountId = new Map<string, string>()
-        for (const row of contactEmailRows ?? []) {
-            if (row.email && row.accountId) {
-                emailToAccountId.set(row.email.toLowerCase(), row.accountId)
-            }
-        }
+            .not('timestamp', 'is', null)
+            .order('timestamp', { ascending: false })
 
         const lastEmailMap = new Map<string, string>()
-        const contactEmails = [...emailToAccountId.keys()]
-        if (contactEmails.length > 0) {
-            const conditions = contactEmails
-                .flatMap((e) => [`from.ilike.*${e}*`, `to.cs.["${e}"]`])
-                .join(',')
-            const { data: emailRows } = await supabaseAdmin
-                .from('emails')
-                .select('from, to, timestamp')
-                .or(conditions)
-                .not('timestamp', 'is', null)
-                .order('timestamp', { ascending: false })
-
-            for (const row of emailRows ?? []) {
-                const ts = row.timestamp as string | null
-                if (!ts) continue
-                const fromEmail = ((row.from as string) || '').toLowerCase()
-                const toArr: string[] = Array.isArray(row.to)
-                    ? (row.to as string[])
-                    : typeof row.to === 'string'
-                        ? [row.to]
-                        : []
-                const candidates = [fromEmail, ...toArr.map((e) => e.toLowerCase())]
-                for (const candidate of candidates) {
-                    const acctId = emailToAccountId.get(candidate)
-                    if (!acctId) continue
-                    const existing = lastEmailMap.get(acctId)
-                    if (!existing || ts > existing) lastEmailMap.set(acctId, ts)
-                }
+        for (const e of emailRows ?? []) {
+            if (!e.accountId || !e.timestamp) continue
+            if (!lastEmailMap.has(e.accountId)) {
+                lastEmailMap.set(e.accountId, e.timestamp)
             }
         }
 
