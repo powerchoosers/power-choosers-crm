@@ -34,8 +34,8 @@ const TYPE_STYLE: Record<SignalEntry['type'], { label: string; color: string; ic
     LIVE: { label: 'LIVE', color: 'text-zinc-500', icon: <Activity className="w-2.5 h-2.5" /> },
 }
 
-function formatTime(d: Date) {
-    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
+function formatTime(d: Date | string) {
+    return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 export function SignalFeed({ onAccountClick }: SignalFeedProps) {
