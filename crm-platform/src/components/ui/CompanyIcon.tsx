@@ -193,7 +193,7 @@ function CompanyIconInner({
       <div className="relative inline-block shrink-0">
         <motion.div
           layout
-          initial={{ opacity: 0 }}
+          initial={false}
           animate={
             isDeleting
               ? { scale: 0.88, opacity: 0.6, transition: { duration: 0.35, ease: 'easeOut' } }
@@ -228,9 +228,9 @@ function CompanyIconInner({
               <motion.div
                 key={healthScore}
                 initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
+                animate={{ scale: [0, 1.25, 1], opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
                 className={cn(
                   'w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
                   health.bg,
@@ -257,6 +257,7 @@ function CompanyIconInner({
     <div className="relative inline-block shrink-0">
       <motion.div
         layout
+        initial={false}
         className={cn(
           'relative overflow-hidden nodal-glass bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]',
           roundedClassName,
@@ -329,9 +330,9 @@ function CompanyIconInner({
             <motion.div
               key={healthScore}
               initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
+              animate={{ scale: [0, 1.25, 1], opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+              transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
               className={cn(
                 'w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
                 health.bg,
