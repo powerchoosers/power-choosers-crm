@@ -3,7 +3,8 @@
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
+import { useWarRoomStore } from '@/store/warRoomStore'
 import { Activity, Phone, Mail, CheckSquare } from 'lucide-react'
 
 function generateId() {
@@ -25,7 +26,7 @@ interface SignalFeedProps {
 }
 
 const TYPE_STYLE: Record<SignalEntry['type'], { label: string; color: string; icon: React.ReactNode }> = {
-    MARKET: { label: 'MARKET', color: 'text-[#002FA7]', icon: <Activity className="w-2.5 h-2.5" /> },
+    MARKET: { label: 'MARKET', color: 'text-zinc-100', icon: <Activity className="w-2.5 h-2.5" /> },
     INTEL: { label: 'INTEL', color: 'text-amber-400', icon: null },
     CALL: { label: 'CALL', color: 'text-zinc-400', icon: <Phone className="w-2.5 h-2.5" /> },
     EMAIL: { label: 'EMAIL', color: 'text-zinc-400', icon: <Mail className="w-2.5 h-2.5" /> },
@@ -36,13 +37,12 @@ function formatTime(d: Date) {
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
-export function SignalFeed({ pendingMarketEvents }: SignalFeedProps) {
-    const [entries, setEntries] = useState<SignalEntry[]>([])
+export function SignalFeed({ onAccountClick }: SignalFeedProps) {
+    const { signalHistory: entries, addSignal } = useWarRoomStore()
     const listRef = useRef<HTMLDivElement>(null)
 
     const push = (entry: Omit<SignalEntry, 'id' | 'time'>) => {
-        const newEntry: SignalEntry = { ...entry, id: generateId(), time: new Date() }
-        setEntries((prev) => [newEntry, ...prev].slice(0, 60))
+        addSignal({ ...entry, id: generateId(), time: new Date() })
     }
 
     // Realtime: listen for new calls
@@ -71,17 +71,11 @@ export function SignalFeed({ pendingMarketEvents }: SignalFeedProps) {
         return () => { supabase.removeChannel(channel) }
     }, [])
 
-    // Inject market events from grid
+    // Initial placeholder entry (if feed empty)
     useEffect(() => {
-        if (!pendingMarketEvents?.length) return
-        for (const e of pendingMarketEvents) {
-            setEntries((prev) => [e, ...prev].slice(0, 60))
+        if (entries.length === 0) {
+            push({ type: 'INTEL', message: 'War Room active — monitoring ERCOT and CRM signals' })
         }
-    }, [pendingMarketEvents])
-
-    // Initial placeholder entries
-    useEffect(() => {
-        push({ type: 'INTEL', message: 'War Room active — monitoring ERCOT and CRM signals' })
     }, [])
 
     return (

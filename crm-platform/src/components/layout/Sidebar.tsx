@@ -169,7 +169,7 @@ export function Sidebar() {
               transition={{ duration: 0.3, delay: 0.1 }}
               className="ml-4 font-bold text-lg tracking-tighter text-white"
             >
-              Nodal<span className="text-[#002FA7]">Point</span> Network
+              Nodal<span className="text-zinc-100">Point</span> Network
             </motion.div>
           )}
         </AnimatePresence>
@@ -242,7 +242,7 @@ export function Sidebar() {
                         {/* Laser Sight Indicator - full height of nav item */}
                         <motion.div
                           layoutId="laserSight"
-                          className="absolute left-0 top-0 bottom-0 w-1 bg-[#002FA7] rounded-r-full z-20 shadow-[0_0_10px_rgba(0,47,167,0.5)]"
+                          className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full z-20 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
                           initial={{ opacity: 0, x: -2 }}
                           animate={{ opacity: 1, x: 0 }}
                           exit={{ opacity: 0, x: -2 }}

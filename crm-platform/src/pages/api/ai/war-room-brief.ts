@@ -1,18 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { supabaseAdmin } from '@/lib/supabase'
 
 /**
  * POST /api/ai/war-room-brief
- * Generates a 3-bullet forensic tactical brief using OpenRouter (Gemini 2.5 Flash).
- * GATED — only fires on explicit user button press, never on page load.
+ * Generates a deep forensic tactical brief using OpenRouter (Gemini 2.5 Flash).
+ * Fetches transcripts, emails, and stakeholder context for top priority accounts.
  */
 
 interface AccountContext {
+    id: string
     name: string
-    contractEndDate: string | null
-    lastTouchTs: string | null
-    lastCallOutcome: string | null
-    industry: string | null
-    overdueTaskCount: number
     liabilityScore: number
     liabilityReasons: string[]
 }
@@ -27,6 +24,7 @@ interface GridContext {
 interface BriefRequest {
     topAccounts: AccountContext[]
     grid: GridContext
+    signalHistory: any[]
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -36,103 +34,117 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const apiKey = process.env.OPEN_ROUTER_API_KEY || process.env.FREE_GEMINI_KEY
     if (!apiKey) {
-        return res.status(503).json({ error: 'No AI API key configured (OPEN_ROUTER_API_KEY or FREE_GEMINI_KEY)' })
+        return res.status(503).json({ error: 'No AI API key configured' })
     }
 
-    const useOpenRouter = !!process.env.OPEN_ROUTER_API_KEY
-
-    const { topAccounts, grid } = req.body as BriefRequest
+    const { topAccounts, grid, signalHistory } = req.body as BriefRequest
 
     if (!topAccounts?.length) {
         return res.status(400).json({ error: 'topAccounts required' })
     }
 
-    const accountSummary = topAccounts
-        .slice(0, 5)
-        .map((a, i) => {
-            const days = a.contractEndDate
-                ? Math.round((new Date(a.contractEndDate).getTime() - Date.now()) / 86400000)
-                : null
-            const touchDays = a.lastTouchTs
-                ? Math.round((Date.now() - new Date(a.lastTouchTs).getTime()) / 86400000)
-                : null
-            return [
-                `${i + 1}. ${a.name} (Score: ${a.liabilityScore})`,
-                days !== null ? `   Contract: ${days > 0 ? `expires in ${days}d` : `EXPIRED ${Math.abs(days)}d ago`}` : '   Contract: Unknown',
-                touchDays !== null ? `   Last touch: ${touchDays}d ago` : '   Last touch: Never',
-                a.lastCallOutcome ? `   Last call outcome: ${a.lastCallOutcome}` : '',
-                a.overdueTaskCount ? `   Overdue tasks: ${a.overdueTaskCount}` : '',
-                `   Reasons: ${a.liabilityReasons.join(' · ')}`,
-            ].filter(Boolean).join('\n')
-        })
-        .join('\n\n')
-
-    const gridSummary = grid
-        ? [
-            grid.hubPrice !== null ? `Hub Price: $${grid.hubPrice.toFixed(2)}/MWh` : null,
-            grid.reserves !== null ? `Reserves: ${grid.reserves.toLocaleString()} MW${grid.reserves < 3000 ? ' ⚠ TIGHT' : ''}` : null,
-            grid.frequency !== null ? `Frequency: ${grid.frequency} Hz` : null,
-            grid.scarcityProb ? `Scarcity Probability: ${grid.scarcityProb}%` : null,
-        ]
-            .filter(Boolean)
-            .join(' | ')
-        : 'Grid data unavailable'
-
-    const prompt = `You are a forensic energy market advisor specializing in the Texas ERCOT market. Your clients are Fortune 500 procurement officers managing multi-million dollar energy liability.
-
-CURRENT ERCOT GRID STATE:
-${gridSummary}
-
-TOP PRIORITY ACCOUNTS (ranked by liability score):
-${accountSummary}
-
-INSTRUCTIONS:
-Write exactly 3 tactical bullets. Each bullet must:
-1. Name WHO to call (account name + why they rank)
-2. State WHY NOW — combine one market signal (from grid state) with one CRM signal (from account data)
-3. Provide the FIRST SENTENCE the advisor should say (forensic/direct, never "save money")
-
-Use vocabulary: demand ratchet, 4CP coincident peak exposure, scarcity adder, below-scarcity pricing window, transmission liability, contract window closing.
-
-Be terse. No preamble, no sign-off, no fluff. Just the 3 bullets in plain text.`
+    const accountIds = topAccounts.slice(0, 5).map(a => a.id)
 
     try {
-        let responseText = ''
+        // Parallel fetch of deep intelligence
+        const [
+            { data: fullAccounts },
+            { data: contacts },
+            { data: calls },
+            { data: emails },
+            { data: tasks },
+            { data: docs }
+        ] = await Promise.all([
+            supabaseAdmin.from('accounts').select('*').in('id', accountIds),
+            supabaseAdmin.from('contacts').select('*').in('accountId', accountIds),
+            supabaseAdmin.from('calls').select('*').in('accountId', accountIds).order('timestamp', { ascending: false }).limit(20),
+            supabaseAdmin.from('emails').select('*').in('accountId', accountIds).order('timestamp', { ascending: false }).limit(20),
+            supabaseAdmin.from('tasks').select('*').in('accountId', accountIds).eq('status', 'overdue'),
+            supabaseAdmin.from('documents').select('*').in('account_id', accountIds)
+        ])
 
-        if (useOpenRouter) {
-            const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${process.env.OPEN_ROUTER_API_KEY}`,
-                    'Content-Type': 'application/json',
-                    'HTTP-Referer': 'https://nodalpoint.io',
-                    'X-Title': 'Nodal Point War Room',
-                },
-                body: JSON.stringify({
-                    model: 'google/gemini-2.5-flash',
-                    messages: [{ role: 'user', content: prompt }],
-                    max_tokens: 600,
-                    temperature: 0.3,
-                }),
-            })
-            const orData = await orRes.json()
-            responseText = orData.choices?.[0]?.message?.content ?? ''
-        } else {
-            // Fallback: Google AI directly via Gemini REST
-            const geminiRes = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.FREE_GEMINI_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }],
-                        generationConfig: { maxOutputTokens: 600, temperature: 0.3 },
-                    }),
-                }
-            )
-            const geminiData = await geminiRes.json()
-            responseText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
-        }
+        // Build Intelligence Dossiers
+        const dossiers = topAccounts.slice(0, 5).map(a => {
+            const acc = fullAccounts?.find(f => f.id === a.id)
+            const accContacts = contacts?.filter(c => c.accountId === a.id) || []
+            const accCalls = calls?.filter(c => c.accountId === a.id).slice(0, 3) || []
+            const accEmails = emails?.filter(c => c.accountId === a.id).slice(0, 3) || []
+            const accTasks = tasks?.filter(t => t.accountId === a.id) || []
+            const accDocs = docs?.filter(d => d.account_id === a.id) || []
+
+            return `
+[DOSSIER: ${a.name}]
+Score: ${a.liabilityScore}
+Industry: ${acc?.industry || 'Unknown'}
+Liability Profile: ${a.liabilityReasons.join(' · ')}
+Load Factor: ${acc?.load_factor || 'Unknown'}
+Electricity Supplier: ${acc?.electricity_supplier || 'Unknown'}
+Contract End: ${acc?.contract_end_date || 'Unknown'}
+
+STAKEHOLDER MAP:
+${accContacts.map(c => `- ${c.firstName} ${c.lastName} (${c.title || 'No Title'}): ${c.email || 'No Email'}`).join('\n') || 'No contacts found'}
+
+RECENT CALL TRANSCRIPTS & SYNOPSIS:
+${accCalls.map(c => `* ${new Date(c.timestamp).toLocaleDateString()}: ${c.summary || 'No summary'}
+  TRANSCRIPT SNIPPET: ${c.transcript?.slice(0, 300) || 'None'}`).join('\n\n') || 'No recent call history'}
+
+RECENT EMAIL COMMUNICATIONS:
+${accEmails.map(e => `* ${new Date(e.timestamp).toLocaleDateString()}: Subject: ${e.subject}
+  SNIPPET: ${e.text?.slice(0, 200)}`).join('\n\n') || 'No recent email communications'}
+
+CRITICAL ACTION TRACE:
+${accTasks.map(t => `- OVERDUE: ${t.title} (Priority: ${t.priority})`).join('\n') || 'No overdue tasks'}
+DOCUMENTS ON FILE: ${accDocs.map(d => d.name).join(', ') || 'None'}
+            `.trim()
+        }).join('\n\n---\n\n')
+
+        const signalLog = signalHistory?.length
+            ? signalHistory.map(s => `[${new Date(s.time).toLocaleTimeString()}] ${s.type}: ${s.message}`).join('\n')
+            : 'No live signals logged'
+
+        const gridSummary = grid
+            ? `Hub: $${grid.hubPrice?.toFixed(2)}/MWh | Reserves: ${grid.reserves?.toLocaleString()} MW | Scarcity Prob: ${grid.scarcityProb}%`
+            : 'Grid data unavailable'
+
+        const prompt = `You are a forensic energy advisor. Provide a 3-bullet TACTICAL STRIKE PLAN based on the Market Pulse and deep Intelligence Dossiers.
+
+CURRENT MARKET PULSE:
+${gridSummary}
+
+LIVE SIGNAL FEED (Last 15m):
+${signalLog}
+
+CORE INTELLIGENCE DOSSIERS:
+${dossiers}
+
+INSTRUCTIONS:
+1. Identify the 3 highest-risk opportunities where Market Tightness meets CRM Liability.
+2. For each bullet:
+   - Identify the SPECIFIC ACCOUNT and the PRIMARY STAKEHOLDER to reach out to.
+   - Reference a SPECIFIC DETAIL from their transcript or email history (e.g., "they mentioned X in their last call").
+   - Define the TACTICAL OPENING: How to pivot the current market volatility into their specific contract vulnerability.
+3. Vocabulary: demand ratchet, 4CP peak exposure, scarcity adder, transmission liability.
+
+Tone: Forensic, urgent but measured, professional. No conversational filler. Exactly 3 bullets.`
+
+        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+                'HTTP-Referer': 'https://nodalpoint.io',
+                'X-Title': 'Nodal Point Deep Brief',
+            },
+            body: JSON.stringify({
+                model: 'google/gemini-2.5-flash',
+                messages: [{ role: 'user', content: prompt }],
+                max_tokens: 800,
+                temperature: 0.2,
+            }),
+        })
+
+        const orData = await orRes.json()
+        const responseText = orData.choices?.[0]?.message?.content ?? ''
 
         if (!responseText) {
             return res.status(502).json({ error: 'AI returned empty response' })
@@ -140,7 +152,9 @@ Be terse. No preamble, no sign-off, no fluff. Just the 3 bullets in plain text.`
 
         return res.status(200).json({ brief: responseText.trim() })
     } catch (err: unknown) {
+        console.error('AI Brief Error:', err)
         const msg = err instanceof Error ? err.message : String(err)
         return res.status(500).json({ error: 'AI brief generation failed', detail: msg })
     }
 }
+

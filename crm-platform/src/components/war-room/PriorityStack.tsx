@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { useWarRoomStore } from '@/store/warRoomStore'
 import { Phone, Mail, CheckSquare, Zap, X, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -127,6 +128,7 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
     const [brief, setBrief] = useState<string | null>(null)
     const [briefLoading, setBriefLoading] = useState(false)
     const [briefError, setBriefError] = useState<string | null>(null)
+    const { signalHistory } = useWarRoomStore()
 
     const reservesTight = (gridSnapshot?.reserves ?? Infinity) < 4000
 
@@ -174,6 +176,11 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                         frequency: gridSnapshot?.frequency ?? null,
                         scarcityProb: gridSnapshot?.scarcityProb ?? null,
                     },
+                    signalHistory: signalHistory.slice(0, 15).map((s: { type: string, message: string, time: Date }) => ({
+                        type: s.type,
+                        message: s.message,
+                        time: s.time
+                    }))
                 }),
             })
             const json = await res.json()
@@ -210,8 +217,8 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                     className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 rounded border text-[10px] font-mono uppercase tracking-widest transition-all',
                         briefLoading
-                            ? 'border-[#002FA7]/30 text-[#002FA7]/50 cursor-not-allowed'
-                            : 'border-[#002FA7]/60 text-[#002FA7] hover:bg-[#002FA7]/10 hover:border-[#002FA7]'
+                            ? 'border-white/10 text-white/30 cursor-not-allowed'
+                            : 'border-white/20 text-white hover:bg-white/10 hover:border-white/40 shadow-[0_0_15px_rgba(255,255,255,0.05)]'
                     )}
                 >
                     {briefLoading
@@ -305,7 +312,7 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
 
     const urgencyGlow =
         reservesTight && (acct.healthTier === 'cold' || acct.healthTier === 'never')
-            ? 'hover:shadow-[0_0_20px_rgba(0,47,167,0.12)]'
+            ? 'hover:shadow-[0_0_20px_rgba(255,255,255,0.02)]'
             : ''
 
     return (
@@ -344,7 +351,7 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-zinc-100 truncate">{acct.name}</span>
                     {acct.liabilityScore >= 70 && !isActiveCall && (
-                        <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded-sm border border-[#002FA7]/50 text-[#002FA7] bg-[#002FA7]/10 uppercase tracking-widest">
+                        <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded-sm border border-white/20 text-zinc-100 bg-white/5 uppercase tracking-widest">
                             HIGH
                         </span>
                     )}
@@ -393,7 +400,7 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
                 </button>
                 <button
                     onClick={onEmail}
-                    className="icon-button-forensic w-7 h-7 flex items-center justify-center rounded hover:bg-[#002FA7]/10 hover:text-[#002FA7] transition-colors"
+                    className="icon-button-forensic w-7 h-7 flex items-center justify-center rounded hover:bg-white/5 hover:text-white transition-colors"
                     title="View emails"
                 >
                     <Mail className="w-3.5 h-3.5" />

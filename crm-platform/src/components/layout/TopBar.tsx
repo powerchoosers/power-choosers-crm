@@ -476,7 +476,7 @@ export function TopBar() {
               </span>
             </div>
             <div className="flex items-center gap-3 mt-0.5">
-              <div className="text-[9px] font-mono text-[#002FA7] tracking-wider">
+              <div className="text-[9px] font-mono text-zinc-400 tracking-wider">
                 {marketStrategy.windowText}
               </div>
             </div>
@@ -520,7 +520,7 @@ export function TopBar() {
                 exit={{ opacity: 0, y: -20 }}
                 className="w-full flex"
               >
-                <div className="w-full h-[50px] nodal-glass border-[#002FA7]/30 rounded-2xl shadow-[0_10px_30px_-10px_rgba(0,47,167,0.5)] flex items-center justify-between px-3 transition-all duration-300">
+                <div className="w-full h-[50px] nodal-glass border-white/20 rounded-2xl shadow-[0_10px_30px_-10px_rgba(255,255,255,0.1)] flex items-center justify-between px-3 transition-all duration-300">
 
                   {/* Left Sector: Identity */}
                   <div className="flex items-center gap-2 w-max max-w-[35%] flex-shrink-0">
@@ -582,11 +582,11 @@ export function TopBar() {
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'connect'
-                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                          ? "bg-white/10 border-white/40 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]"
                           : "bg-zinc-950/50 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-zinc-300"
                       )}
                     >
-                      <Handshake size={14} className={sentiment === 'connect' ? "text-blue-400" : "text-zinc-500"} />
+                      <Handshake size={14} className={sentiment === 'connect' ? "text-zinc-100" : "text-zinc-500"} />
                       <span>Connect</span>
                     </button>
                     <button
@@ -594,11 +594,11 @@ export function TopBar() {
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'interest'
-                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                          ? "bg-white/10 border-white/40 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]"
                           : "bg-zinc-950/50 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-zinc-300"
                       )}
                     >
-                      <Zap size={14} className={sentiment === 'interest' ? "text-blue-400" : "text-zinc-500"} />
+                      <Zap size={14} className={sentiment === 'interest' ? "text-zinc-100" : "text-zinc-500"} />
                       <span>Interest</span>
                     </button>
                     <button
@@ -606,11 +606,11 @@ export function TopBar() {
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'lock'
-                          ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                          ? "bg-white/10 border-white/40 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]"
                           : "bg-zinc-950/50 border-white/10 text-zinc-400 hover:bg-white/10 hover:text-zinc-300"
                       )}
                     >
-                      <FileSignature size={14} className={sentiment === 'lock' ? "text-blue-400" : "text-zinc-500"} />
+                      <FileSignature size={14} className={sentiment === 'lock' ? "text-zinc-100" : "text-zinc-500"} />
                       <span>Lock</span>
                     </button>
 
@@ -738,7 +738,7 @@ export function TopBar() {
                   {/* From/Origin Badge (for Dialer) */}
                   {isDialerOpen && selectedNumber && (
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md">
-                      <Shield size={10} className="text-[#002FA7] shrink-0" />
+                      <Shield size={10} className="text-white shrink-0" />
                       <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
                         From: <span className="text-zinc-200">{selectedNumberName}</span>
                       </span>
@@ -750,7 +750,7 @@ export function TopBar() {
                     <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md">
                       <div className={cn(
                         "w-1.5 h-1.5 rounded-full animate-pulse",
-                        (!contextInfo || contextInfo.type === 'general') ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-[#002FA7] shadow-[0_0_8px_#002FA7]"
+                        (!contextInfo || contextInfo.type === 'general') ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-white shadow-[0_0_8px_rgba(255,255,255,0.5)]"
                       )} />
                       <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
                         {contextInfo.displayLabel}

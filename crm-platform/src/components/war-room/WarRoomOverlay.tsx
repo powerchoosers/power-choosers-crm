@@ -23,11 +23,10 @@ interface GridSnapshot {
 }
 
 export function WarRoomOverlay() {
-    const { isOpen, close } = useWarRoomStore()
+    const { isOpen, close, addSignal } = useWarRoomStore()
     const { isActive: isCallActive, status: callStatus, metadata: callMeta } = useCallStore()
     const router = useRouter()
     const [gridSnapshot, setGridSnapshot] = useState<GridSnapshot | null>(null)
-    const [pendingMarketEvents, setPendingMarketEvents] = useState<SignalEntry[]>([])
     const [prevReserves, setPrevReserves] = useState<number | null>(null)
     const [currentTime, setCurrentTime] = useState(new Date())
     const [prevCallActive, setPrevCallActive] = useState(false)
@@ -48,15 +47,15 @@ export function WarRoomOverlay() {
 
     useEffect(() => {
         if (isCallActive && !prevCallActive) {
-            setPendingMarketEvents([{
+            addSignal({
                 id: generateId(),
                 time: new Date(),
                 type: 'CALL',
                 message: `Live Call initiated: ${callMeta?.name || 'Unknown'} — ${callStatus}`,
-            }])
+            })
         }
         setPrevCallActive(isCallActive)
-    }, [isCallActive, prevCallActive, callMeta?.name, callStatus])
+    }, [isCallActive, prevCallActive, callMeta?.name, callStatus, addSignal])
 
     // Lock body scroll when open
     useEffect(() => {
@@ -72,19 +71,17 @@ export function WarRoomOverlay() {
     const handleGridUpdate = useCallback((data: GridSnapshot & { timestamp?: string | null }) => {
         setGridSnapshot(data)
 
-        const events: SignalEntry[] = []
-
         // Fire a signal when reserves cross threshold
         if (data.reserves !== null && prevReserves !== null) {
             if (prevReserves >= 3000 && data.reserves < 3000) {
-                events.push({
+                addSignal({
                     id: generateId(),
                     time: new Date(),
                     type: 'MARKET',
                     message: `ERCOT reserves breached 3,000 MW floor — ${data.reserves.toLocaleString()} MW`,
                 })
             } else if (prevReserves >= 4000 && data.reserves < 4000) {
-                events.push({
+                addSignal({
                     id: generateId(),
                     time: new Date(),
                     type: 'MARKET',
@@ -95,7 +92,7 @@ export function WarRoomOverlay() {
 
         // Fire when price spikes significantly
         if (data.hubPrice !== null && data.hubPrice > 200) {
-            events.push({
+            addSignal({
                 id: generateId(),
                 time: new Date(),
                 type: 'MARKET',
@@ -103,9 +100,8 @@ export function WarRoomOverlay() {
             })
         }
 
-        if (events.length > 0) setPendingMarketEvents(events)
         setPrevReserves(data.reserves)
-    }, [prevReserves])
+    }, [prevReserves, addSignal])
 
     const handleAccountOpen = useCallback((accountId: string) => {
         router.push(`/network/accounts/${accountId}`)
@@ -142,7 +138,7 @@ export function WarRoomOverlay() {
                         exit={{ opacity: 0, scale: 0.98, y: 8 }}
                         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
                         className="fixed inset-4 z-[100] flex flex-col rounded-xl overflow-hidden border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.8)] bg-[#09090b]"
-                        style={{ backgroundColor: '#09090b', backgroundImage: 'radial-gradient(circle at 50% 120%, rgba(0, 47, 167, 0.05), transparent)' }}
+                        style={{ backgroundColor: '#09090b', backgroundImage: 'radial-gradient(circle at 50% 120%, rgba(255, 255, 255, 0.02), transparent)' }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -150,7 +146,7 @@ export function WarRoomOverlay() {
                             <div className="flex items-center gap-3">
                                 <Shield className={cn(
                                     'w-4 h-4 transition-colors',
-                                    reservesTight ? 'text-[#002FA7]' : 'text-zinc-600'
+                                    reservesTight ? 'text-zinc-100' : 'text-zinc-600'
                                 )} />
                                 <span className="text-xs font-mono text-zinc-300 uppercase tracking-[0.3em]">
                                     Forensic War Room
@@ -167,14 +163,14 @@ export function WarRoomOverlay() {
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         exit={{ opacity: 0, scale: 0.8 }}
-                                        className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-[#002FA7]/40 bg-[#002FA7]/10"
+                                        className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-white/20 bg-white/5"
                                     >
                                         <motion.div
                                             animate={{ opacity: [1, 0.4, 1] }}
                                             transition={{ repeat: Infinity, duration: 1.5 }}
-                                            className="w-1.5 h-1.5 rounded-full bg-[#002FA7]"
+                                            className="w-1.5 h-1.5 rounded-full bg-white"
                                         />
-                                        <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest">
+                                        <span className="text-[10px] font-mono text-zinc-100 uppercase tracking-widest font-bold">
                                             Grid Alert Active
                                         </span>
                                     </motion.div>
@@ -235,7 +231,7 @@ export function WarRoomOverlay() {
 
                             {/* Station III: Signal Feed — 35% width */}
                             <div className="flex-[35] overflow-hidden">
-                                <SignalFeed pendingMarketEvents={pendingMarketEvents} />
+                                <SignalFeed />
                             </div>
                         </div>
 
@@ -248,7 +244,7 @@ export function WarRoomOverlay() {
                                 <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
                                     {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                                 </span>
-                                <span className="text-[10px] font-mono text-[#002FA7] tabular-nums font-bold">
+                                <span className="text-[10px] font-mono text-zinc-100 tabular-nums font-bold">
                                     {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'America/Chicago' })} CST
                                 </span>
                             </div>

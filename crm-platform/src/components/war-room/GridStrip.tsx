@@ -104,7 +104,7 @@ export function GridStrip({ onGridUpdate }: GridStripProps) {
         : 'flat'
 
     const stripBorder = alertLevel === 'critical'
-        ? 'border-b border-[#002FA7]/60 shadow-[0_1px_20px_rgba(0,47,167,0.25)]'
+        ? 'border-b border-white/20 shadow-[0_1px_20px_rgba(255,255,255,0.05)]'
         : alertLevel === 'tight'
             ? 'border-b border-amber-500/30'
             : 'border-b border-white/5'
@@ -121,15 +121,15 @@ export function GridStrip({ onGridUpdate }: GridStripProps) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: [0.15, 0.3, 0.15] }}
                         transition={{ repeat: Infinity, duration: 2 }}
-                        className="absolute inset-0 bg-[#002FA7]/10 pointer-events-none"
+                        className="absolute inset-0 bg-white/5 pointer-events-none"
                     />
                 )}
             </AnimatePresence>
 
             {/* Label */}
             <div className="flex items-center gap-1.5 pr-5 border-r border-white/10 shrink-0">
-                <Activity className="w-3 h-3 text-[#002FA7]" />
-                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-[0.2em]">ERCOT</span>
+                <Activity className="w-3 h-3 text-zinc-100" />
+                <span className="text-[10px] font-mono text-zinc-100 uppercase tracking-[0.2em]">ERCOT</span>
             </div>
 
             {loading ? (
@@ -179,9 +179,9 @@ export function GridStrip({ onGridUpdate }: GridStripProps) {
                     {/* Alert mode label */}
                     {alertLevel !== 'normal' && (
                         <div className={cn(
-                            'flex items-center gap-1 ml-4 px-2.5 py-0.5 rounded-sm text-[10px] font-mono uppercase tracking-widest shrink-0',
+                            'flex items-center gap-1 ml-4 px-2.5 py-0.5 rounded-sm text-[10px] font-mono uppercase tracking-widest shrink-0 font-bold',
                             alertLevel === 'critical'
-                                ? 'bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/40'
+                                ? 'bg-white/10 text-white border border-white/20'
                                 : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                         )}>
                             {alertLevel === 'critical' ? 'SCARCITY ALERT' : 'RESERVES TIGHT'}
@@ -212,8 +212,8 @@ function GridCell({ label, value, accent, suffix, icon }: GridCellProps) {
     const valueColor =
         accent === 'red' ? 'text-rose-400' :
             accent === 'amber' ? 'text-amber-400' :
-                accent === 'blue' ? 'text-[#002FA7]' :
-                    'text-zinc-200'
+                accent === 'blue' ? 'text-zinc-100 font-bold' :
+                    'text-zinc-400'
 
     return (
         <div className="flex items-baseline gap-1 px-4 border-r border-white/5 last:border-0 shrink-0">
