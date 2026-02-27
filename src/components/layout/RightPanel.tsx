@@ -32,6 +32,7 @@ import ContextTasksWidget from '../crm/ContextTasksWidget'
 import OrgIntelligence from '../crm/OrgIntelligence'
 import SignalStream from '../crm/SignalStream'
 import { VectorControlModule } from '../crm/VectorControlModule'
+import { ContractIntelWidget } from '../crm/ContractIntelWidget'
 import { TaskInjectionPopover } from '../crm/TaskInjectionPopover'
 import { mapLocationToZone } from '@/lib/market-mapping'
 import { useWeather } from '@/hooks/useWeather'
@@ -295,9 +296,16 @@ export function RightPanel() {
                     >
                       {/* 0. ASSIGN OPERATIONAL VECTOR — Contacts: protocols + lists; Accounts: lists only (account-filtered) */}
                       {isContactPage && entityId ? (
-                        <VectorControlModule key={`vector-contact-${entityId}`} contactId={entityId} />
+                        <VectorControlModule key={`vector-contact-${entityId}`} contactId={entityId} accountId={contact?.accountId} />
                       ) : isAccountPage && entityId ? (
                         <VectorControlModule key={`vector-account-${entityId}`} accountId={entityId} />
+                      ) : null}
+
+                      {/* 0b. CONTRACT INTEL — active deals for this entity */}
+                      {isContactPage && entityId ? (
+                        <ContractIntelWidget key={`contract-contact-${entityId}`} contactId={entityId} />
+                      ) : isAccountPage && entityId ? (
+                        <ContractIntelWidget key={`contract-account-${entityId}`} accountId={entityId} />
                       ) : null}
 
                       {/* 1. NODE TASKS (Execution) */}
