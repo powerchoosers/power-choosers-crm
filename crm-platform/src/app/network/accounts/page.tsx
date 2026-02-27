@@ -118,7 +118,7 @@ export default function AccountsPage() {
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
   const accountIds = useMemo(() => accounts.map(a => a.id), [accounts])
-  const { data: lastTouchMap } = useAccountLastTouch(accountIds)
+  const { data: lastTouchMap, isLoading: lastTouchLoading } = useAccountLastTouch(accountIds)
 
   useEffect(() => {
     setIsMounted(true)
@@ -356,8 +356,10 @@ export default function AccountsPage() {
         cell: ({ row }) => {
           const account = row.original
 
-          // Health score from REAL last call or email — never from sync/Apollo timestamps
-          const healthScore = computeHealthScore(lastTouchMap?.get(account.id))
+          // Health score from REAL last call or email — undefined while loading (no dot during fetch)
+          const healthScore = lastTouchLoading
+            ? undefined
+            : computeHealthScore(lastTouchMap?.get(account.id))
 
           return (
             <Link

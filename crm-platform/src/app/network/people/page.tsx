@@ -121,7 +121,7 @@ export default function PeoplePage() {
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
-  const { data: lastTouchMap } = useContactLastTouch(contactIds)
+  const { data: lastTouchMap, isLoading: lastTouchLoading } = useContactLastTouch(contactIds)
   const pendingSelectCountRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -331,8 +331,10 @@ export default function PeoplePage() {
         cell: ({ row }) => {
           const contact = row.original
 
-          // Health score from REAL last call or email — never from sync timestamps
-          const healthScore = computeHealthScore(lastTouchMap?.get(contact.id))
+          // Health score from REAL last call or email — undefined while loading (no dot during fetch)
+          const healthScore = lastTouchLoading
+            ? undefined
+            : computeHealthScore(lastTouchMap?.get(contact.id))
 
           return (
             <Link
