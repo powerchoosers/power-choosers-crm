@@ -160,8 +160,8 @@ export default function TargetDetailPage() {
   const entityAccountIds = useMemo(() =>
     isAccountList ? (data as Account[]).map(a => a.id) : [], [isAccountList, data]
   )
-  const { data: contactLastTouchMap } = useContactLastTouch(contactIds)
-  const { data: accountLastTouchMap } = useAccountLastTouch(entityAccountIds)
+  const { data: contactLastTouchMap, isLoading: contactTouchLoading } = useContactLastTouch(contactIds)
+  const { data: accountLastTouchMap, isLoading: accountTouchLoading } = useAccountLastTouch(entityAccountIds)
 
   // Fetch next page when table state changes
   useEffect(() => {
@@ -321,8 +321,10 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const contact = row.original
 
-        // Health score from REAL last call or email
-        const healthScore = computeHealthScore(contactLastTouchMap?.get(contact.id))
+        // Health score from REAL last call or email — undefined while loading (no dot during fetch)
+        const healthScore = contactTouchLoading
+          ? undefined
+          : computeHealthScore(contactLastTouchMap?.get(contact.id))
 
         return (
           <Link
@@ -503,8 +505,10 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const account = row.original
 
-        // Health score from REAL last call or email
-        const healthScore = computeHealthScore(accountLastTouchMap?.get(account.id))
+        // Health score from REAL last call or email — undefined while loading (no dot during fetch)
+        const healthScore = accountTouchLoading
+          ? undefined
+          : computeHealthScore(accountLastTouchMap?.get(account.id))
 
         return (
           <Link
