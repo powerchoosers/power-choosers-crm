@@ -11,6 +11,7 @@ import { X, Shield, Zap } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { useFourCPForecast } from '@/hooks/useFourCPForecast'
+import { useLiveTranscription } from '@/hooks/useLiveTranscription'
 
 function generateId() {
     return Math.random().toString(36).substring(2, 11)
@@ -24,7 +25,7 @@ interface GridSnapshot {
 }
 
 export function WarRoomOverlay() {
-    const { isOpen, close, addSignal } = useWarRoomStore()
+    const { isOpen, close, addSignal, isTranscribing, liveTranscript } = useWarRoomStore()
     const { isActive: isCallActive, status: callStatus, metadata: callMeta } = useCallStore()
     const { data: fourCP } = useFourCPForecast()
     const router = useRouter()
@@ -34,6 +35,9 @@ export function WarRoomOverlay() {
     const [prevCallActive, setPrevCallActive] = useState(false)
     const lastPriceAlertRef = useRef<number>(0)
     const lastBattleStationsRef = useRef(false)
+
+    // Initialize Live Transcription when War Room is open
+    useLiveTranscription(isOpen, callMeta?.accountId)
 
     const isBattleStations = (fourCP?.riskLevel === 'BATTLE_STATIONS' || fourCP?.riskLevel === 'CRITICAL') && fourCP?.isPeakSeason
 
@@ -272,8 +276,41 @@ export function WarRoomOverlay() {
                             </div>
 
                             {/* Station III: Signal Feed — 35% width */}
-                            <div className="flex-[35] overflow-hidden">
+                            <div className="flex-[35] flex flex-col overflow-hidden">
                                 <SignalFeed />
+
+                                {/* Live Monitor Section */}
+                                <AnimatePresence>
+                                    {isTranscribing && (
+                                        <motion.div
+                                            initial={{ y: 20, opacity: 0 }}
+                                            animate={{ y: 0, opacity: 1 }}
+                                            exit={{ y: 20, opacity: 0 }}
+                                            className="px-5 py-4 border-t border-white/5 bg-zinc-950/60 backdrop-blur-md"
+                                        >
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex gap-0.5">
+                                                    {[1, 2, 3].map((i) => (
+                                                        <motion.div
+                                                            key={i}
+                                                            animate={{ height: [4, 12, 4] }}
+                                                            transition={{ repeat: Infinity, duration: 0.6, delay: i * 0.1 }}
+                                                            className="w-0.5 bg-zinc-100"
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                                                    Live Monitor
+                                                </span>
+                                            </div>
+                                            <div className="min-h-[3rem]">
+                                                <p className="text-xs font-mono text-zinc-100 leading-relaxed">
+                                                    {liveTranscript || <span className="text-zinc-700 italic">Listening for forensic signals...</span>}
+                                                </p>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
                         </div>
 
