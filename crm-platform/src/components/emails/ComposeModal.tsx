@@ -22,6 +22,7 @@ import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { RichTextEditor } from './RichTextEditor'
 
 const EMAIL_AI_MODELS = [
   { value: 'gemini-2.5-flash', label: 'GEMINI-2.5-FLASH' },
@@ -607,6 +608,10 @@ CORE RULES:
 - FORMATTING: If you include a greeting (e.g. "Lorena,"), it MUST be on its own line. You MUST follow it with a BLANK LINE before starting the email body. NEVER start the body on the same line as the greeting.
 `
 
+    const isColdPlaintext =
+      (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') &&
+      (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
+
     if (!isRefinementMode) {
       base += `
 OUTPUT FORMAT:
@@ -616,8 +621,15 @@ OUTPUT FORMAT:
 - If the directive is body-only, output only the body with no SUBJECT line.
 - Return ONLY the requested content. No meta-commentary.`
     }
+
+    if (isColdPlaintext) {
+      base += '\n- FORMAT: Strict plain text. No HTML, no markdown formatting.'
+    } else {
+      base += '\n- FORMAT: Output HTML for the email body (e.g., <ul>, <li>, <strong>, <br/>). Do NOT wrap in markdown code blocks like ```html. Use basic inline HTML tags to style the text so it can be directly placed into a rich text editor. If asked for a list or bullets, use <ul> and <li> tags.'
+    }
+
     return base
-  }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context])
+  }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context, emailTypeId, sendAsPlainText])
 
   const generateEmailWithAi = useCallback(async (directive: string) => {
     // Auto-select angle based on industry if no directive provided and industry is present
@@ -940,13 +952,20 @@ OUTPUT FORMAT:
       isColdType &&
       (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
 
+    // Convert potential HTML to plain text for plain text sends or text fallbacks
+    const plainTextContent = typeof document !== 'undefined' ? (() => {
+      const tmp = document.createElement('div')
+      tmp.innerHTML = content.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n')
+      return (tmp.textContent || tmp.innerText || '').trim()
+    })() : content
+
     // When using foundry template, content is already HTML with no signature
     const fullHtml = isColdPlaintext
       ? undefined
       : selectedFoundryId
         ? content // Foundry template is already complete HTML
         : `
-      <div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content.replace(/\n/g, '<br />')}</div>
+      <div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content}</div>
       ${outgoingSignatureHtml}
     `
 
@@ -955,7 +974,7 @@ OUTPUT FORMAT:
       : 'Director of Energy Architecture, Nodal Point'
     const COLD_PLAINTEXT_BRAND_LINE = 'You have seen the math. Now see your data.'
     const coldPlaintextBody = isColdPlaintext
-      ? `${content.trim()}\n\nBest,\n${signerName}\n${titleLine}\nhttps://nodalpoint.io\n\n${COLD_PLAINTEXT_BRAND_LINE}`
+      ? `${plainTextContent}\n\nBest,\n${signerName}\n${titleLine}\nhttps://nodalpoint.io\n\n${COLD_PLAINTEXT_BRAND_LINE}`
       : null
 
     // Convert attachments to base64
@@ -986,8 +1005,8 @@ OUTPUT FORMAT:
         to,
         cc: showCc ? cc : undefined,
         subject,
-        content: coldPlaintextBody ?? content,
-        html: fullHtml ?? (coldPlaintextBody ?? content).replace(/\n/g, '<br />'),
+        content: coldPlaintextBody ?? plainTextContent,
+        html: fullHtml ?? (coldPlaintextBody ? undefined : content),
         attachments: attachmentsData.length > 0 ? attachmentsData : undefined,
       },
       {
@@ -1199,9 +1218,10 @@ OUTPUT FORMAT:
                 )}
                 <div>
                   <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Body</span>
-                  <pre className="mt-0.5 text-sm text-zinc-300 font-sans whitespace-pre-wrap break-words leading-relaxed">
-                    {pendingAiContent}
-                  </pre>
+                  <div
+                    className="mt-0.5 text-sm text-zinc-300 font-sans whitespace-pre-wrap break-words leading-relaxed prose prose-invert max-w-none prose-sm [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pendingAiContent) }}
+                  />
                 </div>
               </div>
             </motion.div>
@@ -1250,18 +1270,18 @@ OUTPUT FORMAT:
                   </div>
                 </div>
               ) : (
-                // Show textarea for regular emails
-                <textarea
-                  placeholder="Write your message..."
-                  value={content}
-                  onChange={(e) => {
-                    setContent(e.target.value)
+                // Show rich text editor for regular emails
+                <RichTextEditor
+                  content={content}
+                  onChange={(val) => {
+                    setContent(val)
                     if (pendingAiContent) {
                       setPendingAiContent(null)
                       setPendingSubjectFromAi(null)
                     }
                   }}
-                  className="w-full min-h-[150px] bg-transparent border-0 resize-none focus:outline-none text-zinc-300 placeholder:text-zinc-600 font-sans leading-relaxed"
+                  className="w-full h-full"
+                  autoFocus
                 />
               )}
               {isAiLoading && (
