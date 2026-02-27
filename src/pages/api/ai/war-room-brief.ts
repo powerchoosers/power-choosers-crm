@@ -34,12 +34,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(405).json({ error: 'Method not allowed' })
     }
 
-    const apiKey = process.env.OPENROUTER_API_KEY || process.env.FREE_GEMINI_KEY
+    const apiKey = process.env.OPEN_ROUTER_API_KEY || process.env.FREE_GEMINI_KEY
     if (!apiKey) {
-        return res.status(503).json({ error: 'No AI API key configured (OPENROUTER_API_KEY or FREE_GEMINI_KEY)' })
+        return res.status(503).json({ error: 'No AI API key configured (OPEN_ROUTER_API_KEY or FREE_GEMINI_KEY)' })
     }
 
-    const useOpenRouter = !!process.env.OPENROUTER_API_KEY
+    const useOpenRouter = !!process.env.OPEN_ROUTER_API_KEY
 
     const { topAccounts, grid } = req.body as BriefRequest
 
@@ -103,7 +103,7 @@ Be terse. No preamble, no sign-off, no fluff. Just the 3 bullets in plain text.`
             const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    'Authorization': `Bearer ${process.env.OPEN_ROUTER_API_KEY}`,
                     'Content-Type': 'application/json',
                     'HTTP-Referer': 'https://nodalpoint.io',
                     'X-Title': 'Nodal Point War Room',
