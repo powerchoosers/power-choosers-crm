@@ -546,7 +546,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-[10px] bg-zinc-900 border border-white/5 flex items-center justify-center">
-              <Zap size={14} className="text-[#002FA7]" />
+              <Zap size={14} className="text-zinc-100" />
             </div>
             <input
               aria-label="Asset Name"
@@ -577,7 +577,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               onClick={() => setIsForensicMode(true)}
               className={cn(
                 "px-3 py-1 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
-                isForensicMode ? "bg-[#002FA7] text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                isForensicMode ? "bg-white text-zinc-950 shadow-lg" : "text-zinc-500 hover:text-zinc-300"
               )}
             >
               Forensic_HTML
@@ -586,7 +586,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               onClick={() => setIsForensicMode(false)}
               className={cn(
                 "px-3 py-1 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all",
-                !isForensicMode ? "bg-[#002FA7] text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                !isForensicMode ? "bg-white text-zinc-950 shadow-lg" : "text-zinc-500 hover:text-zinc-300"
               )}
             >
               Stealth_Text
@@ -595,7 +595,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           <Button
             onClick={saveAsset}
             disabled={isSaving}
-            className="h-8 gap-2 bg-[#002FA7] hover:bg-[#002FA7]/80 text-white font-mono text-xs uppercase rounded-md px-4"
+            className="h-8 gap-2 bg-white hover:bg-white/90 text-zinc-950 font-mono text-xs uppercase rounded-md px-4 shadow-[0_0_15px_rgba(255,255,255,0.2)]"
           >
             {isSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
             {assetId && assetId !== 'new' ? 'Update_Asset' : 'Deploy_Asset'}
@@ -614,10 +614,10 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
               <button
                 key={item.type}
                 onClick={() => addBlock(item.type as Block['type'])}
-                className="flex items-center gap-2 px-3 py-2 bg-black/40 border border-white/5 rounded-xl hover:border-[#002FA7]/50 hover:bg-[#002FA7]/5 transition-all group shrink-0"
+                className="flex items-center gap-2 px-3 py-2 bg-black/40 border border-white/5 rounded-xl hover:border-white/40 hover:bg-white/5 transition-all group shrink-0"
               >
-                <item.icon size={14} className="text-zinc-500 group-hover:text-[#002FA7]" />
-                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 group-hover:text-white">{item.label}</span>
+                <item.icon size={14} className="text-zinc-500 group-hover:text-white" />
+                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 group-hover:text-zinc-100">{item.label}</span>
               </button>
             ))}
           </div>
@@ -642,7 +642,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                     className={cn(
                       "relative group p-4 rounded-xl border transition-all cursor-pointer nodal-recessed nodal-monolith-edge",
                       activeBlock === block.id
-                        ? "bg-[#002FA7]/10 border-[#002FA7]/30 shadow-[0_0_20px_rgba(0,47,167,0.1)]"
+                        ? "bg-white/10 border-white/20 shadow-[0_0_20px_rgba(255,255,255,0.05)]"
                         : "hover:bg-zinc-900/60 hover:border-white/10"
                     )}
                   >
@@ -795,7 +795,7 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
                                   <PopoverTrigger asChild>
                                     <button
                                       type="button"
-                                      className="inline-flex items-center gap-1.5 h-7 px-2 rounded border border-[#002FA7]/30 bg-[#002FA7]/10 text-[10px] font-mono uppercase tracking-widest text-[#002FA7] hover:bg-[#002FA7]/20"
+                                      className="inline-flex items-center gap-1.5 h-7 px-2 rounded border border-white/20 bg-white/5 text-[10px] font-mono uppercase tracking-widest text-white hover:bg-white/10"
                                     >
                                       <Variable size={12} />
                                       Insert variable
@@ -1689,6 +1689,6 @@ export default function FoundryBuilder({ assetId }: { assetId?: string }) {
           Foundry_Ref // V1.4-Alpha
         </div>
       </div>
-    </div>
+    </div >
   )
 }

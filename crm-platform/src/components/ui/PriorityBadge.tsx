@@ -31,7 +31,7 @@ export function PriorityBadge({
         : p === 'low'
           ? 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
           : p === 'protocol' || p === 'sequence'
-            ? 'bg-[#002FA7]/10 text-[#002FA7] border-[#002FA7]/20'
+            ? 'bg-white/10 text-white border-white/20'
             : 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
 
   const label =
@@ -72,6 +72,6 @@ export function priorityColorClasses(priority: string | undefined): string {
   if (p === 'high') return 'bg-rose-500/10 text-rose-500'
   if (p === 'medium') return 'bg-amber-500/10 text-amber-500'
   if (p === 'low') return 'bg-zinc-500/10 text-zinc-500'
-  if (p === 'protocol' || p === 'sequence') return 'bg-[#002FA7]/10 text-[#002FA7]'
+  if (p === 'protocol' || p === 'sequence') return 'bg-white/10 text-white'
   return 'bg-black/40 text-zinc-400'
 }

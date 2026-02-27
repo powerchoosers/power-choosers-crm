@@ -48,8 +48,8 @@ export function MarketPriceChart({ currentPrice, history }: MarketPriceChartProp
                 <AreaChart data={chartData}>
                     <defs>
                         <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#002FA7" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#002FA7" stopOpacity={0} />
+                            <stop offset="5%" stopColor="#FFFFFF" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#FFFFFF" stopOpacity={0} />
                         </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
@@ -77,7 +77,7 @@ export function MarketPriceChart({ currentPrice, history }: MarketPriceChartProp
                     <Area
                         type="monotone"
                         dataKey="price"
-                        stroke="#002FA7"
+                        stroke="#FFFFFF"
                         strokeWidth={2}
                         fillOpacity={1}
                         fill="url(#colorPrice)"
