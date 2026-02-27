@@ -152,7 +152,8 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
     };
 
     const handleFinalTranscript = (text: string) => {
-        // Log to terminal as LIVE signal
+        // Stop logging raw transcript to the UI signal feed as requested
+        /*
         addSignal({
             id: `live-${Date.now()}`,
             time: new Date(),
@@ -160,14 +161,15 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
             message: text,
             isLive: true
         });
+        */
 
         transcriptBufferRef.current += ' ' + text;
 
-        // Trigger Intelligence every 20 seconds or every 50 words
+        // Trigger Intelligence every 10 seconds or every 20 words
         const now = Date.now();
         const wordCount = transcriptBufferRef.current.split(' ').length;
 
-        if (now - lastIntelTimeRef.current > 20000 || wordCount > 50) {
+        if (now - lastIntelTimeRef.current > 10000 || wordCount > 20) {
             triggerIntelligence();
             lastIntelTimeRef.current = now;
         }
