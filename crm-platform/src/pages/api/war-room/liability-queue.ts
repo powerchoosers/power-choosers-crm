@@ -15,7 +15,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Fetch accounts with basic fields
         const { data: accounts, error: accErr } = await supabaseAdmin
             .from('accounts')
-            .select('id, name, domain, industry, city, state, logoUrl, logo_url, contract_end_date, metadata')
+            .select('id, name, domain, industry, city, state, logo_url, contract_end_date, metadata')
             .limit(60)
             .order('name', { ascending: true })
 
@@ -101,7 +101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 industry: acct.industry,
                 city: acct.city,
                 state: acct.state,
-                logoUrl: (acct.logoUrl as string | null) ?? (acct.logo_url as string | null) ?? null,
+                logoUrl: (acct.logo_url as string | null) ?? null,
                 contractEndDate,
                 lastTouchTs,
                 lastCallTs,
