@@ -2,29 +2,32 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, Radar, GitMerge } from 'lucide-react'
+import { X, Plus, Radar, GitMerge, TrendingUp } from 'lucide-react'
 import { useContactListMemberships, useAddContactToList, useRemoveContactFromList } from '@/hooks/useContactListMemberships'
 import { useContactProtocolMemberships, useAddContactToProtocol, useRemoveContactFromProtocol } from '@/hooks/useContactProtocolMemberships'
 import { useAccountListMemberships, useAddAccountToList, useRemoveAccountFromList } from '@/hooks/useAccountListMemberships'
 import { useTargets } from '@/hooks/useTargets'
 import { useProtocols } from '@/hooks/useProtocols'
 import { useCreateTarget } from '@/hooks/useTargets'
+import { useDealsByAccount, useDealsByContact, useCreateDeal, useUpdateDeal } from '@/hooks/useDeals'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
+import { type DealStage } from '@/types/deals'
 
 interface VectorControlModuleProps {
-  /** Contact dossier: protocols + targets (contact lists) */
+  /** Contact dossier: protocols + targets (contact lists) + deals */
   contactId?: string
-  /** Account dossier: targets only (account lists), no protocols */
+  /** Account dossier: targets only (account lists) + deals; no protocols */
   accountId?: string
 }
 
 type VectorChip =
   | { type: 'target'; id: string; membershipId: string; name: string }
   | { type: 'protocol'; id: string; membershipId: string; name: string }
+  | { type: 'deal'; id: string; name: string; stage: DealStage }
 
 const CONTACT_LIST_KINDS = ['people', 'person', 'contact', 'contacts'] as const
 const ACCOUNT_LIST_KINDS = ['account', 'accounts', 'company', 'companies'] as const
@@ -34,7 +37,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   const [searchQuery, setSearchQuery] = useState('')
   const { user } = useAuth()
 
-  const isAccountMode = !!accountId
+  const isAccountMode = !!accountId && !contactId
   const entityId = isAccountMode ? accountId : contactId
 
   const { data: contactListMemberships = [], isLoading: isLoadingContactLists } = useContactListMemberships(isAccountMode ? undefined : contactId)
@@ -50,6 +53,14 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   const removeContactFromList = useRemoveContactFromList()
   const removeAccountFromList = useRemoveAccountFromList()
   const removeContactFromProtocol = useRemoveContactFromProtocol()
+
+  // Deal hooks
+  const { data: accountDeals = [], isLoading: isLoadingAccountDeals } = useDealsByAccount(accountId)
+  const { data: contactDeals = [], isLoading: isLoadingContactDeals } = useDealsByContact(isAccountMode ? undefined : contactId)
+  const createDeal = useCreateDeal()
+  const updateDeal = useUpdateDeal()
+
+  const deals = isAccountMode ? accountDeals : contactDeals
 
   const protocols = protocolsData?.pages?.flatMap(p => p.protocols) ?? []
   const listKinds: readonly string[] = isAccountMode ? ACCOUNT_LIST_KINDS : CONTACT_LIST_KINDS
@@ -67,23 +78,36 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   const availableTargets = matchingTargets.filter(t =>
     !listMemberships.some(m => m.listId === t.id)
   )
+
+  // Available deals to link (contact mode only — search by title)
+  // For account mode deals are read from accountDeals directly; no additional search needed
+  const matchingDeals = !isAccountMode && searchLower
+    ? deals.filter(d => d.title.toLowerCase().includes(searchLower))
+    : []
+
   const hasExactMatch = searchLower && (
     (!isAccountMode && protocols.some(p => p.name.toLowerCase() === searchLower)) ||
     targetLists.some(t => t.name.toLowerCase() === searchLower)
   )
   const showCreateOptions = searchLower && !hasExactMatch
 
-  const chips: VectorChip[] = isAccountMode
-    ? listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName }))
-    : [
-      ...listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName })),
-      ...protocolMemberships.map(m => ({ type: 'protocol' as const, id: m.sequenceId, membershipId: m.id, name: m.sequenceName }))
-    ]
-  const hasAnyAssignments = chips.length > 0
-  const isLoading = isAccountMode
-    ? (isLoadingAccountLists || isLoadingTargets)
-    : (isLoadingContactLists || isLoadingProtocolMemberships || isLoadingTargets || isLoadingProtocols)
+  // Build chip array
+  const targetChips: VectorChip[] = listMemberships.map(m => ({ type: 'target' as const, id: m.listId, membershipId: m.id, name: m.listName }))
+  const protocolChips: VectorChip[] = isAccountMode ? [] : protocolMemberships.map(m => ({ type: 'protocol' as const, id: m.sequenceId, membershipId: m.id, name: m.sequenceName }))
+  const dealChips: VectorChip[] = deals
+    .filter(d => d.stage !== 'TERMINATED')
+    .map(d => ({ type: 'deal' as const, id: d.id, name: d.title, stage: d.stage }))
 
+  const chips: VectorChip[] = [...protocolChips, ...targetChips, ...dealChips]
+  const hasAnyAssignments = chips.length > 0
+
+  const isLoading = isAccountMode
+    ? (isLoadingAccountLists || isLoadingTargets || isLoadingAccountDeals)
+    : (isLoadingContactLists || isLoadingProtocolMemberships || isLoadingTargets || isLoadingProtocols || isLoadingContactDeals)
+
+  // ---------------------------------------------------------------------------
+  // Handlers
+  // ---------------------------------------------------------------------------
   const handleAddToList = async (listId: string) => {
     if (!entityId) return
     try {
@@ -124,6 +148,15 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
     } catch (_) { }
   }
 
+  const handleUnlinkDeal = async (dealId: string) => {
+    // For contacts: clear contactId. For accounts: not exposed (can't unlink account).
+    if (isAccountMode) return
+    try {
+      await updateDeal.mutateAsync({ id: dealId, contactId: null })
+      toast.success('Contact unlinked from contract')
+    } catch (_) { }
+  }
+
   const handleCreateTarget = async () => {
     const name = searchQuery.trim()
     if (!name || !user || !entityId) return
@@ -159,11 +192,29 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
     } catch (_) { }
   }
 
+  const handleCreateDeal = async () => {
+    const title = searchQuery.trim()
+    if (!title || !user) return
+    try {
+      await createDeal.mutateAsync({
+        title,
+        accountId: accountId || '',     // account mode
+        contactId: contactId || undefined, // contact mode
+        stage: 'IDENTIFIED',
+      })
+      toast.success(`Contract "${title}" initialized`)
+      setIsPopoverOpen(false)
+      setSearchQuery('')
+    } catch (_) { }
+  }
+
   if (!contactId && !accountId) return null
 
+  // ---------------------------------------------------------------------------
+  // Popover content
+  // ---------------------------------------------------------------------------
   const renderPopoverContent = () => {
     const hasResults = availableProtocols.length > 0 || availableTargets.length > 0
-    const showSections = hasResults
 
     return (
       <>
@@ -186,7 +237,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
             <div className="p-4 text-center text-zinc-500 font-mono text-xs">Loading...</div>
           ) : (
             <>
-              {showSections && (
+              {hasResults && (
                 <>
                   {!isAccountMode && availableProtocols.length > 0 && (
                     <div className="p-2">
@@ -222,8 +273,9 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
                   )}
                 </>
               )}
+
               {showCreateOptions && (
-                <div className={cn('p-2', showSections && 'border-t border-white/10', 'space-y-1')}>
+                <div className={cn('p-2', hasResults && 'border-t border-white/10', 'space-y-1')}>
                   {!isAccountMode && (
                     <button
                       onClick={handleCreateProtocol}
@@ -238,6 +290,24 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
                   >
                     <Plus className="w-3 h-3" /> Create New Target List: &quot;{searchQuery.trim()}&quot;
                   </button>
+                  <button
+                    onClick={handleCreateDeal}
+                    className="w-full text-left px-3 py-2 rounded bg-amber-500/10 border border-amber-500/30 text-amber-400 hover:bg-amber-500/20 transition-colors text-xs font-mono flex items-center gap-2"
+                  >
+                    <Plus className="w-3 h-3" /> Initialize Contract: &quot;{searchQuery.trim()}&quot;
+                  </button>
+                </div>
+              )}
+
+              {/* When no search query, show Create Contract shortcut */}
+              {!searchLower && (
+                <div className="p-2 border-t border-white/5">
+                  <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 px-2 py-1.5 flex items-center gap-1.5">
+                    <TrendingUp className="w-3 h-3 text-amber-400" /> CONTRACTS
+                  </div>
+                  <p className="px-3 py-1 text-[10px] font-mono text-zinc-600">
+                    Type a name to initialize a new contract
+                  </p>
                 </div>
               )}
             </>
@@ -247,6 +317,9 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
     )
   }
 
+  // ---------------------------------------------------------------------------
+  // Empty state
+  // ---------------------------------------------------------------------------
   if (!isLoading && !hasAnyAssignments) {
     return (
       <div className="mb-2">
@@ -269,6 +342,9 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
     )
   }
 
+  // ---------------------------------------------------------------------------
+  // Chips view
+  // ---------------------------------------------------------------------------
   return (
     <div className="mb-2 space-y-4">
       <div className="flex items-center justify-between">
@@ -289,34 +365,56 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
       </div>
       <div className="flex flex-wrap gap-2">
         <AnimatePresence mode="popLayout">
-          {chips.map((chip) => (
-            <motion.div
-              key={chip.type === 'target' ? `t-${chip.membershipId}` : `p-${chip.membershipId}`}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className={cn(
-                'rounded px-2 py-1 flex items-center gap-2 group',
-                chip.type === 'protocol'
-                  ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
-                  : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
-              )}
-            >
-              {chip.type === 'protocol' ? (
-                <GitMerge className="w-3 h-3 shrink-0" />
-              ) : (
-                <Radar className="w-3 h-3 shrink-0" />
-              )}
-              <span className="font-mono text-xs">{chip.name}</span>
-              <button
-                onClick={() => chip.type === 'target' ? handleRemoveList(chip.membershipId) : handleRemoveProtocol(chip.membershipId)}
-                className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white"
-                title="Remove"
+          {chips.map((chip) => {
+            const key = chip.type === 'deal'
+              ? `d-${chip.id}`
+              : chip.type === 'target'
+                ? `t-${chip.membershipId}`
+                : `p-${chip.membershipId}`
+
+            const colorClass = chip.type === 'protocol'
+              ? 'bg-blue-500/10 border border-blue-500/30 text-blue-400'
+              : chip.type === 'deal'
+                ? 'bg-amber-500/10 border border-amber-500/30 text-amber-400'
+                : 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-400'
+
+            const Icon = chip.type === 'protocol'
+              ? GitMerge
+              : chip.type === 'deal'
+                ? TrendingUp
+                : Radar
+
+            const onRemove = chip.type === 'target'
+              ? () => handleRemoveList(chip.membershipId)
+              : chip.type === 'protocol'
+                ? () => handleRemoveProtocol(chip.membershipId)
+                : () => handleUnlinkDeal(chip.id)
+
+            // Don't show remove for deal chips in account mode
+            const showRemove = !(chip.type === 'deal' && isAccountMode)
+
+            return (
+              <motion.div
+                key={key}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className={cn('rounded px-2 py-1 flex items-center gap-2 group', colorClass)}
               >
-                <X className="w-3 h-3" />
-              </button>
-            </motion.div>
-          ))}
+                <Icon className="w-3 h-3 shrink-0" />
+                <span className="font-mono text-xs">{chip.name}</span>
+                {showRemove && (
+                  <button
+                    onClick={onRemove}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white"
+                    title="Remove"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                )}
+              </motion.div>
+            )
+          })}
         </AnimatePresence>
       </div>
     </div>

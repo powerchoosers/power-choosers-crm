@@ -24,7 +24,8 @@ import {
   Settings,
   LogOut,
   Plus,
-  Zap
+  Zap,
+  TrendingUp
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 
@@ -52,6 +53,7 @@ const navigationStructure = [
     group: "Operations",
     items: [
       { name: 'Targets', href: '/network/targets', icon: Radar },
+      { name: 'Contracts', href: '/network/contracts', icon: TrendingUp },
       { name: 'Protocols', href: '/network/protocols', icon: GitMerge },
       { name: 'Tasks', href: '/network/tasks', icon: CheckSquare }
     ]
