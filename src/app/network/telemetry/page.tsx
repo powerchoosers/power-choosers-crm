@@ -16,6 +16,7 @@ import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader
 import { useMarketPulse, type MarketPulseData } from '@/hooks/useMarketPulse'
 import { useMarketTelemetryHistory } from '@/hooks/useMarketTelemetryHistory'
 import { useEIARetailTexas, type EIARetailRow } from '@/hooks/useEIA'
+import { FourCPBattleStation } from '@/components/market/FourCPBattleStation'
 import { cn } from '@/lib/utils'
 
 /** Chart data point for EIA Commercial vs Industrial rates */
@@ -39,7 +40,7 @@ function MacroVarianceTooltip({
     <div className="rounded-xl nodal-monolith-edge bg-zinc-950/80 px-3 py-2 backdrop-blur-xl shadow-xl">
       <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{label}</div>
       <div className="mt-1 flex gap-4 text-sm font-mono tabular-nums">
-        <span className="text-[#002FA7]">COM {com != null ? com.toFixed(2) : '—'}¢</span>
+        <span className="text-white">COM {com != null ? com.toFixed(2) : '—'}¢</span>
         <span className="text-emerald-500">IND {ind != null ? ind.toFixed(2) : '—'}¢</span>
       </div>
       {variance != null && (
@@ -242,7 +243,7 @@ export default function TelemetryPage() {
                   />
                   <Tooltip content={<ERCOTHistoryTooltip />} />
                   <Line type="monotone" dataKey="hub_avg" stroke="#64748b" strokeWidth={2} dot={false} connectNulls name="HUB_AVG" />
-                  <Line type="monotone" dataKey="north" stroke="#002FA7" strokeWidth={1.5} dot={false} connectNulls name="LZ_NORTH" />
+                  <Line type="monotone" dataKey="north" stroke="#e4e4e7" strokeWidth={1.5} dot={false} connectNulls name="LZ_NORTH" />
                   <Line type="monotone" dataKey="houston" stroke="#22c55e" strokeWidth={1.5} dot={false} connectNulls name="LZ_HOUSTON" />
                   <Line type="monotone" dataKey="west" stroke="#f59e0b" strokeWidth={1.5} dot={false} connectNulls name="LZ_WEST" />
                   <Line type="monotone" dataKey="south" stroke="#ef4444" strokeWidth={1.5} dot={false} connectNulls name="LZ_SOUTH" />
@@ -314,6 +315,17 @@ export default function TelemetryPage() {
         )}
       </section>
 
+      {/* ROW 2.5: 4CP Battle Station */}
+      <section className="space-y-3">
+        <h2 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+          4CP Coincident Peak Monitor
+        </h2>
+        <p className="text-[9px] font-mono text-zinc-600 max-w-xl">
+          Real-time probability that the current hour will coincide with one of ERCOT's 4 highest-demand hours. These 4 hours determine next year's transmission cost liability.
+        </p>
+        <FourCPBattleStation />
+      </section>
+
       {/* ROW 3: MACRO_VARIANCE_CHART (EIA Commercial vs Industrial) */}
       <section className="space-y-3">
         <div>
@@ -337,8 +349,8 @@ export default function TelemetryPage() {
                 <AreaChart data={eiaChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorBlue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#002FA7" stopOpacity={0.4} />
-                      <stop offset="100%" stopColor="#002FA7" stopOpacity={0} />
+                      <stop offset="0%" stopColor="#e4e4e7" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#e4e4e7" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorGreen" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#10b981" stopOpacity={0.4} />
@@ -362,7 +374,7 @@ export default function TelemetryPage() {
                   <Area
                     type="monotone"
                     dataKey="commercial"
-                    stroke="#002FA7"
+                    stroke="#e4e4e7"
                     strokeWidth={2}
                     fill="url(#colorBlue)"
                   />
