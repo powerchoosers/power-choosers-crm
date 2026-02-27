@@ -131,13 +131,14 @@ ${dossiers}
 
 INSTRUCTIONS:
 1. Identify the 3 highest-risk opportunities where Market Tightness meets CRM Liability.
-2. For each bullet:
+2. For each bullet (STRICT 60 WORD MAXIMUM PER BULLET):
    - Identify the SPECIFIC ACCOUNT and the PRIMARY STAKEHOLDER.
    - Reference a SPECIFIC DETAIL from their transcript/email (e.g., "they mentioned X locked contract").
    - Define the TACTICAL OPENING using the NEPQ framework: DO NOT "pitch savings." Diagnose a structural inefficiency. If they previously had an objection (e.g., "locked in", "broker"), script exactly how to diffuse it with a curiosity-driven consequence question (e.g. "When you renew, will you have a benchmark?"). Use a calm, unhurried tone with verbal pauses ("...").
 3. Vocabulary: demand ratchet liability, 4CP peak exposure, scarcity adder, transmission liability, structural audit.
+4. EXTREMELY CRITICAL: DO NOT get cut off. Keep it short. 3 bullets total.
 
-Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets.`
+Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets. No fluff.`
 
         const orRes = await fetch('https://llm-gateway.assemblyai.com/v1/chat/completions', {
             method: 'POST',
@@ -148,7 +149,7 @@ Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets.`
             body: JSON.stringify({
                 model: 'gemini-2.5-flash',
                 messages: [{ role: 'user', content: prompt }],
-                max_tokens: 1400,
+                max_tokens: 3000,
                 temperature: 0.2,
             }),
         })
