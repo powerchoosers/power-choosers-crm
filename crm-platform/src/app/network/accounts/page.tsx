@@ -356,10 +356,10 @@ export default function AccountsPage() {
         cell: ({ row }) => {
           const account = row.original
 
-          // Health score from REAL last call or email — undefined while loading (no dot during fetch)
-          const healthScore = lastTouchLoading
+          // No dot until: (a) loading OR (b) map hasn't settled — covers enabled:false window too
+          const healthScore = (lastTouchLoading || lastTouchMap === undefined)
             ? undefined
-            : computeHealthScore(lastTouchMap?.get(account.id))
+            : computeHealthScore(lastTouchMap.get(account.id))
 
           return (
             <Link

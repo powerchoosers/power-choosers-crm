@@ -331,10 +331,10 @@ export default function PeoplePage() {
         cell: ({ row }) => {
           const contact = row.original
 
-          // Health score from REAL last call or email — undefined while loading (no dot during fetch)
-          const healthScore = lastTouchLoading
+          // No dot until: (a) loading OR (b) map hasn't settled — covers enabled:false window too
+          const healthScore = (lastTouchLoading || lastTouchMap === undefined)
             ? undefined
-            : computeHealthScore(lastTouchMap?.get(contact.id))
+            : computeHealthScore(lastTouchMap.get(contact.id))
 
           return (
             <Link
