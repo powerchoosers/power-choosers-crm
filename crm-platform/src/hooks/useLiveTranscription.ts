@@ -10,9 +10,11 @@ import { useVoice } from '@/context/VoiceContext';
 export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
     const { setTranscribing, updateLiveTranscript, addSignal } = useWarRoomStore();
     const { currentCall } = useVoice();
-    const socketRef = useRef<WebSocket | null>(null);
+    const socketAgentRef = useRef<WebSocket | null>(null);
+    const socketProspectRef = useRef<WebSocket | null>(null);
     const audioContextRef = useRef<AudioContext | null>(null);
-    const processorRef = useRef<ScriptProcessorNode | null>(null);
+    const processorAgentRef = useRef<ScriptProcessorNode | null>(null);
+    const processorProspectRef = useRef<ScriptProcessorNode | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
     const remoteSourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
     const lastIntelTimeRef = useRef<number>(0);
@@ -37,18 +39,18 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
 
         // Poll for the remote stream because Twilio attaches it after call connects
         const interval = setInterval(() => {
-            if (!currentCall || !audioContextRef.current || !processorRef.current) return;
+            if (!currentCall || !audioContextRef.current || !processorProspectRef.current) return;
             if (remoteSourceNodeRef.current) return; // already wired
 
             const remoteStream = currentCall.getRemoteStream();
             if (remoteStream && remoteStream.getAudioTracks().length > 0) {
-                console.log('[AssemblyAI v3] Live mixing Twilio remote stream into transcriber');
+                console.log('[AssemblyAI] Live mixing Twilio prospect stream into transcriber');
                 try {
                     const remoteSource = audioContextRef.current.createMediaStreamSource(remoteStream);
-                    remoteSource.connect(processorRef.current);
+                    remoteSource.connect(processorProspectRef.current);
                     remoteSourceNodeRef.current = remoteSource;
                 } catch (err) {
-                    console.warn('[AssemblyAI v3] Failed to connect remote audio stream', err);
+                    console.warn('[AssemblyAI] Failed to connect remote audio stream', err);
                 }
             }
         }, 1000);
@@ -64,53 +66,53 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
 
             if (!token) throw new Error('No AssemblyAI token received');
 
-            // 2. Setup WebSocket (V3)
-            const socket = new WebSocket(`wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&format_turns=true&token=${token}`);
-            socketRef.current = socket;
+            // Generate a WebSocket for either Agent or Prospect
+            const setupSocket = (role: 'Agent' | 'Prospect') => {
+                const socket = new WebSocket(`wss://streaming.assemblyai.com/v3/ws?sample_rate=16000&format_turns=true&token=${token}`);
 
-            socket.onopen = () => {
-                console.log('[AssemblyAI v3] WebSocket Open');
-                setTranscribing(true);
-                startAudioCapture();
-            };
-
-            socket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-
-                if (data.type === 'Begin') {
-                    console.log(`[AssemblyAI v3] Session began: ID=${data.id}`);
-                }
-                else if (data.type === 'Turn') {
-                    const transcript = data.transcript || '';
-                    if (!transcript) return;
-
-                    if (data.turn_is_formatted) {
-                        updateLiveTranscript(''); // Clear the partial
-                        handleFinalTranscript(transcript);
-                    } else {
-                        updateLiveTranscript(transcript); // Show the partial
+                socket.onopen = () => {
+                    console.log(`[AssemblyAI] ${role} WebSocket Open`);
+                    if (role === 'Agent') {
+                        setTranscribing(true);
+                        startAudioCapture(); // Only start audio capture once
                     }
-                }
-                else if (data.type === 'Termination') {
-                    console.log(`[AssemblyAI v3] Session Terminated`);
-                }
-                else if (data.error) {
-                    console.error('[AssemblyAI v3] Error Message:', data.error);
-                }
+                };
+
+                socket.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'Turn') {
+                        const transcript = data.transcript || '';
+                        if (!transcript) return;
+
+                        if (data.turn_is_formatted) {
+                            if (role === 'Prospect') updateLiveTranscript(''); // Clear the partial
+                            handleFinalTranscript(transcript, role);
+                        } else {
+                            if (role === 'Prospect') updateLiveTranscript(transcript); // Only show Prospect in UI
+                        }
+                    } else if (data.error) {
+                        console.error(`[AssemblyAI] ${role} WS Error Message:`, data.error);
+                    }
+                };
+
+                socket.onerror = (err) => {
+                    console.error(`[AssemblyAI] ${role} WebSocket Error:`, err);
+                    stopStreaming();
+                };
+
+                socket.onclose = () => {
+                    console.log(`[AssemblyAI] ${role} WebSocket Closed`);
+                    if (role === 'Agent') setTranscribing(false);
+                };
+
+                return socket;
             };
 
-            socket.onerror = (err) => {
-                console.error('[AssemblyAI v3] WebSocket Error:', err);
-                stopStreaming();
-            };
-
-            socket.onclose = () => {
-                console.log('[AssemblyAI v3] WebSocket Closed');
-                setTranscribing(false);
-            };
+            socketAgentRef.current = setupSocket('Agent');
+            socketProspectRef.current = setupSocket('Prospect');
 
         } catch (error) {
-            console.error('[AssemblyAI v3] Initialization Error:', error);
+            console.error('[AssemblyAI] Initialization Error:', error);
             setTranscribing(false);
         }
     };
@@ -123,55 +125,53 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
             const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
             audioContextRef.current = audioContext;
 
-            const source = audioContext.createMediaStreamSource(stream);
+            // --- AGENT PIPELINE (Local Mic) ---
+            const sourceAgent = audioContext.createMediaStreamSource(stream);
+            const processorAgent = audioContext.createScriptProcessor(4096, 1, 1);
+            processorAgentRef.current = processorAgent;
 
-            // We mute the local microphone into the processor so ONLY the prospect is transcribed!
-            const gainNode = audioContext.createGain();
-            gainNode.gain.value = 0;
-
-            const processor = audioContext.createScriptProcessor(4096, 1, 1);
-            processorRef.current = processor;
-
-            processor.onaudioprocess = (e) => {
-                if (socketRef.current?.readyState !== WebSocket.OPEN) return;
-
+            processorAgent.onaudioprocess = (e) => {
+                if (socketAgentRef.current?.readyState !== WebSocket.OPEN) return;
                 const inputData = e.inputBuffer.getChannelData(0);
                 const pcmData = new Int16Array(inputData.length);
                 for (let i = 0; i < inputData.length; i++) {
                     pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
                 }
-
-                // AssemblyAI v3 accepts raw binary PCM data directly
-                socketRef.current.send(pcmData.buffer);
+                socketAgentRef.current.send(pcmData.buffer);
             };
 
-            source.connect(gainNode);
-            gainNode.connect(processor);
-            processor.connect(audioContext.destination);
+            sourceAgent.connect(processorAgent);
+            processorAgent.connect(audioContext.destination);
+
+            // --- PROSPECT PIPELINE (Twilio Remote) ---
+            const processorProspect = audioContext.createScriptProcessor(4096, 1, 1);
+            processorProspectRef.current = processorProspect;
+
+            processorProspect.onaudioprocess = (e) => {
+                if (socketProspectRef.current?.readyState !== WebSocket.OPEN) return;
+                const inputData = e.inputBuffer.getChannelData(0);
+                const pcmData = new Int16Array(inputData.length);
+                for (let i = 0; i < inputData.length; i++) {
+                    pcmData[i] = Math.max(-1, Math.min(1, inputData[i])) * 0x7FFF;
+                }
+                socketProspectRef.current.send(pcmData.buffer);
+            };
+
+            processorProspect.connect(audioContext.destination);
         } catch (err) {
             console.error('[AssemblyAI] Audio Capture Error:', err);
         }
     };
 
-    const handleFinalTranscript = (text: string) => {
-        // Stop logging raw transcript to the UI signal feed as requested
-        /*
-        addSignal({
-            id: `live-${Date.now()}`,
-            time: new Date(),
-            type: 'LIVE',
-            message: text,
-            isLive: true
-        });
-        */
+    const handleFinalTranscript = (text: string, speaker: 'Agent' | 'Prospect') => {
+        transcriptBufferRef.current += `\n${speaker}: ${text}`;
 
-        transcriptBufferRef.current += ' ' + text;
-
-        // Trigger Intelligence every 5 seconds or every 8 words
+        // Trigger Intelligence based on timing or string length
         const now = Date.now();
         const wordCount = transcriptBufferRef.current.split(' ').length;
 
-        if (now - lastIntelTimeRef.current > 5000 || wordCount > 8) {
+        // Fire if 5s passed or 20 words have accumulated in the two-channel buffer
+        if (now - lastIntelTimeRef.current > 5000 || wordCount > 20) {
             triggerIntelligence();
             lastIntelTimeRef.current = now;
         }
@@ -221,12 +221,20 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
     };
 
     const stopStreaming = () => {
-        if (socketRef.current) {
-            if (socketRef.current.readyState === WebSocket.OPEN) {
-                socketRef.current.send(JSON.stringify({ type: 'Terminate' }));
+        if (socketAgentRef.current) {
+            if (socketAgentRef.current.readyState === WebSocket.OPEN) {
+                socketAgentRef.current.send(JSON.stringify({ type: 'Terminate' }));
             }
-            socketRef.current.close();
-            socketRef.current = null;
+            socketAgentRef.current.close();
+            socketAgentRef.current = null;
+        }
+
+        if (socketProspectRef.current) {
+            if (socketProspectRef.current.readyState === WebSocket.OPEN) {
+                socketProspectRef.current.send(JSON.stringify({ type: 'Terminate' }));
+            }
+            socketProspectRef.current.close();
+            socketProspectRef.current = null;
         }
 
         if (remoteSourceNodeRef.current) {
@@ -234,9 +242,14 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
             remoteSourceNodeRef.current = null;
         }
 
-        if (processorRef.current) {
-            processorRef.current.disconnect();
-            processorRef.current = null;
+        if (processorAgentRef.current) {
+            processorAgentRef.current.disconnect();
+            processorAgentRef.current = null;
+        }
+
+        if (processorProspectRef.current) {
+            processorProspectRef.current.disconnect();
+            processorProspectRef.current = null;
         }
 
         if (audioContextRef.current) {
