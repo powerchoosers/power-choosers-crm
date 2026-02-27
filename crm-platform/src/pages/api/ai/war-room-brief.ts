@@ -118,7 +118,7 @@ DOCUMENTS ON FILE: ${accDocs.map((d: DocRow) => d.name).join(', ') || 'None'}
             ? `Hub: $${grid.hubPrice?.toFixed(2)}/MWh | Reserves: ${grid.reserves?.toLocaleString()} MW | Scarcity Prob: ${grid.scarcityProb}%`
             : 'Grid data unavailable'
 
-        const prompt = `You are a forensic energy advisor. Provide a 3-bullet TACTICAL STRIKE PLAN based on the Market Pulse and deep Intelligence Dossiers.
+        const prompt = `You are a Forensic Energy Advisor executing the Nodal Point NEPQ (Neuro-Emotional Persuasion Questioning) playbook. Provide a 3-bullet TACTICAL STRIKE PLAN based on the Market Pulse and deep Intelligence Dossiers.
 
 CURRENT MARKET PULSE:
 ${gridSummary}
@@ -132,12 +132,12 @@ ${dossiers}
 INSTRUCTIONS:
 1. Identify the 3 highest-risk opportunities where Market Tightness meets CRM Liability.
 2. For each bullet:
-   - Identify the SPECIFIC ACCOUNT and the PRIMARY STAKEHOLDER to reach out to.
-   - Reference a SPECIFIC DETAIL from their transcript or email history (e.g., "they mentioned X in their last call").
-   - Define the TACTICAL OPENING: How to pivot the current market volatility into their specific contract vulnerability.
-3. Vocabulary: demand ratchet, 4CP peak exposure, scarcity adder, transmission liability.
+   - Identify the SPECIFIC ACCOUNT and the PRIMARY STAKEHOLDER.
+   - Reference a SPECIFIC DETAIL from their transcript/email (e.g., "they mentioned X locked contract").
+   - Define the TACTICAL OPENING using the NEPQ framework: DO NOT "pitch savings." Diagnose a structural inefficiency. If they previously had an objection (e.g., "locked in", "broker"), script exactly how to diffuse it with a curiosity-driven consequence question (e.g. "When you renew, will you have a benchmark?"). Use a calm, unhurried tone with verbal pauses ("...").
+3. Vocabulary: demand ratchet liability, 4CP peak exposure, scarcity adder, transmission liability, structural audit.
 
-Tone: Forensic, urgent but measured, professional. No conversational filler. Exactly 3 bullets.`
+Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets.`
 
         const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
