@@ -321,10 +321,11 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const contact = row.original
 
-        // Health score from REAL last call or email — undefined while loading (no dot during fetch)
-        const healthScore = contactTouchLoading
+        // No dot until:  (a) actively loading, OR (b) map hasn't settled yet
+        // (enabled:false gives isLoading=false but data=undefined — this guard catches both)
+        const healthScore = (contactTouchLoading || contactLastTouchMap === undefined)
           ? undefined
-          : computeHealthScore(contactLastTouchMap?.get(contact.id))
+          : computeHealthScore(contactLastTouchMap.get(contact.id))
 
         return (
           <Link
@@ -505,10 +506,10 @@ export default function TargetDetailPage() {
       cell: ({ row }) => {
         const account = row.original
 
-        // Health score from REAL last call or email — undefined while loading (no dot during fetch)
-        const healthScore = accountTouchLoading
+        // No dot until:  (a) actively loading, OR (b) map hasn't settled yet
+        const healthScore = (accountTouchLoading || accountLastTouchMap === undefined)
           ? undefined
-          : computeHealthScore(accountLastTouchMap?.get(account.id))
+          : computeHealthScore(accountLastTouchMap.get(account.id))
 
         return (
           <Link
