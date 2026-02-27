@@ -27,15 +27,15 @@ interface ContactAvatarProps {
 }
 
 const HEALTH_DOT: Record<ContactHealthScore, { bg: string; shadow: string; label: string }> = {
-  active:  { bg: 'bg-emerald-500', shadow: 'shadow-[0_0_6px_rgba(16,185,129,0.8)]',  label: 'Last touch <30d — Active'    },
-  warming: { bg: 'bg-amber-500',   shadow: 'shadow-[0_0_6px_rgba(245,158,11,0.8)]',  label: 'Last touch 30–90d — Warming' },
-  cold:    { bg: 'bg-rose-500',    shadow: 'shadow-[0_0_6px_rgba(244,63,94,0.8)]',   label: 'Last touch >90d — Cold'      },
+  active: { bg: 'bg-emerald-500', shadow: 'shadow-[0_0_6px_rgba(16,185,129,0.8)]', label: 'Last touch <30d — Active' },
+  warming: { bg: 'bg-amber-500', shadow: 'shadow-[0_0_6px_rgba(245,158,11,0.8)]', label: 'Last touch 30–90d — Warming' },
+  cold: { bg: 'bg-rose-500', shadow: 'shadow-[0_0_6px_rgba(244,63,94,0.8)]', label: 'Last touch >90d — Cold' },
 }
 
-export function ContactAvatar({ 
-  name, 
-  size = 32, 
-  className, 
+export function ContactAvatar({
+  name,
+  size = 32,
+  className,
   textClassName,
   showTargetBadge = false,
   showListBadge = false,
@@ -56,7 +56,7 @@ export function ContactAvatar({
   return (
     <div className="relative inline-block">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={false}
         animate={{ opacity: 1, scale: 1 }}
         className={cn(
           'rounded-[14px]',
@@ -92,9 +92,9 @@ export function ContactAvatar({
             <motion.div
               key={healthScore}
               initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
+              animate={{ scale: [0, 1.25, 1], opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
-              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+              transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
               className={cn(
                 'w-2.5 h-2.5 rounded-full border-2 border-zinc-900 shrink-0',
                 health.bg,
