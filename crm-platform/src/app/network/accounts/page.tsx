@@ -118,7 +118,7 @@ export default function AccountsPage() {
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
   const accountIds = useMemo(() => accounts.map(a => a.id), [accounts])
-  const { data: lastTouchMap, isLoading: lastTouchLoading } = useAccountLastTouch(accountIds)
+  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useAccountLastTouch(accountIds)
 
   useEffect(() => {
     setIsMounted(true)
@@ -686,6 +686,8 @@ export default function AccountsPage() {
                       router={router}
                       saveScroll={saveScroll}
                       columnOrder={columnOrder}
+                      healthLoading={lastTouchLoading}
+                      healthUpdatedAt={lastTouchUpdatedAt}
                     />
                   ))}
                 </AnimatePresence>

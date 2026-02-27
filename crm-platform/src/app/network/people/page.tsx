@@ -121,7 +121,7 @@ export default function PeoplePage() {
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
-  const { data: lastTouchMap, isLoading: lastTouchLoading } = useContactLastTouch(contactIds)
+  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useContactLastTouch(contactIds)
   const pendingSelectCountRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -693,6 +693,8 @@ export default function PeoplePage() {
                       router={router}
                       saveScroll={saveScroll}
                       columnOrder={columnOrder}
+                      healthLoading={lastTouchLoading}
+                      healthUpdatedAt={lastTouchUpdatedAt}
                     />
                   ))}
                 </AnimatePresence>

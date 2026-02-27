@@ -14,6 +14,8 @@ interface ContactTableRowProps {
     router: AppRouterInstance
     saveScroll: () => void
     columnOrder?: string[]
+    healthLoading?: boolean
+    healthUpdatedAt?: number
 }
 
 export const ContactTableRow = memo(function ContactTableRow({
@@ -21,7 +23,9 @@ export const ContactTableRow = memo(function ContactTableRow({
     index,
     router,
     saveScroll,
-    columnOrder
+    columnOrder,
+    healthLoading,
+    healthUpdatedAt
 }: ContactTableRowProps) {
     return (
         <motion.tr
@@ -61,5 +65,7 @@ export const ContactTableRow = memo(function ContactTableRow({
     return prev.row.id === next.row.id &&
         prev.index === next.index &&
         prev.columnOrder === next.columnOrder &&
+        prev.healthLoading === next.healthLoading &&
+        prev.healthUpdatedAt === next.healthUpdatedAt &&
         prev.row.getIsSelected() === next.row.getIsSelected()
 })

@@ -14,6 +14,8 @@ interface AccountTableRowProps {
     router: AppRouterInstance
     saveScroll: () => void
     columnOrder?: string[]
+    healthLoading?: boolean
+    healthUpdatedAt?: number
 }
 
 export const AccountTableRow = memo(function AccountTableRow({
@@ -21,7 +23,9 @@ export const AccountTableRow = memo(function AccountTableRow({
     index,
     router,
     saveScroll,
-    columnOrder
+    columnOrder,
+    healthLoading,
+    healthUpdatedAt
 }: AccountTableRowProps) {
     return (
         <motion.tr
@@ -57,5 +61,7 @@ export const AccountTableRow = memo(function AccountTableRow({
     return prev.row.id === next.row.id &&
         prev.index === next.index &&
         prev.columnOrder === next.columnOrder &&
+        prev.healthLoading === next.healthLoading &&
+        prev.healthUpdatedAt === next.healthUpdatedAt &&
         prev.row.getIsSelected() === next.row.getIsSelected()
 })
