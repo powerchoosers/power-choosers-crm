@@ -116,7 +116,7 @@ export function ContactAvatar({
             'absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 shrink-0',
             showListBadge
               ? 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.7)]'
-              : 'bg-[#002FA7] shadow-[0_0_8px_rgba(0,47,167,0.6)]'
+              : 'bg-zinc-100 shadow-[0_0_8px_rgba(255,255,255,0.4)]'
           )}
           title={showListBadge ? 'In list' : 'In Target List'}
         />

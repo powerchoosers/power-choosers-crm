@@ -137,7 +137,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
           <div className="px-2.5 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-mono text-red-400 tabular-nums">
             {account?.daysRemaining ? `${account.daysRemaining}D` : 'VOID'}
           </div>
-          <div className="px-2.5 py-1.5 rounded-xl bg-[#002FA7]/10 border border-[#002FA7]/20 text-[10px] font-mono text-[#002FA7]">
+          <div className="px-2.5 py-1.5 rounded-xl bg-white/10 border border-white/20 text-[10px] font-mono text-white">
             {account?.loadZone || 'LZ_NORTH'}
           </div>
         </div>
@@ -208,7 +208,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                       className={cn(
                         'px-3 py-1.5 rounded-xl text-[10px] font-mono uppercase tracking-wider transition-colors',
                         selectedVariantIndex === 0
-                          ? 'bg-[#002FA7]/30 border border-[#002FA7]/50 text-[#002FA7]'
+                          ? 'bg-white/20 border border-white/40 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]'
                           : 'bg-white/5 border border-white/10 text-zinc-500 hover:text-zinc-300'
                       )}
                     >
@@ -222,7 +222,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                         className={cn(
                           'px-3 py-1.5 rounded-xl text-[10px] font-mono uppercase tracking-wider transition-colors',
                           selectedVariantIndex === i + 1
-                            ? 'bg-[#002FA7]/30 border border-[#002FA7]/50 text-[#002FA7]'
+                            ? 'bg-white/20 border border-white/40 text-white shadow-[0_0_10px_rgba(255,255,255,0.1)]'
                             : 'bg-white/5 border border-white/10 text-zinc-500 hover:text-zinc-300'
                         )}
                       >
@@ -253,7 +253,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
             onChange={(e) => setLiveInput(e.target.value)}
             onKeyDown={handleLiveContext}
             placeholder="INJECT LIVE CONTEXT..."
-            className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-xs font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/20 outline-none pr-14 transition-all shadow-inner"
+            className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-xs font-mono text-white placeholder:text-zinc-700 focus:border-white/40 focus:ring-1 focus:ring-white/20 outline-none pr-14 transition-all shadow-inner"
           />
           <button
             onClick={() => handleVectorClick('LIVE_PIVOT')}
@@ -269,7 +269,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
           <VectorButton
             label="Open"
             icon={Zap}
-            color="text-[#002FA7]"
+            color="text-zinc-100"
             loading={loadingVector === 'OPENER'}
             onClick={() => handleVectorClick('OPENER')}
           />
@@ -343,15 +343,15 @@ function NeuralScan() {
             repeat: Infinity,
             ease: "easeInOut",
           }}
-          className="absolute inset-0 bg-[#002FA7]/20 blur-2xl rounded-full"
+          className="absolute inset-0 bg-white/10 blur-2xl rounded-full"
         />
-        <Sparkles size={48} className="text-[#002FA7] relative z-10 animate-pulse" />
+        <Sparkles size={48} className="text-zinc-100 relative z-10 animate-pulse" />
       </div>
       <motion.div
         key={step}
         initial={{ opacity: 0, y: 5 }}
         animate={{ opacity: 1, y: 0 }}
-        className="text-[10px] font-mono text-[#002FA7] uppercase tracking-[0.3em]"
+        className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]"
       >
         {steps[step]}
       </motion.div>
@@ -367,7 +367,7 @@ function ScriptStep({ label, content, delay, accent = false }: { label: string, 
       transition={{ delay }}
       className={cn(
         "bg-zinc-900/40 border p-4 rounded-xl relative overflow-hidden",
-        accent ? "border-[#002FA7]/40 bg-[#002FA7]/5" : "border-white/5"
+        accent ? "border-white/20 bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]" : "border-white/5"
       )}
     >
       <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-2">
