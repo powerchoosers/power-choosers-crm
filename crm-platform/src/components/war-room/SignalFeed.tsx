@@ -6,6 +6,10 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useRef, useState } from 'react'
 import { Activity, Phone, Mail, CheckSquare } from 'lucide-react'
 
+function generateId() {
+    return Math.random().toString(36).substring(2, 11)
+}
+
 interface SignalEntry {
     id: string
     time: Date
@@ -37,7 +41,7 @@ export function SignalFeed({ pendingMarketEvents }: SignalFeedProps) {
     const listRef = useRef<HTMLDivElement>(null)
 
     const push = (entry: Omit<SignalEntry, 'id' | 'time'>) => {
-        const newEntry: SignalEntry = { ...entry, id: crypto.randomUUID(), time: new Date() }
+        const newEntry: SignalEntry = { ...entry, id: generateId(), time: new Date() }
         setEntries((prev) => [newEntry, ...prev].slice(0, 60))
     }
 
