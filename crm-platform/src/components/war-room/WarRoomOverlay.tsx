@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useWarRoomStore } from '@/store/warRoomStore'
+import { useCallStore } from '@/store/callStore'
 import { GridStrip } from '@/components/war-room/GridStrip'
 import { PriorityStack } from '@/components/war-room/PriorityStack'
 import { SignalFeed, SignalEntry } from '@/components/war-room/SignalFeed'
@@ -23,11 +24,13 @@ interface GridSnapshot {
 
 export function WarRoomOverlay() {
     const { isOpen, close } = useWarRoomStore()
+    const { isActive: isCallActive, status: callStatus, metadata: callMeta } = useCallStore()
     const router = useRouter()
     const [gridSnapshot, setGridSnapshot] = useState<GridSnapshot | null>(null)
     const [pendingMarketEvents, setPendingMarketEvents] = useState<SignalEntry[]>([])
     const [prevReserves, setPrevReserves] = useState<number | null>(null)
     const [currentTime, setCurrentTime] = useState(new Date())
+    const [prevCallActive, setPrevCallActive] = useState(false)
 
     // Keyboard: Esc closes
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -42,6 +45,18 @@ export function WarRoomOverlay() {
             clearInterval(timer)
         }
     }, [handleKeyDown])
+
+    useEffect(() => {
+        if (isCallActive && !prevCallActive) {
+            setPendingMarketEvents([{
+                id: generateId(),
+                time: new Date(),
+                type: 'CALL',
+                message: `Live Call initiated: ${callMeta?.name || 'Unknown'} — ${callStatus}`,
+            }])
+        }
+        setPrevCallActive(isCallActive)
+    }, [isCallActive, prevCallActive, callMeta?.name, callStatus])
 
     // Lock body scroll when open
     useEffect(() => {
@@ -166,6 +181,34 @@ export function WarRoomOverlay() {
                                 )}
                             </AnimatePresence>
 
+                            {/* Live Call Badge */}
+                            <AnimatePresence>
+                                {isCallActive && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 10 }}
+                                        className="flex items-center gap-2 px-3 py-1 rounded-full border border-rose-500/40 bg-rose-500/10 shadow-[0_0_15px_rgba(244,63,94,0.2)] ml-4"
+                                    >
+                                        <div className="relative">
+                                            <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping absolute inset-0" />
+                                            <div className="w-2 h-2 rounded-full bg-rose-500 relative" />
+                                        </div>
+                                        <span className="text-[10px] font-mono text-rose-500 tabular-nums uppercase tracking-widest font-bold">
+                                            Live Call: {callStatus}
+                                        </span>
+                                        {callMeta?.name && (
+                                            <>
+                                                <span className="text-zinc-700 text-[10px]">/</span>
+                                                <span className="text-[10px] font-mono text-zinc-300 truncate max-w-[120px]">
+                                                    {callMeta.name}
+                                                </span>
+                                            </>
+                                        )}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
                             <button
                                 onClick={close}
                                 className="icon-button-forensic w-8 h-8 flex items-center justify-center rounded hover:bg-white/5"
@@ -184,6 +227,7 @@ export function WarRoomOverlay() {
                             <div className="flex-[65] overflow-hidden border-r border-white/5">
                                 <PriorityStack
                                     gridSnapshot={gridSnapshot}
+                                    activeAccountId={callMeta?.accountId}
                                     onAccountOpen={handleAccountOpen}
                                     onQuickCall={handleQuickCall}
                                 />

@@ -41,6 +41,7 @@ interface GridSnapshot {
 
 interface PriorityStackProps {
     gridSnapshot: GridSnapshot | null
+    activeAccountId?: string
     onAccountOpen: (accountId: string) => void
     onQuickCall: (accountId: string, name: string) => void
 }
@@ -119,7 +120,7 @@ const HEALTH_DOT = {
 
 // ─── PriorityStack ──────────────────────────────────────────────────────────
 
-export function PriorityStack({ gridSnapshot, onAccountOpen, onQuickCall }: PriorityStackProps) {
+export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, onQuickCall }: PriorityStackProps) {
     const router = useRouter()
     const [accounts, setAccounts] = useState<ScoredAccount[]>([])
     const [loading, setLoading] = useState(true)
@@ -275,6 +276,7 @@ export function PriorityStack({ gridSnapshot, onAccountOpen, onQuickCall }: Prio
                                 onCall={() => onQuickCall(acct.id, acct.name)}
                                 onEmail={() => router.push(`/network/accounts/${acct.id}?tab=emails`)}
                                 onTask={() => router.push(`/network/accounts/${acct.id}?tab=tasks`)}
+                                isActiveCall={acct.id === activeAccountId}
                             />
                         ))}
                     </AnimatePresence>
@@ -294,9 +296,10 @@ interface AccountCardProps {
     onCall: () => void
     onEmail: () => void
     onTask: () => void
+    isActiveCall?: boolean
 }
 
-function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTask }: AccountCardProps) {
+function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTask, isActiveCall }: AccountCardProps) {
     const topReason = acct.liabilityReasons[0] ?? ''
     const secondReason = acct.liabilityReasons[1] ?? ''
 
@@ -313,7 +316,8 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
             className={cn(
                 'group flex items-center gap-4 px-5 py-3.5 border-b border-white/[0.04]',
                 'hover:bg-white/[0.025] hover:border-white/10 transition-all duration-200 cursor-pointer',
-                urgencyGlow
+                urgencyGlow,
+                isActiveCall && 'bg-rose-500/5 border-rose-500/20'
             )}
             onClick={onOpen}
         >
@@ -339,9 +343,14 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
             <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                     <span className="text-sm font-medium text-zinc-100 truncate">{acct.name}</span>
-                    {acct.liabilityScore >= 70 && (
+                    {acct.liabilityScore >= 70 && !isActiveCall && (
                         <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded-sm border border-[#002FA7]/50 text-[#002FA7] bg-[#002FA7]/10 uppercase tracking-widest">
                             HIGH
+                        </span>
+                    )}
+                    {isActiveCall && (
+                        <span className="shrink-0 text-[9px] font-mono px-1.5 py-0.5 rounded-sm border border-rose-500/50 text-rose-500 bg-rose-500/10 uppercase tracking-widest animate-pulse">
+                            LIVE CALL
                         </span>
                     )}
                 </div>
