@@ -22,18 +22,18 @@ export default async function handler(req, res) {
     try {
         let accountContext = 'Unknown prospect';
         let industry = 'your industry';
-        
+
         if (accountId) {
             const { data: account } = await supabaseAdmin
                 .from('accounts')
                 .select('name, industry, location')
                 .eq('id', accountId)
                 .single();
-                
+
             if (account) {
                 industry = account.industry || 'your industry';
                 accountContext = `Account: ${account.name} | Industry: ${industry} | Location: ${account.location || 'Unknown'}`;
-                
+
                 // Try grabbing the most recent call summary to add context
                 const { data: lastCall } = await supabaseAdmin
                     .from('calls')
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
                     .order('timestamp', { ascending: false })
                     .limit(1)
                     .single();
-                    
+
                 if (lastCall?.summary) {
                     accountContext += ` | Previous Call Context: ${lastCall.summary}`;
                 }
@@ -68,10 +68,11 @@ NEPQ PLAYBOOK RULES & PSYCHOLOGY:
 4. TONE & CURIOSITY: Calm, diagnostic. Always end with a question (e.g. "Does that make sense?", "Fair?").
 
 INSTRUCTIONS:
-1. Analyze the transcript snippet.
-2. Provide the EXACT, conversational sentences the advisor should read NOW to diffuse objections and advance the diagnosis.
-3. Max 45 words. Make it punchy and instantly readable.
-4. If the transcript is idle or nonsense, return "Monitoring signal..."`;
+1. The transcript contains a two-channel dialogue labeled with 'Agent:' and 'Prospect:'. Analyze the flow of the conversation.
+2. Focus strictly on what the 'Prospect' most recently said.
+3. Provide the EXACT, conversational sentences the 'Agent' should read NOW to diffuse objections and advance the diagnosis.
+4. Max 45 words. Make it punchy and instantly readable.
+5. If the transcript is idle, or the Prospect hasn't said anything substantive yet, return "Monitoring signal..."`;
 
         // AssemblyAI LLM Gateway — gemini-2.5-flash for low-latency live inference
         const response = await fetch('https://llm-gateway.assemblyai.com/v1/chat/completions', {
