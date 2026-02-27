@@ -14,10 +14,11 @@ import { domainToClickableUrl } from '@/lib/url'
 interface AccountUplinkCardProps {
   account: Account
   isEditing?: boolean
+  onEnter?: () => void
   onUpdate?: (updates: Partial<Account>) => void
 }
 
-export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, isEditing, onUpdate }) => {
+export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, isEditing, onEnter, onUpdate }) => {
   const initiateCall = useCallStore((state) => state.initiateCall)
   const [isSearching, setIsSearching] = useState(false)
   const [justUpdated, setJustUpdated] = useState(false)
@@ -124,6 +125,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                 type="text"
                 value={account.companyPhone || ''}
                 onChange={(e) => onUpdate?.({ companyPhone: formatPhoneNumber(e.target.value) })}
+                onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                 className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm font-mono tabular-nums text-white focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                 placeholder="+1 (000) 000-0000"
               />
@@ -172,6 +174,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                 type="text"
                 value={account.domain || ''}
                 onChange={(e) => onUpdate?.({ domain: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                 className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm font-mono text-white focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                 placeholder="domain.com"
               />
@@ -187,6 +190,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                 type="text"
                 value={account.address || ''}
                 onChange={(e) => onUpdate?.({ address: e.target.value })}
+                onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
                 className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
                 placeholder="Full Address"
               />
