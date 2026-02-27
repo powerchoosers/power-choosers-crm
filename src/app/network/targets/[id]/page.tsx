@@ -318,8 +318,11 @@ export default function TargetDetailPage() {
           </span>
         </span>
       ),
-      cell: ({ row }) => {
+      cell: ({ row, table }) => {
         const contact = row.original
+        const meta = table.options.meta as any
+        const contactLastTouchMap = meta?.contactLastTouchMap
+        const contactTouchLoading = meta?.contactTouchLoading
 
         // No dot until:  (a) actively loading, OR (b) map hasn't settled yet
         // (enabled:false gives isLoading=false but data=undefined — this guard catches both)
@@ -439,7 +442,7 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pageIndex, pageSize, isPeopleList, contactLastTouchMap, contactTouchLoading])
+  ], [pageIndex, pageSize, isPeopleList])
 
   // Column definitions for Accounts
   const accountColumns = useMemo<ColumnDef<Account>[]>(() => [
@@ -504,8 +507,11 @@ export default function TargetDetailPage() {
           </span>
         </span>
       ),
-      cell: ({ row }) => {
+      cell: ({ row, table }) => {
         const account = row.original
+        const meta = table.options.meta as any
+        const accountLastTouchMap = meta?.accountLastTouchMap
+        const accountTouchLoading = meta?.accountTouchLoading
 
         // No dot until:  (a) actively loading, OR (b) map hasn't settled yet
         const healthScore = (accountTouchLoading || accountLastTouchMap === undefined)
@@ -600,13 +606,19 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pageIndex, pageSize, router, accountLastTouchMap, accountTouchLoading])
+  ], [pageIndex, pageSize, router])
 
   const tableColumns = useMemo(() => isPeopleList ? peopleColumns : accountColumns, [isPeopleList, peopleColumns, accountColumns])
 
   const table = useReactTable({
     data,
     columns: tableColumns as ColumnDef<any>[],
+    meta: {
+      contactLastTouchMap,
+      contactTouchLoading,
+      accountLastTouchMap,
+      accountTouchLoading
+    },
     onRowSelectionChange: setRowSelection,
     onColumnOrderChange: setColumnOrder,
     manualPagination: false,

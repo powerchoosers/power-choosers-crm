@@ -353,8 +353,11 @@ export default function AccountsPage() {
             </button>
           )
         },
-        cell: ({ row }) => {
+        cell: ({ row, table }) => {
           const account = row.original
+          const meta = table.options.meta as any
+          const lastTouchMap = meta?.lastTouchMap
+          const lastTouchLoading = meta?.lastTouchLoading
 
           // No dot until: (a) loading OR (b) map hasn't settled — covers enabled:false window too
           const healthScore = (lastTouchLoading || lastTouchMap === undefined)
@@ -574,11 +577,15 @@ export default function AccountsPage() {
         },
       },
     ]
-  }, [pageIndex, deletingAccountIds, lastTouchMap, lastTouchLoading])
+  }, [pageIndex, deletingAccountIds])
 
   const table = useReactTable({
     data: accounts,
     columns,
+    meta: {
+      lastTouchMap,
+      lastTouchLoading
+    },
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
