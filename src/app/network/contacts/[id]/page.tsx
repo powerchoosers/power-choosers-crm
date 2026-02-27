@@ -117,6 +117,23 @@ export default function ContactDossierPage() {
 
   const composeContext = useMemo((): ComposeContext | null => {
     if (!s.contact) return null
+
+    let contextForAi = s.editNotes || ''
+
+    // Add recent call transcripts to Context
+    if (s.recentCalls && s.recentCalls.length > 0) {
+      const callsWithText = s.recentCalls.filter(c => c.transcript || c.note)
+      if (callsWithText.length > 0) {
+        contextForAi += '\\n\\nRECENT CALL HISTORY:\\n'
+        contextForAi += callsWithText.slice(0, 3).map(c => {
+          let text = `[Date: ${format(new Date(c.date), 'MMM d, yyyy')}] (${c.type} - ${c.status})\\n`
+          if (c.note) text += `Summary: ${c.note}\\n`
+          if (c.transcript) text += `Transcript:\\n${c.transcript}\\n`
+          return text
+        }).join('\\n---\\n')
+      }
+    }
+
     return {
       contactName: s.contact.name,
       contactTitle: s.contact.title,
@@ -125,9 +142,10 @@ export default function ContactDossierPage() {
       industry: (s.account as any)?.industry,
       accountDescription: (s.account as any)?.description,
       contactId: s.contact.id,
-      accountId: s.account?.id
+      accountId: s.account?.id,
+      contextForAi: contextForAi.trim() || undefined
     }
-  }, [s.contact, s.account, s.editCompany])
+  }, [s.contact, s.account, s.editCompany, s.editNotes, s.recentCalls])
 
   if (s.isLoading) {
     return (
