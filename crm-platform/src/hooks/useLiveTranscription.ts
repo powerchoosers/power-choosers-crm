@@ -165,11 +165,11 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
 
         transcriptBufferRef.current += ' ' + text;
 
-        // Trigger Intelligence every 10 seconds or every 20 words
+        // Trigger Intelligence every 5 seconds or every 8 words
         const now = Date.now();
         const wordCount = transcriptBufferRef.current.split(' ').length;
 
-        if (now - lastIntelTimeRef.current > 10000 || wordCount > 20) {
+        if (now - lastIntelTimeRef.current > 5000 || wordCount > 8) {
             triggerIntelligence();
             lastIntelTimeRef.current = now;
         }
