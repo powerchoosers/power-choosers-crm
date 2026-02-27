@@ -189,7 +189,20 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
                 })
             });
 
-            const { insight } = await res.json();
+            const data = await res.json();
+
+            if (!res.ok) {
+                console.error('[Intelligence] API error:', res.status, data);
+                addSignal({
+                    id: `intel-err-${Date.now()}`,
+                    time: new Date(),
+                    type: 'INTEL',
+                    message: `⚠ Intelligence error ${res.status} — check server logs`
+                });
+                return;
+            }
+
+            const { insight } = data;
             if (insight && insight !== 'Monitoring signal...') {
                 addSignal({
                     id: `intel-${Date.now()}`,

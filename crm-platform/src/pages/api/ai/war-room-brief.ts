@@ -142,7 +142,7 @@ Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets.`
         const orRes = await fetch('https://llm-gateway.assemblyai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': apiKey,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
