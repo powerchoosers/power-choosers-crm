@@ -7,9 +7,10 @@ import { useCallStore } from '@/store/callStore'
 import { GridStrip } from '@/components/war-room/GridStrip'
 import { PriorityStack } from '@/components/war-room/PriorityStack'
 import { SignalFeed, SignalEntry } from '@/components/war-room/SignalFeed'
-import { X, Shield } from 'lucide-react'
+import { X, Shield, Zap } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { useFourCPForecast } from '@/hooks/useFourCPForecast'
 
 function generateId() {
     return Math.random().toString(36).substring(2, 11)
@@ -25,12 +26,16 @@ interface GridSnapshot {
 export function WarRoomOverlay() {
     const { isOpen, close, addSignal } = useWarRoomStore()
     const { isActive: isCallActive, status: callStatus, metadata: callMeta } = useCallStore()
+    const { data: fourCP } = useFourCPForecast()
     const router = useRouter()
     const [gridSnapshot, setGridSnapshot] = useState<GridSnapshot | null>(null)
     const [prevReserves, setPrevReserves] = useState<number | null>(null)
     const [currentTime, setCurrentTime] = useState(new Date())
     const [prevCallActive, setPrevCallActive] = useState(false)
     const lastPriceAlertRef = useRef<number>(0)
+    const lastBattleStationsRef = useRef(false)
+
+    const isBattleStations = (fourCP?.riskLevel === 'BATTLE_STATIONS' || fourCP?.riskLevel === 'CRITICAL') && fourCP?.isPeakSeason
 
     // Keyboard: Esc closes
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -123,6 +128,19 @@ export function WarRoomOverlay() {
 
     const reservesTight = (gridSnapshot?.reserves ?? Infinity) < 4000
 
+    // Auto-inject signal when Battle Stations mode activates
+    useEffect(() => {
+        if (isBattleStations && !lastBattleStationsRef.current) {
+            addSignal({
+                id: generateId(),
+                time: new Date(),
+                type: 'MARKET',
+                message: `⚡ BATTLE STATIONS — 4CP probability at ${fourCP?.probability ?? ''}%. Call 4CP-exposed accounts now.`,
+            })
+        }
+        lastBattleStationsRef.current = !!isBattleStations
+    }, [isBattleStations, fourCP?.probability, addSignal])
+
     return (
         <AnimatePresence>
             {isOpen && (
@@ -145,7 +163,12 @@ export function WarRoomOverlay() {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98, y: 8 }}
                         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-                        className="fixed inset-4 z-[100] flex flex-col rounded-xl overflow-hidden border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.8)] bg-[#09090b]"
+                        className={cn(
+                            'fixed inset-4 z-[100] flex flex-col rounded-xl overflow-hidden shadow-[0_30px_80px_rgba(0,0,0,0.8)] bg-[#09090b]',
+                            isBattleStations
+                                ? 'border border-zinc-100/50 shadow-[0_30px_80px_rgba(0,0,0,0.8),0_0_40px_rgba(255,255,255,0.06)]'
+                                : 'border border-white/10'
+                        )}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -153,11 +176,23 @@ export function WarRoomOverlay() {
                             <div className="flex items-center gap-3">
                                 <Shield className={cn(
                                     'w-4 h-4 transition-colors',
-                                    reservesTight ? 'text-zinc-100' : 'text-zinc-600'
+                                    isBattleStations ? 'text-amber-400' : reservesTight ? 'text-zinc-100' : 'text-zinc-600'
                                 )} />
                                 <span className="text-xs font-mono text-zinc-300 uppercase tracking-[0.3em]">
                                     Forensic War Room
                                 </span>
+                                {isBattleStations && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: -4 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        className="flex items-center gap-1 px-2 py-0.5 rounded border border-amber-500/40 bg-amber-500/10"
+                                    >
+                                        <Zap size={10} className="text-amber-400" />
+                                        <span className="text-[9px] font-mono uppercase tracking-widest text-amber-400">
+                                            BATTLE_STATIONS · {fourCP?.probability}%
+                                        </span>
+                                    </motion.div>
+                                )}
                                 <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
                                     Ctrl+Shift+W
                                 </span>
