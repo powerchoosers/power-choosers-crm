@@ -33,31 +33,27 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
 
     // Dynamically wire the Twilio incoming audio stream into the processor
     useEffect(() => {
-        // If there's an active call and the audio system is running, grab the remote audio
-        if (!currentCall || !audioContextRef.current || !processorRef.current) return;
+        if (!isActive) return;
 
-        const remoteStream = currentCall.getRemoteStream();
-        if (remoteStream && !remoteSourceNodeRef.current) {
-            console.log('[AssemblyAI v3] Live mixing Twilio remote stream into transcriber');
-            try {
-                const remoteSource = audioContextRef.current.createMediaStreamSource(remoteStream);
-                remoteSource.connect(processorRef.current);
-                remoteSourceNodeRef.current = remoteSource;
-            } catch (err) {
-                console.warn('[AssemblyAI v3] Failed to connect remote audio stream', err);
-            }
-        }
+        // Poll for the remote stream because Twilio attaches it after call connects
+        const interval = setInterval(() => {
+            if (!currentCall || !audioContextRef.current || !processorRef.current) return;
+            if (remoteSourceNodeRef.current) return; // already wired
 
-        return () => {
-            if (remoteSourceNodeRef.current && processorRef.current) {
+            const remoteStream = currentCall.getRemoteStream();
+            if (remoteStream && remoteStream.getAudioTracks().length > 0) {
+                console.log('[AssemblyAI v3] Live mixing Twilio remote stream into transcriber');
                 try {
-                    remoteSourceNodeRef.current.disconnect(processorRef.current);
-                } catch (e) {
-                    // Ignore cleanly if it's already gone
+                    const remoteSource = audioContextRef.current.createMediaStreamSource(remoteStream);
+                    remoteSource.connect(processorRef.current);
+                    remoteSourceNodeRef.current = remoteSource;
+                } catch (err) {
+                    console.warn('[AssemblyAI v3] Failed to connect remote audio stream', err);
                 }
-                remoteSourceNodeRef.current = null;
             }
-        };
+        }, 1000);
+
+        return () => clearInterval(interval);
     }, [currentCall, isActive]);
 
     const startStreaming = async () => {
@@ -128,6 +124,11 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
             audioContextRef.current = audioContext;
 
             const source = audioContext.createMediaStreamSource(stream);
+
+            // We mute the local microphone into the processor so ONLY the prospect is transcribed!
+            const gainNode = audioContext.createGain();
+            gainNode.gain.value = 0;
+
             const processor = audioContext.createScriptProcessor(4096, 1, 1);
             processorRef.current = processor;
 
@@ -144,7 +145,8 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
                 socketRef.current.send(pcmData.buffer);
             };
 
-            source.connect(processor);
+            source.connect(gainNode);
+            gainNode.connect(processor);
             processor.connect(audioContext.destination);
         } catch (err) {
             console.error('[AssemblyAI] Audio Capture Error:', err);
