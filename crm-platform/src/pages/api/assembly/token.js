@@ -21,11 +21,17 @@ export default async function handler(req, res) {
             },
         });
 
-        const data = await response.json();
+        // Read raw text first — AssemblyAI returns empty body on 401/429
+        const text = await response.text();
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to fetch AssemblyAI v3 token');
+            console.error(`AssemblyAI token failed: HTTP ${response.status}`, text);
+            return res.status(response.status).json({
+                error: `AssemblyAI returned ${response.status}`,
+                details: text || '(empty response body)',
+            });
         }
 
+        const data = JSON.parse(text);
         return res.status(200).json(data);
     } catch (error) {
         console.error('AssemblyAI Token Error:', error);

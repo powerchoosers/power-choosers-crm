@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "supabase": {
+      "command": "node",
+      "args": ["src/mcp-server/supabase.js"],
+      "description": "Supabase database management via MCP",
+      "env": {
+        "NODE_PATH": "./node_modules"
+      }
+    }
+  }
+}

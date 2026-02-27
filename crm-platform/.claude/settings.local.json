@@ -19,7 +19,9 @@
       "Bash(git add src/app/network/emails/page.tsx src/app/network/people/page.tsx src/components/layout/TopBar.tsx src/pages/api/email/unsubscribe.js src/pages/api/track-email-performance.js src/lib/supabase.ts)",
       "Bash(git add -A)",
       "Bash(git commit:*)",
-      "Bash(cd /c/Users/Lap3p/OneDrive/Documents/Power Choosers CRM/crm-platform)"
+      "Bash(cd /c/Users/Lap3p/OneDrive/Documents/Power Choosers CRM/crm-platform)",
+      "Bash(xargs grep -l \"delete\\\\|DELETE\")",
+      "Bash(xargs grep -l \"accounts\\\\|contacts\")"
     ]
   }
 }

@@ -201,3 +201,28 @@ Required in `.env.local`:
 Hardcoded admin emails in `src/lib/supabase.ts`:
 - `l.patterson@nodalpoint.io`
 - `admin@nodalpoint.io`
+
+---
+
+## Supabase MCP Access
+
+The **official Supabase MCP server** is already connected and available in every session. Use it directly — no setup needed.
+
+**Project ID:** `gfitvnkaevozbcyostez` (Nodal Point Data Engine, `us-east-1`)
+
+### Available MCP tools
+
+| Tool | Use for |
+|---|---|
+| `mcp__supabase__execute_sql` | Run raw SQL (DDL, queries, migrations) |
+| `mcp__supabase__list_tables` | Inspect schema |
+| `mcp__supabase__list_projects` | Confirm project ID |
+| `mcp__supabase__apply_migration` | Apply named migrations |
+| `mcp__supabase__get_logs` | Debug API/auth/postgres/edge logs |
+| `mcp__supabase__get_advisors` | Security & performance advisories |
+
+### Database notes
+
+- Table columns use **camelCase** (e.g., `accountId`, `contactId`, `callSid`, `ownerId`)
+- `calls` table FK constraints use `ON DELETE SET NULL` — deleting an account or contact nulls the reference but **does not delete the call record**
+- No local Docker/psql — always use the MCP tools for database operations

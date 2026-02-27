@@ -73,7 +73,7 @@ INSTRUCTIONS:
 3. Max 45 words. Make it punchy and instantly readable.
 4. If the transcript is idle or nonsense, return "Monitoring signal..."`;
 
-        // AssemblyAI LLM Gateway — gemini-2.5-flash-lite for low-latency live inference
+        // AssemblyAI LLM Gateway — gemini-2.5-flash for low-latency live inference
         const response = await fetch('https://llm-gateway.assemblyai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
