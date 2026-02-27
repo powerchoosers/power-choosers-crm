@@ -13,18 +13,17 @@ export default async function handler(req, res) {
     }
 
     try {
-        const response = await fetch('https://api.assemblyai.com/v2/realtime/token', {
-            method: 'POST',
+        // v3 streaming token — GET request with query param
+        const response = await fetch('https://streaming.assemblyai.com/v3/token?expires_in_seconds=3600', {
+            method: 'GET',
             headers: {
                 'Authorization': apiKey,
-                'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ expires_in: 3600 })
         });
 
         const data = await response.json();
         if (!response.ok) {
-            throw new Error(data.error || 'Failed to fetch AssemblyAI token');
+            throw new Error(data.error || 'Failed to fetch AssemblyAI v3 token');
         }
 
         return res.status(200).json(data);
