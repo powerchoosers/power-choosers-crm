@@ -33,6 +33,8 @@ interface CompanyIconProps {
    * 'active' (<30d) → emerald | 'warming' (31–90d) → amber | 'cold' (>90d) → rose
    */
   healthScore?: ContactHealthScore
+  /** Show a spinning ring placeholder while health data is loading */
+  healthLoading?: boolean
 }
 
 const DEFAULT_ROUNDED = 'rounded-[14px]'
@@ -79,8 +81,10 @@ function CompanyIconInner({
   isDeleting = false,
   metadata,
   healthScore,
+  healthLoading = false,
 }: CompanyIconProps) {
   const health = healthScore ? HEALTH_DOT[healthScore] : null
+  const showHealthSpinner = healthLoading && !health
   // Prioritize direct props, then fallback to metadata paths
   const m = metadata || {}
   const activeLogoUrl = useMemo(() => {
@@ -206,19 +210,37 @@ function CompanyIconInner({
         >
           <Building2 size={size * 0.5} />
         </motion.div>
-        {health && (
-          <motion.div
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.12 }}
-            className={cn(
-              'absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
-              health.bg,
-              health.shadow
+        {/* Health badge — top-LEFT corner */}
+        <div className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5">
+          <AnimatePresence mode="wait">
+            {showHealthSpinner && (
+              <motion.div
+                key="spinner"
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0 }}
+                transition={{ duration: 0.15 }}
+                className="w-2.5 h-2.5 rounded-full border border-zinc-600 border-t-zinc-400 animate-spin"
+                style={{ animationDuration: '0.8s' }}
+              />
             )}
-            title={health.label}
-          />
-        )}
+            {health && (
+              <motion.div
+                key={healthScore}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0, opacity: 0 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                className={cn(
+                  'w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
+                  health.bg,
+                  health.shadow
+                )}
+                title={health.label}
+              />
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     )
   }
@@ -289,19 +311,37 @@ function CompanyIconInner({
           )}
         </AnimatePresence>
       </motion.div>
-      {health && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.12 }}
-          className={cn(
-            'absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
-            health.bg,
-            health.shadow
+      {/* Health badge — top-LEFT corner */}
+      <div className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5">
+        <AnimatePresence mode="wait">
+          {showHealthSpinner && (
+            <motion.div
+              key="spinner"
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0 }}
+              transition={{ duration: 0.15 }}
+              className="w-2.5 h-2.5 rounded-full border border-zinc-600 border-t-zinc-400 animate-spin"
+              style={{ animationDuration: '0.8s' }}
+            />
           )}
-          title={health.label}
-        />
-      )}
+          {health && (
+            <motion.div
+              key={healthScore}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+              className={cn(
+                'w-2.5 h-2.5 rounded-full border-2 border-zinc-900',
+                health.bg,
+                health.shadow
+              )}
+              title={health.label}
+            />
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

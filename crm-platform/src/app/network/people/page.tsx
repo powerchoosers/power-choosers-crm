@@ -347,6 +347,7 @@ export default function PeoplePage() {
                 size={36}
                 className="w-9 h-9 transition-all"
                 healthScore={healthScore}
+                healthLoading={lastTouchLoading || lastTouchMap === undefined}
               />
               <div>
                 <div className="font-medium text-zinc-200 group-hover/person:text-white group-hover/person:scale-[1.02] transition-all origin-left">
@@ -538,7 +539,7 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [router, pageIndex])
+  }, [router, pageIndex, lastTouchMap, lastTouchLoading])
 
   const onPaginationChange = useCallback(
     (updaterOrValue: PaginationState | ((old: PaginationState) => PaginationState)) => {

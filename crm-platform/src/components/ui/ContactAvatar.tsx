@@ -1,7 +1,7 @@
 'use client'
 
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export type ContactHealthScore = 'active' | 'warming' | 'cold'
 
@@ -15,12 +15,15 @@ interface ContactAvatarProps {
   /** Green dot at top-right when contact belongs to a list (notification-style badge) */
   showListBadge?: boolean
   /**
-   * Relationship health indicator — top-left corner, does not conflict with showListBadge (top-right).
+   * Relationship health indicator — top-left corner.
    * 'active'  = touched within 30d  → emerald
    * 'warming' = touched 31–90d ago  → amber
    * 'cold'    = >90d or never       → rose
+   * undefined = not yet loaded
    */
   healthScore?: ContactHealthScore
+  /** Show a spinning ring placeholder while health data is loading */
+  healthLoading?: boolean
 }
 
 const HEALTH_DOT: Record<ContactHealthScore, { bg: string; shadow: string; label: string }> = {
@@ -37,6 +40,7 @@ export function ContactAvatar({
   showTargetBadge = false,
   showListBadge = false,
   healthScore,
+  healthLoading = false,
 }: ContactAvatarProps) {
   const initials = name
     .split(' ')
@@ -71,19 +75,36 @@ export function ContactAvatar({
       </motion.div>
 
       {/* Health badge — top-LEFT corner */}
-      {health && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 25, delay: 0.12 }}
-          className={cn(
-            'absolute -top-0.5 -left-0.5 w-2.5 h-2.5 rounded-full border-2 border-zinc-900 shrink-0',
-            health.bg,
-            health.shadow
+      <div className="absolute -top-0.5 -left-0.5 w-2.5 h-2.5">
+        <AnimatePresence mode="wait">
+          {healthLoading && !health && (
+            <motion.div
+              key="spinner"
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0 }}
+              transition={{ duration: 0.15 }}
+              className="w-2.5 h-2.5 rounded-full border border-zinc-600 border-t-zinc-400 animate-spin"
+              style={{ animationDuration: '0.8s' }}
+            />
           )}
-          title={health.label}
-        />
-      )}
+          {health && (
+            <motion.div
+              key={healthScore}
+              initial={{ scale: 0, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+              className={cn(
+                'w-2.5 h-2.5 rounded-full border-2 border-zinc-900 shrink-0',
+                health.bg,
+                health.shadow
+              )}
+              title={health.label}
+            />
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* List badge — top-RIGHT corner (notification-style) */}
       {showBadge && (
