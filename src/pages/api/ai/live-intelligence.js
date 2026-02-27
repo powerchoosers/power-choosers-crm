@@ -73,15 +73,15 @@ INSTRUCTIONS:
 3. Max 45 words. Make it punchy and instantly readable.
 4. If the transcript is idle or nonsense, return "Monitoring signal..."`;
 
-        // The AssemblyAI LLM Gateway gives you access to top tier models with very low latency
-        const response = await fetch('https://api.assemblyai.com/v1/chat/completions', {
+        // AssemblyAI LLM Gateway — gemini-2.5-flash-lite for low-latency live inference
+        const response = await fetch('https://llm-gateway.assemblyai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': apiKey,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'claude-3-5-sonnet',
+                model: 'gemini-2.5-flash-lite',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: `LIVE TRANSCRIPT SNIPPET:\n\n"${transcript}"` }
@@ -95,31 +95,7 @@ INSTRUCTIONS:
 
         if (!response.ok) {
             console.error('[LLM Gateway] AssemblyAI API Error:', data);
-
-            // Fallback for models without native 'system' role or if the specific sonnet model name differs
-            // Try with standard haiku model if sonnet fails
-            if (data.error && data.error.message && data.error.message.includes("model")) {
-                const fallbackRes = await fetch('https://api.assemblyai.com/v1/chat/completions', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${apiKey}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        model: 'claude-3-haiku',
-                        messages: [
-                            { role: 'user', content: `SYSTEM: ${systemPrompt}\n\nLIVE TRANSCRIPT SNIPPET:\n\n"${transcript}"` }
-                        ],
-                        max_tokens: 100,
-                        temperature: 0.3,
-                    }),
-                });
-                const fallbackData = await fallbackRes.json();
-                const insightFallback = fallbackData.choices?.[0]?.message?.content ?? null;
-                return res.status(200).json({ insight: insightFallback?.trim() });
-            }
-
-            throw new Error(data.error?.message || 'Gateway Error');
+            throw new Error(data.error?.message || 'LLM Gateway Error');
         }
 
         const insight = data.choices?.[0]?.message?.content ?? null;
