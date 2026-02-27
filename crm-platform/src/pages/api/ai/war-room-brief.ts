@@ -41,9 +41,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(405).json({ error: 'Method not allowed' })
     }
 
-    const apiKey = process.env.OPEN_ROUTER_API_KEY || process.env.FREE_GEMINI_KEY
+    const apiKey = process.env.ASSEMBLY_AI_API_KEY
     if (!apiKey) {
-        return res.status(503).json({ error: 'No AI API key configured' })
+        return res.status(503).json({ error: 'No AssemblyAI API key configured' })
     }
 
     const { topAccounts, grid, signalHistory } = req.body as BriefRequest
@@ -139,16 +139,14 @@ INSTRUCTIONS:
 
 Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets.`
 
-        const orRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        const orRes = await fetch('https://llm-gateway.assemblyai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${apiKey}`,
+                'Authorization': apiKey,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://nodalpoint.io',
-                'X-Title': 'Nodal Point Deep Brief',
             },
             body: JSON.stringify({
-                model: 'google/gemini-2.5-flash',
+                model: 'gemini-2.5-flash',
                 messages: [{ role: 'user', content: prompt }],
                 max_tokens: 1400,
                 temperature: 0.2,
@@ -159,7 +157,7 @@ Tone: Forensic, unhurried, diagnostic. Exactly 3 bullets.`
         const responseText = orData.choices?.[0]?.message?.content ?? ''
 
         if (!responseText) {
-            console.error('AI Brief: empty response from OpenRouter', orData)
+            console.error('AI Brief: empty response from AssemblyAI LLM Gateway', orData)
             return res.status(502).json({ error: 'AI returned empty response' })
         }
 
