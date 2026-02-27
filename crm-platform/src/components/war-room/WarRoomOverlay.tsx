@@ -10,6 +10,10 @@ import { X, Shield } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
+function generateId() {
+    return Math.random().toString(36).substring(2, 11)
+}
+
 interface GridSnapshot {
     hubPrice: number | null
     reserves: number | null
@@ -23,6 +27,7 @@ export function WarRoomOverlay() {
     const [gridSnapshot, setGridSnapshot] = useState<GridSnapshot | null>(null)
     const [pendingMarketEvents, setPendingMarketEvents] = useState<SignalEntry[]>([])
     const [prevReserves, setPrevReserves] = useState<number | null>(null)
+    const [currentTime, setCurrentTime] = useState(new Date())
 
     // Keyboard: Esc closes
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -31,7 +36,11 @@ export function WarRoomOverlay() {
 
     useEffect(() => {
         window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
+        const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            clearInterval(timer)
+        }
     }, [handleKeyDown])
 
     // Lock body scroll when open
@@ -54,14 +63,14 @@ export function WarRoomOverlay() {
         if (data.reserves !== null && prevReserves !== null) {
             if (prevReserves >= 3000 && data.reserves < 3000) {
                 events.push({
-                    id: crypto.randomUUID(),
+                    id: generateId(),
                     time: new Date(),
                     type: 'MARKET',
                     message: `ERCOT reserves breached 3,000 MW floor — ${data.reserves.toLocaleString()} MW`,
                 })
             } else if (prevReserves >= 4000 && data.reserves < 4000) {
                 events.push({
-                    id: crypto.randomUUID(),
+                    id: generateId(),
                     time: new Date(),
                     type: 'MARKET',
                     message: `ERCOT reserves tightening — ${data.reserves.toLocaleString()} MW`,
@@ -72,7 +81,7 @@ export function WarRoomOverlay() {
         // Fire when price spikes significantly
         if (data.hubPrice !== null && data.hubPrice > 200) {
             events.push({
-                id: crypto.randomUUID(),
+                id: generateId(),
                 time: new Date(),
                 type: 'MARKET',
                 message: `RT Hub price elevated: $${data.hubPrice.toFixed(2)}/MWh — scarcity adder active`,
@@ -117,8 +126,8 @@ export function WarRoomOverlay() {
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.98, y: 8 }}
                         transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-                        className="fixed inset-4 z-[100] flex flex-col rounded-xl overflow-hidden border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.8)]"
-                        style={{ background: 'oklch(0.13 0.028 261.692)' }}
+                        className="fixed inset-4 z-[100] flex flex-col rounded-xl overflow-hidden border border-white/10 shadow-[0_30px_80px_rgba(0,0,0,0.8)] bg-[#09090b]"
+                        style={{ backgroundColor: '#09090b', backgroundImage: 'radial-gradient(circle at 50% 120%, rgba(0, 47, 167, 0.05), transparent)' }}
                         onClick={(e) => e.stopPropagation()}
                     >
                         {/* Header */}
@@ -187,13 +196,18 @@ export function WarRoomOverlay() {
                         </div>
 
                         {/* Footer */}
-                        <div className="flex items-center justify-between px-5 py-2 border-t border-white/5 shrink-0">
-                            <span className="text-[9px] font-mono text-zinc-700 uppercase tracking-widest">
-                                Nodal Point · Forensic Market Intelligence
+                        <div className="flex items-center justify-between px-5 py-2 border-t border-white/5 shrink-0 bg-black/40">
+                            <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                                Nodal Point · Forensic Terminal v1.0
                             </span>
-                            <span className="text-[9px] font-mono text-zinc-700">
-                                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
-                            </span>
+                            <div className="flex items-center gap-4">
+                                <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                                    {currentTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                </span>
+                                <span className="text-[10px] font-mono text-[#002FA7] tabular-nums font-bold">
+                                    {currentTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true, timeZone: 'America/Chicago' })} CST
+                                </span>
+                            </div>
                         </div>
                     </motion.div>
                 </>
