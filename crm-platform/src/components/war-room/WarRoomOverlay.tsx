@@ -36,8 +36,8 @@ export function WarRoomOverlay() {
     const lastPriceAlertRef = useRef<number>(0)
     const lastBattleStationsRef = useRef(false)
 
-    // Initialize Live Transcription when War Room is open
-    useLiveTranscription(isOpen, callMeta?.accountId)
+    // Initialize Live Transcription ONLY when a Twilio call is active
+    useLiveTranscription(isCallActive, callMeta?.accountId)
 
     const isBattleStations = (fourCP?.riskLevel === 'BATTLE_STATIONS' || fourCP?.riskLevel === 'CRITICAL') && fourCP?.isPeakSeason
 
