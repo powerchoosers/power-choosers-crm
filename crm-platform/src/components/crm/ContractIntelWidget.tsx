@@ -7,6 +7,7 @@ import { type Deal, type DealStage } from '@/types/deals'
 import { differenceInDays } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { useUIStore } from '@/store/uiStore'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // ---------------------------------------------------------------------------
 // Stage indicator styles (compact, for dossier view)
@@ -163,9 +164,19 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
         </div>
       ) : (
         <div className="space-y-1.5">
-          {activeDeals.map(deal => (
-            <DealCard key={deal.id} deal={deal} />
-          ))}
+          <AnimatePresence initial={false}>
+            {activeDeals.map(deal => (
+              <motion.div
+                key={deal.id}
+                initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
+                <DealCard deal={deal} />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       )}
     </div>
