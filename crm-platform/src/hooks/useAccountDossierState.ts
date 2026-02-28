@@ -55,6 +55,7 @@ export function useAccountDossierState(id: string) {
     const [editNotes, setEditNotes] = useState('')
     const [editAnnualUsage, setEditAnnualUsage] = useState('')
     const [editStrikePrice, setEditStrikePrice] = useState('')
+    const [editMills, setEditMills] = useState('')
     const [editIndustry, setEditIndustry] = useState('')
     const [editLocation, setEditLocation] = useState('')
     const [editLogoUrl, setEditLogoUrl] = useState('')
@@ -93,6 +94,7 @@ export function useAccountDossierState(id: string) {
             setEditNotes(account.description || '')
             setEditAnnualUsage(account.annualUsage?.toString() || '')
             setEditStrikePrice(account.currentRate || '')
+            setEditMills(account.mills || '0.0030')
             setEditIndustry(account.industry || '')
             setEditLocation(account.location || '')
             setEditLogoUrl(account.logoUrl || '')
@@ -135,6 +137,7 @@ export function useAccountDossierState(id: string) {
                         description: editNotes,
                         annualUsage: cleanedUsage.toString(),
                         currentRate: editStrikePrice,
+                        mills: editMills,
                         industry: editIndustry,
                         location: editLocation,
                         logoUrl: editLogoUrl,
@@ -157,7 +160,7 @@ export function useAccountDossierState(id: string) {
             }
             triggerSave()
         }
-    }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editIndustry, editLocation, editLogoUrl, editSupplier, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
+    }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editMills, editIndustry, editLocation, editLogoUrl, editSupplier, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
 
     useEffect(() => {
         if (account) {
@@ -174,6 +177,7 @@ export function useAccountDossierState(id: string) {
                     service_addresses: account.serviceAddresses || account.metadata?.service_addresses || [],
                     annual_usage: account.annualUsage || account.metadata?.annual_usage,
                     current_rate: account.currentRate || account.metadata?.current_rate,
+                    mills: account.mills || account.metadata?.mills || '0.0030',
                     contract_end_date: account.contractEnd || account.metadata?.contract_end_date,
                     electricity_supplier: account.electricitySupplier || account.metadata?.electricity_supplier,
                 } as any
@@ -264,6 +268,7 @@ export function useAccountDossierState(id: string) {
             if (prev.contractEnd !== account.contractEnd) changed.add('contractEnd')
             if (prev.electricitySupplier !== account.electricitySupplier) changed.add('currentSupplier')
             if (prev.currentRate !== account.currentRate) changed.add('strikePrice')
+            if (prev.mills !== account.mills) changed.add('mills')
             if (prev.annualUsage !== account.annualUsage) changed.add('annualVolume')
             if (prev.industry !== account.industry) changed.add('industry')
             if (prev.location !== account.location) changed.add('location')
@@ -283,7 +288,7 @@ export function useAccountDossierState(id: string) {
         isEditing, toggleEditing, isSaving, showSynced, setActiveEditField, activeEditField,
         recentlyUpdatedFields, glowingFields, isRecalibrating,
         editAccountName, setEditAccountName, editNotes, setEditNotes, editAnnualUsage, setEditAnnualUsage,
-        editStrikePrice, setEditStrikePrice, editIndustry, setEditIndustry, editLocation, setEditLocation,
+        editStrikePrice, setEditStrikePrice, editMills, setEditMills, editIndustry, setEditIndustry, editLocation, setEditLocation,
         editLogoUrl, setEditLogoUrl, editSupplier, setEditSupplier, editDomain, setEditDomain, editLinkedinUrl, setEditLinkedinUrl,
         editMeters, setEditMeters, editContractEnd, setEditContractEnd, editCompanyPhone, setEditCompanyPhone,
         editAddress, setEditAddress,
