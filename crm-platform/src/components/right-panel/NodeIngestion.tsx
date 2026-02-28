@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
+import { CompanyIcon } from '@/components/ui/CompanyIcon';
 
 // REAL API ENRICHMENT
 const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
@@ -569,11 +570,21 @@ export function NodeIngestion() {
                 <>
                   <div className="space-y-2">
                     {/* Context Lock: contact hard-linked to this account */}
-                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/30">
-                      <Lock className="w-4 h-4 text-white shrink-0" />
-                      <span className="text-[10px] font-mono text-zinc-300 uppercase tracking-widest truncate">
-                        {ingestionContext?.accountName ?? 'Account'}
-                      </span>
+                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                      <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
+                      Node_Context
+                    </div>
+                    <div className="px-4 py-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center gap-4 mb-4">
+                      <CompanyIcon
+                        logoUrl={ingestionContext?.accountLogoUrl}
+                        domain={ingestionContext?.accountDomain}
+                        name={ingestionContext?.accountName || 'Account'}
+                        size={40}
+                      />
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">Account</span>
+                        <span className="text-sm font-semibold text-white truncate">{ingestionContext?.accountName || 'Unlabeled Node'}</span>
+                      </div>
                     </div>
 
                     {/* Apollo Search/Enrichment Indicator */}

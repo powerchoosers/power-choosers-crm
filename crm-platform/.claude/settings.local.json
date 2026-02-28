@@ -21,7 +21,9 @@
       "Bash(git commit:*)",
       "Bash(cd /c/Users/Lap3p/OneDrive/Documents/Power Choosers CRM/crm-platform)",
       "Bash(xargs grep -l \"delete\\\\|DELETE\")",
-      "Bash(xargs grep -l \"accounts\\\\|contacts\")"
+      "Bash(xargs grep -l \"accounts\\\\|contacts\")",
+      "Bash(xargs grep -l \"deal\\\\|Deal\")",
+      "mcp__supabase__apply_migration"
     ]
   }
 }

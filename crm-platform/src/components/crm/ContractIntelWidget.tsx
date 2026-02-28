@@ -1,30 +1,31 @@
 'use client'
 
-import { TrendingUp } from 'lucide-react'
+import { TrendingUp, Plus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDealsByAccount, useDealsByContact } from '@/hooks/useDeals'
 import { type Deal, type DealStage } from '@/types/deals'
 import { differenceInDays } from 'date-fns'
 import { useRouter } from 'next/navigation'
+import { useUIStore } from '@/store/uiStore'
 
 // ---------------------------------------------------------------------------
 // Stage indicator styles (compact, for dossier view)
 // ---------------------------------------------------------------------------
 const STAGE_DOT: Record<DealStage, string> = {
   IDENTIFIED: 'bg-zinc-500',
-  AUDITING:   'bg-amber-400',
-  BRIEFED:    'bg-[#002FA7]',
-  ENGAGED:    'bg-[#002FA7] animate-pulse',
-  SECURED:    'bg-emerald-400',
+  AUDITING: 'bg-amber-400',
+  BRIEFED: 'bg-[#002FA7]',
+  ENGAGED: 'bg-[#002FA7] animate-pulse',
+  SECURED: 'bg-emerald-400',
   TERMINATED: 'bg-rose-400/60',
 }
 
 const STAGE_TEXT: Record<DealStage, string> = {
   IDENTIFIED: 'text-zinc-500',
-  AUDITING:   'text-amber-400',
-  BRIEFED:    'text-[#002FA7]',
-  ENGAGED:    'text-[#002FA7]',
-  SECURED:    'text-emerald-400',
+  AUDITING: 'text-amber-400',
+  BRIEFED: 'text-[#002FA7]',
+  ENGAGED: 'text-[#002FA7]',
+  SECURED: 'text-emerald-400',
   TERMINATED: 'text-rose-400/70',
 }
 
@@ -86,8 +87,8 @@ function DealCard({ deal }: { deal: Deal }) {
             <span className="text-zinc-700">·</span>
             <span className={cn(
               closeLbl === 'Overdue' ? 'text-rose-400' :
-              deal.closeDate && differenceInDays(new Date(deal.closeDate), new Date()) <= 14 ? 'text-[#002FA7]' :
-              'text-zinc-500'
+                deal.closeDate && differenceInDays(new Date(deal.closeDate), new Date()) <= 14 ? 'text-[#002FA7]' :
+                  'text-zinc-500'
             )}>
               {closeLbl}
             </span>
@@ -123,6 +124,7 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
   const { data: accountDeals = [], isLoading: loadingAccount } = useDealsByAccount(accountId)
   const { data: contactDeals = [], isLoading: loadingContact } = useDealsByContact(contactId)
   const router = useRouter()
+  const { setRightPanelMode, setDealContext } = useUIStore()
 
   // Show deals from the most relevant source; avoid duplicates if both provided
   const deals: Deal[] = accountId ? accountDeals : contactDeals
@@ -140,10 +142,14 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
           Contract_Intel
         </h3>
         <button
-          onClick={() => router.push('/network/contracts')}
-          className="text-[9px] font-mono uppercase tracking-widest text-zinc-600 hover:text-[#002FA7] transition-colors"
+          onClick={() => {
+            setDealContext({ accountId, contactId })
+            setRightPanelMode('CREATE_DEAL')
+          }}
+          className="icon-button-forensic p-1 flex items-center justify-center"
+          title="Initialize Contract"
         >
-          + new
+          <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
 

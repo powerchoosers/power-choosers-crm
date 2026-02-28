@@ -1,26 +1,83 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { TrendingUp, Plus, X, Pencil, Trash2, ChevronDown, Search } from 'lucide-react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import {
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  ColumnDef,
+  SortingState,
+  ColumnFiltersState,
+  RowSelectionState,
+} from '@tanstack/react-table'
+import {
+  TrendingUp,
+  Plus,
+  X,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  Check,
+  Clock,
+  MoreHorizontal,
+  Mail,
+  Search
+} from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { useDeals, useCreateDeal, useUpdateDeal, useDeleteDeal, useDealsStats } from '@/hooks/useDeals'
+import { useDeals, useDealsCount, useCreateDeal, useUpdateDeal, useDeleteDeal, useDealsStats } from '@/hooks/useDeals'
 import { type Deal, type DealStage, DEAL_STAGES } from '@/types/deals'
-import { differenceInDays, format } from 'date-fns'
+import { differenceInDays, format, subMonths, isAfter } from 'date-fns'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import Link from 'next/link'
+import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
+import { ForensicTableSkeleton } from '@/components/network/ForensicTableSkeleton'
+import BulkActionDeck from '@/components/network/BulkActionDeck'
+import DestructModal from '@/components/network/DestructModal'
+import FilterCommandDeck from '@/components/network/FilterCommandDeck'
+import { DealTableRow } from '@/components/network/DealTableRow'
+import { useTableState } from '@/hooks/useTableState'
+import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { toast } from 'sonner'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { useUIStore } from '@/store/uiStore'
+
+const PAGE_SIZE = 50
 
 // ---------------------------------------------------------------------------
 // Stage display helpers
 // ---------------------------------------------------------------------------
 const STAGE_COLORS: Record<DealStage, string> = {
   IDENTIFIED: 'text-zinc-400 border-zinc-600/50 bg-zinc-800/40',
-  AUDITING:   'text-amber-400 border-amber-500/40 bg-amber-500/10',
-  BRIEFED:    'text-[#002FA7] border-[#002FA7]/50 bg-[#002FA7]/10',
-  ENGAGED:    'text-[#002FA7] border-[#002FA7]/60 bg-[#002FA7]/15',
-  SECURED:    'text-emerald-400 border-emerald-500/50 bg-emerald-500/10',
+  AUDITING: 'text-amber-400 border-amber-500/40 bg-amber-500/10',
+  BRIEFED: 'text-[#002FA7] border-[#002FA7]/50 bg-[#002FA7]/10',
+  ENGAGED: 'text-[#002FA7] border-[#002FA7]/60 bg-[#002FA7]/15',
+  SECURED: 'text-emerald-400 border-emerald-500/50 bg-emerald-500/10',
   TERMINATED: 'text-rose-400/70 border-rose-500/30 bg-rose-500/10',
 }
 
@@ -38,9 +95,6 @@ function StageBadge({ stage }: { stage: DealStage }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Close date urgency dots
-// ---------------------------------------------------------------------------
 function CloseDots({ closeDate }: { closeDate?: string }) {
   if (!closeDate) return <span className="font-mono text-xs text-zinc-600">—</span>
 
@@ -61,9 +115,6 @@ function CloseDots({ closeDate }: { closeDate?: string }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// Format helpers
-// ---------------------------------------------------------------------------
 function fmtCurrency(val?: number) {
   if (!val) return '—'
   if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`
@@ -325,71 +376,129 @@ function DealForm({ form, onChange, onAccountSelect }: DealFormProps) {
 // Main page
 // ---------------------------------------------------------------------------
 export default function ContractsPage() {
-  const { user } = useAuth()
-  const [stageFilter, setStageFilter] = useState<DealStage | 'ALL'>('ALL')
-  const [search, setSearch] = useState('')
-  const [createOpen, setCreateOpen] = useState(false)
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const scrollKey = (pathname ?? '/network/contracts') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+
+  const [globalFilter, setGlobalFilter] = useState(searchQuery)
+  const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedFilter(globalFilter)
+      setSearch(globalFilter)
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [globalFilter, setSearch])
+
+  const dealFilters = useMemo(() => {
+    return {
+      stage: (columnFilters.find(f => f.id === 'stage')?.value as DealStage[]) || undefined,
+      search: debouncedFilter.length >= 2 ? debouncedFilter : undefined,
+    };
+  }, [columnFilters, debouncedFilter]);
+
+  // useDeals hook currently only supports single stage, but we can wrap it or just use the first element
+  const effectiveStage = Array.isArray(dealFilters.stage) ? dealFilters.stage[0] as DealStage : undefined;
+
+  const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useDeals({
+    stage: effectiveStage,
+    search: dealFilters.search,
+  })
+
+  const { data: totalDeals } = useDealsCount({
+    stage: effectiveStage,
+    search: dealFilters.search,
+  })
+
+  const { data: statsData } = useDealsStats()
+
+  const updateDeal = useUpdateDeal()
+  const deleteDeal = useDeleteDeal()
+
+  const { setRightPanelMode, setDealContext } = useUIStore()
+
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
+  const [isMounted, setIsMounted] = useState(false)
+  const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [editDeal, setEditDeal] = useState<Deal | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState<DealFormState>(EMPTY_FORM)
 
-  const createDeal = useCreateDeal()
-  const updateDeal = useUpdateDeal()
-  const deleteDeal = useDeleteDeal()
-  const { data: statsData } = useDealsStats()
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useDeals({
-    stage: stageFilter,
-    search: search.length >= 2 ? search : undefined,
-  })
+  const deals = useMemo(() => data?.pages.flatMap(page => page.deals) || [], [data])
+  const isLoading = queryLoading || !isMounted
+  const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
 
-  const deals = useMemo(
-    () => data?.pages.flatMap(p => p.deals) ?? [],
-    [data]
-  )
+  const effectiveTotalRecords = totalDeals ?? deals.length
+  const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
+  const displayTotalPages = totalDeals == null && hasNextPage
+    ? Math.max(totalPages, pagination.pageIndex + 2)
+    : totalPages
 
-  const handleCreate = async () => {
-    if (!form.title.trim() || !form.accountId) return
-    await createDeal.mutateAsync({
-      title: form.title.trim(),
-      accountId: form.accountId,
-      contactId: form.contactId || undefined,
-      stage: form.stage,
-      amount: form.amount ? Number(form.amount) : undefined,
-      annualUsage: form.annualUsage ? Number(form.annualUsage) : undefined,
-      mills: form.mills ? Number(form.mills) : undefined,
-      contractLength: form.contractLength ? Number(form.contractLength) : undefined,
-      closeDate: form.closeDate || undefined,
-      probability: form.probability ? Number(form.probability) : undefined,
-      yearlyCommission: form.yearlyCommission ? Number(form.yearlyCommission) : undefined,
+
+  const handleFilterChange = (columnId: string, value: any) => {
+    setColumnFilters(prev => {
+      const existing = prev.find(f => f.id === columnId)
+      if (existing) {
+        if (value === undefined) {
+          return prev.filter(f => f.id !== columnId)
+        }
+        return prev.map(f => f.id === columnId ? { ...f, value } : f)
+      }
+      if (value === undefined) return prev
+      return [...prev, { id: columnId, value }]
     })
-    setForm(EMPTY_FORM)
-    setCreateOpen(false)
+    setPage(0)
   }
+
+  useEffect(() => {
+    const needed = (pagination.pageIndex + 2) * PAGE_SIZE
+    if (hasNextPage && !isFetchingNextPage && deals.length < needed) {
+      fetchNextPage()
+    }
+  }, [pagination.pageIndex, deals.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  const selectedCount = Object.keys(rowSelection).length
+
+
 
   const handleEdit = async () => {
     if (!editDeal) return
-    await updateDeal.mutateAsync({
-      id: editDeal.id,
-      title: form.title.trim() || editDeal.title,
-      accountId: form.accountId || editDeal.accountId,
-      contactId: form.contactId || undefined,
-      stage: form.stage,
-      amount: form.amount ? Number(form.amount) : undefined,
-      annualUsage: form.annualUsage ? Number(form.annualUsage) : undefined,
-      mills: form.mills ? Number(form.mills) : undefined,
-      contractLength: form.contractLength ? Number(form.contractLength) : undefined,
-      closeDate: form.closeDate || undefined,
-      probability: form.probability ? Number(form.probability) : undefined,
-      yearlyCommission: form.yearlyCommission ? Number(form.yearlyCommission) : undefined,
-    })
-    setEditDeal(null)
+    try {
+      await updateDeal.mutateAsync({
+        id: editDeal.id,
+        title: form.title.trim() || editDeal.title,
+        accountId: form.accountId || editDeal.accountId,
+        contactId: form.contactId || undefined,
+        stage: form.stage,
+        amount: form.amount ? Number(form.amount) : undefined,
+        annualUsage: form.annualUsage ? Number(form.annualUsage) : undefined,
+        mills: form.mills ? Number(form.mills) : undefined,
+        contractLength: form.contractLength ? Number(form.contractLength) : undefined,
+        closeDate: form.closeDate || undefined,
+        probability: form.probability ? Number(form.probability) : undefined,
+        yearlyCommission: form.yearlyCommission ? Number(form.yearlyCommission) : undefined,
+      })
+      setEditDeal(null)
+    } catch (e) { }
   }
 
   const handleDelete = async () => {
     if (!deleteId) return
-    await deleteDeal.mutateAsync(deleteId)
-    setDeleteId(null)
+    try {
+      await deleteDeal.mutateAsync(deleteId)
+      setDeleteId(null)
+    } catch (e) { }
   }
 
   const openEdit = (deal: Deal) => {
@@ -397,187 +506,351 @@ export default function ContractsPage() {
     setForm(dealToForm(deal))
   }
 
-  const stats = statsData
+  const handleBulkAction = async (action: string) => {
+    if (action === 'delete') {
+      setIsDestructModalOpen(true)
+    }
+  }
 
-  return (
-    <div className="flex flex-col h-full min-h-0 bg-zinc-950">
+  const handleConfirmBulkDelete = async () => {
+    const selectedIds = Object.keys(rowSelection).filter(Boolean)
+    for (const id of selectedIds) {
+      await deleteDeal.mutateAsync(id)
+    }
+    setRowSelection({})
+    setIsDestructModalOpen(false)
+  }
 
-      {/* ── HEADER ────────────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 px-8 pt-8 pb-4 space-y-6">
-
-        {/* Title row */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <TrendingUp className="w-5 h-5 text-[#002FA7]" />
-            <div>
-              <h1 className="text-sm font-mono uppercase tracking-[0.2em] text-zinc-200">
-                Contract_Matrix
-              </h1>
-              <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-wider mt-0.5">
-                Active Pipeline
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => { setForm(EMPTY_FORM); setCreateOpen(true) }}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/30 text-[#002FA7] hover:bg-[#002FA7]/20 transition-colors font-mono text-xs"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            Initialize Contract
-          </button>
-        </div>
-
-        {/* KPI strip */}
-        {stats && (
-          <div className="flex items-center gap-6 py-3 px-4 rounded-xl bg-white/[0.02] border border-white/5">
-            <div>
-              <div className="font-mono text-lg text-zinc-100 tabular-nums">
-                {fmtCurrency(stats.totalPipeline)}
-              </div>
-              <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Pipeline</div>
-            </div>
-            <div className="h-8 w-px bg-white/5" />
-            <div>
-              <div className="font-mono text-sm text-amber-400 tabular-nums">
-                {stats.closing30dCount} <span className="text-zinc-600 text-xs">contracts</span>
-              </div>
-              <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Closing 30d</div>
-            </div>
-            <div className="h-8 w-px bg-white/5" />
-            <div>
-              <div className="font-mono text-sm text-[#002FA7] tabular-nums flex items-center gap-1.5">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#002FA7] animate-pulse" />
-                {stats.engagedCount}
-              </div>
-              <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Engaged</div>
-            </div>
-            <div className="h-8 w-px bg-white/5" />
-            <div>
-              <div className="font-mono text-sm text-emerald-400 tabular-nums">{stats.securedCount}</div>
-              <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Secured</div>
-            </div>
-          </div>
-        )}
-
-        {/* Filter chips + search */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search contracts..."
-              className="bg-black/30 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-xs font-mono text-zinc-300 placeholder:text-zinc-700 focus:outline-none focus:border-white/20 w-44"
-            />
-          </div>
-          <div className="h-5 w-px bg-white/5" />
-          {(['ALL', ...DEAL_STAGES] as const).map(s => (
+  const columns = useMemo<ColumnDef<Deal>[]>(() => {
+    return [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <div className="flex items-center justify-center px-2">
             <button
-              key={s}
-              onClick={() => setStageFilter(s as DealStage | 'ALL')}
+              onClick={table.getToggleAllPageRowsSelectedHandler()}
               className={cn(
-                'px-3 py-1.5 rounded-lg font-mono text-[10px] uppercase tracking-wider border transition-all',
-                stageFilter === s
-                  ? s === 'ALL'
-                    ? 'bg-white/10 border-white/20 text-zinc-200'
-                    : s === 'SECURED'
-                      ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                      : s === 'TERMINATED'
-                        ? 'bg-rose-500/10 border-rose-500/30 text-rose-400'
-                        : s === 'AUDITING'
-                          ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                          : 'bg-[#002FA7]/15 border-[#002FA7]/40 text-[#002FA7]'
-                  : 'border-white/5 text-zinc-600 hover:border-white/10 hover:text-zinc-500'
+                "w-4 h-4 rounded border border-white/20 transition-all flex items-center justify-center",
+                table.getIsAllPageRowsSelected() ? "bg-[#002FA7] border-[#002FA7]" : "bg-transparent opacity-50 hover:opacity-100"
               )}
             >
-              {s === 'ALL' ? 'All' : s}
+              {table.getIsAllPageRowsSelected() && <Check className="w-3 h-3 text-white" />}
             </button>
-          ))}
+          </div>
+        ),
+        cell: ({ row }) => {
+          const index = row.index + 1 + pagination.pageIndex * PAGE_SIZE
+          const isSelected = row.getIsSelected()
+          return (
+            <div className="flex items-center justify-center px-2 relative group/select h-full min-h-[40px]">
+              <span className={cn(
+                "font-mono text-[10px] text-zinc-700 transition-opacity",
+                isSelected ? "opacity-0" : "group-hover/select:opacity-0"
+              )}>
+                {index.toString().padStart(2, '0')}
+              </span>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  row.toggleSelected()
+                }}
+                className="absolute inset-x-[-8px] inset-y-[-12px] z-20 flex items-center justify-center group/check"
+              >
+                <div className={cn(
+                  "w-4 h-4 rounded border transition-all flex items-center justify-center",
+                  isSelected
+                    ? "bg-[#002FA7] border-[#002FA7] opacity-100"
+                    : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100 group-hover/check:opacity-100"
+                )}>
+                  {isSelected && <Check className="w-3 h-3 text-white" />}
+                </div>
+              </button>
+            </div>
+          )
+        }
+      },
+      {
+        accessorKey: 'title',
+        header: 'Account / Contract',
+        cell: ({ row }) => {
+          const deal = row.original
+          return (
+            <div className="min-w-0">
+              <div className="font-sans text-sm text-zinc-200 truncate group-hover:text-white transition-colors">
+                {deal.account?.name || deal.accountId}
+              </div>
+              <div className="font-mono text-[10px] text-zinc-600 truncate uppercase tracking-tight">
+                {deal.title}
+              </div>
+            </div>
+          )
+        }
+      },
+      {
+        accessorKey: 'stage',
+        header: 'Stage',
+        cell: ({ row }) => <StageBadge stage={row.original.stage} />
+      },
+      {
+        accessorKey: 'amount',
+        header: 'Value/yr',
+        cell: ({ row }) => <div className="font-mono text-xs text-zinc-300 tabular-nums">{fmtCurrency(row.original.amount)}</div>
+      },
+      {
+        accessorKey: 'annualUsage',
+        header: 'kWh/yr',
+        cell: ({ row }) => <div className="font-mono text-xs text-zinc-400 tabular-nums">{fmtUsage(row.original.annualUsage)}</div>
+      },
+      {
+        accessorKey: 'mills',
+        header: 'Mills',
+        cell: ({ row }) => <div className="font-mono text-xs text-zinc-400 tabular-nums">{fmtMills(row.original.mills)}</div>
+      },
+      {
+        accessorKey: 'contractLength',
+        header: 'Term',
+        cell: ({ row }) => <div className="font-mono text-xs text-zinc-400">{row.original.contractLength ? `${row.original.contractLength}mo` : '—'}</div>
+      },
+      {
+        accessorKey: 'closeDate',
+        header: 'Close',
+        cell: ({ row }) => <CloseDots closeDate={row.original.closeDate} />
+      },
+      {
+        id: 'actions',
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => openEdit(row.original)}
+              className="p-1.5 rounded hover:bg-white/5 text-zinc-600 hover:text-zinc-300 transition-colors"
+              title="Edit"
+            >
+              <Pencil className="w-3 h-3" />
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="h-8 w-8 icon-button-forensic flex items-center justify-center">
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => router.push(`/network/accounts/${row.original.accountId}`)}
+                >View Account</DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                  onClick={() => setDeleteId(row.original.id)}
+                >Terminate Contract</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )
+      }
+    ]
+  }, [pagination.pageIndex, rowSelection])
+
+  const table = useReactTable({
+    data: deals,
+    columns,
+    getRowId: (row) => row.id,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    getFilteredRowModel: getFilteredRowModel(),
+    onGlobalFilterChange: setGlobalFilter,
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const nextPagination = updater(pagination)
+        setPage(nextPagination.pageIndex)
+      } else {
+        setPage(updater.pageIndex)
+      }
+    },
+    onRowSelectionChange: setRowSelection,
+    autoResetPageIndex: false,
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+      pagination,
+      rowSelection,
+    },
+  })
+
+  const filteredRowCount = deals.length
+  const showingStart = filteredRowCount === 0 ? 0 : pagination.pageIndex * PAGE_SIZE + 1
+  const showingEnd = Math.min(filteredRowCount, (pagination.pageIndex + 1) * PAGE_SIZE)
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <CollapsiblePageHeader
+        title="Contracts"
+        description="Forensic pipeline of energy supply agreements."
+        globalFilter={globalFilter}
+        onSearchChange={(value) => {
+          setGlobalFilter(value)
+          setPage(0)
+        }}
+        onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
+        isFilterActive={isFilterOpen || columnFilters.length > 0}
+        primaryAction={{
+          label: "Initialize Contract",
+          onClick: () => {
+            setDealContext(null);
+            setRightPanelMode('CREATE_DEAL');
+          },
+          icon: <Plus size={18} className="mr-2" />
+        }}
+      />
+
+      {statsData && (
+        <div className="flex items-center gap-6 py-3 px-6 rounded-xl bg-white/[0.02] border border-white/5 flex-none">
+          <div>
+            <div className="font-mono text-lg text-zinc-100 tabular-nums">
+              {fmtCurrency(statsData.totalPipeline)}
+            </div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Pipeline</div>
+          </div>
+          <div className="h-8 w-px bg-white/5" />
+          <div>
+            <div className="font-mono text-sm text-amber-400 tabular-nums">
+              {statsData.closing30dCount} <span className="text-zinc-600 text-xs">contracts</span>
+            </div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Closing 30d</div>
+          </div>
+          <div className="h-8 w-px bg-white/5" />
+          <div>
+            <div className="font-mono text-sm text-[#002FA7] tabular-nums flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#002FA7] animate-pulse" />
+              {statsData.engagedCount}
+            </div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Engaged</div>
+          </div>
+          <div className="h-8 w-px bg-white/5" />
+          <div>
+            <div className="font-mono text-sm text-emerald-400 tabular-nums">{statsData.securedCount}</div>
+            <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">Secured</div>
+          </div>
+        </div>
+      )}
+
+      <FilterCommandDeck
+        isOpen={isFilterOpen}
+        onClose={() => setIsFilterOpen(false)}
+        type="deals"
+        columnFilters={columnFilters}
+        onFilterChange={handleFilterChange}
+      />
+
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+          <Table>
+            <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <ForensicTableSkeleton columns={columns.length} rows={12} />
+              ) : deals.length ? (
+                <AnimatePresence mode="popLayout">
+                  {table.getRowModel().rows.map((row, index) => (
+                    <DealTableRow
+                      key={row.id}
+                      row={row}
+                      index={index}
+                      router={router}
+                      saveScroll={saveScroll}
+                      isSelected={row.getIsSelected()}
+                    />
+                  ))}
+                </AnimatePresence>
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+                    No contracts found.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+              <span>Sync_Block {showingStart}–{showingEnd}</span>
+              <div className="h-1 w-1 rounded-full bg-black/40" />
+              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
+              disabled={pagination.pageIndex === 0}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+              aria-label="Previous page"
+              title="Previous Page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+              {(pagination.pageIndex + 1).toString().padStart(2, '0')}
+            </div>
+            <button
+              onClick={async () => {
+                const nextPageIndex = pagination.pageIndex + 1
+                if (nextPageIndex >= displayTotalPages) return
+
+                const needed = (nextPageIndex + 1) * PAGE_SIZE
+                if (deals.length < needed && hasNextPage && !isFetchingNextPage) {
+                  await fetchNextPage()
+                }
+
+                setPage(nextPageIndex)
+              }}
+              disabled={pagination.pageIndex + 1 >= displayTotalPages}
+              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+              aria-label="Next page"
+              title="Next Page"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* ── TABLE ─────────────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-8 pb-8">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-40 text-zinc-600 font-mono text-xs">
-            Loading contracts...
-          </div>
-        ) : deals.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 gap-3">
-            <TrendingUp className="w-8 h-8 text-zinc-700" />
-            <p className="text-zinc-600 font-mono text-xs uppercase tracking-widest">
-              No contracts in pipeline
-            </p>
-            <button
-              onClick={() => { setForm(EMPTY_FORM); setCreateOpen(true) }}
-              className="text-[#002FA7] font-mono text-xs hover:underline"
-            >
-              + Initialize first contract
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Column headers */}
-            <div className="grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr_0.8fr_0.6fr_auto] gap-4 px-4 py-2 mb-1">
-              {['Account', 'Stage', 'Value/yr', 'kWh/yr', 'Mills', 'Term', 'Close', ''].map((h, i) => (
-                <div key={i} className="text-[9px] font-mono uppercase tracking-widest text-zinc-600">{h}</div>
-              ))}
-            </div>
+      <BulkActionDeck
+        selectedCount={selectedCount}
+        totalAvailable={effectiveTotalRecords}
+        onClear={() => setRowSelection({})}
+        onAction={handleBulkAction}
+        onSelectCount={() => { }} // Not implemented for deals yet
+      />
 
-            <div className="space-y-1.5">
-              {deals.map(deal => (
-                <DealRow
-                  key={deal.id}
-                  deal={deal}
-                  onEdit={() => openEdit(deal)}
-                  onDelete={() => setDeleteId(deal.id)}
-                />
-              ))}
-            </div>
-
-            {hasNextPage && (
-              <button
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                className="mt-6 w-full py-3 border border-dashed border-zinc-800 hover:border-zinc-600 rounded-xl text-xs font-mono text-zinc-600 hover:text-zinc-400 transition-colors"
-              >
-                {isFetchingNextPage ? 'Loading...' : 'Load more contracts'}
-              </button>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* ── CREATE DIALOG ─────────────────────────────────────────────── */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="bg-zinc-950 border-white/10 max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-sm uppercase tracking-widest text-zinc-300">
-              Initialize Contract
-            </DialogTitle>
-          </DialogHeader>
-          <DealForm
-            form={form}
-            onChange={setForm}
-            onAccountSelect={(id, name) => setForm(f => ({ ...f, accountId: id, accountName: name }))}
-          />
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={() => setCreateOpen(false)}
-              className="px-4 py-2 rounded-lg border border-white/10 text-zinc-500 font-mono text-xs hover:text-zinc-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleCreate}
-              disabled={!form.title.trim() || !form.accountId || createDeal.isPending}
-              className="px-4 py-2 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/40 text-[#002FA7] font-mono text-xs hover:bg-[#002FA7]/30 transition-colors disabled:opacity-40"
-            >
-              {createDeal.isPending ? 'Initializing...' : 'Initialize'}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DestructModal
+        isOpen={isDestructModalOpen}
+        onClose={() => setIsDestructModalOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        count={selectedCount}
+      />
 
       {/* ── EDIT DIALOG ───────────────────────────────────────────────── */}
       <Dialog open={!!editDeal} onOpenChange={v => !v && setEditDeal(null)}>
@@ -638,63 +911,6 @@ export default function ContractsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Deal row
-// ---------------------------------------------------------------------------
-function DealRow({ deal, onEdit, onDelete }: { deal: Deal; onEdit: () => void; onDelete: () => void }) {
-  return (
-    <div className="group grid grid-cols-[2fr_1fr_1fr_1fr_0.8fr_0.8fr_0.6fr_auto] gap-4 items-center px-4 py-3 rounded-xl bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.04] hover:border-white/[0.08] transition-all">
-      {/* Account name */}
-      <div className="min-w-0">
-        <div className="font-sans text-sm text-zinc-200 truncate">{deal.account?.name || deal.accountId}</div>
-        <div className="font-mono text-[10px] text-zinc-600 truncate">{deal.title}</div>
-      </div>
-
-      {/* Stage */}
-      <div>
-        <StageBadge stage={deal.stage} />
-      </div>
-
-      {/* Value */}
-      <div className="font-mono text-xs text-zinc-300 tabular-nums">{fmtCurrency(deal.amount)}</div>
-
-      {/* kWh */}
-      <div className="font-mono text-xs text-zinc-400 tabular-nums">{fmtUsage(deal.annualUsage)}</div>
-
-      {/* Mills */}
-      <div className="font-mono text-xs text-zinc-400 tabular-nums">{fmtMills(deal.mills)}</div>
-
-      {/* Term */}
-      <div className="font-mono text-xs text-zinc-400">
-        {deal.contractLength ? `${deal.contractLength}mo` : '—'}
-      </div>
-
-      {/* Close date */}
-      <div>
-        <CloseDots closeDate={deal.closeDate} />
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={onEdit}
-          className="p-1.5 rounded hover:bg-white/5 text-zinc-600 hover:text-zinc-300 transition-colors"
-          title="Edit"
-        >
-          <Pencil className="w-3 h-3" />
-        </button>
-        <button
-          onClick={onDelete}
-          className="p-1.5 rounded hover:bg-rose-500/10 text-zinc-600 hover:text-rose-400 transition-colors"
-          title="Delete"
-        >
-          <Trash2 className="w-3 h-3" />
-        </button>
-      </div>
     </div>
   )
 }

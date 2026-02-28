@@ -86,6 +86,44 @@ export function useDeals(filters?: DealsFilters) {
   })
 }
 
+export function useDealsCount(filters?: DealsFilters) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['deals-count', QUERY_BUSTER, user?.email, role, filters],
+    queryFn: async () => {
+      if (loading || !user) return 0
+
+      let query = supabase
+        .from('deals')
+        .select('*', { count: 'exact', head: true })
+
+      if (role !== 'admin' && user.email) {
+        query = query.eq('ownerId', user.email)
+      }
+
+      if (filters?.stage && filters.stage !== 'ALL') {
+        query = query.eq('stage', filters.stage)
+      }
+
+      if (filters?.accountId) {
+        query = query.eq('accountId', filters.accountId)
+      }
+
+      if (filters?.search) {
+        query = query.ilike('title', `%${filters.search}%`)
+      }
+
+      const { count, error } = await query
+      if (error) throw error
+      return count || 0
+    },
+    enabled: !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+
 // ---------------------------------------------------------------------------
 // Deals for a specific account (RightPanel + VectorControlModule)
 // ---------------------------------------------------------------------------

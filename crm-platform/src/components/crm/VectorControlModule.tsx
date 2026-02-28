@@ -11,9 +11,11 @@ import { useProtocols } from '@/hooks/useProtocols'
 import { useCreateTarget } from '@/hooks/useTargets'
 import { useDealsByAccount, useDealsByContact, useCreateDeal, useUpdateDeal } from '@/hooks/useDeals'
 import { cn } from '@/lib/utils'
+import { usePathname } from 'next/navigation'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/context/AuthContext'
+import { useUIStore } from '@/store/uiStore'
 import { toast } from 'sonner'
 import { type DealStage } from '@/types/deals'
 
@@ -36,9 +38,10 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   const [isPopoverOpen, setIsPopoverOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const { user } = useAuth()
-
   const isAccountMode = !!accountId && !contactId
   const entityId = isAccountMode ? accountId : contactId
+  const { setRightPanelMode, setDealContext } = useUIStore()
+  const pathname = usePathname()
 
   const { data: contactListMemberships = [], isLoading: isLoadingContactLists } = useContactListMemberships(isAccountMode ? undefined : contactId)
   const { data: accountListMemberships = [], isLoading: isLoadingAccountLists } = useAccountListMemberships(accountId)
@@ -193,19 +196,13 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   }
 
   const handleCreateDeal = async () => {
-    const title = searchQuery.trim()
-    if (!title || !user) return
-    try {
-      await createDeal.mutateAsync({
-        title,
-        accountId: accountId || '',     // account mode
-        contactId: contactId || undefined, // contact mode
-        stage: 'IDENTIFIED',
-      })
-      toast.success(`Contract "${title}" initialized`)
-      setIsPopoverOpen(false)
-      setSearchQuery('')
-    } catch (_) { }
+    setDealContext({
+      accountId: accountId,
+      contactId: contactId
+    })
+    setRightPanelMode('CREATE_DEAL')
+    setIsPopoverOpen(false)
+    setSearchQuery('')
   }
 
   if (!contactId && !accountId) return null
@@ -352,7 +349,7 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
           <PopoverTrigger asChild>
             <button
-              className="icon-button-forensic p-1.5 hover:bg-[#002FA7]/10 hover:text-[#002FA7] transition-colors"
+              className="icon-button-forensic p-1 flex items-center justify-center"
               title="Assign to more vectors"
             >
               <Plus className="w-3.5 h-3.5" />

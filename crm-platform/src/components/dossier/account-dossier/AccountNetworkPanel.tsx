@@ -32,7 +32,12 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">03 // Network</span>
                     <button
                         onClick={() => {
-                            setIngestionContext({ accountId: id, accountName: account?.name || 'Unknown Account' })
+                            setIngestionContext({
+                                accountId: id,
+                                accountName: account?.name || 'Unknown Account',
+                                accountLogoUrl: account?.logoUrl,
+                                accountDomain: account?.domain
+                            })
                             setRightPanelMode('INGEST_CONTACT')
                         }}
                         className="icon-button-forensic w-8 h-8"

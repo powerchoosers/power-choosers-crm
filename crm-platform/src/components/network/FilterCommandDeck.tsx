@@ -8,23 +8,23 @@ import { TITLE_VECTORS } from '@/lib/title-mapping';
 interface FilterDeckProps {
   isOpen: boolean;
   onClose: () => void;
-  type: 'people' | 'account';
+  type: 'people' | 'account' | 'deals';
   columnFilters: { id: string; value: any }[];
   onFilterChange: (columnId: string, value: any) => void;
 }
 
-export default function FilterCommandDeck({ 
-  isOpen, 
-  onClose, 
+export default function FilterCommandDeck({
+  isOpen,
+  onClose,
   type,
   columnFilters,
-  onFilterChange 
+  onFilterChange
 }: FilterDeckProps) {
   // Helper to check if a value is active for a column
   const isActive = (columnId: string, value: any) => {
     const filter = columnFilters.find(f => f.id === columnId);
     if (!filter) return false;
-    
+
     // Special handling for Industry/Title Vector Logic
     if (columnId === 'industry' || columnId === 'title') {
       const activeValues = Array.isArray(filter.value) ? filter.value : [filter.value];
@@ -41,13 +41,13 @@ export default function FilterCommandDeck({
   const toggleFilter = (columnId: string, value: any) => {
     const filter = columnFilters.find(f => f.id === columnId);
     let newValue;
-    
+
     // Special handling for Industry/Title Vector Logic
     if (columnId === 'industry' || columnId === 'title') {
       const vectorMapping = columnId === 'industry' ? INDUSTRY_VECTORS : TITLE_VECTORS;
       const vectorItems = vectorMapping[value] || [value];
       const currentValues = filter ? (Array.isArray(filter.value) ? filter.value : [filter.value]) : [];
-      
+
       const isVectorActive = currentValues.includes(value);
 
       if (isVectorActive) {
@@ -57,7 +57,7 @@ export default function FilterCommandDeck({
         // Add all items associated with this vector, plus the vector key itself
         newValue = [...new Set([...currentValues, ...vectorItems, value])];
       }
-      
+
       if (newValue.length === 0) newValue = undefined;
       onFilterChange(columnId, newValue);
       return;
@@ -84,9 +84,12 @@ export default function FilterCommandDeck({
     onFilterChange('title', undefined);
   };
 
-  const statusOptions = type === 'people' 
+  const statusOptions = type === 'people'
     ? ['Lead', 'Customer', 'Churned']
-    : ['PROSPECT', 'ACTIVE_LOAD', 'CUSTOMER', 'CHURNED'];
+    : type === 'account'
+      ? ['PROSPECT', 'ACTIVE_LOAD', 'CUSTOMER', 'CHURNED']
+      : ['IDENTIFIED', 'AUDITING', 'BRIEFED', 'ENGAGED', 'SECURED', 'TERMINATED'];
+
 
   const industryOptions = Object.keys(INDUSTRY_VECTORS);
   const titleOptions = Object.keys(TITLE_VECTORS);
@@ -112,19 +115,25 @@ export default function FilterCommandDeck({
         >
           <div className={cn(
             "p-6 grid gap-8",
-            type === 'people' ? "grid-cols-1 md:grid-cols-4" : "grid-cols-1 md:grid-cols-3"
+            type === 'people' ? "grid-cols-1 md:grid-cols-4" :
+              type === 'account' ? "grid-cols-1 md:grid-cols-3" :
+                "grid-cols-1 md:grid-cols-3"
+
           )}>
-            
+
             {/* COLUMN 1: STATUS VECTORS */}
             <div className="space-y-3">
               <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                {type === 'people' ? 'RELATIONSHIP_STATE' : 'CONTRACT_STATUS'}
+                {type === 'people' ? 'RELATIONSHIP_STATE' :
+                  type === 'account' ? 'CONTRACT_STATUS' :
+                    'PIPELINE_STAGE'}
+
               </h4>
               <div className="flex flex-wrap gap-2">
                 {statusOptions.map(status => (
-                  <FilterChip 
+                  <FilterChip
                     key={status}
-                    label={status.replace('_', ' ')} 
+                    label={status.replace('_', ' ')}
                     active={isActive('status', status)}
                     onClick={() => toggleFilter('status', status)}
                   />
@@ -139,7 +148,7 @@ export default function FilterCommandDeck({
               </h4>
               <div className="flex flex-wrap gap-2">
                 {industryOptions.map(industry => (
-                  <FilterChip 
+                  <FilterChip
                     key={industry}
                     label={industry}
                     active={isActive('industry', industry)}
@@ -157,7 +166,7 @@ export default function FilterCommandDeck({
                 </h4>
                 <div className="flex flex-wrap gap-2">
                   {titleOptions.map(title => (
-                    <FilterChip 
+                    <FilterChip
                       key={title}
                       label={title}
                       active={isActive('title', title)}
@@ -175,7 +184,7 @@ export default function FilterCommandDeck({
               </h4>
               <div className="flex flex-wrap gap-2">
                 {locationOptions.map(loc => (
-                  <FilterChip 
+                  <FilterChip
                     key={loc}
                     label={loc}
                     active={isActive('location', loc)}
@@ -189,13 +198,13 @@ export default function FilterCommandDeck({
 
           {/* FOOTER ACTIONS */}
           <div className="px-6 pb-6 flex justify-between items-center border-t border-white/5 pt-6">
-            <button 
+            <button
               onClick={onClose}
               className="text-xs text-zinc-500 hover:text-white font-mono flex items-center gap-2 transition-colors"
             >
               <X className="w-3 h-3" /> CLOSE_DECK
             </button>
-            <button 
+            <button
               onClick={clearFilters}
               className="text-xs text-zinc-500 hover:text-white font-mono uppercase tracking-wider transition-colors"
             >
@@ -211,12 +220,12 @@ export default function FilterCommandDeck({
 // Helper Component for the "Pill" Switches
 function FilterChip({ label, active, onClick }: { label: string, active: boolean, onClick: () => void }) {
   return (
-    <button 
+    <button
       onClick={onClick}
       className={cn(
         "px-3 py-1.5 rounded-lg text-[10px] font-mono border transition-all flex items-center gap-2",
-        active 
-          ? "bg-[#002FA7]/10 border-[#002FA7] text-white shadow-[0_0_15px_-5px_rgba(0,47,167,0.5)]" 
+        active
+          ? "bg-[#002FA7]/10 border-[#002FA7] text-white shadow-[0_0_15px_-5px_rgba(0,47,167,0.5)]"
           : "nodal-module-glass border-white/5 text-zinc-500 hover:border-white/20 hover:text-zinc-300"
       )}
     >
