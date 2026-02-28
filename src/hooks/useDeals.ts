@@ -194,8 +194,10 @@ export function useCreateDeal() {
       if (error) throw error
       return data as Deal
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      if (data?.accountId) queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+      if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', QUERY_BUSTER, data.contactId] })
       toast.success('Contract initialized')
     },
     onError: (error) => {
@@ -238,6 +240,9 @@ export function useUpdateDeal() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      if (data?.accountId) queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+      if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', QUERY_BUSTER, data.contactId] })
+
       if (data?.stage === 'SECURED') {
         toast.success('Contract secured — account promoted to Customer')
       } else {
@@ -268,6 +273,8 @@ export function useDeleteDeal() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
       toast.success('Contract terminated')
     },
     onError: (error) => {
