@@ -306,7 +306,7 @@ export function RightPanel() {
 
                       {/* 0b. CONTRACT INTEL — active deals for this entity */}
                       {isContactPage && entityId ? (
-                        <ContractIntelWidget key={`contract-contact-${entityId}`} contactId={entityId} />
+                        <ContractIntelWidget key={`contract-contact-${entityId}`} contactId={entityId} accountId={contact?.accountId || (contact as any)?.linkedAccountId} />
                       ) : isAccountPage && entityId ? (
                         <ContractIntelWidget key={`contract-account-${entityId}`} accountId={entityId} />
                       ) : null}
