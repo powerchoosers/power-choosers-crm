@@ -358,7 +358,7 @@ export function useAccount(id: string) {
         annualUsage: data.annual_usage || '',
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
-        mills: data.metadata?.mills || '0.0030', // default to 3 mills
+        mills: data.metadata?.mills || '0.0070', // default to 7 mills
         status: data.status || 'PROSPECT',
         meters,
         metadata: data.metadata || {}
