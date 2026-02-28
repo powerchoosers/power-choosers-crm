@@ -585,7 +585,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
           <div className="pt-4 border-t border-white/5">
             <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Estimated Annual Revenue</div>
             <div className="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80">{pos.estimatedRevenue}</div>
-            <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at {pos.margin || '0.003'} margin base</div>
+            <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at {pos.margin || '0.0070'} margin base</div>
           </div>
           {!pos.isSimulation && (
             <div className="flex justify-between items-center pt-1 gap-2">
