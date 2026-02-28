@@ -230,9 +230,25 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                         )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 mt-4">
-                        <div>
-                            <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Deal Mills</div>
+                    <div className="pt-4 border-t border-white/5 mt-4">
+                        <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Estimated Annual Revenue</div>
+                        <div className={cn(
+                            "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
+                            glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                        )}>
+                            <ForensicDataPoint
+                                value={(() => {
+                                    const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                                    const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                                    const millsFloat = parseFloat(String(editMills).replace(/[^\d.]/g, '')) || 0.0070;
+                                    return (usage * millsFloat).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                                })()}
+                                valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
+                                inline
+                            />
+                        </div>
+                        <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest flex items-center gap-1">
+                            Calculated at
                             {isEditing ? (
                                 <input
                                     type="text"
@@ -240,7 +256,6 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                     onChange={(e) => {
                                         const val = e.target.value.replace(/[^\d]/g, '')
                                         if (val) {
-                                            // Auto format to decimal like 0.0070
                                             const num = parseInt(val, 10)
                                             setEditMills((num / 10000).toFixed(4))
                                         } else {
@@ -248,37 +263,15 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                         }
                                     }}
                                     onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                    className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 transition-all"
+                                    className="bg-black/40 border border-white/5 rounded px-1 py-0.5 text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 w-16 text-center tabular-nums"
                                     placeholder="0.0070"
                                 />
                             ) : (
-                                <div className={cn(
-                                    "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7] transition-all duration-800",
-                                    glowingFields.has('mills') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
-                                )}>
-                                    <ForensicDataPoint value={editMills || '--'} valueClassName="text-xl font-mono tabular-nums text-[#002FA7]" inline />
-                                </div>
+                                <span className={cn("tabular-nums text-[#002FA7] transition-all", glowingFields.has('mills') && "text-emerald-400")}>
+                                    {editMills || '0.0070'}
+                                </span>
                             )}
-                        </div>
-
-                        <div className="pt-0">
-                            <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Estimated Annual Revenue</div>
-                            <div className={cn(
-                                "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
-                                glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
-                            )}>
-                                <ForensicDataPoint
-                                    value={(() => {
-                                        const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
-                                        const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
-                                        const millsFloat = parseFloat(String(editMills).replace(/[^\d.]/g, '')) || 0.0070;
-                                        return (usage * millsFloat).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                                    })()}
-                                    valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
-                                    inline
-                                />
-                            </div>
-                            <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at {editMills || '0.007'} margin base</div>
+                            margin base
                         </div>
                     </div>
                 </div>
