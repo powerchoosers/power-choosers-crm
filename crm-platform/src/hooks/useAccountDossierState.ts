@@ -94,7 +94,7 @@ export function useAccountDossierState(id: string) {
             setEditNotes(account.description || '')
             setEditAnnualUsage(account.annualUsage?.toString() || '')
             setEditStrikePrice(account.currentRate || '')
-            setEditMills(account.mills || '0.0030')
+            setEditMills(account.mills || '0.0070')
             setEditIndustry(account.industry || '')
             setEditLocation(account.location || '')
             setEditLogoUrl(account.logoUrl || '')
@@ -177,7 +177,7 @@ export function useAccountDossierState(id: string) {
                     service_addresses: account.serviceAddresses || account.metadata?.service_addresses || [],
                     annual_usage: account.annualUsage || account.metadata?.annual_usage,
                     current_rate: account.currentRate || account.metadata?.current_rate,
-                    mills: account.mills || account.metadata?.mills || '0.0030',
+                    mills: account.mills || account.metadata?.mills || '0.0070',
                     contract_end_date: account.contractEnd || account.metadata?.contract_end_date,
                     electricity_supplier: account.electricitySupplier || account.metadata?.electricity_supplier,
                 } as any

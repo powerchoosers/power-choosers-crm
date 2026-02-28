@@ -247,9 +247,9 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                 inline
                             />
                         </div>
-                        <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest flex items-center gap-1">
-                            Calculated at
-                            {isEditing ? (
+                        {isEditing ? (
+                            <div className="mt-3">
+                                <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Deal Mills</div>
                                 <input
                                     type="text"
                                     value={editMills}
@@ -263,16 +263,15 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                         }
                                     }}
                                     onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                    className="bg-black/40 border border-white/5 rounded px-1 py-0.5 text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 w-16 text-center tabular-nums"
+                                    className="w-1/2 bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 tabular-nums"
                                     placeholder="0.0070"
                                 />
-                            ) : (
-                                <span className={cn("tabular-nums text-[#002FA7] transition-all", glowingFields.has('mills') && "text-emerald-400")}>
-                                    {editMills || '0.0070'}
-                                </span>
-                            )}
-                            margin base
-                        </div>
+                            </div>
+                        ) : (
+                            <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">
+                                Calculated at <span className={cn(glowingFields.has('mills') && "text-emerald-400 transition-colors")}>{editMills || '0.0070'}</span> margin base
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
