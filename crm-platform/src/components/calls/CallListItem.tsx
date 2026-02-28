@@ -250,31 +250,42 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {call.recordingUrl && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "text-zinc-500 hover:text-zinc-300 hover:scale-105 transition-all duration-200",
-                isMinimal ? "w-7 h-7" : "w-8 h-8"
-              )}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (isPlayerOpen) togglePlayPause()
-                else openPlayerAndPlay()
-              }}
-              title={isPlayerOpen ? (isPlaying ? 'Pause' : 'Play') : 'Play Recording'}
-            >
-              {isPlayerOpen && isPlaying ? (
-                <Pause className={cn("fill-current", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
-              ) : (
-                <Play className={cn("fill-current", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
-              )}
-            </Button>
-          )}
+          <AnimatePresence mode="wait">
+            {call.recordingUrl && (
+              <motion.div
+                key="play-call"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                className="shrink-0"
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "text-zinc-500 hover:text-zinc-300 hover:scale-105 transition-all duration-200",
+                    isMinimal ? "w-7 h-7" : "w-8 h-8"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    if (isPlayerOpen) togglePlayPause()
+                    else openPlayerAndPlay()
+                  }}
+                  title={isPlayerOpen ? (isPlaying ? 'Pause' : 'Play') : 'Play Recording'}
+                >
+                  {isPlayerOpen && isPlaying ? (
+                    <Pause className={cn("fill-current", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
+                  ) : (
+                    <Play className={cn("fill-current", isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />
+                  )}
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence mode="wait">
-            {!isProcessed && (
+            {!isProcessed ? (
               <motion.div
                 key="process-call"
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -315,20 +326,29 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                   )}
                 </Button>
               </motion.div>
+            ) : (
+              <motion.div
+                key="expand-call"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                transition={{ duration: 0.2 }}
+                className="shrink-0"
+              >
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn(
+                    "text-zinc-500 hover:text-zinc-300 hover:scale-105 transition-all duration-200",
+                    isMinimal ? "w-7 h-7" : "w-8 h-8"
+                  )}
+                  onClick={() => setIsExpanded(!isExpanded)}
+                >
+                  {isExpanded ? <ChevronUp className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} /> : <ChevronDown className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />}
+                </Button>
+              </motion.div>
             )}
           </AnimatePresence>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className={cn(
-              "text-zinc-500 hover:text-zinc-300 hover:scale-105 transition-all duration-200",
-              isMinimal ? "w-7 h-7" : "w-8 h-8"
-            )}
-            onClick={() => setIsExpanded(!isExpanded)}
-          >
-            {isExpanded ? <ChevronUp className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} /> : <ChevronDown className={cn(isMinimal ? "w-3.5 h-3.5" : "w-4 h-4")} />}
-          </Button>
         </div>
       </div>
 
