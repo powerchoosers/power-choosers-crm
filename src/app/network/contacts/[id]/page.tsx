@@ -243,6 +243,8 @@ export default function ContactDossierPage() {
                 setEditStrikePrice={s.setEditStrikePrice}
                 editAnnualUsage={s.editAnnualUsage}
                 setEditAnnualUsage={s.setEditAnnualUsage}
+                editMills={s.editMills}
+                setEditMills={s.setEditMills}
                 onEmailClick={() => s.setIsComposeOpen(true)}
                 onIngestionComplete={handleIngestionComplete}
                 toggleEditing={s.toggleEditing}

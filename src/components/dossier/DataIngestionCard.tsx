@@ -198,10 +198,12 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
 
             // Refresh lists so Accounts and People tables show Customer/Client immediately
-            queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            queryClient.invalidateQueries({ queryKey: ['contacts'] });
-            queryClient.invalidateQueries({ queryKey: ['targets'] });
-            queryClient.invalidateQueries({ queryKey: ['vault-documents'] });
+            await queryClient.invalidateQueries({ queryKey: ['accounts'] });
+            await queryClient.invalidateQueries({ queryKey: ['contacts'] });
+            await queryClient.invalidateQueries({ queryKey: ['contact'] }); // invalidate single contact dossier
+            await queryClient.invalidateQueries({ queryKey: ['targets'] });
+            await queryClient.invalidateQueries({ queryKey: ['vault-documents'] });
+            await queryClient.invalidateQueries({ queryKey: ['deals'] });
 
             // Refresh document list again after AI (in case realtime was slow)
             await fetchDocuments();

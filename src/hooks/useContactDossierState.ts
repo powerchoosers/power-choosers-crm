@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
-import { useAccount } from '@/hooks/useAccounts'
+import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useContactCalls } from '@/hooks/useCalls'
 import { useApolloNews } from '@/hooks/useApolloNews'
 import { useEntityTasks } from '@/hooks/useEntityTasks'
@@ -33,6 +33,7 @@ export function useContactDossierState(id: string) {
     const { data: apolloNewsSignals } = useApolloNews(domain)
     const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id, account?.companyPhone, account?.id)
     const updateContact = useUpdateContact()
+    const updateAccount = useUpdateAccount()
     const { isEditing, setIsEditing, toggleEditing } = useUIStore()
     const setContext = useGeminiStore((state) => state.setContext)
 
@@ -65,6 +66,7 @@ export function useContactDossierState(id: string) {
     const [editCompanyPhone, setEditCompanyPhone] = useState('')
     const [editPrimaryField, setEditPrimaryField] = useState<'mobile' | 'workDirectPhone' | 'otherPhone'>('mobile')
     const [editContractEnd, setEditContractEnd] = useState('')
+    const [editMills, setEditMills] = useState('')
 
     // UI Effects States
     const [recentlyUpdatedFields, setRecentlyUpdatedFields] = useState<Set<string>>(new Set())
@@ -94,9 +96,6 @@ export function useContactDossierState(id: string) {
             setEditPhone(contact.phone || '')
             setEditEmail(contact.email || '')
             setEditNotes(contact.notes || contact.accountDescription || '')
-            setEditSupplier(contact.electricitySupplier || '')
-            setEditStrikePrice(contact.currentRate || '')
-            setEditAnnualUsage(contact.annualUsage || '')
             setEditLocation(contact.location || '')
             setEditLogoUrl(contact.logoUrl || contact.avatarUrl || '')
             setEditWebsite(contact.website || '')
@@ -106,10 +105,24 @@ export function useContactDossierState(id: string) {
             setEditOther(contact.otherPhone || '')
             setEditCompanyPhone(contact.companyPhone || '')
             setEditPrimaryField(contact.primaryPhoneField || 'mobile')
-            setEditContractEnd(contact.contractEnd ? String(contact.contractEnd).slice(0, 10) : '')
             setEditServiceAddresses(Array.isArray(contact.serviceAddresses) ? contact.serviceAddresses : [])
+
+            // Energy & Forensic fields come from Account as the source of truth
+            if (account) {
+                setEditSupplier(account.electricitySupplier || '')
+                setEditStrikePrice(account.currentRate || '')
+                setEditAnnualUsage(account.annualUsage || '')
+                setEditContractEnd(account.contractEnd ? String(account.contractEnd).slice(0, 10) : '')
+                setEditMills(account.mills || '0.0070')
+            } else {
+                setEditSupplier(contact.electricitySupplier || '')
+                setEditStrikePrice(contact.currentRate || '')
+                setEditAnnualUsage(contact.annualUsage || '')
+                setEditContractEnd(contact.contractEnd ? String(contact.contractEnd).slice(0, 10) : '')
+                setEditMills((contact as any)?.mills || '0.0070')
+            }
         }
-    }, [contact, isEditing])
+    }, [contact, account, isEditing])
 
     // Save Effect
     useEffect(() => {
@@ -122,6 +135,7 @@ export function useContactDossierState(id: string) {
                 setIsSaving(true)
                 const fullName = [editFirstName, editLastName].filter(Boolean).join(' ').trim() || editName
                 try {
+                    // Update contact-specific fields
                     await updateContact.mutateAsync({
                         id,
                         name: fullName,
@@ -132,9 +146,6 @@ export function useContactDossierState(id: string) {
                         phone: editPhone,
                         email: editEmail,
                         notes: editNotes,
-                        electricitySupplier: editSupplier,
-                        currentRate: editStrikePrice,
-                        annualUsage: editAnnualUsage,
                         location: editLocation,
                         logoUrl: editLogoUrl,
                         website: editWebsite,
@@ -145,8 +156,22 @@ export function useContactDossierState(id: string) {
                         otherPhone: editOther,
                         companyPhone: editCompanyPhone,
                         primaryPhoneField: editPrimaryField,
-                        contractEnd: editContractEnd || undefined
                     })
+
+                    // If linked to an account, sync energy fields back to the Account Dossier as the source of truth
+                    const accountId = (contact as any)?.accountId || (contact as any)?.linkedAccountId
+                    if (accountId) {
+                        const cleanedUsage = parseInt(editAnnualUsage.replace(/[^0-9]/g, '')) || 0
+                        await updateAccount.mutateAsync({
+                            id: accountId,
+                            electricitySupplier: editSupplier,
+                            currentRate: editStrikePrice,
+                            annualUsage: cleanedUsage.toString(),
+                            mills: editMills,
+                            contractEnd: editContractEnd || undefined
+                        })
+                    }
+
                     setShowSynced(true)
                     setTimeout(() => setShowSynced(false), 3000)
                     toast.success('System Synced')
@@ -158,7 +183,7 @@ export function useContactDossierState(id: string) {
             }
             triggerSave()
         }
-    }, [isEditing, id, editFirstName, editLastName, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editAnnualUsage, editLocation, editLogoUrl, editWebsite, editLinkedinUrl, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editContractEnd, updateContact])
+    }, [isEditing, id, editFirstName, editLastName, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editMills, editAnnualUsage, editLocation, editLogoUrl, editWebsite, editLinkedinUrl, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editContractEnd, updateContact, updateAccount, contact])
 
     return {
         // Data
@@ -195,6 +220,7 @@ export function useContactDossierState(id: string) {
         editNotes,
         editSupplier,
         editStrikePrice,
+        editMills,
         editAnnualUsage,
         editLocation,
         editLogoUrl,
@@ -218,6 +244,7 @@ export function useContactDossierState(id: string) {
         setEditNotes,
         setEditSupplier,
         setEditStrikePrice,
+        setEditMills,
         setEditAnnualUsage,
         setEditLocation,
         setEditLogoUrl,
