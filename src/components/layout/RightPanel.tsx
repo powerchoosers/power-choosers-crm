@@ -16,6 +16,7 @@ import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { useUIStore } from '@/store/uiStore'
 import { NodeIngestion } from '../right-panel/NodeIngestion'
 import { TaskCreationPanel } from '../right-panel/TaskCreationPanel'
+import { DealCreationPanel } from '../right-panel/DealCreationPanel'
 
 /** When on dossier: 'context' = Active Context widgets, 'scanning' = Scanning Mode widgets. Only used when isActiveContext. */
 type DossierPanelView = 'context' | 'scanning'
@@ -158,6 +159,8 @@ export function RightPanel() {
       <AnimatePresence mode="wait">
         {rightPanelMode === 'CREATE_TASK' ? (
           <TaskCreationPanel key="task" />
+        ) : rightPanelMode === 'CREATE_DEAL' ? (
+          <DealCreationPanel key="deal" />
         ) : rightPanelMode !== 'DEFAULT' ? (
           <NodeIngestion key="ingest" />
         ) : (
