@@ -1,10 +1,12 @@
 import { create } from 'zustand'
 
-export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK';
+export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL';
 
 export interface IngestionContext {
   accountId: string
   accountName: string
+  accountLogoUrl?: string
+  accountDomain?: string
 }
 
 export interface TaskContext {
@@ -15,6 +17,15 @@ export interface TaskContext {
   entityDomain?: string
   contactId?: string
   accountId?: string
+}
+
+export interface DealContext {
+  accountId?: string
+  accountName?: string
+  accountLogoUrl?: string
+  accountDomain?: string
+  contactId?: string
+  contactName?: string
 }
 
 interface UIState {
@@ -29,6 +40,9 @@ interface UIState {
   /** Pre-filled context when opening CREATE_TASK mode */
   taskContext: TaskContext | null
   setTaskContext: (ctx: TaskContext | null) => void
+  /** Pre-filled context when opening CREATE_DEAL mode */
+  dealContext: DealContext | null
+  setDealContext: (ctx: DealContext | null) => void
   /** Initial identifier (domain/url) for ingestion from external signals */
   ingestionIdentifier: string | null
   setIngestionIdentifier: (id: string | null) => void
@@ -53,6 +67,8 @@ export const useUIStore = create<UIState>((set) => ({
   setIngestionContext: (ctx) => set({ ingestionContext: ctx }),
   taskContext: null,
   setTaskContext: (ctx) => set({ taskContext: ctx }),
+  dealContext: null,
+  setDealContext: (ctx) => set({ dealContext: ctx }),
   ingestionIdentifier: null,
   setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
   ingestionSignal: null,
