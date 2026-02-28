@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     
     Task 1: Classify the document type.
     - "SIGNED_CONTRACT": A signed Energy Service Agreement (ESA) or similar binding contract.
-    - "BILL": A standard utility bill or invoice.
+    - "BILL": A standard utility bill, invoice, or monthly statement. This explicitly includes documents titled in Spanish such as "recibo", "factura", "recibos luz", "servicio electrico" or any variation indicating a utility bill.
     - "USAGE_DATA": Usage/telemetry: ERCOT or utility usage summaries, OncorSummaryUsageData, annual usage, 12-month usage, CSV usage data.
     - "PROPOSAL": Sales proposals, RFP responses, quotes, pricing proposals.
     - "OTHER": Anything else.
@@ -260,21 +260,68 @@ export default async function handler(req, res) {
       updates.load_factor = Number(Math.min(Math.max(loadFactor, 0), 1).toFixed(3));
     }
 
-    if (type === 'SIGNED_CONTRACT' || type === 'BILL') {
-      updates.status = 'CUSTOMER';
+    // Status and Deal Pipeline Transitions
+    let dealStageToSet = null;
+
+    if (type === 'BILL') {
+      updates.status = 'Active';
+      dealStageToSet = 'AUDITING';
+    } else if (type === 'SIGNED_CONTRACT') {
+      updates.status = 'Customer';
+      dealStageToSet = 'SECURED';
     }
 
     if (Object.keys(updates).length > 0) {
+      // 1. Update Account Record
       await supabaseAdmin
         .from('accounts')
         .update(updates)
         .eq('id', accountId);
 
-      if (updates.status === 'CUSTOMER') {
+      // 2. Cascade Status to Contacts
+      if (updates.status) {
         await supabaseAdmin
           .from('contacts')
-          .update({ status: 'Customer' })
+          .update({ status: updates.status })
           .eq('accountId', accountId);
+      }
+    }
+
+    // 3. Update or Create the Deal/Contract Record
+    if (dealStageToSet) {
+      const { data: existingDeals } = await supabaseAdmin
+        .from('deals')
+        .select('id, stage')
+        .eq('accountId', accountId)
+        .order('createdAt', { ascending: false })
+        .limit(1);
+
+      if (existingDeals && existingDeals.length > 0) {
+        // Only update the stage if it represents a forward progression, 
+        // but for simplicity, we override to reflect the parsed document status.
+        await supabaseAdmin
+          .from('deals')
+          .update({ stage: dealStageToSet, updatedAt: new Date().toISOString() })
+          .eq('id', existingDeals[0].id);
+      } else {
+        // Create a new Deal record if none exists
+        const { data: accountData } = await supabaseAdmin
+          .from('accounts')
+          .select('name')
+          .eq('id', accountId)
+          .single();
+
+        await supabaseAdmin
+          .from('deals')
+          .insert({
+            id: crypto.randomUUID(),
+            title: `Contract Revision: ${accountData?.name || 'Account'}`,
+            accountId: accountId,
+            stage: dealStageToSet,
+            probability: dealStageToSet === 'SECURED' ? 100 : 25,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
       }
     }
 

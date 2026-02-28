@@ -95,6 +95,8 @@ export default function AccountDossierPage() {
               setEditStrikePrice={state.setEditStrikePrice}
               editAnnualUsage={state.editAnnualUsage}
               setEditAnnualUsage={state.setEditAnnualUsage}
+              editMills={state.editMills}
+              setEditMills={state.setEditMills}
               contractEndDate={state.contractEndDate}
               daysRemaining={state.daysRemaining}
               maturityPct={state.maturityPct}

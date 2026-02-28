@@ -32,6 +32,7 @@ export interface Account {
   annualUsage?: string
   electricitySupplier?: string
   currentRate?: string
+  mills?: string // the commission/margin mills
   status?: 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED' | 'CUSTOMER'
   meters?: Array<{
     id: string
@@ -357,6 +358,7 @@ export function useAccount(id: string) {
         annualUsage: data.annual_usage || '',
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
+        mills: data.metadata?.mills || '0.0030', // default to 3 mills
         status: data.status || 'PROSPECT',
         meters,
         metadata: data.metadata || {}
@@ -638,6 +640,7 @@ export function useUpdateAccount() {
       if (updates.occupancy !== undefined) { newMetadata.occupancy = updates.occupancy; hasMetadataUpdate = true; }
       if (updates.loadFactor !== undefined) { newMetadata.loadFactor = updates.loadFactor; hasMetadataUpdate = true; }
       if (updates.loadZone !== undefined) { newMetadata.loadZone = updates.loadZone; hasMetadataUpdate = true; }
+      if (updates.mills !== undefined) { newMetadata.mills = updates.mills; hasMetadataUpdate = true; }
       if (updates.meters !== undefined) {
         newMetadata.meters = updates.meters;
         hasMetadataUpdate = true;
@@ -665,6 +668,8 @@ export function useUpdateAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       queryClient.invalidateQueries({ queryKey: ['account'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contact'] })
     }
   })
 }

@@ -27,6 +27,8 @@ interface AccountPhysicsPanelProps {
     setEditContractEnd: (v: string) => void
     editStrikePrice: string
     setEditStrikePrice: (v: string) => void
+    editMills: string
+    setEditMills: (v: string) => void
     editAnnualUsage: string
     setEditAnnualUsage: (v: string) => void
 
@@ -56,6 +58,8 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
     setEditContractEnd,
     editStrikePrice,
     setEditStrikePrice,
+    editMills,
+    setEditMills,
     editAnnualUsage,
     setEditAnnualUsage,
     contractEndDate,
@@ -200,7 +204,14 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                             <input
                                 type="text"
                                 value={editAnnualUsage}
-                                onChange={(e) => setEditAnnualUsage(e.target.value)}
+                                onChange={(e) => {
+                                    const cleaned = e.target.value.replace(/[^0-9]/g, '')
+                                    if (!cleaned) {
+                                        setEditAnnualUsage('')
+                                        return
+                                    }
+                                    setEditAnnualUsage(parseInt(cleaned).toLocaleString())
+                                }}
                                 onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
                                 className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-white focus:outline-none focus:border-[#002FA7]/50 transition-all"
                                 placeholder="0"
@@ -219,23 +230,56 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                         )}
                     </div>
 
-                    <div className="pt-4 border-t border-white/5">
-                        <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Estimated Annual Revenue</div>
-                        <div className={cn(
-                            "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
-                            glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
-                        )}>
-                            <ForensicDataPoint
-                                value={(() => {
-                                    const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
-                                    const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
-                                    return (usage * 0.003).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                                })()}
-                                valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
-                                inline
-                            />
+                    <div className="grid grid-cols-2 gap-4 mt-4">
+                        <div>
+                            <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Deal Mills</div>
+                            {isEditing ? (
+                                <input
+                                    type="text"
+                                    value={editMills}
+                                    onChange={(e) => {
+                                        const val = e.target.value.replace(/[^\d]/g, '')
+                                        if (val) {
+                                            // Auto format to decimal like 0.0070
+                                            const num = parseInt(val, 10)
+                                            setEditMills((num / 10000).toFixed(4))
+                                        } else {
+                                            setEditMills('')
+                                        }
+                                    }}
+                                    onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
+                                    className="w-full bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 transition-all"
+                                    placeholder="0.0070"
+                                />
+                            ) : (
+                                <div className={cn(
+                                    "text-xl font-mono tabular-nums tracking-tighter text-[#002FA7] transition-all duration-800",
+                                    glowingFields.has('mills') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                                )}>
+                                    <ForensicDataPoint value={editMills || '--'} valueClassName="text-xl font-mono tabular-nums text-[#002FA7]" inline />
+                                </div>
+                            )}
                         </div>
-                        <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at 0.003 margin base</div>
+
+                        <div className="pt-0">
+                            <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Estimated Annual Revenue</div>
+                            <div className={cn(
+                                "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
+                                glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
+                            )}>
+                                <ForensicDataPoint
+                                    value={(() => {
+                                        const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                                        const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                                        const millsFloat = parseFloat(String(editMills).replace(/[^\d.]/g, '')) || 0.0070;
+                                        return (usage * millsFloat).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                                    })()}
+                                    valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
+                                    inline
+                                />
+                            </div>
+                            <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">Calculated at {editMills || '0.007'} margin base</div>
+                        </div>
                     </div>
                 </div>
             </div>

@@ -65,7 +65,7 @@ export function DealCreationPanel() {
                 const fetchMeta = async () => {
                     const { data } = await supabase
                         .from('accounts')
-                        .select('name, logo_url, domain')
+                        .select('name, logo_url, domain, annual_usage, contract_end_date, current_rate, metadata')
                         .eq('id', dealContext.accountId)
                         .single()
 
@@ -77,11 +77,34 @@ export function DealCreationPanel() {
                             accountDomain: data.domain
                         })
                         if (!title) setTitle(`${data.name} - New Opportunity`)
+                        if (!annualUsage && data.annual_usage) setAnnualUsage(parseInt(data.annual_usage).toLocaleString())
+                        if (!closeDate && data.contract_end_date) setCloseDate(data.contract_end_date.slice(0, 10))
+                        if (!mills) {
+                            const dbMills = data.metadata?.mills
+                            setMills(dbMills || '0.0070')
+                        }
                     }
                 }
                 fetchMeta()
             } else if (!title) {
                 setTitle(`${dealContext.accountName} - New Opportunity`)
+                // In case account metadata isn't fully loaded, fetch it anyway to fill out the form
+                const fillForm = async () => {
+                    const { data } = await supabase
+                        .from('accounts')
+                        .select('annual_usage, contract_end_date, current_rate, metadata')
+                        .eq('id', dealContext.accountId)
+                        .single()
+                    if (data) {
+                        if (!annualUsage && data.annual_usage) setAnnualUsage(parseInt(data.annual_usage).toLocaleString())
+                        if (!closeDate && data.contract_end_date) setCloseDate(data.contract_end_date.slice(0, 10))
+                        if (!mills) {
+                            const dbMills = data.metadata?.mills
+                            setMills(dbMills || '0.0070')
+                        }
+                    }
+                }
+                fillForm()
             }
         } else {
             setStep('SELECT_ACCOUNT')
@@ -139,7 +162,7 @@ export function DealCreationPanel() {
                 contactId: dealContext.contactId,
                 stage: stage,
                 amount: amount ? Number(amount) : undefined,
-                annualUsage: annualUsage ? Number(annualUsage) : undefined,
+                annualUsage: annualUsage ? Number(annualUsage.replace(/[^0-9.-]+/g, "")) : undefined,
                 mills: mills ? Number(mills) : undefined,
                 contractLength: contractLength ? Number(contractLength) : undefined,
                 closeDate: closeDate || undefined,
@@ -350,9 +373,12 @@ export function DealCreationPanel() {
                                             <DollarSign className="w-3 h-3" /> Est_Annual_Value
                                         </label>
                                         <Input
-                                            type="number"
+                                            type="text"
                                             value={amount}
-                                            onChange={(e) => setAmount(e.target.value)}
+                                            onChange={(e) => {
+                                                const cleaned = e.target.value.replace(/[^0-9.]/g, '')
+                                                setAmount(cleaned)
+                                            }}
                                             placeholder="0"
                                             className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
                                         />
@@ -362,9 +388,25 @@ export function DealCreationPanel() {
                                             <Zap className="w-3 h-3" /> Est_Annual_Usage
                                         </label>
                                         <Input
-                                            type="number"
+                                            type="text"
                                             value={annualUsage}
-                                            onChange={(e) => setAnnualUsage(e.target.value)}
+                                            onChange={(e) => {
+                                                const cleaned = e.target.value.replace(/[^0-9]/g, '')
+                                                if (!cleaned) {
+                                                    setAnnualUsage('')
+                                                    return
+                                                }
+                                                const usageCommas = parseInt(cleaned).toLocaleString()
+                                                setAnnualUsage(usageCommas)
+
+                                                // calculate deal amount based on usage & mills
+                                                const usageNum = parseInt(cleaned)
+                                                const tmpMills = parseFloat(mills)
+                                                if (!isNaN(usageNum) && !isNaN(tmpMills)) {
+                                                    const calculatedAmount = usageNum * tmpMills
+                                                    setAmount(calculatedAmount.toFixed(2))
+                                                }
+                                            }}
                                             placeholder="0"
                                             className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
                                         />
@@ -375,11 +417,28 @@ export function DealCreationPanel() {
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Margin_Mills</label>
                                         <Input
-                                            type="number"
-                                            step="0.01"
+                                            type="text"
                                             value={mills}
-                                            onChange={(e) => setMills(e.target.value)}
-                                            placeholder="0.00"
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/[^\d]/g, '')
+                                                if (val) {
+                                                    // Auto format to decimal like 0.0070
+                                                    const num = parseInt(val, 10)
+                                                    const formattedMills = (num / 10000).toFixed(4)
+                                                    setMills(formattedMills)
+
+                                                    // calculate deal amount based on usage & mills
+                                                    const usageNum = parseInt(annualUsage.replace(/[^0-9]/g, ''))
+                                                    const tmpMills = parseFloat(formattedMills)
+                                                    if (!isNaN(usageNum) && !isNaN(tmpMills)) {
+                                                        const calculatedAmount = usageNum * tmpMills
+                                                        setAmount(calculatedAmount.toFixed(2))
+                                                    }
+                                                } else {
+                                                    setMills('')
+                                                }
+                                            }}
+                                            placeholder="0.0070"
                                             className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
                                         />
                                     </div>
