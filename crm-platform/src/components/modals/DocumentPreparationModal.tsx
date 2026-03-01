@@ -4,18 +4,22 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, LayoutTemplate, ArrowRight } from 'lucide-react'
 import { Document, Page, pdfjs } from 'react-pdf'
+import { Rnd } from 'react-rnd'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
 // Required for react-pdf to work in Next.js
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`
 
-interface SignatureField {
+export type FieldType = 'signature' | 'text'
+
+export interface SignatureField {
     pageIndex: number
     x: number
     y: number
     width: number
     height: number
+    type: FieldType
 }
 
 interface DocumentPreparationModalProps {
@@ -29,6 +33,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
     const [numPages, setNumPages] = useState<number>(0)
     const [pageNumber, setPageNumber] = useState(1)
     const [fields, setFields] = useState<SignatureField[]>([])
+    const [currentTool, setCurrentTool] = useState<FieldType>('signature')
     const containerRef = useRef<HTMLDivElement>(null)
 
     const handleDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
@@ -37,21 +42,24 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
 
     const handlePageClick = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect()
-        // Determine click position relative to the page
         const x = e.clientX - rect.left
         const y = e.clientY - rect.top
 
-        // Add a new signature block (default 200x60 size)
         setFields([
             ...fields,
             {
                 pageIndex: pageNumber - 1,
                 x,
                 y,
-                width: 200,
-                height: 60
+                width: currentTool === 'signature' ? 200 : 150,
+                height: currentTool === 'signature' ? 60 : 30,
+                type: currentTool
             }
         ])
+    }
+
+    const updateField = (index: number, updates: Partial<SignatureField>) => {
+        setFields(fields.map((f, i) => i === index ? { ...f, ...updates } : f))
     }
 
     const removeField = (index: number) => {
@@ -120,29 +128,37 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
 
                                         {/* Render fields for the current page */}
                                         {fields
-                                            .filter(f => f.pageIndex === pageNumber - 1)
-                                            .map((field, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="absolute z-20 border-2 border-[#002FA7] bg-[#002FA7]/20 cursor-move flex items-center justify-center group"
-                                                    style={{
-                                                        left: field.x,
-                                                        top: field.y,
-                                                        width: field.width,
-                                                        height: field.height
+                                            .map((field, i) => ({ field, originalIndex: i }))
+                                            .filter(f => f.field.pageIndex === pageNumber - 1)
+                                            .map(({ field, originalIndex }) => (
+                                                <Rnd
+                                                    key={originalIndex}
+                                                    bounds="parent"
+                                                    size={{ width: field.width, height: field.height }}
+                                                    position={{ x: field.x, y: field.y }}
+                                                    onDragStop={(e, d) => {
+                                                        updateField(originalIndex, { x: d.x, y: d.y })
                                                     }}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation() // Prevent adding another block below
+                                                    onResizeStop={(e, direction, ref, delta, position) => {
+                                                        updateField(originalIndex, {
+                                                            width: parseInt(ref.style.width, 10),
+                                                            height: parseInt(ref.style.height, 10),
+                                                            ...position
+                                                        })
                                                     }}
+                                                    className={`absolute z-20 border-2 shadow-sm ${field.type === 'signature' ? 'border-[#002FA7] bg-[#002FA7]/20' : 'border-emerald-500 bg-emerald-500/20'} cursor-move flex items-center justify-center group`}
                                                 >
-                                                    <span className="text-[10px] font-mono text-white tracking-widest uppercase">Sign Here</span>
+                                                    <span className="text-[10px] font-mono text-white tracking-widest uppercase truncate px-2">
+                                                        {field.type === 'signature' ? 'Sign Here' : 'Text Input'}
+                                                    </span>
                                                     <button
-                                                        onClick={(e) => { e.stopPropagation(); removeField(fields.findIndex(f => f === field)) }}
-                                                        className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        onClick={(e) => { e.stopPropagation(); removeField(originalIndex) }}
+                                                        onPointerDown={(e) => e.stopPropagation()} // Prevent dragging when clicking the X
+                                                        className="absolute -top-3 -right-3 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-50 hover:bg-red-400"
                                                     >
                                                         <X className="w-3 h-3" />
                                                     </button>
-                                                </div>
+                                                </Rnd>
                                             ))}
                                     </div>
                                 </Document>
@@ -155,7 +171,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                         <div className="w-64 border-l border-white/5 bg-zinc-950 flex flex-col">
                             <div className="p-4 border-b border-white/5">
                                 <h3 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2">Controls</h3>
-                                <div className="flex items-center justify-between text-zinc-300 font-mono text-xs">
+                                <div className="flex items-center justify-between text-zinc-300 font-mono text-xs mb-4">
                                     <button
                                         onClick={() => setPageNumber(Math.max(1, pageNumber - 1))}
                                         disabled={pageNumber <= 1}
@@ -170,6 +186,22 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                                         className="px-2 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50"
                                     >
                                         Next
+                                    </button>
+                                </div>
+
+                                <h3 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-2 mt-6">Select Tool</h3>
+                                <div className="flex bg-zinc-900 border border-white/5 p-1 rounded-md">
+                                    <button
+                                        onClick={() => setCurrentTool('signature')}
+                                        className={`flex-1 text-xs font-mono py-1 rounded transition-colors ${currentTool === 'signature' ? 'bg-[#002FA7] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    >
+                                        Signature
+                                    </button>
+                                    <button
+                                        onClick={() => setCurrentTool('text')}
+                                        className={`flex-1 text-xs font-mono py-1 rounded transition-colors ${currentTool === 'text' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                    >
+                                        Text Input
                                     </button>
                                 </div>
                             </div>

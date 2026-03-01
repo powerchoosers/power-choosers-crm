@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { token, signatureBase64 } = req.body;
+    const { token, signatureBase64, textValues } = req.body;
 
     if (!token || !signatureBase64) {
         return res.status(400).json({ error: 'Missing required parameters: token, signatureBase64' });
@@ -95,7 +95,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Render signature according to all signature_fields if they exist, otherwise fallback to last page default
         if (request.signature_fields && request.signature_fields.length > 0) {
-            request.signature_fields.forEach((field: any) => {
+            request.signature_fields.forEach((field: any, index: number) => {
                 const targetPage = pages[field.pageIndex];
                 if (!targetPage) return;
 
@@ -112,21 +112,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 // Cartesian Flip for PDF-lib Y axis
                 const pdfY = pdfHeight - scaledY - scaledHeight;
 
-                targetPage.drawImage(signatureImage, {
-                    x: scaledX,
-                    y: pdfY,
-                    width: scaledWidth,
-                    height: scaledHeight,
-                });
+                if (field.type === 'text') {
+                    // Draw Text input
+                    const textContent = (textValues && textValues[index]) ? textValues[index] : '';
+                    targetPage.drawText(textContent, {
+                        x: scaledX + 5,
+                        y: pdfY + (scaledHeight / 3), // approximate vertical centering
+                        size: 11,
+                        font: helvetica,
+                        color: rgb(0, 0, 0)
+                    });
+                } else {
+                    // Draw Signature Image
+                    try {
+                        targetPage.drawImage(signatureImage, {
+                            x: scaledX,
+                            y: pdfY,
+                            width: scaledWidth,
+                            height: scaledHeight,
+                        });
 
-                // Add tiny signature metadata under the box
-                targetPage.drawText(`Signed: ${new Date().toISOString().split('T')[0]}`, {
-                    x: scaledX,
-                    y: pdfY - 10,
-                    size: 8,
-                    font: helvetica,
-                    color: rgb(0, 0, 0)
-                });
+                        // Add tiny signature metadata under the box
+                        targetPage.drawText(`Signed: ${new Date().toISOString().split('T')[0]}`, {
+                            x: scaledX,
+                            y: pdfY - 10,
+                            size: 8,
+                            font: helvetica,
+                            color: rgb(0, 0, 0)
+                        });
+                    } catch (err) {
+                        console.error('Failed to draw image field', err);
+                    }
+                }
             });
         } else {
             // Fallback for requests made before Phase 2
@@ -244,59 +261,54 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // 8. Email Delivery
-        // We send to both the original sender (owner) and the signer
-        // We need to fetch the owner's email. For this we might need to rely on existing admin emails, or pass it via metadata?
-        // Wait, signature_requests could have been made by someone. Who? 
-        // Usually the userEmail is the owner. We should have stored `created_by` email in signature_requests.
-        // Nodal Point user is usually derived. Let's send it to the contact and just log it for now.
-        // If request.account has an owner or similar, we use that.
-        const zohoService = new ZohoMailService();
-        // Default to a system admin email if owner isn't directly known, or try to get it from account.
-        // For now, let's just initialize.
-        await zohoService.initialize('noreply@nodalpoint.io'); // fallback initialization
+        try {
+            const zohoService = new ZohoMailService();
+            await zohoService.initialize('noreply@nodalpoint.io'); // fallback initialization
 
-        const base64Attachment = Buffer.from(finalPdfBytes).toString('base64');
+            const base64Attachment = Buffer.from(finalPdfBytes).toString('base64');
 
-        // Upload attachment to Zoho first
-        const zohoAttachment = await zohoService.uploadAttachment(
-            'noreply@nodalpoint.io', // Use a default sender
-            Buffer.from(finalPdfBytes),
-            finalFileName
-        );
+            // Upload attachment to Zoho first
+            const zohoAttachment = await zohoService.uploadAttachment(
+                'noreply@nodalpoint.io', // Use a default sender
+                Buffer.from(finalPdfBytes),
+                finalFileName
+            );
 
-        const emailHtml = `
-      <div style="font-family: monospace; background-color: #09090b; color: #f4f4f5; padding: 40px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
-        <h2 style="text-transform: uppercase; letter-spacing: 0.1em; color: #10b981; font-size: 14px; margin-bottom: 24px;">
-          CONTRACT EXECUTED
-        </h2>
-        
-        <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 20px;">
-          The contract <strong>${request.document.name}</strong> has been successfully executed.
-        </p>
-        
-        <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 24px;">
-          A copy of the fully executed document with the attached Forensic Audit Certificate is attached for your records.
-        </p>
-        
-        <div style="margin-top: 40px; font-size: 11px; color: #52525b; border-top: 1px solid #27272a; padding-top: 16px;">
-          Nodal Point Forensic Systems
-        </div>
-      </div>
-    `;
+            const emailHtml = `
+          <div style="font-family: monospace; background-color: #09090b; color: #f4f4f5; padding: 40px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
+            <h2 style="text-transform: uppercase; letter-spacing: 0.1em; color: #10b981; font-size: 14px; margin-bottom: 24px;">
+              CONTRACT EXECUTED
+            </h2>
+            
+            <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 20px;">
+              The contract <strong>${request.document.name}</strong> has been successfully executed.
+            </p>
+            
+            <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 24px;">
+              A copy of the fully executed document with the attached Forensic Audit Certificate is attached for your records.
+            </p>
+            
+            <div style="margin-top: 40px; font-size: 11px; color: #52525b; border-top: 1px solid #27272a; padding-top: 16px;">
+              Nodal Point Forensic Systems
+            </div>
+          </div>
+        `;
 
-        await zohoService.sendEmail({
-            to: [request.contact.email],
-            // Should also BCC the sender, for now we will just send it to the client to ensure it goes out.
-            // E.g., bcc: [sender_email]. We can fetch sender email from account owner later.
-            subject: `Executed Contract: ${request.document.name}`,
-            html: emailHtml,
-            text: `The contract has been executed. See attached.`,
-            uploadedAttachments: zohoAttachment ? [zohoAttachment] : undefined,
-            userEmail: 'noreply@nodalpoint.io',
-            fromName: 'Nodal Point Compliance'
-        });
+            await zohoService.sendEmail({
+                to: [request.contact.email],
+                subject: `Executed Contract: ${request.document.name}`,
+                html: emailHtml,
+                text: `The contract has been executed. See attached.`,
+                uploadedAttachments: zohoAttachment ? [zohoAttachment] : undefined,
+                userEmail: 'noreply@nodalpoint.io',
+                fromName: 'Nodal Point Compliance'
+            });
+        } catch (emailError: any) {
+            console.error('[Execution Email Failed]', emailError.message);
+            // We do NOT fail the response, contract is legally executed and stored in vault
+        }
 
-        return res.status(200).json({ success: true });
+        return res.status(200).json({ success: true, finalStoragePath });
     } catch (error: any) {
         console.error('[Signature Execution API] Error:', error);
         return res.status(500).json({ error: error.message || 'Internal server error' });
