@@ -9,6 +9,7 @@ export interface SignatureRequest {
     status: SignatureStatus;
     access_token: string;
     signed_document_path?: string;
+    signature_fields?: { pageIndex: number; x: number; y: number; width: number; height: number }[];
     created_at: string;
     updated_at: string;
 
