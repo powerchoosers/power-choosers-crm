@@ -22,9 +22,31 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
     const [activeSignature, setActiveSignature] = useState<string | null>(null)
+    const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw')
+    const [typedSignature, setTypedSignature] = useState('')
+    const [textValues, setTextValues] = useState<Record<number, string>>({})
     const [numPages, setNumPages] = useState<number>(0)
     const [pageNumber, setPageNumber] = useState(1)
     const sigCanvas = useRef<SignatureCanvas>(null)
+    const hiddenCanvasRef = useRef<HTMLCanvasElement>(null)
+
+    // Generate base64 from typed signature
+    useEffect(() => {
+        if (signatureMode === 'type' && typedSignature && hiddenCanvasRef.current) {
+            const canvas = hiddenCanvasRef.current
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                ctx.font = '36px "Brush Script MT", cursive, sans-serif'
+                ctx.fillStyle = '#002FA7' // Nodal Blue
+                ctx.textBaseline = 'middle'
+                ctx.fillText(typedSignature, 20, canvas.height / 2)
+                setActiveSignature(canvas.toDataURL('image/png'))
+            }
+        } else if (signatureMode === 'type' && !typedSignature) {
+            setActiveSignature(null)
+        }
+    }, [typedSignature, signatureMode])
 
     useEffect(() => {
         // Log telemetry on mount
@@ -49,19 +71,19 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     }
 
     const handleClear = () => {
-        sigCanvas.current?.clear()
+        if (signatureMode === 'draw') {
+            sigCanvas.current?.clear()
+        } else {
+            setTypedSignature('')
+        }
         setActiveSignature(null)
     }
 
     const handleExecute = async () => {
-        if (sigCanvas.current?.isEmpty()) {
+        if (!activeSignature) {
             toast.error('Please provide a signature before executing.')
             return
         }
-
-        const signatureBase64 = sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png')
-
-        if (!signatureBase64) return
 
         setIsSubmitting(true)
 
@@ -71,14 +93,15 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     token,
-                    signatureBase64
+                    signatureBase64: activeSignature,
+                    textValues
                 })
             })
 
             const data = await res.json()
 
             if (!res.ok) {
-                throw new Error(data.error || 'Failed to execute document')
+                throw new Error(data.error || 'Failed to execute document. Please try again or contact support.')
             }
 
             setIsSuccess(true)
@@ -86,6 +109,25 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             toast.error(error.message)
         } finally {
             setIsSubmitting(false)
+        }
+    }
+
+    const skipToNextField = () => {
+        if (!request.signature_fields) return
+
+        // Find the first text field that is empty or the first signature field if activeSignature is empty
+        const nextField = request.signature_fields.find((f: any, idx: number) => {
+            if (f.type === 'text') {
+                return !textValues[idx] || textValues[idx].trim() === ''
+            }
+            return !activeSignature
+        })
+
+        if (nextField) {
+            setPageNumber(nextField.pageIndex + 1)
+            toast('Skipped to next required field', { icon: '🔍' })
+        } else {
+            toast.success('All fields are ready for execution.')
         }
     }
 
@@ -175,25 +217,52 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                         width={800}
                                     />
                                     {/* Render Signature Overlays */}
-                                    {request.signature_fields?.filter((f: any) => f.pageIndex === pageNumber - 1).map((field: any, idx: number) => (
-                                        <div
-                                            key={idx}
-                                            className={`absolute z-20 border-2 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20'} flex items-center justify-center overflow-hidden`}
-                                            style={{
-                                                left: field.x,
-                                                top: field.y,
-                                                width: field.width,
-                                                height: field.height
-                                            }}
-                                        >
-                                            {activeSignature ? (
-                                                /* eslint-disable-next-line @next/next/no-img-element */
-                                                <img src={activeSignature} alt="Signature Preview" className="w-full h-full object-contain" />
-                                            ) : (
-                                                <span className="text-[10px] font-mono text-white tracking-widest uppercase animate-pulse">Sign Here</span>
-                                            )}
-                                        </div>
-                                    ))}
+                                    {request.signature_fields?.map((field: any, idx: number) => {
+                                        if (field.pageIndex !== pageNumber - 1) return null;
+
+                                        if (field.type === 'text') {
+                                            return (
+                                                <div
+                                                    key={idx}
+                                                    className="absolute z-20 flex items-center justify-center overflow-hidden"
+                                                    style={{
+                                                        left: field.x,
+                                                        top: field.y,
+                                                        width: field.width,
+                                                        height: field.height
+                                                    }}
+                                                >
+                                                    <input
+                                                        type="text"
+                                                        value={textValues[idx] || ''}
+                                                        onChange={(e) => setTextValues(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                        placeholder="Type here..."
+                                                        className="w-full h-full bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-100 placeholder:text-emerald-500/50 px-2 font-mono text-xs focus:outline-none focus:border-emerald-400 focus:bg-emerald-500/20 transition-all"
+                                                    />
+                                                </div>
+                                            )
+                                        }
+
+                                        return (
+                                            <div
+                                                key={idx}
+                                                className={`absolute z-20 border-2 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20'} flex items-center justify-center overflow-hidden`}
+                                                style={{
+                                                    left: field.x,
+                                                    top: field.y,
+                                                    width: field.width,
+                                                    height: field.height
+                                                }}
+                                            >
+                                                {activeSignature ? (
+                                                    /* eslint-disable-next-line @next/next/no-img-element */
+                                                    <img src={activeSignature} alt="Signature Preview" className="w-full h-full object-contain" />
+                                                ) : (
+                                                    <span className="text-[10px] font-mono text-white tracking-widest uppercase animate-pulse">Sign Here</span>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
                                 </div>
                             </Document>
                         ) : (
@@ -221,7 +290,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-xs font-mono uppercase tracking-widest text-zinc-400">
-                                    Signature Canvas
+                                    Signature
                                 </h2>
                                 <button
                                     onClick={handleClear}
@@ -231,23 +300,63 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                 </button>
                             </div>
 
+                            <div className="flex bg-zinc-900 border border-white/5 p-1 rounded-md mb-2">
+                                <button
+                                    onClick={() => setSignatureMode('draw')}
+                                    className={`flex-1 text-[10px] uppercase font-mono py-1.5 rounded transition-colors ${signatureMode === 'draw' ? 'bg-[#002FA7] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    Draw
+                                </button>
+                                <button
+                                    onClick={() => setSignatureMode('type')}
+                                    className={`flex-1 text-[10px] uppercase font-mono py-1.5 rounded transition-colors ${signatureMode === 'type' ? 'bg-[#002FA7] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                                >
+                                    Type
+                                </button>
+                            </div>
+
                             <div className="w-full h-40 bg-white border-2 border-dashed border-[#002FA7]/40 rounded-lg overflow-hidden relative cursor-crosshair">
-                                <SignatureCanvas
-                                    ref={sigCanvas}
-                                    penColor="#002FA7"
-                                    onEnd={handleSignatureEnd}
-                                    canvasProps={{
-                                        className: 'w-full h-full relative z-10'
-                                    }}
-                                />
-                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-5 z-0">
-                                    <PenTool className="w-12 h-12 text-[#002FA7]" />
-                                </div>
+                                {signatureMode === 'draw' ? (
+                                    <>
+                                        <SignatureCanvas
+                                            ref={sigCanvas}
+                                            penColor="#002FA7"
+                                            onEnd={handleSignatureEnd}
+                                            canvasProps={{
+                                                className: 'w-full h-full relative z-10'
+                                            }}
+                                        />
+                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-5 z-0">
+                                            <PenTool className="w-12 h-12 text-[#002FA7]" />
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center p-4">
+                                        <input
+                                            type="text"
+                                            value={typedSignature}
+                                            onChange={(e) => setTypedSignature(e.target.value)}
+                                            placeholder="Type your name..."
+                                            className="w-full text-center text-4xl text-[#002FA7] bg-transparent border-b border-zinc-200 focus:outline-none focus:border-[#002FA7] pb-2 font-serif italic"
+                                        />
+                                        {/* Hidden canvas to render text into base64 */}
+                                        <canvas ref={hiddenCanvasRef} width={600} height={200} className="hidden" />
+                                    </div>
+                                )}
                             </div>
                             <p className="text-[10px] text-zinc-600 font-sans leading-relaxed">
-                                By drawing your signature above and clicking Execute Contract, you agree to be legally bound by the terms presented in this document.
+                                By {signatureMode === 'draw' ? 'drawing' : 'typing'} your signature above and clicking Execute Contract, you agree to be legally bound by the terms presented in this document.
                             </p>
                         </div>
+
+                        {request.signature_fields && request.signature_fields.length > 0 && (
+                            <button
+                                onClick={skipToNextField}
+                                className="w-full h-10 mt-2 bg-zinc-900 border border-white/5 hover:border-white/20 text-emerald-500 font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all"
+                            >
+                                Skip to Next Missing Field
+                            </button>
+                        )}
 
                         <button
                             onClick={handleExecute}
