@@ -66,7 +66,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md"
+                className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-md"
             >
                 <div className="w-full h-full max-w-6xl max-h-[90vh] bg-zinc-950 border border-white/10 rounded-xl overflow-hidden shadow-2xl flex flex-col">
                     {/* Header */}

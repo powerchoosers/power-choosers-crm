@@ -411,16 +411,27 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                   <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all">
                     {file.type === 'application/pdf' && (
                       <button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
-                          setSignatureRequestContext({
-                            documentId: file.id,
-                            documentName: file.name,
-                            documentUrl: file.url,
-                            storagePath: file.storage_path,
-                            accountId: accountId
-                          });
-                          setRightPanelMode('CREATE_SIGNATURE_REQUEST');
+                          try {
+                            const { data, error } = await supabase.storage
+                              .from('vault')
+                              .createSignedUrl(file.storage_path, 3600); // 1 hour prep window
+
+                            if (error) throw error;
+                            if (data?.signedUrl) {
+                              setSignatureRequestContext({
+                                documentId: file.id,
+                                documentName: file.name,
+                                documentUrl: data.signedUrl,
+                                storagePath: file.storage_path,
+                                accountId: accountId
+                              });
+                              setRightPanelMode('CREATE_SIGNATURE_REQUEST');
+                            }
+                          } catch (err: any) {
+                            toast.error(`Failed to access secure document: ${err.message}`);
+                          }
                         }}
                         className="p-2 text-zinc-600 hover:text-[#002FA7] transition-all"
                         title="Request Signature"
