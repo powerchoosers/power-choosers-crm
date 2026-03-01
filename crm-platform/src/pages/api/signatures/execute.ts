@@ -262,14 +262,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // 8. Email Delivery
         try {
+            const zohoAuthEmail = request.metadata?.agentEmail || request.deal?.ownerId || request.account?.ownerId || 'noreply@nodalpoint.io';
+
             const zohoService = new ZohoMailService();
-            await zohoService.initialize('noreply@nodalpoint.io'); // fallback initialization
+            await zohoService.initialize(zohoAuthEmail);
 
             const base64Attachment = Buffer.from(finalPdfBytes).toString('base64');
 
             // Upload attachment to Zoho first
             const zohoAttachment = await zohoService.uploadAttachment(
-                'noreply@nodalpoint.io', // Use a default sender
+                zohoAuthEmail,
                 Buffer.from(finalPdfBytes),
                 finalFileName
             );
@@ -294,16 +296,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           </div>
         `;
 
-            const senderEmail = request.deal?.ownerId || request.account?.ownerId;
-
             await zohoService.sendEmail({
                 to: [request.contact.email],
-                bcc: senderEmail ? [senderEmail] : undefined,
+                bcc: [zohoAuthEmail], // directly BCC the sender
                 subject: `Executed Contract: ${request.document.name}`,
                 html: emailHtml,
                 text: `The contract has been executed. See attached.`,
                 uploadedAttachments: zohoAttachment ? [zohoAttachment] : undefined,
-                userEmail: 'noreply@nodalpoint.io',
+                userEmail: zohoAuthEmail,
                 fromName: 'Nodal Point Compliance'
             });
         } catch (emailError: any) {
