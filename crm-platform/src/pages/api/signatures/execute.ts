@@ -79,10 +79,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const pdfDoc = await PDFDocument.load(pdfBuffer);
         const pages = pdfDoc.getPages();
         const lastPage = pages[pages.length - 1];
-        const { width, height } = lastPage.getSize();
 
-        // 4a. Draw the signature image on the last page of the contract
-        // Clean up base64 string
+        // 4a. Embed the signature image
         const base64Data = signatureBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
         const signatureImageBytes = Buffer.from(base64Data, 'base64');
         let signatureImage;
@@ -92,36 +90,68 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             signatureImage = await pdfDoc.embedPng(signatureImageBytes);
         }
 
-        // Scale image to a reasonable size (e.g., max 200 width)
-        const sigDims = signatureImage.scaleToFit(200, 100);
-
-        // Draw near the bottom of the last page, leaving some margin
-        lastPage.drawImage(signatureImage, {
-            x: 50,
-            y: 50,
-            width: sigDims.width,
-            height: sigDims.height,
-        });
-
-        // Draw name and date next to it
         const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-        lastPage.drawText(`Signed by: ${request.contact?.firstName || ''} ${request.contact?.lastName || request.contact?.name || ''}`, {
-            x: 50,
-            y: 40,
-            size: 10,
-            font: helvetica,
-            color: rgb(0, 0, 0)
-        });
+        // Render signature according to all signature_fields if they exist, otherwise fallback to last page default
+        if (request.signature_fields && request.signature_fields.length > 0) {
+            request.signature_fields.forEach((field: any) => {
+                const targetPage = pages[field.pageIndex];
+                if (!targetPage) return;
 
-        lastPage.drawText(`Date: ${new Date().toUTCString()}`, {
-            x: 50,
-            y: 28,
-            size: 10,
-            font: helvetica,
-            color: rgb(0, 0, 0)
-        });
+                // HTML coordinate system used by react-pdf (800px width based)
+                const pdfWidth = targetPage.getWidth();
+                const pdfHeight = targetPage.getHeight();
+                const scale = pdfWidth / 800; // HTML rendered at 800px Fixed Width
+
+                const scaledWidth = field.width * scale;
+                const scaledHeight = field.height * scale;
+                const scaledX = field.x * scale;
+                const scaledY = field.y * scale;
+
+                // Cartesian Flip for PDF-lib Y axis
+                const pdfY = pdfHeight - scaledY - scaledHeight;
+
+                targetPage.drawImage(signatureImage, {
+                    x: scaledX,
+                    y: pdfY,
+                    width: scaledWidth,
+                    height: scaledHeight,
+                });
+
+                // Add tiny signature metadata under the box
+                targetPage.drawText(`Signed: ${new Date().toISOString().split('T')[0]}`, {
+                    x: scaledX,
+                    y: pdfY - 10,
+                    size: 8,
+                    font: helvetica,
+                    color: rgb(0, 0, 0)
+                });
+            });
+        } else {
+            // Fallback for requests made before Phase 2
+            const sigDims = signatureImage.scaleToFit(200, 100);
+            lastPage.drawImage(signatureImage, {
+                x: 50,
+                y: 50,
+                width: sigDims.width,
+                height: sigDims.height,
+            });
+            lastPage.drawText(`Signed by: ${request.contact?.firstName || ''} ${request.contact?.lastName || request.contact?.name || ''}`, {
+                x: 50,
+                y: 40,
+                size: 10,
+                font: helvetica,
+                color: rgb(0, 0, 0)
+            });
+            lastPage.drawText(`Date: ${new Date().toUTCString()}`, {
+                x: 50,
+                y: 28,
+                size: 10,
+                font: helvetica,
+                color: rgb(0, 0, 0)
+            });
+        }
 
         // 4b. Create the Forensic Audit Certificate
         const certPage = pdfDoc.addPage([595.28, 841.89]); // A4 Size

@@ -5,6 +5,8 @@ export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | '
 export interface SignatureRequestContext {
   documentId: string
   documentName: string
+  documentUrl?: string
+  storagePath?: string
   accountId?: string
 }
 

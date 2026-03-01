@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
 import { useDealsByAccount } from '@/hooks/useDeals'
 import { toast } from 'sonner'
+import { DocumentPreparationModal } from '../modals/DocumentPreparationModal'
 
 export function SignatureRequestPanel() {
     const { setRightPanelMode, signatureRequestContext } = useUIStore()
@@ -17,6 +18,7 @@ export function SignatureRequestPanel() {
     const [selectedDealId, setSelectedDealId] = useState<string>('')
     const [message, setMessage] = useState('Please review and execute the following document.')
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [showPrepModal, setShowPrepModal] = useState(false)
 
     // Fetch contacts for the account to populate the dropdown
     const { data: contacts, isLoading: loadingContacts } = useAccountContacts(signatureRequestContext?.accountId || '')
@@ -26,13 +28,17 @@ export function SignatureRequestPanel() {
         setRightPanelMode('DEFAULT')
     }
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleInitialSubmit = (e: React.FormEvent) => {
         e.preventDefault()
         if (!selectedContactId) {
             toast.error('Please select a contact to sign the document')
             return
         }
+        setShowPrepModal(true)
+    }
 
+    const executeDispatch = async (signatureFields: any[]) => {
+        setShowPrepModal(false)
         setIsSubmitting(true)
         const toastId = toast.loading('Generating secure token & dispatching email...')
 
@@ -46,7 +52,8 @@ export function SignatureRequestPanel() {
                     contactId: selectedContactId,
                     dealId: selectedDealId || undefined,
                     userEmail: user?.email || 'test@nodalpoint.io',
-                    message
+                    message,
+                    signatureFields
                 })
             })
 
@@ -73,6 +80,12 @@ export function SignatureRequestPanel() {
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
             className="flex-1 flex flex-col h-full bg-zinc-950 border-white/5 relative z-50 shadow-2xl"
         >
+            <DocumentPreparationModal
+                isOpen={showPrepModal}
+                onClose={() => setShowPrepModal(false)}
+                onComplete={executeDispatch}
+                pdfUrl={signatureRequestContext?.documentUrl || ''}
+            />
             <div className="h-24 px-6 flex items-center justify-between border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl shrink-0">
                 <div className="flex items-center gap-3">
                     <div className="h-8 w-8 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/30 flex items-center justify-center text-[#002FA7]">
@@ -95,7 +108,7 @@ export function SignatureRequestPanel() {
             </div>
 
             <div className="flex-1 overflow-y-auto np-scroll p-6">
-                <form id="sig-form" onSubmit={handleSubmit} className="space-y-6">
+                <form id="sig-form" onSubmit={handleInitialSubmit} className="space-y-6">
                     <div className="space-y-2">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                             Assign Signatory <span className="text-rose-500">*</span>
@@ -175,7 +188,7 @@ export function SignatureRequestPanel() {
                     ) : (
                         <>
                             <CheckCircle className="w-4 h-4" />
-                            Dispatch Secure Link
+                            Next: Place Signatures
                         </>
                     )}
                 </button>

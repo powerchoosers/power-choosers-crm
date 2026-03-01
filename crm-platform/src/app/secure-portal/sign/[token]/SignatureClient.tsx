@@ -5,6 +5,11 @@ import SignatureCanvas from 'react-signature-canvas'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CheckCircle, ShieldCheck, PenTool, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
+import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/Page/AnnotationLayer.css'
+import 'react-pdf/dist/Page/TextLayer.css'
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`
 
 interface SignatureClientProps {
     token: string
@@ -16,6 +21,9 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     const [isViewing, setIsViewing] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
+    const [activeSignature, setActiveSignature] = useState<string | null>(null)
+    const [numPages, setNumPages] = useState<number>(0)
+    const [pageNumber, setPageNumber] = useState(1)
     const sigCanvas = useRef<SignatureCanvas>(null)
 
     useEffect(() => {
@@ -34,8 +42,15 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         logView()
     }, [token])
 
+    const handleSignatureEnd = () => {
+        if (!sigCanvas.current?.isEmpty()) {
+            setActiveSignature(sigCanvas.current?.getTrimmedCanvas().toDataURL('image/png') || null)
+        }
+    }
+
     const handleClear = () => {
         sigCanvas.current?.clear()
+        setActiveSignature(null)
     }
 
     const handleExecute = async () => {
@@ -129,18 +144,64 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                 {/* PDF Viewer */}
-                <div className="lg:col-span-2 h-[800px] border border-white/10 rounded-xl overflow-hidden bg-white">
-                    {documentUrl ? (
-                        <iframe
-                            src={`${documentUrl}#toolbar=0`}
-                            className="w-full h-full"
-                            title="Contract Preview"
-                        />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-sm bg-zinc-900 border border-white/5">
-                            Secure document preview unavailable
-                        </div>
-                    )}
+                <div className="lg:col-span-2 h-[800px] border border-white/10 rounded-xl overflow-hidden bg-zinc-900 flex flex-col">
+                    <div className="h-12 border-b border-white/5 flex items-center justify-center gap-4 bg-zinc-950 text-zinc-300 font-mono text-xs">
+                        <button
+                            onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+                            disabled={pageNumber <= 1}
+                            className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 transition-colors"
+                        >Prev</button>
+                        <span>Page {pageNumber} of {numPages || '-'}</span>
+                        <button
+                            onClick={() => setPageNumber(p => Math.min(numPages, p + 1))}
+                            disabled={pageNumber >= numPages}
+                            className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 transition-colors"
+                        >Next</button>
+                    </div>
+
+                    <div className="flex-1 overflow-y-auto np-scroll p-4 flex justify-center relative">
+                        {documentUrl ? (
+                            <Document
+                                file={documentUrl}
+                                onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                                className="shadow-2xl border border-white/10"
+                                loading={<div className="text-xs font-mono text-zinc-500 animate-pulse mt-10">Decrypting Document...</div>}
+                            >
+                                <div className="relative inline-block">
+                                    <Page
+                                        pageNumber={pageNumber}
+                                        renderTextLayer={false}
+                                        renderAnnotationLayer={false}
+                                        width={800}
+                                    />
+                                    {/* Render Signature Overlays */}
+                                    {request.signature_fields?.filter((f: any) => f.pageIndex === pageNumber - 1).map((field: any, idx: number) => (
+                                        <div
+                                            key={idx}
+                                            className={`absolute z-20 border-2 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20'} flex items-center justify-center overflow-hidden`}
+                                            style={{
+                                                left: field.x,
+                                                top: field.y,
+                                                width: field.width,
+                                                height: field.height
+                                            }}
+                                        >
+                                            {activeSignature ? (
+                                                /* eslint-disable-next-line @next/next/no-img-element */
+                                                <img src={activeSignature} alt="Signature Preview" className="w-full h-full object-contain" />
+                                            ) : (
+                                                <span className="text-[10px] font-mono text-white tracking-widest uppercase animate-pulse">Sign Here</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </Document>
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-sm bg-zinc-900 border border-white/5">
+                                Secure document preview unavailable
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Action Panel */}
@@ -174,11 +235,12 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                 <SignatureCanvas
                                     ref={sigCanvas}
                                     penColor="#002FA7"
+                                    onEnd={handleSignatureEnd}
                                     canvasProps={{
-                                        className: 'w-full h-full'
+                                        className: 'w-full h-full relative z-10'
                                     }}
                                 />
-                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-5">
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-5 z-0">
                                     <PenTool className="w-12 h-12 text-[#002FA7]" />
                                 </div>
                             </div>
