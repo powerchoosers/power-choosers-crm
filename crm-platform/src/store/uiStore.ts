@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 
-export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL';
+export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST';
+
+export interface SignatureRequestContext {
+  documentId: string
+  documentName: string
+  accountId?: string
+}
 
 export interface IngestionContext {
   accountId: string
@@ -43,6 +49,9 @@ interface UIState {
   /** Pre-filled context when opening CREATE_DEAL mode */
   dealContext: DealContext | null
   setDealContext: (ctx: DealContext | null) => void
+  /** Pre-filled context for signature requests */
+  signatureRequestContext: SignatureRequestContext | null
+  setSignatureRequestContext: (ctx: SignatureRequestContext | null) => void
   /** Initial identifier (domain/url) for ingestion from external signals */
   ingestionIdentifier: string | null
   setIngestionIdentifier: (id: string | null) => void
@@ -69,6 +78,8 @@ export const useUIStore = create<UIState>((set) => ({
   setTaskContext: (ctx) => set({ taskContext: ctx }),
   dealContext: null,
   setDealContext: (ctx) => set({ dealContext: ctx }),
+  signatureRequestContext: null,
+  setSignatureRequestContext: (ctx) => set({ signatureRequestContext: ctx }),
   ingestionIdentifier: null,
   setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
   ingestionSignal: null,

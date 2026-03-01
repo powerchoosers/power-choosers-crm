@@ -56,13 +56,18 @@ function DealCard({ deal }: { deal: Deal }) {
   const probPct = Math.min(100, Math.max(0, deal.probability ?? 0))
   const closeLbl = closeLabel(deal.closeDate)
 
+  // Find the most recent signature request if any
+  const latestSigRequest = deal.signature_requests && deal.signature_requests.length > 0
+    ? [...deal.signature_requests].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+    : null;
+
   return (
     <button
       onClick={() => router.push('/network/contracts')}
-      className="w-full text-left group p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.08] transition-all"
+      className="w-full text-left group p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.08] transition-all relative overflow-hidden"
     >
       {/* Top row: stage dot + title */}
-      <div className="flex items-center gap-2 mb-1.5">
+      <div className="flex items-center gap-2 mb-1.5 pr-16">
         <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', STAGE_DOT[deal.stage])} />
         <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-300 truncate flex-1">
           {deal.title}
@@ -71,6 +76,20 @@ function DealCard({ deal }: { deal: Deal }) {
           {deal.stage}
         </span>
       </div>
+
+      {latestSigRequest && (
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-black/40">
+          <span className={cn(
+            "h-1.5 w-1.5 rounded-full flex-shrink-0",
+            latestSigRequest.status === 'completed' || latestSigRequest.status === 'signed' ? 'bg-emerald-500' :
+              latestSigRequest.status === 'viewed' ? 'bg-[#002FA7]' :
+                'bg-amber-500 animate-pulse'
+          )} />
+          <span className="font-mono text-[8.5px] uppercase tracking-widest text-zinc-400">
+            {latestSigRequest.status === 'completed' ? 'signed' : latestSigRequest.status}
+          </span>
+        </div>
+      )}
 
       {/* Data row: value · term · close */}
       <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 mb-2">
