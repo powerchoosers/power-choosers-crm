@@ -12,7 +12,7 @@ import { useWarRoomStore } from '@/store/warRoomStore'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Eye } from 'lucide-react'
 
 function GlobalListeners() {
   const queryClient = useQueryClient()
@@ -36,6 +36,13 @@ function GlobalListeners() {
             queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
             queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
             queryClient.invalidateQueries({ queryKey: ['accounts'] })
+          } else if (oldRecord.status !== 'viewed' && newRecord.status === 'viewed') {
+            toast('Contract Opened by Signatory', {
+              icon: <Eye className="w-4 h-4 text-[#002FA7]" />
+            })
+            queryClient.invalidateQueries({ queryKey: ['deals'] })
+            queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
+            queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
           }
         }
       )
