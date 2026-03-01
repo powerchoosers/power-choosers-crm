@@ -59,6 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const signingUrl = `${protocol}://${host}/secure-portal/sign/${token}`;
 
     // 5. Build the email template (dark mode/forensic aesthetic)
+    const trackingId = `sig_${Date.now()}_${token.substring(0, 8)}`;
     const emailHtml = `
       <div style="font-family: monospace; background-color: #09090b; color: #f4f4f5; padding: 40px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
         <h2 style="text-transform: uppercase; letter-spacing: 0.1em; color: #a1a1aa; font-size: 14px; margin-bottom: 24px; border-bottom: 1px solid #27272a; padding-bottom: 12px;">
@@ -89,7 +90,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       </div>
     `;
 
-    // 6. Send the email via Zoho
+    // 6. Record the email in the Supabase 'emails' table for CRM visibility
+    const emailRecord = {
+      id: trackingId,
+      contactId: contactId,
+      accountId: accountId || null,
+      ownerId: userEmail,
+      from: userEmail,
+      to: [contactEmail],
+      subject: `Signature Request: ${document.name}`,
+      html: emailHtml,
+      text: `Please review and sign the document here: ${signingUrl}`,
+      status: 'sent',
+      type: 'sent',
+      timestamp: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      metadata: {
+        isSignatureRequest: true,
+        documentId,
+        dealId,
+        token
+      }
+    };
+
+    await supabaseAdmin.from('emails').insert(emailRecord);
+
+    // 7. Send the email via Zoho
     const zohoService = new ZohoMailService();
     // Assuming Zoho is configured and ready. We use userEmail as the "from" or owner depending on what zoho expects
     await zohoService.initialize(userEmail);
