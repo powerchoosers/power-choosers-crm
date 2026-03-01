@@ -183,11 +183,11 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             </div>
 
             {/* Main Content Layout */}
-            <div className="w-full grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="w-full flex flex-col lg:flex-row gap-8">
 
                 {/* PDF Viewer */}
-                <div className="lg:col-span-2 h-[800px] border border-white/10 rounded-xl overflow-hidden bg-zinc-900 flex flex-col">
-                    <div className="h-12 border-b border-white/5 flex items-center justify-center gap-4 bg-zinc-950 text-zinc-300 font-mono text-xs">
+                <div className="w-full lg:w-2/3 h-[600px] lg:h-[800px] border border-white/10 rounded-xl overflow-hidden bg-zinc-900 flex flex-col relative">
+                    <div className="h-12 border-b border-white/5 flex items-center justify-center gap-4 bg-zinc-950 text-zinc-300 font-mono text-xs z-30">
                         <button
                             onClick={() => setPageNumber(p => Math.max(1, p - 1))}
                             disabled={pageNumber <= 1}
@@ -201,30 +201,53 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                         >Next</button>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto np-scroll p-4 flex justify-center relative">
+                    <div className="flex-1 overflow-auto bg-zinc-950 p-4 w-full h-full relative" style={{ WebkitOverflowScrolling: 'touch' }}>
                         {documentUrl ? (
-                            <Document
-                                file={documentUrl}
-                                onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                                className="shadow-2xl border border-white/10"
-                                loading={<div className="text-xs font-mono text-zinc-500 animate-pulse mt-10">Decrypting Document...</div>}
-                            >
-                                <div className="relative inline-block">
-                                    <Page
-                                        pageNumber={pageNumber}
-                                        renderTextLayer={false}
-                                        renderAnnotationLayer={false}
-                                        width={800}
-                                    />
-                                    {/* Render Signature Overlays */}
-                                    {request.signature_fields?.map((field: any, idx: number) => {
-                                        if (field.pageIndex !== pageNumber - 1) return null;
+                            <div className="min-w-max mx-auto flex flex-col items-center">
+                                <Document
+                                    file={documentUrl}
+                                    onLoadSuccess={({ numPages }) => setNumPages(numPages)}
+                                    className="shadow-2xl border border-white/10 bg-white"
+                                    loading={<div className="text-xs font-mono text-zinc-500 animate-pulse mt-10 w-full text-center">Decrypting Document...</div>}
+                                >
+                                    <div className="relative inline-block w-fit h-fit">
+                                        <Page
+                                            pageNumber={pageNumber}
+                                            renderTextLayer={false}
+                                            renderAnnotationLayer={false}
+                                            width={800}
+                                        />
+                                        {/* Render Signature Overlays */}
+                                        {request.signature_fields?.map((field: any, idx: number) => {
+                                            if (field.pageIndex !== pageNumber - 1) return null;
 
-                                        if (field.type === 'text') {
+                                            if (field.type === 'text') {
+                                                return (
+                                                    <div
+                                                        key={idx}
+                                                        className="absolute z-20 flex items-center justify-center overflow-hidden"
+                                                        style={{
+                                                            left: field.x,
+                                                            top: field.y,
+                                                            width: field.width,
+                                                            height: field.height
+                                                        }}
+                                                    >
+                                                        <input
+                                                            type="text"
+                                                            value={textValues[idx] || ''}
+                                                            onChange={(e) => setTextValues(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                            placeholder="Type here..."
+                                                            className="w-full h-full bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-100 placeholder:text-emerald-500/50 px-2 font-mono text-xs focus:outline-none focus:border-emerald-400 focus:bg-emerald-500/20 transition-all"
+                                                        />
+                                                    </div>
+                                                )
+                                            }
+
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className="absolute z-20 flex items-center justify-center overflow-hidden"
+                                                    className={`absolute z-20 border-2 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20'} flex items-center justify-center overflow-hidden`}
                                                     style={{
                                                         left: field.x,
                                                         top: field.y,
@@ -232,39 +255,18 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                                         height: field.height
                                                     }}
                                                 >
-                                                    <input
-                                                        type="text"
-                                                        value={textValues[idx] || ''}
-                                                        onChange={(e) => setTextValues(prev => ({ ...prev, [idx]: e.target.value }))}
-                                                        placeholder="Type here..."
-                                                        className="w-full h-full bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-100 placeholder:text-emerald-500/50 px-2 font-mono text-xs focus:outline-none focus:border-emerald-400 focus:bg-emerald-500/20 transition-all"
-                                                    />
+                                                    {activeSignature ? (
+                                                        /* eslint-disable-next-line @next/next/no-img-element */
+                                                        <img src={activeSignature} alt="Signature Preview" className="w-full h-full object-contain" />
+                                                    ) : (
+                                                        <span className="text-[10px] font-mono text-white tracking-widest uppercase animate-pulse">Sign Here</span>
+                                                    )}
                                                 </div>
                                             )
-                                        }
-
-                                        return (
-                                            <div
-                                                key={idx}
-                                                className={`absolute z-20 border-2 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20'} flex items-center justify-center overflow-hidden`}
-                                                style={{
-                                                    left: field.x,
-                                                    top: field.y,
-                                                    width: field.width,
-                                                    height: field.height
-                                                }}
-                                            >
-                                                {activeSignature ? (
-                                                    /* eslint-disable-next-line @next/next/no-img-element */
-                                                    <img src={activeSignature} alt="Signature Preview" className="w-full h-full object-contain" />
-                                                ) : (
-                                                    <span className="text-[10px] font-mono text-white tracking-widest uppercase animate-pulse">Sign Here</span>
-                                                )}
-                                            </div>
-                                        )
-                                    })}
-                                </div>
-                            </Document>
+                                        })}
+                                    </div>
+                                </Document>
+                            </div>
                         ) : (
                             <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-sm bg-zinc-900 border border-white/5">
                                 Secure document preview unavailable
@@ -274,7 +276,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                 </div>
 
                 {/* Action Panel */}
-                <div className="space-y-6">
+                <div className="w-full lg:w-1/3 space-y-6">
                     <div className="nodal-module-glass p-6 rounded-xl space-y-6 sticky top-12">
 
                         <div>
