@@ -5,7 +5,7 @@ export const metadata = {
     title: 'Secure Document Execution | Nodal Point',
 };
 
-export default async function SecureSignPage({ params }: { params: { token: string } }) {
+export default async function SecureSignPage({ params }: { params: Promise<{ token: string }> }) {
     const { token } = await params;
 
     // Validate the token and fetch request details
