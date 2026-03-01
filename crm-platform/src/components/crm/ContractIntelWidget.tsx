@@ -17,6 +17,7 @@ const STAGE_DOT: Record<DealStage, string> = {
   AUDITING: 'bg-amber-400',
   BRIEFED: 'bg-[#002FA7]',
   ENGAGED: 'bg-[#002FA7] animate-pulse',
+  OUT_FOR_SIGNATURE: 'bg-emerald-400 animate-pulse',
   SECURED: 'bg-emerald-400',
   TERMINATED: 'bg-rose-400/60',
 }
@@ -26,6 +27,7 @@ const STAGE_TEXT: Record<DealStage, string> = {
   AUDITING: 'text-amber-400',
   BRIEFED: 'text-[#002FA7]',
   ENGAGED: 'text-[#002FA7]',
+  OUT_FOR_SIGNATURE: 'text-emerald-400',
   SECURED: 'text-emerald-400',
   TERMINATED: 'text-rose-400/70',
 }

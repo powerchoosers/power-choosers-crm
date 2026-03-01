@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // 1. Fetch request and validate
         const { data: request, error: fetchError } = await supabaseAdmin
             .from('signature_requests')
-            .select('*, document:documents(*), contact:contacts(*), account:accounts(*)')
+            .select('*, document:documents(*), contact:contacts(*), account:accounts(*), deal:deals(*)')
             .eq('access_token', token)
             .single();
 
@@ -294,8 +294,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           </div>
         `;
 
+            const senderEmail = request.deal?.ownerId || request.account?.ownerId;
+
             await zohoService.sendEmail({
                 to: [request.contact.email],
+                bcc: senderEmail ? [senderEmail] : undefined,
                 subject: `Executed Contract: ${request.document.name}`,
                 html: emailHtml,
                 text: `The contract has been executed. See attached.`,

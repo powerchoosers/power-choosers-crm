@@ -77,6 +77,7 @@ const STAGE_COLORS: Record<DealStage, string> = {
   AUDITING: 'text-amber-400 border-amber-500/40 bg-amber-500/10',
   BRIEFED: 'text-[#002FA7] border-[#002FA7]/50 bg-[#002FA7]/10',
   ENGAGED: 'text-[#002FA7] border-[#002FA7]/60 bg-[#002FA7]/15',
+  OUT_FOR_SIGNATURE: 'text-emerald-400 border-emerald-500/50 bg-emerald-500/15',
   SECURED: 'text-emerald-400 border-emerald-500/50 bg-emerald-500/10',
   TERMINATED: 'text-rose-400/70 border-rose-500/30 bg-rose-500/10',
 }
@@ -87,8 +88,8 @@ function StageBadge({ stage }: { stage: DealStage }) {
       'inline-flex items-center gap-1.5 px-2 py-0.5 rounded border font-mono text-[10px] uppercase tracking-wider',
       STAGE_COLORS[stage]
     )}>
-      {stage === 'ENGAGED' && (
-        <span className="h-1 w-1 rounded-full bg-[#002FA7] animate-pulse" />
+      {(stage === 'ENGAGED' || stage === 'OUT_FOR_SIGNATURE') && (
+        <span className={cn("h-1 w-1 rounded-full animate-pulse", stage === 'ENGAGED' ? "bg-[#002FA7]" : "bg-emerald-400")} />
       )}
       {stage}
     </span>

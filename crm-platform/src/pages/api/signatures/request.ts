@@ -47,6 +47,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (insertError) throw new Error(`Failed to create signature request: ${insertError.message}`);
 
+    // Update the deal stage to OUT_FOR_SIGNATURE if a deal is attached
+    if (dealId) {
+      await supabaseAdmin.from('deals').update({ stage: 'OUT_FOR_SIGNATURE' }).eq('id', dealId);
+    }
+
     // 4. Construct the signing URL
     const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
     const host = req.headers.host || 'nodalpoint.io';

@@ -3,6 +3,7 @@ export type DealStage =
   | 'AUDITING'
   | 'BRIEFED'
   | 'ENGAGED'
+  | 'OUT_FOR_SIGNATURE'
   | 'SECURED'
   | 'TERMINATED'
 
@@ -11,6 +12,7 @@ export const DEAL_STAGES: DealStage[] = [
   'AUDITING',
   'BRIEFED',
   'ENGAGED',
+  'OUT_FOR_SIGNATURE',
   'SECURED',
   'TERMINATED',
 ]
