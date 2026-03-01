@@ -1,13 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileText, X, Loader2, PenTool } from 'lucide-react';
+import { UploadCloud, FileText, X, Loader2, PenTool, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 
 interface Document {
@@ -42,6 +50,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const [loading, setLoading] = useState(false);
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
+  const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const queryClient = useQueryClient();
   const { setRightPanelMode, setSignatureRequestContext } = useUIStore();
 
@@ -236,12 +245,14 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
     }
   }, [accountId, onIngestionComplete, queryClient, fetchDocuments]);
 
-  const handleDelete = async (doc: Document) => {
+  const handleDelete = async () => {
+    if (!docToDelete) return;
+
     try {
       // 1. Delete from Storage
       const { error: storageError } = await supabase.storage
         .from('vault')
-        .remove([doc.storage_path]);
+        .remove([docToDelete.storage_path]);
 
       if (storageError) {
         console.error('Storage delete error:', storageError);
@@ -251,10 +262,15 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
       const { error: dbError } = await supabase
         .from('documents')
         .delete()
-        .eq('id', doc.id);
+        .eq('id', docToDelete.id);
 
       if (dbError) throw dbError;
+
+      // Animate file out of local state
+      setFiles(prev => prev.filter(f => f.id !== docToDelete.id));
       toast.success('Document purged');
+      setDocToDelete(null); // specific close modal step
+
     } catch (err) {
       console.error('Delete failed:', err);
       toast.error('Purge failed');
@@ -442,7 +458,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDelete(file);
+                        setDocToDelete(file);
                       }}
                       className="p-2 text-zinc-600 hover:text-red-400 transition-all"
                       title="Purge Document"
@@ -456,6 +472,36 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
           </AnimatePresence>
         )}
       </div>
+
+      <Dialog open={!!docToDelete} onOpenChange={(open) => !open && setDocToDelete(null)}>
+        <DialogContent className="sm:max-w-[425px] bg-zinc-950 border border-white/10 shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-500 font-mono text-sm tracking-widest uppercase">
+              <AlertTriangle className="w-4 h-4" />
+              Purge Authorization Required
+            </DialogTitle>
+            <DialogDescription className="text-zinc-400 pt-3">
+              This action will permanently purge <span className="text-zinc-200 font-mono">{docToDelete?.name}</span> from the secure intelligence vault.
+              <br /><br />
+              This data anomaly cannot be recovered.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-6 flex gap-3 sm:justify-end">
+            <button
+              onClick={() => setDocToDelete(null)}
+              className="px-4 py-2 rounded-lg text-xs font-mono tracking-widest text-zinc-400 border border-white/5 hover:bg-white/5 hover:text-white transition-all"
+            >
+              ABORT
+            </button>
+            <button
+              onClick={handleDelete}
+              className="px-4 py-2 rounded-lg text-xs font-mono tracking-widest bg-red-950/30 text-red-500 border border-red-500/20 hover:bg-red-950/60 hover:border-red-500/50 transition-all"
+            >
+              CONFIRM PURGE
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* DROP ZONE OVERLAY (Only visible when dragging) */}
       {isDragging && (
