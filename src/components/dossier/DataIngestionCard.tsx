@@ -416,6 +416,8 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                           setSignatureRequestContext({
                             documentId: file.id,
                             documentName: file.name,
+                            documentUrl: file.url,
+                            storagePath: file.storage_path,
                             accountId: accountId
                           });
                           setRightPanelMode('CREATE_SIGNATURE_REQUEST');
