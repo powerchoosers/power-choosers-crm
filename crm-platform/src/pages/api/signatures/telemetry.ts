@@ -2,13 +2,15 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    if (req.method !== 'POST') {
+    if (req.method !== 'POST' && req.method !== 'GET') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
 
-    const { token, action } = req.body;
+    const token = req.method === 'GET' ? req.query.token : req.body.token;
+    const action = req.method === 'GET' ? req.query.action : req.body.action;
 
     if (!token || !action) {
+        if (req.method === 'GET') return res.status(400).send('Missing token or action');
         return res.status(400).json({ error: 'Missing required parameters: token, action' });
     }
 
@@ -45,11 +47,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // 4. Update the request status if it was pending
+        // We only trigger 'viewed' if they actually load the PDF document (action: viewed)
+        // NOT when they just open the email (action: opened)
         if (request.status === 'pending' && action === 'viewed') {
             await supabaseAdmin
                 .from('signature_requests')
                 .update({ status: 'viewed', updated_at: new Date().toISOString() })
                 .eq('id', request.id);
+        }
+
+        if (req.method === 'GET') {
+            const transparentGif = Buffer.from(
+                'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                'base64'
+            );
+            res.setHeader('Content-Type', 'image/gif');
+            res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+            return res.status(200).send(transparentGif);
         }
 
         return res.status(200).json({ success: true, logged: true });
