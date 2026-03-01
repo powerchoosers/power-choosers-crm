@@ -9,6 +9,45 @@ import { createIDBPersister } from '@/lib/persister'
 import { ChunkLoadErrorHandler } from '@/components/layout/ChunkLoadErrorHandler'
 import { WarRoomOverlay } from '@/components/war-room/WarRoomOverlay'
 import { useWarRoomStore } from '@/store/warRoomStore'
+import { supabase } from '@/lib/supabase'
+import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
+import { CheckCircle } from 'lucide-react'
+
+function GlobalListeners() {
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const channel = supabase.channel('global-changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'signature_requests' },
+        (payload) => {
+          const oldRecord = payload.old
+          const newRecord = payload.new
+
+          if (oldRecord.status !== 'completed' && newRecord.status === 'completed') {
+            toast('Contract Secured', {
+              icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
+            })
+            // Invalidate lists to fetch real-time updates without polling
+            queryClient.invalidateQueries({ queryKey: ['deals'] })
+            queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
+            queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
+            queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
+            queryClient.invalidateQueries({ queryKey: ['accounts'] })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [queryClient])
+
+  return null
+}
 
 function WarRoomKeyListener() {
   const toggle = useWarRoomStore((s) => s.toggle)
@@ -66,6 +105,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
     >
       <AuthProvider>
         <VoiceProvider>
+          <GlobalListeners />
           <ChunkLoadErrorHandler />
           <WarRoomKeyListener />
           <WarRoomOverlay />
