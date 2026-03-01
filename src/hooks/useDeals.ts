@@ -27,7 +27,7 @@ export function useDeals(filters?: DealsFilters) {
 
       let query = supabase
         .from('deals')
-        .select('*', { count: 'exact' })
+        .select('*, signature_requests(id, status, created_at, updated_at)', { count: 'exact' })
 
       if (role !== 'admin' && user.email) {
         query = query.eq('ownerId', user.email)
@@ -136,7 +136,7 @@ export function useDealsByAccount(accountId?: string) {
       if (!accountId) return []
       const { data, error } = await supabase
         .from('deals')
-        .select('*')
+        .select('*, signature_requests(id, status, created_at, updated_at)')
         .eq('accountId', accountId)
         .order('createdAt', { ascending: false })
       if (error) throw error
@@ -159,7 +159,7 @@ export function useDealsByContact(contactId?: string) {
       if (!contactId) return []
       const { data, error } = await supabase
         .from('deals')
-        .select('*')
+        .select('*, signature_requests(id, status, created_at, updated_at)')
         .eq('contactId', contactId)
         .order('createdAt', { ascending: false })
       if (error) throw error
