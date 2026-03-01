@@ -46,10 +46,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // We don't want to fail the generic request just because telemetry failed, but log it internally
         }
 
-        // 4. Update the request status if it was pending
-        // We only trigger 'viewed' if they actually load the PDF document (action: viewed)
-        // NOT when they just open the email (action: opened)
-        if (request.status === 'pending' && action === 'viewed') {
+        // 4. Update the request status
+        // Transition: pending -> opened -> viewed
+        if (request.status === 'pending' && action === 'opened') {
+            await supabaseAdmin
+                .from('signature_requests')
+                .update({ status: 'opened', updated_at: new Date().toISOString() })
+                .eq('id', request.id);
+        } else if ((request.status === 'pending' || request.status === 'opened') && action === 'viewed') {
             await supabaseAdmin
                 .from('signature_requests')
                 .update({ status: 'viewed', updated_at: new Date().toISOString() })
