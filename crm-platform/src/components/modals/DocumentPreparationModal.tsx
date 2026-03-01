@@ -229,7 +229,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                                     onClick={() => onComplete(fields)}
                                     className="w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all"
                                 >
-                                    Confirm Placement
+                                    [ EXECUTE_CONTRACT_DEPLOYMENT ]
                                     <ArrowRight className="w-3 h-3" />
                                 </button>
                             </div>
