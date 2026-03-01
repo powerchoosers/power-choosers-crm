@@ -39,6 +39,12 @@ export interface Deal {
     name: string
     domain?: string
   }
+  signature_requests?: {
+    id: string
+    status: string
+    created_at: string
+    updated_at: string
+  }[]
 }
 
 export interface CreateDealInput {

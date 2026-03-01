@@ -17,6 +17,7 @@ import { useUIStore } from '@/store/uiStore'
 import { NodeIngestion } from '../right-panel/NodeIngestion'
 import { TaskCreationPanel } from '../right-panel/TaskCreationPanel'
 import { DealCreationPanel } from '../right-panel/DealCreationPanel'
+import { SignatureRequestPanel } from '@/components/right-panel/SignatureRequestPanel'
 
 /** When on dossier: 'context' = Active Context widgets, 'scanning' = Scanning Mode widgets. Only used when isActiveContext. */
 type DossierPanelView = 'context' | 'scanning'
@@ -161,6 +162,8 @@ export function RightPanel() {
           <TaskCreationPanel key="task" />
         ) : rightPanelMode === 'CREATE_DEAL' ? (
           <DealCreationPanel key="deal" />
+        ) : rightPanelMode === 'CREATE_SIGNATURE_REQUEST' ? (
+          <SignatureRequestPanel key="sigreq" />
         ) : rightPanelMode !== 'DEFAULT' ? (
           <NodeIngestion key="ingest" />
         ) : (

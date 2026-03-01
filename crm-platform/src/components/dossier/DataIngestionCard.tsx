@@ -2,17 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileText, X, Loader2 } from 'lucide-react';
+import { UploadCloud, FileText, X, Loader2, PenTool } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { useUIStore } from '@/store/uiStore';
 
 
 interface Document {
   id: string;
   name: string;
   size: string;
+  type?: string;
+  metadata?: any;
   url: string;
   storage_path: string;
   created_at: string;
@@ -40,6 +43,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const queryClient = useQueryClient();
+  const { setRightPanelMode, setSignatureRequestContext } = useUIStore();
 
   const fetchDocuments = useCallback(async () => {
     if (!accountId) return;
@@ -404,15 +408,35 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                       </span>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDelete(file);
-                    }}
-                    className="opacity-0 group-hover:opacity-100 p-2 text-zinc-600 hover:text-red-400 transition-all"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
+                  <div className="flex items-center opacity-0 group-hover:opacity-100 transition-all">
+                    {file.type === 'application/pdf' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSignatureRequestContext({
+                            documentId: file.id,
+                            documentName: file.name,
+                            accountId: accountId
+                          });
+                          setRightPanelMode('CREATE_SIGNATURE_REQUEST');
+                        }}
+                        className="p-2 text-zinc-600 hover:text-[#002FA7] transition-all"
+                        title="Request Signature"
+                      >
+                        <PenTool className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(file);
+                      }}
+                      className="p-2 text-zinc-600 hover:text-red-400 transition-all"
+                      title="Purge Document"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             ))}
