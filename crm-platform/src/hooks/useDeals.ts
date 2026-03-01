@@ -198,7 +198,6 @@ export function useCreateDeal() {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
       if (data?.accountId) queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
       if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', QUERY_BUSTER, data.contactId] })
-      toast.success('Contract initialized')
     },
     onError: (error) => {
       console.error('Error creating deal:', error)
