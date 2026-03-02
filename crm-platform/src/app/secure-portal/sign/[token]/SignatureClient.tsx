@@ -29,14 +29,13 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     const sigCanvas = useRef<SignatureCanvas>(null)
     const hiddenCanvasRef = useRef<HTMLCanvasElement>(null)
     const pdfScrollContainerRef = useRef<HTMLDivElement>(null)
-    // ── Canvas sizing refs ────────────────────────────────────────────────────
-    const sigContainerRef = useRef<HTMLDivElement>(null)
+    // ── Refs ──────────────────────────────────────────────────────────────────
+    const sigContainerRef = useRef<HTMLDivElement>(null)  // signature pad outer div
     const typedInputRef = useRef<HTMLInputElement>(null)
-    // ── Draw signature state tracking ─────────────────────────────────────────
     // sigPadScrollRef: target for "Sign Here" click-to-focus scroll
     const sigPadScrollRef = useRef<HTMLDivElement>(null)
-    // hasDrawnRef: true once user has drawn a stroke since last clear/resize
-    // Used instead of sigCanvas.isEmpty() to avoid race with ResizeObserver
+    // hasDrawnRef: true once user presses down on the canvas (set on pointerdown).
+    // Race-proof — does NOT rely on signature_pad's isEmpty() or onBegin event.
     const hasDrawnRef = useRef(false)
     // captureTimerRef: debounce handle for the 2-second auto-capture after onEnd
     const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -84,44 +83,15 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         }
     }, [typedSignature, signatureMode])
 
-    // ── Sync canvas buffer to container display size (fixes mobile offset) ───
-    // The canvas buffer must match the CSS display size exactly so that
-    // signature_pad draws strokes directly under the user's finger/stylus.
-    useEffect(() => {
-        const container = sigContainerRef.current
-        if (!container) return
-
-        const syncSize = () => {
-            const canvas = sigCanvas.current?.getCanvas()
-            if (!canvas) return
-            const rect = container.getBoundingClientRect()
-            const w = Math.floor(rect.width)
-            const h = Math.floor(rect.height)
-            if (canvas.width !== w || canvas.height !== h) {
-                canvas.width = w
-                canvas.height = h
-                // Setting canvas.width/height wipes the buffer — also call .clear()
-                // so signature_pad resets its internal state.
-                sigCanvas.current?.clear()
-                // Reset draw tracking: canvas is now blank so any pending capture
-                // would produce a white image. Cancel the timer and clear flags.
-                hasDrawnRef.current = false
-                if (captureTimerRef.current) {
-                    clearTimeout(captureTimerRef.current)
-                    captureTimerRef.current = null
-                }
-                setDrawPending(false)
-                // DO NOT call setActiveSignature(null) — once the user has captured
-                // and the overlay is showing, resizing should never wipe it.
-            }
-        }
-
-        const ro = new ResizeObserver(syncSize)
-        ro.observe(container)
-        syncSize() // sync on mount
-
-        return () => ro.disconnect()
-    }, [signatureMode]) // re-run when mode toggles (canvas unmounts/remounts)
+    // ── Canvas sizing note ────────────────────────────────────────────────────
+    // react-signature-canvas calls _resizeCanvas() on componentDidMount, which
+    // sets canvas.width/height = offsetWidth/offsetHeight * devicePixelRatio and
+    // scales the 2D context. This is the correct way to handle HiDPI displays
+    // and touch coordinate alignment. We deliberately do NOT override this with a
+    // custom ResizeObserver — doing so fights the library's internal state,
+    // resets _isEmpty, and cancels the draw-tracking refs on every resize event.
+    // clearOnResize={false} stops the library's window.resize handler from wiping
+    // the canvas mid-draw (the user can always Clear and redraw if they rotate).
 
     // ── Auto-scale typed signature font to fit the input width ───────────────
     useEffect(() => {
@@ -407,10 +377,11 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                                     className={`absolute z-20 border-2 transition-all duration-300 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20 cursor-pointer'} flex items-center justify-center overflow-hidden`}
                                                     style={{ left: field.x, top: field.y, width: field.width, height: field.height }}
                                                     onClick={!activeSignature ? () => {
-                                                        // Scroll the signature pad into view and flash a ring so the user
-                                                        // knows exactly where to sign
-                                                        sigPadScrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                                        // scrollIntoView breaks when the target is inside a sticky
+                                                        // container. Use getBoundingClientRect + window.scrollTo instead.
                                                         if (sigPadScrollRef.current) {
+                                                            const rect = sigPadScrollRef.current.getBoundingClientRect()
+                                                            window.scrollTo({ top: window.scrollY + rect.top - 24, behavior: 'smooth' })
                                                             sigPadScrollRef.current.style.boxShadow = '0 0 0 2px #002FA7'
                                                             setTimeout(() => {
                                                                 if (sigPadScrollRef.current) sigPadScrollRef.current.style.boxShadow = ''
@@ -496,6 +467,16 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             <div
                                 ref={sigContainerRef}
                                 className="w-full h-40 bg-white border-2 border-dashed border-[#002FA7]/40 rounded-lg overflow-hidden relative cursor-crosshair"
+                                onPointerDown={() => {
+                                    // Set hasDrawnRef on pointer-down (before onBegin fires) so
+                                    // the draw-tracking flag is always set regardless of which
+                                    // event the browser fires first. Cancels any pending timer
+                                    // since a new stroke means the user isn't done yet.
+                                    if (signatureMode !== 'draw') return
+                                    hasDrawnRef.current = true
+                                    if (captureTimerRef.current) clearTimeout(captureTimerRef.current)
+                                    setDrawPending(false)
+                                }}
                             >
                                 {signatureMode === 'draw' ? (
                                     <>
@@ -503,18 +484,13 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                             key="draw-canvas"
                                             ref={sigCanvas}
                                             penColor="#002FA7"
-                                            onBegin={() => {
-                                                // Mark that the user has drawn at least one stroke.
-                                                // Cancel any pending capture timer (new stroke = not done yet).
-                                                hasDrawnRef.current = true
-                                                if (captureTimerRef.current) clearTimeout(captureTimerRef.current)
-                                                setDrawPending(false)
-                                            }}
+                                            clearOnResize={false}
                                             onEnd={handleSignatureEnd}
                                             canvasProps={{
-                                                // NO explicit width/height — canvas buffer is sized by
-                                                // the ResizeObserver above to exactly match the display
-                                                // size, so touch coordinates map 1:1 with drawn strokes.
+                                                // react-signature-canvas sizes the buffer correctly on
+                                                // mount via _resizeCanvas (offsetWidth * devicePixelRatio).
+                                                // clearOnResize={false} prevents window.resize from
+                                                // wiping the canvas mid-draw.
                                                 className: 'w-full h-full block relative z-10',
                                                 style: { touchAction: 'none' } as React.CSSProperties
                                             }}
@@ -621,7 +597,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                 ) : (
                                     <>
                                         <ShieldCheck className="w-4 h-4" />
-                                        Execute Contract
+                                        Deploy Contract
                                     </>
                                 )}
                             </button>
