@@ -305,12 +305,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const zohoService = new ZohoMailService();
             await zohoService.initialize(adminEmail);
 
-            // Upload attachment to Zoho first
-            const zohoAttachment = await zohoService.uploadAttachment(
-                adminEmail,
-                Buffer.from(finalPdfBytes),
-                finalFileName
-            );
+            // Upload attachment to Zoho first — non-fatal if it fails
+            // (email still sends without attachment rather than silently dropping)
+            let zohoAttachment = null;
+            try {
+                zohoAttachment = await zohoService.uploadAttachment(
+                    adminEmail,
+                    Buffer.from(finalPdfBytes),
+                    finalFileName
+                );
+            } catch (attachErr: any) {
+                console.error('[Execution Email] Attachment upload failed — sending without attachment:', attachErr.message);
+            }
 
             const emailSubject = `Executed Contract: ${request.document.name}`;
             const emailHtml = `
