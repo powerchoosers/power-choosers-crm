@@ -1,4 +1,13 @@
 // API endpoint for sending emails via Zoho Mail API
+// Increase body size limit to handle HTML email content + base64 attachments
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '10mb',
+        },
+    },
+};
+
 import { cors } from '../_cors.js';
 import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from './zoho-service.js';
