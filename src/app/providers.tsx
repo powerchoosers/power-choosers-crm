@@ -18,50 +18,84 @@ function GlobalListeners() {
   const queryClient = useQueryClient()
 
   useEffect(() => {
-    const channel = supabase.channel('global-changes')
+    // Helper: invalidate all email-related queries (useEmails, useEntityEmails, useEmailsCount)
+    const invalidateEmails = () => {
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+    }
+
+    // Helper: invalidate all deal-related queries
+    const invalidateDeals = () => {
+      queryClient.invalidateQueries({ queryKey: ['deals'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
+    }
+
+    // 1. Listen for signature_requests status changes (toasts + cache busting)
+    const sigChannel = supabase.channel('signature-request-changes')
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'signature_requests' },
         (payload) => {
-          const oldRecord = payload.old
-          const newRecord = payload.new
+          const oldRecord = payload.old as { status?: string }
+          const newRecord = payload.new as { status?: string }
 
           if (oldRecord.status !== 'completed' && newRecord.status === 'completed') {
             toast('Contract Secured', {
               icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
             })
-            queryClient.invalidateQueries({ queryKey: ['deals'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
+            invalidateDeals()
+            invalidateEmails()
             queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
             queryClient.invalidateQueries({ queryKey: ['accounts'] })
-            queryClient.invalidateQueries({ queryKey: ['emails'] })
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           } else if (oldRecord.status !== 'opened' && newRecord.status === 'opened') {
             toast('Signature Email Opened', {
               icon: <Eye className="w-4 h-4 text-[#002FA7]" />
             })
-            queryClient.invalidateQueries({ queryKey: ['deals'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
-            queryClient.invalidateQueries({ queryKey: ['emails'] })
+            invalidateDeals()
+            invalidateEmails()
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           } else if (oldRecord.status !== 'viewed' && newRecord.status === 'viewed') {
             toast('Contract Viewed by Signatory', {
               icon: <Eye className="w-4 h-4 text-[#002FA7]" />
             })
-            queryClient.invalidateQueries({ queryKey: ['deals'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
-            queryClient.invalidateQueries({ queryKey: ['emails'] })
+            invalidateDeals()
+            invalidateEmails()
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           }
         }
       )
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.info('[Realtime] signature_requests channel connected')
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Realtime] signature_requests channel error:', status)
+        }
+      })
+
+    // 2. Listen for new emails being inserted (Email Intelligence live refresh)
+    const emailChannel = supabase.channel('email-insert-changes')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'emails' },
+        () => {
+          // New email landed — refresh email intel on all dossiers + email page
+          invalidateEmails()
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.info('[Realtime] emails channel connected')
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.warn('[Realtime] emails channel error:', status)
+        }
+      })
 
     return () => {
-      supabase.removeChannel(channel)
+      supabase.removeChannel(sigChannel)
+      supabase.removeChannel(emailChannel)
     }
   }, [queryClient])
 
