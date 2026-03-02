@@ -1067,7 +1067,7 @@ OUTPUT FORMAT:
         )}
       >
         {/* Fixed Header Section */}
-        <div className="flex-none px-6 py-2 border-b border-white/5 bg-zinc-950/50 backdrop-blur-md space-y-1 z-20">
+        <div className="flex-none px-6 py-4 border-b border-white/5 bg-zinc-950/50 backdrop-blur-md space-y-2 z-20">
           {/* Deliverability Alert */}
           {to && user?.email && to.toLowerCase().trim() === user.email.toLowerCase().trim() && (
             <motion.div
@@ -1298,21 +1298,21 @@ OUTPUT FORMAT:
             {aiError && (
               <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
             )}
-          </div>
-          </div>
 
-          {/* Non-Scrollable Bottom Section - Signature, Checkboxes, Attachments */}
-          <div className="flex-shrink-0 border-t border-white/5 px-6 py-4 space-y-3 bg-zinc-950/50 backdrop-blur-sm">
-            {/* Signature Preview */}
+            {/* Signature - Scrolls with email body */}
             {signatureHtml && !selectedFoundryId && (
-              <div className="pt-2 border-t border-white/5 opacity-90">
+              <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
                 <div
                   className="rounded-lg overflow-hidden"
                   dangerouslySetInnerHTML={{ __html: signatureHtml }}
                 />
               </div>
             )}
+          </div>
+          </div>
 
+          {/* Non-Scrollable Bottom Section - Checkboxes, Attachments */}
+          <div className="flex-shrink-0 border-t border-white/5 px-6 py-3 space-y-2 bg-zinc-950/50 backdrop-blur-sm">
             {/* Plain Text Checkbox */}
             {(emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && !selectedFoundryId && (
               <label className="flex items-center gap-2 cursor-pointer select-none text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors">
