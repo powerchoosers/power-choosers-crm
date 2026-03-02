@@ -110,7 +110,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         </a>
 
         <div style="margin-top: 40px; font-size: 11px; color: #52525b; border-top: 1px solid #27272a; padding-top: 16px;">
-          This is a secure, tamper-evident signing link. Your IP address and network telemetry will be recorded upon access for audit trail purposes. Do not forward this email.
+          This is a secure, tamper-evident signing link. For security purposes, do not forward this email.
         </div>
         <img src="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=opened" width="1" height="1" alt="" style="display:none;" />
       </div>
