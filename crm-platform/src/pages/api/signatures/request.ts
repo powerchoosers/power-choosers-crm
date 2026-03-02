@@ -27,14 +27,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const contactEmail = contact.email;
     if (!contactEmail) throw new Error('Contact has no email address');
 
-    // 2. Idempotency — reject if an active request already exists for this doc + contact
-    const { data: existingRequest } = await supabaseAdmin
+    // 2. Idempotency — reject if an active, non-expired request already exists.
+    //    Scope: document + contact + deal (when a deal is provided).
+    //    This allows resending the same doc to the same person under a new deal,
+    //    and also allows resending after the previous link has expired.
+    const now = new Date().toISOString();
+    let idempotencyQuery = supabaseAdmin
       .from('signature_requests')
       .select('id')
       .eq('document_id', documentId)
       .eq('contact_id', contactId)
-      .not('status', 'in', '(completed,declined)')
-      .maybeSingle();
+      .not('status', 'in', '(completed,declined,signed)')
+      .or(`expires_at.is.null,expires_at.gt.${now}`);
+
+    // If a deal is attached, only block if the existing request is for the SAME deal.
+    // Sending the same doc under a different (new) deal is allowed.
+    if (dealId) {
+      idempotencyQuery = idempotencyQuery.eq('deal_id', dealId);
+    }
+
+    const { data: existingRequest } = await idempotencyQuery.maybeSingle();
 
     if (existingRequest) {
       return res.status(409).json({ error: 'An active signature request already exists for this document and contact.' });

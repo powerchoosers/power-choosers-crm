@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
 import { useDealsByAccount } from '@/hooks/useDeals'
 import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
 import dynamic from 'next/dynamic'
 
 const DocumentPreparationModal = dynamic(
@@ -18,6 +19,7 @@ const DocumentPreparationModal = dynamic(
 export function SignatureRequestPanel() {
     const { setRightPanelMode, signatureRequestContext } = useUIStore()
     const { user } = useAuth()
+    const queryClient = useQueryClient()
 
     const [selectedContactId, setSelectedContactId] = useState<string>('')
     const [selectedDealId, setSelectedDealId] = useState<string>('')
@@ -69,6 +71,16 @@ export function SignatureRequestPanel() {
             }
 
             toast.success('Signature request dispatched successfully', { id: toastId })
+
+            // Immediately bust email + deal caches so email intel and
+            // right-panel contract sections reflect the new request without a page refresh
+            queryClient.invalidateQueries({ queryKey: ['emails'] })
+            queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
+            queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+            queryClient.invalidateQueries({ queryKey: ['deals'] })
+            queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
+            queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
+
             handleClose()
         } catch (error: any) {
             toast.error(error.message, { id: toastId })

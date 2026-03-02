@@ -290,10 +290,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // 8. Email Delivery
         try {
             const adminEmail = 'signal@nodalpoint.io';
-            const agentEmail = request.metadata?.agentEmail || request.deal?.ownerId || request.account?.ownerId;
+            // Resolve agent email from the request metadata (set at dispatch time), then deal owner, then account owner.
+            // Fall back to adminEmail so the notification inbox always receives a copy even when the chain is incomplete.
+            const resolvedAgentEmail: string =
+                request.metadata?.agentEmail ||
+                request.deal?.ownerId ||
+                request.account?.ownerId ||
+                adminEmail;
 
-            if (!agentEmail) {
-                console.warn('[Execution Email] agentEmail could not be resolved for request', request.id, '— agent will not receive BCC copy.');
+            if (!request.metadata?.agentEmail && !request.deal?.ownerId && !request.account?.ownerId) {
+                console.warn('[Execution Email] agentEmail could not be resolved for request', request.id, '— falling back to adminEmail for BCC.');
             }
 
             const zohoService = new ZohoMailService();
@@ -355,9 +361,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 console.error('[Execution Email] Failed to log email to CRM:', emailInsertError.message);
             }
 
+            // BCC always resolves — agent inbox guaranteed a copy even when metadata chain is incomplete
             await zohoService.sendEmail({
                 to: [request.contact.email],
-                bcc: agentEmail ? [agentEmail] : undefined,
+                bcc: [resolvedAgentEmail],
                 subject: emailSubject,
                 html: emailHtml,
                 text: `The contract has been executed. See attached.`,
