@@ -1,9 +1,18 @@
-
 /**
  * Zoho Mail API endpoint for sequence emails
  * Matches MailerSend interface for easy migration
  * Adapted from gmail-send-sequence.js
  */
+
+// Increase body size limit to handle HTML email content + base64 attachments
+export const config = {
+    api: {
+        bodyParser: {
+            sizeLimit: '10mb',
+        },
+    },
+};
+
 import { cors } from '../_cors.js';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
