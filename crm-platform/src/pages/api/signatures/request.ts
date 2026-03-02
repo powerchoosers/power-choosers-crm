@@ -54,7 +54,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         access_token: token,
         signature_fields: signatureFields || [],
         metadata: { agentEmail: userEmail },
-        status: 'pending'
+        status: 'pending',
+        // Signing links expire after 30 days
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       })
       .select()
       .single();

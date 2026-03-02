@@ -53,8 +53,8 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                 pageIndex: pageNumber - 1,
                 x,
                 y,
-                width: currentTool === 'signature' ? 200 : 150,
-                height: currentTool === 'signature' ? 60 : 30,
+                width: 200,
+                height: 40,
                 type: currentTool
             }
         ])

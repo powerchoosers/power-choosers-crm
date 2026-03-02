@@ -35,6 +35,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(404).json({ error: 'Invalid or expired secure token' });
         }
 
+        if (request.expires_at && new Date(request.expires_at) < new Date()) {
+            return res.status(410).json({ error: 'This signing link has expired. Please contact your representative to request a new one.' });
+        }
+
         if (request.status === 'signed' || request.status === 'completed' || request.status === 'declined') {
             return res.status(400).json({ error: 'Document has already been executed or was declined' });
         }
