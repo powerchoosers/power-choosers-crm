@@ -18,7 +18,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // 1. Get the signature request by token
         const { data: request, error: fetchError } = await supabaseAdmin
             .from('signature_requests')
-            .select('id, status')
+            .select('id, status, expires_at')
             .eq('access_token', token)
             .single();
 
@@ -26,7 +26,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(404).json({ error: 'Invalid or expired secure token' });
         }
 
-        // 2. Rate limit — max 10 telemetry events per token per 60 seconds
+        // 2. Token expiry check
+        if (request.expires_at && new Date(request.expires_at) < new Date()) {
+            if (req.method === 'GET') return res.status(410).send('Link expired');
+            return res.status(410).json({ error: 'This signing link has expired.' });
+        }
+
+        // 3. Rate limit — max 10 telemetry events per token per 60 seconds
         // This prevents audit trail flooding by anyone holding a signing link
         const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
         const { count: recentCount, error: countError } = await supabaseAdmin
@@ -40,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(429).json({ error: 'Rate limit exceeded. Too many telemetry events for this token.' });
         }
 
-        // 3. Extract telemetry data from headers
+        // 4. Extract telemetry data from headers
         const forwardedFor = req.headers['x-forwarded-for'];
         const ipAddress = Array.isArray(forwardedFor) ? forwardedFor[0] : (forwardedFor || req.socket.remoteAddress || 'Unknown IP');
         const userAgent = req.headers['user-agent'] || 'Unknown Device';

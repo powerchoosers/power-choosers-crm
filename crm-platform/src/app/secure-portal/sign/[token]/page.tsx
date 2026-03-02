@@ -29,6 +29,21 @@ export default async function SecureSignPage({ params }: { params: Promise<{ tok
         );
     }
 
+    // Signing link TTL check — return 410 Gone if past expires_at
+    if (request.expires_at && new Date(request.expires_at) < new Date()) {
+        return (
+            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center font-mono">
+                <div className="h-12 w-12 rounded-full border border-amber-500/30 bg-amber-500/10 text-amber-500 flex items-center justify-center mb-6">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+                </div>
+                <h1 className="text-xl text-zinc-200 uppercase tracking-widest mb-2">Link Expired</h1>
+                <p className="text-sm text-zinc-500 max-w-md">
+                    This signing link expired on {new Date(request.expires_at).toLocaleDateString()}. Please contact your Nodal Point representative to request a new one.
+                </p>
+            </div>
+        );
+    }
+
     // If already signed, show completed view
     if (request.status === 'signed' || request.status === 'completed') {
         return (
