@@ -64,9 +64,9 @@ function scoreAccount(acct: AccountRecord, reservesTight: boolean): ScoredAccoun
         score += 10
         if (contractDaysLeft <= 0) {
             score += 65; reasons.push('CONTRACT EXPIRED')
-        } else if (contractDaysLeft <= 60) {
+        } else if (contractDaysLeft <= 90) {
             score += 55; reasons.push(`RENEWAL DANGER (${contractDaysLeft}D)`)
-        } else if (contractDaysLeft <= 120) {
+        } else if (contractDaysLeft <= 180) {
             score += 45; reasons.push(`WINDOW OPEN (${contractDaysLeft}D)`)
         } else if (contractDaysLeft <= 365) {
             score += 25; reasons.push(`MONITOR (${contractDaysLeft}D)`)
@@ -365,7 +365,7 @@ function AccountCard({ acct, rank, reservesTight, onOpen, onCall, onEmail, onTas
                 <div className="flex items-center gap-2 mt-0.5">
                     <span className={cn(
                         'text-[10px] font-mono uppercase tracking-wider truncate',
-                        topReason.includes('COLD') || topReason.includes('EXPIRED') ? 'text-rose-400' :
+                        topReason.includes('COLD') || topReason.includes('EXPIRED') || topReason.includes('DANGER') ? 'text-rose-400' :
                             topReason.includes('WARMING') || topReason.includes('TIGHT') ? 'text-amber-400' :
                                 'text-zinc-500'
                     )}>
