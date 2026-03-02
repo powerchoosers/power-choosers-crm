@@ -1286,7 +1286,6 @@ OUTPUT FORMAT:
                     }
                   }}
                   className="w-full h-full"
-                  autoFocus
                 />
               )}
               {isAiLoading && (
