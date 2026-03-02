@@ -17,7 +17,7 @@ const DocumentPreparationModal = dynamic(
 )
 
 export function SignatureRequestPanel() {
-    const { setRightPanelMode, signatureRequestContext } = useUIStore()
+    const { setRightPanelMode, signatureRequestContext, setSignatureRequestContext } = useUIStore()
     const { user } = useAuth()
     const queryClient = useQueryClient()
 
@@ -32,6 +32,7 @@ export function SignatureRequestPanel() {
     const { data: deals, isLoading: loadingDeals } = useDealsByAccount(signatureRequestContext?.accountId)
 
     const handleClose = () => {
+        setSignatureRequestContext(null)
         setRightPanelMode('DEFAULT')
     }
 
@@ -142,7 +143,7 @@ export function SignatureRequestPanel() {
                                 <option value="">-- Select Contact --</option>
                                 {contacts.map((c: Contact) => (
                                     <option key={c.id} value={c.id}>
-                                        {c.firstName} {c.lastName} ({c.email || 'No email'})
+                                        {c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown'} ({c.email || 'No email'})
                                     </option>
                                 ))}
                             </select>
