@@ -90,9 +90,11 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             if (canvas.width !== w || canvas.height !== h) {
                 canvas.width = w
                 canvas.height = h
-                // Clear after resize so stale pixels don't bleed through
+                // Clear after resize so stale pixels don't bleed through.
+                // Do NOT call setActiveSignature(null) here — it would race with
+                // captureDrawnSignature and wipe the overlay after the user lifts
+                // their finger on mobile.
                 sigCanvas.current?.clear()
-                setActiveSignature(null)
             }
         }
 
@@ -140,13 +142,23 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     // Called by onEnd (pointer up) AND by onTouchEnd/onMouseUp on the container
     // as a belt-and-suspenders fallback for mobile browsers that may not fire onEnd.
     const captureDrawnSignature = useCallback(() => {
-        if (sigCanvas.current && !sigCanvas.current.isEmpty()) {
-            const dataUrl = sigCanvas.current.getTrimmedCanvas().toDataURL('image/png')
-            // Sanity-check — an empty trimmed canvas returns a tiny stub (~50 chars)
-            if (dataUrl && dataUrl.length > 200) {
-                setActiveSignature(dataUrl)
-            }
-        }
+        if (!sigCanvas.current || sigCanvas.current.isEmpty()) return
+        const srcCanvas = sigCanvas.current.getCanvas()
+        if (!srcCanvas || !srcCanvas.width || !srcCanvas.height) return
+        // Composite onto a white background canvas.
+        // getTrimmedCanvas() scans for non-transparent pixels; on mobile with a
+        // transparent-background canvas it can return a near-empty 1×1 bitmap,
+        // producing a data URL that is > 200 chars but renders invisible on the
+        // PDF overlay. Using getCanvas() + manual composite bypasses that entirely.
+        const out = document.createElement('canvas')
+        out.width = srcCanvas.width
+        out.height = srcCanvas.height
+        const ctx = out.getContext('2d')
+        if (!ctx) return
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, out.width, out.height)
+        ctx.drawImage(srcCanvas, 0, 0)
+        setActiveSignature(out.toDataURL('image/png'))
     }, [])
 
     const handleClear = () => {
