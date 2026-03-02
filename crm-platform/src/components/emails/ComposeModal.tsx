@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useEmails } from '@/hooks/useEmails'
 import { useAuth } from '@/context/AuthContext'
 import { generateNodalSignature } from '@/lib/signature'
-import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap } from 'lucide-react'
+import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap, Type } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -518,6 +518,9 @@ function ComposePanel({
   const [sendAsPlainText, setSendAsPlainText] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
 
+  // Formatting panel state
+  const [formattingOpen, setFormattingOpen] = useState(false)
+
   // Search suggestions state
   const [toQuery, setToQuery] = useState(initialTo)
   const [ccQuery, setCcQuery] = useState('')
@@ -960,14 +963,13 @@ OUTPUT FORMAT:
     })() : content
 
     // When using foundry template, content is already HTML with no signature
+    // IMPORTANT: Do NOT include signature in HTML sent to API - it causes 413 payload errors
+    // The signature will be added by the mail service on the backend
     const fullHtml = isColdPlaintext
       ? undefined
       : selectedFoundryId
         ? content // Foundry template is already complete HTML
-        : `
-      <div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content}</div>
-      ${outgoingSignatureHtml}
-    `
+        : `<div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content}</div>`
 
     const titleLine = profile?.jobTitle
       ? `${profile.jobTitle}, Nodal Point`
@@ -1190,8 +1192,11 @@ OUTPUT FORMAT:
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto np-scroll px-6 py-4 space-y-4">
-          {pendingAiContent !== null && (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+          {/* Scrollable Content Area - Only Editor */}
+          <div className="flex-1 overflow-y-auto np-scroll px-6 py-4">
+            {/* AI Content Preview - Sticky at Top */}
+            {pendingAiContent !== null && (
             <motion.div
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
@@ -1293,16 +1298,24 @@ OUTPUT FORMAT:
             {aiError && (
               <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
             )}
+          </div>
+          </div>
+
+          {/* Non-Scrollable Bottom Section - Signature, Checkboxes, Attachments */}
+          <div className="flex-shrink-0 border-t border-white/5 px-6 py-4 space-y-3 bg-zinc-950/50 backdrop-blur-sm">
+            {/* Signature Preview */}
             {signatureHtml && !selectedFoundryId && (
-              <div className="mt-4 pt-4 border-t border-white/5 opacity-90">
+              <div className="pt-2 border-t border-white/5 opacity-90">
                 <div
                   className="rounded-lg overflow-hidden"
                   dangerouslySetInnerHTML={{ __html: signatureHtml }}
                 />
               </div>
             )}
+
+            {/* Plain Text Checkbox */}
             {(emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && !selectedFoundryId && (
-              <label className="mt-4 flex items-center gap-2 cursor-pointer select-none text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-[10px] font-mono text-zinc-400 hover:text-zinc-200 transition-colors">
                 <input
                   type="checkbox"
                   checked={sendAsPlainText}
@@ -1312,28 +1325,32 @@ OUTPUT FORMAT:
                 Send as plain text (cold deliverability)
               </label>
             )}
+
+            {/* Attachments List */}
             {attachments.length > 0 && (
-              <div className="mt-4 space-y-2">
+              <div className="space-y-2">
                 <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">Attachments</span>
-                {attachments.map((file, idx) => (
-                  <div key={idx} className="flex items-center justify-between gap-2 p-2 rounded border border-white/10 bg-white/5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Paperclip className="w-3 h-3 text-zinc-400 flex-shrink-0" />
-                      <span className="text-xs text-zinc-300 truncate">{file.name}</span>
-                      <span className="text-[10px] text-zinc-500 flex-shrink-0">
-                        ({(file.size / 1024).toFixed(1)} KB)
-                      </span>
+                <div className="space-y-2 max-h-[120px] overflow-y-auto np-scroll">
+                  {attachments.map((file, idx) => (
+                    <div key={idx} className="flex items-center justify-between gap-2 p-2 rounded border border-white/10 bg-white/5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Paperclip className="w-3 h-3 text-zinc-400 flex-shrink-0" />
+                        <span className="text-xs text-zinc-300 truncate">{file.name}</span>
+                        <span className="text-[10px] text-zinc-500 flex-shrink-0">
+                          ({(file.size / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        title="Remove Attachment"
+                        onClick={() => removeAttachment(idx)}
+                        className="icon-button-forensic h-6 w-6 flex items-center justify-center hover:text-red-400"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      title="Remove Attachment"
-                      onClick={() => removeAttachment(idx)}
-                      className="icon-button-forensic h-6 w-6 flex items-center justify-center hover:text-red-400"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1443,6 +1460,41 @@ OUTPUT FORMAT:
           )}
         </AnimatePresence>
 
+        {/* Formatting Panel — slides up above footer, similar to AI Rail */}
+        <AnimatePresence>
+          {formattingOpen && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute left-4 right-4 bottom-[calc(4rem+8px)] z-50 h-auto min-h-12 backdrop-blur-xl bg-zinc-950/90 border border-white/10 rounded-lg shadow-2xl overflow-hidden"
+            >
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">Text Formatting</span>
+                  <button
+                    type="button"
+                    title="Close formatting"
+                    onClick={() => setFormattingOpen(false)}
+                    className="icon-button-forensic h-6 w-6 flex items-center justify-center"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <div className="text-[9px] text-zinc-400 leading-relaxed max-w-xs">
+                  Use the formatting toolbar in the editor above to style your text. You can:
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Make text <strong>bold</strong>, <em>italic</em>, or <u>underlined</u></li>
+                    <li>Create bullet points and numbered lists</li>
+                    <li>Change text color and add images</li>
+                  </ul>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <div className="flex-none px-6 py-4 border-t border-white/5 nodal-recessed flex items-center justify-between gap-2 flex-wrap">
           <div className="flex items-center gap-2 flex-wrap">
             <input
@@ -1462,6 +1514,18 @@ OUTPUT FORMAT:
               <label htmlFor="email-attachment-input" title="Attach Files" className="cursor-pointer">
                 <Paperclip className="w-4 h-4" />
               </label>
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn(
+                "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
+                formattingOpen && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
+              )}
+              onClick={() => setFormattingOpen(!formattingOpen)}
+              title="Text Formatting"
+            >
+              <Type className={cn("h-4 w-4", formattingOpen && "fill-current")} />
             </Button>
             <Button
               variant="outline"
