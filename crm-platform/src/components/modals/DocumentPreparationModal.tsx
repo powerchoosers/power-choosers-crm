@@ -14,6 +14,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/l
 export type FieldType = 'signature' | 'text'
 
 export interface SignatureField {
+    fieldId: string
     pageIndex: number
     x: number
     y: number
@@ -48,6 +49,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
         setFields([
             ...fields,
             {
+                fieldId: crypto.randomUUID(),
                 pageIndex: pageNumber - 1,
                 x,
                 y,
@@ -227,11 +229,17 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                             <div className="p-4 border-t border-white/5 bg-zinc-950">
                                 <button
                                     onClick={() => onComplete(fields)}
-                                    className="w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all"
+                                    disabled={fields.length === 0}
+                                    className="w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     [ EXECUTE_CONTRACT_DEPLOYMENT ]
                                     <ArrowRight className="w-3 h-3" />
                                 </button>
+                                {fields.length === 0 && (
+                                    <p className="text-[10px] font-mono text-rose-500 text-center mt-2">
+                                        Place at least one field to continue
+                                    </p>
+                                )}
                             </div>
                         </div>
                     </div>
