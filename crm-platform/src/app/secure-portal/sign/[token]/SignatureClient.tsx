@@ -32,6 +32,16 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     // ── Canvas sizing refs ────────────────────────────────────────────────────
     const sigContainerRef = useRef<HTMLDivElement>(null)
     const typedInputRef = useRef<HTMLInputElement>(null)
+    // ── Draw signature state tracking ─────────────────────────────────────────
+    // sigPadScrollRef: target for "Sign Here" click-to-focus scroll
+    const sigPadScrollRef = useRef<HTMLDivElement>(null)
+    // hasDrawnRef: true once user has drawn a stroke since last clear/resize
+    // Used instead of sigCanvas.isEmpty() to avoid race with ResizeObserver
+    const hasDrawnRef = useRef(false)
+    // captureTimerRef: debounce handle for the 2-second auto-capture after onEnd
+    const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    // drawPending: true when user has finished drawing but capture hasn't fired yet
+    const [drawPending, setDrawPending] = useState(false)
 
     // ── Field completion tracking ─────────────────────────────────────────────
     const fields: any[] = request.signature_fields ?? []
@@ -90,11 +100,19 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             if (canvas.width !== w || canvas.height !== h) {
                 canvas.width = w
                 canvas.height = h
-                // Clear after resize so stale pixels don't bleed through.
-                // Do NOT call setActiveSignature(null) here — it would race with
-                // captureDrawnSignature and wipe the overlay after the user lifts
-                // their finger on mobile.
+                // Setting canvas.width/height wipes the buffer — also call .clear()
+                // so signature_pad resets its internal state.
                 sigCanvas.current?.clear()
+                // Reset draw tracking: canvas is now blank so any pending capture
+                // would produce a white image. Cancel the timer and clear flags.
+                hasDrawnRef.current = false
+                if (captureTimerRef.current) {
+                    clearTimeout(captureTimerRef.current)
+                    captureTimerRef.current = null
+                }
+                setDrawPending(false)
+                // DO NOT call setActiveSignature(null) — once the user has captured
+                // and the overlay is showing, resizing should never wipe it.
             }
         }
 
@@ -139,17 +157,21 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     }, [token])
 
     // ── Draw signature capture ────────────────────────────────────────────────
-    // Called by onEnd (pointer up) AND by onTouchEnd/onMouseUp on the container
-    // as a belt-and-suspenders fallback for mobile browsers that may not fire onEnd.
+    // captureDrawnSignature: the actual capture — composites strokes onto a white
+    // background and stores the result in activeSignature so the PDF overlay fills.
+    // Uses hasDrawnRef (not isEmpty()) to avoid race conditions with ResizeObserver.
     const captureDrawnSignature = useCallback(() => {
-        if (!sigCanvas.current || sigCanvas.current.isEmpty()) return
+        // Cancel any pending debounce timer
+        if (captureTimerRef.current) {
+            clearTimeout(captureTimerRef.current)
+            captureTimerRef.current = null
+        }
+        setDrawPending(false)
+        if (!sigCanvas.current || !hasDrawnRef.current) return
         const srcCanvas = sigCanvas.current.getCanvas()
         if (!srcCanvas || !srcCanvas.width || !srcCanvas.height) return
-        // Composite onto a white background canvas.
-        // getTrimmedCanvas() scans for non-transparent pixels; on mobile with a
-        // transparent-background canvas it can return a near-empty 1×1 bitmap,
-        // producing a data URL that is > 200 chars but renders invisible on the
-        // PDF overlay. Using getCanvas() + manual composite bypasses that entirely.
+        // Composite onto white — avoids transparent-canvas issues where getImageData
+        // returns near-empty bitmaps on some mobile WebKit versions.
         const out = document.createElement('canvas')
         out.width = srcCanvas.width
         out.height = srcCanvas.height
@@ -161,9 +183,25 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         setActiveSignature(out.toDataURL('image/png'))
     }, [])
 
+    // handleSignatureEnd: called by SignatureCanvas onEnd.
+    // Starts a 2-second debounce — auto-applies if no new stroke arrives.
+    // The user can also tap "Apply Signature" immediately via the drawPending button.
+    const handleSignatureEnd = useCallback(() => {
+        if (!hasDrawnRef.current) return
+        if (captureTimerRef.current) clearTimeout(captureTimerRef.current)
+        setDrawPending(true)
+        captureTimerRef.current = setTimeout(captureDrawnSignature, 2000)
+    }, [captureDrawnSignature])
+
     const handleClear = () => {
         if (signatureMode === 'draw') {
             sigCanvas.current?.clear()
+            hasDrawnRef.current = false
+            if (captureTimerRef.current) {
+                clearTimeout(captureTimerRef.current)
+                captureTimerRef.current = null
+            }
+            setDrawPending(false)
         } else {
             setTypedSignature('')
         }
@@ -366,8 +404,19 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                                 <div
                                                     id={`sig-field-${textKey}`}
                                                     key={textKey}
-                                                    className={`absolute z-20 border-2 transition-all duration-300 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20'} flex items-center justify-center overflow-hidden`}
+                                                    className={`absolute z-20 border-2 transition-all duration-300 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20 cursor-pointer'} flex items-center justify-center overflow-hidden`}
                                                     style={{ left: field.x, top: field.y, width: field.width, height: field.height }}
+                                                    onClick={!activeSignature ? () => {
+                                                        // Scroll the signature pad into view and flash a ring so the user
+                                                        // knows exactly where to sign
+                                                        sigPadScrollRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                                        if (sigPadScrollRef.current) {
+                                                            sigPadScrollRef.current.style.boxShadow = '0 0 0 2px #002FA7'
+                                                            setTimeout(() => {
+                                                                if (sigPadScrollRef.current) sigPadScrollRef.current.style.boxShadow = ''
+                                                            }, 1500)
+                                                        }
+                                                    } : undefined}
                                                 >
                                                     {activeSignature ? (
                                                         /* eslint-disable-next-line @next/next/no-img-element */
@@ -423,7 +472,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                         )}
 
                         {/* Signature pad */}
-                        <div className="space-y-3">
+                        <div ref={sigPadScrollRef} className="space-y-3 rounded-lg transition-shadow">
                             <div className="flex items-center justify-between">
                                 <h2 className="text-xs font-mono uppercase tracking-widest text-zinc-400">Signature</h2>
                                 <button onClick={handleClear} className="text-[10px] font-mono uppercase text-rose-400 hover:text-rose-300 transition-colors">
@@ -447,8 +496,6 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             <div
                                 ref={sigContainerRef}
                                 className="w-full h-40 bg-white border-2 border-dashed border-[#002FA7]/40 rounded-lg overflow-hidden relative cursor-crosshair"
-                                onMouseUp={() => signatureMode === 'draw' && captureDrawnSignature()}
-                                onTouchEnd={() => signatureMode === 'draw' && captureDrawnSignature()}
                             >
                                 {signatureMode === 'draw' ? (
                                     <>
@@ -456,7 +503,14 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                             key="draw-canvas"
                                             ref={sigCanvas}
                                             penColor="#002FA7"
-                                            onEnd={captureDrawnSignature}
+                                            onBegin={() => {
+                                                // Mark that the user has drawn at least one stroke.
+                                                // Cancel any pending capture timer (new stroke = not done yet).
+                                                hasDrawnRef.current = true
+                                                if (captureTimerRef.current) clearTimeout(captureTimerRef.current)
+                                                setDrawPending(false)
+                                            }}
+                                            onEnd={handleSignatureEnd}
                                             canvasProps={{
                                                 // NO explicit width/height — canvas buffer is sized by
                                                 // the ResizeObserver above to exactly match the display
@@ -485,6 +539,17 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                     </div>
                                 )}
                             </div>
+
+                            {/* Apply button — shown after drawing ends, before auto-capture fires */}
+                            {signatureMode === 'draw' && drawPending && (
+                                <button
+                                    onClick={captureDrawnSignature}
+                                    className="w-full h-9 border border-[#002FA7] text-[#002FA7] hover:bg-[#002FA7] hover:text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all"
+                                >
+                                    <CheckCircle className="w-3.5 h-3.5" />
+                                    Apply Signature to Contract
+                                </button>
+                            )}
 
                             <p className="text-[10px] text-zinc-600 font-sans leading-relaxed">
                                 By {signatureMode === 'draw' ? 'drawing' : 'typing'} your signature above and clicking Execute Contract, you agree to be legally bound by the terms presented in this document.
