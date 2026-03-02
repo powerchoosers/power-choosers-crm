@@ -30,12 +30,13 @@ function GlobalListeners() {
             toast('Contract Secured', {
               icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
             })
-            // Invalidate lists to fetch real-time updates without polling
             queryClient.invalidateQueries({ queryKey: ['deals'] })
             queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
             queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
             queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
             queryClient.invalidateQueries({ queryKey: ['accounts'] })
+            queryClient.invalidateQueries({ queryKey: ['emails'] })
+            queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           } else if (oldRecord.status !== 'opened' && newRecord.status === 'opened') {
             toast('Signature Email Opened', {
               icon: <Eye className="w-4 h-4 text-[#002FA7]" />
@@ -44,6 +45,7 @@ function GlobalListeners() {
             queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
             queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
             queryClient.invalidateQueries({ queryKey: ['emails'] })
+            queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           } else if (oldRecord.status !== 'viewed' && newRecord.status === 'viewed') {
             toast('Contract Viewed by Signatory', {
               icon: <Eye className="w-4 h-4 text-[#002FA7]" />
@@ -52,6 +54,7 @@ function GlobalListeners() {
             queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
             queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
             queryClient.invalidateQueries({ queryKey: ['emails'] })
+            queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           }
         }
       )

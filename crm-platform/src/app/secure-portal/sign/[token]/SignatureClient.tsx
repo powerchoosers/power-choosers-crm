@@ -18,13 +18,12 @@ interface SignatureClientProps {
 }
 
 export default function SignatureClient({ token, request, documentUrl }: SignatureClientProps) {
-    const [isViewing, setIsViewing] = useState(false)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
     const [activeSignature, setActiveSignature] = useState<string | null>(null)
     const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw')
     const [typedSignature, setTypedSignature] = useState('')
-    const [textValues, setTextValues] = useState<Record<number, string>>({})
+    const [textValues, setTextValues] = useState<Record<string, string>>({})
     const [numPages, setNumPages] = useState<number>(0)
     const [pageNumber, setPageNumber] = useState(1)
     const sigCanvas = useRef<SignatureCanvas>(null)
@@ -117,8 +116,9 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
         // Find the first text field that is empty or the first signature field if activeSignature is empty
         const nextField = request.signature_fields.find((f: any, idx: number) => {
+            const key = f.fieldId ?? String(idx)
             if (f.type === 'text') {
-                return !textValues[idx] || textValues[idx].trim() === ''
+                return !textValues[key] || textValues[key].trim() === ''
             }
             return !activeSignature
         })
@@ -220,11 +220,12 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                         {/* Render Signature Overlays */}
                                         {request.signature_fields?.map((field: any, idx: number) => {
                                             if (field.pageIndex !== pageNumber - 1) return null;
+                                            const textKey = field.fieldId ?? String(idx)
 
                                             if (field.type === 'text') {
                                                 return (
                                                     <div
-                                                        key={idx}
+                                                        key={textKey}
                                                         className="absolute z-20 flex items-center justify-center overflow-hidden"
                                                         style={{
                                                             left: field.x,
@@ -235,8 +236,8 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                                     >
                                                         <input
                                                             type="text"
-                                                            value={textValues[idx] || ''}
-                                                            onChange={(e) => setTextValues(prev => ({ ...prev, [idx]: e.target.value }))}
+                                                            value={textValues[textKey] || ''}
+                                                            onChange={(e) => setTextValues(prev => ({ ...prev, [textKey]: e.target.value }))}
                                                             placeholder="Type here..."
                                                             className="w-full h-full bg-emerald-500/10 border-2 border-emerald-500/40 text-emerald-100 placeholder:text-emerald-500/50 px-2 font-mono text-xs focus:outline-none focus:border-emerald-400 focus:bg-emerald-500/20 transition-all"
                                                         />
@@ -246,7 +247,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
                                             return (
                                                 <div
-                                                    key={idx}
+                                                    key={textKey}
                                                     className={`absolute z-20 border-2 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20'} flex items-center justify-center overflow-hidden`}
                                                     style={{
                                                         left: field.x,

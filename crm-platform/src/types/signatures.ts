@@ -1,4 +1,4 @@
-export type SignatureStatus = 'pending' | 'viewed' | 'signed' | 'declined' | 'completed';
+export type SignatureStatus = 'pending' | 'opened' | 'viewed' | 'signed' | 'declined' | 'completed';
 
 export interface SignatureRequest {
     id: string;
@@ -9,7 +9,7 @@ export interface SignatureRequest {
     status: SignatureStatus;
     access_token: string;
     signed_document_path?: string;
-    signature_fields?: { pageIndex: number; x: number; y: number; width: number; height: number }[];
+    signature_fields?: { fieldId?: string; pageIndex: number; x: number; y: number; width: number; height: number; type?: 'signature' | 'text' }[];
     created_at: string;
     updated_at: string;
 
@@ -23,7 +23,7 @@ export interface SignatureRequest {
 export interface SignatureTelemetry {
     id: string;
     request_id: string;
-    action: 'sent' | 'viewed' | 'signed' | 'declined';
+    action: 'sent' | 'opened' | 'viewed' | 'signed' | 'declined';
     ip_address?: string;
     user_agent?: string;
     metadata?: any;

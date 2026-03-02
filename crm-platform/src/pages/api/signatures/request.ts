@@ -27,10 +27,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const contactEmail = contact.email;
     if (!contactEmail) throw new Error('Contact has no email address');
 
-    // 2. Generate a secure random token
+    // 2. Idempotency — reject if an active request already exists for this doc + contact
+    const { data: existingRequest } = await supabaseAdmin
+      .from('signature_requests')
+      .select('id')
+      .eq('document_id', documentId)
+      .eq('contact_id', contactId)
+      .not('status', 'in', '(completed,declined)')
+      .maybeSingle();
+
+    if (existingRequest) {
+      return res.status(409).json({ error: 'An active signature request already exists for this document and contact.' });
+    }
+
+    // 3. Generate a secure random token
     const token = crypto.randomBytes(32).toString('hex');
 
-    // 3. Create the signature request record
+    // 4. Create the signature request record
     const { data: requestRecord, error: insertError } = await supabaseAdmin
       .from('signature_requests')
       .insert({
@@ -54,9 +67,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // 4. Construct the signing URL
-    const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-    const host = req.headers.host || 'nodalpoint.io';
-    const signingUrl = `${protocol}://${host}/secure-portal/sign/${token}`;
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nodalpoint.io';
+    const signingUrl = `${appBaseUrl}/secure-portal/sign/${token}`;
 
     // 5. Build the email template (dark mode/forensic aesthetic)
     const trackingId = `sig_${Date.now()}_${token.substring(0, 8)}`;
@@ -79,14 +91,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           <div style="font-size: 16px;">${document.name}</div>
         </div>
         
-        <a href="${signingUrl}" style="display: inline-block; background-color: #002fa7; color: white; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-size: 14px;">
+        <a href="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=opened&redirect=/secure-portal/sign/${token}" style="display: inline-block; background-color: #002fa7; color: white; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-size: 14px;">
           Review & Execute Document
         </a>
-        
+
         <div style="margin-top: 40px; font-size: 11px; color: #52525b; border-top: 1px solid #27272a; padding-top: 16px;">
           This is a secure, tamper-evident signing link. Your IP address and network telemetry will be recorded upon access for audit trail purposes. Do not forward this email.
         </div>
-        <img src="${protocol}://${host}/api/signatures/telemetry?token=${token}&action=opened" width="1" height="1" alt="" style="display:none;" />
+        <img src="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=opened" width="1" height="1" alt="" style="display:none;" />
       </div>
     `;
 
@@ -109,8 +121,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         isSignatureRequest: true,
         documentId,
-        dealId,
-        token
+        dealId
       }
     };
 

@@ -35,8 +35,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(404).json({ error: 'Invalid or expired secure token' });
         }
 
-        if (request.status === 'signed' || request.status === 'completed') {
-            return res.status(400).json({ error: 'Document has already been executed' });
+        if (request.status === 'signed' || request.status === 'completed' || request.status === 'declined') {
+            return res.status(400).json({ error: 'Document has already been executed or was declined' });
         }
 
         // 2. Log signing telemetry
@@ -113,8 +113,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const pdfY = pdfHeight - scaledY - scaledHeight;
 
                 if (field.type === 'text') {
-                    // Draw Text input
-                    const textContent = (textValues && textValues[index]) ? textValues[index] : '';
+                    // Draw Text input — use stable fieldId as key; fall back to index for legacy requests
+                    const textKey = field.fieldId ?? String(index);
+                    const textContent = (textValues && textValues[textKey]) ? textValues[textKey] : '';
                     targetPage.drawText(textContent, {
                         x: scaledX + 5,
                         y: pdfY + (scaledHeight / 3), // approximate vertical centering
@@ -187,23 +188,44 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         certPage.drawText(`Original SHA-256 Hash: ${originalHash}`, { x: 50, y: certHeight - 110, size: 10, font: helvetica });
         certPage.drawText(`Signer: ${request.contact?.email || 'Unknown'}`, { x: 50, y: certHeight - 130, size: 10, font: helvetica });
 
+        // Track the active cert page — overflow adds a labelled continuation page automatically
+        let activeCertPage = certPage;
+        const CERT_LEFT = 50;
+        const CERT_MIN_Y = 80;    // reserve bottom 80pt for the footer line
+        const CERT_ENTRY_HEIGHT = 52; // approx height consumed per telemetry entry (15 + 12 + 25)
+
         let currentY = certHeight - 170;
-        certPage.drawText('TELEMETRY TIMELINE:', { x: 50, y: currentY, size: 12, font: helveticaBold });
+        activeCertPage.drawText('TELEMETRY TIMELINE:', { x: CERT_LEFT, y: currentY, size: 12, font: helveticaBold });
         currentY -= 20;
 
         if (telemetries) {
             telemetries.forEach((t) => {
-                certPage.drawText(`[${new Date(t.created_at).toISOString()}] ACTION: ${t.action.toUpperCase()}`, { x: 50, y: currentY, size: 10, font: helveticaBold });
+                // If the next entry would bleed off the bottom of the current page, start a new one
+                if (currentY < CERT_MIN_Y + CERT_ENTRY_HEIGHT) {
+                    activeCertPage = pdfDoc.addPage([595.28, 841.89]);
+                    const contHeight = activeCertPage.getHeight();
+                    activeCertPage.drawText('NODAL POINT | FORENSIC AUDIT CERTIFICATE (continued)', {
+                        x: CERT_LEFT,
+                        y: contHeight - 50,
+                        size: 10,
+                        font: helveticaBold,
+                        color: rgb(0, 0.184, 0.655)
+                    });
+                    currentY = contHeight - 80;
+                }
+
+                activeCertPage.drawText(`[${new Date(t.created_at).toISOString()}] ACTION: ${t.action.toUpperCase()}`, { x: CERT_LEFT, y: currentY, size: 10, font: helveticaBold });
                 currentY -= 15;
-                certPage.drawText(`IP Address: ${t.ip_address || 'Unknown'}`, { x: 70, y: currentY, size: 9, font: helvetica });
+                activeCertPage.drawText(`IP Address: ${t.ip_address || 'Unknown'}`, { x: CERT_LEFT + 20, y: currentY, size: 9, font: helvetica });
                 currentY -= 12;
-                certPage.drawText(`Device/OS: ${t.user_agent ? t.user_agent.substring(0, 80) : 'Unknown'}`, { x: 70, y: currentY, size: 9, font: helvetica });
+                activeCertPage.drawText(`Device/OS: ${t.user_agent ? t.user_agent.substring(0, 80) : 'Unknown'}`, { x: CERT_LEFT + 20, y: currentY, size: 9, font: helvetica });
                 currentY -= 25;
             });
         }
 
-        certPage.drawText('This document is electronically signed and secured by Nodal Point.', {
-            x: 50,
+        // Draw footer on whichever cert page was last written to
+        activeCertPage.drawText('This document is electronically signed and secured by Nodal Point.', {
+            x: CERT_LEFT,
             y: 50,
             size: 9,
             font: helvetica,
@@ -217,7 +239,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const originalExt = request.document.name.split('.').pop();
         const originalNameNoExt = request.document.name.replace(`.${originalExt}`, '');
         const finalFileName = `${originalNameNoExt}_Signed_${Date.now()}.${originalExt}`;
-        const finalStoragePath = `accounts/${request.account_id}/${finalFileName}`;
+        const accountFolder = request.account_id ?? 'unassigned';
+        const finalStoragePath = `accounts/${accountFolder}/${finalFileName}`;
 
         const { error: finalUploadError } = await supabaseAdmin.storage
             .from('vault')
@@ -265,10 +288,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const adminEmail = 'signal@nodalpoint.io';
             const agentEmail = request.metadata?.agentEmail || request.deal?.ownerId || request.account?.ownerId;
 
+            if (!agentEmail) {
+                console.warn('[Execution Email] agentEmail could not be resolved for request', request.id, '— agent will not receive BCC copy.');
+            }
+
             const zohoService = new ZohoMailService();
             await zohoService.initialize(adminEmail);
-
-            const base64Attachment = Buffer.from(finalPdfBytes).toString('base64');
 
             // Upload attachment to Zoho first
             const zohoAttachment = await zohoService.uploadAttachment(
@@ -277,30 +302,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 finalFileName
             );
 
+            const emailSubject = `Executed Contract: ${request.document.name}`;
             const emailHtml = `
           <div style="font-family: monospace; background-color: #09090b; color: #f4f4f5; padding: 40px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
             <h2 style="text-transform: uppercase; letter-spacing: 0.1em; color: #10b981; font-size: 14px; margin-bottom: 24px;">
               CONTRACT EXECUTED
             </h2>
-            
+
             <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 20px;">
               The contract <strong>${request.document.name}</strong> has been successfully executed.
             </p>
-            
+
             <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 24px;">
               A copy of the fully executed document with the attached Forensic Audit Certificate is attached for your records.
             </p>
-            
+
             <div style="margin-top: 40px; font-size: 11px; color: #52525b; border-top: 1px solid #27272a; padding-top: 16px;">
               Nodal Point Forensic Systems
             </div>
           </div>
         `;
 
+            // Log execution email in the CRM emails table for CRM visibility
+            const execEmailId = `sig_exec_${Date.now()}_${request.id.substring(0, 8)}`;
+            const { error: emailInsertError } = await supabaseAdmin.from('emails').insert({
+                id: execEmailId,
+                contactId: request.contact_id,
+                accountId: request.account_id || null,
+                ownerId: adminEmail,
+                from: adminEmail,
+                to: [request.contact.email],
+                subject: emailSubject,
+                html: emailHtml,
+                text: `The contract has been executed. See attached.`,
+                status: 'sent',
+                type: 'sent',
+                timestamp: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                metadata: {
+                    isSignatureExecution: true,
+                    documentId: request.document.id,
+                    dealId: request.deal_id,
+                    signedDocumentPath: finalStoragePath
+                }
+            });
+            if (emailInsertError) {
+                console.error('[Execution Email] Failed to log email to CRM:', emailInsertError.message);
+            }
+
             await zohoService.sendEmail({
                 to: [request.contact.email],
-                bcc: agentEmail ? [agentEmail] : undefined, // directly BCC the agent
-                subject: `Executed Contract: ${request.document.name}`,
+                bcc: agentEmail ? [agentEmail] : undefined,
+                subject: emailSubject,
                 html: emailHtml,
                 text: `The contract has been executed. See attached.`,
                 uploadedAttachments: zohoAttachment ? [zohoAttachment] : undefined,
