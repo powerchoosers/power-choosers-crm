@@ -8,7 +8,12 @@ import { useAuth } from '@/context/AuthContext'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
 import { useDealsByAccount } from '@/hooks/useDeals'
 import { toast } from 'sonner'
-import { DocumentPreparationModal } from '../modals/DocumentPreparationModal'
+import dynamic from 'next/dynamic'
+
+const DocumentPreparationModal = dynamic(
+    () => import('../modals/DocumentPreparationModal').then(m => m.DocumentPreparationModal),
+    { ssr: false }
+)
 
 export function SignatureRequestPanel() {
     const { setRightPanelMode, signatureRequestContext } = useUIStore()

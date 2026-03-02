@@ -26,12 +26,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(404).json({ error: 'Invalid or expired secure token' });
         }
 
-        // 2. Extract telemetry data from headers
+        // 2. Rate limit — max 10 telemetry events per token per 60 seconds
+        // This prevents audit trail flooding by anyone holding a signing link
+        const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+        const { count: recentCount, error: countError } = await supabaseAdmin
+            .from('signature_telemetry')
+            .select('*', { count: 'exact', head: true })
+            .eq('request_id', request.id)
+            .gte('created_at', oneMinuteAgo);
+
+        if (!countError && recentCount !== null && recentCount >= 10) {
+            if (req.method === 'GET') return res.status(429).send('Too many requests');
+            return res.status(429).json({ error: 'Rate limit exceeded. Too many telemetry events for this token.' });
+        }
+
+        // 3. Extract telemetry data from headers
         const forwardedFor = req.headers['x-forwarded-for'];
         const ipAddress = Array.isArray(forwardedFor) ? forwardedFor[0] : (forwardedFor || req.socket.remoteAddress || 'Unknown IP');
         const userAgent = req.headers['user-agent'] || 'Unknown Device';
 
-        // 3. Log the telemetry event
+        // 4. Log the telemetry event
         const { error: insertError } = await supabaseAdmin
             .from('signature_telemetry')
             .insert({
@@ -46,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // We don't want to fail the generic request just because telemetry failed, but log it internally
         }
 
-        // 4. Update the request status
+        // 5. Update the request status
         // Transition: pending -> opened -> viewed
         if (request.status === 'pending' && action === 'opened') {
             await supabaseAdmin
@@ -61,6 +75,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         if (req.method === 'GET') {
+            // If a redirect path is supplied (must be relative, starting with '/') use it
+            // as a reliable click-through tracker instead of returning a pixel GIF.
+            const redirectPath = typeof req.query.redirect === 'string' ? req.query.redirect : null;
+            if (redirectPath && redirectPath.startsWith('/')) {
+                res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+                return res.redirect(302, redirectPath);
+            }
+
             const transparentGif = Buffer.from(
                 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
                 'base64'
