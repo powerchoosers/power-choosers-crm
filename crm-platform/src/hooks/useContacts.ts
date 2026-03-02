@@ -298,22 +298,28 @@ export function useAccountContacts(accountId: string) {
         throw error
       }
 
-      return (data || []).map(row => ({
-        id: row.id,
-        name: buildContactName({
-          firstName: row.firstName || row.first_name,
-          lastName: row.lastName || row.last_name,
-          rawName: row.name,
-          email: row.email
-        }),
-        email: row.email || '',
-        phone: row.phone || '',
-        title: row.title || '',
-        accountId: row.accountId,
-        company: '', // Default for required field
-        status: 'Lead', // Default for required field
-        lastContact: row.lastContactedAt || '' // Default for required field
-      })) as Contact[]
+      return (data || []).map(row => {
+        const fName = row.firstName || row.first_name || ''
+        const lName = row.lastName || row.last_name || ''
+        return {
+          id: row.id,
+          name: buildContactName({
+            firstName: fName,
+            lastName: lName,
+            rawName: row.name,
+            email: row.email
+          }),
+          firstName: fName,
+          lastName: lName,
+          email: row.email || '',
+          phone: row.phone || '',
+          title: row.title || '',
+          accountId: row.accountId,
+          company: '', // Default for required field
+          status: 'Lead', // Default for required field
+          lastContact: row.lastContactedAt || '' // Default for required field
+        }
+      }) as Contact[]
     },
     enabled: !!accountId && !loading && !!user,
     staleTime: 1000 * 60 * 5,
