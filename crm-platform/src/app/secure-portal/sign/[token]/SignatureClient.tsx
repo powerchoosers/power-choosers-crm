@@ -29,6 +29,9 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     const sigCanvas = useRef<SignatureCanvas>(null)
     const hiddenCanvasRef = useRef<HTMLCanvasElement>(null)
     const pdfScrollContainerRef = useRef<HTMLDivElement>(null)
+    // ── Canvas sizing refs ────────────────────────────────────────────────────
+    const sigContainerRef = useRef<HTMLDivElement>(null)
+    const typedInputRef = useRef<HTMLInputElement>(null)
 
     // ── Field completion tracking ─────────────────────────────────────────────
     const fields: any[] = request.signature_fields ?? []
@@ -70,6 +73,52 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             setActiveSignature(null)
         }
     }, [typedSignature, signatureMode])
+
+    // ── Sync canvas buffer to container display size (fixes mobile offset) ───
+    // The canvas buffer must match the CSS display size exactly so that
+    // signature_pad draws strokes directly under the user's finger/stylus.
+    useEffect(() => {
+        const container = sigContainerRef.current
+        if (!container) return
+
+        const syncSize = () => {
+            const canvas = sigCanvas.current?.getCanvas()
+            if (!canvas) return
+            const rect = container.getBoundingClientRect()
+            const w = Math.floor(rect.width)
+            const h = Math.floor(rect.height)
+            if (canvas.width !== w || canvas.height !== h) {
+                canvas.width = w
+                canvas.height = h
+                // Clear after resize so stale pixels don't bleed through
+                sigCanvas.current?.clear()
+                setActiveSignature(null)
+            }
+        }
+
+        const ro = new ResizeObserver(syncSize)
+        ro.observe(container)
+        syncSize() // sync on mount
+
+        return () => ro.disconnect()
+    }, [signatureMode]) // re-run when mode toggles (canvas unmounts/remounts)
+
+    // ── Auto-scale typed signature font to fit the input width ───────────────
+    useEffect(() => {
+        const input = typedInputRef.current
+        if (!input) return
+        if (!typedSignature) {
+            input.style.fontSize = ''
+            return
+        }
+        // Start at max readable size and shrink until text fits without overflow
+        let size = 36
+        input.style.fontSize = `${size}px`
+        while (input.scrollWidth > input.clientWidth && size > 10) {
+            size -= 1
+            input.style.fontSize = `${size}px`
+        }
+    }, [typedSignature])
 
     // ── Log view telemetry on mount ───────────────────────────────────────────
     useEffect(() => {
@@ -384,6 +433,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
                             {/* Signature input area */}
                             <div
+                                ref={sigContainerRef}
                                 className="w-full h-40 bg-white border-2 border-dashed border-[#002FA7]/40 rounded-lg overflow-hidden relative cursor-crosshair"
                                 onMouseUp={() => signatureMode === 'draw' && captureDrawnSignature()}
                                 onTouchEnd={() => signatureMode === 'draw' && captureDrawnSignature()}
@@ -391,15 +441,15 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                 {signatureMode === 'draw' ? (
                                     <>
                                         <SignatureCanvas
+                                            key="draw-canvas"
                                             ref={sigCanvas}
                                             penColor="#002FA7"
                                             onEnd={captureDrawnSignature}
                                             canvasProps={{
-                                                // Explicit pixel dimensions prevent mobile rendering mismatch.
-                                                // CSS (w-full h-full) controls display size; these set resolution.
-                                                width: 600,
-                                                height: 160,
-                                                className: 'w-full h-full relative z-10',
+                                                // NO explicit width/height — canvas buffer is sized by
+                                                // the ResizeObserver above to exactly match the display
+                                                // size, so touch coordinates map 1:1 with drawn strokes.
+                                                className: 'w-full h-full block relative z-10',
                                                 style: { touchAction: 'none' } as React.CSSProperties
                                             }}
                                         />
@@ -408,15 +458,17 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                         </div>
                                     </>
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center p-4 relative">
+                                    <div className="w-full h-full flex items-center justify-center px-4 relative">
                                         <input
+                                            ref={typedInputRef}
                                             type="text"
                                             value={typedSignature}
                                             onChange={(e) => setTypedSignature(e.target.value)}
                                             placeholder="Type your name..."
-                                            className="w-full text-center text-4xl text-[#002FA7] bg-transparent border-b border-zinc-200 focus:outline-none focus:border-[#002FA7] pb-2 font-serif italic"
+                                            className="w-full text-center text-[#002FA7] bg-transparent border-b border-zinc-200 focus:outline-none focus:border-[#002FA7] pb-2 font-serif italic whitespace-nowrap overflow-hidden"
+                                            style={{ fontSize: '36px' }}
                                         />
-                                        {/* Hidden canvas: same aspect as draw area (600×160) for proportional embedding */}
+                                        {/* Hidden canvas for rendering typed signature as image */}
                                         <canvas ref={hiddenCanvasRef} width={600} height={160} className="hidden absolute" />
                                     </div>
                                 )}
@@ -427,15 +479,53 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             </p>
                         </div>
 
-                        {/* Skip to next field */}
+                        {/* Field Navigator — jump to any field, see completion status */}
                         {totalFields > 0 && (
-                            <button
-                                onClick={skipToNextField}
-                                className="w-full h-10 bg-zinc-900 border border-white/5 hover:border-white/20 text-emerald-500 font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all"
-                            >
-                                <ChevronRight className="w-3.5 h-3.5" />
-                                Skip to Next Missing Field
-                            </button>
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-xs font-mono uppercase tracking-widest text-zinc-400">Field Map</h2>
+                                    <button
+                                        onClick={skipToNextField}
+                                        className="text-[10px] font-mono text-[#002FA7] hover:text-blue-400 flex items-center gap-1 transition-colors"
+                                    >
+                                        <ChevronRight className="w-3 h-3" />
+                                        Next missing
+                                    </button>
+                                </div>
+                                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto pr-0.5">
+                                    {fields.map((f: any, idx: number) => {
+                                        const key = f.fieldId ?? String(idx)
+                                        const isComplete = f.type === 'text'
+                                            ? !!textValues[key]?.trim()
+                                            : !!activeSignature
+                                        return (
+                                            <button
+                                                key={key}
+                                                onClick={() => {
+                                                    setPageNumber(f.pageIndex + 1)
+                                                    setTimeout(() => {
+                                                        const el = document.getElementById(`sig-field-${key}`)
+                                                        if (el) {
+                                                            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+                                                            el.classList.add('!ring-2', '!ring-[#002FA7]', '!ring-offset-2')
+                                                            setTimeout(() => el.classList.remove('!ring-2', '!ring-[#002FA7]', '!ring-offset-2'), 1500)
+                                                        }
+                                                    }, 200)
+                                                }}
+                                                className="flex items-center gap-2 px-2 py-1.5 rounded border border-white/5 hover:border-white/20 hover:bg-white/[0.03] transition-all text-left w-full"
+                                            >
+                                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${isComplete ? 'bg-emerald-500' : 'bg-rose-400 animate-pulse'}`} />
+                                                <span className="text-[10px] font-mono text-zinc-400 flex-1 truncate">
+                                                    {f.type === 'text' ? 'Text Field' : 'Signature'} · pg {(f.pageIndex ?? 0) + 1}
+                                                </span>
+                                                <span className={`text-[10px] font-mono font-bold ${isComplete ? 'text-emerald-500' : 'text-zinc-600'}`}>
+                                                    {isComplete ? '✓' : '○'}
+                                                </span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
                         )}
 
                         {/* Execute button */}
