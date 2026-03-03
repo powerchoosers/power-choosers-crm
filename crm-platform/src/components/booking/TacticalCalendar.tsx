@@ -87,8 +87,8 @@ export default function TacticalCalendar({
             {/* Calendar Grid */}
             <div className="mb-8 p-4 bg-black/20 rounded-2xl border border-white/5">
                 <div className="grid grid-cols-7 gap-1 mb-2 text-center">
-                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d) => (
-                        <div key={d} className="text-[10px] font-mono text-zinc-600 uppercase py-2">
+                    {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                        <div key={i} className="text-[10px] font-mono text-zinc-600 uppercase py-2">
                             {d}
                         </div>
                     ))}
