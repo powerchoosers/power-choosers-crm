@@ -289,28 +289,35 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // 8. Email Delivery
         try {
-            const adminEmail = 'signal@nodalpoint.io';
+            // authEmail: the Zoho account that holds real OAuth tokens (l.patterson@nodalpoint.io).
+            // fromEmail:  the alias address the email appears to come from (signal@nodalpoint.io).
+            // These MUST be separate — token lookup uses authEmail, display from uses fromEmail.
+            // Using fromEmail for token lookup throws "No Zoho credentials found for signal@nodalpoint.io"
+            // because signal@ is an alias with no stored OAuth tokens, silently killing the email.
+            const authEmail = 'l.patterson@nodalpoint.io';
+            const fromEmail = 'signal@nodalpoint.io';
+
             // Resolve agent email from the request metadata (set at dispatch time), then deal owner, then account owner.
-            // Fall back to adminEmail so the notification inbox always receives a copy even when the chain is incomplete.
+            // Fall back to fromEmail so the notification inbox always receives a copy even when the chain is incomplete.
             const resolvedAgentEmail: string =
                 request.metadata?.agentEmail ||
                 request.deal?.ownerId ||
                 request.account?.ownerId ||
-                adminEmail;
+                fromEmail;
 
             if (!request.metadata?.agentEmail && !request.deal?.ownerId && !request.account?.ownerId) {
-                console.warn('[Execution Email] agentEmail could not be resolved for request', request.id, '— falling back to adminEmail for BCC.');
+                console.warn('[Execution Email] agentEmail could not be resolved for request', request.id, '— falling back to fromEmail for BCC.');
             }
 
             const zohoService = new ZohoMailService();
-            await zohoService.initialize(adminEmail);
+            await zohoService.initialize(authEmail);
 
             // Upload attachment to Zoho first — non-fatal if it fails
             // (email still sends without attachment rather than silently dropping)
             let zohoAttachment = null;
             try {
                 zohoAttachment = await zohoService.uploadAttachment(
-                    adminEmail,
+                    authEmail,
                     Buffer.from(finalPdfBytes),
                     finalFileName
                 );
@@ -345,8 +352,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 id: execEmailId,
                 contactId: request.contact_id,
                 accountId: request.account_id || null,
-                ownerId: adminEmail,
-                from: adminEmail,
+                ownerId: fromEmail,
+                from: fromEmail,
                 to: [request.contact.email],
                 subject: emailSubject,
                 html: emailHtml,
@@ -375,7 +382,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 html: emailHtml,
                 text: `The contract has been executed. See attached.`,
                 uploadedAttachments: zohoAttachment ? [zohoAttachment] : undefined,
-                userEmail: adminEmail,
+                userEmail: authEmail,       // l.patterson@nodalpoint.io — used for OAuth token lookup
+                from: fromEmail,            // signal@nodalpoint.io — display from address
                 fromName: 'Nodal Point Compliance'
             });
         } catch (emailError: any) {
