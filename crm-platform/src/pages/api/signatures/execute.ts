@@ -281,6 +281,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             await supabaseAdmin.from('deals').update({ stage: 'SECURED' }).eq('id', request.deal_id);
         }
 
+        // Advance account lifecycle: Active Load → Customer on contract execution
+        if (request.account_id) {
+            await supabaseAdmin.from('accounts').update({ status: 'Customer' }).eq('id', request.account_id);
+        }
+
         // 8. Email Delivery
         try {
             const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nodalpoint.io';
