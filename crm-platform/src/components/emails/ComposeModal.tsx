@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useEmails } from '@/hooks/useEmails'
 import { useAuth } from '@/context/AuthContext'
 import { generateNodalSignature } from '@/lib/signature'
-import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap, Type } from 'lucide-react'
+import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap, Type, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, Palette } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -23,6 +23,8 @@ import { useQuery } from '@tanstack/react-query'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { RichTextEditor } from './RichTextEditor'
+import type { Editor } from '@tiptap/react'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 const EMAIL_AI_MODELS = [
   { value: 'google/gemini-2.5-flash', label: 'GEMINI-2.5-FLASH' },
@@ -33,6 +35,12 @@ const EMAIL_AI_MODELS = [
   { value: 'openai/gpt-oss-120b:free', label: 'GPT-OSS-120B' },
   { value: 'nvidia/nemotron-3-nano-30b-a3b:free', label: 'NEMOTRON-30B' },
 ] as const
+
+const TOOLBAR_COLORS = [
+  '#FAFAFA', '#A1A1AA', '#EF4444', '#F97316', '#F59E0B',
+  '#10B981', '#06B6D4', '#3B82F6', '#6366F1', '#8B5CF6', '#EC4899',
+  '#002FA7',
+]
 
 export type EmailTypeId = 'cold_first_touch' | 'cold_followup' | 'professional' | 'followup' | 'post_call' | 'internal' | 'support'
 
@@ -628,6 +636,42 @@ function ComposePanel({
 
   // Formatting panel state
   const [formattingOpen, setFormattingOpen] = useState(false)
+
+  // TipTap editor instance exposed from RichTextEditor — used to drive the floating formatting toolbar
+  const editorRef = useRef<Editor | null>(null)
+  // Incrementing this forces ComposePanel to re-render so toolbar active states (bold/italic/etc.) stay in sync
+  const [, setEditorTick] = useState(0)
+  const handleEditorReady = useCallback((editor: Editor | null) => {
+    editorRef.current = editor
+    if (editor) {
+      editor.on('transaction', () => setEditorTick(t => t + 1))
+    }
+  }, [])
+
+  // Hidden file input for inserting images via the floating toolbar
+  const toolbarImageInputRef = useRef<HTMLInputElement>(null)
+  const uploadToolbarImage = async (file: File) => {
+    const { toast } = await import('sonner')
+    const toastId = toast.loading('Uploading image...')
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await fetch('/api/upload', { method: 'POST', body: formData })
+      if (!response.ok) throw new Error('Failed to upload image')
+      const data = await response.json()
+      if (editorRef.current && data.url) {
+        editorRef.current.chain().focus().setImage({ src: data.url }).run()
+      }
+      toast.success('Image uploaded', { id: toastId })
+    } catch {
+      toast.error('Failed to upload image', { id: toastId })
+    }
+  }
+  const handleToolbarImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) uploadToolbarImage(file)
+    if (toolbarImageInputRef.current) toolbarImageInputRef.current.value = ''
+  }
 
   // Deep foundry context: energy profile + call transcripts loaded from Supabase when contact/account is present
   const [foundryContext, setFoundryContext] = useState<FoundryContext | null>(null)
@@ -1465,7 +1509,7 @@ OUTPUT FORMAT:
                     }
                   }}
                   className="w-full"
-                  showToolbar={formattingOpen}
+                  onEditorReady={handleEditorReady}
                 />
               )}
               {isAiLoading && (
@@ -1534,6 +1578,116 @@ OUTPUT FORMAT:
             )}
           </div>
         </div>
+
+        {/* Formatting Toolbar — slides up above footer, identical animation to AI rail */}
+        <AnimatePresence>
+          {formattingOpen && !selectedFoundryId && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute left-4 right-4 bottom-[calc(4rem+8px)] z-50 backdrop-blur-xl bg-zinc-950/90 border border-white/10 rounded-lg shadow-2xl overflow-visible"
+            >
+              <div className="flex flex-wrap items-center gap-1 p-2">
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); editorRef.current?.chain().focus().toggleBold().run() }}
+                  className={cn('p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors', editorRef.current?.isActive('bold') && 'bg-white/10 text-white')}
+                  title="Bold"
+                >
+                  <Bold className="w-4 h-4" />
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); editorRef.current?.chain().focus().toggleItalic().run() }}
+                  className={cn('p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors', editorRef.current?.isActive('italic') && 'bg-white/10 text-white')}
+                  title="Italic"
+                >
+                  <Italic className="w-4 h-4" />
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); editorRef.current?.chain().focus().toggleUnderline().run() }}
+                  className={cn('p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors', editorRef.current?.isActive('underline') && 'bg-white/10 text-white')}
+                  title="Underline"
+                >
+                  <UnderlineIcon className="w-4 h-4" />
+                </button>
+
+                <div className="w-px h-4 bg-white/10 mx-1" />
+
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); editorRef.current?.chain().focus().toggleBulletList().run() }}
+                  className={cn('p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors', editorRef.current?.isActive('bulletList') && 'bg-white/10 text-white')}
+                  title="Bullet List"
+                >
+                  <List className="w-4 h-4" />
+                </button>
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); editorRef.current?.chain().focus().toggleOrderedList().run() }}
+                  className={cn('p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors', editorRef.current?.isActive('orderedList') && 'bg-white/10 text-white')}
+                  title="Numbered List"
+                >
+                  <ListOrdered className="w-4 h-4" />
+                </button>
+
+                <div className="w-px h-4 bg-white/10 mx-1" />
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors flex items-center gap-1"
+                      title="Text Color"
+                      onMouseDown={(e) => e.preventDefault()}
+                    >
+                      <Palette className="w-4 h-4" />
+                      <div
+                        className="w-3 h-3 rounded-full border border-white/20"
+                        style={{ backgroundColor: editorRef.current?.getAttributes('textStyle').color || 'transparent' }}
+                      />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-2 bg-zinc-950 border-white/10 nodal-monolith-edge z-[300]" align="start" side="top">
+                    <div className="grid grid-cols-6 gap-1.5">
+                      {TOOLBAR_COLORS.map((color) => (
+                        <button
+                          key={color}
+                          className={cn(
+                            'w-6 h-6 rounded-md hover:scale-110 transition-transform',
+                            editorRef.current?.getAttributes('textStyle').color === color && 'ring-2 ring-white/50'
+                          )}
+                          style={{ backgroundColor: color }}
+                          onMouseDown={(e) => { e.preventDefault(); editorRef.current?.chain().focus().setColor(color).run() }}
+                        />
+                      ))}
+                      <button
+                        className="col-span-6 mt-1 text-[10px] text-zinc-400 hover:text-white transition-colors py-1"
+                        onMouseDown={(e) => { e.preventDefault(); editorRef.current?.chain().focus().unsetColor().run() }}
+                      >
+                        Reset Color
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <div className="w-px h-4 bg-white/10 mx-1" />
+
+                <button
+                  onMouseDown={(e) => { e.preventDefault(); toolbarImageInputRef.current?.click() }}
+                  className="p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors"
+                  title="Insert Image"
+                >
+                  <ImageIcon className="w-4 h-4" />
+                </button>
+                <input
+                  type="file"
+                  ref={toolbarImageInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handleToolbarImageChange}
+                />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* AI Command Rail — slides up above footer */}
         <AnimatePresence>
