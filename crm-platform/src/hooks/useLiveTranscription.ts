@@ -20,6 +20,14 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
     const lastIntelTimeRef = useRef<number>(0);
     const transcriptBufferRef = useRef<string>('');
 
+    const rollingWindowRef = useRef<string>('');
+    const lastProspectFinalRef = useRef<string>('');
+    const lastInsightHashRef = useRef<string>('');
+    const inflightIntelRef = useRef(false);
+    const lastNonIdleIntelTimeRef = useRef<number>(0);
+
+    const lastDebugTimeRef = useRef<number>(0);
+
     useEffect(() => {
         if (!isActive) {
             stopStreaming();
@@ -164,32 +172,110 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
     };
 
     const handleFinalTranscript = (text: string, speaker: 'Agent' | 'Prospect') => {
-        transcriptBufferRef.current += `\n${speaker}: ${text}`;
+        const line = `${speaker}: ${text}`;
+        transcriptBufferRef.current += `\n${line}`;
+        rollingWindowRef.current = `${rollingWindowRef.current}\n${line}`.trim();
+
+        // Keep rolling window bounded to reduce token usage while preserving context.
+        // Aim for ~2500 chars (a couple minutes of dialogue) as a stable context.
+        if (rollingWindowRef.current.length > 2500) {
+            rollingWindowRef.current = rollingWindowRef.current.slice(rollingWindowRef.current.length - 2500);
+        }
+
+        if (speaker === 'Prospect') {
+            lastProspectFinalRef.current = text.trim();
+        }
 
         // Trigger Intelligence based on timing or string length
         const now = Date.now();
         const wordCount = transcriptBufferRef.current.split(' ').length;
 
-        // Fire if 5s passed or 20 words have accumulated in the two-channel buffer
-        if (now - lastIntelTimeRef.current > 5000 || wordCount > 20) {
-            triggerIntelligence();
+        // Premier-grade trigger:
+        // - prioritize Prospect final turns (moment-based)
+        // - throttle to avoid noise
+        // - keep baseline timer/word-count as fallback
+        const prospectJustSpoke = speaker === 'Prospect' && text.trim().length >= 6;
+        const cooldownMs = 4500;
+        const baselineDue = (now - lastIntelTimeRef.current > 7000) || wordCount > 35;
+
+        if (prospectJustSpoke && now - lastIntelTimeRef.current > cooldownMs) {
+            triggerIntelligence('prospect_final');
             lastIntelTimeRef.current = now;
+        } else if (baselineDue && now - lastIntelTimeRef.current > cooldownMs) {
+            triggerIntelligence('baseline');
+            lastIntelTimeRef.current = now;
+        } else if (prospectJustSpoke) {
+            // Diagnostic breadcrumb without spamming.
+            if (now - lastDebugTimeRef.current > 20_000) {
+                addSignal({
+                    id: `live-${Date.now()}`,
+                    time: new Date(),
+                    type: 'LIVE',
+                    message: `Live Insights throttled — Prospect said: "${text.trim().slice(0, 80)}"`
+                });
+                lastDebugTimeRef.current = now;
+            }
         }
     };
 
-    const triggerIntelligence = async () => {
-        const textToAnalyze = transcriptBufferRef.current.trim();
-        transcriptBufferRef.current = ''; // Clear buffer after sending
+    const triggerIntelligence = async (reason: 'prospect_final' | 'baseline') => {
+        if (inflightIntelRef.current) {
+            const now = Date.now();
+            if (now - lastDebugTimeRef.current > 20_000) {
+                addSignal({
+                    id: `live-${Date.now()}`,
+                    time: new Date(),
+                    type: 'LIVE',
+                    message: 'Live Insights busy — waiting for current analysis to complete'
+                });
+                lastDebugTimeRef.current = now;
+            }
+            return;
+        }
 
-        if (!textToAnalyze || textToAnalyze.length < 20) return;
+        const now = Date.now();
+        const windowText = rollingWindowRef.current.trim();
+        const deltaText = transcriptBufferRef.current.trim();
+        transcriptBufferRef.current = '';
+
+        // If we don't have meaningful prospect content, don't spam.
+        const lastProspect = lastProspectFinalRef.current;
+        if (!windowText || windowText.length < 40) return;
+
+        // Avoid calling the model repeatedly on the same prospect line.
+        const fingerprint = `${accountId ?? ''}|${lastProspect}|${windowText.slice(-220)}`;
+        if (fingerprint === lastInsightHashRef.current) {
+            const now = Date.now();
+            if (now - lastDebugTimeRef.current > 25_000 && reason === 'prospect_final') {
+                addSignal({
+                    id: `live-${Date.now()}`,
+                    time: new Date(),
+                    type: 'LIVE',
+                    message: 'Live Insights dedup — no new prospect signal'
+                });
+                lastDebugTimeRef.current = now;
+            }
+            return;
+        }
+        lastInsightHashRef.current = fingerprint;
+
+        // If nothing changed since last call and we recently produced a non-idle insight, back off.
+        if (!deltaText && now - lastNonIdleIntelTimeRef.current < 12_000 && reason === 'baseline') {
+            return;
+        }
+
+        inflightIntelRef.current = true;
 
         try {
             const res = await fetch('/api/ai/live-intelligence', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    transcript: textToAnalyze,
-                    accountId: accountId
+                    transcript: windowText,
+                    accountId: accountId,
+                    contactId: currentCall?.metadata?.contactId,
+                    reason,
+                    lastProspect,
                 })
             });
 
@@ -206,8 +292,16 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
                 return;
             }
 
-            const { insight } = data;
-            if (insight && insight !== 'Monitoring signal...') {
+            const { insight, insight_json } = data;
+
+            // Basic usefulness heuristic: if model indicates silence, don't keep hammering.
+            const moment = typeof insight_json?.moment === 'string' ? insight_json.moment : null;
+            const isIdle = moment === 'SILENCE' || moment === 'UNKNOWN';
+            if (!isIdle && insight) {
+                lastNonIdleIntelTimeRef.current = now;
+            }
+
+            if (insight) {
                 addSignal({
                     id: `intel-${Date.now()}`,
                     time: new Date(),
@@ -217,6 +311,8 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
             }
         } catch (error) {
             console.warn('[Intelligence] Failed to fetch live insight:', error);
+        } finally {
+            inflightIntelRef.current = false;
         }
     };
 
@@ -261,6 +357,12 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
             streamRef.current.getTracks().forEach(track => track.stop());
             streamRef.current = null;
         }
+
+        rollingWindowRef.current = '';
+        lastProspectFinalRef.current = '';
+        lastInsightHashRef.current = '';
+        inflightIntelRef.current = false;
+        lastNonIdleIntelTimeRef.current = 0;
 
         setTranscribing(false);
         updateLiveTranscript('');

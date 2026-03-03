@@ -13,11 +13,28 @@ export default async function handler(req, res) {
         return res.status(503).json({ error: 'No AssemblyAI API key configured' });
     }
 
-    const { transcript, accountId } = req.body;
+    const { transcript, accountId, reason, lastProspect } = req.body;
 
     if (!transcript || transcript.length < 20) {
         return res.status(200).json({ insight: null });
     }
+
+    const safeJsonParse = (value) => {
+        if (typeof value !== 'string') return null;
+        try {
+            return JSON.parse(value);
+        } catch {
+            return null;
+        }
+    };
+
+    const extractFirstJsonObject = (text) => {
+        if (typeof text !== 'string') return null;
+        const start = text.indexOf('{');
+        const end = text.lastIndexOf('}');
+        if (start === -1 || end === -1 || end <= start) return null;
+        return safeJsonParse(text.slice(start, end + 1));
+    };
 
     try {
         let accountContext = 'Unknown prospect';
@@ -26,13 +43,20 @@ export default async function handler(req, res) {
         if (accountId) {
             const { data: account } = await supabaseAdmin
                 .from('accounts')
-                .select('name, industry, location')
+                .select('name, industry, location, description, notes')
                 .eq('id', accountId)
                 .single();
 
             if (account) {
                 industry = account.industry || 'your industry';
-                accountContext = `Account: ${account.name} | Industry: ${industry} | Location: ${account.location || 'Unknown'}`;
+                const parts = [
+                    `Account: ${account.name}`,
+                    `Industry: ${industry}`,
+                    `Location: ${account.location || 'Unknown'}`,
+                    account.description && `Description: ${account.description.trim()}`,
+                    account.notes && `Notes: ${account.notes.trim()}`
+                ].filter(Boolean);
+                accountContext = parts.join(' | ');
 
                 // Try grabbing the most recent call summary to add context
                 const { data: lastCall } = await supabaseAdmin
@@ -46,6 +70,39 @@ export default async function handler(req, res) {
                 if (lastCall?.summary) {
                     accountContext += ` | Previous Call Context: ${lastCall.summary}`;
                 }
+
+                // Recent email context (last 2 subjects)
+                const { data: recentEmails } = await supabaseAdmin
+                    .from('emails')
+                    .select('subject')
+                    .eq('accountId', accountId)
+                    .order('sentAt', { ascending: false })
+                    .limit(2);
+                if (recentEmails?.length) {
+                    const subjects = recentEmails.map(e => e.subject).filter(Boolean).join('; ');
+                    accountContext += ` | Recent Emails: ${subjects}`;
+                }
+
+                // If a contactId is available via call metadata, enrich with contact fields
+                // NOTE: Adjust payload key if you pass contactId differently
+                const { contactId } = req.body;
+                if (contactId) {
+                    const { data: contact } = await supabaseAdmin
+                        .from('contacts')
+                        .select('title, role, notes')
+                        .eq('id', contactId)
+                        .single();
+                    if (contact) {
+                        const contactParts = [
+                            contact.title && `Title: ${contact.title.trim()}`,
+                            contact.role && `Role: ${contact.role.trim()}`,
+                            contact.notes && `Notes: ${contact.notes.trim()}`
+                        ].filter(Boolean);
+                        if (contactParts.length) {
+                            accountContext += ` | Contact: ${contactParts.join(' | ')}`;
+                        }
+                    }
+                }
             }
         }
 
@@ -53,6 +110,10 @@ export default async function handler(req, res) {
 
 ACCOUNT CONTEXT (Use this to customize the script):
 ${accountContext}
+
+REQUEST CONTEXT:
+- Trigger reason: ${reason || 'unknown'}
+- Last Prospect final line (may be empty): ${lastProspect || ''}
 
 NEPQ PLAYBOOK RULES & PSYCHOLOGY:
 1. GATEKEEPERS & OPENERS:
@@ -69,10 +130,24 @@ NEPQ PLAYBOOK RULES & PSYCHOLOGY:
 
 INSTRUCTIONS:
 1. The transcript contains a two-channel dialogue labeled with 'Agent:' and 'Prospect:'. Analyze the flow of the conversation.
-2. Focus strictly on what the 'Prospect' most recently said.
-3. Provide the EXACT, conversational sentences the 'Agent' should read NOW to diffuse objections and advance the diagnosis.
-4. Max 45 words. Make it punchy and instantly readable.
-5. If the transcript is idle, or the Prospect hasn't said anything substantive yet, return "Monitoring signal..."`;
+2. Focus primarily on what the 'Prospect' most recently said, but you may use the prior 2-3 turns for context.
+3. You MUST first classify what is happening into a MOMENT label.
+4. You MUST return a single JSON object ONLY (no markdown, no prose) with this exact schema:
+   {
+     "moment": "GATEKEEPER|OPENER|DISCOVERY|OBJECTION|EMAIL_REQUEST|LOCKED_IN|BROKER|NOT_INTERESTED|TIMING|PRICING|COMPLIANCE|SILENCE|UNKNOWN",
+     "confidence": 0.0,
+     "next_line": "Exact sentence(s) the agent should say now.",
+     "follow_up": "One short question to advance diagnosis.",
+     "if_pushback": "One fallback line if they resist.",
+     "watch_for": "What phrase/intent to listen for next (short)."
+   }
+5. Constraints:
+   - Keep next_line <= 35 words.
+   - follow_up <= 18 words.
+   - if_pushback <= 25 words.
+   - Use forensic energy language (structural inefficiency, demand ratchet liability, 4CP exposure).
+   - If Prospect hasn't said anything substantive recently, set moment=SILENCE and provide a control-regain discovery question.
+6. Never return "Monitoring signal...". Always return valid JSON.`;
 
         // AssemblyAI LLM Gateway — gemini-2.5-flash for low-latency live inference
         const response = await fetch('https://llm-gateway.assemblyai.com/v1/chat/completions', {
@@ -87,7 +162,7 @@ INSTRUCTIONS:
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: `LIVE TRANSCRIPT SNIPPET:\n\n"${transcript}"` }
                 ],
-                max_tokens: 100,
+                max_tokens: 220,
                 temperature: 0.3,
             }),
         });
@@ -99,9 +174,31 @@ INSTRUCTIONS:
             throw new Error(data.error?.message || 'LLM Gateway Error');
         }
 
-        const insight = data.choices?.[0]?.message?.content ?? null;
+        const raw = data.choices?.[0]?.message?.content ?? null;
+        const parsed = safeJsonParse(raw) ?? extractFirstJsonObject(raw);
+        if (parsed && typeof parsed === 'object') {
+            const moment = typeof parsed.moment === 'string' ? parsed.moment : 'UNKNOWN';
+            const nextLine = typeof parsed.next_line === 'string' ? parsed.next_line.trim() : '';
+            const followUp = typeof parsed.follow_up === 'string' ? parsed.follow_up.trim() : '';
+            const ifPushback = typeof parsed.if_pushback === 'string' ? parsed.if_pushback.trim() : '';
+            const watchFor = typeof parsed.watch_for === 'string' ? parsed.watch_for.trim() : '';
+            const confidence = typeof parsed.confidence === 'number' ? parsed.confidence : null;
 
-        return res.status(200).json({ insight: insight?.trim() });
+            const messageParts = [
+                `[${moment}${confidence !== null ? ` ${Math.round(confidence * 100)}%` : ''}]`,
+                nextLine ? `NEXT: ${nextLine}` : null,
+                followUp ? `Q: ${followUp}` : null,
+                ifPushback ? `IF PUSHBACK: ${ifPushback}` : null,
+                watchFor ? `LISTEN FOR: ${watchFor}` : null,
+            ].filter(Boolean);
+
+            return res.status(200).json({
+                insight: messageParts.join(' '),
+                insight_json: parsed,
+            });
+        }
+
+        return res.status(200).json({ insight: typeof raw === 'string' ? raw.trim() : null });
     } catch (err) {
         console.error('Live Intelligence Error:', err);
         return res.status(500).json({ error: 'Failed to generate live insight' });

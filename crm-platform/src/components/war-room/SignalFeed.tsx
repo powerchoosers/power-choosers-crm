@@ -38,6 +38,18 @@ function formatTime(d: Date | string) {
     return new Date(d).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+function parseIntelMessage(message: string) {
+    const m = message.match(/^\[(?<moment>[^\]]+)\]\s*(?<rest>[\s\S]*)$/)
+    if (!m?.groups) {
+        return { moment: null as string | null, rest: message, lines: [] as string[] }
+    }
+
+    const moment = m.groups.moment?.trim() || null
+    const rest = (m.groups.rest || '').trim()
+    const parts = rest.split(/\s+(?=(NEXT:|Q:|IF PUSHBACK:|LISTEN FOR:))/g).map((s) => s.trim()).filter(Boolean)
+    return { moment, rest, lines: parts }
+}
+
 export function SignalFeed({ onAccountClick }: SignalFeedProps) {
     const { signalHistory: entries, addSignal } = useWarRoomStore()
     const listRef = useRef<HTMLDivElement>(null)
@@ -92,6 +104,10 @@ export function SignalFeed({ onAccountClick }: SignalFeedProps) {
                 <AnimatePresence initial={false}>
                     {entries.map((entry) => {
                         const style = TYPE_STYLE[entry.type]
+                        const intelParsed = entry.type === 'INTEL' ? parseIntelMessage(entry.message) : null
+
+                        const nextLine = intelParsed?.lines.find((l) => l.startsWith('NEXT:')) ?? null
+                        const detailLines = intelParsed?.lines.filter((l) => l !== nextLine) ?? []
                         return (
                             <motion.div
                                 key={entry.id}
@@ -108,9 +124,36 @@ export function SignalFeed({ onAccountClick }: SignalFeedProps) {
                                     {style.icon}
                                     {style.label}
                                 </span>
-                                <span className="text-[11px] font-mono text-zinc-400 leading-snug">
-                                    {entry.message}
-                                </span>
+                                {entry.type === 'INTEL' && intelParsed ? (
+                                    <div className="flex-1 min-w-0">
+                                        {intelParsed.moment && (
+                                            <div className="text-[9px] font-mono text-amber-400/80 uppercase tracking-widest mb-1">
+                                                {intelParsed.moment}
+                                            </div>
+                                        )}
+                                        <div className="text-[11px] font-mono text-zinc-200 leading-snug">
+                                            {nextLine ? nextLine.replace(/^NEXT:\s*/, '') : intelParsed.rest}
+                                        </div>
+                                        {detailLines.length > 0 && (
+                                            <details className="mt-1">
+                                                <summary className="text-[10px] font-mono text-zinc-600 cursor-pointer select-none">
+                                                    details
+                                                </summary>
+                                                <div className="mt-1 space-y-1">
+                                                    {detailLines.map((l, idx) => (
+                                                        <div key={idx} className="text-[10px] font-mono text-zinc-500 leading-snug">
+                                                            {l}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </details>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <span className="text-[11px] font-mono text-zinc-400 leading-snug">
+                                        {entry.message}
+                                    </span>
+                                )}
                             </motion.div>
                         )
                     })}
