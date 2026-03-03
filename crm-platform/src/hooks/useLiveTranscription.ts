@@ -273,7 +273,7 @@ export const useLiveTranscription = (isActive: boolean, accountId?: string) => {
                 body: JSON.stringify({
                     transcript: windowText,
                     accountId: accountId,
-                    contactId: currentCall?.metadata?.contactId,
+                    contactId: currentCall?.parameters?.contactId || null,
                     reason,
                     lastProspect,
                 })
