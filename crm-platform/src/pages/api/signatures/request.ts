@@ -15,10 +15,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // 1. Fetch contact and document info to customize the email
-    const [{ data: contact, error: contactError }, { data: document, error: docError }] = await Promise.all([
+    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nodalpoint.io';
+    const logoUrl = `${appBaseUrl}/images/nodalpoint-webicon.png`;
+
+    // 1. Fetch contact, document, and sending agent in parallel
+    const [
+      { data: contact, error: contactError },
+      { data: document, error: docError },
+      { data: agentUser }
+    ] = await Promise.all([
       supabaseAdmin.from('contacts').select('*').eq('id', contactId).single(),
-      supabaseAdmin.from('documents').select('*').eq('id', documentId).single()
+      supabaseAdmin.from('documents').select('*').eq('id', documentId).single(),
+      supabaseAdmin.from('users').select('first_name, last_name').eq('email', userEmail).maybeSingle()
     ]);
 
     if (contactError || !contact) throw new Error(`Contact not found: ${contactError?.message}`);
@@ -27,10 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const contactEmail = contact.email;
     if (!contactEmail) throw new Error('Contact has no email address');
 
+    const agentFirstName = agentUser?.first_name || 'your advisor';
+
     // 2. Idempotency — reject if an active, non-expired request already exists.
-    //    Scope: document + contact + deal (when a deal is provided).
-    //    This allows resending the same doc to the same person under a new deal,
-    //    and also allows resending after the previous link has expired.
     const now = new Date().toISOString();
     let idempotencyQuery = supabaseAdmin
       .from('signature_requests')
@@ -40,8 +47,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .not('status', 'in', '(completed,declined,signed)')
       .or(`expires_at.is.null,expires_at.gt.${now}`);
 
-    // If a deal is attached, only block if the existing request is for the SAME deal.
-    // Sending the same doc under a different (new) deal is allowed.
     if (dealId) {
       idempotencyQuery = idempotencyQuery.eq('deal_id', dealId);
     }
@@ -67,7 +72,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         signature_fields: signatureFields || [],
         metadata: { agentEmail: userEmail },
         status: 'pending',
-        // Signing links expire after 30 days
         expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
       })
       .select()
@@ -75,56 +79,67 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (insertError) throw new Error(`Failed to create signature request: ${insertError.message}`);
 
-    // Update the deal stage to OUT_FOR_SIGNATURE if a deal is attached
     if (dealId) {
       await supabaseAdmin.from('deals').update({ stage: 'OUT_FOR_SIGNATURE' }).eq('id', dealId);
     }
 
-    // 4. Construct the signing URL
-    const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nodalpoint.io';
+    // 5. Construct signing URL + email
     const signingUrl = `${appBaseUrl}/secure-portal/sign/${token}`;
-
-    // 5. Build the email template (dark mode/forensic aesthetic)
     const trackingId = `sig_${Date.now()}_${token.substring(0, 8)}`;
+    const emailSubject = `Action Required: Your Energy Agreement is Ready to Sign`;
+
+    const emailHeader = `
+      <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px; padding-bottom:20px; border-bottom:1px solid #27272a; width:100%;">
+        <tr>
+          <td style="width:44px; vertical-align:middle; padding-right:12px;">
+            <img src="${logoUrl}" alt="Nodal Point" width="36" height="36" style="display:block; border-radius:6px;" />
+          </td>
+          <td style="vertical-align:middle;">
+            <span style="font-family:monospace; font-size:12px; letter-spacing:0.15em; color:#a1a1aa; text-transform:uppercase;">Nodal Point</span>
+          </td>
+        </tr>
+      </table>
+    `;
+
     const emailHtml = `
-      <div style="font-family: monospace; background-color: #09090b; color: #f4f4f5; padding: 40px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
-        <h2 style="text-transform: uppercase; letter-spacing: 0.1em; color: #a1a1aa; font-size: 14px; margin-bottom: 24px; border-bottom: 1px solid #27272a; padding-bottom: 12px;">
-          Nodal Point Digital Signature Request
-        </h2>
-        
-        <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 20px;">
+      <div style="font-family:monospace; background-color:#09090b; color:#f4f4f5; padding:40px; border:1px solid #27272a; max-width:600px; margin:0 auto;">
+        ${emailHeader}
+
+        <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:16px; margin-top:0; color:#f4f4f5;">
           Hello ${contact.firstName || contact.name || ''},
         </p>
-        
-        <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 24px;">
-          ${message || 'Please review and execute the following document.'}
-        </p>
-        
-        <div style="background-color: #18181b; padding: 16px; border: 1px solid #27272a; border-radius: 4px; margin-bottom: 32px;">
-          <div style="font-size: 12px; color: #a1a1aa; text-transform: uppercase; tracking: 0.1em; margin-bottom: 4px;">Document</div>
-          <div style="font-size: 16px;">${document.name}</div>
-        </div>
-        
-        <a href="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=opened&redirect=/secure-portal/sign/${token}" style="display: inline-block; background-color: #002fa7; color: white; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; font-size: 14px;">
-          Review & Execute Document
-        </a>
 
-        <div style="margin-top: 40px; font-size: 11px; color: #52525b; border-top: 1px solid #27272a; padding-top: 16px;">
+        <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:32px; color:#f4f4f5;">
+          ${message || 'Please review and sign the following document at your earliest convenience.'}
+        </p>
+
+        <div style="text-align:center; margin-bottom:32px;">
+          <a href="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=opened&redirect=/secure-portal/sign/${token}"
+            style="display:inline-block; background-color:#002fa7; color:white; padding:14px 32px; text-decoration:none; font-weight:bold; border-radius:4px; text-transform:uppercase; letter-spacing:0.08em; font-size:13px; font-family:monospace;">
+            Review &amp; Sign Document
+          </a>
+        </div>
+
+        <p style="font-family:sans-serif; font-size:14px; line-height:1.6; color:#a1a1aa; margin-bottom:0;">
+          Your advisor, ${agentFirstName}
+        </p>
+
+        <div style="margin-top:40px; font-size:11px; color:#52525b; border-top:1px solid #27272a; padding-top:16px; font-family:monospace;">
           This is a secure, tamper-evident signing link. For security purposes, do not forward this email.
         </div>
         <img src="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=opened" width="1" height="1" alt="" style="display:none;" />
       </div>
     `;
 
-    // 6. Record the email in the Supabase 'emails' table for CRM visibility
-    const emailRecord = {
+    // 6. Log email to CRM
+    await supabaseAdmin.from('emails').insert({
       id: trackingId,
       contactId: contactId,
       accountId: accountId || null,
       ownerId: userEmail,
       from: userEmail,
       to: [contactEmail],
-      subject: `Signature Request: ${document.name}`,
+      subject: emailSubject,
       html: emailHtml,
       text: `Please review and sign the document here: ${signingUrl}`,
       status: 'sent',
@@ -132,23 +147,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       timestamp: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      metadata: {
-        isSignatureRequest: true,
-        documentId,
-        dealId
-      }
-    };
+      metadata: { isSignatureRequest: true, documentId, dealId }
+    });
 
-    await supabaseAdmin.from('emails').insert(emailRecord);
-
-    // 7. Send the email via Zoho
+    // 7. Send via Zoho
     const zohoService = new ZohoMailService();
-    // Assuming Zoho is configured and ready. We use userEmail as the "from" or owner depending on what zoho expects
     await zohoService.initialize(userEmail);
 
     await zohoService.sendEmail({
       to: [contactEmail],
-      subject: `Signature Request: ${document.name}`,
+      subject: emailSubject,
       html: emailHtml,
       text: `Please review and sign the document here: ${signingUrl}`,
       userEmail: userEmail,
