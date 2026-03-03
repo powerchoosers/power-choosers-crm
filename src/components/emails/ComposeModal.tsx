@@ -616,19 +616,23 @@ function ComposePanel({
   const [selectedFoundryId, setSelectedFoundryId] = useState<string | null>(null)
   const [contentBeforeFoundry, setContentBeforeFoundry] = useState('')
   const [subjectBeforeFoundry, setSubjectBeforeFoundry] = useState('')
-  const foundrySelectValue = selectedFoundryId || 'none'
   const [isLoadingTemplate, setIsLoadingTemplate] = useState(false)
 
   // AI Command Rail state
   const [aiRailOpen, setAiRailOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [emailTypeId, setEmailTypeId] = useState<EmailTypeId>('cold_first_touch')
+  // Ref always holds the current emailTypeId — prevents stale closure in async buildFoundryContext callback
+  const emailTypeIdRef = useRef<EmailTypeId>('cold_first_touch')
+  useEffect(() => { emailTypeIdRef.current = emailTypeId }, [emailTypeId])
+  const [isLoadingContext, setIsLoadingContext] = useState(false)
   const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.5-flash')
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [pendingAiContent, setPendingAiContent] = useState<string | null>(null)
   const [pendingSubjectFromAi, setPendingSubjectFromAi] = useState<string | null>(null)
   const [contentBeforeAi, setContentBeforeAi] = useState('')
+  const [showUndoAi, setShowUndoAi] = useState(false)
   const [subjectAnimationKey, setSubjectAnimationKey] = useState(0)
   /** In-modal toggle: when true and type is cold, send as plain text with minimal signature (Option B). */
   const [sendAsPlainText, setSendAsPlainText] = useState(false)
@@ -677,15 +681,23 @@ function ComposePanel({
   const [foundryContext, setFoundryContext] = useState<FoundryContext | null>(null)
   useEffect(() => {
     if (!context?.contactId && !context?.accountId) return
+    setIsLoadingContext(true)
     buildFoundryContext(supabase, context.contactId ?? null, context.accountId ?? null)
       .then(ctx => {
         setFoundryContext(ctx)
-        // Auto-suggest post_call mode when there are recent transcripts and user hasn't manually changed type
-        if (ctx.intelligence.transcripts.length > 0 && emailTypeId === 'cold_first_touch') {
+        // Auto-suggest post_call mode when there are recent transcripts and user hasn't manually changed type.
+        // Uses emailTypeIdRef (always current) instead of emailTypeId to avoid stale closure.
+        if (ctx.intelligence.transcripts.length > 0 && emailTypeIdRef.current === 'cold_first_touch') {
           setEmailTypeId('post_call')
+          toast(`Switched to Post-Call mode`, {
+            description: `${ctx.intelligence.transcripts.length} recent call transcript${ctx.intelligence.transcripts.length > 1 ? 's' : ''} found — AI will reference your call.`,
+            icon: '📞',
+            duration: 4000,
+          })
         }
       })
       .catch(err => console.error('[ComposeModal] Failed to load foundry context:', err))
+      .finally(() => setIsLoadingContext(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [context?.contactId, context?.accountId])
 
@@ -764,6 +776,14 @@ function ComposePanel({
         lines.push(context.contextForAi.trim())
       }
       if (lines.length) base += '\n\n' + lines.join('\n')
+    }
+
+    // When there is no contact context at all, still inject a universal angle for cold email types
+    const isColdOrOutreach = effectiveConfig.id === 'cold_first_touch' || effectiveConfig.id === 'cold_followup'
+    const hasContextAngle = context && (context.industry || context.companyName || context.accountName)
+    if (isColdOrOutreach && !hasContextAngle) {
+      const universalAngle = getUniversalEnergyAngle()
+      base += `\n\nVERTICAL-SPECIFIC ANGLE (use this automatically; do not mention "vertical" or "angle" in the email):\n${universalAngle}`
     }
 
     // Inject deep context from Supabase: energy profile + call transcripts
@@ -865,6 +885,7 @@ OUTPUT FORMAT:
     if (isRefinementMode && !content.trim()) return
     setAiError(null)
     setContentBeforeAi(content)
+    setShowUndoAi(false)
     setIsAiLoading(true)
     try {
       const systemPrompt = buildEmailSystemPrompt()
@@ -880,7 +901,7 @@ OUTPUT FORMAT:
             { role: 'user', content: userContent },
           ],
           model: selectedModel,
-          userProfile: { firstName: profile?.firstName || 'Trey' },
+          userProfile: { firstName: profile?.firstName || signerName.split(' ')[0] || 'Lewis' },
           context: context ? {
             type: context.contactId ? 'contact' : (context.accountId ? 'account' : 'general'),
             id: context.contactId || context.accountId,
@@ -1151,12 +1172,19 @@ OUTPUT FORMAT:
     }
     setPendingAiContent(null)
     setPendingSubjectFromAi(null)
-  }, [pendingAiContent, pendingSubjectFromAi])
+    // Show undo option only if there was prior content to restore
+    if (contentBeforeAi.trim()) setShowUndoAi(true)
+  }, [pendingAiContent, pendingSubjectFromAi, contentBeforeAi])
 
   const discardAiContent = useCallback(() => {
     setPendingAiContent(null)
     setPendingSubjectFromAi(null)
   }, [])
+
+  const undoAiContent = useCallback(() => {
+    setContent(contentBeforeAi)
+    setShowUndoAi(false)
+  }, [contentBeforeAi])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -1521,6 +1549,15 @@ OUTPUT FORMAT:
             {aiError && (
               <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
             )}
+            {showUndoAi && !pendingAiContent && (
+              <button
+                type="button"
+                onClick={undoAiContent}
+                className="flex items-center gap-1 mt-1 px-1 text-[9px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
+              >
+                <RotateCcw className="w-2.5 h-2.5" /> Undo AI replace
+              </button>
+            )}
 
             {/* Signature - Scrolls with email body */}
             {signatureHtml && !selectedFoundryId && (
@@ -1781,7 +1818,13 @@ OUTPUT FORMAT:
                     ))}
                 </div>
                 {/* Context status indicators */}
-                {(emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
+                {isLoadingContext && (
+                  <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-1">
+                    <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                    Loading contact context...
+                  </div>
+                )}
+                {!isLoadingContext && (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
                   <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-1">
                     {context?.industry
                       ? `Angle: ${context.industry} vertical`
@@ -1790,7 +1833,7 @@ OUTPUT FORMAT:
                         : 'Angle: universal (no industry context)'}
                   </div>
                 )}
-                {emailTypeId === 'post_call' && (
+                {!isLoadingContext && emailTypeId === 'post_call' && (
                   <div className={`text-[9px] font-mono uppercase tracking-wider px-1 ${(foundryContext?.intelligence.transcripts.length ?? 0) > 0 ? 'text-emerald-500/70' : 'text-zinc-500'}`}>
                     {(foundryContext?.intelligence.transcripts.length ?? 0) > 0
                       ? `✓ ${foundryContext!.intelligence.transcripts.length} call transcript${foundryContext!.intelligence.transcripts.length > 1 ? 's' : ''} loaded — AI will reference call content`
@@ -1829,7 +1872,7 @@ OUTPUT FORMAT:
                 "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
                 formattingOpen && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
               )}
-              onClick={() => setFormattingOpen(!formattingOpen)}
+              onClick={() => { setFormattingOpen(f => !f); setAiRailOpen(false) }}
               title="Text Formatting"
             >
               <Type className={cn("h-4 w-4", formattingOpen && "fill-current")} />
@@ -1841,7 +1884,7 @@ OUTPUT FORMAT:
                 "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
                 aiRailOpen && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
               )}
-              onClick={() => setAiRailOpen(!aiRailOpen)}
+              onClick={() => { setAiRailOpen(r => !r); setFormattingOpen(false) }}
               title="AI Assistant (Spark)"
             >
               <Sparkles className={cn("h-4 w-4", aiRailOpen && "fill-current")} />
