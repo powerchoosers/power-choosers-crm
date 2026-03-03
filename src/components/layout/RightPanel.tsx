@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle
+  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle, ChevronUp
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, usePathname } from 'next/navigation'
@@ -59,8 +59,6 @@ export function RightPanel() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const scrollRafRef = useRef<number | null>(null)
   const lastScrolledRef = useRef<boolean | null>(null)
-  const snapToTopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const SNAP_TOP_THRESHOLD = 80
   /** On dossier: which content to show. Only relevant when isActiveContext. */
   const [dossierPanelView, setDossierPanelView] = useState<DossierPanelView>('context')
   /** Hover over header mode strip: reveal other mode (carousel) without switching. */
@@ -130,14 +128,12 @@ export function RightPanel() {
     setHeaderHoverReveal(false)
   }, [])
 
-  useEffect(() => {
-    setIsReady(true)
+  const handleScrollToTop = useCallback(() => {
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
   useEffect(() => {
-    return () => {
-      if (snapToTopTimeoutRef.current !== null) clearTimeout(snapToTopTimeoutRef.current)
-    }
+    setIsReady(true)
   }, [])
 
   // Update time every second (client-side only to avoid hydration mismatch)
@@ -261,6 +257,24 @@ export function RightPanel() {
               </button>
             </div>
 
+            {/* SCROLL TO TOP — appears when scrolled, straddles header bottom edge */}
+            <AnimatePresence>
+              {isScrolled && (
+                <motion.button
+                  key="scroll-top"
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.18, ease: 'easeOut' }}
+                  onClick={handleScrollToTop}
+                  className="absolute left-1/2 -translate-x-1/2 top-[84px] z-50 w-7 h-7 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-100 hover:border-white/20 hover:bg-zinc-800 transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
+                  aria-label="Scroll to top"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+
             <div className="flex-1 flex flex-col overflow-hidden relative">
               <motion.div
                 key="content-wrapper"
@@ -276,17 +290,6 @@ export function RightPanel() {
                       setIsScrolled(value);
                     }
                   });
-                  // Snap to top when close to top after scroll settles
-                  if (snapToTopTimeoutRef.current !== null) clearTimeout(snapToTopTimeoutRef.current);
-                  snapToTopTimeoutRef.current = setTimeout(() => {
-                    snapToTopTimeoutRef.current = null;
-                    const el = scrollContainerRef.current;
-                    if (!el) return;
-                    const top = el.scrollTop;
-                    if (top > 0 && top <= SNAP_TOP_THRESHOLD) {
-                      el.scrollTo({ top: 0, behavior: 'smooth' });
-                    }
-                  }, 120);
                 }}
                 className="flex-1 flex flex-col gap-4 overflow-y-auto px-6 pt-[93px] pb-4 np-scroll scroll-smooth"
               >
