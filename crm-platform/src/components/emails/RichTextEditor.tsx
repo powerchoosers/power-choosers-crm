@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 
@@ -27,6 +27,7 @@ interface RichTextEditorProps {
     placeholder?: string
     className?: string
     autoFocus?: boolean
+    showToolbar?: boolean
 }
 
 const COLORS = [
@@ -35,7 +36,7 @@ const COLORS = [
     '#002FA7' // Nodal Blue
 ]
 
-export function RichTextEditor({ content, onChange, placeholder, className, autoFocus }: RichTextEditorProps) {
+export function RichTextEditor({ content, onChange, placeholder, className, autoFocus, showToolbar = false }: RichTextEditorProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const editor = useEditor({
@@ -89,14 +90,12 @@ export function RichTextEditor({ content, onChange, placeholder, className, auto
         setTimeout(() => editor.commands.focus('end'), 0)
     }
 
-    // Update content strictly if it differs from external source and hasn't just been typed
-    // TipTap usually handles its internal state, we just need to catch when `content` changes widely
-    // We can use useEffect to track external content change
-    useCallback(() => {
+    // Sync external content changes into TipTap (e.g. when AI content is accepted)
+    useEffect(() => {
         if (editor && content !== editor.getHTML()) {
             editor.commands.setContent(content, { emitUpdate: false })
         }
-    }, [content, editor]) // Just defining logic inside editor config directly is safer
+    }, [content, editor])
 
 
     const uploadImage = async (file: File) => {
@@ -141,8 +140,8 @@ export function RichTextEditor({ content, onChange, placeholder, className, auto
 
     return (
         <div className="flex flex-col w-full h-full relative">
-            {/* Editor Toolbar */}
-            <div className="flex flex-wrap items-center gap-1 p-1 mb-2 rounded-lg border border-white/5 bg-zinc-950/50 backdrop-blur-sm">
+            {/* Editor Toolbar — only shown when showToolbar is true */}
+            {showToolbar && <div className="flex flex-wrap items-center gap-1 p-1 mb-2 rounded-lg border border-white/5 bg-zinc-950/50 backdrop-blur-sm">
                 <button
                     onClick={() => editor.chain().focus().toggleBold().run()}
                     className={cn(
@@ -251,7 +250,7 @@ export function RichTextEditor({ content, onChange, placeholder, className, auto
                     accept="image/*"
                     onChange={handleFileChange}
                 />
-            </div>
+            </div>}
 
             <div className="relative flex-1 cursor-text w-full">
                 {!editor.isFocused && (!editor.getText().trim() && !editor.isActive('image')) && (
@@ -259,7 +258,7 @@ export function RichTextEditor({ content, onChange, placeholder, className, auto
                         {placeholder || 'Write your message...'}
                     </div>
                 )}
-                <EditorContent editor={editor} className="w-full text-zinc-300 h-full max-h-[400px] overflow-y-auto np-scroll" />
+                <EditorContent editor={editor} className="w-full text-zinc-300" />
             </div>
         </div>
     )
