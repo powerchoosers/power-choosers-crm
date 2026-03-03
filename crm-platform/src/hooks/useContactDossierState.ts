@@ -37,6 +37,27 @@ export function useContactDossierState(id: string) {
     const { isEditing, setIsEditing, toggleEditing } = useUIStore()
     const setContext = useGeminiStore((state) => state.setContext)
 
+    useEffect(() => {
+        if (!contact || !id) return
+        const c = contact as any
+        const linkedAccountId = c?.linkedAccountId || c?.linked_account_id || c?.accountId || c?.account_id || ''
+        const contextAccountId = account?.id || linkedAccountId || ''
+        const label = `${String(contact.name || editCompany || 'UNKNOWN CONTACT').toUpperCase()}`
+        setContext({
+            type: 'contact',
+            id,
+            label,
+            data: {
+                accountId: contextAccountId,
+                contactTitle: c?.title || c?.jobTitle || '',
+                contactCompany: c?.companyName || c?.company || c?.company_name || '',
+                domain,
+            },
+        } as any)
+        return () => setContext(null)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, contact, account?.id, domain, setContext])
+
     const [isSaving, setIsSaving] = useState(false)
     const [showSynced, setShowSynced] = useState(false)
     const [isComposeOpen, setIsComposeOpen] = useState(false)
