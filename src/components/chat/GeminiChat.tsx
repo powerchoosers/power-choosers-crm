@@ -1062,7 +1062,7 @@ export function GeminiChatPanel() {
     let baseContext: { type: string, id?: string | string[], label: string };
     if (storeContext) {
       baseContext = storeContext;
-    } else if (pathname?.includes('/people/')) {
+    } else if (pathname?.includes('/people/') || pathname?.includes('/contacts/')) {
       baseContext = { type: 'contact', id: params?.id, label: `CONTACT: ${String(params?.id || '').slice(0, 12)}` };
     } else if (pathname?.includes('/accounts/')) {
       baseContext = { type: 'account', id: params?.id, label: `ACCOUNT: ${String(params?.id || '').slice(0, 12)}` };

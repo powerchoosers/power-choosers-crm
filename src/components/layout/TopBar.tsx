@@ -215,7 +215,7 @@ export function TopBar() {
     let baseContext;
     if (storeContext) {
       baseContext = storeContext;
-    } else if (pathname?.includes('/people/')) {
+    } else if (pathname?.includes('/people/') || pathname?.includes('/contacts/')) {
       baseContext = { type: 'contact', id: params?.id, label: `CONTACT: ${String(params?.id || '').slice(0, 12)}` };
     } else if (pathname?.includes('/accounts/')) {
       baseContext = { type: 'account', id: params?.id, label: `ACCOUNT: ${String(params?.id || '').slice(0, 12)}` };
@@ -625,7 +625,9 @@ export function TopBar() {
                           isDialpadOpen && "text-white [&_svg]:scale-[1.15]"
                         )}
                         title="Dialpad (DTMF)"
-                        aria-expanded={isDialpadOpen}
+                        aria-label="Toggle dialpad"
+                        aria-haspopup="menu"
+                        aria-expanded={isDialpadOpen ? 'true' : 'false'}
                       >
                         <Grid3X3 size={16} />
                       </button>
@@ -680,6 +682,8 @@ export function TopBar() {
                         "icon-button-forensic p-1.5",
                         isMuted ? "text-amber-500 hover:text-amber-400" : ""
                       )}
+                      title={isMuted ? "Unmute microphone" : "Mute microphone"}
+                      aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
                     >
                       <Mic size={16} />
                     </button>
@@ -690,6 +694,8 @@ export function TopBar() {
                         handleHangup();
                       }}
                       className="group flex items-center justify-center min-w-[32px] min-h-[32px] w-[32px] h-[32px] shrink-0 ml-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all duration-300 hover:scale-[1.12]"
+                      title="Hang up"
+                      aria-label="Hang up"
                     >
                       <Phone size={16} className="transition-transform duration-300 group-hover:rotate-[135deg]" />
                     </button>
