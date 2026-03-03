@@ -23,7 +23,11 @@
       "Bash(xargs grep -l \"delete\\\\|DELETE\")",
       "Bash(xargs grep -l \"accounts\\\\|contacts\")",
       "Bash(xargs grep -l \"deal\\\\|Deal\")",
-      "mcp__supabase__apply_migration"
+      "mcp__supabase__apply_migration",
+      "Bash(npx tsc --noEmit)",
+      "Bash(git add src/pages/api/signatures/execute.ts src/pages/api/signatures/request.ts src/pages/api/signatures/telemetry.ts src/types/signatures.ts src/app/secure-portal/sign/[token]/SignatureClient.tsx src/components/modals/DocumentPreparationModal.tsx src/app/providers.tsx src/components/right-panel/SignatureRequestPanel.tsx)",
+      "Bash(git push origin main)",
+      "Bash(xargs grep -l \"send\\\\|zoho\")"
     ]
   }
 }

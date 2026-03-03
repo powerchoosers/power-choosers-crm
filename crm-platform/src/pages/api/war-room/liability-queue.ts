@@ -14,12 +14,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
         // Fetch accounts ordered so that contracts expiring soonest come first.
         // NULLS LAST keeps accounts without a contract end date at the bottom of the list.
-        // Limit increased to 200 so near-expiry accounts are never excluded by the cap.
+        // Limit increased so near-expiry accounts are never excluded by the cap.
         const { data: accounts, error: accErr } = await supabaseAdmin
             .from('accounts')
             .select('id, name, domain, industry, city, state, logo_url, contract_end_date, metadata')
             .order('contract_end_date', { ascending: true, nullsFirst: false })
-            .limit(200)
+            .limit(300)
 
         if (accErr) throw accErr
 
@@ -32,17 +32,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Last call per account
         const { data: callRows } = await supabaseAdmin
             .from('calls')
-            .select('accountId, timestamp')
+            .select('accountId, timestamp, status')
             .in('accountId', accountIds)
             .not('timestamp', 'is', null)
             .order('timestamp', { ascending: false })
 
         // Build last-call map
-        const lastCallMap = new Map<string, { timestamp: string }>()
+        const lastCallMap = new Map<string, { timestamp: string, status: string | null }>()
         for (const c of callRows ?? []) {
             if (!c.accountId || !c.timestamp) continue
             if (!lastCallMap.has(c.accountId)) {
-                lastCallMap.set(c.accountId, { timestamp: c.timestamp })
+                lastCallMap.set(c.accountId, { timestamp: c.timestamp, status: c.status ?? null })
             }
         }
 
@@ -82,7 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const call = lastCallMap.get(acct.id)
             const emailTs = lastEmailMap.get(acct.id)
             const lastCallTs = call?.timestamp ?? null
-            const lastCallOutcome = null
+            const lastCallOutcome = call?.status ?? null
             const lastTouchTs =
                 lastCallTs && emailTs
                     ? lastCallTs > emailTs ? lastCallTs : emailTs

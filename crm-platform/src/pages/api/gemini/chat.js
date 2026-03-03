@@ -69,6 +69,7 @@ const tools = [
             city: { type: 'string', description: 'Filter by city (e.g. "Houston")' },
             state: { type: 'string', description: 'Filter by state (e.g. "Texas")' },
             expiration_year: { type: 'number', description: 'Filter accounts by contract expiration year (e.g. 2026)' },
+            expiring_within_days: { type: 'number', description: 'Filter accounts by contracts expiring within X days from today (e.g. 90, 30)' },
             limit: { type: 'number', description: 'Maximum number of accounts to return' }
           }
         }
@@ -752,7 +753,7 @@ const toolHandlers = {
     if (error) throw error;
     return data;
   },
-  list_accounts: async ({ search, industry, expiration_year, city, state, limit = 10 }) => {
+  list_accounts: async ({ search, industry, expiration_year, expiring_within_days, city, state, limit = 10 }) => {
     let data = [];
     let usedVector = false;
 
@@ -826,10 +827,40 @@ const toolHandlers = {
       }
     }
 
+    // 1b. Specialized expiration search if days provided
+    if (!usedVector && expiring_within_days) {
+      console.log(`[list_accounts] Performing direct query for expiration within: ${expiring_within_days} days`);
+      const now = new Date();
+      const futureDate = new Date();
+      futureDate.setDate(now.getDate() + expiring_within_days);
+
+      const startDate = now.toISOString().split('T')[0];
+      const endDate = futureDate.toISOString().split('T')[0];
+
+      const { data: expiringData, error: expiringError } = await supabaseAdmin
+        .from('accounts')
+        .select('*')
+        .gte('contract_end_date', startDate)
+        .lte('contract_end_date', endDate)
+        .order('contract_end_date', { ascending: true })
+        .limit(100);
+
+      if (!expiringError && expiringData && expiringData.length > 0) {
+        data = expiringData;
+        usedVector = true;
+      } else if (expiringError) {
+        console.error('[list_accounts] Expiration days query error:', expiringError);
+      }
+    }
+
     // 2. Use Hybrid Search (replacing Vector Search)
-    if (!usedVector && (normalizedSearch || expiration_year)) {
+    if (!usedVector && (normalizedSearch || expiration_year || expiring_within_days)) {
       try {
-        const query = normalizedSearch ? normalizedSearch : `accounts expiring in ${expiration_year}`;
+        let query = normalizedSearch;
+        if (!query) {
+          if (expiration_year) query = `accounts expiring in ${expiration_year}`;
+          else if (expiring_within_days) query = `accounts expiring within ${expiring_within_days} days`;
+        }
         const embedding = await generateEmbedding(query);
         if (embedding) {
           console.log(`[list_accounts] Using hybrid search for: "${query}"`);
@@ -915,6 +946,25 @@ const toolHandlers = {
           dateStr.includes(`-${shortYear}`) ||
           dateStr.endsWith(` ${yearStr}`) ||
           dateStr.endsWith(` ${shortYear}`);
+      });
+    }
+    if (expiring_within_days) {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      const futureDate = new Date();
+      futureDate.setDate(now.getDate() + expiring_within_days);
+      const startMs = now.getTime();
+      const endMs = futureDate.getTime();
+      data = data.filter(r => {
+        const metadata = r.metadata || {};
+        const d = r.contract_end_date ||
+          metadata.contract_end_date ||
+          metadata.contractEndDate ||
+          metadata.general?.contractEndDate;
+        if (!d) return false;
+        const targetDate = new Date(d);
+        if (isNaN(targetDate.getTime())) return false;
+        return targetDate.getTime() >= startMs && targetDate.getTime() <= endMs;
       });
     }
 
@@ -1976,6 +2026,7 @@ export default async function handler(req, res) {
         GLOBAL_SEARCH_STRATEGY:
         - When in "GLOBAL_SCOPE" or "GLOBAL_DASHBOARD", you are the master of the entire CRM.
         - If the user asks for "accounts expiring in 2026", you MUST call \`list_accounts({ expiration_year: 2026 })\`.
+        - If the user asks for "accounts expiring within 90 days", "expiring in 30 days", or "expiring soon", you MUST call \`list_accounts({ expiring_within_days: 90 })\` (or the specific number of days requested).
         - If the user asks for "contacts with accounts expiring in 2026", you MUST first call \`list_accounts({ expiration_year: 2026 })\` to get the account IDs, and then call \`list_contacts\` or query the details for those accounts to find the associated people.
         - DO NOT wait for the user to specify a company or contact if you are in GLOBAL_SCOPE. RUN THE SEARCH ACROSS ALL NODES.
 

@@ -267,10 +267,10 @@ export function RightPanel() {
                   exit={{ opacity: 0, scale: 0.7 }}
                   transition={{ duration: 0.18, ease: 'easeOut' }}
                   onClick={handleScrollToTop}
-                  className="absolute left-1/2 -translate-x-1/2 top-[84px] z-50 w-7 h-7 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-zinc-500 hover:text-zinc-100 hover:border-white/20 hover:bg-zinc-800 transition-colors shadow-[0_4px_16px_rgba(0,0,0,0.5)]"
+                  className="absolute left-1/2 -translate-x-1/2 top-[84px] z-50 w-7 h-7 rounded-full bg-[#002FA7] border border-white/20 flex items-center justify-center text-white hover:bg-[#002FA7]/90 hover:border-white/40 transition-all shadow-[0_4px_16px_rgba(0,47,167,0.3)]"
                   aria-label="Scroll to top"
                 >
-                  <ChevronUp className="w-3.5 h-3.5" />
+                  <ChevronUp className="w-3.5 h-3.5 stroke-[2.5]" />
                 </motion.button>
               )}
             </AnimatePresence>
