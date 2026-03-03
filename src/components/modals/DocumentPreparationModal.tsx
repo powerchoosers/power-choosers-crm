@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, LayoutTemplate, ArrowRight } from 'lucide-react'
 import { Document, Page, pdfjs } from 'react-pdf'
@@ -36,6 +37,9 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
     const [fields, setFields] = useState<SignatureField[]>([])
     const [currentTool, setCurrentTool] = useState<FieldType>('signature')
     const containerRef = useRef<HTMLDivElement>(null)
+    // mounted: ensures createPortal only runs client-side (document is available)
+    const [mounted, setMounted] = useState(false)
+    useEffect(() => { setMounted(true) }, [])
 
     const handleDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
         setNumPages(numPages)
@@ -68,9 +72,12 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
         setFields(fields.filter((_, i) => i !== index))
     }
 
-    if (!isOpen) return null
+    // Portal renders directly into document.body — this breaks out of any parent
+    // stacking contexts (framer-motion transforms on the right panel, z-50 containers,
+    // etc.) that were causing the TopBar (z-40) to bleed over the modal (z-[9999]).
+    if (!isOpen || !mounted) return null
 
-    return (
+    return createPortal(
         <AnimatePresence>
             <motion.div
                 initial={{ opacity: 0 }}
@@ -281,6 +288,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                     </div>
                 </div>
             </motion.div>
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body
     )
 }
