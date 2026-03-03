@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Landmark, ArrowUpRight, Plus, Trash2, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 
 interface Meter {
   id: string
@@ -157,7 +158,12 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                         <div className="p-1.5 rounded-lg bg-[#002FA7]/10 border border-[#002FA7]/20">
                           <Landmark className="w-3.5 h-3.5 text-[#002FA7]" />
                         </div>
-                        <div className="font-mono text-xs text-zinc-300 tracking-tight">{meter.esiId || 'No ESI ID'}</div>
+                        <ForensicDataPoint
+                          value={meter.esiId || 'No ESI ID'}
+                          copyValue={meter.esiId}
+                          valueClassName="font-mono text-xs text-zinc-300 tracking-tight"
+                          inline
+                        />
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-bold font-mono text-white tabular-nums tracking-tighter">
@@ -169,9 +175,12 @@ export const MeterArray: React.FC<MeterArrayProps> = ({ meters = [], isEditing =
                       </div>
                     </div>
 
-                    <div className="text-[10px] text-zinc-500 font-medium truncate mb-2">
-                      {meter.address || 'No address provided'}
-                    </div>
+                    <ForensicDataPoint
+                      value={meter.address || 'No address provided'}
+                      copyValue={meter.address}
+                      valueClassName="text-[10px] text-zinc-500 font-medium"
+                      className="mb-2"
+                    />
 
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <ArrowUpRight className="w-3 h-3 text-zinc-600" />
