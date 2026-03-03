@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search, Building2, User, Link2, MapPin,
-  Sparkles, AlertTriangle, CheckCircle, ArrowRight, Loader2, Lock, X
+  Search, Building2, User, MapPin,
+  Target, AlertTriangle, CheckCircle, ArrowRight, Loader2, X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/store/uiStore';
@@ -94,7 +94,7 @@ export function NodeIngestion() {
   const isRapidContactInjection = type === 'CONTACT' && !!ingestionContext?.accountId;
 
   const [step, setStep] = useState<'SIGNAL' | 'VERIFY' | 'COMMIT'>('SIGNAL');
-  const [identifier, setIdentifier] = useState(ingestionIdentifier || '');
+  const [identifier, setIdentifier] = useState(type === 'CONTACT' && ingestionIdentifier ? ingestionIdentifier : '');
   const [isScanning, setIsScanning] = useState(false);
   const [isCommitting, setIsCommitting] = useState(false);
   const [scanResult, setScanResult] = useState<any>(null);
@@ -103,7 +103,11 @@ export function NodeIngestion() {
   // Auto-scan if identifier is pre-filled from external signal
   useEffect(() => {
     if (ingestionIdentifier && step === 'SIGNAL') {
-      handleScan();
+      if (type === 'ACCOUNT') {
+        handleSmartSearch();
+      } else {
+        handleScan();
+      }
       // Clear after one-time use to prevent loops/stale data on next open
       setIngestionIdentifier(null);
     }
@@ -124,7 +128,7 @@ export function NodeIngestion() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
-  const [nodeTopology, setNodeTopology] = useState<'PARENT' | 'SUBSIDIARY'>('PARENT');
+  const [isExistingRecord, setIsExistingRecord] = useState(false);
 
   // Apollo Search & Enrichment State (Rapid Injection)
   const [isSearching, setIsSearching] = useState(false);
@@ -134,8 +138,7 @@ export function NodeIngestion() {
   const [showVerifyModal, setShowVerifyModal] = useState(false);
 
   // Account Name Search State
-  const [isNameSearchMode, setIsNameSearchMode] = useState(true);
-  const [accountSearchQuery, setAccountSearchQuery] = useState('');
+  const [accountSearchQuery, setAccountSearchQuery] = useState(type === 'ACCOUNT' && ingestionIdentifier ? ingestionIdentifier : '');
   const [isSearchingName, setIsSearchingName] = useState(false);
   const [accountSearchResults, setAccountSearchResults] = useState<any[]>([]);
 
@@ -146,6 +149,36 @@ export function NodeIngestion() {
       return () => clearTimeout(timer);
     }
   }, [isRapidContactInjection, step]);
+
+  // Duplicate check: flag isExistingRecord when we enter VERIFY step
+  useEffect(() => {
+    if (step !== 'VERIFY') return;
+    const checkDuplicate = async () => {
+      if (type === 'ACCOUNT') {
+        const domainKey = identifier.includes('.') ? identifier : scanResult?.domain;
+        if (domainKey) {
+          const { data } = await supabase.from('accounts').select('id').eq('domain', domainKey).maybeSingle();
+          if (data) { setIsExistingRecord(true); return; }
+        }
+        if (entityName) {
+          const { data } = await supabase.from('accounts').select('id').ilike('name', entityName).maybeSingle();
+          if (data) { setIsExistingRecord(true); return; }
+        }
+      } else {
+        if (email) {
+          const { data } = await supabase.from('contacts').select('id').eq('email', email).maybeSingle();
+          if (data) { setIsExistingRecord(true); return; }
+        }
+        const fullName = `${firstName} ${lastName}`.trim();
+        if (fullName) {
+          const { data } = await supabase.from('contacts').select('id').ilike('name', fullName).maybeSingle();
+          if (data) { setIsExistingRecord(true); return; }
+        }
+      }
+      setIsExistingRecord(false);
+    };
+    checkDuplicate();
+  }, [step]);
 
   // Fetch account data for Apollo search context
   useEffect(() => {
@@ -325,30 +358,74 @@ export function NodeIngestion() {
     }
   };
 
-  const handleAccountNameSearch = async () => {
-    if (!accountSearchQuery) return;
-    setIsSearchingName(true);
-    setAccountSearchResults([]);
+  const handleSmartSearch = async () => {
+    const query = accountSearchQuery.trim();
+    if (!query) return;
 
-    try {
-      const response = await fetch('/api/apollo/search-organizations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          q_organization_name: accountSearchQuery,
-          per_page: 5
-        })
-      });
+    // Domain detection: no spaces, contains a dot, TLD at least 2 chars
+    const isDomain = /^[^\s]+\.[^\s]{2,}$/.test(query) && !query.includes(' ');
 
-      if (response.ok) {
-        const data = await response.json();
-        setAccountSearchResults(data.organizations || []);
+    if (isDomain) {
+      // Domain path: enrich directly and advance to VERIFY
+      setIdentifier(query);
+      setIsScanning(true);
+      try {
+        const data = await enrichNode(query, 'ACCOUNT');
+        if (data) {
+          setScanResult(data);
+          setEntityName(data.name || '');
+          setDescription(data.description || '');
+          setPhone(data.phone || '');
+          setRevenue(data.revenue || '');
+          setEmployees(data.employees || '');
+          setAddress(data.address || '');
+          setCity(data.city || '');
+          setState(data.state || '');
+          setIsManual(false);
+        } else {
+          setIsManual(true);
+          setEntityName('');
+        }
+        setStep('VERIFY');
+      } catch (e) {
+        setIsManual(true);
+        setStep('VERIFY');
+      } finally {
+        setIsScanning(false);
       }
-    } catch (error) {
-      console.error('Failed to search organizations by name:', error);
-      toast.error('Search failed');
-    } finally {
-      setIsSearchingName(false);
+    } else {
+      // Name path: search Apollo, show results or auto-advance if empty
+      setIsSearchingName(true);
+      setAccountSearchResults([]);
+      try {
+        const response = await fetch('/api/apollo/search-organizations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ q_organization_name: query, per_page: 5 })
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const results = data.organizations || [];
+          if (results.length === 0) {
+            setEntityName(query);
+            setIsManual(true);
+            setStep('VERIFY');
+          } else {
+            setAccountSearchResults(results);
+          }
+        } else {
+          setEntityName(query);
+          setIsManual(true);
+          setStep('VERIFY');
+        }
+      } catch (error) {
+        console.error('Failed to search organizations by name:', error);
+        setEntityName(query);
+        setIsManual(true);
+        setStep('VERIFY');
+      } finally {
+        setIsSearchingName(false);
+      }
     }
   };
 
@@ -386,10 +463,24 @@ export function NodeIngestion() {
   const handleCommit = async () => {
     setIsCommitting(true);
     try {
-      const id = crypto.randomUUID();
       const now = new Date().toISOString();
 
       if (type === 'ACCOUNT') {
+        const domainKey = identifier.includes('.') ? identifier : scanResult?.domain;
+
+        // --- DUPLICATE CHECK: domain first, then name ---
+        let existingId: string | null = null;
+        if (domainKey) {
+          const { data } = await supabase.from('accounts').select('id').eq('domain', domainKey).maybeSingle();
+          if (data) existingId = data.id;
+        }
+        if (!existingId && entityName) {
+          const { data } = await supabase.from('accounts').select('id').ilike('name', entityName).maybeSingle();
+          if (data) existingId = data.id;
+        }
+
+        const id = existingId || crypto.randomUUID();
+
         // Build service_addresses array if we have address data
         const serviceAddresses = [];
         if (address || city || state) {
@@ -412,85 +503,112 @@ export function NodeIngestion() {
           endDate: ''
         }] : [];
 
-        const { error } = await supabase.from('accounts').insert({
-          id,
+        const payload = {
           name: entityName,
-          domain: identifier.includes('.') ? identifier : scanResult?.domain,
+          domain: domainKey,
           industry: scanResult?.industry,
           description: description || scanResult?.description,
           revenue: revenue,
           employees: parseInt(employees) || 0,
-          address: address, // Populate uplink address
+          address: address,
           city: city,
           state: state,
           country: scanResult?.country,
-          service_addresses: serviceAddresses, // Save to service_addresses JSONB array
+          service_addresses: serviceAddresses,
           logo_url: scanResult?.logoUrl || scanResult?.logo,
           phone: formatPhoneNumber(phone || scanResult?.phone) || null,
           linkedin_url: scanResult?.linkedin,
           status: 'active',
-          metadata: {
-            meters: meters // Save meter with service address to metadata
-          },
-          createdAt: now,
-          updatedAt: now
+          metadata: { meters: meters },
+          updatedAt: now,
+        };
+
+        if (existingId) {
+          const { error } = await supabase.from('accounts').update(payload).eq('id', existingId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('accounts').insert({ id, ...payload, createdAt: now });
+          if (error) throw error;
+        }
+
+        // Link intelligence signal regardless of new/existing
+        if (ingestionSignal) {
+          try {
+            await fetch('/api/intelligence/link-signal', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ signal: ingestionSignal, accountId: id, domainKey: domainKey || '' })
+            });
+            queryClient.invalidateQueries({ queryKey: ['market-recon-signals'] });
+          } catch (e) {
+            console.error('Failed to link intelligence signal', e);
+          }
+        }
+
+        toast.success(existingId ? 'Account Node Enriched' : 'Account Node Initialized', {
+          description: existingId
+            ? `${entityName} already exists — record enriched with latest intelligence.`
+            : `${entityName} has been committed to the database.`,
+          className: "bg-zinc-950 nodal-monolith-edge text-white font-mono",
         });
 
-        if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['accounts'] });
+        router.push(`/network/accounts/${id}`);
+
       } else {
-        const { error } = await supabase.from('contacts').insert({
-          id,
+        // --- DUPLICATE CHECK: email first, then full name ---
+        let existingId: string | null = null;
+        if (email) {
+          const { data } = await supabase.from('contacts').select('id').eq('email', email).maybeSingle();
+          if (data) existingId = data.id;
+        }
+        if (!existingId && (firstName || lastName)) {
+          const { data } = await supabase.from('contacts').select('id')
+            .ilike('name', `${firstName} ${lastName}`.trim())
+            .maybeSingle();
+          if (data) existingId = data.id;
+        }
+
+        const id = existingId || crypto.randomUUID();
+
+        // Base enrichment fields (safe to update on existing records)
+        const updatePayload = {
           firstName: firstName,
           lastName: lastName,
           name: entityName || `${firstName} ${lastName}`.trim(),
           email: email,
           phone: formatPhoneNumber(phone) || null,
           title: title,
-          linkedinUrl: identifier.includes('linkedin.com') ? identifier : scanResult?.linkedin,
-          accountId: ingestionContext?.accountId ?? scanResult?.accountId,
+          linkedinUrl: identifier.includes('linkedin.com') ? identifier : (scanResult?.linkedin || null),
           city: city,
           state: state,
           status: 'active',
+          updatedAt: now,
+        };
+
+        // Only set accountId on new records — never overwrite an existing contact's account link
+        const insertPayload = {
+          ...updatePayload,
+          accountId: ingestionContext?.accountId || null,
           createdAt: now,
-          updatedAt: now
+        };
+
+        if (existingId) {
+          const { error } = await supabase.from('contacts').update(updatePayload).eq('id', existingId);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from('contacts').insert({ id, ...insertPayload });
+          if (error) throw error;
+        }
+
+        const displayName = entityName || `${firstName} ${lastName}`.trim();
+        toast.success(existingId ? 'Contact Node Enriched' : 'Contact Node Initialized', {
+          description: existingId
+            ? `${displayName} already exists — record enriched with latest intelligence.`
+            : `${displayName} has been committed to the database.`,
+          className: "bg-zinc-950 nodal-monolith-edge text-white font-mono",
         });
 
-        if (error) throw error;
-      }
-
-      // If we initialized from an intelligence signal (Account), persist it to the News Vector via API (bypasses RLS)
-      if (type === 'ACCOUNT' && ingestionSignal) {
-        try {
-          const domainKey = identifier.includes('.') ? identifier : scanResult?.domain;
-
-          await fetch('/api/intelligence/link-signal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              signal: ingestionSignal,
-              accountId: id,
-              domainKey: domainKey || ''
-            })
-          });
-
-          // Invalidate signals so the matrix updates automatically
-          queryClient.invalidateQueries({ queryKey: ['market-recon-signals'] });
-
-        } catch (e) {
-          console.error('Failed to link intelligence signal', e);
-        }
-      }
-
-      toast.success(`${type} Node Initialized`, {
-        description: `${entityName || firstName + ' ' + lastName} has been committed to the database.`,
-        className: "bg-zinc-950 nodal-monolith-edge text-white font-mono",
-      });
-
-      // Invalidate queries to refresh the lists immediately
-      if (type === 'ACCOUNT') {
-        queryClient.invalidateQueries({ queryKey: ['accounts'] });
-        router.push(`/network/accounts/${id}`);
-      } else {
         queryClient.invalidateQueries({ queryKey: ['contacts'] });
         if (ingestionContext?.accountId) {
           queryClient.invalidateQueries({ queryKey: ['account-contacts', ingestionContext.accountId] });
@@ -516,6 +634,9 @@ export function NodeIngestion() {
     setIngestionSignal(null);
     setStep('SIGNAL');
     setIdentifier('');
+    setIsExistingRecord(false);
+    setAccountSearchQuery('');
+    setAccountSearchResults([]);
     setScanResult(null);
     setIsManual(false);
     setEntityName('');
@@ -660,6 +781,8 @@ export function NodeIngestion() {
                           <Loader2 className="w-4 h-4 animate-spin" />
                           COMMITTING...
                         </>
+                      ) : isExistingRecord ? (
+                        '[ ENRICH_EXISTING_NODE ]'
                       ) : (
                         '[ COMMIT_NODE_TO_DB ]'
                       )}
@@ -668,82 +791,42 @@ export function NodeIngestion() {
                 </>
               ) : (
                 <div className="space-y-4">
-                  {type === 'ACCOUNT' && (
-                    <div className="flex bg-black/40 rounded-lg p-1 border border-white/5">
-                      <button
-                        onClick={() => setIsNameSearchMode(true)}
-                        className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all rounded ${isNameSearchMode ? 'bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30' : 'text-zinc-500 hover:text-zinc-300'}`}
-                      >
-                        Search by Name
-                      </button>
-                      <button
-                        onClick={() => setIsNameSearchMode(false)}
-                        className={`flex-1 py-1.5 text-[10px] font-mono tracking-widest uppercase transition-all rounded ${!isNameSearchMode ? 'bg-[#002FA7]/20 text-[#002FA7] border border-[#002FA7]/30' : 'text-zinc-500 hover:text-zinc-300'}`}
-                      >
-                        Search by Domain
-                      </button>
-                    </div>
-                  )}
-
-                  {!isNameSearchMode || type === 'CONTACT' ? (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
-                        Signal Source
-                      </label>
-                      <div className="relative group">
-                        <input
-                          value={identifier}
-                          onChange={(e) => setIdentifier(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleScan()}
-                          placeholder={type === 'ACCOUNT' ? "company.com" : "linkedin.com/in/..."}
-                          className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
-                          autoFocus={!isNameSearchMode || type === 'CONTACT'}
-                        />
-                        <div className="absolute right-4 top-4">
-                          {isScanning ? (
-                            <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
-                          ) : (
-                            <button onClick={handleScan} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
-                              <ArrowRight className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-zinc-600 pl-1">
-                        Input vector required for probabilistic enrichment.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
+                  {type === 'ACCOUNT' ? (
+                    <>
                       <div className="space-y-2">
                         <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
                           <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
-                          Account Name
+                          Signal Source
                         </label>
                         <div className="relative group">
                           <input
                             value={accountSearchQuery}
-                            onChange={(e) => setAccountSearchQuery(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAccountNameSearch()}
-                            placeholder="Type exact legal entity name..."
+                            onChange={(e) => {
+                              setAccountSearchQuery(e.target.value);
+                              if (accountSearchResults.length > 0) setAccountSearchResults([]);
+                            }}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSmartSearch()}
+                            placeholder="company.com or Company Name"
                             className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
                             autoFocus
                           />
                           <div className="absolute right-4 top-4">
-                            {isSearchingName ? (
+                            {isScanning || isSearchingName ? (
                               <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
                             ) : (
-                              <button onClick={handleAccountNameSearch} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
+                              <button onClick={handleSmartSearch} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
                                 <Search className="w-4 h-4" />
                               </button>
                             )}
                           </div>
                         </div>
+                        <p className="text-[10px] text-zinc-600 pl-1">
+                          Enter a domain for direct enrichment, or a company name to search.
+                        </p>
                       </div>
 
                       {accountSearchResults.length > 0 && (
-                        <div className="space-y-2 mt-4">
+                        <div className="space-y-2">
                           <label className="text-[10px] font-mono text-zinc-500 uppercase">Suggested Targets</label>
                           <div className="flex flex-col gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
                             {accountSearchResults.map((org: any) => (
@@ -790,6 +873,35 @@ export function NodeIngestion() {
                           </div>
                         </div>
                       )}
+                    </>
+                  ) : (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-mono text-zinc-500 uppercase flex items-center gap-2">
+                        <span className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
+                        Signal Source
+                      </label>
+                      <div className="relative group">
+                        <input
+                          value={identifier}
+                          onChange={(e) => setIdentifier(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && handleScan()}
+                          placeholder="linkedin.com/in/..."
+                          className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
+                          autoFocus
+                        />
+                        <div className="absolute right-4 top-4">
+                          {isScanning ? (
+                            <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
+                          ) : (
+                            <button onClick={handleScan} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
+                              <ArrowRight className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-zinc-600 pl-1">
+                        Input vector required for probabilistic enrichment.
+                      </p>
                     </div>
                   )}
                 </div>
@@ -822,7 +934,7 @@ export function NodeIngestion() {
                 </div>
               ) : (
                 <div className="bg-[#002FA7]/10 border border-[#002FA7]/30 p-3 rounded flex items-start gap-3">
-                  <Sparkles className="w-4 h-4 text-white mt-0.5" />
+                  <Target className="w-4 h-4 text-white mt-0.5" />
                   <div>
                     <div className="text-[10px] font-mono text-white font-bold uppercase tracking-widest">
                       INTELLIGENCE_ACQUIRED
@@ -859,26 +971,35 @@ export function NodeIngestion() {
                     </div>
                   </>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-zinc-500 uppercase">First Name</label>
-                      <input
-                        value={firstName}
-                        onChange={(e) => setFirstName(e.target.value)}
-                        className="nodal-input w-full"
-                        placeholder="First Name"
-                      />
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">First Name</label>
+                        <input
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="First Name"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Last Name</label>
+                        <input
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="Last Name"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-zinc-500 uppercase">Last Name</label>
-                      <input
-                        value={lastName}
-                        onChange={(e) => setLastName(e.target.value)}
-                        className="nodal-input w-full"
-                        placeholder="Last Name"
-                      />
-                    </div>
-                  </div>
+                    {ingestionContext?.accountName && (
+                      <div className="px-3 py-2 rounded bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center gap-2">
+                        <Building2 className="w-3 h-3 text-zinc-500 shrink-0" />
+                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">Link →</span>
+                        <span className="text-xs font-mono text-white truncate">{ingestionContext.accountName}</span>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {type === 'CONTACT' && (
@@ -912,71 +1033,87 @@ export function NodeIngestion() {
                         />
                       </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">City</label>
+                        <input
+                          value={city}
+                          onChange={(e) => setCity(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="City"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">State</label>
+                        <input
+                          value={state}
+                          onChange={(e) => setState(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="TX"
+                        />
+                      </div>
+                    </div>
                   </>
                 )}
 
                 {type === 'ACCOUNT' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-zinc-500 uppercase">Revenue</label>
-                      <input
-                        value={revenue}
-                        onChange={(e) => setRevenue(e.target.value)}
-                        className="nodal-input w-full"
-                        placeholder="Unknown"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-mono text-zinc-500 uppercase">Headcount</label>
-                      <input
-                        value={employees}
-                        onChange={(e) => setEmployees(e.target.value)}
-                        className="nodal-input w-full"
-                        placeholder="Unknown"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {type === 'ACCOUNT' && (
-                  <div className="pt-4 border-t border-white/5">
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase block mb-3">Node Topology</span>
-                    <div className="grid grid-cols-2 gap-2 mb-4">
-                      <button
-                        onClick={() => setNodeTopology('PARENT')}
-                        className={`text-xs font-mono py-2 rounded border transition-all ${nodeTopology === 'PARENT' ? 'bg-[#002FA7]/20 border-[#002FA7] text-white shadow-[0_0_10px_-3px_#002FA7]' : 'border-white/10 text-zinc-500 hover:bg-white/5'}`}
-                      >
-                        [ PARENT ]
-                      </button>
-                      <button
-                        onClick={() => setNodeTopology('SUBSIDIARY')}
-                        className={`text-xs font-mono py-2 rounded border transition-all ${nodeTopology === 'SUBSIDIARY' ? 'bg-[#002FA7]/20 border-[#002FA7] text-white shadow-[0_0_10px_-3px_#002FA7]' : 'border-white/10 text-zinc-500 hover:bg-white/5'}`}
-                      >
-                        [ SUBSIDIARY ]
-                      </button>
-                    </div>
-
-                    {nodeTopology === 'SUBSIDIARY' && (
-                      <div className="animate-in fade-in slide-in-from-top-2 p-3 bg-black/20 rounded border border-white/5">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Link2 className="w-3 h-3 text-zinc-500" />
-                          <span className="text-[10px] text-zinc-400 font-mono">LINK PARENT NODE</span>
-                        </div>
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Revenue</label>
                         <input
-                          placeholder="Search existing database..."
-                          className="w-full bg-transparent border-b border-white/10 text-xs font-mono text-white focus:border-[#002FA7] outline-none pb-1"
+                          value={revenue}
+                          onChange={(e) => setRevenue(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="Unknown"
                         />
                       </div>
-                    )}
-                  </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Headcount</label>
+                        <input
+                          value={employees}
+                          onChange={(e) => setEmployees(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="Unknown"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Phone</label>
+                        <input
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="nodal-input w-full"
+                          placeholder="+1 (555) 000-0000"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">LinkedIn</label>
+                        <input
+                          value={scanResult?.linkedin || ''}
+                          readOnly
+                          className="nodal-input w-full opacity-60"
+                          placeholder="linkedin.com/company/..."
+                        />
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {type === 'ACCOUNT' && (
                   <div className="pt-2">
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-[10px] font-mono text-zinc-500 uppercase">Grid Coordinates</label>
-                      {!isManual && (
-                        <button className="text-[9px] font-mono text-white hover:text-zinc-300 transition-colors">
+                      {!isManual && scanResult?.address && (
+                        <button
+                          onClick={() => {
+                            if (scanResult?.address) setAddress(scanResult.address);
+                            if (scanResult?.city) setCity(scanResult.city);
+                            if (scanResult?.state) setState(scanResult.state);
+                          }}
+                          className="text-[9px] font-mono text-white hover:text-[#002FA7] transition-colors"
+                        >
                           [ SYNC_HQ_ADDRESS ]
                         </button>
                       )}
@@ -995,7 +1132,7 @@ export function NodeIngestion() {
               </div>
 
               {/* ACTION FOOTER */}
-              <div className="pt-6 mt-6 border-t border-white/10">
+              <div className="pt-6 mt-6 border-t border-white/10 space-y-2">
                 <Button
                   onClick={handleCommit}
                   disabled={isCommitting || (type === 'ACCOUNT' ? !entityName : (!firstName && !lastName))}
@@ -1006,10 +1143,18 @@ export function NodeIngestion() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                       COMMITTING...
                     </>
+                  ) : isExistingRecord ? (
+                    '[ ENRICH_EXISTING_NODE ]'
                   ) : (
                     '[ COMMIT_NODE_TO_DB ]'
                   )}
                 </Button>
+                <button
+                  onClick={() => setStep('SIGNAL')}
+                  className="w-full py-2 text-[10px] font-mono text-zinc-600 hover:text-zinc-300 transition-colors"
+                >
+                  [ ← RESCAN ]
+                </button>
               </div>
 
             </motion.div>
@@ -1090,7 +1235,7 @@ export function NodeIngestion() {
                     onClick={() => setShowVerifyModal(false)}
                     className="w-full py-2 text-xs font-mono text-zinc-500 hover:text-white transition-colors"
                   >
-                    [ CANCEL ]
+                    [ NONE OF THESE — PROCEED MANUALLY ]
                   </button>
                 </div>
               </div>
