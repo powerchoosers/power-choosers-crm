@@ -1285,7 +1285,8 @@ OUTPUT FORMAT:
                       setPendingSubjectFromAi(null)
                     }
                   }}
-                  className="w-full h-full"
+                  className="w-full"
+                  showToolbar={formattingOpen}
                 />
               )}
               {isAiLoading && (
@@ -1454,41 +1455,6 @@ OUTPUT FORMAT:
                     Angle auto-selected from industry: {context.industry}
                   </div>
                 )}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Formatting Panel — slides up above footer, similar to AI Rail */}
-        <AnimatePresence>
-          {formattingOpen && (
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="absolute left-4 right-4 bottom-[calc(4rem+8px)] z-50 h-auto min-h-12 backdrop-blur-xl bg-zinc-950/90 border border-white/10 rounded-lg shadow-2xl overflow-hidden"
-            >
-              <div className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">Text Formatting</span>
-                  <button
-                    type="button"
-                    title="Close formatting"
-                    onClick={() => setFormattingOpen(false)}
-                    className="icon-button-forensic h-6 w-6 flex items-center justify-center"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="text-[9px] text-zinc-400 leading-relaxed max-w-xs">
-                  Use the formatting toolbar in the editor above to style your text. You can:
-                  <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Make text <strong>bold</strong>, <em>italic</em>, or <u>underlined</u></li>
-                    <li>Create bullet points and numbered lists</li>
-                    <li>Change text color and add images</li>
-                  </ul>
-                </div>
               </div>
             </motion.div>
           )}
