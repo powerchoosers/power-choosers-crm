@@ -127,9 +127,9 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     }, [token])
 
     // ── Draw signature capture ────────────────────────────────────────────────
-    // captureDrawnSignature: the actual capture — composites strokes onto a white
-    // background and stores the result in activeSignature so the PDF overlay fills.
-    // Uses hasDrawnRef (not isEmpty()) to avoid race conditions with ResizeObserver.
+    // captureDrawnSignature: copies strokes onto a transparent canvas and stores
+    // the result. Transparent PNG means the signature overlays the contract lines
+    // cleanly — no white rectangle blocking the document content.
     const captureDrawnSignature = useCallback(() => {
         // Cancel any pending debounce timer
         if (captureTimerRef.current) {
@@ -140,15 +140,13 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         if (!sigCanvas.current || !hasDrawnRef.current) return
         const srcCanvas = sigCanvas.current.getCanvas()
         if (!srcCanvas || !srcCanvas.width || !srcCanvas.height) return
-        // Composite onto white — avoids transparent-canvas issues where getImageData
-        // returns near-empty bitmaps on some mobile WebKit versions.
+        // Copy strokes onto a fresh transparent canvas — no white fill.
+        // PNG preserves the alpha channel so only the ink is visible on the PDF.
         const out = document.createElement('canvas')
         out.width = srcCanvas.width
         out.height = srcCanvas.height
         const ctx = out.getContext('2d')
         if (!ctx) return
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, out.width, out.height)
         ctx.drawImage(srcCanvas, 0, 0)
         setActiveSignature(out.toDataURL('image/png'))
     }, [])
@@ -391,7 +389,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                                 >
                                                     {activeSignature ? (
                                                         /* eslint-disable-next-line @next/next/no-img-element */
-                                                        <img src={activeSignature} alt="Signature" className="w-full h-full object-contain" />
+                                                        <img src={activeSignature} alt="Signature" className="w-full h-full object-contain object-left" />
                                                     ) : (
                                                         <span className="text-[10px] font-mono text-white tracking-widest uppercase animate-pulse">Sign Here</span>
                                                     )}
