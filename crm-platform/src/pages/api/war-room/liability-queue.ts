@@ -12,12 +12,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     try {
-        // Fetch accounts with basic fields
+        // Fetch accounts ordered so that contracts expiring soonest come first.
+        // NULLS LAST keeps accounts without a contract end date at the bottom of the list.
+        // Limit increased to 200 so near-expiry accounts are never excluded by the cap.
         const { data: accounts, error: accErr } = await supabaseAdmin
             .from('accounts')
             .select('id, name, domain, industry, city, state, logo_url, contract_end_date, metadata')
-            .limit(60)
-            .order('name', { ascending: true })
+            .order('contract_end_date', { ascending: true, nullsFirst: false })
+            .limit(200)
 
         if (accErr) throw accErr
 
