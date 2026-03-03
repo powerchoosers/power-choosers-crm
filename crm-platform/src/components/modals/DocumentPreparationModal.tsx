@@ -112,7 +112,43 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                                     onLoadSuccess={handleDocumentLoadSuccess}
                                     className="border border-white/10 shadow-2xl"
                                     loading={
-                                        <div className="text-xs font-mono text-zinc-500 animate-pulse">Loading Document...</div>
+                                        <div className="w-[800px] h-[1040px] flex flex-col items-center justify-center gap-8 bg-zinc-900 relative overflow-hidden border border-white/5">
+                                            {/* Grid */}
+                                            <div className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'linear-gradient(rgba(0,47,167,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,47,167,0.5) 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
+                                            {/* Scan line */}
+                                            <motion.div
+                                                className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#002FA7]/70 to-transparent pointer-events-none"
+                                                animate={{ y: [0, 1040] }}
+                                                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+                                            />
+                                            <div className="relative flex flex-col items-center gap-5 z-10">
+                                                {/* Spinner */}
+                                                <div className="relative w-14 h-14">
+                                                    <div className="absolute inset-0 rounded-full border border-[#002FA7]/20" />
+                                                    <div className="absolute inset-0 rounded-full border-2 border-[#002FA7]/20 border-t-[#002FA7] animate-spin" />
+                                                    <div className="absolute inset-0 flex items-center justify-center">
+                                                        <LayoutTemplate className="w-5 h-5 text-[#002FA7]/50" />
+                                                    </div>
+                                                </div>
+                                                {/* Labels */}
+                                                <div className="text-center space-y-1.5">
+                                                    <div className="text-[9px] font-mono uppercase tracking-[0.5em] text-[#002FA7]">NODAL POINT</div>
+                                                    <div className="text-xs font-mono text-zinc-400 animate-pulse">Loading Secure Document</div>
+                                                    <div className="text-[9px] font-mono text-zinc-600 tracking-[0.3em] uppercase">Establishing Encrypted Channel</div>
+                                                </div>
+                                                {/* Waveform */}
+                                                <div className="flex gap-1.5 items-end h-6">
+                                                    {[3, 6, 4, 8, 5, 7, 3, 5, 4].map((h, i) => (
+                                                        <motion.div
+                                                            key={i}
+                                                            className="w-[3px] bg-[#002FA7]/40 rounded-full"
+                                                            animate={{ height: [`${h * 2}px`, `${h * 4}px`, `${h * 2}px`] }}
+                                                            transition={{ duration: 0.7 + i * 0.08, repeat: Infinity, ease: 'easeInOut', delay: i * 0.08 }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
                                     }
                                 >
                                     <div className="relative inline-block cursor-crosshair">
@@ -232,7 +268,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                                     disabled={fields.length === 0}
                                     className="w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
-                                    [ EXECUTE_CONTRACT_DEPLOYMENT ]
+                                    [ DEPLOY_CONTRACT ]
                                     <ArrowRight className="w-3 h-3" />
                                 </button>
                                 {fields.length === 0 && (
