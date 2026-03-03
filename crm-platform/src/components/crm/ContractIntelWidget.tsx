@@ -22,14 +22,17 @@ const STAGE_DOT: Record<DealStage, string> = {
   TERMINATED: 'bg-rose-400/60',
 }
 
-const STAGE_TEXT: Record<DealStage, string> = {
-  IDENTIFIED: 'text-zinc-500',
-  AUDITING: 'text-amber-400',
-  BRIEFED: 'text-[#002FA7]',
-  ENGAGED: 'text-[#002FA7]',
-  OUT_FOR_SIGNATURE: 'text-emerald-400',
-  SECURED: 'text-emerald-400',
-  TERMINATED: 'text-rose-400/70',
+// Stage-derived progress — accurate reflection of pipeline position.
+// Using deal.probability (a manually-entered guess) was causing the bar
+// to show 50% even after a contract was fully signed. Stage is the truth.
+const STAGE_PROGRESS: Record<DealStage, number> = {
+  IDENTIFIED: 10,
+  AUDITING: 25,
+  BRIEFED: 40,
+  ENGAGED: 60,
+  OUT_FOR_SIGNATURE: 80,
+  SECURED: 100,
+  TERMINATED: 0,
 }
 
 // ---------------------------------------------------------------------------
@@ -55,7 +58,7 @@ function closeLabel(closeDate?: string) {
 // ---------------------------------------------------------------------------
 function DealCard({ deal }: { deal: Deal }) {
   const router = useRouter()
-  const probPct = Math.min(100, Math.max(0, deal.probability ?? 0))
+  const probPct = STAGE_PROGRESS[deal.stage] ?? 0
   const closeLbl = closeLabel(deal.closeDate)
 
   // Find the most recent signature request if any
@@ -68,14 +71,11 @@ function DealCard({ deal }: { deal: Deal }) {
       onClick={() => router.push('/network/contracts')}
       className="w-full text-left group p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.08] transition-all relative overflow-hidden"
     >
-      {/* Top row: stage dot + title */}
+      {/* Top row: stage dot + title. Stage text removed — badge handles status display */}
       <div className="flex items-center gap-2 mb-1.5 pr-16">
         <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', STAGE_DOT[deal.stage])} />
         <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-300 truncate flex-1">
           {deal.title}
-        </span>
-        <span className={cn('font-mono text-[9px] uppercase tracking-wider flex-shrink-0', STAGE_TEXT[deal.stage])}>
-          {deal.stage}
         </span>
       </div>
 
@@ -118,18 +118,18 @@ function DealCard({ deal }: { deal: Deal }) {
         )}
       </div>
 
-      {/* Probability bar */}
-      {probPct > 0 && (
-        <div className="space-y-1">
-          <div className="h-0.5 w-full bg-zinc-800 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-zinc-500 rounded-full transition-all"
-              style={{ width: `${probPct}%` }}
-            />
-          </div>
-          <div className="text-[9px] font-mono text-zinc-600 text-right tabular-nums">{probPct}%</div>
+      {/* Stage progress bar — always shown, derived from pipeline stage not manual probability */}
+      <div className="space-y-1">
+        <div className="h-0.5 w-full bg-zinc-800 rounded-full overflow-hidden">
+          <div
+            className={cn('h-full rounded-full transition-all duration-500', probPct === 100 ? 'bg-emerald-500' : 'bg-zinc-500')}
+            style={{ width: `${probPct}%` }}
+          />
         </div>
-      )}
+        <div className={cn('text-[9px] font-mono text-right tabular-nums', probPct === 100 ? 'text-emerald-600' : 'text-zinc-600')}>
+          {probPct}%
+        </div>
+      </div>
     </button>
   )
 }
