@@ -514,17 +514,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                 )}
                             </div>
 
-                            {/* Apply button — shown after drawing ends, before auto-capture fires */}
-                            {signatureMode === 'draw' && drawPending && (
-                                <button
-                                    onClick={captureDrawnSignature}
-                                    className="w-full h-9 border border-[#002FA7] text-[#002FA7] hover:bg-[#002FA7] hover:text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all"
-                                >
-                                    <CheckCircle className="w-3.5 h-3.5" />
-                                    Apply Signature to Contract
-                                </button>
-                            )}
-
+                            
                             <p className="text-[10px] text-zinc-600 font-sans leading-relaxed">
                                 By {signatureMode === 'draw' ? 'drawing' : 'typing'} your signature above and clicking Execute Contract, you agree to be legally bound by the terms presented in this document.
                             </p>
