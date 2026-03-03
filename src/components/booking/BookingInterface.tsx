@@ -10,6 +10,8 @@ import { useRouter } from 'next/navigation';
 
 export default function BookingInterface({ email }: { email: string }) {
     const router = useRouter();
+    const [localEmail, setLocalEmail] = useState(email);
+    const [emailInput, setEmailInput] = useState('');
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [selectedTime, setSelectedTime] = useState<string | null>(null);
     const [identityData, setIdentityData] = useState<any>(null);
@@ -17,7 +19,7 @@ export default function BookingInterface({ email }: { email: string }) {
     const [isSuccess, setIsSuccess] = useState(false);
 
     const handleConfirm = async () => {
-        if (!selectedDate || !selectedTime || !email) return;
+        if (!selectedDate || !selectedTime || !localEmail) return;
 
         setIsBooking(true);
         try {
@@ -27,11 +29,11 @@ export default function BookingInterface({ email }: { email: string }) {
                 body: JSON.stringify({
                     contactName: identityData?.name || 'Unknown Contact',
                     companyName: identityData?.company || 'Unknown Company',
-                    email: email,
+                    email: localEmail,
                     phone: identityData?.phone || '',
                     appointmentDate: format(selectedDate, 'yyyy-MM-dd'),
                     selectedTime: selectedTime,
-                    source: 'forensic-briefing' // Special source for this flow
+                    source: 'forensic-briefing'
                 })
             });
 
@@ -39,13 +41,11 @@ export default function BookingInterface({ email }: { email: string }) {
                 throw new Error('Booking protocol failed');
             }
 
-            // Success State
             setIsSuccess(true);
             toast.success('Protocol Initiated: Briefing Scheduled.');
 
-            // Redirect after delay
             setTimeout(() => {
-                router.push('/philosophy'); // Redirect to Philosophy page
+                router.push('/philosophy');
             }, 3000);
 
         } catch (error) {
@@ -83,10 +83,48 @@ export default function BookingInterface({ email }: { email: string }) {
         );
     }
 
+    // Email gate — shown when accessed directly without an email param
+    if (!localEmail) {
+        return (
+            <div className="flex-1 flex flex-col items-center justify-center p-6">
+                <div className="max-w-md w-full">
+                    <div className="flex items-center gap-2 mb-6">
+                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
+                            IDENTITY_VECTOR_MISSING
+                        </span>
+                    </div>
+                    <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Book a Briefing</h2>
+                    <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
+                        Enter your work email to access the scheduling system and personalize your forensic briefing.
+                    </p>
+                    <div className="space-y-3">
+                        <input
+                            type="email"
+                            value={emailInput}
+                            onChange={e => setEmailInput(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter' && emailInput) setLocalEmail(emailInput); }}
+                            placeholder="you@company.com"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3.5 text-white placeholder-zinc-600 font-mono text-sm focus:outline-none focus:border-[#002FA7]/60 focus:bg-white/[0.07] transition-all"
+                            autoFocus
+                        />
+                        <button
+                            onClick={() => { if (emailInput) setLocalEmail(emailInput); }}
+                            disabled={!emailInput}
+                            className="w-full bg-white text-black rounded-xl py-3.5 font-bold uppercase tracking-wide hover:bg-zinc-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        >
+                            Initialize Briefing
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-            {/* LEFT PANEL: Tactical Calendar (Cols 1-7) */}
-            <div className="flex-[7] p-6 md:p-10 border-b lg:border-b-0 lg:border-r border-white/5 overflow-y-auto np-scroll">
+        <div className="flex-1 flex flex-col lg:flex-row lg:overflow-hidden">
+            {/* LEFT PANEL: Tactical Calendar */}
+            <div className="flex-[7] p-4 md:p-8 lg:p-10 border-b lg:border-b-0 lg:border-r border-white/5 lg:overflow-y-auto np-scroll">
                 <TacticalCalendar
                     selectedDate={selectedDate}
                     onDateSelect={setSelectedDate}
@@ -95,11 +133,10 @@ export default function BookingInterface({ email }: { email: string }) {
                 />
             </div>
 
-            {/* RIGHT PANEL: Live Recon / Context (Cols 8-12) */}
-            <div className="flex-[5] bg-black/20 p-6 md:p-10 overflow-y-auto np-scroll relative">
-                {/* Background Text Removed per user request */}
+            {/* RIGHT PANEL: Live Recon / Context */}
+            <div className="flex-[5] bg-black/20 p-4 md:p-8 lg:p-10 lg:overflow-y-auto np-scroll relative">
                 <IdentityDossier
-                    email={email}
+                    email={localEmail}
                     onIdentityResolved={setIdentityData}
                     onConfirm={handleConfirm}
                     isValid={!!selectedDate && !!selectedTime}

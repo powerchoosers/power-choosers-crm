@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import Link from 'next/link'
 import Image from 'next/image'
 import { Activity, Layers, Users } from 'lucide-react'
+import { LandingFooter } from '@/components/landing/LandingFooter'
 
 export function LandingSections() {
   const observerRef = useRef<IntersectionObserver | null>(null)
@@ -230,15 +230,7 @@ export function LandingSections() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="bg-zinc-900 text-zinc-400 py-20 px-6 border-t border-zinc-800">
-        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-8">
-          <div className="bg-white p-3 rounded-3xl">
-            <Image src="/images/nodalpoint.png" alt="Nodal Point Logo" width={120} height={48} className="h-12 w-auto" />
-          </div>
-          <p className="font-mono text-sm tracking-widest opacity-60">&copy; 2026 Nodal Point. All Systems Nominal.</p>
-        </div>
-      </footer>
+      <LandingFooter />
     </>
   )
 }
