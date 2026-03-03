@@ -172,10 +172,16 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
         }
 
         // 4. Map Apollo data
+        const apFirstName = apolloPerson.first_name || undefined;
+        const apLastName = apolloPerson.last_name || undefined;
+        const apName = apolloPerson.name?.trim() ||
+            (apFirstName && apLastName ? `${apFirstName} ${apLastName}` : apFirstName || apLastName) ||
+            'Unknown Entity';
+
         const identity: IdentityData = {
-            name: apolloPerson.name || `${apolloPerson.first_name} ${apolloPerson.last_name}`.trim(),
-            firstName: apolloPerson.first_name,
-            lastName: apolloPerson.last_name,
+            name: apName,
+            firstName: apFirstName,
+            lastName: apLastName,
             title: apolloPerson.title || 'N/A',
             company: apolloPerson.organization?.name || 'Unknown Corp',
             email: apolloPerson.email || email,
@@ -188,9 +194,9 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
         // 5. Save to Supabase for next time
         const contactData = {
             id: crypto.randomUUID(),
-            name: identity.name,
-            firstName: identity.firstName,
-            lastName: identity.lastName,
+            name: apName,
+            firstName: apFirstName,
+            lastName: apLastName,
             title: identity.title,
             email: identity.email,
             phone: identity.phone ? formatPhoneNumber(identity.phone) : null,
@@ -220,4 +226,33 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
         console.error('Resolve Identity Error:', error);
         return null;
     }
+}
+
+/**
+ * Patch a contact record with manually entered identity data (Apollo-miss fallback)
+ */
+export async function updateContactManualData(
+    email: string,
+    data: { name?: string; title?: string; phone?: string }
+): Promise<void> {
+    if (!email) return;
+
+    const updates: Record<string, string | undefined> = {};
+    if (data.name) {
+        const parts = data.name.trim().split(' ');
+        updates.name = data.name.trim();
+        updates.firstName = parts[0];
+        updates.lastName = parts.slice(1).join(' ') || undefined;
+    }
+    if (data.title) updates.title = data.title;
+    if (data.phone) updates.phone = data.phone;
+
+    if (Object.keys(updates).length === 0) return;
+
+    const { error } = await supabaseAdmin
+        .from('contacts')
+        .update(updates)
+        .eq('email', email);
+
+    if (error) console.error('updateContactManualData error:', error);
 }

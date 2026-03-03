@@ -40,7 +40,7 @@ export function NextStepsCard({ email }: NextStepsCardProps) {
 
                 <div className="flex flex-col items-center gap-8">
                     <Link
-                        href={`/book${email ? `?email=${encodeURIComponent(email)}` : ''}`}
+                        href={`/book?${email ? `email=${encodeURIComponent(email)}&` : ''}from=%2Fbill-debugger`}
                         className="group px-12 py-6 bg-black text-white rounded-full font-bold text-xl hover:scale-105 transition-all flex items-center gap-4 shadow-[#000]/20 shadow-2xl hover:shadow-black/30 active:scale-95"
                     >
                         <Calendar className="w-6 h-6" />
