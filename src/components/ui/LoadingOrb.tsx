@@ -31,7 +31,7 @@ export function LoadingOrb({ className, size = 'md', label }: LoadingOrbProps) {
             ease: "easeInOut"
           }}
           className={cn(
-            "rounded-full bg-white shadow-[0_0_40px_rgba(255,255,255,0.4)]",
+            "rounded-full bg-[#002FA7] shadow-[0_0_40px_rgba(0,47,167,0.4)]",
             sizeClasses[size]
           )}
         />
@@ -48,14 +48,14 @@ export function LoadingOrb({ className, size = 'md', label }: LoadingOrbProps) {
             ease: "easeInOut"
           }}
           className={cn(
-            "absolute inset-0 rounded-full border-2 border-white/40",
+            "absolute inset-0 rounded-full border-2 border-[#002FA7]/40",
             sizeClasses[size]
           )}
         />
 
         {/* Inner Core */}
         <div className={cn(
-          "absolute inset-0 m-auto rounded-full bg-white opacity-40 blur-[1px]",
+          "absolute inset-0 m-auto rounded-full bg-[#002FA7] opacity-60 blur-[1px]",
           size === 'lg' ? 'h-4 w-4' : size === 'md' ? 'h-2 w-2' : 'h-1 w-1'
         )} />
       </div>
