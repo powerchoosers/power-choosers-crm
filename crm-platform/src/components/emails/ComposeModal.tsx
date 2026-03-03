@@ -25,10 +25,9 @@ import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { RichTextEditor } from './RichTextEditor'
 
 const EMAIL_AI_MODELS = [
-  { value: 'gemini-2.5-flash', label: 'GEMINI-2.5-FLASH' },
-  { value: 'gemini-2.5-flash-lite', label: 'GEMINI-2.5-FLASH-LITE' },
-  { value: 'gemini-3-flash-preview', label: 'GEMINI-3.0-FLASH-PREVIEW' },
-  { value: 'gemini-2.0-flash', label: 'GEMINI-2.0-FLASH' },
+  { value: 'google/gemini-2.5-flash', label: 'GEMINI-2.5-FLASH' },
+  { value: 'google/gemini-2.5-flash-lite', label: 'GEMINI-2.5-FLASH-LITE' },
+  { value: 'google/gemini-2.0-flash-001', label: 'GEMINI-2.0-FLASH' },
   { value: 'sonar-pro', label: 'SONAR-PRO' },
   { value: 'sonar', label: 'SONAR-STANDARD' },
   { value: 'openai/gpt-oss-120b:free', label: 'GPT-OSS-120B' },
@@ -507,7 +506,7 @@ function ComposePanel({
   const [aiRailOpen, setAiRailOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [emailTypeId, setEmailTypeId] = useState<EmailTypeId>('cold_first_touch')
-  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-flash-lite')
+  const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.5-flash')
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
   const [pendingAiContent, setPendingAiContent] = useState<string | null>(null)
