@@ -1238,9 +1238,14 @@ export default async function handler(req, res) {
     if (requestContext?.type === 'contact' && requestContext?.id) {
       try {
         const contactId = String(requestContext.id).trim();
+        const requestedCallId = req.body?.context?.data?.callId ? String(req.body.context.data.callId).trim() : '';
+        const callsQuery = requestedCallId
+          ? supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp, type, direction').eq('id', requestedCallId).limit(1)
+          : supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp, type, direction').eq('contactId', contactId).order('timestamp', { ascending: false }).limit(6);
+
         const [contactRes, callsRes] = await Promise.all([
           supabaseAdmin.from('contacts').select('*').eq('id', contactId).single(),
-          supabaseAdmin.from('calls').select('id, transcript, summary, ai_summary, timestamp, type, direction').eq('contactId', contactId).order('timestamp', { ascending: false }).limit(6)
+          callsQuery,
         ]);
         const contact = contactRes?.data;
         const calls = callsRes?.data || [];
@@ -1280,12 +1285,20 @@ export default async function handler(req, res) {
             if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 400)}${trans.length > 400 ? '…' : ''}`);
           });
         }
-        // Apollo company news for contact's account domain (or contact website-derived domain)
+        // Pull linked account context (contract end, supplier, etc.) and domain for Apollo news
         let contactDomain = null;
-        const linkedAccountId = contact.linked_account_id ?? contact.linkedAccountId;
+        const linkedAccountId = contact?.linked_account_id ?? contact?.linkedAccountId ?? req.body?.context?.data?.accountId;
         if (linkedAccountId) {
-          const { data: acc } = await supabaseAdmin.from('accounts').select('domain').eq('id', linkedAccountId).single();
-          contactDomain = acc?.domain?.trim() || null;
+          const { data: acc } = await supabaseAdmin.from('accounts').select('*').eq('id', linkedAccountId).single();
+          if (acc) {
+            lines.push(`LINKED ACCOUNT: ${acc.name || 'Unknown'}`);
+            if (acc.industry) lines.push(`Account industry: ${acc.industry}`);
+            if (acc.contract_end_date) lines.push(`Contract end: ${acc.contract_end_date}`);
+            if (acc.electricity_supplier) lines.push(`Supplier: ${acc.electricity_supplier}`);
+            const accNotes = String(acc.notes ?? acc.description ?? '').trim();
+            if (accNotes) lines.push(`Account notes: ${accNotes.slice(0, 600)}${accNotes.length > 600 ? '…' : ''}`);
+            contactDomain = acc?.domain?.trim() || null;
+          }
         }
         if (!contactDomain && contact.website) {
           try {
