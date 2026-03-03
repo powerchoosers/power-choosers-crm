@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { useWarRoomStore } from '@/store/warRoomStore'
-import { Phone, Mail, CheckSquare, Zap, X, Loader2 } from 'lucide-react'
+import { Phone, Mail, CheckSquare, Zap, X, Loader2, Calendar } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -54,7 +54,8 @@ function scoreAccount(acct: AccountRecord, reservesTight: boolean): ScoredAccoun
     const reasons: string[] = []
     const now = Date.now()
 
-    // Contract end date
+    // Contract end date — HIGHEST WEIGHT signals
+    // 90D expiry must dominate so it always surfaces above cold/uncontacted accounts
     let contractDaysLeft: number | null = null
     if (acct.contractEndDate) {
         contractDaysLeft = Math.round(
@@ -63,9 +64,13 @@ function scoreAccount(acct: AccountRecord, reservesTight: boolean): ScoredAccoun
         // Bonus for having any contract date
         score += 10
         if (contractDaysLeft <= 0) {
-            score += 65; reasons.push('CONTRACT EXPIRED')
+            score += 100; reasons.push('CONTRACT EXPIRED')
+        } else if (contractDaysLeft <= 30) {
+            score += 95; reasons.push(`CRITICAL — ${contractDaysLeft}D TO EXPIRY`)
+        } else if (contractDaysLeft <= 60) {
+            score += 85; reasons.push(`URGENT — ${contractDaysLeft}D TO EXPIRY`)
         } else if (contractDaysLeft <= 90) {
-            score += 55; reasons.push(`RENEWAL DANGER (${contractDaysLeft}D)`)
+            score += 75; reasons.push(`RENEWAL DANGER (${contractDaysLeft}D)`)
         } else if (contractDaysLeft <= 180) {
             score += 45; reasons.push(`WINDOW OPEN (${contractDaysLeft}D)`)
         } else if (contractDaysLeft <= 365) {
@@ -123,6 +128,10 @@ const HEALTH_DOT = {
     never: 'bg-rose-600',
 }
 
+// ─── Filter types ────────────────────────────────────────────────────────────
+
+type FilterMode = 'all' | 'expiring' | 'cold' | 'high_risk'
+
 // ─── PriorityStack ──────────────────────────────────────────────────────────
 
 export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, onQuickCall }: PriorityStackProps) {
@@ -132,6 +141,7 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
     const [brief, setBrief] = useState<string | null>(null)
     const [briefLoading, setBriefLoading] = useState(false)
     const [briefError, setBriefError] = useState<string | null>(null)
+    const [filterMode, setFilterMode] = useState<FilterMode>('all')
     const { signalHistory } = useWarRoomStore()
 
     const reservesTight = (gridSnapshot?.reserves ?? Infinity) < 4000
@@ -197,6 +207,21 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
         }
     }
 
+    // Filtered view
+    const filteredAccounts = accounts.filter((a) => {
+        if (filterMode === 'expiring') return a.contractDaysLeft !== null && a.contractDaysLeft <= 90
+        if (filterMode === 'cold') return a.healthTier === 'cold' || a.healthTier === 'never'
+        if (filterMode === 'high_risk') return a.liabilityScore >= 70
+        return true
+    })
+
+    const FILTERS: { id: FilterMode; label: string; count?: number }[] = [
+        { id: 'all', label: 'ALL', count: accounts.length },
+        { id: 'expiring', label: 'EXPIRING_90D', count: accounts.filter(a => a.contractDaysLeft !== null && a.contractDaysLeft <= 90).length },
+        { id: 'cold', label: 'COLD', count: accounts.filter(a => a.healthTier === 'cold' || a.healthTier === 'never').length },
+        { id: 'high_risk', label: 'HIGH_RISK', count: accounts.filter(a => a.liabilityScore >= 70).length },
+    ]
+
     return (
         <div className="flex flex-col h-full overflow-hidden">
             {/* Toolbar */}
@@ -207,7 +232,7 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                     </span>
                     {!loading && (
                         <span className="text-[10px] font-mono text-zinc-700">
-                            {accounts.length} targets
+                            {filteredAccounts.length} targets
                         </span>
                     )}
                 </div>
@@ -229,6 +254,39 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                         ? <><Loader2 className="w-3 h-3 animate-spin" /> Generating...</>
                         : <><Zap className="w-3 h-3" /> Tactical Brief</>}
                 </motion.button>
+            </div>
+
+            {/* Filter bar */}
+            <div className="flex items-center gap-1 px-4 py-2 border-b border-white/5 shrink-0 overflow-x-auto np-scroll">
+                {FILTERS.map((f) => {
+                    const isExpiring = f.id === 'expiring'
+                    const hasItems = (f.count ?? 0) > 0
+                    return (
+                        <button
+                            key={f.id}
+                            onClick={() => setFilterMode(f.id)}
+                            className={cn(
+                                'flex items-center gap-1.5 px-2.5 py-1 rounded text-[9px] font-mono uppercase tracking-widest whitespace-nowrap transition-all',
+                                filterMode === f.id
+                                    ? isExpiring
+                                        ? 'bg-amber-500/15 border border-amber-500/40 text-amber-400'
+                                        : 'bg-white/10 border border-white/20 text-white'
+                                    : 'border border-transparent text-zinc-600 hover:text-zinc-400 hover:border-white/10'
+                            )}
+                        >
+                            {isExpiring && hasItems && <Calendar className="w-2.5 h-2.5" />}
+                            {f.label}
+                            {f.count !== undefined && (
+                                <span className={cn(
+                                    'text-[8px] tabular-nums',
+                                    filterMode === f.id ? 'opacity-100' : 'opacity-50'
+                                )}>
+                                    {f.count}
+                                </span>
+                            )}
+                        </button>
+                    )
+                })}
             </div>
 
             {/* AI Brief output */}
@@ -275,9 +333,15 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                             </div>
                         ))}
                     </div>
+                ) : filteredAccounts.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-[200px] gap-2">
+                        <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest">
+                            No accounts match this filter
+                        </span>
+                    </div>
                 ) : (
                     <div className="animate-in fade-in duration-300">
-                        {accounts.map((acct, idx) => (
+                        {filteredAccounts.map((acct, idx) => (
                             <AccountCard
                                 key={acct.id}
                                 acct={acct}
