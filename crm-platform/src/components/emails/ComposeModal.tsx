@@ -658,13 +658,22 @@ function ComposePanel({
     const { toast } = await import('sonner')
     const toastId = toast.loading('Uploading image...')
     try {
-      const formData = new FormData()
-      formData.append('file', file)
-      const response = await fetch('/api/upload', { method: 'POST', body: formData })
+      const buffer = await file.arrayBuffer()
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+
+      const response = await fetch('/api/upload/signature-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: base64,
+          type: 'template-image',
+        }),
+      })
       if (!response.ok) throw new Error('Failed to upload image')
       const data = await response.json()
-      if (editorRef.current && data.url) {
-        editorRef.current.chain().focus().setImage({ src: data.url }).run()
+      const url = data?.url || data?.imageUrl
+      if (editorRef.current && url) {
+        editorRef.current.chain().focus().setImage({ src: url }).run()
       }
       toast.success('Image uploaded', { id: toastId })
     } catch {
