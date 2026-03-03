@@ -273,10 +273,10 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                                 <button
                                     onClick={() => onComplete(fields)}
                                     disabled={fields.length === 0}
-                                    className="w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                                    className="group w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
                                     [ DEPLOY_CONTRACT ]
-                                    <ArrowRight className="w-3 h-3" />
+                                    <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
                                 </button>
                                 {fields.length === 0 && (
                                     <p className="text-[10px] font-mono text-rose-500 text-center mt-2">
