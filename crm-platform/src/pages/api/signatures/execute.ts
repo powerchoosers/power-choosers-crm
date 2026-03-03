@@ -7,7 +7,7 @@ import crypto from 'crypto';
 export const config = {
     api: {
         bodyParser: {
-            sizeLimit: '10mb' // Signatures and PDF buffers can be large
+            sizeLimit: '10mb'
         }
     }
 }
@@ -75,14 +75,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         const pdfBuffer = await pdfData.arrayBuffer();
-
-        // Calculate hash of original document
         const originalHash = crypto.createHash('sha256').update(Buffer.from(pdfBuffer)).digest('hex');
 
         // 4. Modify PDF with pdf-lib
         const pdfDoc = await PDFDocument.load(pdfBuffer);
         const pages = pdfDoc.getPages();
         const lastPage = pages[pages.length - 1];
+
+        // File naming — hoisted early so customerFileName is available before cert pages are added
+        const originalExt = request.document.name.split('.').pop();
+        const originalNameNoExt = request.document.name.replace(`.${originalExt}`, '');
+        const finalFileName = `${originalNameNoExt}_Signed_${Date.now()}.${originalExt}`;
+        const customerFileName = `${originalNameNoExt}_Executed.${originalExt}`;
 
         // 4a. Embed the signature image
         const base64Data = signatureBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
@@ -103,32 +107,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const targetPage = pages[field.pageIndex];
                 if (!targetPage) return;
 
-                // HTML coordinate system used by react-pdf (800px width based)
                 const pdfWidth = targetPage.getWidth();
                 const pdfHeight = targetPage.getHeight();
-                const scale = pdfWidth / 800; // HTML rendered at 800px Fixed Width
+                const scale = pdfWidth / 800;
 
                 const scaledWidth = field.width * scale;
                 const scaledHeight = field.height * scale;
                 const scaledX = field.x * scale;
                 const scaledY = field.y * scale;
-
-                // Cartesian Flip for PDF-lib Y axis
                 const pdfY = pdfHeight - scaledY - scaledHeight;
 
                 if (field.type === 'text') {
-                    // Draw Text input — use stable fieldId as key; fall back to index for legacy requests
                     const textKey = field.fieldId ?? String(index);
                     const textContent = (textValues && textValues[textKey]) ? textValues[textKey] : '';
                     targetPage.drawText(textContent, {
                         x: scaledX + 5,
-                        y: pdfY + (scaledHeight / 3), // approximate vertical centering
+                        y: pdfY + (scaledHeight / 3),
                         size: 11,
                         font: helvetica,
                         color: rgb(0, 0, 0)
                     });
                 } else {
-                    // Draw Signature Image
                     try {
                         targetPage.drawImage(signatureImage, {
                             x: scaledX,
@@ -136,8 +135,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             width: scaledWidth,
                             height: scaledHeight,
                         });
-
-                        // Add tiny signature metadata under the box
                         targetPage.drawText(`Signed: ${new Date().toISOString().split('T')[0]}`, {
                             x: scaledX,
                             y: pdfY - 10,
@@ -175,8 +172,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
         }
 
-        // 4b. Create the Forensic Audit Certificate
-        const certPage = pdfDoc.addPage([595.28, 841.89]); // A4 Size
+        // 4b. Save customer copy BEFORE appending cert pages.
+        //     Customer receives a clean signed PDF — no forensic audit trail.
+        const customerPdfBytes = await pdfDoc.save();
+
+        // 4c. Create the Forensic Audit Certificate (internal copy only)
+        const certPage = pdfDoc.addPage([595.28, 841.89]);
         const certWidth = certPage.getWidth();
         const certHeight = certPage.getHeight();
 
@@ -185,18 +186,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             y: certHeight - 50,
             size: 16,
             font: helveticaBold,
-            color: rgb(0, 0.184, 0.655) // #002FA7
+            color: rgb(0, 0.184, 0.655)
         });
 
         certPage.drawText(`Document ID: ${request.document.id}`, { x: 50, y: certHeight - 90, size: 10, font: helvetica });
         certPage.drawText(`Original SHA-256 Hash: ${originalHash}`, { x: 50, y: certHeight - 110, size: 10, font: helvetica });
         certPage.drawText(`Signer: ${request.contact?.email || 'Unknown'}`, { x: 50, y: certHeight - 130, size: 10, font: helvetica });
 
-        // Track the active cert page — overflow adds a labelled continuation page automatically
         let activeCertPage = certPage;
         const CERT_LEFT = 50;
-        const CERT_MIN_Y = 80;    // reserve bottom 80pt for the footer line
-        const CERT_ENTRY_HEIGHT = 52; // approx height consumed per telemetry entry (15 + 12 + 25)
+        const CERT_MIN_Y = 80;
+        const CERT_ENTRY_HEIGHT = 52;
 
         let currentY = certHeight - 170;
         activeCertPage.drawText('TELEMETRY TIMELINE:', { x: CERT_LEFT, y: currentY, size: 12, font: helveticaBold });
@@ -204,7 +204,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         if (telemetries) {
             telemetries.forEach((t) => {
-                // If the next entry would bleed off the bottom of the current page, start a new one
                 if (currentY < CERT_MIN_Y + CERT_ENTRY_HEIGHT) {
                     activeCertPage = pdfDoc.addPage([595.28, 841.89]);
                     const contHeight = activeCertPage.getHeight();
@@ -227,7 +226,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             });
         }
 
-        // Draw footer on whichever cert page was last written to
         activeCertPage.drawText('This document is electronically signed and secured by Nodal Point.', {
             x: CERT_LEFT,
             y: 50,
@@ -236,13 +234,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             color: rgb(0.4, 0.4, 0.4)
         });
 
-        // 5. Save final PDF
+        // 5. Save final PDF (with cert) — this is the authoritative vault record
         const finalPdfBytes = await pdfDoc.save();
 
-        // 6. Upload final PDF to Supabase Storage
-        const originalExt = request.document.name.split('.').pop();
-        const originalNameNoExt = request.document.name.replace(`.${originalExt}`, '');
-        const finalFileName = `${originalNameNoExt}_Signed_${Date.now()}.${originalExt}`;
+        // 6. Upload final PDF (with cert) to Supabase Storage
         const accountFolder = request.account_id ?? 'unassigned';
         const finalStoragePath = `accounts/${accountFolder}/${finalFileName}`;
 
@@ -263,7 +258,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 size: `${(finalPdfBytes.length / 1024 / 1024).toFixed(2)} MB`,
                 type: 'application/pdf',
                 storage_path: finalStoragePath,
-                url: '' // private vault
+                url: ''
             })
             .select()
             .single();
@@ -283,22 +278,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .eq('id', request.id);
 
         if (request.deal_id) {
-            // Optionally update the deal stage to SECURED
             await supabaseAdmin.from('deals').update({ stage: 'SECURED' }).eq('id', request.deal_id);
         }
 
         // 8. Email Delivery
         try {
-            // authEmail: the Zoho account that holds real OAuth tokens (l.patterson@nodalpoint.io).
-            // fromEmail:  the alias address the email appears to come from (signal@nodalpoint.io).
-            // These MUST be separate — token lookup uses authEmail, display from uses fromEmail.
-            // Using fromEmail for token lookup throws "No Zoho credentials found for signal@nodalpoint.io"
-            // because signal@ is an alias with no stored OAuth tokens, silently killing the email.
+            const appBaseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://nodalpoint.io';
+            const logoUrl = `${appBaseUrl}/images/nodalpoint-webicon.png`;
+
+            // authEmail: Zoho OAuth token lookup (l.patterson@nodalpoint.io — has stored tokens).
+            // fromEmail:  display from address shown to recipients (signal@nodalpoint.io alias).
             const authEmail = 'l.patterson@nodalpoint.io';
             const fromEmail = 'signal@nodalpoint.io';
 
-            // Resolve agent email from the request metadata (set at dispatch time), then deal owner, then account owner.
-            // Fall back to fromEmail so the notification inbox always receives a copy even when the chain is incomplete.
+            // Resolve agent email from dispatch metadata, deal owner, or account owner
             const resolvedAgentEmail: string =
                 request.metadata?.agentEmail ||
                 request.deal?.ownerId ||
@@ -306,47 +299,105 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 fromEmail;
 
             if (!request.metadata?.agentEmail && !request.deal?.ownerId && !request.account?.ownerId) {
-                console.warn('[Execution Email] agentEmail could not be resolved for request', request.id, '— falling back to fromEmail for BCC.');
+                console.warn('[Execution Email] agentEmail could not be resolved for request', request.id, '— falling back to fromEmail.');
             }
+
+            // Look up agent's first name for email personalization
+            const { data: agentUser } = await supabaseAdmin
+                .from('users')
+                .select('first_name, last_name')
+                .eq('email', resolvedAgentEmail)
+                .maybeSingle();
+
+            const agentFirstName = agentUser?.first_name || 'your advisor';
+            const contactFirstName = request.contact?.firstName || request.contact?.name?.split(' ')[0] || 'there';
+            const contactLastName = request.contact?.lastName || '';
+            const contactFullName = [contactFirstName, contactLastName].filter(Boolean).join(' ') || request.contact?.email || 'Contact';
+            const accountName = request.account?.name || '';
+
+            const customerSubject = `Your Energy Agreement Has Been Executed`;
+            const internalSubject = `EXECUTED — ${contactFullName}${accountName ? ` · ${accountName}` : ''}`;
+
+            // Shared email header with logo
+            const emailHeader = `
+              <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px; padding-bottom:20px; border-bottom:1px solid #27272a; width:100%;">
+                <tr>
+                  <td style="width:44px; vertical-align:middle; padding-right:12px;">
+                    <img src="${logoUrl}" alt="Nodal Point" width="36" height="36" style="display:block; border-radius:6px;" />
+                  </td>
+                  <td style="vertical-align:middle;">
+                    <span style="font-family:monospace; font-size:12px; letter-spacing:0.15em; color:#a1a1aa; text-transform:uppercase;">Nodal Point</span>
+                  </td>
+                </tr>
+              </table>
+            `;
+
+            // Customer email — clean signed PDF, no audit trail
+            const customerEmailHtml = `
+              <div style="font-family:monospace; background-color:#09090b; color:#f4f4f5; padding:40px; border:1px solid #27272a; max-width:600px; margin:0 auto;">
+                ${emailHeader}
+                <h2 style="text-transform:uppercase; letter-spacing:0.1em; color:#10b981; font-size:13px; margin-top:0; margin-bottom:24px;">Contract Executed</h2>
+                <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:16px; color:#f4f4f5;">Hi ${contactFirstName},</p>
+                <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:20px; color:#f4f4f5;">
+                  Your energy services agreement has been fully executed and cryptographically sealed. A signed copy is attached for your records.
+                </p>
+                <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:0; color:#a1a1aa;">
+                  If you have any questions, please don't hesitate to reach out to your advisor, ${agentFirstName}.
+                </p>
+                <div style="margin-top:40px; font-size:11px; color:#52525b; border-top:1px solid #27272a; padding-top:16px; font-family:monospace;">
+                  Nodal Point Compliance &middot; nodalpoint.io
+                </div>
+              </div>
+            `;
+
+            // Internal email — full PDF with forensic audit certificate
+            const internalEmailHtml = `
+              <div style="font-family:monospace; background-color:#09090b; color:#f4f4f5; padding:40px; border:1px solid #27272a; max-width:600px; margin:0 auto;">
+                ${emailHeader}
+                <h2 style="text-transform:uppercase; letter-spacing:0.1em; color:#10b981; font-size:13px; margin-top:0; margin-bottom:24px;">Contract Executed</h2>
+                <div style="background-color:#18181b; padding:16px; border:1px solid #27272a; border-radius:4px; margin-bottom:24px;">
+                  <div style="font-size:10px; color:#71717a; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px; font-family:monospace;">Signatory</div>
+                  <div style="font-size:15px; color:#f4f4f5; font-family:sans-serif; margin-bottom:2px;">${contactFullName}</div>
+                  <div style="font-size:12px; color:#71717a; font-family:sans-serif;">${request.contact?.email || ''}</div>
+                  ${accountName ? `<div style="font-size:11px; color:#52525b; font-family:monospace; margin-top:6px; text-transform:uppercase; letter-spacing:0.05em;">${accountName}</div>` : ''}
+                </div>
+                <p style="font-family:sans-serif; font-size:14px; line-height:1.6; color:#a1a1aa; margin-bottom:0;">
+                  The executed document and Forensic Audit Certificate are attached. The signed record has been archived in the secure vault.
+                </p>
+                <div style="margin-top:40px; font-size:11px; color:#52525b; border-top:1px solid #27272a; padding-top:16px; font-family:monospace;">
+                  Nodal Point Forensic Systems &middot; Signal Intelligence
+                </div>
+              </div>
+            `;
 
             const zohoService = new ZohoMailService();
             await zohoService.initialize(authEmail);
 
-            // Upload attachment to Zoho first — non-fatal if it fails
-            // (email still sends without attachment rather than silently dropping)
-            let zohoAttachment = null;
+            // Upload customer copy (no cert) for customer email
+            let customerZohoAttachment = null;
             try {
-                zohoAttachment = await zohoService.uploadAttachment(
+                customerZohoAttachment = await zohoService.uploadAttachment(
+                    authEmail,
+                    Buffer.from(customerPdfBytes),
+                    customerFileName
+                );
+            } catch (attachErr: any) {
+                console.error('[Execution Email] Customer attachment upload failed — sending without attachment:', attachErr.message);
+            }
+
+            // Upload internal copy (with cert) for agent email
+            let internalZohoAttachment = null;
+            try {
+                internalZohoAttachment = await zohoService.uploadAttachment(
                     authEmail,
                     Buffer.from(finalPdfBytes),
                     finalFileName
                 );
             } catch (attachErr: any) {
-                console.error('[Execution Email] Attachment upload failed — sending without attachment:', attachErr.message);
+                console.error('[Execution Email] Internal attachment upload failed — sending without attachment:', attachErr.message);
             }
 
-            const emailSubject = `Executed Contract: ${request.document.name}`;
-            const emailHtml = `
-          <div style="font-family: monospace; background-color: #09090b; color: #f4f4f5; padding: 40px; border: 1px solid #27272a; max-width: 600px; margin: 0 auto;">
-            <h2 style="text-transform: uppercase; letter-spacing: 0.1em; color: #10b981; font-size: 14px; margin-bottom: 24px;">
-              CONTRACT EXECUTED
-            </h2>
-
-            <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 20px;">
-              The contract <strong>${request.document.name}</strong> has been successfully executed.
-            </p>
-
-            <p style="font-family: sans-serif; font-size: 15px; margin-bottom: 24px;">
-              A copy of the fully executed document with the attached Forensic Audit Certificate is attached for your records.
-            </p>
-
-            <div style="margin-top: 40px; font-size: 11px; color: #52525b; border-top: 1px solid #27272a; padding-top: 16px;">
-              Nodal Point Forensic Systems
-            </div>
-          </div>
-        `;
-
-            // Log execution email in the CRM emails table for CRM visibility
+            // Log customer email to CRM emails table
             const execEmailId = `sig_exec_${Date.now()}_${request.id.substring(0, 8)}`;
             const { error: emailInsertError } = await supabaseAdmin.from('emails').insert({
                 id: execEmailId,
@@ -355,9 +406,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 ownerId: fromEmail,
                 from: fromEmail,
                 to: [request.contact.email],
-                subject: emailSubject,
-                html: emailHtml,
-                text: `The contract has been executed. See attached.`,
+                subject: customerSubject,
+                html: customerEmailHtml,
+                text: `Your energy services agreement has been fully executed. A signed copy is attached.`,
                 status: 'sent',
                 type: 'sent',
                 timestamp: new Date().toISOString(),
@@ -374,21 +425,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 console.error('[Execution Email] Failed to log email to CRM:', emailInsertError.message);
             }
 
-            // BCC always resolves — agent inbox guaranteed a copy even when metadata chain is incomplete
+            // Send customer email — clean signed copy, no audit trail
             await zohoService.sendEmail({
                 to: [request.contact.email],
-                bcc: [resolvedAgentEmail],
-                subject: emailSubject,
-                html: emailHtml,
-                text: `The contract has been executed. See attached.`,
-                uploadedAttachments: zohoAttachment ? [zohoAttachment] : undefined,
-                userEmail: authEmail,       // l.patterson@nodalpoint.io — used for OAuth token lookup
-                from: fromEmail,            // signal@nodalpoint.io — display from address
+                subject: customerSubject,
+                html: customerEmailHtml,
+                text: `Your energy services agreement has been fully executed. A signed copy is attached.`,
+                uploadedAttachments: customerZohoAttachment ? [customerZohoAttachment] : undefined,
+                userEmail: authEmail,
+                from: fromEmail,
                 fromName: 'Nodal Point Compliance'
             });
+
+            // Send internal email to agent — full PDF with forensic audit certificate
+            await zohoService.sendEmail({
+                to: [resolvedAgentEmail],
+                subject: internalSubject,
+                html: internalEmailHtml,
+                text: `${contactFullName} has executed their energy agreement. Full document and Forensic Audit Certificate attached.`,
+                uploadedAttachments: internalZohoAttachment ? [internalZohoAttachment] : undefined,
+                userEmail: authEmail,
+                from: fromEmail,
+                fromName: 'Nodal Point Compliance'
+            });
+
         } catch (emailError: any) {
             console.error('[Execution Email Failed]', emailError.message);
-            // We do NOT fail the response, contract is legally executed and stored in vault
+            // Contract is legally executed and stored in vault — email failure is non-fatal
         }
 
         return res.status(200).json({ success: true, finalStoragePath });
