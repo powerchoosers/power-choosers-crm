@@ -40,6 +40,7 @@ const CONTACT_FIELDS = [
   { id: 'state', label: 'State', required: false },
   { id: 'linkedin_url', label: 'LinkedIn Vector', required: false },
   { id: 'company_name', label: 'Company Name', required: false },
+  { id: 'company_domain', label: 'Company Domain / Website', required: false },
 ];
 
 const ACCOUNT_FIELDS = [
@@ -413,33 +414,111 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
           const companyName = mappedData.company_name?.trim();
           
           if (companyName) {
-            // Try to find existing account with exact name match (case-insensitive)
-            const { data: existingAccount } = await supabase
-              .from('accounts')
-              .select('id')
-              .ilike('name', companyName)
-              .maybeSingle();
-            
+            // Resolve domain from mapped field if available
+            const companyDomain = mappedData.company_domain
+              ? normalizeWebsiteForImport(mappedData.company_domain)
+              : null;
+
+            // Check existing by domain first (more precise), then by name
+            let existingAccount = null;
+            if (companyDomain) {
+              const { data } = await supabase
+                .from('accounts')
+                .select('id')
+                .eq('domain', companyDomain)
+                .maybeSingle();
+              existingAccount = data;
+            }
+            if (!existingAccount) {
+              const { data } = await supabase
+                .from('accounts')
+                .select('id')
+                .ilike('name', companyName)
+                .maybeSingle();
+              existingAccount = data;
+            }
+
             if (existingAccount) {
               linkedAccountId = existingAccount.id;
             } else {
-              // No match: create a new account with the company name
+              // No match: create account with optional full Apollo enrichment
               try {
-                const newAccount = await upsertAccount.mutateAsync({
-                  name: companyName,
-                  domain: '',
-                  industry: '',
-                  description: '',
-                  companyPhone: '',
-                  contractEnd: '',
-                  employees: '',
-                  location: '',
-                  serviceAddresses: [],
-                  metadata: { import_source: 'bulk_import_contact', import_batch: new Date().toISOString() }
-                } as any);
-                if (newAccount?.id) {
-                  linkedAccountId = newAccount.id;
+                let apolloData: any = null;
+                let resolvedDomain = companyDomain;
+
+                if (isEnriching) {
+                  // If no domain mapped, search Apollo by name to resolve one
+                  if (!resolvedDomain) {
+                    try {
+                      const searchRes = await fetch('/api/apollo/search-organizations', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ q_organization_name: companyName, per_page: 1 })
+                      });
+                      if (searchRes.ok) {
+                        const searchData = await searchRes.json();
+                        const orgs = searchData.organizations || [];
+                        if (orgs.length > 0 && orgs[0].domain) {
+                          resolvedDomain = orgs[0].domain;
+                        }
+                      }
+                    } catch (e) {
+                      console.error('Apollo org search error for:', companyName, e);
+                    }
+                  }
+
+                  // Full enrichment via company endpoint
+                  if (resolvedDomain) {
+                    try {
+                      const enrichRes = await fetch(`/api/apollo/company?domain=${encodeURIComponent(resolvedDomain)}`);
+                      if (enrichRes.ok) {
+                        apolloData = await enrichRes.json();
+                      }
+                    } catch (e) {
+                      console.error('Apollo company enrich error for:', resolvedDomain, e);
+                    }
+                  }
                 }
+
+                const newAccount = await upsertAccount.mutateAsync({
+                  name: apolloData?.name || companyName,
+                  domain: apolloData?.domain || resolvedDomain || '',
+                  industry: apolloData?.industry || '',
+                  description: apolloData?.description || '',
+                  companyPhone: apolloData?.companyPhone || '',
+                  logoUrl: apolloData?.logoUrl || '',
+                  linkedinUrl: apolloData?.linkedin || '',
+                  address: apolloData?.address || '',
+                  city: apolloData?.city || '',
+                  state: apolloData?.state || '',
+                  employees: apolloData?.employees ? String(apolloData.employees) : '',
+                  contractEnd: '',
+                  sqft: '',
+                  occupancy: '',
+                  serviceAddresses: apolloData?.address ? [{
+                    address: apolloData.address,
+                    city: apolloData.city || '',
+                    state: apolloData.state || '',
+                    country: apolloData.country || '',
+                    type: 'headquarters',
+                    isPrimary: true
+                  }] : [],
+                  metadata: {
+                    import_source: 'bulk_import_contact',
+                    import_batch: new Date().toISOString(),
+                    enriched: !!apolloData,
+                    country: apolloData?.country || '',
+                    meters: apolloData?.address ? [{
+                      id: crypto.randomUUID(),
+                      esiId: '',
+                      address: apolloData.address,
+                      rate: '',
+                      endDate: ''
+                    }] : []
+                  }
+                } as any);
+
+                if (newAccount?.id) linkedAccountId = newAccount.id;
               } catch (accountErr) {
                 console.error('Failed to create account for company:', companyName, accountErr);
                 // Continue without account link; contact still has company in metadata
