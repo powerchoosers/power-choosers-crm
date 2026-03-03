@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils'
 import { ScanlineLoader } from '@/components/chat/ScanlineLoader'
 import { INDUSTRY_VECTORS } from '@/lib/industry-mapping'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
-import { buildFoundryContext, generateSystemPrompt } from '@/lib/foundry-prompt'
+import { buildFoundryContext, generateSystemPrompt, FoundryContext } from '@/lib/foundry-prompt'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchContacts } from '@/hooks/useContacts'
@@ -34,7 +34,7 @@ const EMAIL_AI_MODELS = [
   { value: 'nvidia/nemotron-3-nano-30b-a3b:free', label: 'NEMOTRON-30B' },
 ] as const
 
-export type EmailTypeId = 'cold_first_touch' | 'cold_followup' | 'professional' | 'followup' | 'internal' | 'support'
+export type EmailTypeId = 'cold_first_touch' | 'cold_followup' | 'professional' | 'followup' | 'post_call' | 'internal' | 'support'
 
 function EmailIframePreview({ content }: { content: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -67,11 +67,37 @@ DELIVERABILITY RULES:
 - For cold first-touch: do not include any links. Plain text only.
 - TESTING: Do not send to yourself repeatedly. Email providers flag high-frequency same-domain traffic with tracking links as suspicious.`
 
-/** Maps industry to vertical-specific pain points and angles. Used to automatically inject context into prompts. */
-function getIndustryAngle(industry: string | undefined): string | null {
-  if (!industry || typeof industry !== 'string') return null
+/** Universal fallback angles — rotated by seed so same contact always gets the same angle. */
+const UNIVERSAL_ENERGY_ANGLES = [
+  `ANGLE: Contract Opacity / Rate Review
+CONTEXT: Most commercial accounts are on contracts signed under different market conditions, often auto-renewing without review.
+ANGLES: "When did you last formally benchmark your rate against current market prices?" "Most contracts auto-renew without anyone reviewing them — that's when the spread grows." Focus on contract opacity and the compounding cost of inaction.`,
+
+  `ANGLE: Demand Charge / Ratchet Risk
+CONTEXT: A single 15-minute peak interval can lock in the demand/delivery portion of the bill for 12 months in most Texas utility territories.
+ANGLES: "One busy day can lock in your delivery costs for the rest of the year." "A single spike in summer stays on the bill all the way through winter." Focus on the asymmetric risk: one interval vs. 12 months of locked-in charges.`,
+
+  `ANGLE: Non-Commodity / Delivery Charges
+CONTEXT: In Texas deregulated markets, utility delivery charges (TDSP/TDU) are often 40–60% of the total bill and are rarely benchmarked or reviewed.
+ANGLES: "How much of your bill is the utility portion that doesn't drop when commodity rates fall?" "The delivery side of your bill may have grown more than the commodity side without anyone noticing." Focus on the unreviewed portion of the bill.`,
+
+  `ANGLE: Budget Volatility
+CONTEXT: Variable rate exposure means energy bills swing significantly month-to-month, making operational budgeting unpredictable and reactive.
+ANGLES: "How much did your energy bill swing last summer compared to winter?" "When the grid tightens, who gets the call about the spike?" Focus on budget unpredictability and who owns that risk inside their organization.`,
+]
+
+/** Returns a consistent angle for a given seed string (company/contact name) so the same contact always gets the same angle. */
+function getUniversalEnergyAngle(seed?: string): string {
+  if (!seed) return UNIVERSAL_ENERGY_ANGLES[0]
+  const hash = seed.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  return UNIVERSAL_ENERGY_ANGLES[hash % UNIVERSAL_ENERGY_ANGLES.length]
+}
+
+/** Maps industry to vertical-specific pain points and angles. Falls back to a universal angle if no specific match. */
+function getIndustryAngle(industry: string | undefined, seed?: string): string {
+  if (!industry || typeof industry !== 'string') return getUniversalEnergyAngle(seed)
   const normalized = industry.trim().toLowerCase()
-  if (!normalized) return null
+  if (!normalized) return getUniversalEnergyAngle(seed)
 
   // Check for specific verticals
   if (normalized.includes('restaurant') || normalized.includes('food & beverage') || normalized.includes('food and beverage') || normalized.includes('hospitality')) {
@@ -82,78 +108,123 @@ ANGLES: "Dinner rush can quietly set demand charges that crush margins." "How ma
   if (normalized.includes('hotel') || normalized.includes('accommodation')) {
     return `VERTICAL: Hotels/Hospitality
 PAINS: Guest comfort (AC), occupancy-driven peaks. Common-area loads (lobby, conference, pool). Seasonality and weekend spikes.
-ANGLES: "A few hot weekends can lock in demand charges for the off-season." "Have you ever seen a spike where guest comfort and your bill go in opposite directions?" Focus on occupancy patterns and guest experience vs cost tradeoffs.`
+ANGLES: "A few hot weekends can lock in demand charges for the off-season." "Have you ever seen a spike where guest comfort and your bill go in opposite directions?" Focus on occupancy patterns and the guest experience vs. cost tradeoff.`
   }
-  if (normalized.includes('nonprofit') || normalized.includes('non-profit') || normalized.includes('non profit') || normalized.includes('clinic') || normalized.includes('shelter') || normalized.includes('community center')) {
-    return `VERTICAL: Nonprofits/Clinics
+  if (normalized.includes('nonprofit') || normalized.includes('non-profit') || normalized.includes('non profit') || normalized.includes('shelter') || normalized.includes('community center')) {
+    return `VERTICAL: Nonprofits/Community Organizations
 PAINS: Fixed or donor-driven budgets. Mission-critical services; outages are reputational risk. Need predictability more than rock-bottom price.
-ANGLES: "When the power bill jumps 15%, what program loses funding?" "You can't shut the doors when the grid gets tight; how are you insulating your budget from that volatility?" Focus on budget predictability and mission-critical reliability, not generic cost savings.`
+ANGLES: "When the power bill jumps 15%, what program loses funding?" "You can't shut the doors when the grid gets tight; how are you insulating your budget from that volatility?" Focus on budget predictability and mission-critical reliability.`
   }
-  if (normalized.includes('school') || normalized.includes('isd') || normalized.includes('education') || normalized.includes('district')) {
-    return `VERTICAL: Schools/ISDs
+  if (normalized.includes('school') || normalized.includes('isd') || normalized.includes('education') || normalized.includes('district') || normalized.includes('university') || normalized.includes('college')) {
+    return `VERTICAL: Schools/Education
 PAINS: Large campuses with HVAC-driven peaks. Bond-funded projects need predictable OPEX. High summer usage when buildings are "empty".
-ANGLES: "Empty buildings in August still set 12 months of charges." "What does a summer peak do to next year's budget per student?" Focus on summer HVAC when buildings are empty and budget per student impact.`
+ANGLES: "Empty buildings in August still set 12 months of charges." "What does a summer peak do to next year's budget per student?" Focus on summer HVAC when buildings are empty and per-student budget impact.`
   }
   if (normalized.includes('warehouse') || normalized.includes('logistics') || normalized.includes('distribution') || normalized.includes('3pl') || normalized.includes('freight')) {
     return `VERTICAL: Warehouses/Logistics
-PAINS: Demand peaks during loading/unloading. Multi-site footprint with inconsistent usage. Refrigerated/conditioned space driving high kW. Contracts not matched to actual load profile.
-ANGLES: "One busy loading window can set 12 months of charges." "We mapped your facilities and saw a huge spread in kW that isn't showing up in base rates." Focus on operational peaks (loading/unloading windows) and multi-site inconsistencies.`
+PAINS: Demand peaks during loading/unloading windows. Multi-site footprint with inconsistent usage. Refrigerated/conditioned space driving high kW. Contracts not matched to actual load profile.
+ANGLES: "One busy loading window can set 12 months of charges." "We mapped your facilities and saw a spread in kW that isn't showing up in base rates." Focus on operational peaks (loading/unloading windows) and multi-site inconsistencies.`
   }
-  if (normalized.includes('manufacturing') || normalized.includes('production') || normalized.includes('factory')) {
+  if (normalized.includes('manufacturing') || normalized.includes('production') || normalized.includes('factory') || normalized.includes('fabrication') || normalized.includes('machining')) {
     return `VERTICAL: Manufacturing
 PAINS: Production line peaks, shift changes, HVAC for conditioned spaces. Contracts often don't match actual load shape. High kW during production runs.
-ANGLES: "One production run can set demand charges for months." "When all the lines are running, that peak can lock in next year's delivery costs." Focus on production-driven peaks and load shape mismatches.`
+ANGLES: "One production run can set demand charges for months." "When all the lines are running, that peak can lock in next year's delivery costs." Focus on production-driven peaks and load shape mismatches between contract and actual usage.`
   }
-  if (normalized.includes('healthcare') || normalized.includes('hospital') || normalized.includes('medical') || normalized.includes('clinic')) {
+  if (normalized.includes('healthcare') || normalized.includes('hospital') || normalized.includes('medical') || normalized.includes('clinic') || normalized.includes('urgent care') || normalized.includes('dental')) {
     return `VERTICAL: Healthcare
 PAINS: 24/7 operations, critical equipment loads, HVAC for patient comfort. Outages are life-safety risks. Budget predictability matters more than lowest price.
-ANGLES: "When the power bill jumps, what service gets cut?" "You can't shut down when the grid gets tight; how are you insulating your budget from volatility?" Focus on reliability and budget predictability, not generic cost savings.`
+ANGLES: "When the power bill jumps, what service gets cut?" "You can't shut down when the grid gets tight; how are you insulating your budget from that volatility?" Focus on reliability and budget predictability.`
   }
-  if (normalized.includes('retail') || normalized.includes('store') || normalized.includes('supermarket')) {
+  if (normalized.includes('retail') || normalized.includes('store') || normalized.includes('supermarket') || normalized.includes('grocery')) {
     return `VERTICAL: Retail
 PAINS: Customer-facing operations; peaks during business hours. Lighting, HVAC, and equipment loads. Tight margins; power costs hit profitability.
-ANGLES: "Peak shopping hours can quietly set demand charges that eat into margins." "When all the lights and AC are maxed during busy hours, that peak locks in charges for months." Focus on customer-facing operational peaks and margin impact.`
+ANGLES: "Peak shopping hours can quietly set demand charges that eat into margins." "When all the lights and AC are maxed during busy hours, that peak locks in charges for months." Focus on customer-facing operational peaks and their margin impact.`
   }
-  if (normalized.includes('real estate') || normalized.includes('property') || normalized.includes('commercial real estate')) {
+  if (normalized.includes('real estate') || normalized.includes('property') || normalized.includes('commercial real estate') || normalized.includes('property management') || normalized.includes('reit')) {
     return `VERTICAL: Real Estate/Property Management
-PAINS: Multi-tenant buildings with inconsistent usage. Common-area loads (hallways, elevators, parking). Tenant comfort vs cost tradeoffs.
-ANGLES: "Common-area loads can set demand charges across the whole building." "When tenants crank AC during hot days, that peak locks in charges for all tenants." Focus on multi-tenant dynamics and common-area loads.`
+PAINS: Multi-tenant buildings with inconsistent usage. Common-area loads (hallways, elevators, parking lots). Tenant comfort vs. cost tradeoffs across floors.
+ANGLES: "Common-area loads can set demand charges across the whole building." "When tenants crank AC on hot days, that peak locks in charges for all tenants for the next 12 months." Focus on multi-tenant dynamics and common-area load exposure.`
+  }
+  if (normalized.includes('construction') || normalized.includes('contractor') || normalized.includes('builder') || normalized.includes('general contractor') || normalized.includes('subcontractor')) {
+    return `VERTICAL: Construction/Contractors
+PAINS: Temporary service at job sites, unpredictable usage patterns. Main office/yard on permanent service with equipment peaks. Project-driven cost spikes.
+ANGLES: "Heavy equipment startup at the yard can set demand charges even on slow months." "Are your job site accounts adding up to a number nobody's tracking?" Focus on job site vs. permanent service complexity and equipment-driven peaks.`
+  }
+  if (normalized.includes('oil') || normalized.includes('gas') || normalized.includes('oilfield') || normalized.includes('petroleum') || normalized.includes('midstream') || normalized.includes('upstream') || normalized.includes('downstream')) {
+    return `VERTICAL: Oil & Gas
+PAINS: High 24/7 power draws at production sites. Pump jack and compressor loads driving demand. Rate structure may not match intermittent production cycles.
+ANGLES: "Pump jack startups during peak summer hours can set demand charges that stay for 12 months even when production dips." "Is your rate structure designed for a facility that runs 24/7 or one that cycles?" Focus on production cycle vs. flat rate mismatch.`
+  }
+  if (normalized.includes('auto') || normalized.includes('dealership') || normalized.includes('car dealer') || normalized.includes('automotive')) {
+    return `VERTICAL: Auto Dealerships
+PAINS: Large showroom lighting + HVAC, service bay equipment, EV charging infrastructure. High overhead with pressure on margins.
+ANGLES: "Showroom lighting and service bays running 12 hours a day can quietly set demand charges that eat into service department margins." "How does your energy cost per vehicle sold compare to regional benchmarks?" Focus on overhead-to-revenue ratio and the service bay peak load.`
+  }
+  if (normalized.includes('fitness') || normalized.includes('gym') || normalized.includes('recreation center') || normalized.includes('athletic') || normalized.includes('sport')) {
+    return `VERTICAL: Fitness/Recreation
+PAINS: HVAC and ventilation costs in high-occupancy workout spaces. Evening and weekend occupancy peaks. Membership-driven revenue vs. fixed utility costs.
+ANGLES: "Peak class hours can set demand charges that run for months even on slow weeks." "How much of your monthly overhead is the power bill, and does it match your membership revenue curve?" Focus on peak occupancy periods and the mismatch between usage spikes and flat billing.`
+  }
+  if (normalized.includes('office') || normalized.includes('professional service') || normalized.includes('law firm') || normalized.includes('accounting') || normalized.includes('consulting') || normalized.includes('financial service')) {
+    return `VERTICAL: Professional Services/Office
+PAINS: HVAC-heavy during business hours. Predictable 9-5 usage but rate rarely reviewed. Often still on a default utility rate set when they moved in.
+ANGLES: "Most offices are on a rate that was set up when they signed their lease and never revisited." "A large open-plan office can have higher demand spikes than expected just from HVAC startup in the morning." Focus on the unreviewed default rate and HVAC startup peaks.`
+  }
+  if (normalized.includes('data center') || normalized.includes('colocation') || normalized.includes('colo') || normalized.includes('hosting') || normalized.includes('tech') || normalized.includes('technology')) {
+    return `VERTICAL: Technology/Data Centers
+PAINS: High, consistent 24/7 power draw. Cooling overhead adding 30–40% on top of IT load. Rate structure critical for flat vs. variable loads.
+ANGLES: "With 24/7 load, your rate structure should look different than a facility that peaks and drops." "Cooling load can add 30–40% on top of IT power draw — is that reflected in your contract?" Focus on load shape mismatch and cooling overhead.`
+  }
+  if (normalized.includes('agriculture') || normalized.includes('farm') || normalized.includes('ranch') || normalized.includes('irrigation') || normalized.includes('nursery') || normalized.includes('greenhouse')) {
+    return `VERTICAL: Agriculture/Farming
+PAINS: Irrigation pumping during hot months creating massive, brief demand peaks. Seasonal usage patterns that don't match year-round rate structures.
+ANGLES: "Irrigation pump startups during peak summer hours can set demand charges that last all year." "Your summer irrigation load and your winter storage load look nothing alike — is your rate built for both?" Focus on irrigation-driven demand peaks and the seasonal mismatch.`
+  }
+  if (normalized.includes('self storage') || normalized.includes('self-storage') || normalized.includes('mini storage') || normalized.includes('storage unit') || normalized.includes('public storage')) {
+    return `VERTICAL: Self Storage
+PAINS: Climate-controlled units driving HVAC costs. 24/7 lighting and security. Often underestimated energy overhead for what looks like a passive asset class.
+ANGLES: "Climate-controlled units are quietly one of the highest per-square-foot energy costs in commercial real estate." "How does the energy cost per occupied unit compare to what you projected when you underwrote the deal?" Focus on surprise energy overhead relative to underwriting assumptions.`
+  }
+  if (normalized.includes('municipal') || normalized.includes('government') || normalized.includes('city') || normalized.includes('county') || normalized.includes('public sector')) {
+    return `VERTICAL: Municipal/Government
+PAINS: Multi-building portfolio with inconsistent rate structures. Budget cycles that don't align with energy market timing. Public procurement rules limiting flexibility.
+ANGLES: "With multiple buildings across different accounts, the rate spread across your portfolio might surprise you." "Most municipal accounts were set up on default rates during procurement — those rates rarely get benchmarked." Focus on portfolio-wide rate inconsistency and the procurement inertia that locks in uncompetitive rates.`
   }
 
   // Check INDUSTRY_VECTORS for broader matches
   for (const [vector, values] of Object.entries(INDUSTRY_VECTORS)) {
     const match = values.some(v => normalized.includes(v.toLowerCase()) || v.toLowerCase().includes(normalized))
     if (match) {
-      // Map vector to angle if we have a specific one
       if (vector === 'Food & Beverage') {
         return `VERTICAL: Food & Beverage
-PAINS: Tight margins; power costs hit food cost and labor. Evening peaks (kitchen + HVAC + lights). Risk of spoilage during outages.
+PAINS: Tight margins; power costs hit food cost and labor. Evening peaks (kitchen + HVAC + lights).
 ANGLES: "Dinner rush can quietly set demand charges that crush margins." Focus on operational peaks and margin impact.`
       }
       if (vector === 'Logistics & Warehouse') {
         return `VERTICAL: Logistics/Warehouse
-PAINS: Demand peaks during loading/unloading. Multi-site footprint with inconsistent usage. Refrigerated/conditioned space driving high kW.
+PAINS: Demand peaks during loading/unloading. Multi-site footprint with inconsistent usage.
 ANGLES: "One busy loading window can set 12 months of charges." Focus on operational peaks and multi-site inconsistencies.`
       }
       if (vector === 'Education') {
         return `VERTICAL: Education
-PAINS: Large campuses with HVAC-driven peaks. Bond-funded projects need predictable OPEX. High summer usage when buildings are "empty".
+PAINS: Large campuses with HVAC-driven peaks. High summer usage when buildings are "empty".
 ANGLES: "Empty buildings in August still set 12 months of charges." Focus on summer HVAC when buildings are empty.`
       }
       if (vector === 'Healthcare') {
         return `VERTICAL: Healthcare
-PAINS: 24/7 operations, critical equipment loads, HVAC for patient comfort. Outages are life-safety risks. Budget predictability matters.
+PAINS: 24/7 operations, critical equipment loads. Budget predictability matters.
 ANGLES: "When the power bill jumps, what service gets cut?" Focus on reliability and budget predictability.`
       }
       if (vector === 'Manufacturing') {
         return `VERTICAL: Manufacturing
-PAINS: Production line peaks, shift changes, HVAC for conditioned spaces. Contracts often don't match actual load shape.
+PAINS: Production line peaks, shift changes, HVAC for conditioned spaces.
 ANGLES: "One production run can set demand charges for months." Focus on production-driven peaks.`
       }
     }
   }
 
-  return null
+  // No specific industry match — return a universal angle keyed to the seed
+  return getUniversalEnergyAngle(seed)
 }
 
 interface EmailTypeConfig {
@@ -314,6 +385,44 @@ Output ONLY the email body. Plain text, no markdown.`,
     refinementChips: [
       { label: 'Softer', directive: 'Soften the tone; make it less pushy.' },
       { label: 'Clearer CTA', directive: 'Make the call-to-action or ask clearer and more specific.' },
+    ],
+  },
+  {
+    id: 'post_call',
+    label: 'Post-Call Follow-up',
+    getSystemPrompt: ({ signerName, to, subject }) =>
+      `You are writing a POST-CALL FOLLOW-UP email on behalf of ${signerName}. This email is sent after a live phone or video conversation with the recipient.
+
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output meta-commentary, questions about the prompt, or instructions. If the user's directive is unclear, interpret it and write email content anyway.
+
+TONE: Warm, collegial, and direct — like continuing a real conversation in writing. It should feel personal and immediate, not templated. The recipient just talked to you; they should feel it.
+
+STRUCTURE: Short call reference (1 sentence, natural) → Key takeaway or relevant finding for them (1–2 sentences) → One clear next step or ask (1 sentence). 80–130 words total.
+
+PERSONALIZATION: If CALL INTELLIGENCE or NOTES are provided in the context, reference something specific from the conversation. One specific detail beats three generic lines. Make it feel like you were listening.
+
+SENDER: ${signerName}
+RECIPIENT: ${to || '(not specified)'}
+SUBJECT: ${subject || '(no subject)'}
+
+GREETING: "Hi [firstname]," or "Good talking with you, [firstname]," followed by exactly TWO (2) line breaks. NEVER put the body on the same line as the greeting.
+CLOSING: "Best," or "Thanks," followed by the SENDER's first name only (warm, informal).
+SUBJECT (when generating): Reference the call or topic. Examples: "Following up from our call", "Quick follow-up: [topic from call]", "Next step from today's call". 4–7 words.
+
+${DELIVERABILITY_RULES}
+- Light formatting is fine. No heavy bullet lists unless specifically requested. Output ONLY the email body (or SUBJECT: + body when generating). No meta-commentary.`,
+    getRefinementInstruction: () =>
+      'REFINEMENT: Make this post-call email warmer and more specific. Reference the conversation naturally. One clear next step. Output only the revised body.',
+    generationChips: [
+      { label: 'Thank you + recap', directive: 'Write a warm post-call thank-you that briefly references the key topic we discussed and proposes one concrete next step. 80–100 words.' },
+      { label: 'Send the math', directive: 'Write a short post-call follow-up saying I am following up with the numbers I mentioned on the call. Reference what we discussed. Build curiosity. 70–90 words.' },
+      { label: 'Schedule next step', directive: 'Write a post-call follow-up that thanks them for the conversation and proposes one specific next step (follow-up call, sending an audit, or a proposal). 80–100 words.' },
+      { label: 'Drip materials', directive: 'Write a post-call follow-up mentioning I am attaching or linking the materials I referenced on the call. Make it feel like a natural continuation. 70–90 words.' },
+    ],
+    refinementChips: [
+      { label: 'More specific', directive: 'Make this more specific to the call that happened. Less generic. Reference one detail from the conversation.' },
+      { label: 'Shorter', directive: 'Shorten to 60–80 words. Keep the warmth and the ask.' },
+      { label: 'Stronger CTA', directive: 'Make the call-to-action more direct and specific. What exactly is the next step?' },
     ],
   },
   {
@@ -520,6 +629,22 @@ function ComposePanel({
   // Formatting panel state
   const [formattingOpen, setFormattingOpen] = useState(false)
 
+  // Deep foundry context: energy profile + call transcripts loaded from Supabase when contact/account is present
+  const [foundryContext, setFoundryContext] = useState<FoundryContext | null>(null)
+  useEffect(() => {
+    if (!context?.contactId && !context?.accountId) return
+    buildFoundryContext(supabase, context.contactId ?? null, context.accountId ?? null)
+      .then(ctx => {
+        setFoundryContext(ctx)
+        // Auto-suggest post_call mode when there are recent transcripts and user hasn't manually changed type
+        if (ctx.intelligence.transcripts.length > 0 && emailTypeId === 'cold_first_touch') {
+          setEmailTypeId('post_call')
+        }
+      })
+      .catch(err => console.error('[ComposeModal] Failed to load foundry context:', err))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [context?.contactId, context?.accountId])
+
   // Search suggestions state
   const [toQuery, setToQuery] = useState(initialTo)
   const [ccQuery, setCcQuery] = useState('')
@@ -572,9 +697,10 @@ function ComposePanel({
         if (isEnergyManager) lines.push('- Audience: energy manager / energy-focused role — you may use precise terms (4CP, ratchet, TDU, pass-through) when helpful.')
         else lines.push('- Audience: general (ops, finance, facility) — use plain English only; avoid industry jargon.')
       }
-      // Industry-specific angle (automatic, invisible to user)
-      const industryAngle = getIndustryAngle(context.industry)
-      if (industryAngle) {
+      // Industry-specific angle (automatic, invisible to user) — always inject for cold/outreach types
+      const isColdOrOutreach = effectiveConfig.id === 'cold_first_touch' || effectiveConfig.id === 'cold_followup'
+      if (isColdOrOutreach) {
+        const industryAngle = getIndustryAngle(context.industry, context.companyName || context.accountName)
         lines.push('VERTICAL-SPECIFIC ANGLE (use this automatically; do not mention "vertical" or "angle" in the email):')
         lines.push(industryAngle)
       }
@@ -595,12 +721,38 @@ function ComposePanel({
       }
       if (lines.length) base += '\n\n' + lines.join('\n')
     }
+
+    // Inject deep context from Supabase: energy profile + call transcripts
+    if (foundryContext) {
+      const deepLines: string[] = []
+      const { energy, intelligence } = foundryContext
+      const hasEnergyData = energy.currentRate || energy.contractEnd || energy.annualUsage || energy.supplier || energy.loadZone
+      if (hasEnergyData) {
+        deepLines.push('ENERGY PROFILE (use for precision when referencing costs or contract details):')
+        if (energy.supplier) deepLines.push(`- Current Supplier: ${energy.supplier}`)
+        if (energy.currentRate) deepLines.push(`- Current Rate: ${energy.currentRate}/kWh`)
+        if (energy.contractEnd) deepLines.push(`- Contract Expiry: ${energy.contractEnd} — this is a live trigger if upcoming`)
+        if (energy.annualUsage) deepLines.push(`- Annual Usage: ${energy.annualUsage}`)
+        if (energy.loadZone) deepLines.push(`- ERCOT Load Zone: ${energy.loadZone}`)
+      }
+      if (intelligence.transcripts.length > 0) {
+        deepLines.push('')
+        deepLines.push('CALL INTELLIGENCE (for post-call or follow-up emails, reference specific talking points from these transcripts):')
+        intelligence.transcripts.slice(0, 2).forEach(t => deepLines.push(t.slice(0, 600)))
+      }
+      if (intelligence.summary && intelligence.summary.trim() && !context?.contextForAi?.includes(intelligence.summary.slice(0, 40))) {
+        deepLines.push('')
+        deepLines.push(`CONTACT NOTES: ${intelligence.summary.slice(0, 400)}`)
+      }
+      if (deepLines.length > 0) base += '\n\n' + deepLines.join('\n')
+    }
+
     if (isRefinementMode) {
       base += '\n\n' + effectiveConfig.getRefinementInstruction()
     }
 
     base += `
-    
+
 CORE RULES:
 - TONE: Peer-to-Peer. Professional but human. Speak like a knowledgeable industry colleague.
 - NO JARGON: Use plain English. No buzzwords like "delve", "optimize", "streamline".
@@ -631,20 +783,26 @@ OUTPUT FORMAT:
     }
 
     return base
-  }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context, emailTypeId, sendAsPlainText])
+  }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context, emailTypeId, sendAsPlainText, foundryContext])
 
   const generateEmailWithAi = useCallback(async (directive: string) => {
     // Auto-select angle based on industry if no directive provided and industry is present
     let effectiveDirective = directive.trim()
-    if (!effectiveDirective && context?.industry && (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup')) {
-      const industryAngle = getIndustryAngle(context.industry)
-      if (industryAngle) {
-        // Extract angle guidance from the industry angle block
-        const angleMatch = industryAngle.match(/ANGLES:\s*([\s\S]+?)(?:\n|$)/)
-        if (angleMatch) {
-          effectiveDirective = `Write a 40–70 word first-touch cold email using the VERTICAL-SPECIFIC ANGLE provided above. ${angleMatch[1].trim()} Focus on the operational pain specific to this vertical. Plain text, minimal sign-off.`
+    if (!effectiveDirective) {
+      if (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') {
+        // Auto-generate directive from industry angle (always present now — universal fallback if no match)
+        const industryAngle = getIndustryAngle(context?.industry, context?.companyName || context?.accountName)
+        const angleMatch = industryAngle.match(/ANGLES:\s*([\s\S]+?)(?:\n\n|$)/)
+        const angleHint = angleMatch ? angleMatch[1].split('"').filter(Boolean)[0]?.trim() : ''
+        const wordCount = emailTypeId === 'cold_first_touch' ? '40–70' : '80–120'
+        effectiveDirective = `Write a ${wordCount} word ${emailTypeId === 'cold_first_touch' ? 'first-touch cold' : 'cold follow-up'} email using the VERTICAL-SPECIFIC ANGLE provided above.${angleHint ? ` Lead with: ${angleHint}` : ''} Focus on the operational pain, not generic energy savings. Plain text, minimal sign-off.`
+      } else if (emailTypeId === 'post_call') {
+        const hasTranscripts = (foundryContext?.intelligence.transcripts.length ?? 0) > 0
+        const hasCallNotes = !!(context?.contextForAi && /call|spoke|talked|conversation|meeting/i.test(context.contextForAi))
+        if (hasTranscripts || hasCallNotes) {
+          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference the specific topics from the CALL INTELLIGENCE above. Propose one concrete next step.`
         } else {
-          effectiveDirective = `Write a 40–70 word first-touch cold email using the VERTICAL-SPECIFIC ANGLE provided above. Focus on the operational pain specific to this vertical. Plain text, minimal sign-off.`
+          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference our recent conversation naturally. Propose one clear next step.`
         }
       }
     }
@@ -653,6 +811,7 @@ OUTPUT FORMAT:
       cold_followup: 'Sharpen this follow-up. Remove filler. One clear CTA. Up to 120–150 words. Output only the revised body.',
       professional: 'Tighten and clarify this email. Keep the same intent and tone. Remove redundancy. Output only the revised body.',
       followup: 'Make this follow-up clearer and more concise. Keep it polite and professional. Output only the revised body.',
+      post_call: 'Make this post-call email warmer and more specific. Reference the call naturally. One clear next step. Output only the revised body.',
       internal: 'Make this internal email clearer and shorter. Keep the same information. Output only the revised body.',
       support: 'Make this support email clearer and more helpful. Keep empathy and accuracy. Output only the revised body.',
     }
@@ -688,9 +847,32 @@ OUTPUT FORMAT:
       const data = await response.json()
       if (data.error) throw new Error(data.message || data.error)
       const raw = typeof data.content === 'string' ? data.content.trim() : ''
-      const metaCommentary = /^(I (?:am |')?(?:sorry|cannot|can't|won't|unable to)|Could you please|Please verify|as an AI|I am an AI|I do not have access|I don't have access|I can't browse|I cannot (?:send|access|use)|I'm unable to)/im
+      // Detect genuine meta-commentary/refusals (anchored to string start, no multiline so ^ = first char only)
+      const metaCommentary = /^(I(?:'m| am) (?:sorry|unable|afraid)|I (?:cannot|can't|won't) (?:create|generate|write|send|access|use|browse|complete)|Could you please (?:verify|clarify|provide)|Please (?:verify|confirm) (?:your|the)|(?:As |Being )?an AI[, ]|I(?:'m| am) an AI\b|I (?:do not|don't) have (?:access|the ability)|This (?:appears|seems) to be a (?:verification|harmful|test))/i
       if (metaCommentary.test(raw)) {
-        toast.error('AI returned a verification message instead of draft content. Try again or pick a different model.')
+        // Attempt to salvage: look for SUBJECT: line or greeting buried after the refusal text
+        const subjectIdx = raw.search(/SUBJECT:\s*.+/i)
+        const greetingIdx = raw.search(/(Hi|Hello|Dear)\s+[A-Za-z]+,/)
+        const salvageIdx = subjectIdx >= 0 ? subjectIdx : greetingIdx >= 0 ? greetingIdx : -1
+        if (salvageIdx > 0 && raw.slice(salvageIdx).trim().length > 40) {
+          // Use the salvaged content — strip the refusal prefix
+          const salvaged = raw.slice(salvageIdx).trim()
+          const lines = salvaged.split(/\r?\n/)
+          const subjectLineIndex = lines.findIndex((line: string) => /^\s*SUBJECT:\s*.+/.test(line))
+          let newBody = salvaged
+          let parsedSubject: string | null = null
+          if (subjectLineIndex >= 0) {
+            const subMatch = lines[subjectLineIndex].match(/^\s*SUBJECT:\s*(.+)$/i)
+            if (subMatch) parsedSubject = subMatch[1].trim()
+            newBody = lines.slice(subjectLineIndex + 1).join('\n').replace(/^\s*\n+/, '').trim()
+          }
+          newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
+          setPendingSubjectFromAi(parsedSubject)
+          setPendingAiContent(newBody)
+          setAiPrompt('')
+          return
+        }
+        toast.error('AI declined to generate content. Try rephrasing or switching to a different model.')
         setAiError('Model declined to generate; try another model or rephrase.')
         return
       }
@@ -721,7 +903,7 @@ OUTPUT FORMAT:
     } finally {
       setIsAiLoading(false)
     }
-  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId, context])
+  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId, context, foundryContext])
 
   // Fetch available foundry templates
   const { data: foundryAssets } = useQuery<any[]>({
@@ -950,9 +1132,7 @@ OUTPUT FORMAT:
     }
 
     const isColdType = emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup'
-    const isColdPlaintext =
-      isColdType &&
-      (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
+    const isColdPlaintext = isColdType && (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
 
     // Convert potential HTML to plain text for plain text sends or text fallbacks
     const plainTextContent = typeof document !== 'undefined' ? (() => {
@@ -1421,37 +1601,46 @@ OUTPUT FORMAT:
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                {/* Hide chips when industry is present (angle auto-selected) for cold emails */}
-                {!(context?.industry && (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup')) && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {isRefinementMode
-                      ? emailTypeConfig.refinementChips.map((chip) => (
-                        <button
-                          key={chip.label}
-                          type="button"
-                          onClick={() => generateEmailWithAi(chip.directive)}
-                          disabled={isAiLoading}
-                          className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-                        >
-                          {chip.label}
-                        </button>
-                      ))
-                      : emailTypeConfig.generationChips.map((chip) => (
-                        <button
-                          key={chip.label}
-                          type="button"
-                          onClick={() => generateEmailWithAi(chip.directive)}
-                          disabled={isAiLoading}
-                          className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
-                        >
-                          {chip.label}
-                        </button>
-                      ))}
+                <div className="flex flex-wrap gap-1.5">
+                  {isRefinementMode
+                    ? emailTypeConfig.refinementChips.map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        onClick={() => generateEmailWithAi(chip.directive)}
+                        disabled={isAiLoading}
+                        className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
+                      >
+                        {chip.label}
+                      </button>
+                    ))
+                    : emailTypeConfig.generationChips.map((chip) => (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        onClick={() => generateEmailWithAi(chip.directive)}
+                        disabled={isAiLoading}
+                        className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                </div>
+                {/* Context status indicators */}
+                {(emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
+                  <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-1">
+                    {context?.industry
+                      ? `Angle: ${context.industry} vertical`
+                      : context?.companyName || context?.accountName
+                        ? `Angle: auto-selected for ${context.companyName || context.accountName}`
+                        : 'Angle: universal (no industry context)'}
                   </div>
                 )}
-                {context?.industry && (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
-                  <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-1">
-                    Angle auto-selected from industry: {context.industry}
+                {emailTypeId === 'post_call' && (
+                  <div className={`text-[9px] font-mono uppercase tracking-wider px-1 ${(foundryContext?.intelligence.transcripts.length ?? 0) > 0 ? 'text-emerald-500/70' : 'text-zinc-500'}`}>
+                    {(foundryContext?.intelligence.transcripts.length ?? 0) > 0
+                      ? `✓ ${foundryContext!.intelligence.transcripts.length} call transcript${foundryContext!.intelligence.transcripts.length > 1 ? 's' : ''} loaded — AI will reference call content`
+                      : context?.contextForAi ? '✓ call notes detected' : 'No prior call data — AI will write a generic warm follow-up'}
                   </div>
                 )}
               </div>
