@@ -274,6 +274,55 @@ export function LandingSections() {
         </div>
       </section>
 
+      {/* FAQ */}
+      <section className="bg-white px-6 py-24 border-t border-zinc-100">
+        <div className="max-w-5xl mx-auto">
+          <div className="mb-16 reveal-on-scroll">
+            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">FAQ</p>
+            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">Common questions.</h2>
+          </div>
+          <div className="divide-y divide-zinc-100">
+
+            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
+                What is a demand charge — and why do most businesses miss it?
+              </p>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Demand charges are billed on your single highest 15-minute peak in the month — not your total usage. A 3-second spike can inflate your bill by 30–40%. Most businesses never see it because it's buried in delivery line items. We surface it immediately.
+              </p>
+            </div>
+
+            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
+                What if I'm already locked into a contract?
+              </p>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Most contracts have renegotiation windows or switch clauses the supplier won't volunteer. We identify them. Even mid-contract, we find recoverable margin — on the delivery side, the demand structure, or the rate class.
+              </p>
+            </div>
+
+            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
+                How long does the analysis take?
+              </p>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Upload your bill. Forensic report in under 60 seconds. No forms, no intake calls, no waiting. The signal is either there or it isn't — we tell you immediately.
+              </p>
+            </div>
+
+            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
+                Do you cover all Texas suppliers?
+              </p>
+              <p className="text-zinc-500 text-sm leading-relaxed">
+                Yes. We've mapped 100+ ERCOT supplier tariff structures across all load zones. TXU, Reliant, Direct Energy, Constellation, and all major REPs operating in the South, Houston, North, and West zones.
+              </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
       {/* SECTION 6: FINAL CTA (The Impulse) */}
       <section className="py-40 bg-white flex flex-col items-center justify-center text-center relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
