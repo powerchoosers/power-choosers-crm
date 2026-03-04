@@ -171,11 +171,10 @@ export default function PortalContent() {
 
             {/* Header — fixed + blur on scroll */}
             <header
-                className={`fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 transition-all duration-300 ${
-                    isScrolled
+                className={`fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 transition-all duration-300 ${isScrolled
                         ? 'h-16 bg-zinc-950/85 backdrop-blur-xl border-b border-white/5'
                         : 'h-20 bg-transparent'
-                }`}
+                    }`}
             >
                 <Link href="/" className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
@@ -358,7 +357,7 @@ export default function PortalContent() {
                                 <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-zinc-400 group-hover:translate-x-0.5 transition-all" />
                             </Link>
                             <Link
-                                href="/book"
+                                href={`/book${email.trim() ? `?email=${encodeURIComponent(email)}&from=/portal` : ''}`}
                                 className="w-full flex items-center justify-between gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-medium py-3.5 px-5 rounded-xl transition-all duration-200 group"
                             >
                                 <div className="flex items-center gap-3">

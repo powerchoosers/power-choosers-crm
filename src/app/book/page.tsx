@@ -21,6 +21,7 @@ interface BookingPageProps {
 export default async function BookingPage({ searchParams }: BookingPageProps) {
     const resolvedParams = await searchParams;
     const email = resolvedParams?.email || "";
+
     // Validate `from` to prevent open redirect — must be a relative path
     const rawFrom = resolvedParams?.from ?? '';
     const from = rawFrom.startsWith('/') ? rawFrom : '/';

@@ -993,7 +993,7 @@ export function ClientDashboard() {
                         {/* ── ADVISOR CTAs ── */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Link
-                                href="/book"
+                                href={`/book${userEmail ? `?email=${encodeURIComponent(userEmail)}&from=/client` : ''}`}
                                 className="flex items-center justify-between px-6 py-5 rounded-2xl bg-[#002FA7]/10 border border-[#002FA7]/30 hover:bg-[#002FA7]/15 hover:border-[#002FA7]/50 transition-all group"
                             >
                                 <div className="flex items-center gap-4">
