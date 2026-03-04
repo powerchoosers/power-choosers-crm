@@ -294,7 +294,7 @@ export function LandingSections() {
               <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center">
                 $<span className="counter" data-target="25" data-suffix="B+">0</span>
               </div>
-              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Texas commercial electricity spend</div>
+              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Texas commercial energy spend</div>
               <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">Annually · Source: EIA</div>
             </div>
 
