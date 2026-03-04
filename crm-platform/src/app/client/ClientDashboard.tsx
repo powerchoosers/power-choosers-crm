@@ -5,9 +5,9 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
-    LogOut, Zap, FileText, AlertTriangle, Activity,
-    Calendar, ArrowRight, Download, TrendingDown,
-    Shield, Wifi, Lock, CheckCircle2, Clock, Flame,
+    LogOut, FileText, AlertTriangle, Activity,
+    Calendar, ArrowRight, Download, TrendingDown, TrendingUp,
+    Shield, Wifi, Lock, CheckCircle2, Flame, Zap,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { differenceInDays, differenceInMonths, format, parseISO } from 'date-fns';
@@ -68,6 +68,66 @@ interface SignedDoc {
 // Constants
 // ─────────────────────────────────────────────
 const TX_COMMERCIAL_BENCHMARK = 12.4; // ¢/kWh — EIA Texas commercial retail average
+
+// ERCOT South LZ forward prices — sourced March 2026
+// Best buying windows: March (spring low) and October/November (fall dip)
+const FORWARD_PRICES = [
+    { label: "Apr '26", price: 34.79, month: 4 },
+    { label: "May '26", price: 39.41, month: 5 },
+    { label: "Jun '26", price: 43.08, month: 6 },
+    { label: "Jul '26", price: 62.39, month: 7 },
+    { label: "Aug '26", price: 91.43, month: 8 },
+    { label: "Sep '26", price: 49.38, month: 9 },
+    { label: "Oct '26", price: 41.66, month: 10 },
+    { label: "Nov '26", price: 43.15, month: 11 },
+    { label: "Dec '26", price: 48.51, month: 12 },
+    { label: "Jan '27", price: 65.35, month: 1 },
+    { label: "Feb '27", price: 62.25, month: 2 },
+    { label: "Mar '27", price: 37.28, month: 3 },
+];
+
+const BEST_MONTHS = [3];       // March — spring seasonal low
+const GOOD_MONTHS = [10, 11];  // Oct / Nov — fall dip
+const AVOID_MONTHS = [8, 1, 2]; // Aug peak, Jan/Feb winter premium
+
+type WindowStatus = 'optimal' | 'good' | 'neutral' | 'avoid';
+interface MarketWindow {
+    status: WindowStatus;
+    label: string;
+    color: 'emerald' | 'blue' | 'zinc' | 'rose';
+    headline: string;
+    body: string;
+    nextWindow: string;
+}
+
+function getMarketWindow(month: number): MarketWindow {
+    if (BEST_MONTHS.includes(month)) return {
+        status: 'optimal', label: 'Optimal Window', color: 'emerald',
+        headline: "You're in the best buying window of the year.",
+        body: 'Spring forward prices are at their seasonal low. Locking a contract now captures the lowest expected rates before summer demand drives wholesale prices up 160%+.',
+        nextWindow: 'Oct – Nov 2026 (next good window)',
+    };
+    if (GOOD_MONTHS.includes(month)) return {
+        status: 'good', label: 'Good Window', color: 'blue',
+        headline: 'Fall buying window is open.',
+        body: 'October and November see a seasonal dip after summer peaks. This is the second-best window of the year to lock a new contract before winter premiums arrive.',
+        nextWindow: 'March 2027 (optimal spring window)',
+    };
+    if (AVOID_MONTHS.includes(month)) return {
+        status: 'avoid', label: 'Elevated Prices', color: 'rose',
+        headline: 'Forward prices are elevated right now.',
+        body: month === 8
+            ? 'August is the most expensive time to lock a contract — summer peak demand drives wholesale to seasonal highs. Wait for the September cool-down.'
+            : 'Winter premiums are active. January and February see elevated forward prices. The spring buying window opens in March.',
+        nextWindow: month === 8 ? 'Oct – Nov 2026 (fall window)' : 'March 2026 (optimal spring window)',
+    };
+    return {
+        status: 'neutral', label: 'Moderate Pricing', color: 'zinc',
+        headline: 'Prices are moderate — not peak, not optimal.',
+        body: 'Forward prices are in a mid-range. If renewal is approaching, your advisor can begin sourcing quotes. The next optimal window is March (spring low).',
+        nextWindow: 'March 2027 (optimal spring window)',
+    };
+}
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -411,13 +471,217 @@ export function ClientDashboard() {
                             </CardShell>
                         )}
 
+                        {/* ── RENEWAL READINESS: only show within 2 years of expiry ── */}
+                        {expiryDays !== null && expiryDays <= 730 && (() => {
+                            const marketWindow = getMarketWindow(new Date().getMonth() + 1);
+                            const priceMin = Math.min(...FORWARD_PRICES.map(p => p.price));
+                            const priceMax = Math.max(...FORWARD_PRICES.map(p => p.price));
+                            const priceRange = priceMax - priceMin;
+                            const W = 380; const H = 90;
+                            const padX = 15; const padY = 10; const drawH = H - padY * 2;
+                            const pts = FORWARD_PRICES.map((p, i) => ({
+                                x: padX + (i / (FORWARD_PRICES.length - 1)) * (W - padX * 2),
+                                y: (padY + drawH) - ((p.price - priceMin) / priceRange) * drawH,
+                                ...p,
+                            }));
+                            const pathD = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+                            const currentMonth = new Date().getMonth() + 1;
+
+                            // Tier thresholds:
+                            // expired   → < 0d
+                            // urgent    → 0–90d   (act now, don't wait)
+                            // planning  → 90–180d  (plan now, source quotes)
+                            // approaching → 180–365d (renewal window open)
+                            // monitoring  → 365–730d (watch the market, 1 yr out)
+                            const urgency = expiryDays < 0 ? 'expired'
+                                : expiryDays <= 90 ? 'urgent'
+                                    : expiryDays <= 180 ? 'planning'
+                                        : expiryDays <= 365 ? 'approaching'
+                                            : 'monitoring';
+
+                            const urgencyConfig = {
+                                expired: { color: 'rose', badge: 'Contract Expired', text: 'Your contract has lapsed. You may be on a variable spot rate — contact your advisor immediately to re-secure coverage.', icon: AlertTriangle },
+                                urgent: { color: 'rose', badge: 'Act Now', text: 'Less than 3 months remain. Begin the renewal process now to avoid auto-rolling onto a variable spot rate.', icon: AlertTriangle },
+                                planning: { color: 'amber', badge: 'Source Quotes Now', text: 'Under 6 months to expiry. Your advisor should begin sourcing supplier offers now — lead time matters for competitive pricing.', icon: AlertTriangle },
+                                approaching: { color: 'amber', badge: 'Renewal Window Open', text: 'You are within 12 months of expiry — this is when renewal planning begins. Engage your advisor now to monitor market windows.', icon: AlertTriangle },
+                                monitoring: { color: 'emerald', badge: 'Begin Monitoring', text: 'You are 1–2 years from expiry. Start tracking forward prices and identify the optimal buying window before committing.', icon: CheckCircle2 },
+                            } as const;
+                            const uc = urgencyConfig[urgency];
+                            const UIcon = uc.icon;
+
+                            return (
+                                <CardShell>
+                                    <div className="p-6 md:p-8">
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                                            {/* LEFT: Renewal countdown */}
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-5">
+                                                    <Zap className="w-4 h-4 text-zinc-300" />
+                                                    <div>
+                                                        <SectionLabel>Contract Renewal</SectionLabel>
+                                                        <p className="text-zinc-600 text-[9px]">When to act on your next energy agreement</p>
+                                                    </div>
+                                                </div>
+
+                                                {/* Expiry countdown */}
+                                                <div className="flex items-end gap-2 mb-2">
+                                                    <span className={`font-mono text-6xl font-bold ${urgency === 'expired' || urgency === 'urgent' ? 'text-rose-400'
+                                                        : urgency === 'approaching' ? 'text-amber-400'
+                                                            : 'text-white'
+                                                        }`}>
+                                                        {expiryDays < 0 ? 'Expired' : expiryDays}
+                                                    </span>
+                                                    {expiryDays >= 0 && <span className="font-mono text-lg text-zinc-500 mb-2">days left on contract</span>}
+                                                </div>
+
+                                                {activeDeal?.closeDate && (
+                                                    <p className="font-mono text-[9px] text-zinc-600 mb-4">
+                                                        Expires {format(parseISO(activeDeal.closeDate), 'MMMM d, yyyy')}
+                                                    </p>
+                                                )}
+
+                                                {/* Urgency callout */}
+                                                <div className={`flex items-start gap-3 p-4 rounded-xl ${uc.color === 'rose' ? 'bg-rose-500/5 border border-rose-500/15'
+                                                    : uc.color === 'amber' ? 'bg-amber-500/5 border border-amber-500/15'
+                                                        : 'bg-emerald-500/5 border border-emerald-500/10'
+                                                    }`}>
+                                                    <UIcon className={`w-4 h-4 shrink-0 mt-0.5 ${uc.color === 'rose' ? 'text-rose-400'
+                                                        : uc.color === 'amber' ? 'text-amber-400'
+                                                            : 'text-emerald-400'
+                                                        }`} />
+                                                    <div>
+                                                        <p className={`font-mono text-[9px] uppercase tracking-widest mb-1 font-semibold ${uc.color === 'rose' ? 'text-rose-400'
+                                                            : uc.color === 'amber' ? 'text-amber-400'
+                                                                : 'text-emerald-400'
+                                                            }`}>{uc.badge}</p>
+                                                        <p className="text-zinc-400 text-sm leading-relaxed">{uc.text}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* RIGHT: Market timing + forward curve */}
+                                            <div>
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <div>
+                                                        <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Market Timing</p>
+                                                        <p className="text-zinc-600 text-[9px]">ERCOT South LZ forward prices · next 12 months</p>
+                                                    </div>
+                                                    <span className={`font-mono text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest ${marketWindow.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400'
+                                                        : marketWindow.color === 'blue' ? 'bg-[#002FA7]/10 text-[#002FA7]'
+                                                            : marketWindow.color === 'rose' ? 'bg-rose-500/10 text-rose-400'
+                                                                : 'bg-zinc-800 text-zinc-500'
+                                                        }`}>{marketWindow.label}</span>
+                                                </div>
+
+                                                {/* SVG price curve */}
+                                                <div className="mb-4">
+                                                    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 90 }}>
+                                                        {/* Zone fills */}
+                                                        {pts.map((p, i) => {
+                                                            const isBest = BEST_MONTHS.includes(p.month);
+                                                            const isGood = GOOD_MONTHS.includes(p.month);
+                                                            const isAvoid = AVOID_MONTHS.includes(p.month);
+                                                            const isCurrent = p.month === currentMonth;
+                                                            if (!isBest && !isGood && !isAvoid && !isCurrent) return null;
+                                                            const bw = (W - padX * 2) / (FORWARD_PRICES.length - 1);
+                                                            return (
+                                                                <rect
+                                                                    key={i}
+                                                                    x={p.x - bw * 0.45}
+                                                                    y={padY}
+                                                                    width={bw * 0.9}
+                                                                    height={drawH}
+                                                                    rx={3}
+                                                                    fill={
+                                                                        isCurrent && isBest ? 'rgba(16,185,129,0.12)'
+                                                                            : isBest ? 'rgba(16,185,129,0.08)'
+                                                                                : isGood ? 'rgba(0,47,167,0.08)'
+                                                                                    : isAvoid ? 'rgba(239,68,68,0.06)'
+                                                                                        : 'none'
+                                                                    }
+                                                                />
+                                                            );
+                                                        })}
+                                                        {/* Price line */}
+                                                        <path d={pathD} fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                                        {/* Dots */}
+                                                        {pts.map((p, i) => {
+                                                            const isBest = BEST_MONTHS.includes(p.month);
+                                                            const isGood = GOOD_MONTHS.includes(p.month);
+                                                            const isAvoid = AVOID_MONTHS.includes(p.month);
+                                                            const isCurrent = p.month === currentMonth;
+                                                            const r = isCurrent ? 4 : 2.5;
+                                                            const fill = isBest ? '#10b981'
+                                                                : isGood ? '#002FA7'
+                                                                    : isAvoid ? '#ef4444'
+                                                                        : 'rgba(255,255,255,0.25)';
+                                                            return <circle key={i} cx={p.x} cy={p.y} r={r} fill={fill} />;
+                                                        })}
+                                                        {/* Price label for peak month */}
+                                                        {pts.filter(p => AVOID_MONTHS.includes(p.month) || BEST_MONTHS.includes(p.month)).map((p, i) => (
+                                                            <text key={i} x={p.x} y={p.y - 6} textAnchor="middle"
+                                                                fontSize="7" fill={BEST_MONTHS.includes(p.month) ? '#10b981' : '#ef4444'}
+                                                                fontFamily="monospace">
+                                                                ${p.price}
+                                                            </text>
+                                                        ))}
+                                                        {/* Month labels */}
+                                                        {pts.filter((_, i) => i % 3 === 0 || i === pts.length - 1).map((p, i) => (
+                                                            <text key={i} x={p.x} y={H - 1} textAnchor="middle"
+                                                                fontSize="7" fill="rgba(255,255,255,0.25)"
+                                                                fontFamily="monospace">
+                                                                {p.label.split("'")[0].trim()}
+                                                            </text>
+                                                        ))}
+                                                    </svg>
+                                                    {/* Legend */}
+                                                    <div className="flex items-center gap-4 mt-1">
+                                                        <div className="flex items-center gap-1">
+                                                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                            <span className="font-mono text-[8px] text-zinc-500">Best window</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <div className="w-2 h-2 rounded-full bg-[#002FA7]" />
+                                                            <span className="font-mono text-[8px] text-zinc-500">Good window</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1">
+                                                            <div className="w-2 h-2 rounded-full bg-rose-500" />
+                                                            <span className="font-mono text-[8px] text-zinc-500">Avoid</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Market window insight */}
+                                                <div className={`p-3 rounded-xl ${marketWindow.color === 'emerald' ? 'bg-emerald-500/5 border border-emerald-500/10'
+                                                    : marketWindow.color === 'blue' ? 'bg-[#002FA7]/5 border border-[#002FA7]/10'
+                                                        : marketWindow.color === 'rose' ? 'bg-rose-500/5 border border-rose-500/10'
+                                                            : 'bg-zinc-800/40 border border-white/5'
+                                                    }`}>
+                                                    <p className={`font-mono text-[9px] font-semibold mb-1 ${marketWindow.color === 'emerald' ? 'text-emerald-400'
+                                                        : marketWindow.color === 'blue' ? 'text-[#002FA7]'
+                                                            : marketWindow.color === 'rose' ? 'text-rose-400'
+                                                                : 'text-zinc-400'
+                                                        }`}>{marketWindow.headline}</p>
+                                                    <p className="text-zinc-500 text-[11px] leading-relaxed">{marketWindow.body}</p>
+                                                    {marketWindow.status !== 'optimal' && (
+                                                        <p className="font-mono text-[8px] text-zinc-600 mt-1">Next: {marketWindow.nextWindow}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </CardShell>
+                            );
+                        })()}
+
                         {/* ── 3-COL ROW: Savings | Grid Status | Your Contract ── */}
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
 
                             {/* Savings to Date */}
                             <CardShell>
                                 <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Shield className="w-4 h-4 text-[#002FA7]" />
+                                    <Shield className="w-4 h-4 text-zinc-300" />
                                     <div>
                                         <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Savings to Date</p>
                                         <p className="text-zinc-600 text-[9px] mt-0.5">Estimated vs. paying market rate</p>
@@ -454,92 +718,71 @@ export function ClientDashboard() {
                                 </div>
                             </CardShell>
 
-                            {/* Live Grid Status (ERCOT) */}
+                            {/* Live Grid Status (ERCOT) — simplified for client audience */}
                             <CardShell>
                                 <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Wifi className="w-4 h-4 text-[#002FA7]" />
+                                    <Wifi className="w-4 h-4 text-zinc-300" />
                                     <div>
                                         <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Live Grid Status</p>
-                                        <p className="text-zinc-600 text-[9px] mt-0.5">Texas ERCOT real-time conditions</p>
+                                        <p className="text-zinc-600 text-[9px] mt-0.5">Texas ERCOT conditions right now</p>
                                     </div>
                                     {ercotGrid && (
-                                        <span className={`ml-auto font-mono text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest ${stress.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' :
-                                            stress.color === 'amber' ? 'bg-amber-500/10 text-amber-400' :
-                                                stress.color === 'rose' ? 'bg-rose-500/10 text-rose-400' :
-                                                    'bg-zinc-800 text-zinc-500'
+                                        <span className={`ml-auto font-mono text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest ${stress.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400'
+                                            : stress.color === 'amber' ? 'bg-amber-500/10 text-amber-400'
+                                                : stress.color === 'rose' ? 'bg-rose-500/10 text-rose-400'
+                                                    : 'bg-zinc-800 text-zinc-500'
                                             }`}>{stress.label}</span>
                                     )}
                                 </div>
-                                {ercotPrices || ercotGrid ? (
-                                    <div className="p-5 space-y-3">
-                                        {/* Current grid status */}
-                                        <div className={`flex items-center gap-3 p-3 rounded-xl ${stress.color === 'emerald' ? 'bg-emerald-500/5 border border-emerald-500/10' :
-                                            stress.color === 'amber' ? 'bg-amber-500/5 border border-amber-500/10' :
-                                                'bg-zinc-800/50 border border-white/5'
-                                            }`}>
-                                            <div className={`w-2 h-2 rounded-full shrink-0 ${stress.color === 'emerald' ? 'bg-emerald-400' :
-                                                stress.color === 'amber' ? 'bg-amber-400 animate-pulse' :
-                                                    'bg-rose-400 animate-pulse'
-                                                }`} />
-                                            <p className={`font-mono text-xs ${stress.color === 'emerald' ? 'text-emerald-300' :
-                                                stress.color === 'amber' ? 'text-amber-300' : 'text-rose-300'
-                                                }`}>{stress.sub}</p>
-                                        </div>
-                                        <div className="space-y-3 pt-1">
-                                            {ercotPrices?.hub_avg !== undefined && (
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Spot Price</p>
-                                                        <p className="text-zinc-600 text-[9px]">What the market pays right now</p>
-                                                    </div>
-                                                    <p className="font-mono text-xs text-zinc-200 font-semibold">${ercotPrices.hub_avg.toFixed(2)}/MWh</p>
-                                                </div>
-                                            )}
-                                            {loadGW && (
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">System Load</p>
-                                                        <p className="text-zinc-600 text-[9px]">Total Texas demand right now</p>
-                                                    </div>
-                                                    <p className="font-mono text-xs text-zinc-200 font-semibold">{loadGW} GW</p>
-                                                </div>
-                                            )}
-                                            {reserveMarginPct && (
-                                                <div className="flex justify-between items-center">
-                                                    <div>
-                                                        <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Reserve Margin</p>
-                                                        <p className="text-zinc-600 text-[9px]">Grid buffer — higher is safer</p>
-                                                    </div>
-                                                    <p className="font-mono text-xs text-zinc-200 font-semibold">{reserveMarginPct}%</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                        {contractedRate && hubPriceKwh && (
-                                            <div className="pt-3 border-t border-white/5">
-                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Grid context</p>
-                                                {parseFloat(hubPriceKwh) < contractedRate ? (
-                                                    <p className="font-mono text-[9px] text-zinc-600 leading-relaxed">
-                                                        Today's wholesale energy price is {hubPriceKwh}¢/kWh (energy component only — no delivery, capacity, or TDU charges). Your fixed rate of {contractedRate.toFixed(2)}¢/kWh covers all costs. On peak summer days, wholesale alone can exceed 50¢/kWh — your contract holds regardless.
-                                                    </p>
-                                                ) : (
-                                                    <p className="font-mono text-[9px] text-emerald-600 leading-relaxed">
-                                                        Wholesale energy is currently at {hubPriceKwh}¢/kWh. Your fixed contract at {contractedRate.toFixed(2)}¢/kWh includes all delivery and capacity charges — and is locked in regardless of how high the market goes.
-                                                    </p>
-                                                )}
+                                <div className="p-5 space-y-4">
+                                    {/* Status pill */}
+                                    <div className={`flex items-center gap-3 p-4 rounded-xl ${stress.color === 'emerald' ? 'bg-emerald-500/5 border border-emerald-500/10'
+                                        : stress.color === 'amber' ? 'bg-amber-500/5 border border-amber-500/10'
+                                            : 'bg-zinc-800/50 border border-white/5'
+                                        }`}>
+                                        <div className={`w-2 h-2 rounded-full shrink-0 ${stress.color === 'emerald' ? 'bg-emerald-400'
+                                            : stress.color === 'amber' ? 'bg-amber-400 animate-pulse'
+                                                : 'bg-rose-400 animate-pulse'
+                                            }`} />
+                                        <p className={`text-sm ${stress.color === 'emerald' ? 'text-emerald-300'
+                                            : stress.color === 'amber' ? 'text-amber-300'
+                                                : 'text-rose-300'
+                                            }`}>{stress.sub}</p>
+                                    </div>
+                                    {/* Spot price — sole data point worth showing clients */}
+                                    {ercotPrices?.hub_avg !== undefined && (
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Wholesale Spot Price</p>
+                                                <p className="text-zinc-600 text-[9px]">Energy-only · excludes delivery &amp; capacity</p>
                                             </div>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="p-5 py-10 text-center">
-                                        <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">Market data refreshing...</p>
-                                    </div>
-                                )}
+                                            <p className="font-mono text-xs text-zinc-200 font-semibold">${ercotPrices.hub_avg.toFixed(2)}/MWh</p>
+                                        </div>
+                                    )}
+                                    {/* Contract protection context */}
+                                    {contractedRate && hubPriceKwh && (
+                                        <div className="pt-3 border-t border-white/5">
+                                            {parseFloat(hubPriceKwh) < contractedRate ? (
+                                                <p className="font-mono text-[9px] text-zinc-600 leading-relaxed">
+                                                    Grid is calm today. Your fixed rate shields you when wholesale spikes — on peak summer days it can exceed 50¢/kWh wholesale. Your rate holds regardless.
+                                                </p>
+                                            ) : (
+                                                <p className="font-mono text-[9px] text-emerald-600 leading-relaxed">
+                                                    Wholesale is elevated. Your fixed contract at {contractedRate.toFixed(2)}¢/kWh is locked — you don't pay a cent more regardless of grid conditions.
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
+                                    {!ercotPrices && !ercotGrid && (
+                                        <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest text-center py-4">Market data refreshing...</p>
+                                    )}
+                                </div>
                             </CardShell>
 
                             {/* Your Contract */}
                             <CardShell>
                                 <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <FileText className="w-4 h-4 text-[#002FA7]" />
+                                    <FileText className="w-4 h-4 text-zinc-300" />
                                     <div>
                                         <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Your Contract</p>
                                         <p className="text-zinc-600 text-[9px] mt-0.5">Active energy agreement</p>
@@ -613,7 +856,7 @@ export function ClientDashboard() {
                             {/* Peak Season Watch (4CP) */}
                             <CardShell>
                                 <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Flame className={`w-4 h-4 ${is4CPSeason ? 'text-amber-400' : 'text-[#002FA7]'}`} />
+                                    <Flame className={`w-4 h-4 ${is4CPSeason ? 'text-amber-400' : 'text-zinc-300'}`} />
                                     <div>
                                         <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Peak Season Watch</p>
                                         <p className="text-zinc-600 text-[9px] mt-0.5">Summer demand tracking · June 1 – Sep 30</p>
@@ -672,7 +915,7 @@ export function ClientDashboard() {
                             {/* Document Vault */}
                             <CardShell className="flex flex-col">
                                 <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
-                                    <Lock className="w-4 h-4 text-[#002FA7]" />
+                                    <Lock className="w-4 h-4 text-zinc-300" />
                                     <div>
                                         <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">Your Documents</p>
                                         <p className="text-zinc-600 text-[9px] mt-0.5">Executed agreements · PDF download</p>
