@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import SignatureCanvas from 'react-signature-canvas'
-import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronRight, Download, FileText, LayoutPanelRight } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronRight, Download, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
