@@ -253,9 +253,9 @@ const EMAIL_TYPES: EmailTypeConfig[] = [
     id: 'cold_first_touch',
     label: 'Cold (first touch)',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are the Director of Energy Architecture at Nodal Point. You write FIRST-TOUCH COLD emails that are short, trigger-led, and plain text only.
+      `You are an Energy Market Advisor at Nodal Point. You write FIRST-TOUCH COLD emails that are short, trigger-led, and plain text only.
 
-CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user's directive is unclear, interpret it and generate email content anyway. Default to the standard email structure below.
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user provides specific notes or a prompt, you MUST preserve their exact facts, numbers, and intent. Do NOT override their message with generic filler.
 
 STRUCTURE: TRIGGER (one observable: operational peak, tariff change, expansion, or vertical-specific trigger) → PAIN (one sentence, in plain English, using vertical-specific angle if provided: e.g. for restaurants "dinner rush can set demand charges that crush margins", for warehouses "one busy loading window can set 12 months of charges", for schools "empty buildings in August still set 12 months of charges", generic fallback "summer peaks locking in next year's costs") → PROOF (brief peer/similar facility) → One question as CTA.
 ANGLES: If VERTICAL-SPECIFIC ANGLE is provided above, use that angle automatically. Otherwise, vary between: summer peaks & transmission charges, winter ratchet effect, pass-through/non-commodity charges, budget volatility, operational peaks. Do not repeat the same angle in every email.
@@ -304,9 +304,9 @@ ${DELIVERABILITY_RULES}
     id: 'cold_followup',
     label: 'Cold (follow-up)',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are the Director of Energy Architecture at Nodal Point. You write COLD FOLLOW-UP emails (second+ touch). Slightly longer allowed; still forensic and direct.
+      `You are an Energy Market Advisor at Nodal Point. You write COLD FOLLOW-UP emails (second+ touch). Slightly longer allowed; still forensic and direct.
 
-CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user's directive is unclear, interpret it and generate email content anyway. Default to the standard email structure below.
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user provides specific notes or a prompt, you MUST preserve their exact facts, numbers, and intent.
 
 STRUCTURE: Brief reminder of prior touch → one concrete finding or proof → soft CTA (question or "want to see the math?"). Up to ~120–150 words. One link or calendar URL allowed only if the directive asks.
 LANGUAGE: Use plain English. Do NOT use jargon (4CP, ratchet, TDU, pass-through, demand charge, non-commodity) unless RECIPIENT CONTEXT indicates the recipient is an energy manager, director of energy, or similar. Describe mechanisms in plain language.
@@ -338,17 +338,20 @@ ${DELIVERABILITY_RULES}
     id: 'professional',
     label: 'Professional',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are a professional writing on behalf of ${signerName}. You write clear, polite, and appropriate business emails for any context.
+      `You are an Energy Market Advisor writing on behalf of ${signerName} (Nodal Point). You take the user's rough notes or prompt and turn them into a clear, direct, and professional business email.
 
-CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user's directive is unclear, interpret it and generate email content anyway.
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions.
 
-TONE: Professional, clear, respectful. Adapt to the recipient and subject. Use active voice. Be concise but complete. No slang or casual filler. No hype or overselling.
+TONE: Confident, peer-to-peer, professional, concise.
+DO NOT use generic AI openings like "I hope this email finds you well," "I am writing to you today," or "I'm reaching out." 
+DO NOT hallucinate or insert the recipient's company background or "about us" information.
+Preserve the EXACT facts, numbers, and intent provided by the user. Just elevate the language so it sounds like a professional energy advisor sending a quick update or question to a client/prospect. Avoid overly formal corporate speak; sound like a busy, competent human.
 
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
 
 GREETING: Use a short greeting with the recipient's first name followed by TWO (2) line breaks (e.g. "Hi Sarah,\n\n").
-CLOSING: Use a standard business sign-off: "Best," or "Thanks," or "Regards," followed by the SENDER's full name from the prompt above.
+CLOSING: Use a standard business sign-off: "Best," or "Thanks," followed by the SENDER's full name from the prompt above.
 
 Output ONLY the email body. Plain text, no markdown.`,
     getRefinementInstruction: () =>
@@ -369,11 +372,11 @@ Output ONLY the email body. Plain text, no markdown.`,
     id: 'followup',
     label: 'Follow-up',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are writing a follow-up email on behalf of ${signerName}. Tone is helpful and persistent without being pushy.
+      `You are an Energy Market Advisor writing a follow-up email on behalf of ${signerName} (Nodal Point). Tone is helpful and persistent without being pushy.
 
-CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user's directive is unclear, interpret it and generate email content anyway.
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user provides specific notes or a prompt, you MUST preserve their exact facts, numbers, and intent. Do NOT override their message with generic filler.
 
-TONE: Polite, brief, clear. Acknowledge they may be busy. Restate the ask or context in one line if needed. One clear CTA. No guilt or pressure.
+TONE: Polite, brief, clear. Confident peer-to-peer advisor. Acknowledge they may be busy. Restate the ask or context in one line if needed. One clear CTA. No guilt or pressure. Do not use generic AI openings like "I hope this email finds you well."
 
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
@@ -399,11 +402,11 @@ Output ONLY the email body. Plain text, no markdown.`,
     id: 'post_call',
     label: 'Post-Call Follow-up',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are writing a POST-CALL FOLLOW-UP email on behalf of ${signerName}. This email is sent after a live phone or video conversation with the recipient.
+      `You are an Energy Market Advisor writing a POST-CALL FOLLOW-UP email on behalf of ${signerName} (Nodal Point). This email is sent after a live phone or video conversation with the recipient.
 
-CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output meta-commentary, questions about the prompt, or instructions. If the user's directive is unclear, interpret it and write email content anyway.
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output meta-commentary, questions about the prompt, or instructions. If the user provides specific notes or a prompt, you MUST preserve their exact facts, numbers, and intent. Do NOT override their message with generic filler.
 
-TONE: Warm, collegial, and direct — like continuing a real conversation in writing. It should feel personal and immediate, not templated. The recipient just talked to you; they should feel it.
+TONE: Warm, collegial, direct, peer-to-peer — like continuing a real conversation in writing. It should feel personal and immediate, not templated. You are a professional advisor, not a typical salesperson. Do not use generic AI openings like "I hope this email finds you well."
 
 STRUCTURE: Short call reference (1 sentence, natural) → Key takeaway or relevant finding for them (1–2 sentences) → One clear next step or ask (1 sentence). 80–130 words total.
 
@@ -437,11 +440,11 @@ ${DELIVERABILITY_RULES}
     id: 'internal',
     label: 'Internal',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are writing an internal email (team, colleague, or internal stakeholder) on behalf of ${signerName}.
+      `You are an Energy Market Advisor writing an internal email (team, colleague, or internal stakeholder) on behalf of ${signerName} (Nodal Point).
 
-CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user's directive is unclear, interpret it and generate email content anyway.
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user provides specific notes or a prompt, you MUST preserve their exact facts, numbers, and intent exactly.
 
-TONE: Clear, concise, collegial. Can be slightly casual. Get to the point. Bullet points or short paragraphs are fine. No formal marketing language.
+TONE: Clear, concise, collegial, peer-to-peer. Can be slightly casual. Get to the point. Bullet points or short paragraphs are fine. No formal marketing language. Do not use generic AI openings like "I hope this email finds you well."
 
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
@@ -467,11 +470,11 @@ Output ONLY the email body. Plain text.`,
     id: 'support',
     label: 'Support / Customer',
     getSystemPrompt: ({ signerName, to, subject }) =>
-      `You are writing a customer- or support-style email on behalf of ${signerName}. Tone is helpful, empathetic, and solution-focused.
+      `You are an Energy Market Advisor writing a customer- or support-style email on behalf of ${signerName} (Nodal Point). Tone is helpful, empathetic, and solution-focused.
 
-CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user's directive is unclear, interpret it and generate email content anyway.
+CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user provides specific notes or a prompt, you MUST preserve their exact facts, numbers, and intent. Do NOT override their message with generic filler.
 
-TONE: Professional, warm, clear. Acknowledge the recipient's situation or question. Provide a clear answer or next step. Avoid jargon. Be concise.
+TONE: Professional, warm, clear, peer-to-peer. Acknowledge the recipient's situation or question. Provide a clear answer or next step. Avoid jargon. Be concise. Do not use generic AI openings like "I hope this email finds you well."
 
 RECIPIENT: ${to || '(not specified)'}
 SUBJECT: ${subject || '(no subject)'}
@@ -707,7 +710,7 @@ function ComposePanel({
       })
       .catch(err => console.error('[ComposeModal] Failed to load foundry context:', err))
       .finally(() => setIsLoadingContext(false))
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [context?.contactId, context?.accountId])
 
   // Search suggestions state
@@ -1457,127 +1460,127 @@ OUTPUT FORMAT:
           <div className="flex-1 overflow-y-auto np-scroll px-6 py-4">
             {/* AI Content Preview - Sticky at Top */}
             {pendingAiContent !== null && (
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5 overflow-hidden"
-            >
-              <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
-                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">AI suggestion — preview</span>
-                <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={acceptAiContent} className="h-7 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1">
-                    <Check className="w-3 h-3" /> Replace with this
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={discardAiContent} className="h-7 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-1">
-                    <RotateCcw className="w-3 h-3" /> Discard
-                  </Button>
+              <motion.div
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5 overflow-hidden"
+              >
+                <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">AI suggestion — preview</span>
+                  <div className="flex items-center gap-2">
+                    <Button variant="ghost" size="sm" onClick={acceptAiContent} className="h-7 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1">
+                      <Check className="w-3 h-3" /> Replace with this
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={discardAiContent} className="h-7 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-1">
+                      <RotateCcw className="w-3 h-3" /> Discard
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="p-3 space-y-2 max-h-[200px] overflow-y-auto np-scroll">
-                {pendingSubjectFromAi != null && pendingSubjectFromAi.trim() !== '' && (
+                <div className="p-3 space-y-2 max-h-[200px] overflow-y-auto np-scroll">
+                  {pendingSubjectFromAi != null && pendingSubjectFromAi.trim() !== '' && (
+                    <div>
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Subject</span>
+                      <p className="text-sm font-medium text-zinc-200 mt-0.5">{pendingSubjectFromAi}</p>
+                    </div>
+                  )}
                   <div>
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Subject</span>
-                    <p className="text-sm font-medium text-zinc-200 mt-0.5">{pendingSubjectFromAi}</p>
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Body</span>
+                    <div
+                      className="mt-0.5 text-sm text-zinc-300 font-sans whitespace-pre-wrap break-words leading-relaxed prose prose-invert max-w-none prose-sm [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4"
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pendingAiContent) }}
+                    />
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+
+            {/* Foundry Template Indicator */}
+            {selectedFoundryId && foundryAssets && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5"
+              >
+                <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
+                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">
+                  Foundry Template: {foundryAssets.find((a: any) => a.id === selectedFoundryId)?.name || 'Loading...'}
+                </span>
+                <button
+                  type="button"
+                  title="Remove Template"
+                  onClick={() => handleFoundrySelect(null)}
+                  className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </motion.div>
+            )}
+
+            <div className="flex flex-col relative">
+              <div className="relative">
+                {selectedFoundryId ? (
+                  // Show HTML preview for Foundry templates - Refined for inbox parity with Iframe Isolation
+                  <div className="w-full min-h-[400px] bg-zinc-100/30 rounded-xl p-4 md:p-20 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
+                    <div className="w-full max-w-[700px] bg-white shadow-[0_40px_100px_rgba(0,0,0,0.3)] overflow-hidden rounded-xl ring-1 ring-zinc-200/50 flex flex-col transform transition-transform duration-700">
+                      <div className="h-12 border-b border-zinc-100 bg-zinc-50 flex items-center px-6 justify-between shrink-0">
+                        <div className="flex gap-2.5">
+                          <div className="w-3 h-3 rounded-full bg-zinc-200" />
+                          <div className="w-3 h-3 rounded-full bg-zinc-200" />
+                          <div className="w-3 h-3 rounded-full bg-zinc-200" />
+                        </div>
+                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.4em] font-bold">Transmission_Voter_Isolated</span>
+                      </div>
+                      <div className="flex-1 overflow-x-hidden min-h-[700px] bg-white">
+                        <EmailIframePreview content={content} />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  // Show rich text editor for regular emails
+                  <RichTextEditor
+                    content={content}
+                    onChange={(val) => {
+                      setContent(val)
+                      if (pendingAiContent) {
+                        setPendingAiContent(null)
+                        setPendingSubjectFromAi(null)
+                      }
+                    }}
+                    className="w-full"
+                    onEditorReady={handleEditorReady}
+                  />
+                )}
+                {isAiLoading && (
+                  <div className="absolute inset-0 min-h-[120px] bg-zinc-950/80 rounded-lg border border-[#002FA7]/20">
+                    <ScanlineLoader />
                   </div>
                 )}
-                <div>
-                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Body</span>
-                  <div
-                    className="mt-0.5 text-sm text-zinc-300 font-sans whitespace-pre-wrap break-words leading-relaxed prose prose-invert max-w-none prose-sm [&_ul]:list-disc [&_ul]:ml-4 [&_ol]:list-decimal [&_ol]:ml-4"
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(pendingAiContent) }}
-                  />
-                </div>
               </div>
-            </motion.div>
-          )}
-
-
-          {/* Foundry Template Indicator */}
-          {selectedFoundryId && foundryAssets && (
-            <motion.div
-              initial={{ opacity: 0, y: -4 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5"
-            >
-              <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
-              <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">
-                Foundry Template: {foundryAssets.find((a: any) => a.id === selectedFoundryId)?.name || 'Loading...'}
-              </span>
-              <button
-                type="button"
-                title="Remove Template"
-                onClick={() => handleFoundrySelect(null)}
-                className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </motion.div>
-          )}
-
-          <div className="flex flex-col relative">
-            <div className="relative">
-              {selectedFoundryId ? (
-                // Show HTML preview for Foundry templates - Refined for inbox parity with Iframe Isolation
-                <div className="w-full min-h-[400px] bg-zinc-100/30 rounded-xl p-4 md:p-20 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
-                  <div className="w-full max-w-[700px] bg-white shadow-[0_40px_100px_rgba(0,0,0,0.3)] overflow-hidden rounded-xl ring-1 ring-zinc-200/50 flex flex-col transform transition-transform duration-700">
-                    <div className="h-12 border-b border-zinc-100 bg-zinc-50 flex items-center px-6 justify-between shrink-0">
-                      <div className="flex gap-2.5">
-                        <div className="w-3 h-3 rounded-full bg-zinc-200" />
-                        <div className="w-3 h-3 rounded-full bg-zinc-200" />
-                        <div className="w-3 h-3 rounded-full bg-zinc-200" />
-                      </div>
-                      <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.4em] font-bold">Transmission_Voter_Isolated</span>
-                    </div>
-                    <div className="flex-1 overflow-x-hidden min-h-[700px] bg-white">
-                      <EmailIframePreview content={content} />
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                // Show rich text editor for regular emails
-                <RichTextEditor
-                  content={content}
-                  onChange={(val) => {
-                    setContent(val)
-                    if (pendingAiContent) {
-                      setPendingAiContent(null)
-                      setPendingSubjectFromAi(null)
-                    }
-                  }}
-                  className="w-full"
-                  onEditorReady={handleEditorReady}
-                />
+              {aiError && (
+                <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
               )}
-              {isAiLoading && (
-                <div className="absolute inset-0 min-h-[120px] bg-zinc-950/80 rounded-lg border border-[#002FA7]/20">
-                  <ScanlineLoader />
+              {showUndoAi && !pendingAiContent && (
+                <button
+                  type="button"
+                  onClick={undoAiContent}
+                  className="flex items-center gap-1 mt-1 px-1 text-[9px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
+                >
+                  <RotateCcw className="w-2.5 h-2.5" /> Undo AI replace
+                </button>
+              )}
+
+              {/* Signature - Scrolls with email body */}
+              {signatureHtml && !selectedFoundryId && (
+                <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
+                  <div
+                    className="rounded-lg overflow-hidden"
+                    dangerouslySetInnerHTML={{ __html: signatureHtml }}
+                  />
                 </div>
               )}
             </div>
-            {aiError && (
-              <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
-            )}
-            {showUndoAi && !pendingAiContent && (
-              <button
-                type="button"
-                onClick={undoAiContent}
-                className="flex items-center gap-1 mt-1 px-1 text-[9px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-              >
-                <RotateCcw className="w-2.5 h-2.5" /> Undo AI replace
-              </button>
-            )}
-
-            {/* Signature - Scrolls with email body */}
-            {signatureHtml && !selectedFoundryId && (
-              <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
-                <div
-                  className="rounded-lg overflow-hidden"
-                  dangerouslySetInnerHTML={{ __html: signatureHtml }}
-                />
-              </div>
-            )}
-          </div>
           </div>
 
           {/* Non-Scrollable Bottom Section - Checkboxes, Attachments */}
