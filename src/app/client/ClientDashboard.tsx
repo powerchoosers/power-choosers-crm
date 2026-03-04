@@ -350,15 +350,15 @@ export function ClientDashboard() {
                                             <p className="text-zinc-500 text-sm mt-0.5">EIA Texas commercial retail average · Updated monthly</p>
                                         </div>
                                         <div className={`flex items-center gap-2 px-4 py-2 rounded-full ${protection.color === 'emerald' ? 'bg-emerald-500/10 border border-emerald-500/20' :
-                                                protection.color === 'amber' ? 'bg-amber-500/10 border border-amber-500/20' :
-                                                    'bg-rose-500/10 border border-rose-500/20'
+                                            protection.color === 'amber' ? 'bg-amber-500/10 border border-amber-500/20' :
+                                                'bg-rose-500/10 border border-rose-500/20'
                                             }`}>
                                             {protection.color === 'emerald'
                                                 ? <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                                                 : <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
                                             }
                                             <span className={`font-mono text-[10px] uppercase tracking-widest font-semibold ${protection.color === 'emerald' ? 'text-emerald-400' :
-                                                    protection.color === 'amber' ? 'text-amber-400' : 'text-rose-400'
+                                                protection.color === 'amber' ? 'text-amber-400' : 'text-rose-400'
                                                 }`}>{protection.label}</span>
                                         </div>
                                     </div>
@@ -464,9 +464,9 @@ export function ClientDashboard() {
                                     </div>
                                     {ercotGrid && (
                                         <span className={`ml-auto font-mono text-[9px] px-2 py-0.5 rounded-full uppercase tracking-widest ${stress.color === 'emerald' ? 'bg-emerald-500/10 text-emerald-400' :
-                                                stress.color === 'amber' ? 'bg-amber-500/10 text-amber-400' :
-                                                    stress.color === 'rose' ? 'bg-rose-500/10 text-rose-400' :
-                                                        'bg-zinc-800 text-zinc-500'
+                                            stress.color === 'amber' ? 'bg-amber-500/10 text-amber-400' :
+                                                stress.color === 'rose' ? 'bg-rose-500/10 text-rose-400' :
+                                                    'bg-zinc-800 text-zinc-500'
                                             }`}>{stress.label}</span>
                                     )}
                                 </div>
@@ -474,15 +474,15 @@ export function ClientDashboard() {
                                     <div className="p-5 space-y-3">
                                         {/* Current grid status */}
                                         <div className={`flex items-center gap-3 p-3 rounded-xl ${stress.color === 'emerald' ? 'bg-emerald-500/5 border border-emerald-500/10' :
-                                                stress.color === 'amber' ? 'bg-amber-500/5 border border-amber-500/10' :
-                                                    'bg-zinc-800/50 border border-white/5'
+                                            stress.color === 'amber' ? 'bg-amber-500/5 border border-amber-500/10' :
+                                                'bg-zinc-800/50 border border-white/5'
                                             }`}>
                                             <div className={`w-2 h-2 rounded-full shrink-0 ${stress.color === 'emerald' ? 'bg-emerald-400' :
-                                                    stress.color === 'amber' ? 'bg-amber-400 animate-pulse' :
-                                                        'bg-rose-400 animate-pulse'
+                                                stress.color === 'amber' ? 'bg-amber-400 animate-pulse' :
+                                                    'bg-rose-400 animate-pulse'
                                                 }`} />
                                             <p className={`font-mono text-xs ${stress.color === 'emerald' ? 'text-emerald-300' :
-                                                    stress.color === 'amber' ? 'text-amber-300' : 'text-rose-300'
+                                                stress.color === 'amber' ? 'text-amber-300' : 'text-rose-300'
                                                 }`}>{stress.sub}</p>
                                         </div>
                                         <div className="space-y-3 pt-1">
@@ -516,9 +516,16 @@ export function ClientDashboard() {
                                         </div>
                                         {contractedRate && hubPriceKwh && (
                                             <div className="pt-3 border-t border-white/5">
-                                                <p className="font-mono text-[9px] text-zinc-600 leading-relaxed">
-                                                    Your fixed rate of {contractedRate.toFixed(2)}¢/kWh shields you from today's spot market at {hubPriceKwh}¢/kWh.
-                                                </p>
+                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest mb-1">Grid context</p>
+                                                {parseFloat(hubPriceKwh) < contractedRate ? (
+                                                    <p className="font-mono text-[9px] text-zinc-600 leading-relaxed">
+                                                        Today's wholesale energy price is {hubPriceKwh}¢/kWh (energy component only — no delivery, capacity, or TDU charges). Your fixed rate of {contractedRate.toFixed(2)}¢/kWh covers all costs. On peak summer days, wholesale alone can exceed 50¢/kWh — your contract holds regardless.
+                                                    </p>
+                                                ) : (
+                                                    <p className="font-mono text-[9px] text-emerald-600 leading-relaxed">
+                                                        Wholesale energy is currently at {hubPriceKwh}¢/kWh. Your fixed contract at {contractedRate.toFixed(2)}¢/kWh includes all delivery and capacity charges — and is locked in regardless of how high the market goes.
+                                                    </p>
+                                                )}
                                             </div>
                                         )}
                                     </div>
