@@ -32,7 +32,7 @@ export function HeroSection() {
             href="/book"
             className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-300 text-zinc-600 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 transition-all duration-300 whitespace-nowrap"
           >
-            <span>Book a Consultation</span>
+            <span>Book a Briefing</span>
           </Link>
         </div>
       </div>
