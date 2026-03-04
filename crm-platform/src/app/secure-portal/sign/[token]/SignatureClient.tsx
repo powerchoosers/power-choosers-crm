@@ -472,6 +472,50 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                         </span>
                                     </div>
                                 </div>
+
+                                {/* Clickable field list — jump to any field */}
+                                <div className="flex flex-col gap-1 mt-1 max-h-48 overflow-y-auto np-scroll pr-0.5">
+                                    {fields.map((f: any, idx: number) => {
+                                        const key = f.fieldId ?? String(idx)
+                                        const isComplete = f.type === 'text'
+                                            ? !!textValues[key]?.trim()
+                                            : !!activeSignature
+
+                                        return (
+                                            <button
+                                                key={key}
+                                                onClick={() => {
+                                                    setPageNumber(f.pageIndex + 1)
+                                                    setTimeout(() => {
+                                                        const el = document.getElementById(`sig-field-${key}`)
+                                                        if (el) {
+                                                            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+                                                            el.classList.add('!ring-2', '!ring-[#002FA7]', '!ring-offset-2')
+                                                            setTimeout(() => el.classList.remove('!ring-2', '!ring-[#002FA7]', '!ring-offset-2'), 1500)
+                                                        }
+                                                    }, 200)
+                                                }}
+                                                className="flex items-center gap-2.5 px-3 py-2 rounded border border-white/5 hover:border-white/15 hover:bg-white/[0.03] transition-all text-left w-full group"
+                                            >
+                                                {/* Status dot */}
+                                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${isComplete ? 'bg-emerald-500' : 'bg-rose-400 animate-pulse'}`} />
+
+                                                {/* Label */}
+                                                <span className="text-[10px] font-mono text-zinc-400 flex-1 truncate group-hover:text-zinc-200 transition-colors">
+                                                    {f.type === 'text' ? 'Text Input' : 'Signature'} · pg {(f.pageIndex ?? 0) + 1}
+                                                </span>
+
+                                                {/* Complete / pending badge */}
+                                                <span className={`text-[9px] font-mono font-bold uppercase tracking-widest ${isComplete ? 'text-emerald-500' : 'text-zinc-600'}`}>
+                                                    {isComplete ? 'Done' : 'Open'}
+                                                </span>
+
+                                                {/* Jump arrow */}
+                                                <ChevronRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors flex-shrink-0" />
+                                            </button>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         )}
 
