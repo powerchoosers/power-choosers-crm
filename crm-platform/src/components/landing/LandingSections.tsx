@@ -2,7 +2,8 @@
 
 import { useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { Activity, Layers, Users } from 'lucide-react'
+import Link from 'next/link'
+import { Activity, Layers, Users, ArrowRight } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 
 export function LandingSections() {
@@ -201,8 +202,13 @@ export function LandingSections() {
               <p className="text-zinc-500 mb-8">
                 Exposing hidden TDU charges and &quot;pass-through&quot; leaks. We simulate your bill against 100+ supplier tariffs.
               </p>
-              <div className="w-full mb-8 overflow-hidden rounded-xl border border-white/50">
+              <div className="w-full mb-6 overflow-hidden rounded-xl border border-white/50">
                 <Image src="/images/graph-scattered.jpg" alt="True Cost Revealer Visualization" width={400} height={225} className="w-full h-auto" />
+              </div>
+              <div className="pt-5 border-t border-zinc-200/60">
+                <Link href="/bill-debugger" className="inline-flex items-center gap-2 text-[#002FA7] font-mono text-[10px] uppercase tracking-widest hover:gap-3 transition-all duration-200">
+                  Run Analysis <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
             </div>
             <div className="glass-card p-10 rounded-3xl reveal-on-scroll delay-100 hover:shadow-2xl transition-shadow duration-300">
@@ -211,8 +217,13 @@ export function LandingSections() {
               <p className="text-zinc-500 mb-8">
                 The 2026 Market Navigator. We forecast capacity markets and hedge against regulatory shifts before they happen.
               </p>
-              <div className="w-full mb-8 overflow-hidden rounded-xl border border-white/50">
+              <div className="w-full mb-6 overflow-hidden rounded-xl border border-white/50">
                 <Image src="/images/line-graph.jpg" alt="Future-Proof Engine Visualization" width={400} height={225} className="w-full h-auto" />
+              </div>
+              <div className="pt-5 border-t border-zinc-200/60">
+                <Link href="/market-outlook" className="inline-flex items-center gap-2 text-[#002FA7] font-mono text-[10px] uppercase tracking-widest hover:gap-3 transition-all duration-200">
+                  View Market Outlook <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
             </div>
             <div className="glass-card p-10 rounded-3xl reveal-on-scroll delay-200 hover:shadow-2xl transition-shadow duration-300">
@@ -221,8 +232,13 @@ export function LandingSections() {
               <p className="text-zinc-500 mb-8">
                 Multi-site management unified into a single stream of truth. One dashboard. Zero noise.
               </p>
-              <div className="w-full mb-8 overflow-hidden rounded-xl border border-white/50">
+              <div className="w-full mb-6 overflow-hidden rounded-xl border border-white/50">
                 <Image src="/images/centralization.jpg" alt="Energy Minimalism Visualization" width={400} height={225} className="w-full h-auto" />
+              </div>
+              <div className="pt-5 border-t border-zinc-200/60">
+                <Link href="/book" className="inline-flex items-center gap-2 text-[#002FA7] font-mono text-[10px] uppercase tracking-widest hover:gap-3 transition-all duration-200">
+                  Book a Briefing <ArrowRight className="w-3 h-3" />
+                </Link>
               </div>
             </div>
           </div>
