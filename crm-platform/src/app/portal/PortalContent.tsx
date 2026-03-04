@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowRight, Lock, Activity, Mail, CheckCircle2, CalendarDays, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useScrollEffect } from '@/hooks/useScrollEffect';
 
 // Blurred dashboard preview cards
 function ForensicPreview() {
@@ -102,6 +103,7 @@ export default function PortalContent() {
     const [mode, setMode] = useState<'password' | 'magic'>('password');
     const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
+    const isScrolled = useScrollEffect((y) => y > 30, false);
 
     const handlePasswordLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -167,8 +169,14 @@ export default function PortalContent() {
     return (
         <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
-            {/* Header */}
-            <header className="px-8 py-6 flex items-center justify-between shrink-0">
+            {/* Header — fixed + blur on scroll */}
+            <header
+                className={`fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 transition-all duration-300 ${
+                    isScrolled
+                        ? 'h-16 bg-zinc-950/85 backdrop-blur-xl border-b border-white/5'
+                        : 'h-20 bg-transparent'
+                }`}
+            >
                 <Link href="/" className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
                         <Image src="/images/nodalpoint.png" alt="Nodal Point" width={32} height={32} className="h-full w-auto object-contain" />
@@ -182,8 +190,8 @@ export default function PortalContent() {
                 </Link>
             </header>
 
-            {/* Main */}
-            <main className="flex-1 flex items-center justify-center px-6 py-12">
+            {/* Main — padded for fixed header */}
+            <main className="flex-1 flex items-center justify-center px-6 pt-28 pb-12">
                 <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
                     {/* LEFT: Login */}

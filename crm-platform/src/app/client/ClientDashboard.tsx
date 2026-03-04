@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { differenceInDays, format, parseISO } from 'date-fns';
+import { useScrollEffect } from '@/hooks/useScrollEffect';
 
 // ─────────────────────────────────────────────
 // Types
@@ -102,6 +103,7 @@ export function ClientDashboard() {
     const [deals, setDeals] = useState<DealData[]>([]);
     const [contactName, setContactName] = useState('');
     const [error, setError] = useState('');
+    const isScrolled = useScrollEffect((y) => y > 30, false);
 
     useEffect(() => {
         async function init() {
@@ -181,8 +183,14 @@ export function ClientDashboard() {
     return (
         <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col">
 
-            {/* ── HEADER ─────────────────────────────────── */}
-            <header className="px-8 py-5 flex items-center justify-between border-b border-white/5 shrink-0">
+            {/* ── HEADER — fixed + blur on scroll ────────── */}
+            <header
+                className={`fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-8 transition-all duration-300 ${
+                    isScrolled
+                        ? 'h-16 bg-zinc-950/85 backdrop-blur-xl border-b border-white/5'
+                        : 'h-20 bg-transparent border-b border-white/5'
+                }`}
+            >
                 <Link href="/" className="flex items-center gap-2">
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
                         <Image src="/images/nodalpoint.png" alt="Nodal Point" width={32} height={32} className="h-full w-auto object-contain" />
@@ -209,8 +217,8 @@ export function ClientDashboard() {
                 </div>
             </header>
 
-            {/* ── MAIN ───────────────────────────────────── */}
-            <main className="flex-1 px-6 py-10 max-w-6xl mx-auto w-full">
+            {/* ── MAIN — padded for fixed header ─────────── */}
+            <main className="flex-1 px-6 pt-28 pb-10 max-w-6xl mx-auto w-full">
 
                 {/* PAGE LABEL */}
                 <div className="mb-8">
