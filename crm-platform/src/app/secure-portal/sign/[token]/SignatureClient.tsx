@@ -317,9 +317,9 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                         <div className="flex items-center gap-3">
                             <button
                                 onClick={handleDownload}
-                                className="flex items-center gap-2 px-3 py-1 text-[10px] font-mono uppercase bg-[#002FA7]/10 hover:bg-[#002FA7]/20 text-[#002FA7] rounded transition-all border border-[#002FA7]/20"
+                                className="flex items-center gap-2 px-3 py-1 text-[10px] font-mono uppercase bg-[#002FA7] hover:bg-[#002FA7]/80 text-white rounded transition-all border border-[#002FA7]"
                             >
-                                <Download className="w-3 h-3" />
+                                <Download className="w-3 h-3 text-white" />
                                 Download for review
                             </button>
                         </div>
@@ -377,8 +377,9 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                                         type="text"
                                                         value={textValues[textKey] || ''}
                                                         onChange={(e) => setTextValues(prev => ({ ...prev, [textKey]: e.target.value }))}
-                                                        placeholder="ENTER TEXT"
-                                                        className="w-full h-full bg-[#002FA7]/5 border-2 border-[#002FA7]/20 text-zinc-900 placeholder:text-zinc-400 px-2 font-mono text-[10px] focus:outline-none focus:border-[#002FA7] focus:bg-[#002FA7]/10 transition-all uppercase"
+                                                        placeholder="Type here"
+                                                        className="w-full h-full bg-[#002FA7]/5 border-2 border-[#002FA7]/20 text-zinc-900 placeholder:text-zinc-400 px-2 font-mono focus:outline-none focus:border-[#002FA7] focus:bg-[#002FA7]/10 transition-all"
+                                                        style={{ fontSize: `${Math.max(11, Math.round(13 * scale))}px` }}
                                                     />
                                                 </div>
                                             )

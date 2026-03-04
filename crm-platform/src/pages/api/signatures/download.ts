@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const pages = pdfDoc.getPages();
         const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
-        const bannerHeight = 40;
+        const bannerHeight = 26;
         const bannerText = 'FOR REVIEW ONLY — DO NOT SIGN THIS COPY. PLEASE USE THE SECURE E-SIGN PORTAL.';
 
         pages.forEach((page) => {
