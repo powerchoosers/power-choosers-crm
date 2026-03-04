@@ -6,7 +6,7 @@ const NAV_GROUPS = [
     label: 'Platform',
     links: [
       { label: 'Bill Debugger', href: '/bill-debugger' },
-      { label: 'Book a Consultation', href: '/book' },
+      { label: 'Book a Briefing', href: '/book' },
       { label: 'Sign In', href: '/network' },
     ],
   },

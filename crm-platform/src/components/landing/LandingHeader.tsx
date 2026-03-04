@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Activity, Menu, X } from 'lucide-react'
+import { Activity, Menu, X, Lock } from 'lucide-react'
 import { useScrollEffect } from '@/hooks/useScrollEffect'
 
 const MENU_ITEMS = [
@@ -40,8 +40,9 @@ export function LandingHeader() {
           <div className="flex items-center gap-6">
             <Link
               href="/portal"
-              className="hidden md:block font-mono text-[11px] uppercase tracking-widest text-zinc-500 hover:text-black transition-colors"
+              className="hidden md:flex items-center gap-1.5 border border-black/15 text-black/70 hover:text-black hover:border-black/30 px-4 py-2 rounded-full font-mono text-[10px] uppercase tracking-widest transition-all duration-200 hover:bg-black/[0.03]"
             >
+              <Lock className="w-3 h-3" />
               Client Portal
             </Link>
             <a
