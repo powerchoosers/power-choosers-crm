@@ -348,6 +348,16 @@
       box-shadow: 0 0 0 12px rgba(0, 47, 167, 0);
     }
   }
+
+  @keyframes ticker-scroll {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
 }
 
 /* Global Scrollbar Theme */

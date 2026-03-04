@@ -75,7 +75,7 @@ export function LandingSections() {
     fetch('/api/market/ercot?type=prices')
       .then(r => r.ok ? r.json() : null)
       .then(data => { const p = data?.prices?.south; if (p != null && mounted) setLivePrice(p) })
-      .catch(() => {})
+      .catch(() => { })
     return () => { mounted = false }
   }, [])
 
@@ -190,6 +190,64 @@ export function LandingSections() {
 
         </div>
       </section>
+
+      {/* INTELLIGENCE COVERAGE TICKER */}
+      <div className="bg-white border-y border-zinc-100 py-5 overflow-hidden relative">
+        {/* Fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+
+        <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
+          {[
+            { label: 'ONCOR', sub: 'TDSP' },
+            { label: 'CENTERPOINT', sub: 'TDSP' },
+            { label: 'AEP TEXAS', sub: 'TDSP' },
+            { label: 'TNMP', sub: 'TDSP' },
+            { label: 'TXU ENERGY', sub: 'REP' },
+            { label: 'RELIANT', sub: 'REP' },
+            { label: 'CONSTELLATION', sub: 'REP' },
+            { label: 'DIRECT ENERGY', sub: 'REP' },
+            { label: 'NRG', sub: 'REP' },
+            { label: 'CHAMPION ENERGY', sub: 'REP' },
+            { label: 'CIRRO ENERGY', sub: 'REP' },
+            { label: 'GREEN MOUNTAIN', sub: 'REP' },
+            { label: '100+ TARIFF STRUCTURES', sub: 'MAPPED' },
+            { label: 'DEMAND RATCHET', sub: 'DECODED' },
+            { label: 'SCARCITY ADDER', sub: 'TRACKED' },
+            { label: '4CP EXPOSURE', sub: 'ISOLATED' },
+            // Duplicate for seamless loop
+            { label: 'ONCOR', sub: 'TDSP' },
+            { label: 'CENTERPOINT', sub: 'TDSP' },
+            { label: 'AEP TEXAS', sub: 'TDSP' },
+            { label: 'TNMP', sub: 'TDSP' },
+            { label: 'TXU ENERGY', sub: 'REP' },
+            { label: 'RELIANT', sub: 'REP' },
+            { label: 'CONSTELLATION', sub: 'REP' },
+            { label: 'DIRECT ENERGY', sub: 'REP' },
+            { label: 'NRG', sub: 'REP' },
+            { label: 'CHAMPION ENERGY', sub: 'REP' },
+            { label: 'CIRRO ENERGY', sub: 'REP' },
+            { label: 'GREEN MOUNTAIN', sub: 'REP' },
+            { label: '100+ TARIFF STRUCTURES', sub: 'MAPPED' },
+            { label: 'DEMAND RATCHET', sub: 'DECODED' },
+            { label: 'SCARCITY ADDER', sub: 'TRACKED' },
+            { label: '4CP EXPOSURE', sub: 'ISOLATED' },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center shrink-0">
+              <div className="flex items-baseline gap-1.5 px-6">
+                <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
+                  {item.label}
+                </span>
+                <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
+                  {item.sub}
+                </span>
+              </div>
+              <span className="text-zinc-200 text-xs select-none">·</span>
+            </div>
+          ))}
+        </div>
+
+      </div>
 
       {/* ACT 3: THE PHILOSOPHY (The Code) */}
       <section className="flex items-center justify-center px-6 py-24 bg-[#F5F5F7]">
