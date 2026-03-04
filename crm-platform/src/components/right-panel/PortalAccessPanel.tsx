@@ -69,9 +69,19 @@ export function PortalAccessPanel() {
         }
 
         try {
+            // Attach the caller's JWT so requireUser() can verify the advisor
+            const { data: { session } } = await supabase.auth.getSession()
+            if (!session?.access_token) {
+                toast.error('Not authenticated. Please refresh and try again.')
+                return
+            }
+
             const res = await fetch('/api/portal/send-access', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${session.access_token}`,
+                },
                 body: JSON.stringify({ contactIds: contactsToInvite.map(c => c.id) }),
             })
             const json = await res.json()
