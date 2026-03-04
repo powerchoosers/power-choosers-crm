@@ -135,13 +135,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             width: scaledWidth,
                             height: scaledHeight,
                         });
-                        targetPage.drawText(`Signed: ${new Date().toISOString().split('T')[0]}`, {
-                            x: scaledX,
-                            y: pdfY - 10,
-                            size: 8,
-                            font: helvetica,
-                            color: rgb(0, 0, 0)
-                        });
                     } catch (err) {
                         console.error('Failed to draw image field', err);
                     }
