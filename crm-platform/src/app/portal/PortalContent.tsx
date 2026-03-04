@@ -125,7 +125,7 @@ export default function PortalContent() {
                 }
                 setStatus('error');
             } else {
-                window.location.href = '/network';
+                window.location.href = '/client';
             }
         } catch {
             setErrorMsg('Something went wrong. Please try again.');
@@ -144,7 +144,7 @@ export default function PortalContent() {
                 email: email.trim().toLowerCase(),
                 options: {
                     shouldCreateUser: false,
-                    emailRedirectTo: `${window.location.origin}/network`,
+                    emailRedirectTo: `${window.location.origin}/client`,
                 },
             });
 
