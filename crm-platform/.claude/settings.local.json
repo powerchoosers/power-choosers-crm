@@ -27,7 +27,14 @@
       "Bash(npx tsc --noEmit)",
       "Bash(git add src/pages/api/signatures/execute.ts src/pages/api/signatures/request.ts src/pages/api/signatures/telemetry.ts src/types/signatures.ts src/app/secure-portal/sign/[token]/SignatureClient.tsx src/components/modals/DocumentPreparationModal.tsx src/app/providers.tsx src/components/right-panel/SignatureRequestPanel.tsx)",
       "Bash(git push origin main)",
-      "Bash(xargs grep -l \"send\\\\|zoho\")"
+      "Bash(xargs grep -l \"send\\\\|zoho\")",
+      "WebFetch(domain:nodalpoint.io)",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3000\")",
+      "Bash(taskkill /PID 28600 /F)",
+      "Bash(del /Q \"C:\\\\Users\\\\Lap3p\\\\OneDrive\\\\Documents\\\\Power Choosers CRM\\\\crm-platform\\\\.next\\\\dev\\\\lock\")",
+      "Bash(taskkill /F /PID 28600)",
+      "Bash(powershell -Command \"Stop-Process -Id 28600 -Force\")"
     ]
   }
 }
