@@ -137,7 +137,9 @@ export default function PortalContent() {
             {/* Header */}
             <header className="px-8 py-6 flex items-center justify-between shrink-0">
                 <Link href="/" className="flex items-center gap-2">
-                    <Image src="/images/nodalpoint.png" alt="Nodal Point" width={32} height={32} className="h-8 w-auto" />
+                    <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center p-1 shrink-0">
+                        <Image src="/images/nodalpoint.png" alt="Nodal Point" width={32} height={32} className="h-full w-auto object-contain" />
+                    </div>
                     <span className="font-bold text-lg tracking-tighter text-white">
                         Nodal <span className="text-[#002FA7]">Point</span>
                     </span>
