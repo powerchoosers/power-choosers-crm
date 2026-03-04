@@ -27,7 +27,8 @@ import {
   Clock,
   MoreHorizontal,
   Mail,
-  Search
+  Search,
+  ShieldCheck
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -421,7 +422,7 @@ export default function ContractsPage() {
   const updateDeal = useUpdateDeal()
   const deleteDeal = useDeleteDeal()
 
-  const { setRightPanelMode, setDealContext } = useUIStore()
+  const { setRightPanelMode, setDealContext, setPortalAccessContext } = useUIStore()
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
@@ -640,6 +641,19 @@ export default function ContractsPage() {
                   className="hover:bg-white/5 cursor-pointer"
                   onClick={() => router.push(`/network/accounts/${row.original.accountId}`)}
                 >View Account</DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer flex items-center gap-2"
+                  onClick={() => {
+                    setPortalAccessContext({
+                      accountId: row.original.accountId,
+                      accountName: row.original.account?.name,
+                    })
+                    setRightPanelMode('SEND_PORTAL_ACCESS')
+                  }}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 text-[#002FA7]" />
+                  Send Portal Access
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/10" />
                 <DropdownMenuItem
                   className="text-red-400 hover:bg-red-500/10 cursor-pointer"
