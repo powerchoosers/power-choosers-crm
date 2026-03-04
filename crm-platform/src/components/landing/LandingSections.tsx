@@ -103,8 +103,56 @@ export function LandingSections() {
         </div>
       </section>
 
+      {/* FORENSIC PROTOCOL: HOW IT WORKS */}
+      <section className="bg-white flex items-center justify-center px-6 py-24 border-t border-zinc-100">
+        <div className="max-w-5xl w-full mx-auto">
+
+          {/* Header */}
+          <div className="mb-16 reveal-on-scroll">
+            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">FORENSIC_PROTOCOL</p>
+            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">Three steps. No noise.</h2>
+          </div>
+
+          {/* Steps — number + connector + content unified per column */}
+          <div className="grid grid-cols-1 md:grid-cols-3 md:gap-8">
+
+            {/* Step 01 */}
+            <div className="reveal-on-scroll border-l-2 border-[#002FA7]/20 pl-5 py-2 md:border-l-0 md:pl-0 md:py-0 mb-8 md:mb-0">
+              <div className="flex items-center mb-6">
+                <span className="font-mono text-3xl font-bold text-[#002FA7] shrink-0">01</span>
+                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200" />
+              </div>
+              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SUBMIT</p>
+              <p className="text-zinc-600 text-sm leading-relaxed font-medium">Upload your energy bill or PDF. Takes 30 seconds.</p>
+            </div>
+
+            {/* Step 02 */}
+            <div className="reveal-on-scroll delay-100 border-l-2 border-[#002FA7]/20 pl-5 py-2 md:border-l-0 md:pl-0 md:py-0 mb-8 md:mb-0">
+              <div className="flex items-center mb-6">
+                <span className="font-mono text-3xl font-bold text-[#002FA7] shrink-0">02</span>
+                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200" />
+              </div>
+              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">ISOLATE</p>
+              <p className="text-zinc-600 text-sm leading-relaxed font-medium">Cost leakage isolated from supplier markup.</p>
+            </div>
+
+            {/* Step 03 */}
+            <div className="reveal-on-scroll delay-200 border-l-2 border-[#002FA7]/20 pl-5 py-2 md:border-l-0 md:pl-0 md:py-0">
+              <div className="flex items-center mb-6">
+                <span className="font-mono text-3xl font-bold text-[#002FA7] shrink-0">03</span>
+                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200" />
+              </div>
+              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SIGNAL</p>
+              <p className="text-zinc-600 text-sm leading-relaxed font-medium">Forensic report delivered. No noise.</p>
+            </div>
+
+          </div>
+
+        </div>
+      </section>
+
       {/* ACT 3: THE PHILOSOPHY (The Code) */}
-      <section className="flex items-center justify-center px-6 py-24 bg-white">
+      <section className="flex items-center justify-center px-6 py-24 bg-[#F5F5F7]">
         <div className="max-w-7xl mx-auto w-full">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
             <div className="reveal-on-scroll group">
