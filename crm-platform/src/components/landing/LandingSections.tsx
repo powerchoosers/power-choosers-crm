@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { Activity, Layers, Users, ArrowRight } from 'lucide-react'
@@ -63,6 +63,45 @@ export function LandingSections() {
       counterObserver.disconnect()
     }
   }, [])
+
+  // Live ERCOT price — fetch + animate on scroll into view
+  const [livePrice, setLivePrice] = useState<number | null>(null)
+  const [displayPrice, setDisplayPrice] = useState(0)
+  const livePriceRef = useRef<HTMLDivElement>(null)
+  const priceAnimatedRef = useRef(false)
+
+  useEffect(() => {
+    let mounted = true
+    fetch('/api/market/ercot?type=prices')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { const p = data?.prices?.south; if (p != null && mounted) setLivePrice(p) })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [])
+
+  useEffect(() => {
+    if (livePrice == null || priceAnimatedRef.current) return
+    const el = livePriceRef.current
+    if (!el) return
+    let cancelled = false
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting && !priceAnimatedRef.current) {
+        priceAnimatedRef.current = true
+        const start = performance.now()
+        const animate = (now: number) => {
+          if (cancelled) return
+          const progress = Math.min((now - start) / 2000, 1)
+          const ease = 1 - (1 - progress) ** 4
+          setDisplayPrice(livePrice * ease)
+          if (progress < 1) requestAnimationFrame(animate)
+        }
+        requestAnimationFrame(animate)
+        obs.disconnect()
+      }
+    }, { threshold: 0.3 })
+    obs.observe(el)
+    return () => { cancelled = true; obs.disconnect() }
+  }, [livePrice])
 
   return (
     <>
@@ -245,31 +284,45 @@ export function LandingSections() {
         </div>
       </section>
 
-      {/* SECTION 5: THE OUTPUT (The Proof) */}
+      {/* SECTION 5: THE MARKET (The Stakes) */}
       <section className="py-32 bg-[#F5F5F7] border-t border-black/5 relative">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
+
+            {/* Stat 1: TX commercial spend */}
             <div className="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll flex flex-col items-center justify-center">
               <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center">
-                <span className="counter" data-target="3.4" data-suffix="¢">0</span>
+                $<span className="counter" data-target="25" data-suffix="B+">0</span>
               </div>
-              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Avg. kWh reduction</div>
-              <div className="text-zinc-700 font-medium text-center">We exploit the spread.</div>
+              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Texas commercial electricity spend</div>
+              <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">Annually · Source: EIA</div>
             </div>
-            <div className="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-100 flex flex-col items-center justify-center">
+
+            {/* Stat 2: Live ERCOT price */}
+            <div ref={livePriceRef} className="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-100 flex flex-col items-center justify-center">
               <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center">
-                <span className="counter" data-target="124" data-prefix="$" data-suffix="M">0</span>
+                ${livePrice == null ? (
+                  <span className="animate-pulse text-zinc-300">--</span>
+                ) : (
+                  <span>{displayPrice.toFixed(2)}</span>
+                )}
               </div>
-              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Scarcity premiums removed</div>
-              <div className="text-zinc-700 font-medium text-center">Volatility is optional.</div>
+              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">ERCOT LZ_South spot price</div>
+              <div className="flex items-center justify-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest">Live signal · /MWh</div>
+              </div>
             </div>
+
+            {/* Stat 3: Demand charge share */}
             <div className="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-200 flex flex-col items-center justify-center">
               <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center">
-                <span className="counter" data-target="99.9" data-suffix="%">0</span>
+                <span className="counter" data-target="40" data-suffix="%">0</span>
               </div>
-              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Uptime & Accuracy</div>
-              <div className="text-zinc-700 font-medium text-center">We measure everything.</div>
+              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Of your bill that isn't usage</div>
+              <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">Demand charges · buried in delivery</div>
             </div>
+
           </div>
         </div>
       </section>
