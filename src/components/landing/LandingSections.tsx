@@ -275,15 +275,15 @@ export function LandingSections() {
       </section>
 
       {/* FAQ */}
-      <section className="bg-white px-6 py-24 border-t border-zinc-100">
+      <section className="bg-white px-6 pt-16 pb-8 border-t border-zinc-100">
         <div className="max-w-5xl mx-auto">
-          <div className="mb-16 reveal-on-scroll">
+          <div className="mb-8 reveal-on-scroll">
             <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">FAQ</p>
-            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">Common questions.</h2>
+            <h2 className="text-5xl md:text-6xl font-semibold tracking-tighter text-zinc-900">Common questions.</h2>
           </div>
           <div className="divide-y divide-zinc-100">
 
-            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
               <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
                 What is a demand charge — and why do most businesses miss it?
               </p>
@@ -292,7 +292,7 @@ export function LandingSections() {
               </p>
             </div>
 
-            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
               <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
                 What if I'm already locked into a contract?
               </p>
@@ -301,7 +301,7 @@ export function LandingSections() {
               </p>
             </div>
 
-            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
               <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
                 How long does the analysis take?
               </p>
@@ -310,7 +310,7 @@ export function LandingSections() {
               </p>
             </div>
 
-            <div className="py-8 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
+            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
               <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
                 Do you cover all Texas suppliers?
               </p>
