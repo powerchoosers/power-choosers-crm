@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import SignatureCanvas from 'react-signature-canvas'
-import { motion } from 'framer-motion'
-import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronRight } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronRight, Download, FileText, LayoutPanelRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -26,21 +26,34 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     const [textValues, setTextValues] = useState<Record<string, string>>({})
     const [numPages, setNumPages] = useState<number>(0)
     const [pageNumber, setPageNumber] = useState(1)
+    const [containerWidth, setContainerWidth] = useState(0)
+
     const sigCanvas = useRef<SignatureCanvas>(null)
     const hiddenCanvasRef = useRef<HTMLCanvasElement>(null)
     const pdfScrollContainerRef = useRef<HTMLDivElement>(null)
-    // ── Refs ──────────────────────────────────────────────────────────────────
-    const sigContainerRef = useRef<HTMLDivElement>(null)  // signature pad outer div
+    const sigContainerRef = useRef<HTMLDivElement>(null)
     const typedInputRef = useRef<HTMLInputElement>(null)
-    // sigPadScrollRef: target for "Sign Here" click-to-focus scroll
     const sigPadScrollRef = useRef<HTMLDivElement>(null)
-    // hasDrawnRef: true once user presses down on the canvas (set on pointerdown).
-    // Race-proof — does NOT rely on signature_pad's isEmpty() or onBegin event.
     const hasDrawnRef = useRef(false)
-    // captureTimerRef: debounce handle for the 2-second auto-capture after onEnd
     const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-    // drawPending: true when user has finished drawing but capture hasn't fired yet
     const [drawPending, setDrawPending] = useState(false)
+
+    // ── Responsive Scaling ────────────────────────────────────────────────────
+    useEffect(() => {
+        const measure = () => {
+            if (pdfScrollContainerRef.current) {
+                // Subtract padding for the document
+                setContainerWidth(pdfScrollContainerRef.current.clientWidth - 48)
+            }
+        }
+        measure()
+        const observer = new ResizeObserver(measure)
+        if (pdfScrollContainerRef.current) observer.observe(pdfScrollContainerRef.current)
+        return () => observer.disconnect()
+    }, [])
+
+    const pdfWidth = Math.max(containerWidth, 400)
+    const scale = pdfWidth / 800
 
     // ── Field completion tracking ─────────────────────────────────────────────
     const fields: any[] = request.signature_fields ?? []
@@ -52,18 +65,15 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         return !!activeSignature
     }).length
 
-    // All complete: zero-field requests are always executable (legacy fallback)
     const allComplete = totalFields === 0 || completedFields >= totalFields
 
-    // ── Typed signature — auto-scale font to fill canvas ─────────────────────
+    // ── Typed signature logic ────────────────────────────────────────────────
     useEffect(() => {
         if (signatureMode === 'type' && typedSignature && hiddenCanvasRef.current) {
             const canvas = hiddenCanvasRef.current
             const ctx = canvas.getContext('2d')
             if (ctx) {
                 ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-                // Scale font down until text fits within canvas (40px padding each side)
                 let fontSize = 80
                 const maxWidth = canvas.width - 80
                 ctx.font = `${fontSize}px "Brush Script MT", cursive, sans-serif`
@@ -71,7 +81,6 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     fontSize -= 2
                     ctx.font = `${fontSize}px "Brush Script MT", cursive, sans-serif`
                 }
-
                 ctx.fillStyle = '#002FA7'
                 ctx.textBaseline = 'middle'
                 ctx.textAlign = 'center'
@@ -83,17 +92,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         }
     }, [typedSignature, signatureMode])
 
-    // ── Canvas sizing note ────────────────────────────────────────────────────
-    // react-signature-canvas calls _resizeCanvas() on componentDidMount, which
-    // sets canvas.width/height = offsetWidth/offsetHeight * devicePixelRatio and
-    // scales the 2D context. This is the correct way to handle HiDPI displays
-    // and touch coordinate alignment. We deliberately do NOT override this with a
-    // custom ResizeObserver — doing so fights the library's internal state,
-    // resets _isEmpty, and cancels the draw-tracking refs on every resize event.
-    // clearOnResize={false} stops the library's window.resize handler from wiping
-    // the canvas mid-draw (the user can always Clear and redraw if they rotate).
-
-    // ── Auto-scale typed signature font to fit the input width ───────────────
+    // Scale font in input box
     useEffect(() => {
         const input = typedInputRef.current
         if (!input) return
@@ -101,7 +100,6 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             input.style.fontSize = ''
             return
         }
-        // Start at max readable size and shrink until text fits without overflow
         let size = 36
         input.style.fontSize = `${size}px`
         while (input.scrollWidth > input.clientWidth && size > 10) {
@@ -110,7 +108,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         }
     }, [typedSignature])
 
-    // ── Log view telemetry on mount ───────────────────────────────────────────
+    // ── Telemetry ────────────────────────────────────────────────────────────
     useEffect(() => {
         const logView = async () => {
             try {
@@ -119,19 +117,13 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ token, action: 'viewed' })
                 })
-            } catch {
-                // Silent — telemetry failure must not break signing
-            }
+            } catch { }
         }
         logView()
     }, [token])
 
-    // ── Draw signature capture ────────────────────────────────────────────────
-    // captureDrawnSignature: copies strokes onto a transparent canvas and stores
-    // the result. Transparent PNG means the signature overlays the contract lines
-    // cleanly — no white rectangle blocking the document content.
+    // ── Drawing logic ────────────────────────────────────────────────────────
     const captureDrawnSignature = useCallback(() => {
-        // Cancel any pending debounce timer
         if (captureTimerRef.current) {
             clearTimeout(captureTimerRef.current)
             captureTimerRef.current = null
@@ -140,8 +132,6 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         if (!sigCanvas.current || !hasDrawnRef.current) return
         const srcCanvas = sigCanvas.current.getCanvas()
         if (!srcCanvas || !srcCanvas.width || !srcCanvas.height) return
-        // Copy strokes onto a fresh transparent canvas — no white fill.
-        // PNG preserves the alpha channel so only the ink is visible on the PDF.
         const out = document.createElement('canvas')
         out.width = srcCanvas.width
         out.height = srcCanvas.height
@@ -151,9 +141,6 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         setActiveSignature(out.toDataURL('image/png'))
     }, [])
 
-    // handleSignatureEnd: called by SignatureCanvas onEnd.
-    // Starts a 2-second debounce — auto-applies if no new stroke arrives.
-    // The user can also tap "Apply Signature" immediately via the drawPending button.
     const handleSignatureEnd = useCallback(() => {
         if (!hasDrawnRef.current) return
         if (captureTimerRef.current) clearTimeout(captureTimerRef.current)
@@ -176,13 +163,11 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         setActiveSignature(null)
     }
 
-    // ── Execute ───────────────────────────────────────────────────────────────
     const handleExecute = async () => {
         if (!activeSignature) {
             toast.error('Please provide your signature before executing.')
             return
         }
-        // Guard: every text field must have a value
         const firstUnfilled = fields.findIndex((f: any, idx: number) => {
             if (f.type !== 'text') return false
             const key = f.fieldId ?? String(idx)
@@ -190,7 +175,6 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         })
         if (firstUnfilled !== -1) {
             toast.error('Please complete all text fields before executing.')
-            // Jump to the unfilled field
             const target = fields[firstUnfilled]
             setPageNumber(target.pageIndex + 1)
             setTimeout(() => {
@@ -208,9 +192,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                 body: JSON.stringify({ token, signatureBase64: activeSignature, textValues })
             })
             const data = await res.json()
-            if (!res.ok) {
-                throw new Error(data.error || 'Failed to execute document. Please try again or contact support.')
-            }
+            if (!res.ok) throw new Error(data.error || 'Failed to execute document.')
             setIsSuccess(true)
         } catch (error: any) {
             toast.error(error.message)
@@ -219,295 +201,306 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
         }
     }
 
-    // ── Skip to next missing field ────────────────────────────────────────────
+    const handleDownload = () => {
+        window.open(`/api/signatures/download?token=${token}`, '_blank')
+        toast.success('Generating review copy with forensic watermark...')
+    }
+
     const skipToNextField = () => {
         if (!fields.length) return
-
         const nextIdx = fields.findIndex((f: any, idx: number) => {
             const key = f.fieldId ?? String(idx)
             if (f.type === 'text') return !textValues[key]?.trim()
             return !activeSignature
         })
-
         if (nextIdx === -1) {
-            toast.success('All fields complete — ready to execute.')
+            toast.success('All fields complete')
             return
         }
-
         const nextField = fields[nextIdx]
         const key = nextField.fieldId ?? String(nextIdx)
-        const targetPage = nextField.pageIndex + 1
-
-        setPageNumber(targetPage)
-
-        // After React re-renders the page, scroll the element into view and flash it
+        setPageNumber(nextField.pageIndex + 1)
         setTimeout(() => {
             const el = document.getElementById(`sig-field-${key}`)
             if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' })
                 el.classList.add('!ring-2', '!ring-[#002FA7]', '!ring-offset-2')
                 setTimeout(() => el.classList.remove('!ring-2', '!ring-[#002FA7]', '!ring-offset-2'), 1500)
             }
         }, 200)
-
-        toast(`Jumped to field ${nextIdx + 1} of ${totalFields}`, { icon: '🔍' })
     }
 
-    // ── Success screen ────────────────────────────────────────────────────────
+    // ── Success Screen ────────────────────────────────────────────────────────
     if (isSuccess) {
         return (
-            <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center font-mono">
+            <div className="h-screen bg-zinc-950 flex flex-col items-center justify-center p-6 text-center font-mono">
                 <motion.div
                     initial={{ scale: 0.8, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: 'spring' }}
-                    className="h-16 w-16 mb-6 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 flex items-center justify-center"
+                    className="h-20 w-20 mb-8 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-500 flex items-center justify-center"
                 >
-                    <CheckCircle className="w-8 h-8" />
+                    <CheckCircle className="w-10 h-10" />
                 </motion.div>
                 <motion.h1
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.1 }}
-                    className="text-2xl text-zinc-100 uppercase tracking-[0.2em] mb-3"
+                    className="text-3xl text-zinc-50 uppercase tracking-[0.3em] font-light mb-4"
                 >
-                    Contract Executed
+                    Document Secured
                 </motion.h1>
-                <motion.p
+                <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="text-sm text-zinc-500 max-w-md mx-auto leading-relaxed border border-white/5 bg-white/[0.02] p-4 rounded-lg"
+                    className="max-w-md p-6 border border-white/5 bg-white/[0.02] rounded-lg space-y-4"
                 >
-                    The document has been securely cryptographically sealed with a forensic audit trail. A final copy has been dispatched to {request.contact?.email} and Nodal Point Compliance.
-                </motion.p>
+                    <p className="text-sm text-zinc-400 font-sans leading-relaxed">
+                        The energy services agreement has been cryptographically sealed with a forensic audit trail. A final copy is being dispatched to you and our compliance team.
+                    </p>
+                    <div className="pt-4 border-t border-white/5 flex flex-col items-center gap-2">
+                        <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Nodal Point forensic systems</span>
+                        <div className="h-1px w-12 bg-[#002FA7]/30" />
+                    </div>
+                </motion.div>
             </div>
         )
     }
 
-    // ── Main render ───────────────────────────────────────────────────────────
+    // ── Main Interface ────────────────────────────────────────────────────────
     return (
-        <div className="flex flex-col min-h-screen items-center py-12 px-4 max-w-5xl mx-auto">
+        <div className="h-screen w-full flex flex-col bg-zinc-950 overflow-hidden font-sans">
 
-            {/* Header */}
-            <div className="w-full flex items-center justify-between mb-8 pb-6 border-b border-white/5">
-                <div>
-                    <h1 className="text-xl font-mono uppercase tracking-[0.1em] text-zinc-200">
-                        Secure Document Review
-                    </h1>
-                    <p className="text-sm font-sans text-zinc-500 mt-1">
-                        {request.document?.name}
-                    </p>
+            {/* Header: Forensic Navigation */}
+            <header className="h-16 border-b border-white/5 bg-zinc-950 px-6 flex items-center justify-between z-50 shrink-0">
+                <div className="flex items-center gap-4">
+                    <div className="flex flex-col">
+                        <h1 className="text-xs font-mono uppercase tracking-[0.2em] text-[#002FA7] font-bold">
+                            Forensic Document Review
+                        </h1>
+                        <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
+                            ID: {request.id.substring(0, 12)} · {request.document?.name}
+                        </p>
+                    </div>
                 </div>
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 text-emerald-500 font-mono text-[10px] uppercase tracking-widest">
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>Encrypted Session</span>
+
+                <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-3 px-3 py-1.5 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-500/70 font-mono text-[9px] uppercase tracking-widest">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>256-Bit Encrypted Session</span>
+                    </div>
                 </div>
-            </div>
+            </header>
 
-            {/* Main Content Layout */}
-            <div className="w-full flex flex-col lg:flex-row gap-8">
+            {/* Main Body: Two Column Forensic Layout */}
+            <div className="flex-1 flex overflow-hidden">
 
-                {/* PDF Viewer */}
-                <div className="w-full lg:w-2/3 h-[600px] lg:h-[800px] border border-white/10 rounded-xl overflow-hidden bg-zinc-900 flex flex-col relative">
-                    <div className="h-12 border-b border-white/5 flex items-center justify-center gap-4 bg-zinc-950 text-zinc-300 font-mono text-xs z-30">
-                        <button
-                            onClick={() => setPageNumber(p => Math.max(1, p - 1))}
-                            disabled={pageNumber <= 1}
-                            className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 transition-colors"
-                        >Prev</button>
-                        <span>Page {pageNumber} of {numPages || '-'}</span>
-                        <button
-                            onClick={() => setPageNumber(p => Math.min(numPages, p + 1))}
-                            disabled={pageNumber >= numPages}
-                            className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 transition-colors"
-                        >Next</button>
+                {/* Left: Document Viewport */}
+                <main className="flex-1 flex flex-col bg-zinc-900/30 overflow-hidden relative">
+
+                    {/* View Controls */}
+                    <div className="h-10 shrink-0 border-b border-white/5 bg-zinc-950/50 flex items-center justify-between px-4">
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => setPageNumber(p => Math.max(1, p - 1))}
+                                disabled={pageNumber <= 1}
+                                className="p-1 px-3 text-[10px] font-mono uppercase bg-white/5 hover:bg-white/10 rounded disabled:opacity-20 transition-all text-zinc-400"
+                            >Prev</button>
+                            <div className="px-4 text-[10px] font-mono text-zinc-500 border-x border-white/5">
+                                Page <span className="text-zinc-200">{pageNumber}</span> / {numPages || '-'}
+                            </div>
+                            <button
+                                onClick={() => setPageNumber(p => Math.min(numPages, p + 1))}
+                                disabled={pageNumber >= numPages}
+                                className="p-1 px-3 text-[10px] font-mono uppercase bg-white/5 hover:bg-white/10 rounded disabled:opacity-20 transition-all text-zinc-400"
+                            >Next</button>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                onClick={handleDownload}
+                                className="flex items-center gap-2 px-3 py-1 text-[10px] font-mono uppercase bg-[#002FA7]/10 hover:bg-[#002FA7]/20 text-[#002FA7] rounded transition-all border border-[#002FA7]/20"
+                            >
+                                <Download className="w-3 h-3" />
+                                Download for review
+                            </button>
+                        </div>
                     </div>
 
+                    {/* PDF Scroller */}
                     <div
                         ref={pdfScrollContainerRef}
-                        className="flex-1 overflow-auto bg-zinc-950 p-4 w-full h-full relative"
-                        style={{ WebkitOverflowScrolling: 'touch' } as React.CSSProperties}
+                        className="flex-1 overflow-auto np-scroll p-6 flex flex-col items-center bg-[url('/grid.svg')] bg-[size:40px_40px] bg-fixed"
                     >
                         {documentUrl ? (
-                            <div className="min-w-max mx-auto flex flex-col items-center">
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="relative rounded-sm shadow-2xl overflow-visible border border-white/10"
+                            >
                                 <Document
                                     file={documentUrl}
                                     onLoadSuccess={({ numPages }) => setNumPages(numPages)}
-                                    className="shadow-2xl border border-white/10 bg-white"
+                                    className="bg-zinc-800"
                                     loading={
-                                        <div className="w-[800px] h-[1040px] flex flex-col items-center justify-center gap-8 bg-zinc-950 relative overflow-hidden border border-white/5">
-                                            {/* Grid */}
-                                            <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'linear-gradient(rgba(0,47,167,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(0,47,167,0.5) 1px, transparent 1px)', backgroundSize: '48px 48px' }} />
-                                            {/* Scan line */}
-                                            <motion.div
-                                                className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#002FA7]/70 to-transparent pointer-events-none"
-                                                animate={{ y: [0, 1040] }}
-                                                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                                            />
-                                            <div className="relative flex flex-col items-center gap-5 z-10">
-                                                {/* Spinner */}
-                                                <div className="relative w-14 h-14">
-                                                    <div className="absolute inset-0 rounded-full border border-[#002FA7]/20" />
-                                                    <div className="absolute inset-0 rounded-full border-2 border-[#002FA7]/20 border-t-[#002FA7] animate-spin" />
-                                                    <div className="absolute inset-0 flex items-center justify-center">
-                                                        <ShieldCheck className="w-5 h-5 text-[#002FA7]/50" />
-                                                    </div>
-                                                </div>
-                                                {/* Labels */}
-                                                <div className="text-center space-y-1.5">
-                                                    <div className="text-[9px] font-mono uppercase tracking-[0.5em] text-[#002FA7]">NODAL POINT</div>
-                                                    <div className="text-xs font-mono text-zinc-400 animate-pulse">Decrypting Document</div>
-                                                    <div className="text-[9px] font-mono text-zinc-600 tracking-[0.3em] uppercase">Forensic Seal Verification Active</div>
-                                                </div>
-                                                {/* Waveform */}
-                                                <div className="flex gap-1.5 items-end h-6">
-                                                    {[3, 6, 4, 8, 5, 7, 3, 5, 4].map((h, i) => (
-                                                        <motion.div
-                                                            key={i}
-                                                            className="w-[3px] bg-[#002FA7]/40 rounded-full"
-                                                            animate={{ height: [`${h * 2}px`, `${h * 4}px`, `${h * 2}px`] }}
-                                                            transition={{ duration: 0.7 + i * 0.08, repeat: Infinity, ease: 'easeInOut', delay: i * 0.08 }}
-                                                        />
-                                                    ))}
-                                                </div>
-                                            </div>
+                                        <div className="flex flex-col items-center justify-center p-20 gap-4">
+                                            <Loader2 className="w-8 h-8 animate-spin text-[#002FA7]" />
+                                            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Decrypting Document Payload</div>
                                         </div>
                                     }
                                 >
-                                    <div className="relative inline-block w-fit h-fit">
-                                        <Page
-                                            pageNumber={pageNumber}
-                                            renderTextLayer={false}
-                                            renderAnnotationLayer={false}
-                                            width={800}
-                                        />
-                                        {/* Field overlays */}
-                                        {fields.map((field: any, idx: number) => {
-                                            if (field.pageIndex !== pageNumber - 1) return null
-                                            const textKey = field.fieldId ?? String(idx)
+                                    <Page
+                                        pageNumber={pageNumber}
+                                        renderTextLayer={false}
+                                        renderAnnotationLayer={false}
+                                        width={pdfWidth}
+                                        className="bg-white"
+                                    />
 
-                                            if (field.type === 'text') {
-                                                return (
-                                                    <div
-                                                        id={`sig-field-${textKey}`}
-                                                        key={textKey}
-                                                        className="absolute z-20 flex items-center justify-center overflow-hidden transition-all duration-300"
-                                                        style={{ left: field.x, top: field.y, width: field.width, height: field.height }}
-                                                    >
-                                                        <input
-                                                            type="text"
-                                                            value={textValues[textKey] || ''}
-                                                            onChange={(e) => setTextValues(prev => ({ ...prev, [textKey]: e.target.value }))}
-                                                            placeholder="Type here..."
-                                                            className="w-full h-full bg-emerald-500/10 border-2 border-emerald-500/40 text-zinc-900 placeholder:text-emerald-700/50 px-2 font-mono text-xs focus:outline-none focus:border-emerald-500 focus:bg-emerald-50 transition-all"
-                                                        />
-                                                    </div>
-                                                )
-                                            }
+                                    {/* Responsive Field Overlays */}
+                                    {fields.map((field: any, idx: number) => {
+                                        if (field.pageIndex !== pageNumber - 1) return null
+                                        const textKey = field.fieldId ?? String(idx)
 
+                                        if (field.type === 'text') {
                                             return (
                                                 <div
                                                     id={`sig-field-${textKey}`}
                                                     key={textKey}
-                                                    className={`absolute z-20 border-2 transition-all duration-300 ${activeSignature ? 'border-transparent' : 'border-[#002FA7] bg-[#002FA7]/20 cursor-pointer'} flex items-center justify-center overflow-hidden`}
-                                                    style={{ left: field.x, top: field.y, width: field.width, height: field.height }}
-                                                    onClick={!activeSignature ? () => {
-                                                        // scrollIntoView breaks when the target is inside a sticky
-                                                        // container. Use getBoundingClientRect + window.scrollTo instead.
-                                                        if (sigPadScrollRef.current) {
-                                                            const rect = sigPadScrollRef.current.getBoundingClientRect()
-                                                            window.scrollTo({ top: window.scrollY + rect.top - 24, behavior: 'smooth' })
-                                                            sigPadScrollRef.current.style.boxShadow = '0 0 0 2px #002FA7'
-                                                            setTimeout(() => {
-                                                                if (sigPadScrollRef.current) sigPadScrollRef.current.style.boxShadow = ''
-                                                            }, 1500)
-                                                        }
-                                                    } : undefined}
+                                                    className="absolute z-20 flex items-center justify-center overflow-hidden transition-all duration-300"
+                                                    style={{
+                                                        left: field.x * scale,
+                                                        top: field.y * scale,
+                                                        width: field.width * scale,
+                                                        height: field.height * scale
+                                                    }}
                                                 >
-                                                    {activeSignature ? (
-                                                        /* eslint-disable-next-line @next/next/no-img-element */
-                                                        <img src={activeSignature} alt="Signature" className="w-full h-full object-contain object-left" />
-                                                    ) : (
-                                                        <span className="text-[10px] font-mono text-white tracking-widest uppercase animate-pulse">Sign Here</span>
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        value={textValues[textKey] || ''}
+                                                        onChange={(e) => setTextValues(prev => ({ ...prev, [textKey]: e.target.value }))}
+                                                        placeholder="ENTER TEXT"
+                                                        className="w-full h-full bg-[#002FA7]/5 border-2 border-[#002FA7]/20 text-zinc-900 placeholder:text-zinc-400 px-2 font-mono text-[10px] focus:outline-none focus:border-[#002FA7] focus:bg-[#002FA7]/10 transition-all uppercase"
+                                                    />
                                                 </div>
                                             )
-                                        })}
-                                    </div>
+                                        }
+
+                                        return (
+                                            <div
+                                                id={`sig-field-${textKey}`}
+                                                key={textKey}
+                                                className={`absolute z-20 border-2 transition-all duration-300 ${activeSignature ? 'border-transparent' : 'border-[#002FA7]/40 bg-[#002FA7]/10 cursor-pointer'} flex items-center justify-center overflow-hidden`}
+                                                style={{
+                                                    left: field.x * scale,
+                                                    top: field.y * scale,
+                                                    width: field.width * scale,
+                                                    height: field.height * scale
+                                                }}
+                                                onClick={!activeSignature ? () => {
+                                                    if (sigPadScrollRef.current) {
+                                                        sigPadScrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                                        sigPadScrollRef.current.classList.add('ring-1', 'ring-[#002FA7]')
+                                                        setTimeout(() => sigPadScrollRef.current?.classList.remove('ring-1', 'ring-[#002FA7]'), 1000)
+                                                    }
+                                                } : undefined}
+                                            >
+                                                {activeSignature ? (
+                                                    <img src={activeSignature} alt="Signature" className="w-full h-full object-contain object-left" />
+                                                ) : (
+                                                    <span className="text-[8px] font-mono text-[#002FA7] tracking-widest uppercase animate-pulse">Signature Required</span>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
                                 </Document>
-                            </div>
+                            </motion.div>
                         ) : (
-                            <div className="w-full h-full flex items-center justify-center text-zinc-500 font-mono text-sm bg-zinc-900 border border-white/5">
-                                Secure document preview unavailable
+                            <div className="flex-1 flex flex-col items-center justify-center text-zinc-700 font-mono gap-4 uppercase tracking-widest text-xs">
+                                <FileText className="w-12 h-12 opacity-20" />
+                                <span>Payload Unavailable</span>
                             </div>
                         )}
+                        {/* Buffer at the bottom */}
+                        <div className="h-20 shrink-0" />
                     </div>
-                </div>
+                </main>
 
-                {/* Action Panel */}
-                <div className="w-full lg:w-1/3 space-y-6">
-                    <div className="nodal-module-glass p-6 rounded-xl space-y-6 sticky top-12">
+                {/* Right: Forensic Console (The Action Panel) */}
+                <aside className="w-[384px] shrink-0 border-l border-white/5 bg-zinc-950 flex flex-col z-40 shadow-2xl">
+                    <div className="p-6 flex-1 overflow-y-auto np-scroll space-y-8">
 
-                        {/* Signatory */}
-                        <div>
-                            <h2 className="text-xs font-mono uppercase tracking-widest text-zinc-400 mb-2">Signatory</h2>
-                            <div className="text-sm font-sans text-zinc-200 font-medium">
-                                {request.contact?.firstName} {request.contact?.lastName}
+                        {/* Signatory Profile */}
+                        <div className="space-y-4">
+                            <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-zinc-600" />
+                                <h2 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Document Stakeholder</h2>
                             </div>
-                            <div className="text-xs font-sans text-zinc-500">
-                                {request.contact?.email}
+                            <div className="p-4 border border-white/5 bg-white/[0.02] rounded-lg">
+                                <div className="text-sm font-sans text-zinc-100 font-medium tracking-tight">
+                                    {request.contact?.firstName} {request.contact?.lastName}
+                                </div>
+                                <div className="text-xs font-mono text-zinc-500 mt-1 uppercase tracking-wider">
+                                    {request.contact?.email}
+                                </div>
                             </div>
                         </div>
 
-                        {/* Field progress bar */}
+                        {/* Progress */}
                         {totalFields > 0 && (
-                            <div className="space-y-2">
+                            <div className="space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Fields Completed</span>
-                                    <span className={`text-[10px] font-mono font-bold tabular-nums ${completedFields === totalFields ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                        {completedFields} / {totalFields}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        <ChevronRight className="w-4 h-4 text-zinc-600" />
+                                        <h2 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Field Map</h2>
+                                    </div>
+                                    <button
+                                        onClick={skipToNextField}
+                                        className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest hover:text-blue-400 transition-colors"
+                                    >Next Field</button>
                                 </div>
-                                <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                                    <div
-                                        className={`h-full rounded-full transition-all duration-500 ${completedFields === totalFields ? 'bg-emerald-500' : 'bg-[#002FA7]'}`}
-                                        style={{ width: `${totalFields ? (completedFields / totalFields) * 100 : 0}%` }}
-                                    />
+                                <div className="space-y-1.5">
+                                    <div className="w-full h-1 bg-zinc-900 rounded-full overflow-hidden">
+                                        <motion.div
+                                            className={`h-full rounded-full ${completedFields === totalFields ? 'bg-emerald-500' : 'bg-[#002FA7]'}`}
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${(completedFields / totalFields) * 100}%` }}
+                                        />
+                                    </div>
+                                    <div className="flex justify-between text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                                        <span>Completion</span>
+                                        <span className={completedFields === totalFields ? 'text-emerald-500' : 'text-zinc-400'}>
+                                            {completedFields} OF {totalFields}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* Signature pad */}
-                        <div ref={sigPadScrollRef} className="space-y-3 rounded-lg transition-shadow">
+                        {/* Signature Instrument */}
+                        <div ref={sigPadScrollRef} className="space-y-4 pt-4 border-t border-white/5">
                             <div className="flex items-center justify-between">
-                                <h2 className="text-xs font-mono uppercase tracking-widest text-zinc-400">Signature</h2>
-                                <button onClick={handleClear} className="text-[10px] font-mono uppercase text-rose-400 hover:text-rose-300 transition-colors">
-                                    Clear
+                                <div className="flex items-center gap-2">
+                                    <PenTool className="w-4 h-4 text-zinc-600" />
+                                    <h2 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Sign Instrument</h2>
+                                </div>
+                                <button onClick={handleClear} className="text-[9px] font-mono uppercase text-rose-500/70 hover:text-rose-400 transition-colors">
+                                    Reset
                                 </button>
                             </div>
 
-                            {/* Draw / Type toggle */}
-                            <div className="flex bg-zinc-900 border border-white/5 p-1 rounded-md mb-2">
+                            <div className="flex bg-zinc-900/50 border border-white/5 p-0.5 rounded-md">
                                 <button
                                     onClick={() => setSignatureMode('draw')}
-                                    className={`flex-1 text-[10px] uppercase font-mono py-1.5 rounded transition-colors ${signatureMode === 'draw' ? 'bg-[#002FA7] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >Draw</button>
+                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'draw' ? 'bg-[#002FA7] text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                >Draw Ink</button>
                                 <button
                                     onClick={() => setSignatureMode('type')}
-                                    className={`flex-1 text-[10px] uppercase font-mono py-1.5 rounded transition-colors ${signatureMode === 'type' ? 'bg-[#002FA7] text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
-                                >Type</button>
+                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'type' ? 'bg-[#002FA7] text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                >Type Font</button>
                             </div>
 
-                            {/* Signature input area */}
                             <div
-                                ref={sigContainerRef}
-                                className="w-full h-40 bg-white border-2 border-dashed border-[#002FA7]/40 rounded-lg overflow-hidden relative cursor-crosshair"
+                                className="w-full h-44 bg-white rounded-lg overflow-hidden relative group border border-white/5 transition-all"
                                 onPointerDown={() => {
-                                    // Set hasDrawnRef on pointer-down (before onBegin fires) so
-                                    // the draw-tracking flag is always set regardless of which
-                                    // event the browser fires first. Cancels any pending timer
-                                    // since a new stroke means the user isn't done yet.
                                     if (signatureMode !== 'draw') return
                                     hasDrawnRef.current = true
                                     if (captureTimerRef.current) clearTimeout(captureTimerRef.current)
@@ -515,127 +508,67 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                 }}
                             >
                                 {signatureMode === 'draw' ? (
-                                    <>
-                                        <SignatureCanvas
-                                            key="draw-canvas"
-                                            ref={sigCanvas}
-                                            penColor="#002FA7"
-                                            clearOnResize={false}
-                                            onEnd={handleSignatureEnd}
-                                            canvasProps={{
-                                                // react-signature-canvas sizes the buffer correctly on
-                                                // mount via _resizeCanvas (offsetWidth * devicePixelRatio).
-                                                // clearOnResize={false} prevents window.resize from
-                                                // wiping the canvas mid-draw.
-                                                className: 'w-full h-full block relative z-10',
-                                                style: { touchAction: 'none' } as React.CSSProperties
-                                            }}
-                                        />
-                                        <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-5 z-0">
-                                            <PenTool className="w-12 h-12 text-[#002FA7]" />
-                                        </div>
-                                    </>
+                                    <SignatureCanvas
+                                        key="draw-canvas"
+                                        ref={sigCanvas}
+                                        penColor="#002FA7"
+                                        clearOnResize={false}
+                                        onEnd={handleSignatureEnd}
+                                        canvasProps={{
+                                            className: 'w-full h-full block relative z-10 cursor-crosshair',
+                                            style: { touchAction: 'none' } as React.CSSProperties
+                                        }}
+                                    />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center px-4 relative">
+                                    <div className="w-full h-full flex flex-col items-center justify-center px-6 relative bg-zinc-50">
                                         <input
                                             ref={typedInputRef}
                                             type="text"
                                             value={typedSignature}
                                             onChange={(e) => setTypedSignature(e.target.value)}
-                                            placeholder="Type your name..."
-                                            className="w-full text-center text-[#002FA7] bg-transparent border-b border-zinc-200 focus:outline-none focus:border-[#002FA7] pb-2 font-serif italic whitespace-nowrap overflow-hidden"
-                                            style={{ fontSize: '36px' }}
+                                            placeholder="SIGNATURE REPLICA"
+                                            className="w-full text-center text-[#002FA7] bg-transparent border-b border-zinc-200 focus:outline-none focus:border-[#002FA7] pb-2 font-serif italic whitespace-nowrap overflow-hidden uppercase placeholder:text-zinc-300 placeholder:italic"
                                         />
-                                        {/* Hidden canvas for rendering typed signature as image */}
-                                        <canvas ref={hiddenCanvasRef} width={600} height={160} className="hidden absolute" />
+                                        <canvas ref={hiddenCanvasRef} width={600} height={160} className="hidden" />
                                     </div>
                                 )}
                             </div>
 
-                            
-                            <p className="text-[10px] text-zinc-600 font-sans leading-relaxed">
-                                By {signatureMode === 'draw' ? 'drawing' : 'typing'} your signature above and clicking Execute Contract, you agree to be legally bound by the terms presented in this document.
+                            <p className="text-[9px] text-zinc-600 font-mono leading-relaxed uppercase tracking-tighter opacity-60">
+                                Executing this instrument binds you to the terms under universal forensic e-signature standards.
                             </p>
                         </div>
+                    </div>
 
-                        {/* Field Navigator — jump to any field, see completion status */}
-                        {totalFields > 0 && (
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between">
-                                    <h2 className="text-xs font-mono uppercase tracking-widest text-zinc-400">Field Map</h2>
-                                    <button
-                                        onClick={skipToNextField}
-                                        className="text-[10px] font-mono text-[#002FA7] hover:text-blue-400 flex items-center gap-1 transition-colors"
-                                    >
-                                        <ChevronRight className="w-3 h-3" />
-                                        Next missing
-                                    </button>
-                                </div>
-                                <div className="flex flex-col gap-1 max-h-36 overflow-y-auto pr-0.5">
-                                    {fields.map((f: any, idx: number) => {
-                                        const key = f.fieldId ?? String(idx)
-                                        const isComplete = f.type === 'text'
-                                            ? !!textValues[key]?.trim()
-                                            : !!activeSignature
-                                        return (
-                                            <button
-                                                key={key}
-                                                onClick={() => {
-                                                    setPageNumber(f.pageIndex + 1)
-                                                    setTimeout(() => {
-                                                        const el = document.getElementById(`sig-field-${key}`)
-                                                        if (el) {
-                                                            el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
-                                                            el.classList.add('!ring-2', '!ring-[#002FA7]', '!ring-offset-2')
-                                                            setTimeout(() => el.classList.remove('!ring-2', '!ring-[#002FA7]', '!ring-offset-2'), 1500)
-                                                        }
-                                                    }, 200)
-                                                }}
-                                                className="flex items-center gap-2 px-2 py-1.5 rounded border border-white/5 hover:border-white/20 hover:bg-white/[0.03] transition-all text-left w-full"
-                                            >
-                                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 transition-colors ${isComplete ? 'bg-emerald-500' : 'bg-rose-400 animate-pulse'}`} />
-                                                <span className="text-[10px] font-mono text-zinc-400 flex-1 truncate">
-                                                    {f.type === 'text' ? 'Text Field' : 'Signature'} · pg {(f.pageIndex ?? 0) + 1}
-                                                </span>
-                                                <span className={`text-[10px] font-mono font-bold ${isComplete ? 'text-emerald-500' : 'text-zinc-600'}`}>
-                                                    {isComplete ? '✓' : '○'}
-                                                </span>
-                                            </button>
-                                        )
-                                    })}
-                                </div>
+                    {/* Footer: Primary Action */}
+                    <div className="p-6 border-t border-white/5 bg-zinc-950/80 backdrop-blur-md">
+                        <button
+                            onClick={handleExecute}
+                            disabled={isSubmitting || !allComplete}
+                            className="w-full h-12 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[11px] uppercase tracking-[0.2em] rounded-md flex items-center justify-center gap-3 transition-all disabled:opacity-20 disabled:grayscale group"
+                        >
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Sealing forensic record...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <ShieldCheck className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                                    <span>Execute Agreement</span>
+                                </>
+                            )}
+                        </button>
+                        {!allComplete && totalFields > 0 && (
+                            <div className="mt-3 flex items-center justify-center gap-2 animate-pulse">
+                                <div className="w-1 h-1 rounded-full bg-rose-500" />
+                                <p className="text-[9px] font-mono text-rose-500 uppercase tracking-widest">
+                                    {totalFields - completedFields} field{totalFields - completedFields !== 1 ? 's' : ''} outstanding
+                                </p>
                             </div>
                         )}
-
-                        {/* Execute button */}
-                        <div className="space-y-2">
-                            <button
-                                onClick={handleExecute}
-                                disabled={isSubmitting || !allComplete}
-                                title={!allComplete ? `${totalFields - completedFields} field(s) still required` : undefined}
-                                className="w-full h-12 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-xs uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                                {isSubmitting ? (
-                                    <>
-                                        <Loader2 className="w-4 h-4 animate-spin" />
-                                        Generating Forensic Seal...
-                                    </>
-                                ) : (
-                                    <>
-                                        <ShieldCheck className="w-4 h-4" />
-                                        Deploy Contract
-                                    </>
-                                )}
-                            </button>
-                            {!allComplete && totalFields > 0 && (
-                                <p className="text-[10px] font-mono text-rose-400 text-center">
-                                    {totalFields - completedFields} field{totalFields - completedFields !== 1 ? 's' : ''} still required
-                                </p>
-                            )}
-                        </div>
-
                     </div>
-                </div>
+                </aside>
             </div>
         </div>
     )
