@@ -11,6 +11,8 @@ export const metadata: Metadata = {
 
 const BACK_LABELS: Record<string, string> = {
     '/bill-debugger': 'Return to Report',
+    '/portal': 'Return to Portal',
+    '/client': 'Return to Dashboard',
     '/': 'Return to Home',
 };
 
