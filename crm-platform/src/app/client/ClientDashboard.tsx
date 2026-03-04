@@ -12,6 +12,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import { differenceInDays, differenceInMonths, format, parseISO } from 'date-fns';
 import { useScrollEffect } from '@/hooks/useScrollEffect';
+import { mapLocationToZone } from '@/lib/market-mapping';
 
 // ─────────────────────────────────────────────
 // Types
@@ -296,7 +297,22 @@ export function ClientDashboard() {
     const totalSavings = annualSavings * (monthsActive / 12);
     const monthlySavings = annualSavings / 12;
     const stress = gridStress(ercotGrid?.reserves, ercotGrid?.actual_load);
-    const hubPriceKwh = ercotPrices?.hub_avg !== undefined ? (ercotPrices.hub_avg / 10).toFixed(2) : null;
+
+    // Default to ERCOT Hub Average
+    let wholesalePrice = ercotPrices?.hub_avg;
+    let wholesaleLabel = 'Wholesale Spot Price';
+    let wholesaleDescription = 'ERCOT Hub Average · excludes delivery & capacity';
+
+    if (account && ercotPrices) {
+        const loadZone = mapLocationToZone(account.city ?? '', account.state ?? '');
+        const zoneKey = loadZone.replace('LZ_', '').toLowerCase() as keyof ErcotPrices;
+        if (ercotPrices[zoneKey] !== undefined) {
+            wholesalePrice = ercotPrices[zoneKey];
+            wholesaleLabel = `${loadZone.replace('LZ_', '')} Spot Price`;
+            wholesaleDescription = `${loadZone} wholesale node · excludes delivery`;
+        }
+    }
+    const spotPriceKwh = wholesalePrice !== undefined ? (wholesalePrice / 10).toFixed(2) : null;
     const reserveMarginPct = ercotGrid?.reserves && ercotGrid?.actual_load
         ? ((ercotGrid.reserves / ercotGrid.actual_load) * 100).toFixed(0) : null;
     const loadGW = ercotGrid?.actual_load ? (ercotGrid.actual_load / 1000).toFixed(1) : null;
@@ -750,19 +766,19 @@ export function ClientDashboard() {
                                             }`}>{stress.sub}</p>
                                     </div>
                                     {/* Spot price — sole data point worth showing clients */}
-                                    {ercotPrices?.hub_avg !== undefined && (
+                                    {wholesalePrice !== undefined && (
                                         <div className="flex justify-between items-center">
                                             <div>
-                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Wholesale Spot Price</p>
-                                                <p className="text-zinc-600 text-[9px]">Energy-only · excludes delivery &amp; capacity</p>
+                                                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">{wholesaleLabel}</p>
+                                                <p className="text-zinc-600 text-[9px]">{wholesaleDescription}</p>
                                             </div>
-                                            <p className="font-mono text-xs text-zinc-200 font-semibold">${ercotPrices.hub_avg.toFixed(2)}/MWh</p>
+                                            <p className="font-mono text-xs text-zinc-200 font-semibold">${wholesalePrice.toFixed(2)}/MWh</p>
                                         </div>
                                     )}
                                     {/* Contract protection context */}
-                                    {contractedRate && hubPriceKwh && (
+                                    {contractedRate && spotPriceKwh && (
                                         <div className="pt-3 border-t border-white/5">
-                                            {parseFloat(hubPriceKwh) < contractedRate ? (
+                                            {parseFloat(spotPriceKwh) < contractedRate ? (
                                                 <p className="font-mono text-[9px] text-zinc-600 leading-relaxed">
                                                     Grid is calm today. Your fixed rate shields you when wholesale spikes — on peak summer days it can exceed 50¢/kWh wholesale. Your rate holds regardless.
                                                 </p>
