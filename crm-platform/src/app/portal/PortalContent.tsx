@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowRight, Lock, Activity, Mail, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Lock, Activity, Mail, CheckCircle2, CalendarDays, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 // Blurred dashboard preview cards
@@ -97,10 +97,43 @@ function ContractPreview() {
 
 export default function PortalContent() {
     const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [mode, setMode] = useState<'password' | 'magic'>('password');
     const [status, setStatus] = useState<'idle' | 'loading' | 'sent' | 'error'>('idle');
     const [errorMsg, setErrorMsg] = useState('');
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handlePasswordLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!email.trim() || !password.trim()) return;
+        setStatus('loading');
+        setErrorMsg('');
+
+        try {
+            const { error } = await supabase.auth.signInWithPassword({
+                email: email.trim().toLowerCase(),
+                password,
+            });
+
+            if (error) {
+                if (error.message.toLowerCase().includes('invalid login credentials')) {
+                    setErrorMsg('Incorrect email or password. If you haven\'t set a password yet, use the magic link option below.');
+                } else if (error.message.toLowerCase().includes('email not confirmed')) {
+                    setErrorMsg('Please check your email for an invitation link to activate your account first.');
+                } else {
+                    setErrorMsg(error.message);
+                }
+                setStatus('error');
+            } else {
+                window.location.href = '/network';
+            }
+        } catch {
+            setErrorMsg('Something went wrong. Please try again.');
+            setStatus('error');
+        }
+    };
+
+    const handleMagicLink = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email.trim()) return;
         setStatus('loading');
@@ -110,7 +143,7 @@ export default function PortalContent() {
             const { error } = await supabase.auth.signInWithOtp({
                 email: email.trim().toLowerCase(),
                 options: {
-                    shouldCreateUser: false, // existing clients only
+                    shouldCreateUser: false,
                     emailRedirectTo: `${window.location.origin}/network`,
                 },
             });
@@ -160,7 +193,7 @@ export default function PortalContent() {
                             Your energy intelligence dashboard.
                         </h1>
                         <p className="text-zinc-400 text-sm leading-relaxed mb-10">
-                            Enter your email to receive a secure access link. Client access is by engagement only.
+                            Sign in with your credentials. Client access is by engagement only.
                         </p>
 
                         {status === 'sent' ? (
@@ -170,9 +203,85 @@ export default function PortalContent() {
                                 <p className="text-zinc-400 text-sm leading-relaxed">
                                     We sent a secure access link to <span className="text-zinc-200 font-mono">{email}</span>. The link expires in 10 minutes.
                                 </p>
+                                <button
+                                    onClick={() => setStatus('idle')}
+                                    className="mt-4 font-mono text-[10px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wider transition-colors"
+                                >
+                                    ← Back to sign in
+                                </button>
                             </div>
+                        ) : mode === 'password' ? (
+                            <form onSubmit={handlePasswordLogin} className="space-y-4">
+                                {/* Email */}
+                                <div className="relative">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={e => setEmail(e.target.value)}
+                                        placeholder="your@company.com"
+                                        required
+                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-11 pr-4 py-3.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7] transition-colors"
+                                    />
+                                </div>
+
+                                {/* Password */}
+                                <div className="relative">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={password}
+                                        onChange={e => setPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        required
+                                        className="w-full bg-zinc-900 border border-zinc-700 rounded-xl pl-11 pr-11 py-3.5 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7] transition-colors"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(v => !v)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+                                        tabIndex={-1}
+                                    >
+                                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                    </button>
+                                </div>
+
+                                {status === 'error' && (
+                                    <div className="bg-zinc-900 border border-zinc-700 rounded-xl px-4 py-3">
+                                        <p className="text-zinc-400 text-xs leading-relaxed">{errorMsg}</p>
+                                    </div>
+                                )}
+
+                                <button
+                                    type="submit"
+                                    disabled={status === 'loading' || !email.trim() || !password.trim()}
+                                    className="w-full flex items-center justify-center gap-2 bg-[#002FA7] hover:bg-[#002FA7]/90 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
+                                >
+                                    {status === 'loading' ? (
+                                        <span className="font-mono text-sm">Authenticating...</span>
+                                    ) : (
+                                        <>
+                                            <span className="font-mono text-sm uppercase tracking-wider">Access Portal</span>
+                                            <ArrowRight className="w-4 h-4" />
+                                        </>
+                                    )}
+                                </button>
+
+                                <div className="text-center pt-1 space-y-1">
+                                    <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest">
+                                        Access by invitation only · Existing clients
+                                    </p>
+                                    <button
+                                        type="button"
+                                        onClick={() => { setMode('magic'); setStatus('idle'); setErrorMsg(''); }}
+                                        className="font-mono text-[9px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wider transition-colors"
+                                    >
+                                        Send me a login link instead →
+                                    </button>
+                                </div>
+                            </form>
                         ) : (
-                            <form onSubmit={handleSubmit} className="space-y-4">
+                            <form onSubmit={handleMagicLink} className="space-y-4">
                                 <div className="relative">
                                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
                                     <input
@@ -206,9 +315,15 @@ export default function PortalContent() {
                                     )}
                                 </button>
 
-                                <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest text-center pt-1">
-                                    Access by invitation only · Existing clients
-                                </p>
+                                <div className="text-center pt-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setMode('password'); setStatus('idle'); setErrorMsg(''); }}
+                                        className="font-mono text-[9px] text-zinc-500 hover:text-zinc-300 uppercase tracking-wider transition-colors"
+                                    >
+                                        ← Sign in with password instead
+                                    </button>
+                                </div>
                             </form>
                         )}
 
@@ -226,7 +341,7 @@ export default function PortalContent() {
                                 className="w-full flex items-center justify-between gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-medium py-3.5 px-5 rounded-xl transition-all duration-200 group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <Activity className="w-4 h-4 text-[#002FA7]" />
+                                    <Activity className="w-4 h-4 text-white" />
                                     <div>
                                         <p className="text-sm font-semibold">Run a Free Analysis</p>
                                         <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Upload your bill · 60 seconds</p>
@@ -239,9 +354,7 @@ export default function PortalContent() {
                                 className="w-full flex items-center justify-between gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-200 font-medium py-3.5 px-5 rounded-xl transition-all duration-200 group"
                             >
                                 <div className="flex items-center gap-3">
-                                    <div className="w-4 h-4 rounded-full border border-[#002FA7] flex items-center justify-center shrink-0">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7]" />
-                                    </div>
+                                    <CalendarDays className="w-4 h-4 text-white shrink-0" />
                                     <div>
                                         <p className="text-sm font-semibold">Book a Briefing</p>
                                         <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Strategy session · No commitment</p>

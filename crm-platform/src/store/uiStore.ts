@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST';
+export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'SEND_PORTAL_ACCESS';
 
 export interface SignatureRequestContext {
   documentId: string
@@ -36,6 +36,11 @@ export interface DealContext {
   contactName?: string
 }
 
+export interface PortalAccessContext {
+  accountId: string
+  accountName?: string
+}
+
 interface UIState {
   isEditing: boolean
   setIsEditing: (isEditing: boolean) => void
@@ -54,6 +59,9 @@ interface UIState {
   /** Pre-filled context for signature requests */
   signatureRequestContext: SignatureRequestContext | null
   setSignatureRequestContext: (ctx: SignatureRequestContext | null) => void
+  /** Pre-filled context for portal access provisioning */
+  portalAccessContext: PortalAccessContext | null
+  setPortalAccessContext: (ctx: PortalAccessContext | null) => void
   /** Initial identifier (domain/url) for ingestion from external signals */
   ingestionIdentifier: string | null
   setIngestionIdentifier: (id: string | null) => void
@@ -82,6 +90,8 @@ export const useUIStore = create<UIState>((set) => ({
   setDealContext: (ctx) => set({ dealContext: ctx }),
   signatureRequestContext: null,
   setSignatureRequestContext: (ctx) => set({ signatureRequestContext: ctx }),
+  portalAccessContext: null,
+  setPortalAccessContext: (ctx) => set({ portalAccessContext: ctx }),
   ingestionIdentifier: null,
   setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
   ingestionSignal: null,
