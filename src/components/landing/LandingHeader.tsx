@@ -39,10 +39,10 @@ export function LandingHeader() {
           </div>
           <div className="flex items-center gap-6">
             <Link
-              href="/network"
-              className="hidden md:block text-sm font-medium text-zinc-500 hover:text-black transition-colors"
+              href="/portal"
+              className="hidden md:block font-mono text-[11px] uppercase tracking-widest text-zinc-500 hover:text-black transition-colors"
             >
-              Sign In
+              Client Portal
             </Link>
             <a
               href="/bill-debugger"
