@@ -4,7 +4,7 @@
  * Used for the Prospecting page to find new accounts
  */
 
-import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
+import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation, requireApolloAuth } from './_utils.js';
 
 /**
  * Simple SIC code to industry name mapping
@@ -69,6 +69,10 @@ export default async function handler(req, res) {
     return;
   }
   
+  
+  const auth = await requireApolloAuth(req, res);
+  if (!auth) return;
+
   try {
     const { 
       page = 1, 
@@ -261,3 +265,7 @@ export default async function handler(req, res) {
     }));
   }
 }
+
+
+
+

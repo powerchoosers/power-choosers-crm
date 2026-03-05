@@ -3,7 +3,7 @@
  * Tests authentication with Apollo's health endpoint
  */
 
-import { cors, getApiKey } from './_utils.js';
+import { cors, getApiKey, requireApolloAuth } from './_utils.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -14,6 +14,10 @@ export default async function handler(req, res) {
     return;
   }
   
+  
+  const auth = await requireApolloAuth(req, res);
+  if (!auth) return;
+
   try {
     const APOLLO_API_KEY = getApiKey();
     
@@ -62,4 +66,8 @@ export default async function handler(req, res) {
     }));
   }
 }
+
+
+
+
 

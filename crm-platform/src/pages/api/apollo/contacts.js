@@ -4,7 +4,7 @@
  * Maps Apollo person data to Lusha contact format
  */
 
-import { cors, fetchWithRetry, normalizeDomain, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
+import { cors, fetchWithRetry, normalizeDomain, getApiKey, APOLLO_BASE_URL, formatLocation, requireApolloAuth } from './_utils.js';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -16,6 +16,10 @@ export default async function handler(req, res) {
     return;
   }
   
+  
+  const auth = await requireApolloAuth(req, res);
+  if (!auth) return;
+
   try {
     const requestBody = req.body || {};
     
@@ -269,3 +273,7 @@ function mapApolloContactToLushaFormat(apolloPerson) {
     isSuccess: true
   };
 }
+
+
+
+

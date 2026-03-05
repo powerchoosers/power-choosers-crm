@@ -16,10 +16,19 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
 
 // REAL API ENRICHMENT
+const getApolloAuthHeaders = async (includeContentType: boolean = false): Promise<Record<string, string>> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return {
+    ...(includeContentType ? { 'Content-Type': 'application/json' } : {}),
+    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+  };
+};
+
 const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
+  const authHeaders = await getApolloAuthHeaders();
   try {
     if (type === 'ACCOUNT') {
-      const response = await fetch(`/api/apollo/company?domain=${encodeURIComponent(identifier)}`);
+      const response = await fetch(`/api/apollo/company?domain=${encodeURIComponent(identifier)}`, { headers: authHeaders });
       if (!response.ok) return null;
       const data = await response.json();
 
@@ -55,7 +64,7 @@ const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
 
       const response = await fetch('/api/apollo/enrich', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getApolloAuthHeaders(true),
         body: JSON.stringify(body)
       });
 
@@ -240,7 +249,7 @@ export function NodeIngestion() {
 
         const response = await fetch('/api/apollo/search-people', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await getApolloAuthHeaders(true),
           body: JSON.stringify(searchBody)
         });
 
@@ -295,7 +304,7 @@ export function NodeIngestion() {
 
       const response = await fetch('/api/apollo/enrich', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await getApolloAuthHeaders(true),
         body: JSON.stringify(enrichBody)
       });
 
@@ -400,7 +409,7 @@ export function NodeIngestion() {
       try {
         const response = await fetch('/api/apollo/search-organizations', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await getApolloAuthHeaders(true),
           body: JSON.stringify({ q_organization_name: query, per_page: 5 })
         });
         if (response.ok) {
@@ -536,7 +545,7 @@ export function NodeIngestion() {
           try {
             await fetch('/api/intelligence/link-signal', {
               method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+              headers: await getApolloAuthHeaders(true),
               body: JSON.stringify({ signal: ingestionSignal, accountId: id, domainKey: domainKey || '' })
             });
             queryClient.invalidateQueries({ queryKey: ['market-recon-signals'] });
@@ -1246,3 +1255,6 @@ export function NodeIngestion() {
     </motion.div>
   );
 }
+
+
+

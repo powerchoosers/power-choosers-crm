@@ -6,7 +6,7 @@
  * contact dossier even if the user left the page (background link).
  */
 
-import { cors, formatPhoneForContact } from './_utils.js';
+import { cors, formatPhoneForContact, requireApolloWebhookSecret } from './_utils.js';
 import { supabaseAdmin } from '@/lib/supabase';
 
 // Store phone data for 30 minutes
@@ -21,6 +21,8 @@ export default async function handler(req, res) {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
+
+  if (!requireApolloWebhookSecret(req, res)) return;
 
   try {
     // Apollo sends the phone data in the request body
@@ -135,4 +137,7 @@ export async function getPhoneData(personId) {
     return null;
   }
 }
+
+
+
 
