@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase';
 import { differenceInDays, differenceInMonths, format, parseISO } from 'date-fns';
 import { useScrollEffect } from '@/hooks/useScrollEffect';
 import { mapLocationToZone } from '@/lib/market-mapping';
+import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel';
 
 // ─────────────────────────────────────────────
 // Types
@@ -27,6 +28,7 @@ interface AccountData {
     city: string | null;
     state: string | null;
     domain: string | null;
+    metadata?: any;
 }
 
 interface DealData {
@@ -236,7 +238,7 @@ export function ClientDashboard() {
 
             const { data: acct } = await supabase
                 .from('accounts')
-                .select('id, name, electricity_supplier, current_rate, annual_usage, contract_end_date, city, state, domain')
+                .select('id, name, electricity_supplier, current_rate, annual_usage, contract_end_date, city, state, domain, metadata')
                 .eq('id', accountId)
                 .single();
             if (acct) setAccount(acct);
@@ -690,6 +692,11 @@ export function ClientDashboard() {
                                 </CardShell>
                             );
                         })()}
+
+                        {/* ── 12-MONTH USAGE PROFILE ── */}
+                        <div className="h-[400px]">
+                            <UsageProfilePanel usageHistory={account?.metadata?.usageHistory} />
+                        </div>
 
                         {/* ── 3-COL ROW: Savings | Grid Status | Your Contract ── */}
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
