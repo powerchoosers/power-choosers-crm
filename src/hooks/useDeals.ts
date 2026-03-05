@@ -194,9 +194,28 @@ export function useCreateDeal() {
       if (error) throw error
       return data as Deal
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
-      if (data?.accountId) queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+      if (data?.accountId) {
+        queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+        queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
+
+        // Sync to account
+        const accountUpdates: any = {}
+        if (data.annualUsage) accountUpdates.annual_usage = String(data.annualUsage)
+        if (data.mills) {
+          // Fetch current account to merge metadata
+          const { data: acc } = await supabase.from('accounts').select('metadata').eq('id', data.accountId).single()
+          accountUpdates.metadata = { ...(acc?.metadata || {}), mills: String(data.mills) }
+        }
+        if (data.closeDate) accountUpdates.contract_end_date = data.closeDate
+
+        if (Object.keys(accountUpdates).length > 0) {
+          await supabase.from('accounts').update(accountUpdates).eq('id', data.accountId)
+          queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
+          queryClient.invalidateQueries({ queryKey: ['accounts'] })
+        }
+      }
       if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', QUERY_BUSTER, data.contactId] })
     },
     onError: (error) => {
@@ -236,10 +255,27 @@ export function useUpdateDeal() {
 
       return data as Deal
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      if (data?.accountId) queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+      if (data?.accountId) {
+        queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+        queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
+
+        // Sync to account
+        const accountUpdates: any = {}
+        if (data.annualUsage) accountUpdates.annual_usage = String(data.annualUsage)
+        if (data.mills) {
+          const { data: acc } = await supabase.from('accounts').select('metadata').eq('id', data.accountId).single()
+          accountUpdates.metadata = { ...(acc?.metadata || {}), mills: String(data.mills) }
+        }
+        if (data.closeDate) accountUpdates.contract_end_date = data.closeDate
+
+        if (Object.keys(accountUpdates).length > 0) {
+          await supabase.from('accounts').update(accountUpdates).eq('id', data.accountId)
+          queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
+        }
+      }
       if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', QUERY_BUSTER, data.contactId] })
 
       if (data?.stage === 'SECURED') {
