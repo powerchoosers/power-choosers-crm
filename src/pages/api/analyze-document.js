@@ -271,6 +271,20 @@ export default async function handler(req, res) {
       updates.load_factor = Number(Math.min(Math.max(loadFactor, 0), 1).toFixed(3));
     }
 
+    if (data.usage_history && Array.isArray(data.usage_history) && data.usage_history.length > 0) {
+      const { data: currentAcct } = await supabaseAdmin
+        .from('accounts')
+        .select('metadata')
+        .eq('id', accountId)
+        .single();
+
+      const currentMetadata = currentAcct?.metadata || {};
+      updates.metadata = {
+        ...currentMetadata,
+        usageHistory: data.usage_history
+      };
+    }
+
     // Status and Deal Pipeline Transitions
     let dealStageToSet = null;
 
