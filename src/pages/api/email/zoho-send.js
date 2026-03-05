@@ -12,7 +12,7 @@ import { cors } from '../_cors.js';
 import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
-import { generateForensicSignature } from '@/lib/signature';
+import { generateNodalSignature } from '@/lib/signature';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -102,21 +102,31 @@ export default async function handler(req, res) {
 
                     const { data: userData, error: userError } = await supabaseAdmin
                         .from('users')
-                        .select('first_name, last_name, job_title, hosted_photo_url')
+                        .select('email, first_name, last_name, name, job_title, linkedin_url, hosted_photo_url, settings')
                         .eq('email', lookupEmail)
                         .maybeSingle();
 
                     if (userData && !userError) {
-                        const forensicSig = generateForensicSignature({
+                        const settings = userData.settings && typeof userData.settings === 'object' ? userData.settings : {};
+                        const composeSig = generateNodalSignature({
+                            email: userData.email || ownerEmail,
+                            name: userData.name || null,
                             firstName: userData.first_name,
                             lastName: userData.last_name,
                             jobTitle: userData.job_title,
-                            hostedPhotoUrl: userData.hosted_photo_url
-                        });
+                            linkedinUrl: userData.linkedin_url || null,
+                            city: settings.city ?? null,
+                            state: settings.state ?? null,
+                            hostedPhotoUrl: userData.hosted_photo_url,
+                            twilioNumbers: settings.twilioNumbers || [],
+                            selectedPhoneNumber: settings.selectedPhoneNumber || null,
+                            bio: null,
+                            bridgeToMobile: settings.bridgeToMobile || false
+                        }, { email: ownerEmail }, false);
 
-                        if (forensicSig) {
-                            trackedContent = `${trackedContent}${forensicSig}`;
-                            logger.info(`[Zoho] Injected Forensic Signature for ${ownerEmail} (via ${lookupEmail})`, 'zoho-send');
+                        if (composeSig) {
+                            trackedContent = `${trackedContent}${composeSig}`;
+                            logger.info(`[Zoho] Injected Compose Signature for ${ownerEmail} (via ${lookupEmail})`, 'zoho-send');
                         }
                     } else {
                         logger.warn(`[Zoho] No profile found for ${lookupEmail}. Signature injection skipped.`, 'zoho-send');
