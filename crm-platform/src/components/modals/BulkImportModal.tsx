@@ -450,9 +450,13 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   // If no domain mapped, search Apollo by name to resolve one
                   if (!resolvedDomain) {
                     try {
+                      const { data: { session } } = await supabase.auth.getSession();
                       const searchRes = await fetch('/api/apollo/search-organizations', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                          'Content-Type': 'application/json',
+                          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+                        },
                         body: JSON.stringify({ q_organization_name: companyName, per_page: 1 })
                       });
                       if (searchRes.ok) {
@@ -470,7 +474,10 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   // Full enrichment via company endpoint
                   if (resolvedDomain) {
                     try {
-                      const enrichRes = await fetch(`/api/apollo/company?domain=${encodeURIComponent(resolvedDomain)}`);
+                      const { data: { session: enrichSession } } = await supabase.auth.getSession();
+                      const enrichRes = await fetch(`/api/apollo/company?domain=${encodeURIComponent(resolvedDomain)}`, {
+                        headers: { ...(enrichSession?.access_token ? { Authorization: `Bearer ${enrichSession.access_token}` } : {}) },
+                      });
                       if (enrichRes.ok) {
                         apolloData = await enrichRes.json();
                       }
@@ -1123,3 +1130,10 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     </Dialog>
   );
 }
+
+
+
+
+
+
+

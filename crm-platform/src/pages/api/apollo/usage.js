@@ -5,7 +5,7 @@
  * Note: Requires master API key (not regular API key)
  */
 
-import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL } from './_utils.js';
+import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, requireApolloAuth } from './_utils.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -16,6 +16,10 @@ export default async function handler(req, res) {
     return;
   }
   
+  
+  const auth = await requireApolloAuth(req, res);
+  if (!auth) return;
+
   try {
     const APOLLO_API_KEY = getApiKey();
     
@@ -109,3 +113,7 @@ function mapApolloUsageToLushaFormat(apolloUsage) {
   
   return response;
 }
+
+
+
+

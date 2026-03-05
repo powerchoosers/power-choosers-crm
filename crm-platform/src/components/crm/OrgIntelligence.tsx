@@ -579,7 +579,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           if (attempts >= maxAttempts) return;
           attempts += 1;
           try {
-            const res = await fetch(`/api/apollo/phone-retrieve?personId=${encodeURIComponent(apolloPersonId)}`);
+            const res = await fetch(`/api/apollo/phone-retrieve?personId=${encodeURIComponent(apolloPersonId)}`, {
+              headers: { ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+            });
             if (!res.ok) return;
             const json = await res.json();
             if (json.ready && Array.isArray(json.phones) && json.phones.length > 0) {
@@ -1466,3 +1468,5 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     </motion.div>
   );
 }
+
+
