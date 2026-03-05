@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { UploadCloud, FileText, X, Loader2, PenTool, AlertTriangle, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -52,8 +53,11 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const [scanProgress, setScanProgress] = useState(0);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ doc: Document; signedUrl: string } | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
   const queryClient = useQueryClient();
   const { setRightPanelMode, setSignatureRequestContext } = useUIStore();
+
+  useEffect(() => { setIsMounted(true) }, [])
 
   const fetchDocuments = useCallback(async () => {
     if (!accountId) return;
@@ -530,73 +534,76 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
         </DialogContent>
       </Dialog>
 
-      {/* DOCUMENT PREVIEW MODAL */}
-      <AnimatePresence>
-        {!!previewDoc && (
-          <>
-            {/* Backdrop overlay with blur */}
-            <motion.div
-              key="preview-backdrop"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md"
-              onClick={() => setPreviewDoc(null)}
-            />
-            {/* Modal panel */}
-            <motion.div
-              key="preview-panel"
-              initial={{ opacity: 0, scale: 0.97 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.97 }}
-              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-              className="fixed inset-0 z-[101] flex items-center justify-center p-4 pointer-events-none"
-            >
-              <div
-                className="w-[95vw] h-[92vh] bg-zinc-950 border border-white/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl pointer-events-auto"
-                onClick={(e) => e.stopPropagation()}
+      {/* DOCUMENT PREVIEW MODAL — rendered in a portal to escape transform stacking context */}
+      {isMounted && createPortal(
+        <AnimatePresence>
+          {!!previewDoc && (
+            <>
+              {/* Backdrop overlay with blur */}
+              <motion.div
+                key="preview-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-md"
+                onClick={() => setPreviewDoc(null)}
+              />
+              {/* Modal panel */}
+              <motion.div
+                key="preview-panel"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none"
               >
-                {/* Header */}
-                <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-zinc-900/50 shrink-0">
-                  <h2 className="text-zinc-200 font-mono text-sm uppercase tracking-widest truncate flex-1 min-w-0 pr-4">
-                    {previewDoc?.doc.name}
-                  </h2>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={executeDownload}
-                      className="flex items-center gap-2 px-4 py-1.5 bg-[#002FA7]/20 border border-[#002FA7]/40 text-white rounded-md text-xs font-mono uppercase tracking-widest hover:bg-[#002FA7]/30 transition-colors shadow-[0_0_15px_-5px_#002FA7]"
-                    >
-                      <Download className="w-3.5 h-3.5" /> Download
-                    </button>
-                    <button
-                      onClick={() => setPreviewDoc(null)}
-                      className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10"
-                      title="Close"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                <div
+                  className="w-[95vw] h-[92vh] bg-zinc-950 border border-white/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl pointer-events-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-zinc-900/50 shrink-0">
+                    <h2 className="text-zinc-200 font-mono text-sm uppercase tracking-widest truncate flex-1 min-w-0 pr-4">
+                      {previewDoc?.doc.name}
+                    </h2>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={executeDownload}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-[#002FA7]/20 border border-[#002FA7]/40 text-white rounded-md text-xs font-mono uppercase tracking-widest hover:bg-[#002FA7]/30 transition-colors shadow-[0_0_15px_-5px_#002FA7]"
+                      >
+                        <Download className="w-3.5 h-3.5" /> Download
+                      </button>
+                      <button
+                        onClick={() => setPreviewDoc(null)}
+                        className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10"
+                        title="Close"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                  {/* Content */}
+                  <div className="flex-1 bg-zinc-900 relative overflow-hidden">
+                    {previewDoc?.signedUrl ? (
+                      <iframe
+                        src={previewDoc.signedUrl}
+                        className="w-full h-full border-0 absolute inset-0"
+                        title={previewDoc?.doc.name}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center w-full h-full text-zinc-500 font-mono text-xs uppercase">
+                        Unable to load document preview.
+                      </div>
+                    )}
                   </div>
                 </div>
-                {/* Content */}
-                <div className="flex-1 bg-zinc-900 relative overflow-hidden">
-                  {previewDoc?.signedUrl ? (
-                    <iframe
-                      src={previewDoc.signedUrl}
-                      className="w-full h-full border-0 absolute inset-0"
-                      title={previewDoc?.doc.name}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center w-full h-full text-zinc-500 font-mono text-xs uppercase">
-                      Unable to load document preview.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* DROP ZONE OVERLAY (Only visible when dragging) */}
       {isDragging && (
