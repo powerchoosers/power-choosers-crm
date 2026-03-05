@@ -262,7 +262,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
             currentRate: data.current_rate || '',
             status: data.status || 'PROSPECT',
             meters: data.metadata?.meters || [],
-            mills: data.mills || data.metadata?.mills || '0.0070',
+            mills: data.metadata?.mills || '0.0070',
             metadata: data.metadata || {}
           }
         }) as Account[];
@@ -359,7 +359,7 @@ export function useAccount(id: string) {
         annualUsage: data.annual_usage || '',
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
-        mills: data.mills || data.metadata?.mills || '0.0070', // try direct column first, then metadata
+        mills: data.metadata?.mills || '0.0070', // try direct column first, then metadata
         status: data.status || 'PROSPECT',
         meters,
         metadata: data.metadata || {}
@@ -632,7 +632,6 @@ export function useUpdateAccount() {
       if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier || null
       if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate || null
       if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT' // PROSPECT | ACTIVE_LOAD | CUSTOMER | CHURNED
-      if (updates.mills !== undefined) dbUpdates.mills = updates.mills || null
 
       // Metadata updates
       const newMetadata = { ...currentMetadata }
