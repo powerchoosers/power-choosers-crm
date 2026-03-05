@@ -133,6 +133,15 @@ export function RightPanel() {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
+
+  const syncScrolledState = useCallback((scrollTop: number) => {
+    const value = scrollTop > 10
+    if (value !== lastScrolledRef.current) {
+      lastScrolledRef.current = value
+      setIsScrolled(value)
+    }
+  }, [])
+
   useEffect(() => {
     setIsReady(true)
   }, [])
@@ -146,6 +155,49 @@ export function RightPanel() {
     const interval = setInterval(updateTime, 1000)
     return () => clearInterval(interval)
   }, [])
+
+  // Keep header blur/border state in sync even when layout/content changes without scroll events.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    syncScrolledState(container.scrollTop)
+  }, [
+    syncScrolledState,
+    pathname,
+    entityId,
+    rightPanelMode,
+    effectiveView,
+    contact?.id,
+    account?.id,
+    tasksData?.pages?.length,
+  ])
+
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container || typeof ResizeObserver === 'undefined') return
+
+    const scheduleSync = () => {
+      if (scrollRafRef.current !== null) cancelAnimationFrame(scrollRafRef.current)
+      scrollRafRef.current = requestAnimationFrame(() => {
+        scrollRafRef.current = null
+        syncScrolledState(container.scrollTop)
+      })
+    }
+
+    scheduleSync()
+    const observer = new ResizeObserver(scheduleSync)
+    observer.observe(container)
+    if (container.firstElementChild) observer.observe(container.firstElementChild)
+
+    return () => {
+      observer.disconnect()
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current)
+        scrollRafRef.current = null
+      }
+    }
+  }, [syncScrolledState, rightPanelMode, effectiveView, entityId])
+
 
   if (!isReady) return <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 hidden lg:flex" />
 
@@ -287,11 +339,7 @@ export function RightPanel() {
                   if (scrollRafRef.current !== null) return;
                   scrollRafRef.current = requestAnimationFrame(() => {
                     scrollRafRef.current = null;
-                    const value = target.scrollTop > 10;
-                    if (value !== lastScrolledRef.current) {
-                      lastScrolledRef.current = value;
-                      setIsScrolled(value);
-                    }
+                    syncScrolledState(target.scrollTop)
                   });
                 }}
                 className="flex-1 flex flex-col gap-4 overflow-y-auto px-6 pt-[93px] pb-4 np-scroll scroll-smooth"
@@ -461,4 +509,5 @@ export function RightPanel() {
     </aside>
   )
 }
+
 
