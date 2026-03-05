@@ -608,7 +608,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                         className="w-full h-full border-0 absolute inset-0"
                         style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
                         title={previewDoc?.doc.name}
-                        onLoad={() => setIframeLoaded(true)}
+                        onLoad={() => setTimeout(() => setIframeLoaded(true), 900)}
                       />
                     ) : (
                       <div className="flex items-center justify-center w-full h-full text-zinc-500 font-mono text-xs uppercase">
