@@ -42,6 +42,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
     }
 
     const maxKwh = Math.max(...usageHistory.map(d => d.kwh || 0));
+    const maxDemand = Math.max(...usageHistory.map(d => d.billed_kw || 0));
 
     // Custom Tooltip for Chart
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -136,9 +137,18 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                         tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
                                         tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
                                     />
+                                    <YAxis
+                                        yAxisId="right"
+                                        orientation="right"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
+                                        tickFormatter={(value) => `${value} kW`}
+                                    />
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                                     <Tooltip content={<CustomTooltip />} />
                                     <Bar yAxisId="left" dataKey="kwh" name="Total kWh" fill="url(#colorKwh)" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Line yAxisId="right" type="monotone" dataKey="billed_kw" name="Billed Demand" stroke="#d4d4d8" strokeWidth={2} dot={{ r: 3, fill: '#d4d4d8', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </motion.div>
