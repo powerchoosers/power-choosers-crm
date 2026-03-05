@@ -12,6 +12,7 @@ import { cors } from '../_cors.js';
 import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
+import { generateForensicSignature } from '@/lib/signature';
 import logger from '../_logger.js';
 
 export default async function handler(req, res) {
@@ -85,10 +86,50 @@ export default async function handler(req, res) {
             logger.info(`[Zoho] Internal/Self-send detected. Adjusting deliverability settings: tracking=${deliverability.enableTracking}`, 'zoho-send');
         }
 
-        // Inject tracking pixel and wrap links for click tracking
+        // Restore signature injection for direct compose sends.
+        // ComposeModal no longer posts signature HTML and relies on backend injection.
         let trackedContent = content;
-        if (!hasTrackingPixel(content)) {
-            trackedContent = injectTracking(content, trackingId, {
+        if (isHtmlEmailBoolean && trackedContent) {
+            const isFoundry = trackedContent.includes('<!-- FOUNDRY_TEMPLATE -->') || trackedContent.includes('data-foundry');
+            const hasSignature = trackedContent.includes('NODAL_FORENSIC_SIGNATURE') || trackedContent.includes('nodal-signature');
+
+            if (!isFoundry && !hasSignature) {
+                try {
+                    let lookupEmail = ownerEmail;
+                    if (lookupEmail.endsWith('@getnodalpoint.com')) {
+                        lookupEmail = lookupEmail.replace('@getnodalpoint.com', '@nodalpoint.io');
+                    }
+
+                    const { data: userData, error: userError } = await supabaseAdmin
+                        .from('users')
+                        .select('first_name, last_name, job_title, hosted_photo_url')
+                        .eq('email', lookupEmail)
+                        .maybeSingle();
+
+                    if (userData && !userError) {
+                        const forensicSig = generateForensicSignature({
+                            firstName: userData.first_name,
+                            lastName: userData.last_name,
+                            jobTitle: userData.job_title,
+                            hostedPhotoUrl: userData.hosted_photo_url
+                        });
+
+                        if (forensicSig) {
+                            trackedContent = `${trackedContent}${forensicSig}`;
+                            logger.info(`[Zoho] Injected Forensic Signature for ${ownerEmail} (via ${lookupEmail})`, 'zoho-send');
+                        }
+                    } else {
+                        logger.warn(`[Zoho] No profile found for ${lookupEmail}. Signature injection skipped.`, 'zoho-send');
+                    }
+                } catch (sigError) {
+                    logger.error('[Zoho] Failed to inject signature:', sigError, 'zoho-send');
+                }
+            }
+        }
+
+        // Inject tracking pixel and wrap links for click tracking
+        if (!hasTrackingPixel(trackedContent)) {
+            trackedContent = injectTracking(trackedContent, trackingId, {
                 enableOpenTracking: deliverability.enableTracking,
                 enableClickTracking: deliverability.enableClickTracking
             });
