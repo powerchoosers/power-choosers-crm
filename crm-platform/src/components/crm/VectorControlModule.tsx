@@ -198,7 +198,8 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
   const handleCreateDeal = async () => {
     setDealContext({
       accountId: accountId,
-      contactId: contactId
+      contactId: contactId,
+      defaultTitle: searchQuery.trim() || undefined
     })
     setRightPanelMode('CREATE_DEAL')
     setIsPopoverOpen(false)

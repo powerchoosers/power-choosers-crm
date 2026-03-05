@@ -34,6 +34,7 @@ export interface DealContext {
   accountDomain?: string
   contactId?: string
   contactName?: string
+  defaultTitle?: string
 }
 
 export interface PortalAccessContext {

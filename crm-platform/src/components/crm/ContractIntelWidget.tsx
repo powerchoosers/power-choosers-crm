@@ -156,6 +156,7 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
   const activeDeals = deals.filter(d => d.stage !== 'TERMINATED')
 
   if (!accountId && !contactId) return null
+  if (activeDeals.length === 0) return null
 
   return (
     <div className="space-y-3">
@@ -175,31 +176,21 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
         </button>
       </div>
 
-      {isLoading ? (
-        <div className="text-[10px] font-mono text-zinc-700 px-1">Loading...</div>
-      ) : activeDeals.length === 0 ? (
-        <div className="py-3 border border-dashed border-zinc-800 rounded-lg flex items-center justify-center">
-          <span className="text-[10px] font-mono text-zinc-700 uppercase tracking-wider">
-            No active contracts
-          </span>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          <AnimatePresence initial={false}>
-            {activeDeals.map(deal => (
-              <motion.div
-                key={deal.id}
-                initial={{ opacity: 0, height: 0, scale: 0.95 }}
-                animate={{ opacity: 1, height: 'auto', scale: 1 }}
-                exit={{ opacity: 0, height: 0, scale: 0.95 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-              >
-                <DealCard deal={deal} />
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+      <div className="space-y-1.5">
+        <AnimatePresence initial={false}>
+          {activeDeals.map(deal => (
+            <motion.div
+              key={deal.id}
+              initial={{ opacity: 0, height: 0, scale: 0.95 }}
+              animate={{ opacity: 1, height: 'auto', scale: 1 }}
+              exit={{ opacity: 0, height: 0, scale: 0.95 }}
+              transition={{ duration: 0.3, ease: 'easeOut' }}
+            >
+              <DealCard deal={deal} />
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }
