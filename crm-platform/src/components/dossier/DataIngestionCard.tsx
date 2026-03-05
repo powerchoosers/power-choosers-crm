@@ -552,14 +552,14 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
               {/* Modal panel */}
               <motion.div
                 key="preview-panel"
-                initial={{ opacity: 0, scale: 0.97 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.97 }}
-                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none"
               >
                 <div
-                  className="w-[85vw] h-[92vh] bg-zinc-950 border border-white/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl pointer-events-auto"
+                  className="w-[78vw] h-[92vh] bg-zinc-950 border border-white/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl pointer-events-auto"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Header */}
@@ -587,7 +587,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                   <div className="flex-1 bg-zinc-900 relative overflow-hidden">
                     {previewDoc?.signedUrl ? (
                       <iframe
-                        src={previewDoc.signedUrl}
+                        src={`${previewDoc.signedUrl}#view=FitH`}
                         className="w-full h-full border-0 absolute inset-0"
                         title={previewDoc?.doc.name}
                       />
