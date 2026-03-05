@@ -559,7 +559,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                 className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none"
               >
                 <div
-                  className="w-[95vw] h-[92vh] bg-zinc-950 border border-white/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl pointer-events-auto"
+                  className="w-[85vw] h-[92vh] bg-zinc-950 border border-white/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl pointer-events-auto"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Header */}
