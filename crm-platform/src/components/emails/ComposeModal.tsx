@@ -1225,14 +1225,13 @@ OUTPUT FORMAT:
       return (tmp.textContent || tmp.innerText || '').trim()
     })() : content
 
-    // When using foundry template, content is already HTML with no signature
-    // IMPORTANT: Do NOT include signature in HTML sent to API - it causes 413 payload errors
-    // The signature will be added by the mail service on the backend
+    // For standard compose sends, append the compose signature directly so send does not
+    // depend on backend profile lookup. Foundry templates remain signature-free.
     const fullHtml = isColdPlaintext
       ? undefined
       : selectedFoundryId
         ? content // Foundry template is already complete HTML
-        : `<div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content}</div>`
+        : `<div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content}</div>${outgoingSignatureHtml || ''}`
 
     const titleLine = profile?.jobTitle
       ? `${profile.jobTitle}, Nodal Point`

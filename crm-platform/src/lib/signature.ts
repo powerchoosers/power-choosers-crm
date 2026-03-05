@@ -34,6 +34,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
   const locationLine = [city, state].filter(Boolean).join(', ')
 
   return `
+<!-- NODAL_COMPOSE_SIGNATURE -->
 <table cellpadding="0" cellspacing="0" style="font-family: Helvetica, Arial, sans-serif; font-size: 14px; width: 100%; max-width: 600px; border-collapse: collapse;">
   <tr>
     <!-- THE SIGNAL LINE (Vertical Blue Bar) -->

@@ -91,7 +91,10 @@ export default async function handler(req, res) {
         let trackedContent = content;
         if (isHtmlEmailBoolean && trackedContent) {
             const isFoundry = trackedContent.includes('<!-- FOUNDRY_TEMPLATE -->') || trackedContent.includes('data-foundry');
-            const hasSignature = trackedContent.includes('NODAL_FORENSIC_SIGNATURE') || trackedContent.includes('nodal-signature');
+            const hasSignature =
+                trackedContent.includes('NODAL_FORENSIC_SIGNATURE') ||
+                trackedContent.includes('NODAL_COMPOSE_SIGNATURE') ||
+                trackedContent.includes('nodal-signature');
 
             if (!isFoundry && !hasSignature) {
                 try {
