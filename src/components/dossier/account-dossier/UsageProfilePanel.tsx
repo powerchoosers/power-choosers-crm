@@ -159,7 +159,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                             className="absolute inset-0 np-scroll overflow-y-auto"
                         >
                             <table className="w-full text-left border-collapse">
-                                <thead className="border-b border-white/5 sticky top-0 z-10 bg-zinc-950/80 backdrop-blur-md">
+                                <thead className="nodal-table-header sticky top-0 z-10 border-b border-white/5">
                                     <tr>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium">Month</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">kWh Usage</th>
