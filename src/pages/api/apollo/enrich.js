@@ -13,7 +13,7 @@
  * - Use revealPhones=true to reveal BOTH email + phone (slower)
  */
 
-import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation } from './_utils.js';
+import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation, requireApolloAuth } from './_utils.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -24,6 +24,10 @@ export default async function handler(req, res) {
     return;
   }
   
+  
+  const auth = await requireApolloAuth(req, res);
+  if (!auth) return;
+
   try {
     const { 
       requestId, 
@@ -299,3 +303,8 @@ async function saveToApolloContacts(apolloPerson, apiKey) {
     throw error;
   }
 }
+
+
+
+
+

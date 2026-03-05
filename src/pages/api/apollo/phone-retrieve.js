@@ -5,20 +5,24 @@
  * to the phone-webhook endpoint.
  */
 
-import { cors } from './_utils.js';
+import { cors, requireApolloAuth } from './_utils.js';
 import { getPhoneData } from './phone-webhook.js';
 
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
   
-  // Only accept GET requests
   if (req.method !== 'GET') {
     res.writeHead(405, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
   
+  // Only accept GET requests
+  
+  const auth = await requireApolloAuth(req, res);
+  if (!auth) return;
+
   try {
     const { personId } = req.query || {};
     
@@ -53,3 +57,7 @@ export default async function handler(req, res) {
     }));
   }
 }
+
+
+
+

@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase'
 
 export interface ApolloNewsSignal {
   id: string
@@ -18,8 +19,12 @@ interface NewsResponse {
 
 async function fetchNews(domain: string): Promise<ApolloNewsSignal[]> {
   const params = new URLSearchParams({ domain })
+  const { data: { session } } = await supabase.auth.getSession()
   const res = await fetch(`/api/apollo/news?${params.toString()}`, {
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    },
   })
   if (!res.ok) return []
   const data = (await res.json()) as NewsResponse

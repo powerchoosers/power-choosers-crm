@@ -8,7 +8,7 @@
  * @see Apollo/News Feed.md for API spec
  */
 
-import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, normalizeDomain } from './_utils.js';
+import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, normalizeDomain, requireApolloAuth } from './_utils.js';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export default async function handler(req, res) {
@@ -19,6 +19,9 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ error: 'Method not allowed' }));
     return;
   }
+
+  const auth = await requireApolloAuth(req, res);
+  if (!auth) return;
 
   try {
     const { domain: rawDomain, organization_id: organizationId } = req.query || {};
@@ -190,3 +193,6 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({ error: 'Server error', signals: [] }));
   }
 }
+
+
+

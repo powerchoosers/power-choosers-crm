@@ -2,6 +2,7 @@
  * Apollo API Shared Utilities
  * Provides common functions for Apollo API integration
  */
+import { requireUser } from '@/lib/supabase';
 
 export const APOLLO_BASE_URL = 'https://api.apollo.io/api/v1';
 
@@ -22,6 +23,37 @@ export function cors(req, res) {
     return true;
   }
   return false;
+}
+
+export async function requireApolloAuth(req, res) {
+  const { user, email, id, isAdmin } = await requireUser(req);
+  if (!user) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unauthorized' }));
+    return null;
+  }
+  return { user, email, id, isAdmin };
+}
+
+export function requireApolloWebhookSecret(req, res) {
+  const configuredSecret = (process.env.APOLLO_WEBHOOK_SECRET || '').trim();
+  const providedHeader = typeof req.headers['x-apollo-webhook-secret'] === 'string'
+    ? req.headers['x-apollo-webhook-secret']
+    : '';
+  const providedQuery = typeof req.query?.secret === 'string' ? req.query.secret : '';
+  const providedSecret = (providedHeader || providedQuery || '').trim();
+
+  if (!configuredSecret && process.env.NODE_ENV !== 'production') {
+    return true;
+  }
+
+  if (!configuredSecret || providedSecret !== configuredSecret) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unauthorized webhook' }));
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -159,6 +191,8 @@ export function formatPhoneForContact(raw) {
   if (ten.length === 0) return '';
   return `+1 (${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
 }
+
+
 
 
 
