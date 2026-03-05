@@ -10,7 +10,6 @@ import {
 interface UsageMonth {
     month: string;
     kwh: number;
-    peak_demand_kw: number;
     billed_kw: number;
     actual_kw: number;
     tdsp_charges: number;
@@ -43,7 +42,6 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
     }
 
     const maxKwh = Math.max(...usageHistory.map(d => d.kwh || 0));
-    const maxDemand = Math.max(...usageHistory.map(d => d.peak_demand_kw || 0));
 
     // Custom Tooltip for Chart
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -86,7 +84,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                     <button
                         onClick={() => setViewMode('graph')}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'graph'
-                            ? 'bg-[#002FA7]/20 text-white border border-[#002FA7]/40 shadow-[0_0_15px_-5px_#002FA7]'
+                            ? 'bg-zinc-800 text-white border border-white/10 shadow-sm'
                             : 'text-zinc-500 hover:text-white border border-transparent'
                             }`}
                     >
@@ -95,7 +93,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                     <button
                         onClick={() => setViewMode('table')}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'table'
-                            ? 'bg-[#002FA7]/20 text-white border border-[#002FA7]/40 shadow-[0_0_15px_-5px_#002FA7]'
+                            ? 'bg-zinc-800 text-white border border-white/10 shadow-sm'
                             : 'text-zinc-500 hover:text-white border border-transparent'
                             }`}
                     >
@@ -120,8 +118,8 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                 <ComposedChart data={usageHistory} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorKwh" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#002FA7" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#002FA7" stopOpacity={0} />
+                                            <stop offset="5%" stopColor="#52525b" stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor="#27272a" stopOpacity={0.2} />
                                         </linearGradient>
                                     </defs>
                                     <XAxis
@@ -138,18 +136,9 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                         tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
                                         tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
                                     />
-                                    <YAxis
-                                        yAxisId="right"
-                                        orientation="right"
-                                        axisLine={false}
-                                        tickLine={false}
-                                        tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
-                                        tickFormatter={(value) => `${value} kW`}
-                                    />
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
                                     <Tooltip content={<CustomTooltip />} />
                                     <Bar yAxisId="left" dataKey="kwh" name="Total kWh" fill="url(#colorKwh)" radius={[4, 4, 0, 0]} barSize={40} />
-                                    <Line yAxisId="right" type="monotone" dataKey="peak_demand_kw" name="Peak Demand" stroke="#10b981" strokeWidth={2} dot={{ r: 3, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 5 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </motion.div>
@@ -167,7 +156,6 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                     <tr>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium">Month</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">kWh Usage</th>
-                                        <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Peak kW</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Billed kW</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Actual kW</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">TDSP Charges</th>
@@ -178,7 +166,6 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                         <tr key={idx} className="hover:bg-zinc-900/40 transition-colors">
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-200">{row.month}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-300 text-right">{row.kwh?.toLocaleString() ?? '—'}</td>
-                                            <td className="px-4 py-3 font-mono text-sm text-emerald-400 text-right">{row.peak_demand_kw?.toLocaleString() ?? '—'}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{row.billed_kw?.toLocaleString() ?? '—'}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{row.actual_kw?.toLocaleString() ?? '—'}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">
