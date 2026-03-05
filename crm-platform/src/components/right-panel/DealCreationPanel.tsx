@@ -78,7 +78,7 @@ export function DealCreationPanel() {
                             accountLogoUrl: data.logo_url,
                             accountDomain: data.domain
                         })
-                        if (!title) setTitle(`${data.name} - New Opportunity`)
+                        if (!title) setTitle(dealContext.defaultTitle || `${data.name} - New Opportunity`)
                         if (!annualUsage && data.annual_usage) setAnnualUsage(parseInt(data.annual_usage).toLocaleString())
                         if (!closeDate && data.contract_end_date) setCloseDate(data.contract_end_date.slice(0, 10))
                         if (!mills) {
@@ -89,7 +89,7 @@ export function DealCreationPanel() {
                 }
                 fetchMeta()
             } else if (!title) {
-                setTitle(`${dealContext.accountName} - New Opportunity`)
+                setTitle(dealContext.defaultTitle || `${dealContext.accountName} - New Opportunity`)
                 // In case account metadata isn't fully loaded, fetch it anyway to fill out the form
                 const fillForm = async () => {
                     const { data } = await supabase
@@ -147,7 +147,7 @@ export function DealCreationPanel() {
             accountDomain: account.domain
         })
         setStep('DEAL_DETAILS')
-        setTitle(`${account.name} - New Opportunity`)
+        setTitle(dealContext?.defaultTitle || `${account.name} - New Opportunity`)
     }
 
     const handleCommit = async () => {
