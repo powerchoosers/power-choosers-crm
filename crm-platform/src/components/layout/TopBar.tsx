@@ -543,36 +543,80 @@ export function TopBar() {
 
                   {/* Center Sector: Dynamics (Reduced Size & Left-Aligned) */}
                   <div className="flex-1 flex items-center justify-start min-w-0 ml-4">
-                    <div className="flex items-center gap-2 px-2 py-0.5 border border-dotted border-emerald-500/40 rounded-lg bg-emerald-500/10">
-                      {status === 'connected' && (
-                        <div className="flex items-center gap-0.5 opacity-60">
-                          {[...Array(5)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              className="w-[1.5px] bg-emerald-500/50 rounded-full"
-                              animate={{ height: ["2px", "8px", "2px"] }}
-                              transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
-                            />
-                          ))}
-                        </div>
-                      )}
-                      <div className="text-[10px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-1.5">
-                        {status === 'connected' && <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse" />}
-                        {status === 'dialing' ? 'Dialing...' : formatDuration(callDuration)}
-                      </div>
-                      {status === 'connected' && (
-                        <div className="flex items-center gap-0.5 opacity-60">
-                          {[...Array(5)].map((_, i) => (
-                            <motion.div
-                              key={i}
-                              className="w-[1.5px] bg-emerald-500/50 rounded-full"
-                              animate={{ height: ["2px", "8px", "2px"] }}
-                              transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
-                            />
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <motion.div
+                      layout
+                      transition={{ layout: { type: "spring", bounce: 0, duration: 0.4 } }}
+                      className="flex items-center gap-2 px-2 py-0.5 border border-dotted border-emerald-500/40 rounded-lg bg-emerald-500/10 overflow-hidden"
+                    >
+                      <AnimatePresence mode="popLayout">
+                        {status === 'connected' && (
+                          <motion.div
+                            key="left-bars"
+                            initial={{ width: 0, opacity: 0, y: 5 }}
+                            animate={{ width: "auto", opacity: 0.6, y: 0 }}
+                            exit={{ width: 0, opacity: 0, y: 5 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="flex items-center gap-0.5 origin-bottom"
+                          >
+                            <div className="flex items-center gap-0.5 w-max">
+                              {[...Array(5)].map((_, i) => (
+                                <motion.div
+                                  key={i}
+                                  className="w-[1.5px] bg-emerald-500/50 rounded-full flex-shrink-0"
+                                  initial={{ height: "2px" }}
+                                  animate={{ height: ["2px", "8px", "2px"] }}
+                                  transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
+                                />
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <motion.div
+                        layout
+                        className="text-[10px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-1.5 whitespace-nowrap"
+                      >
+                        {status === 'connected' && <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse flex-shrink-0" />}
+                        {status === 'dialing' ? (
+                          <span className="flex items-center">
+                            Dialing
+                            <span className="inline-flex ml-[2px] w-3 font-bold justify-start">
+                              <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0 }}>.</motion.span>
+                              <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 0.5 }}>.</motion.span>
+                              <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ repeat: Infinity, duration: 1.5, delay: 1.0 }}>.</motion.span>
+                            </span>
+                          </span>
+                        ) : (
+                          formatDuration(callDuration)
+                        )}
+                      </motion.div>
+
+                      <AnimatePresence mode="popLayout">
+                        {status === 'connected' && (
+                          <motion.div
+                            key="right-bars"
+                            initial={{ width: 0, opacity: 0, y: 5 }}
+                            animate={{ width: "auto", opacity: 0.6, y: 0 }}
+                            exit={{ width: 0, opacity: 0, y: 5 }}
+                            transition={{ duration: 0.3, ease: "easeOut" }}
+                            className="flex items-center gap-0.5 origin-bottom"
+                          >
+                            <div className="flex items-center gap-0.5 w-max justify-end">
+                              {[...Array(5)].map((_, i) => (
+                                <motion.div
+                                  key={i}
+                                  className="w-[1.5px] bg-emerald-500/50 rounded-full flex-shrink-0"
+                                  initial={{ height: "2px" }}
+                                  animate={{ height: ["2px", "8px", "2px"] }}
+                                  transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
+                                />
+                              ))}
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </motion.div>
                   </div>
 
                   {/* Right Sector: Intervention Triggers */}
