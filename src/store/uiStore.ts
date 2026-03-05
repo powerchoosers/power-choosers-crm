@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { type DealStage } from '@/types/deals'
 
 export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'SEND_PORTAL_ACCESS';
 
@@ -35,6 +36,16 @@ export interface DealContext {
   contactId?: string
   contactName?: string
   defaultTitle?: string
+  mode?: 'create' | 'edit'
+  dealId?: string
+  stage?: DealStage
+  amount?: number
+  annualUsage?: number
+  mills?: number
+  contractLength?: number
+  closeDate?: string
+  probability?: number
+  yearlyCommission?: number
 }
 
 export interface PortalAccessContext {

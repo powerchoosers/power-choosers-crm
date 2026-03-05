@@ -1,6 +1,6 @@
 'use client'
 
-import { TrendingUp, Plus } from 'lucide-react'
+import { Plus, MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDealsByAccount, useDealsByContact } from '@/hooks/useDeals'
 import { type Deal, type DealStage } from '@/types/deals'
@@ -8,6 +8,17 @@ import { differenceInDays } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { useUIStore } from '@/store/uiStore'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useDeleteDeal } from '@/hooks/useDeals'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useState } from 'react'
 
 // ---------------------------------------------------------------------------
 // Stage indicator styles (compact, for dossier view)
@@ -56,7 +67,13 @@ function closeLabel(closeDate?: string) {
 // ---------------------------------------------------------------------------
 // Single deal card inside the widget
 // ---------------------------------------------------------------------------
-function DealCard({ deal }: { deal: Deal }) {
+interface DealCardProps {
+  deal: Deal
+  onEdit: (deal: Deal) => void
+  onRequestDelete: (dealId: string) => void
+}
+
+function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
   const router = useRouter()
   const probPct = STAGE_PROGRESS[deal.stage] ?? 0
   const closeLbl = closeLabel(deal.closeDate)
@@ -67,12 +84,14 @@ function DealCard({ deal }: { deal: Deal }) {
     : null;
 
   return (
-    <button
-      onClick={() => router.push('/network/contracts')}
-      className="w-full text-left group p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.08] transition-all relative overflow-hidden"
-    >
+    <div className="w-full text-left group p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.08] transition-all relative overflow-hidden">
       {/* Top row: stage dot + title. Stage text removed — badge handles status display */}
-      <div className="flex items-center gap-2 mb-1.5 pr-16">
+      <button
+        type="button"
+        onClick={() => router.push('/network/contracts')}
+        className="w-full text-left"
+      >
+      <div className="flex items-center gap-2 mb-1.5 pr-24">
         <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', STAGE_DOT[deal.stage])} />
         <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-300 truncate flex-1">
           {deal.title}
@@ -130,7 +149,39 @@ function DealCard({ deal }: { deal: Deal }) {
           {probPct}%
         </div>
       </div>
-    </button>
+      </button>
+
+      <div className="absolute top-2.5 right-2.5">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="h-6 w-6 rounded-md border border-white/10 bg-black/50 text-zinc-400 hover:text-zinc-200 hover:border-white/20 flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+              aria-label="Contract actions"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem
+              className="hover:bg-white/5 cursor-pointer"
+              onClick={() => onEdit(deal)}
+            >
+              Edit Contract
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="bg-white/10" />
+            <DropdownMenuItem
+              className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+              onClick={() => onRequestDelete(deal.id)}
+            >
+              Terminate Contract
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
   )
 }
 
@@ -145,15 +196,53 @@ interface ContractIntelWidgetProps {
 export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidgetProps) {
   const { data: accountDeals = [], isLoading: loadingAccount } = useDealsByAccount(accountId)
   const { data: contactDeals = [], isLoading: loadingContact } = useDealsByContact(contactId)
-  const router = useRouter()
+  const deleteDeal = useDeleteDeal()
   const { setRightPanelMode, setDealContext } = useUIStore()
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [removedDealIds, setRemovedDealIds] = useState<Record<string, true>>({})
 
   // Show deals from the most relevant source; avoid duplicates if both provided
   const deals: Deal[] = accountId ? accountDeals : contactDeals
   const isLoading = accountId ? loadingAccount : loadingContact
 
   // Filter out TERMINATED for the dossier (keep it clean)
-  const activeDeals = deals.filter(d => d.stage !== 'TERMINATED')
+  const activeDeals = deals.filter(d => d.stage !== 'TERMINATED' && !removedDealIds[d.id])
+
+  const openEditInRightPanel = (deal: Deal) => {
+    setDealContext({
+      mode: 'edit',
+      dealId: deal.id,
+      accountId: deal.accountId,
+      accountName: deal.account?.name,
+      contactId: deal.contactId,
+      defaultTitle: deal.title,
+      stage: deal.stage,
+      amount: deal.amount,
+      annualUsage: deal.annualUsage,
+      mills: deal.mills,
+      contractLength: deal.contractLength,
+      closeDate: deal.closeDate,
+      probability: deal.probability,
+      yearlyCommission: deal.yearlyCommission,
+    })
+    setRightPanelMode('CREATE_DEAL')
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    const targetId = deleteId
+    setDeleteId(null)
+    setRemovedDealIds(prev => ({ ...prev, [targetId]: true }))
+    try {
+      await deleteDeal.mutateAsync(targetId)
+    } catch {
+      setRemovedDealIds(prev => {
+        const next = { ...prev }
+        delete next[targetId]
+        return next
+      })
+    }
+  }
 
   if (!accountId && !contactId) return null
   if (activeDeals.length === 0) return null
@@ -186,11 +275,43 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
               exit={{ opacity: 0, height: 0, scale: 0.95 }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
             >
-              <DealCard deal={deal} />
+              <DealCard
+                deal={deal}
+                onEdit={openEditInRightPanel}
+                onRequestDelete={(dealId) => setDeleteId(dealId)}
+              />
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
+
+      <Dialog open={!!deleteId} onOpenChange={v => !v && setDeleteId(null)}>
+        <DialogContent className="bg-zinc-950 border-white/10 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="font-mono text-sm uppercase tracking-widest text-rose-400">
+              Terminate Contract
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-xs font-mono text-zinc-400">
+            This will permanently remove the contract record. This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <button
+              onClick={() => setDeleteId(null)}
+              className="px-4 py-2 rounded-lg border border-white/10 text-zinc-500 font-mono text-xs hover:text-zinc-300 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={deleteDeal.isPending}
+              className="px-4 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs hover:bg-rose-500/20 transition-colors disabled:opacity-40"
+            >
+              {deleteDeal.isPending ? 'Terminating...' : 'Terminate'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
