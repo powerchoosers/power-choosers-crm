@@ -221,8 +221,20 @@ function DealForm({ form, onChange, onAccountSelect }: DealFormProps) {
   const accountResults = useAccountSearch(form.accountName)
   const [showAccountDropdown, setShowAccountDropdown] = useState(false)
 
-  const set = (key: keyof DealFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
-    onChange({ ...form, [key]: e.target.value })
+  const set = (key: keyof DealFormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const nextForm = { ...form, [key]: e.target.value }
+
+    // Auto-calculate amount if usage or mills changes
+    if (key === 'annualUsage' || key === 'mills') {
+      const usage = parseFloat(nextForm.annualUsage.replace(/[^0-9.-]/g, '')) || 0
+      const mills = parseFloat(nextForm.mills.replace(/[^0-9.-]/g, '')) || 0
+      if (usage && mills) {
+        nextForm.amount = (usage * mills).toFixed(2)
+      }
+    }
+
+    onChange(nextForm)
+  }
 
   return (
     <div className="space-y-4">

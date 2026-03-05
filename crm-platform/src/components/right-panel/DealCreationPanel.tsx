@@ -172,18 +172,6 @@ export function DealCreationPanel() {
                 yearlyCommission: yearlyCommission ? Number(yearlyCommission) : undefined,
             })
 
-            // Sync these fields back to the Account dossier as the ultimate source of truth
-            const accountUpdates: any = {}
-            if (annualUsage) accountUpdates.annual_usage = String(Number(annualUsage.replace(/[^0-9.-]+/g, "")))
-            if (closeDate) accountUpdates.contract_end_date = closeDate
-            if (mills) accountUpdates.mills = Number(mills)
-
-            if (Object.keys(accountUpdates).length > 0) {
-                await supabase.from('accounts').update(accountUpdates).eq('id', dealContext.accountId)
-                queryClient.invalidateQueries({ queryKey: [`account-${dealContext.accountId}`] })
-                queryClient.invalidateQueries({ queryKey: ['accounts'] }) // Refresh lists if needed
-            }
-
             toast.success('CONTRACT_INITIALIZED // VECTOR_LOCKED')
             handleClose()
         } catch (error: any) {
