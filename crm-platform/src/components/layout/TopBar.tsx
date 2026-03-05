@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Mic, PhoneOff, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap, Handshake, FileSignature } from 'lucide-react'
+import { Phone, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap, Handshake, FileSignature } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -112,7 +112,7 @@ export function TopBar() {
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
   const { profile } = useAuth()
-  const { connect, disconnect, mute, isMuted, sendDigits, metadata: voiceMetadata } = useVoice()
+  const { connect, disconnect, sendDigits, metadata: voiceMetadata } = useVoice()
   const pathname = usePathname()
   const params = useParams()
 
@@ -503,11 +503,11 @@ export function TopBar() {
                 {isActive && (
                   <button
                     onClick={() => setIsShowingCallBar(true)}
-                    className="icon-button-forensic h-[50px] px-4 flex items-center gap-2 text-emerald-500 bg-emerald-500/5 border-emerald-500/20"
+                    className="h-[50px] px-4 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all duration-300 shrink-0"
                     title="Return to Call"
                   >
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <Phone size={16} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <Phone size={14} />
                     <span className="text-[10px] font-mono uppercase tracking-widest hidden lg:inline">Active Call</span>
                   </button>
                 )}
@@ -639,7 +639,7 @@ export function TopBar() {
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute top-full mt-3 right-0 w-48 glass-panel rounded-2xl p-4 z-50"
+                            className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 glass-panel rounded-2xl p-4 z-50"
                           >
                             <div className="grid grid-cols-3 gap-2">
                               {[
@@ -677,15 +677,12 @@ export function TopBar() {
                     </div>
 
                     <button
-                      onClick={() => mute(!isMuted)}
-                      className={cn(
-                        "icon-button-forensic p-1.5",
-                        isMuted ? "text-amber-500 hover:text-amber-400" : ""
-                      )}
-                      title={isMuted ? "Unmute microphone" : "Mute microphone"}
-                      aria-label={isMuted ? "Unmute microphone" : "Mute microphone"}
+                      onClick={() => setIsShowingCallBar(false)}
+                      className="icon-button-forensic p-1.5"
+                      title="Open Search"
+                      aria-label="Open Search"
                     >
-                      <Mic size={16} />
+                      <Search size={16} />
                     </button>
 
                     <button
