@@ -113,7 +113,6 @@ export default async function handler(req, res) {
     - supplier: The name of the retail electricity provider (REP).
     - annual_usage: IF THIS IS A USAGE DATA FILE (like a CSV or usage profile) spanning 12 or 13 months, CALCULATE the EXACT 12-month annual usage across the most recent 12 months in the file. Otherwise, extract estimated annual kWh if present.
     - monthly_kwh: The total kWh consumed in the billing period.
-    - peak_demand_kw: The peak demand in kW during the billing period.
     - billing_days: Number of days in the billing period.
     - esids: An array of ALL ESI ID numbers (17-22 digits) found in the document. Include service addresses if found.
 
@@ -126,7 +125,6 @@ export default async function handler(req, res) {
         "supplier": string or null,
         "annual_usage": number or null,
         "monthly_kwh": number or null,
-        "peak_demand_kw": number or null,
         "billing_days": number or null,
         "esids": [{ "id": "string", "address": "string" }]
       }
