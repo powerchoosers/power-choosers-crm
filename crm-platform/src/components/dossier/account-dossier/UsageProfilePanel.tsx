@@ -25,14 +25,14 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
 
     if (!usageHistory || usageHistory.length === 0) {
         return (
-            <div className="nodal-glass flex flex-col overflow-hidden rounded-2xl h-full">
-                <div className="flex justify-between items-center px-5 py-4 border-b border-white/5 gap-2">
-                    <h3 className="text-sm font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
+            <div className="rounded-2xl flex flex-col overflow-hidden border border-white/5 opacity-80 h-full bg-zinc-900">
+                <div className="flex justify-between items-center p-4 border-b border-white/5 bg-zinc-900">
+                    <h3 className="text-[11px] font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-2">
                         <Activity className="w-4 h-4" />
                         Usage Profile [No Data]
                     </h3>
                 </div>
-                <div className="flex-1 flex items-center justify-center p-8 text-center">
+                <div className="flex-1 flex items-center justify-center p-8 bg-zinc-950 text-center">
                     <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest max-w-xs">
                         Ingest a usage data file or CSV into the Data Locker to generate the 12-month usage profile.
                     </p>
@@ -70,9 +70,9 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
     };
 
     return (
-        <div className="nodal-glass flex flex-col overflow-hidden rounded-2xl h-full">
+        <div className="rounded-2xl flex flex-col overflow-hidden border border-white/5 bg-zinc-900 shadow-lg h-full">
             {/* Header / Toggle */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <div className="flex items-center justify-between p-4 border-b border-white/5 bg-zinc-900">
                 <h3 className="text-[11px] font-mono text-zinc-300 uppercase tracking-widest flex items-center gap-2">
                     <Activity className="w-4 h-4 text-[#002FA7]" />
                     12-Month Usage Profile
@@ -101,7 +101,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
             </div>
 
             {/* Content Area */}
-            <div className="relative flex-1 min-h-[300px]">
+            <div className="relative flex-1 min-h-[300px] bg-zinc-950">
                 <AnimatePresence mode="wait">
                     {viewMode === 'graph' ? (
                         <motion.div
@@ -159,7 +159,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                             className="absolute inset-0 np-scroll overflow-y-auto"
                         >
                             <table className="w-full text-left border-collapse">
-                                <thead className="nodal-table-header sticky top-0 z-10 border-b border-white/5">
+                                <thead className="bg-zinc-950 sticky top-0 z-10 border-b border-white/5">
                                     <tr>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium">Month</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">kWh Usage</th>
@@ -171,7 +171,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                 </thead>
                                 <tbody className="divide-y divide-white/[0.02]">
                                     {usageHistory.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-zinc-900 transition-colors">
+                                        <tr key={idx} className="hover:bg-zinc-900/40 transition-colors">
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-200">{row.month}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-300 text-right">{row.kwh?.toLocaleString() ?? '—'}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-emerald-400 text-right">{row.peak_demand_kw?.toLocaleString() ?? '—'}</td>
