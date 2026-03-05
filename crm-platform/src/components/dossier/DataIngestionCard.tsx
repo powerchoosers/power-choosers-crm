@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileText, X, Loader2, PenTool, AlertTriangle } from 'lucide-react';
+import { UploadCloud, FileText, X, Loader2, PenTool, AlertTriangle, Download } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -51,6 +51,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const [isRecalibrating, setIsRecalibrating] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ doc: Document; signedUrl: string } | null>(null);
   const queryClient = useQueryClient();
   const { setRightPanelMode, setSignatureRequestContext } = useUIStore();
 
@@ -277,19 +278,45 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
     }
   };
 
-  const handleDownload = async (doc: Document) => {
+  const handlePreview = async (doc: Document) => {
     try {
       const { data, error } = await supabase.storage
         .from('vault')
-        .createSignedUrl(doc.storage_path, 60); // 60 seconds access
+        .createSignedUrl(doc.storage_path, 3600); // 1 hour access for preview
 
       if (error) throw error;
       if (data?.signedUrl) {
-        window.open(data.signedUrl, '_blank');
+        setPreviewDoc({ doc, signedUrl: data.signedUrl });
       }
     } catch (err) {
       console.error('Signed URL error:', err);
       toast.error('Failed to access file');
+    }
+  };
+
+  const executeDownload = async () => {
+    if (previewDoc?.doc) {
+      toast.loading('Preparing download...', { id: 'download-toast' });
+      try {
+        const { data, error } = await supabase.storage
+          .from('vault')
+          .createSignedUrl(previewDoc.doc.storage_path, 60, {
+            download: previewDoc.doc.name
+          });
+
+        if (error) throw error;
+
+        if (data?.signedUrl) {
+          const link = document.createElement('a');
+          link.href = data.signedUrl;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          toast.success('Download started', { id: 'download-toast' });
+        }
+      } catch (err) {
+        toast.error('Download failed', { id: 'download-toast' });
+      }
     }
   };
 
@@ -412,7 +439,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                 >
                   <div
                     className="flex items-center gap-3 overflow-hidden flex-1"
-                    onClick={() => handleDownload(file)}
+                    onClick={() => handlePreview(file)}
                   >
                     <div className="p-2 rounded-lg bg-zinc-950/40 border border-white/5 text-zinc-400 group-hover:text-[#002FA7] transition-colors">
                       <FileText className="w-4 h-4" />
@@ -500,6 +527,38 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
               CONFIRM PURGE
             </button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* DOCUMENT PREVIEW MODAL */}
+      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+        <DialogContent className="max-w-5xl w-[90vw] h-[90vh] bg-zinc-950/95 backdrop-blur-xl border border-white/10 shadow-2xl flex flex-col p-0 overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-white/5 bg-zinc-900/40">
+            <h2 className="text-zinc-200 font-mono text-sm uppercase tracking-widest truncate max-w-2xl px-2">
+              {previewDoc?.doc.name}
+            </h2>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={executeDownload}
+                className="flex items-center gap-2 px-4 py-2 bg-[#002FA7]/20 border border-[#002FA7]/40 text-white rounded-md text-xs font-mono uppercase tracking-widest hover:bg-[#002FA7]/30 transition-colors shadow-[0_0_15px_-5px_#002FA7]"
+              >
+                <Download className="w-4 h-4" /> Download
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 bg-zinc-900 relative">
+            {previewDoc?.signedUrl ? (
+              <iframe
+                src={previewDoc.signedUrl}
+                className="w-full h-full border-0 absolute inset-0"
+                title={previewDoc.doc.name}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full text-zinc-500 font-mono text-xs uppercase">
+                Unable to load document preview.
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
