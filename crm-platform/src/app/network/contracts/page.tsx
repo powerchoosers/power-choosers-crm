@@ -516,8 +516,23 @@ export default function ContractsPage() {
   }
 
   const openEdit = (deal: Deal) => {
-    setEditDeal(deal)
-    setForm(dealToForm(deal))
+    setDealContext({
+      mode: 'edit',
+      dealId: deal.id,
+      accountId: deal.accountId,
+      accountName: deal.account?.name,
+      contactId: deal.contactId,
+      defaultTitle: deal.title,
+      stage: deal.stage,
+      amount: deal.amount,
+      annualUsage: deal.annualUsage,
+      mills: deal.mills,
+      contractLength: deal.contractLength,
+      closeDate: deal.closeDate,
+      probability: deal.probability,
+      yearlyCommission: deal.yearlyCommission,
+    })
+    setRightPanelMode('CREATE_DEAL')
   }
 
   const handleBulkAction = async (action: string) => {
@@ -649,6 +664,13 @@ export default function ContractsPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => openEdit(row.original)}
+                >
+                  Edit Contract
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
                 <DropdownMenuItem
                   className="hover:bg-white/5 cursor-pointer"
                   onClick={() => router.push(`/network/accounts/${row.original.accountId}`)}
@@ -878,37 +900,6 @@ export default function ContractsPage() {
         onConfirm={handleConfirmBulkDelete}
         count={selectedCount}
       />
-
-      {/* ── EDIT DIALOG ───────────────────────────────────────────────── */}
-      <Dialog open={!!editDeal} onOpenChange={v => !v && setEditDeal(null)}>
-        <DialogContent className="bg-zinc-950 border-white/10 max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-sm uppercase tracking-widest text-zinc-300">
-              Edit Contract
-            </DialogTitle>
-          </DialogHeader>
-          <DealForm
-            form={form}
-            onChange={setForm}
-            onAccountSelect={(id, name) => setForm(f => ({ ...f, accountId: id, accountName: name }))}
-          />
-          <div className="flex justify-end gap-2 pt-2">
-            <button
-              onClick={() => setEditDeal(null)}
-              className="px-4 py-2 rounded-lg border border-white/10 text-zinc-500 font-mono text-xs hover:text-zinc-300 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleEdit}
-              disabled={updateDeal.isPending}
-              className="px-4 py-2 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/40 text-[#002FA7] font-mono text-xs hover:bg-[#002FA7]/30 transition-colors disabled:opacity-40"
-            >
-              {updateDeal.isPending ? 'Saving...' : 'Save Changes'}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* ── DELETE CONFIRM ────────────────────────────────────────────── */}
       <Dialog open={!!deleteId} onOpenChange={v => !v && setDeleteId(null)}>

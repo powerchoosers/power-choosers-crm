@@ -58,3 +58,4 @@ mingw64/
 # Personal / agent rules (keep local only; may contain personal workflow)
 .trae/rules/nodalpoint.md
 builder-agent-instructions.md
+.openclaw_workspace/

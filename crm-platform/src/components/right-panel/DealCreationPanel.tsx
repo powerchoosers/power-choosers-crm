@@ -20,7 +20,7 @@ import { useUIStore } from '@/store/uiStore'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useDeals, useCreateDeal } from '@/hooks/useDeals'
+import { useCreateDeal, useUpdateDeal } from '@/hooks/useDeals'
 import { type DealStage, DEAL_STAGES } from '@/types/deals'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -38,6 +38,7 @@ interface AccountResult {
 export function DealCreationPanel() {
     const { dealContext, rightPanelMode, setRightPanelMode, setDealContext } = useUIStore()
     const createDeal = useCreateDeal()
+    const updateDeal = useUpdateDeal()
     const queryClient = useQueryClient()
 
     const [step, setStep] = useState<'SELECT_ACCOUNT' | 'DEAL_DETAILS'>('SELECT_ACCOUNT')
@@ -56,11 +57,29 @@ export function DealCreationPanel() {
     const [probability, setProbability] = useState('50')
     const [yearlyCommission, setYearlyCommission] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
+    const isEditMode = dealContext?.mode === 'edit' && !!dealContext?.dealId
 
     // Auto-skip step 1 and resolve metadata if account context is provided
     useEffect(() => {
         if (dealContext?.accountId) {
             setStep('DEAL_DETAILS')
+
+            if (isEditMode) {
+                setTitle(dealContext.defaultTitle || '')
+                setStage(dealContext.stage || 'IDENTIFIED')
+                setAmount(dealContext.amount?.toString() || '')
+                setAnnualUsage(
+                    typeof dealContext.annualUsage === 'number'
+                        ? Math.trunc(dealContext.annualUsage).toLocaleString()
+                        : ''
+                )
+                setMills(dealContext.mills?.toString() || '')
+                setContractLength(dealContext.contractLength?.toString() || '')
+                setCloseDate(dealContext.closeDate ? dealContext.closeDate.slice(0, 10) : '')
+                setProbability(dealContext.probability?.toString() || '50')
+                setYearlyCommission(dealContext.yearlyCommission?.toString() || '')
+                return
+            }
 
             // If we only have an ID, fetch the metadata
             if (!dealContext.accountName) {
@@ -111,7 +130,7 @@ export function DealCreationPanel() {
         } else {
             setStep('SELECT_ACCOUNT')
         }
-    }, [dealContext?.accountId])
+    }, [dealContext?.accountId, dealContext?.dealId, isEditMode])
 
     // Internal Account Search
     useEffect(() => {
@@ -158,24 +177,40 @@ export function DealCreationPanel() {
 
         setIsCommitting(true)
         try {
-            await createDeal.mutateAsync({
-                title: title.trim(),
-                accountId: dealContext.accountId,
-                contactId: dealContext.contactId,
-                stage: stage,
-                amount: amount ? Number(amount) : undefined,
-                annualUsage: annualUsage ? Number(annualUsage.replace(/[^0-9.-]+/g, "")) : undefined,
-                mills: mills ? Number(mills) : undefined,
-                contractLength: contractLength ? Number(contractLength) : undefined,
-                closeDate: closeDate || undefined,
-                probability: probability ? Number(probability) : undefined,
-                yearlyCommission: yearlyCommission ? Number(yearlyCommission) : undefined,
-            })
-
-            toast.success('CONTRACT_INITIALIZED // VECTOR_LOCKED')
+            if (isEditMode && dealContext.dealId) {
+                await updateDeal.mutateAsync({
+                    id: dealContext.dealId,
+                    title: title.trim(),
+                    accountId: dealContext.accountId,
+                    contactId: dealContext.contactId || undefined,
+                    stage,
+                    amount: amount ? Number(amount) : undefined,
+                    annualUsage: annualUsage ? Number(annualUsage.replace(/[^0-9.-]+/g, "")) : undefined,
+                    mills: mills ? Number(mills) : undefined,
+                    contractLength: contractLength ? Number(contractLength) : undefined,
+                    closeDate: closeDate || undefined,
+                    probability: probability ? Number(probability) : undefined,
+                    yearlyCommission: yearlyCommission ? Number(yearlyCommission) : undefined,
+                })
+            } else {
+                await createDeal.mutateAsync({
+                    title: title.trim(),
+                    accountId: dealContext.accountId,
+                    contactId: dealContext.contactId,
+                    stage: stage,
+                    amount: amount ? Number(amount) : undefined,
+                    annualUsage: annualUsage ? Number(annualUsage.replace(/[^0-9.-]+/g, "")) : undefined,
+                    mills: mills ? Number(mills) : undefined,
+                    contractLength: contractLength ? Number(contractLength) : undefined,
+                    closeDate: closeDate || undefined,
+                    probability: probability ? Number(probability) : undefined,
+                    yearlyCommission: yearlyCommission ? Number(yearlyCommission) : undefined,
+                })
+                toast.success('CONTRACT_INITIALIZED // VECTOR_LOCKED')
+            }
             handleClose()
         } catch (error: any) {
-            toast.error(error.message || 'System error during initialization')
+            toast.error(error.message || (isEditMode ? 'System error during update' : 'System error during initialization'))
         } finally {
             setIsCommitting(false)
         }
@@ -188,11 +223,13 @@ export function DealCreationPanel() {
         setStep('SELECT_ACCOUNT')
         setSearchQuery('')
         setTitle('')
+        setStage('IDENTIFIED')
         setAmount('')
         setAnnualUsage('')
         setMills('')
         setContractLength('')
         setCloseDate('')
+        setProbability('50')
         setYearlyCommission('')
     }
 
@@ -501,10 +538,10 @@ export function DealCreationPanel() {
                                     {isCommitting ? (
                                         <>
                                             <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
-                                            INITIATING...
+                                            {isEditMode ? 'UPDATING...' : 'INITIATING...'}
                                         </>
                                     ) : (
-                                        '[ INITIATE_CONTRACT ]'
+                                        isEditMode ? 'EDIT_CONTRACT' : '[ INITIATE_CONTRACT ]'
                                     )}
                                 </Button>
                             </div>
