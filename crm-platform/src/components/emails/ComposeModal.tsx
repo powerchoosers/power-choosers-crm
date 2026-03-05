@@ -235,6 +235,57 @@ ANGLES: "One production run can set demand charges for months." Focus on product
   return getUniversalEnergyAngle(seed)
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function aiBodyToEditorHtml(body: string): string {
+  const raw = (body || '').trim()
+  if (!raw) return ''
+
+  // If model already returned HTML, keep it as-is.
+  if (/<\/?[a-z][\s\S]*>/i.test(raw)) return raw
+
+  const normalized = raw.replace(/\r\n?/g, '\n')
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+
+  return paragraphs
+    .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br />')}</p>`)
+    .join('')
+}
+
+function normalizeEditorHtmlForEmail(html: string): string {
+  if (!html) return html
+
+  // Email clients apply large default paragraph margins; flatten them so one
+  // editor line break renders as one visual line break after send.
+  return html.replace(/<p([^>]*)>/gi, (_match, rawAttrs: string = '') => {
+    const attrs = rawAttrs || ''
+    const styleMatch = attrs.match(/\sstyle=(['"])(.*?)\1/i)
+
+    if (styleMatch) {
+      const quote = styleMatch[1]
+      const styleValue = styleMatch[2]
+      const hasMargin = /(^|;)\s*margin\s*:/i.test(styleValue)
+      const needsSemicolon = styleValue.trim() !== '' && !styleValue.trim().endsWith(';')
+      const mergedStyle = hasMargin
+        ? styleValue
+        : `${styleValue}${needsSemicolon ? ';' : ''}margin:0;`
+      return `<p${attrs.replace(styleMatch[0], ` style=${quote}${mergedStyle}${quote}`)}>`
+    }
+
+    return `<p${attrs} style="margin:0;">`
+  })
+}
+
 interface EmailTypeConfig {
   id: EmailTypeId
   label: string
@@ -1177,7 +1228,7 @@ OUTPUT FORMAT:
   const acceptAiContent = useCallback(() => {
     const body = pendingAiContent ?? ''
     const subj = pendingSubjectFromAi
-    setContent(body)
+    setContent(aiBodyToEditorHtml(body))
     if (subj != null && subj.trim() !== '') {
       setSubject(subj.trim())
       setSubjectAnimationKey((k) => k + 1)
@@ -1217,13 +1268,18 @@ OUTPUT FORMAT:
 
     const isColdType = emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup'
     const isColdPlaintext = isColdType && (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
+    const normalizedEmailBodyHtml = normalizeEditorHtmlForEmail(content)
 
     // Convert potential HTML to plain text for plain text sends or text fallbacks
     const plainTextContent = typeof document !== 'undefined' ? (() => {
       const tmp = document.createElement('div')
-      tmp.innerHTML = content.replace(/<br\s*\/?>/gi, '\n').replace(/<\/p>/gi, '\n\n')
-      return (tmp.textContent || tmp.innerText || '').trim()
-    })() : content
+      tmp.innerHTML = normalizedEmailBodyHtml
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+      return (tmp.textContent || tmp.innerText || '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    })() : normalizedEmailBodyHtml
 
     // For standard compose sends, append the compose signature directly so send does not
     // depend on backend profile lookup. Foundry templates remain signature-free.
@@ -1231,7 +1287,7 @@ OUTPUT FORMAT:
       ? undefined
       : selectedFoundryId
         ? content // Foundry template is already complete HTML
-        : `<div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b;">${content}</div>${outgoingSignatureHtml || ''}`
+        : `<div style="font-family: sans-serif; margin-bottom: 24px; color: #18181b; line-height: 1.45;">${normalizedEmailBodyHtml}</div>${outgoingSignatureHtml || ''}`
 
     const titleLine = profile?.jobTitle
       ? `${profile.jobTitle}, Nodal Point`
@@ -1476,7 +1532,7 @@ OUTPUT FORMAT:
                     </Button>
                   </div>
                 </div>
-                <div className="p-3 space-y-2 max-h-[200px] overflow-y-auto np-scroll">
+                <div className="p-3 space-y-2">
                   {pendingSubjectFromAi != null && pendingSubjectFromAi.trim() !== '' && (
                     <div>
                       <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Subject</span>
@@ -1495,91 +1551,95 @@ OUTPUT FORMAT:
             )}
 
 
-            {/* Foundry Template Indicator */}
-            {selectedFoundryId && foundryAssets && (
-              <motion.div
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5"
-              >
-                <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
-                <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">
-                  Foundry Template: {foundryAssets.find((a: any) => a.id === selectedFoundryId)?.name || 'Loading...'}
-                </span>
-                <button
-                  type="button"
-                  title="Remove Template"
-                  onClick={() => handleFoundrySelect(null)}
-                  className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </motion.div>
-            )}
+            {pendingAiContent === null && (
+              <>
+                {/* Foundry Template Indicator */}
+                {selectedFoundryId && foundryAssets && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5"
+                  >
+                    <Zap className="w-3.5 h-3.5 text-[#002FA7]" />
+                    <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">
+                      Foundry Template: {foundryAssets.find((a: any) => a.id === selectedFoundryId)?.name || 'Loading...'}
+                    </span>
+                    <button
+                      type="button"
+                      title="Remove Template"
+                      onClick={() => handleFoundrySelect(null)}
+                      className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </motion.div>
+                )}
 
-            <div className="flex flex-col relative">
-              <div className="relative">
-                {selectedFoundryId ? (
-                  // Show HTML preview for Foundry templates - Refined for inbox parity with Iframe Isolation
-                  <div className="w-full min-h-[400px] bg-zinc-100/30 rounded-xl p-4 md:p-20 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
-                    <div className="w-full max-w-[700px] bg-white shadow-[0_40px_100px_rgba(0,0,0,0.3)] overflow-hidden rounded-xl ring-1 ring-zinc-200/50 flex flex-col transform transition-transform duration-700">
-                      <div className="h-12 border-b border-zinc-100 bg-zinc-50 flex items-center px-6 justify-between shrink-0">
-                        <div className="flex gap-2.5">
-                          <div className="w-3 h-3 rounded-full bg-zinc-200" />
-                          <div className="w-3 h-3 rounded-full bg-zinc-200" />
-                          <div className="w-3 h-3 rounded-full bg-zinc-200" />
+                <div className="flex flex-col relative">
+                  <div className="relative">
+                    {selectedFoundryId ? (
+                      // Show HTML preview for Foundry templates - Refined for inbox parity with Iframe Isolation
+                      <div className="w-full min-h-[400px] bg-zinc-100/30 rounded-xl p-4 md:p-20 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
+                        <div className="w-full max-w-[700px] bg-white shadow-[0_40px_100px_rgba(0,0,0,0.3)] overflow-hidden rounded-xl ring-1 ring-zinc-200/50 flex flex-col transform transition-transform duration-700">
+                          <div className="h-12 border-b border-zinc-100 bg-zinc-50 flex items-center px-6 justify-between shrink-0">
+                            <div className="flex gap-2.5">
+                              <div className="w-3 h-3 rounded-full bg-zinc-200" />
+                              <div className="w-3 h-3 rounded-full bg-zinc-200" />
+                              <div className="w-3 h-3 rounded-full bg-zinc-200" />
+                            </div>
+                            <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.4em] font-bold">Transmission_Voter_Isolated</span>
+                          </div>
+                          <div className="flex-1 overflow-x-hidden min-h-[700px] bg-white">
+                            <EmailIframePreview content={content} />
+                          </div>
                         </div>
-                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.4em] font-bold">Transmission_Voter_Isolated</span>
                       </div>
-                      <div className="flex-1 overflow-x-hidden min-h-[700px] bg-white">
-                        <EmailIframePreview content={content} />
+                    ) : (
+                      // Show rich text editor for regular emails
+                      <RichTextEditor
+                        content={content}
+                        onChange={(val) => {
+                          setContent(val)
+                          if (pendingAiContent) {
+                            setPendingAiContent(null)
+                            setPendingSubjectFromAi(null)
+                          }
+                        }}
+                        className="w-full"
+                        onEditorReady={handleEditorReady}
+                      />
+                    )}
+                    {isAiLoading && (
+                      <div className="absolute inset-0 min-h-[120px] bg-zinc-950/80 rounded-lg border border-[#002FA7]/20">
+                        <ScanlineLoader />
                       </div>
-                    </div>
+                    )}
                   </div>
-                ) : (
-                  // Show rich text editor for regular emails
-                  <RichTextEditor
-                    content={content}
-                    onChange={(val) => {
-                      setContent(val)
-                      if (pendingAiContent) {
-                        setPendingAiContent(null)
-                        setPendingSubjectFromAi(null)
-                      }
-                    }}
-                    className="w-full"
-                    onEditorReady={handleEditorReady}
-                  />
-                )}
-                {isAiLoading && (
-                  <div className="absolute inset-0 min-h-[120px] bg-zinc-950/80 rounded-lg border border-[#002FA7]/20">
-                    <ScanlineLoader />
-                  </div>
-                )}
-              </div>
-              {aiError && (
-                <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
-              )}
-              {showUndoAi && !pendingAiContent && (
-                <button
-                  type="button"
-                  onClick={undoAiContent}
-                  className="flex items-center gap-1 mt-1 px-1 text-[9px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
-                >
-                  <RotateCcw className="w-2.5 h-2.5" /> Undo AI replace
-                </button>
-              )}
+                  {aiError && (
+                    <p className="mt-1 text-[10px] font-mono text-red-400">{aiError}</p>
+                  )}
+                  {showUndoAi && !pendingAiContent && (
+                    <button
+                      type="button"
+                      onClick={undoAiContent}
+                      className="flex items-center gap-1 mt-1 px-1 text-[9px] font-mono text-zinc-500 hover:text-zinc-300 transition-colors"
+                    >
+                      <RotateCcw className="w-2.5 h-2.5" /> Undo AI replace
+                    </button>
+                  )}
 
-              {/* Signature - Scrolls with email body */}
-              {signatureHtml && !selectedFoundryId && (
-                <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
-                  <div
-                    className="rounded-lg overflow-hidden"
-                    dangerouslySetInnerHTML={{ __html: signatureHtml }}
-                  />
+                  {/* Signature - Scrolls with email body */}
+                  {signatureHtml && !selectedFoundryId && (
+                    <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
+                      <div
+                        className="rounded-lg overflow-hidden"
+                        dangerouslySetInnerHTML={{ __html: signatureHtml }}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            )}
           </div>
 
           {/* Non-Scrollable Bottom Section - Checkboxes, Attachments */}
