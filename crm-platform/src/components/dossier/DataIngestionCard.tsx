@@ -54,6 +54,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   const [docToDelete, setDocToDelete] = useState<Document | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ doc: Document; signedUrl: string } | null>(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const queryClient = useQueryClient();
   const { setRightPanelMode, setSignatureRequestContext } = useUIStore();
 
@@ -283,6 +284,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
   };
 
   const handlePreview = async (doc: Document) => {
+    setIframeLoaded(false);
     try {
       const { data, error } = await supabase.storage
         .from('vault')
@@ -552,10 +554,10 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
               {/* Modal panel */}
               <motion.div
                 key="preview-panel"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.15 }}
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
                 className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none"
               >
                 <div
@@ -585,11 +587,28 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                   </div>
                   {/* Content */}
                   <div className="flex-1 bg-zinc-900 relative overflow-hidden">
+                    {/* Skeleton shown until PDF is fully loaded */}
+                    {!iframeLoaded && (
+                      <div className="absolute inset-0 z-10 flex flex-col bg-zinc-900 gap-3 p-8">
+                        <div className="w-1/2 h-4 bg-zinc-800 rounded animate-pulse mx-auto" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse mt-4" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="w-4/5 h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse mt-2" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="w-3/4 h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="mt-4 text-[10px] font-mono text-zinc-600 uppercase tracking-widest text-center animate-pulse">
+                          Loading document...
+                        </div>
+                      </div>
+                    )}
                     {previewDoc?.signedUrl ? (
                       <iframe
                         src={`${previewDoc.signedUrl}#view=FitH`}
                         className="w-full h-full border-0 absolute inset-0"
+                        style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
                         title={previewDoc?.doc.name}
+                        onLoad={() => setIframeLoaded(true)}
                       />
                     ) : (
                       <div className="flex items-center justify-center w-full h-full text-zinc-500 font-mono text-xs uppercase">
