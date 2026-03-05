@@ -132,8 +132,8 @@ function fmtUsage(val?: number) {
 }
 
 function fmtMills(val?: number) {
-  if (!val) return '—'
-  return `${val.toFixed(2)}¢`
+  if (val === undefined || val === null) return '—'
+  return val.toFixed(4)
 }
 
 // ---------------------------------------------------------------------------
