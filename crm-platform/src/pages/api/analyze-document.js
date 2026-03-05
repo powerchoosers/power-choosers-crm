@@ -85,16 +85,25 @@ export default async function handler(req, res) {
     let mimeType = fileData.type || 'application/pdf';
 
     const safeFileName = typeof fileName === 'string' ? fileName : '';
-    const prompt = `
+    const isCsvOrText = mimeType.includes('csv') || mimeType.includes('text') || safeFileName.toLowerCase().endsWith('.csv');
+
+    let textContentSnippet = "";
+    if (isCsvOrText) {
+      const fullText = Buffer.from(arrayBuffer).toString('utf-8');
+      // Cap text to avoid overwhelming context, but large enough for monthly/daily interval CSVs
+      textContentSnippet = fullText.substring(0, 50000);
+    }
+
+    let prompt = `
     You are an expert energy analyst for Nodal Point CRM. Analyze this document.
     
     The original filename is: "${safeFileName}"
-    Use the filename as a strong signal for classification (e.g. "OncorSummaryUsageData", "annual usage", "12 month usage", "usage data" → USAGE_DATA).
+    Use the filename as a strong signal for classification (e.g. "OncorSummaryUsageData", "annual usage", "12 month usage", "usage data", ".csv" → USAGE_DATA).
     
     Task 1: Classify the document type.
     - "SIGNED_CONTRACT": A signed Energy Service Agreement (ESA) or similar binding contract.
     - "BILL": A standard utility bill, invoice, or monthly statement. This explicitly includes documents titled in Spanish such as "recibo", "factura", "recibos luz", "servicio electrico" or any variation indicating a utility bill.
-    - "USAGE_DATA": Usage/telemetry: ERCOT or utility usage summaries, OncorSummaryUsageData, annual usage, 12-month usage, CSV usage data.
+    - "USAGE_DATA": Usage/telemetry: ERCOT or utility usage summaries, OncorSummaryUsageData, annual usage, 12-month or 13-month usage, CSV usage data profiles.
     - "PROPOSAL": Sales proposals, RFP responses, quotes, pricing proposals.
     - "OTHER": Anything else.
 
@@ -102,7 +111,7 @@ export default async function handler(req, res) {
     - contract_end_date: The specific expiration date (YYYY-MM-DD).
     - strike_price: The energy rate (in cents/kWh or $/MWh). Convert to cents (e.g., 0.045).
     - supplier: The name of the retail electricity provider (REP).
-    - annual_usage: Estimated annual kWh.
+    - annual_usage: IF THIS IS A USAGE DATA FILE (like a CSV or usage profile) spanning 12 or 13 months, CALCULATE the EXACT 12-month annual usage across the most recent 12 months in the file. Otherwise, extract estimated annual kWh if present.
     - monthly_kwh: The total kWh consumed in the billing period.
     - peak_demand_kw: The peak demand in kW during the billing period.
     - billing_days: Number of days in the billing period.
@@ -124,15 +133,31 @@ export default async function handler(req, res) {
     }
     `;
 
+    if (isCsvOrText) {
+      prompt += `\n\n[DOCUMENT CONTENT START]\n${textContentSnippet}\n[DOCUMENT CONTENT END]\n`;
+    }
+
     let analysis = null;
+
+    // Helper block to construct message content to avoid sending text files as image_url
+    const buildMessageContent = () => {
+      let contentArray = [{ type: 'text', text: prompt }];
+      if (!isCsvOrText) {
+        const isPdf = mimeType === 'application/pdf';
+        const fileUrlContent = isPdf ? base64Data : `data:${mimeType};base64,${base64Data}`;
+        const attachmentType = isPdf ? 'file_url' : 'image_url';
+        contentArray.push({
+          type: attachmentType,
+          [attachmentType]: { url: fileUrlContent }
+        });
+      }
+      return contentArray;
+    };
 
     // 3. Try Perplexity (Sonar-Pro)
     if (perplexityApiKey) {
       try {
         logger.log('[Analyze Document] Trying Perplexity...');
-        const isPdf = mimeType === 'application/pdf';
-        const fileUrlContent = isPdf ? base64Data : `data:${mimeType};base64,${base64Data}`;
-        const attachmentType = isPdf ? 'file_url' : 'image_url';
 
         const response = await fetch('https://api.perplexity.ai/chat/completions', {
           method: 'POST',
@@ -145,13 +170,7 @@ export default async function handler(req, res) {
             messages: [
               {
                 role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  {
-                    type: attachmentType,
-                    [attachmentType]: { url: fileUrlContent }
-                  }
-                ]
+                content: buildMessageContent()
               }
             ]
             // response_format: { type: 'json_object' }
@@ -192,15 +211,7 @@ export default async function handler(req, res) {
             messages: [
               {
                 role: 'user',
-                content: [
-                  { type: 'text', text: prompt },
-                  {
-                    type: mimeType === 'application/pdf' ? 'file_url' : 'image_url',
-                    [mimeType === 'application/pdf' ? 'file_url' : 'image_url']: {
-                      url: mimeType === 'application/pdf' ? base64Data : `data:${mimeType};base64,${base64Data}`
-                    }
-                  }
-                ]
+                content: buildMessageContent()
               }
             ],
             response_format: { type: 'json_object' }
