@@ -347,6 +347,7 @@ export default function PeoplePage() {
             >
               <ContactAvatar
                 name={contact.name}
+                photoUrl={contact.avatarUrl}
                 size={36}
                 className="w-9 h-9 transition-all"
                 healthScore={healthScore}

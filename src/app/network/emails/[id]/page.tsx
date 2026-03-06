@@ -2,18 +2,21 @@
 
 import { useParams, useRouter } from 'next/navigation'
 import { useEmail, useMarkEmailAsRead } from '@/hooks/useEmail'
+import { useEmailThread } from '@/hooks/useEmailThread'
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon } from 'lucide-react'
+import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown } from 'lucide-react'
 import { format } from 'date-fns'
 import { EmailContent } from '@/components/emails/EmailContent'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import { cn } from '@/lib/utils'
 import { RichTextEditor } from '@/components/emails/RichTextEditor'
 import type { Editor } from '@tiptap/react'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
-import type { EmailAttachment } from '@/hooks/useEmails'
+import type { Email, EmailAttachment } from '@/hooks/useEmails'
 import { useEmailIdentityMap, extractEmailAddress } from '@/hooks/useEmailIdentityMap'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -28,7 +31,7 @@ export default function EmailDetailPage() {
   const params = useParams()
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { user, profile } = useAuth()
+  const { user, profile, role } = useAuth()
   const id = params?.id as string
   const { data: email, isLoading } = useEmail(id)
   const { mutate: markAsRead } = useMarkEmailAsRead()
@@ -40,6 +43,21 @@ export default function EmailDetailPage() {
   const [isSendingReply, setIsSendingReply] = useState(false)
   const [replyAttachments, setReplyAttachments] = useState<File[]>([])
   const [previewAttachment, setPreviewAttachment] = useState<{ filename: string; url: string; mimeType?: string } | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const ownerEmail = user?.email?.toLowerCase() ?? 'guest'
+  const threadKey = email?.threadId || email?.id
+  const threadQueryKey = ['email-thread', threadKey ?? '', ownerEmail, role]
+  const { data: threadEmails = [], isLoading: isThreadLoading } = useEmailThread(threadKey)
+  const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null)
+
+  useEffect(() => {
+    setExpandedThreadId(null)
+  }, [threadKey])
+
+  useEffect(() => {
+    if (threadEmails.length === 0) return
+    setExpandedThreadId((prev) => prev ?? threadEmails[0].id)
+  }, [threadEmails])
 
   useEffect(() => {
     return () => {
@@ -48,6 +66,14 @@ export default function EmailDetailPage() {
       }
     }
   }, [previewAttachment])
+
+  useEffect(() => {
+    if (!isReplyOpen) return
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    container.scrollTo({ top: 0, behavior: 'smooth' })
+  }, [isReplyOpen])
 
   const handleDownloadAttachment = async (attachment: EmailAttachment) => {
     if (!attachment.attachmentId || !attachment.messageId) {
@@ -168,7 +194,19 @@ export default function EmailDetailPage() {
   const fromValue = email?.from || ''
   const toList = email ? (Array.isArray(email.to) ? email.to : [email.to]) : []
   const fromMailbox = parseMailbox(fromValue)
-  const identityAddresses = [fromValue, ...toList].map((addr) => extractEmailAddress(String(addr || ''))).filter(Boolean)
+  const threadAddressPool: Array<string | null | undefined> = threadEmails.length
+    ? threadEmails.flatMap((message: { from?: string | null; to?: string | string[] | null }) => {
+        const toCollection = Array.isArray(message.to) ? message.to : [message.to]
+        return [message.from, ...toCollection]
+      })
+    : [fromValue, ...toList]
+  const identityAddresses: string[] = Array.from(
+    new Set(
+      threadAddressPool
+        .map((addr: string | null | undefined) => extractEmailAddress(String(addr || '')))
+        .filter((address: string): boolean => Boolean(address))
+    )
+  )
   const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
   const fromAddressKey = extractEmailAddress(fromValue)
   const fromContact = contactByEmail[fromAddressKey]
@@ -285,8 +323,10 @@ export default function EmailDetailPage() {
       setReplyHtml('')
       setReplyAttachments([])
       setIsReplyOpen(false)
+      setExpandedThreadId(null)
       queryClient.invalidateQueries({ queryKey: ['emails'] })
       queryClient.invalidateQueries({ queryKey: ['email', id] })
+      queryClient.invalidateQueries({ queryKey: threadQueryKey })
     } catch (error: any) {
       toast.error(error?.message || 'Failed to send reply')
     } finally {
@@ -335,7 +375,12 @@ export default function EmailDetailPage() {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
               {fromContact ? (
-                <ContactAvatar name={fromContact.displayName} size={48} className="rounded-[14px]" />
+                <ContactAvatar
+                  name={fromContact.displayName}
+                  photoUrl={fromContact.avatarUrl}
+                  size={48}
+                  className="rounded-[14px]"
+                />
               ) : (
                 <CompanyIcon
                   name={displayFromName}
@@ -395,181 +440,308 @@ export default function EmailDetailPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-white/0 np-scroll">
-           {isReplyOpen ? (
-             <div className="px-8 pt-6 pb-2 border-b border-white/5">
-               <div className="rounded-xl border border-white/10 bg-black/30 overflow-hidden">
-                 <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-                   <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                     Replying to <span className="text-zinc-200 normal-case tracking-normal font-sans">{replyToAddress}</span>
-                   </div>
-                  <button
-                    type="button"
-                     onClick={() => setIsReplyOpen(false)}
-                     className="icon-button-forensic w-8 h-8"
-                     title="Close reply"
-                   >
-                     <X className="w-4 h-4" />
-                   </button>
-                 </div>
-
-                 <div className="px-4 py-2 border-b border-white/10 flex flex-wrap items-center gap-1.5">
-                   <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleBold().run() }} className="icon-button-forensic w-8 h-8" title="Bold">
-                     <Bold className="w-4 h-4" />
-                   </button>
-                   <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleItalic().run() }} className="icon-button-forensic w-8 h-8" title="Italic">
-                     <Italic className="w-4 h-4" />
-                   </button>
-                   <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleUnderline().run() }} className="icon-button-forensic w-8 h-8" title="Underline">
-                     <UnderlineIcon className="w-4 h-4" />
-                   </button>
-                   <div className="h-4 w-px bg-white/10 mx-1" />
-                   <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleBulletList().run() }} className="icon-button-forensic w-8 h-8" title="Bullet List">
-                     <List className="w-4 h-4" />
-                   </button>
-                   <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleOrderedList().run() }} className="icon-button-forensic w-8 h-8" title="Numbered List">
-                     <ListOrdered className="w-4 h-4" />
-                   </button>
-                   <button
-                     type="button"
-                     onMouseDown={(e) => {
-                       e.preventDefault()
-                       const input = document.createElement('input')
-                       input.type = 'file'
-                       input.accept = 'image/*'
-                       input.onchange = async () => {
-                         const file = input.files?.[0]
-                         if (!file || !replyEditor) return
-                         const reader = new FileReader()
-                         reader.onload = () => {
-                           replyEditor.chain().focus().setImage({ src: reader.result as string }).run()
-                         }
-                         reader.readAsDataURL(file)
-                       }
-                       input.click()
-                     }}
-                     className="icon-button-forensic w-8 h-8"
-                     title="Insert Image"
+        <div className="flex-1 overflow-y-auto bg-white/0 np-scroll" ref={scrollContainerRef}>
+          <AnimatePresence initial={false}>
+            {isReplyOpen && (
+              <motion.div
+                key="reply-box"
+                initial={{ opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
+                transition={{ duration: 0.28, ease: [0.19, 1, 0.22, 1] }}
+                className="px-8 pt-6 pb-2 border-b border-white/5"
+                layout
+              >
+                <div className="rounded-xl border border-white/10 bg-black/30 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                    <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
+                      Replying to <span className="text-zinc-200 normal-case tracking-normal font-sans">{replyToAddress}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsReplyOpen(false)}
+                      className="icon-button-forensic w-8 h-8"
+                      title="Close reply"
                     >
-                     <ImageIcon className="w-4 h-4" />
-                   </button>
-                   <button
-                     type="button"
-                     onMouseDown={(e) => {
-                       e.preventDefault()
-                       const input = document.createElement('input')
-                       input.type = 'file'
-                       input.multiple = true
-                       input.onchange = () => {
-                         const files = Array.from(input.files || [])
-                         if (files.length === 0) return
-                         setReplyAttachments((prev) => [...prev, ...files])
-                       }
-                       input.click()
-                     }}
-                     className="icon-button-forensic w-8 h-8"
-                     title="Attach Files"
-                   >
-                     <Paperclip className="w-4 h-4" />
-                   </button>
-                 </div>
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                 <div className="p-4 min-h-[180px]">
-                   <RichTextEditor
-                     content={replyHtml}
-                     onChange={setReplyHtml}
-                     onEditorReady={setReplyEditor}
-                     placeholder="Write your reply..."
-                     className="min-h-[140px]"
-                     autoFocus
-                   />
-                   {replyAttachments.length > 0 ? (
-                     <div className="mt-3 space-y-2">
-                       {replyAttachments.map((file, idx) => (
-                         <div key={`${file.name}-${idx}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                           <div className="min-w-0">
-                             <p className="text-xs text-zinc-200 truncate">{file.name}</p>
-                             <p className="text-[10px] text-zinc-500">{(file.size / 1024).toFixed(1)} KB</p>
-                           </div>
-                           <button
-                             type="button"
-                             onClick={() => setReplyAttachments((prev) => prev.filter((_, i) => i !== idx))}
-                             className="icon-button-forensic w-7 h-7"
-                             title="Remove attachment"
-                           >
-                             <X className="w-3 h-3" />
-                           </button>
-                         </div>
-                       ))}
-                     </div>
-                   ) : null}
-                 </div>
+                  <div className="px-4 py-2 border-b border-white/10 flex flex-wrap items-center gap-1.5">
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleBold().run() }} className="icon-button-forensic w-8 h-8" title="Bold">
+                      <Bold className="w-4 h-4" />
+                    </button>
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleItalic().run() }} className="icon-button-forensic w-8 h-8" title="Italic">
+                      <Italic className="w-4 h-4" />
+                    </button>
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleUnderline().run() }} className="icon-button-forensic w-8 h-8" title="Underline">
+                      <UnderlineIcon className="w-4 h-4" />
+                    </button>
+                    <div className="h-4 w-px bg-white/10 mx-1" />
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleBulletList().run() }} className="icon-button-forensic w-8 h-8" title="Bullet List">
+                      <List className="w-4 h-4" />
+                    </button>
+                    <button type="button" onMouseDown={(e) => { e.preventDefault(); replyEditor?.chain().focus().toggleOrderedList().run() }} className="icon-button-forensic w-8 h-8" title="Numbered List">
+                      <ListOrdered className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*'
+                        input.onchange = async () => {
+                          const file = input.files?.[0]
+                          if (!file || !replyEditor) return
+                          const reader = new FileReader()
+                          reader.onload = () => {
+                            replyEditor.chain().focus().setImage({ src: reader.result as string }).run()
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                        input.click()
+                      }}
+                      className="icon-button-forensic w-8 h-8"
+                      title="Insert Image"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault()
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.multiple = true
+                        input.onchange = () => {
+                          const files = Array.from(input.files || [])
+                          if (files.length === 0) return
+                          setReplyAttachments((prev) => [...prev, ...files])
+                        }
+                        input.click()
+                      }}
+                      className="icon-button-forensic w-8 h-8"
+                      title="Attach Files"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                 <div className="px-4 py-3 border-t border-white/10 flex items-center justify-end gap-2">
-                   <Button variant="ghost" onClick={() => setIsReplyOpen(false)} className="text-zinc-400 hover:text-white hover:bg-white/5">
-                     Cancel
-                   </Button>
-                   <Button onClick={handleReply} disabled={isSendingReply} className="bg-white text-zinc-950 hover:bg-zinc-200 min-w-[110px]">
-                     {isSendingReply ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-                     Send Reply
-                   </Button>
-                 </div>
-               </div>
-             </div>
-           ) : null}
+                  <div className="p-4 min-h-[180px]">
+                    <RichTextEditor
+                      content={replyHtml}
+                      onChange={setReplyHtml}
+                      onEditorReady={setReplyEditor}
+                      placeholder="Write your reply..."
+                      className="min-h-[140px]"
+                      autoFocus
+                    />
+                    {replyAttachments.length > 0 ? (
+                      <div className="mt-3 space-y-2">
+                        {replyAttachments.map((file, idx) => (
+                          <div key={`${file.name}-${idx}`} className="flex items-center justify-between rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="text-xs text-zinc-200 truncate">{file.name}</p>
+                              <p className="text-[10px] text-zinc-500">{(file.size / 1024).toFixed(1)} KB</p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setReplyAttachments((prev) => prev.filter((_, i) => i !== idx))}
+                              className="icon-button-forensic w-7 h-7"
+                              title="Remove attachment"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
 
-           <EmailContent 
-             html={email.html} 
-             text={email.text || email.snippet} 
-             subject={email.subject}
-             printTrigger={isPrintRequested}
-             initialLightMode={email.type === 'sent'}
-             className="p-4"
-           />
-           
-           {/* Attachments Section */}
-           {email.attachments && email.attachments.length > 0 && (
-             <div className="px-8 pb-6 space-y-3">
-               <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
-                 <Paperclip className="w-3 h-3" />
-                 <span>Attachments ({email.attachments.length})</span>
-               </div>
-               <div className="space-y-2">
-                 {email.attachments.map((attachment, idx) => (
-                   <div
-                     key={idx}
-                     className="flex items-center justify-between gap-3 p-3 rounded-lg border border-white/10 bg-black/20 hover:bg-black/30 transition-colors group cursor-pointer"
-                     onClick={() => openAttachmentPreview(attachment)}
-                   >
-                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                       <div className="w-10 h-10 rounded-xl nodal-glass flex items-center justify-center border border-white/10 flex-shrink-0">
-                         <Paperclip className="w-4 h-4 text-zinc-400" />
-                       </div>
-                       <div className="min-w-0 flex-1">
-                         <p className="text-sm font-medium text-zinc-200 truncate">{attachment.filename}</p>
-                         <p className="text-xs text-zinc-500">
-                           {typeof attachment.size === 'number' ? `${(attachment.size / 1024).toFixed(1)} KB` : 'Unknown size'}
-                         </p>
-                       </div>
-                     </div>
-                     <button
-                       onClick={(e) => { e.stopPropagation(); handleDownloadAttachment(attachment) }}
-                       disabled={!!attachment.downloadUnavailable || !attachment.attachmentId || !attachment.messageId || downloadingAttachment === attachment.attachmentId}
-                       className="icon-button-forensic h-9 px-4 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider"
-                     >
-                       {downloadingAttachment === attachment.attachmentId ? (
-                         <Loader2 className="w-4 h-4 animate-spin" />
-                       ) : (
-                         <Download className="w-4 h-4" />
-                       )}
-                       Download
-                     </button>
-                   </div>
-                 ))}
-               </div>
-             </div>
-           )}
+                  <div className="px-4 py-3 border-t border-white/10 flex items-center justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setIsReplyOpen(false)} className="text-zinc-400 hover:text-white hover:bg-white/5">
+                      Cancel
+                    </Button>
+                    <Button onClick={handleReply} disabled={isSendingReply} className="bg-white text-zinc-950 hover:bg-zinc-200 min-w-[110px]">
+                      {isSendingReply ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                      Send Reply
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="px-8 pb-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-[10px] font-mono uppercase tracking-[0.5em] text-zinc-500">Conversation</h2>
+              <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-400">
+                {threadEmails.length} {threadEmails.length === 1 ? 'message' : 'messages'}
+              </span>
+            </div>
+
+            {isThreadLoading ? (
+              <div className="text-center text-xs font-mono text-zinc-500 py-6">
+                Loading conversation...
+              </div>
+            ) : threadEmails.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-zinc-950/30 px-6 py-10 text-center">
+                <p className="text-[10px] font-mono uppercase tracking-[0.4em] text-zinc-500">Conversation unavailable</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <AnimatePresence initial={false}>
+                  {threadEmails.map((threadEmail: Email, index: number) => {
+                    const isExpanded = expandedThreadId === threadEmail.id
+                    const fromKey = extractEmailAddress(threadEmail.from || '')
+                    const fromContactEntry = fromKey ? contactByEmail[fromKey] : undefined
+                    const parsedFrom = parseMailbox(threadEmail.from || '')
+                    const displayName = fromContactEntry?.displayName || (threadEmail.type === 'sent'
+                      ? (profile?.firstName ? `${profile.firstName} • You` : 'You')
+                      : threadEmail.fromName || parsedFrom.name || threadEmail.from || 'Unknown')
+                    const displaySegment = threadEmail.type === 'sent'
+                      ? `To ${Array.isArray(threadEmail.to) ? threadEmail.to.join(', ') : threadEmail.to}`
+                      : `From ${parsedFrom.address || threadEmail.from}`
+                    const snippet = threadEmail.snippet || (threadEmail.text || '').slice(0, 140)
+                    const isLatest = index === 0
+
+                    return (
+                      <motion.article
+                        key={threadEmail.id}
+                        layout
+                        initial={{ opacity: 0, y: 8 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 8 }}
+                        className={cn(
+                          "group rounded-2xl border transition-all duration-300 overflow-hidden",
+                          isExpanded ? "bg-zinc-950/90 border-white/10 shadow-2xl" : "bg-zinc-950/40 border-white/5 hover:bg-zinc-950/80 hover:border-white/10"
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setExpandedThreadId((prev) => (prev === threadEmail.id ? null : threadEmail.id))}
+                          className="w-full text-left p-4 flex items-start gap-3 focus:outline-none"
+                        >
+                          <div className="flex-shrink-0">
+                            {fromContactEntry ? (
+                              <ContactAvatar name={fromContactEntry.displayName} size={40} className="rounded-[14px]" />
+                            ) : (
+                              <CompanyIcon
+                                name={displayName}
+                                domain={(parsedFrom.address || threadEmail.from || '').includes('@') ? (parsedFrom.address || threadEmail.from || '').split('@')[1] : undefined}
+                                size={40}
+                                roundedClassName="rounded-[14px]"
+                              />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0 space-y-2">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={cn("font-semibold text-sm truncate", isExpanded ? "text-white" : "text-zinc-200")}>
+                                  {displayName}
+                                </span>
+                                {isLatest && (
+                                  <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-400">
+                                    Latest
+                                  </span>
+                                )}
+                              </div>
+                              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">
+                                {format(new Date(threadEmail.date || Date.now()), 'MMM d, yyyy h:mm a')}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-zinc-500">
+                                {threadEmail.type === 'sent' ? 'Outbound' : 'Inbox'}
+                              </span>
+                              <span className="text-xs text-zinc-400 truncate">{displaySegment}</span>
+                            </div>
+                            {!isExpanded && snippet && (
+                              <p className="text-sm text-zinc-400 line-clamp-3">
+                                {snippet}
+                              </p>
+                            )}
+                          </div>
+                          <motion.span
+                            animate={{ rotate: isExpanded ? 180 : 0 }}
+                            transition={{ duration: 0.2, ease: [0.19, 1, 0.22, 1] }}
+                            className="flex items-center justify-center"
+                          >
+                            <ChevronDown className="w-4 h-4 text-zinc-400" />
+                          </motion.span>
+                        </button>
+                        <AnimatePresence initial={false}>
+                          {isExpanded && (
+                            <motion.div
+                              key="thread-content"
+                              initial={{ height: 0, opacity: 0 }}
+                              animate={{ height: 'auto', opacity: 1 }}
+                              exit={{ height: 0, opacity: 0 }}
+                              transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+                              className="overflow-hidden border-t border-white/5"
+                            >
+                              <div className="bg-zinc-900/80 p-4 space-y-4">
+                                <EmailContent
+                                  html={threadEmail.html}
+                                  text={threadEmail.text}
+                                  subject={threadEmail.subject}
+                                  initialLightMode={threadEmail.type === 'sent'}
+                                  className="rounded-2xl border border-white/10"
+                                />
+                                {threadEmail.attachments && threadEmail.attachments.length > 0 && (
+                                  <div className="px-4 py-3 border border-white/5 rounded-xl bg-black/30 space-y-3">
+                                    <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-400">
+                                      <Paperclip className="w-3 h-3" />
+                                      <span>Attachments ({threadEmail.attachments.length})</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {threadEmail.attachments.map((attachment: EmailAttachment, idx: number) => (
+                                        <div
+                                          key={`${attachment.filename}-${idx}`}
+                                          className="flex items-center justify-between gap-3 p-3 rounded-lg border border-white/10 bg-black/20 hover:bg-black/30 transition-colors group cursor-pointer"
+                                          onClick={() => openAttachmentPreview(attachment)}
+                                        >
+                                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                                            <div className="w-10 h-10 rounded-xl nodal-glass flex items-center justify-center border border-white/10 flex-shrink-0">
+                                              <Paperclip className="w-4 h-4 text-zinc-400" />
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                              <p className="text-sm font-medium text-zinc-200 truncate">{attachment.filename}</p>
+                                              <p className="text-[10px] text-zinc-500">
+                                                {attachment.size ? `${(attachment.size / 1024).toFixed(1)} KB` : 'Unknown size'}
+                                              </p>
+                                            </div>
+                                          </div>
+                                          <button
+                                            onClick={(e) => { e.stopPropagation(); handleDownloadAttachment(attachment) }}
+                                            disabled={!!attachment.downloadUnavailable || !attachment.attachmentId || !attachment.messageId || downloadingAttachment === attachment.attachmentId}
+                                            className="icon-button-forensic h-9 px-4 flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider"
+                                          >
+                                            {downloadingAttachment === attachment.attachmentId ? (
+                                              <Loader2 className="w-4 h-4 animate-spin" />
+                                            ) : (
+                                              <Download className="w-4 h-4" />
+                                            )}
+                                            Download
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </motion.article>
+                    )
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
+        </div>
 
         <div className="p-4 border-t border-white/5 nodal-recessed">
             <button 

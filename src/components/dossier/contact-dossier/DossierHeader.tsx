@@ -115,6 +115,7 @@ export const DossierHeader = memo(function DossierHeader({
                                     >
                                         <ContactAvatar
                                             name={contactName}
+                                            photoUrl={contact?.avatarUrl}
                                             size={56}
                                             className={cn(
                                                 "w-14 h-14 transition-all",
@@ -125,6 +126,7 @@ export const DossierHeader = memo(function DossierHeader({
                                 ) : (
                                     <ContactAvatar
                                         name={contactName}
+                                        photoUrl={contact?.avatarUrl}
                                         size={56}
                                         className={cn(
                                             "w-14 h-14 transition-all",

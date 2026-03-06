@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useCallStore } from '@/store/callStore';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { ContactAvatar } from '@/components/ui/ContactAvatar';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
@@ -47,6 +48,7 @@ interface ApolloContactRow {
   name: string;
   firstName?: string;
   lastName?: string;
+  photoUrl?: string;
   title?: string;
   email: string;
   status: 'verified' | 'unverified';
@@ -409,6 +411,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           fullName?: string;
           firstName?: string;
           lastName?: string;
+          photoUrl?: string;
           jobTitle?: string;
           email?: string;
           linkedin?: string;
@@ -453,6 +456,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           acquired_at: new Date().toISOString(),
           company: companySummary?.name || companyName || domain,
           apollo_person_id: person.id,
+          photoUrl: enriched.photoUrl || person.photoUrl || '',
           original_apollo_data: enriched
         }
       };
@@ -554,6 +558,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           name: enriched.fullName || p.name,
           firstName: enriched.firstName || p.firstName,
           lastName: enriched.lastName || p.lastName,
+          photoUrl: enriched.photoUrl || p.photoUrl,
           email: enriched.email || p.email,
           title: enriched.jobTitle || p.title,
           linkedin: enriched.linkedin || p.linkedin,
@@ -762,6 +767,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           ].filter(Boolean).join(', ')
 
           const linkedin = typeof contact.linkedin_url === 'string' ? contact.linkedin_url : undefined
+          const photoUrl = typeof contact.photo_url === 'string'
+            ? contact.photo_url
+            : (typeof contact.photoUrl === 'string' ? contact.photoUrl : undefined)
 
           // Apollo phone numbers are often in a 'phones' array
           const phones: string[] = []
@@ -784,6 +792,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             isMonitored,
             location,
             linkedin,
+            photoUrl,
             phones
           }
         })
@@ -886,6 +895,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           ].filter(Boolean).join(', ');
 
           const linkedin = typeof c.linkedin_url === 'string' ? c.linkedin_url : typeof c.linkedin === 'string' ? c.linkedin : undefined;
+          const photoUrl = typeof c.photo_url === 'string'
+            ? c.photo_url
+            : (typeof c.photoUrl === 'string' ? c.photoUrl : undefined);
 
           const phones: string[] = [];
           if (Array.isArray(c.phones)) {
@@ -910,6 +922,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             isMonitored,
             location,
             linkedin,
+            photoUrl,
             phones
           };
         })
@@ -1241,8 +1254,16 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       className="group flex flex-col p-2.5 rounded-xl hover:bg-zinc-950/40 transition-all border border-transparent hover:border-white/5 space-y-2"
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex flex-col min-w-0 flex-1 mr-2">
-                          <div className="flex items-center gap-1.5 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                          <ContactAvatar
+                            name={person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact'}
+                            photoUrl={person.photoUrl}
+                            size={36}
+                            className="w-9 h-9 rounded-[10px]"
+                            textClassName="text-[10px]"
+                          />
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 min-w-0">
                             <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
                               {person.isMonitored
                                 ? person.name
@@ -1252,10 +1273,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             {person.isMonitored && (
                               <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" aria-label="Synced" />
                             )}
+                            </div>
+                            <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
+                              {person.title || 'Nodal Analyst'}
+                            </span>
                           </div>
-                          <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
-                            {person.title || 'Nodal Analyst'}
-                          </span>
                         </div>
 
                         <div className="flex items-center gap-1.5">
@@ -1348,6 +1370,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                         const domainForCall = (accountDomain && accountDomain.trim()) || companySummary?.domain || domain;
                                         initiateCall(num, {
                                           name: callName,
+                                          photoUrl: person.photoUrl,
                                           account: companyName,
                                           title: person.title,
                                           logoUrl: logoUrl || undefined,

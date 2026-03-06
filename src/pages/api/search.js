@@ -98,6 +98,7 @@ export default async function handler(req, res) {
           workPhone, 
           otherPhone, 
           phone, 
+          metadata,
           accountId,
           city,
           state,
@@ -132,6 +133,7 @@ export default async function handler(req, res) {
           accountId: data.accountId || '',
           city: data.city || '',
           state: data.state || '',
+          avatarUrl: data.metadata?.photoUrl || data.metadata?.photo_url || data.metadata?.avatarUrl || data.metadata?.avatar_url || data.metadata?.original_apollo_data?.photoUrl || '',
           domain: data.accounts?.domain || data.accounts?.metadata?.domain || data.accounts?.metadata?.general?.domain || '',
           logoUrl: data.accounts?.logo_url || data.accounts?.metadata?.logo_url || data.accounts?.metadata?.logoUrl || ''
         };

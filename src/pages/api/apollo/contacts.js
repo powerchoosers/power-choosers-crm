@@ -24,7 +24,7 @@ export default async function handler(req, res) {
     const requestBody = req.body || {};
     
     // Extract parameters (matching Lusha format from widget)
-    const { pages = {}, filters = {} } = requestBody;
+    const { pages = {}, filters = {}, includePhotos = true } = requestBody;
     const page = pages.page !== undefined ? pages.page : 0;
     const size = pages.size !== undefined ? pages.size : 10;
     const personName = filters.person_name || ''; // New filter for name search
@@ -177,11 +177,59 @@ export default async function handler(req, res) {
     const apolloPeople = searchData.people || [];
 
     if (apolloPeople.length > 0) {
-      
-      // OPTIMIZATION: Do NOT automatically enrich everyone.
-      // The user wants to avoid paying 1 credit per person just to see the list.
-      // We will return the obfuscated data (from api_search) and let the user "Enrich" individual contacts via the UI.
-      // This saves ~10 credits per search.
+      // Optional lightweight enrichment pass to improve avatar coverage.
+      // We request bulk_match with reveal flags disabled so this only hydrates profile fields.
+      if (includePhotos) {
+        try {
+          const enrichedMap = new Map();
+          const chunkSize = 10;
+
+          for (let i = 0; i < apolloPeople.length; i += chunkSize) {
+            const chunk = apolloPeople.slice(i, i + chunkSize);
+            const details = chunk
+              .map((p) => (p?.id ? { id: p.id } : null))
+              .filter(Boolean);
+            if (details.length === 0) continue;
+
+            const bulkMatchUrl = `${APOLLO_BASE_URL}/people/bulk_match`;
+            const bulkResp = await fetchWithRetry(bulkMatchUrl, {
+              method: 'POST',
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Content-Type': 'application/json',
+                'X-Api-Key': APOLLO_API_KEY
+              },
+              body: JSON.stringify({
+                details,
+                reveal_personal_emails: false,
+                reveal_phone_number: false
+              })
+            });
+
+            if (!bulkResp.ok) continue;
+            const bulkData = await bulkResp.json();
+            const matches = bulkData.matches || [];
+            matches.forEach((match) => {
+              if (match?.id) enrichedMap.set(match.id, match);
+            });
+          }
+
+          apolloPeople.forEach((p, index) => {
+            const enriched = p?.id ? enrichedMap.get(p.id) : null;
+            if (enriched) {
+              apolloPeople[index] = {
+                ...p,
+                photo_url: p.photo_url || enriched.photo_url || '',
+                first_name: p.first_name || enriched.first_name || '',
+                last_name: p.last_name || enriched.last_name || '',
+                name: p.name || enriched.name || ''
+              };
+            }
+          });
+        } catch (_) {
+          // Keep endpoint resilient: if enrichment fails, return base search results.
+        }
+      }
     }
 
     // Map Apollo people to Lusha contact format

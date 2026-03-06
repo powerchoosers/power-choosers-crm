@@ -5,6 +5,10 @@ import { getValidAccessTokenForUser } from './zoho-token-manager.js';
 import logger from '../_logger.js';
 import crypto from 'crypto';
 
+const MAX_AUTO_INGEST_ATTACHMENT_BYTES = 20 * 1024 * 1024; // 20MB safety cap
+const AUTO_INGEST_INBOUND_ATTACHMENTS = process.env.AUTO_INGEST_INBOUND_ATTACHMENTS !== 'false';
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://nodalpoint.io';
+
 function stripHtml(value) {
     if (!value) return '';
     return String(value)
@@ -48,6 +52,181 @@ function extractZohoAttachments(summary, content, messageId) {
             downloadUnavailable: !attachmentId,
         };
     });
+}
+
+function formatBytes(bytes, decimals = 2) {
+    if (!+bytes) return '0 Bytes';
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+
+function extractEmailAddress(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const angle = raw.match(/<\s*([^>]+)\s*>/);
+    const email = angle?.[1] || raw;
+    return email.trim().toLowerCase();
+}
+
+function sanitizeFileName(name) {
+    return String(name || 'attachment.bin').replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+async function resolveContactAndAccount(ownerEmail, senderEmail) {
+    if (!ownerEmail || !senderEmail) return { contactId: null, accountId: null };
+
+    const ownedQuery = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId, ownerId')
+        .ilike('email', senderEmail)
+        .eq('ownerId', ownerEmail)
+        .limit(1)
+        .maybeSingle();
+
+    if (ownedQuery.error) {
+        logger.warn('[Zoho Sync] Contact/account resolution (owned) failed:', ownedQuery.error.message || ownedQuery.error, 'zoho-sync');
+        return { contactId: null, accountId: null };
+    }
+
+    if (ownedQuery.data?.id) {
+        return {
+            contactId: ownedQuery.data.id || null,
+            accountId: ownedQuery.data.accountId || null,
+        };
+    }
+
+    const sharedQuery = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId, ownerId')
+        .ilike('email', senderEmail)
+        .is('ownerId', null)
+        .limit(1)
+        .maybeSingle();
+
+    if (sharedQuery.error) {
+        logger.warn('[Zoho Sync] Contact/account resolution (shared) failed:', sharedQuery.error.message || sharedQuery.error, 'zoho-sync');
+        return { contactId: null, accountId: null };
+    }
+
+    return {
+        contactId: sharedQuery.data?.id || null,
+        accountId: sharedQuery.data?.accountId || null,
+    };
+}
+
+async function autoIngestInboundAttachments({
+    zohoService,
+    ownerEmail,
+    messageId,
+    accountId,
+    attachments,
+    folderId,
+}) {
+    if (!AUTO_INGEST_INBOUND_ATTACHMENTS) return { saved: 0, skipped: 0 };
+    if (!accountId || !Array.isArray(attachments) || attachments.length === 0) return { saved: 0, skipped: 0 };
+
+    let saved = 0;
+    let skipped = 0;
+
+    for (const attachment of attachments) {
+        try {
+            if (!attachment?.attachmentId || attachment?.downloadUnavailable) {
+                skipped++;
+                continue;
+            }
+
+            if (typeof attachment.size === 'number' && attachment.size > MAX_AUTO_INGEST_ATTACHMENT_BYTES) {
+                logger.info(`[Zoho Sync] Skipping large attachment ${attachment.filename} (${attachment.size} bytes)`, 'zoho-sync');
+                skipped++;
+                continue;
+            }
+
+            const safeFileName = sanitizeFileName(attachment.filename || 'attachment.bin');
+            const storagePath = `accounts/${accountId}/email_attachments/${messageId}_${attachment.attachmentId}_${safeFileName}`;
+
+            const { data: existingDoc } = await supabaseAdmin
+                .from('documents')
+                .select('id')
+                .eq('storage_path', storagePath)
+                .maybeSingle();
+
+            if (existingDoc?.id) {
+                skipped++;
+                continue;
+            }
+
+            const { fileBuffer, contentType } = await zohoService.downloadAttachment(
+                String(ownerEmail),
+                String(messageId),
+                String(attachment.attachmentId),
+                folderId || 'inbox'
+            );
+
+            const { error: uploadError } = await supabaseAdmin.storage
+                .from('vault')
+                .upload(storagePath, fileBuffer, {
+                    contentType: contentType || attachment.mimeType || 'application/octet-stream',
+                    upsert: true,
+                });
+
+            if (uploadError) {
+                logger.warn(`[Zoho Sync] Attachment upload failed (${safeFileName}): ${uploadError.message}`, 'zoho-sync');
+                skipped++;
+                continue;
+            }
+
+            const { error: insertError } = await supabaseAdmin
+                .from('documents')
+                .insert({
+                    account_id: accountId,
+                    name: attachment.filename || safeFileName,
+                    size: formatBytes(fileBuffer.length),
+                    type: contentType || attachment.mimeType || 'application/octet-stream',
+                    storage_path: storagePath,
+                    url: '',
+                    document_type: 'PROPOSAL',
+                });
+
+            if (insertError) {
+                logger.warn(`[Zoho Sync] Attachment document insert failed (${safeFileName}): ${insertError.message}`, 'zoho-sync');
+                skipped++;
+                continue;
+            }
+
+            await triggerDocumentAnalysis(accountId, storagePath, attachment.filename || safeFileName);
+
+            saved++;
+        } catch (ingestError) {
+            logger.warn(`[Zoho Sync] Attachment ingest error for message ${messageId}: ${ingestError?.message || ingestError}`, 'zoho-sync');
+            skipped++;
+        }
+    }
+
+    return { saved, skipped };
+}
+
+async function triggerDocumentAnalysis(accountId, filePath, fileName) {
+    if (!accountId || !filePath) return false;
+    try {
+        const response = await fetch(`${APP_URL}/api/analyze-document`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ accountId, filePath, fileName })
+        });
+
+        if (!response.ok) {
+            const body = await response.text().catch(() => '');
+            logger.warn(`[Zoho Sync] analyze-document failed for ${fileName || filePath}: ${response.status} ${body}`, 'zoho-sync');
+            return false;
+        }
+        return true;
+    } catch (error) {
+        logger.warn(`[Zoho Sync] analyze-document request error for ${fileName || filePath}: ${error?.message || error}`, 'zoho-sync');
+        return false;
+    }
 }
 
 export default async function handler(req, res) {
@@ -99,6 +278,7 @@ export default async function handler(req, res) {
 
         let syncedCount = 0;
         let skippedCount = 0;
+        let ingestedAttachmentCount = 0;
 
         for (const msgSummary of messages) {
             // Zoho messageId is a 19-digit number as a string
@@ -122,6 +302,11 @@ export default async function handler(req, res) {
             // 4. Parse 
             const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
 
+            const senderEmail = extractEmailAddress(msgSummary?.sender || fullContent?.fromAddress || '');
+            const resolvedIdentity = await resolveContactAndAccount(userEmail, senderEmail);
+            emailDoc.contactId = resolvedIdentity.contactId;
+            emailDoc.accountId = resolvedIdentity.accountId;
+
             // 5. Ensure thread exists (Must be before email insert due to FK constraint)
             await updateThread(emailDoc);
 
@@ -134,11 +319,22 @@ export default async function handler(req, res) {
                 logger.error(`[Zoho Sync] Failed to save message ${messageId}:`, insertError, 'zoho-sync');
             } else {
                 syncedCount++;
+                if (emailDoc.type === 'received' && emailDoc.accountId && Array.isArray(emailDoc.metadata?.attachments) && emailDoc.metadata.attachments.length > 0) {
+                    const ingest = await autoIngestInboundAttachments({
+                        zohoService,
+                        ownerEmail: userEmail,
+                        messageId,
+                        accountId: emailDoc.accountId,
+                        attachments: emailDoc.metadata.attachments,
+                        folderId: msgSummary?.folderId || msgSummary?.folderName || 'inbox',
+                    });
+                    ingestedAttachmentCount += ingest.saved;
+                }
             }
         }
 
-        logger.info(`[Zoho Sync] Sync complete for ${userEmail}: ${syncedCount} new, ${skippedCount} skipped`, 'zoho-sync');
-        res.status(200).json({ success: true, count: syncedCount });
+        logger.info(`[Zoho Sync] Sync complete for ${userEmail}: ${syncedCount} new, ${skippedCount} skipped, ${ingestedAttachmentCount} attachments ingested`, 'zoho-sync');
+        res.status(200).json({ success: true, count: syncedCount, ingestedAttachments: ingestedAttachmentCount });
 
     } catch (error) {
         logger.error(`[Zoho Sync] Global error for ${userEmail}:`, error, 'zoho-sync');

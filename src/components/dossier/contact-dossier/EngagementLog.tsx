@@ -88,6 +88,7 @@ export function EngagementLog({
                                                     accountDomain={account?.domain}
                                                     accountName={account?.name}
                                                     contactName={contact?.name}
+                                                    contactPhotoUrl={contact?.avatarUrl || contact?.photoUrl}
                                                     customerAvatar={isCompanyCall ? 'company' : 'contact'}
                                                     variant="minimal"
                                                 />
