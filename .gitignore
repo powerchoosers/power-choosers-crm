@@ -55,7 +55,16 @@ Power Choosers CRM - Local Development.ini
 usr/
 mingw64/
 
-# Personal / agent rules (keep local only; may contain personal workflow)
-.trae/rules/nodalpoint.md
-builder-agent-instructions.md
+# Personal / agent tool folders (keep local only; may contain personal workflow)
+.agent/
+.agents/
+.augment/
+.cursor/
+.gemini/
+.kilocode/
+.kiro/
+.trae/
+.windsurf/
 .openclaw_workspace/
+crm-platform/.claude/
+builder-agent-instructions.md
