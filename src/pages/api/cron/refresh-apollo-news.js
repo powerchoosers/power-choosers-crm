@@ -7,7 +7,8 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { fetchWithRetry, getApiKey, APOLLO_BASE_URL, normalizeDomain } from '../apollo/_utils.js';
 
-const REFRESH_WINDOW_DAYS = 7;
+const REFRESH_WINDOW_DAYS = 14;
+const MAX_DOMAINS_PER_RUN = Number(process.env.APOLLO_NEWS_MAX_PER_RUN || '30');
 
 function getCronSecret() {
   return process.env.APOLLO_NEWS_CRON_SECRET || process.env.CRON_SECRET || '';
@@ -114,9 +115,20 @@ export default async function handler(req, res) {
     const staleDomains = (refreshRows || []).filter(
       (r) => !r.last_refreshed_at || new Date(r.last_refreshed_at) < cutoff
     ).map((r) => r.key);
+    const domainsToRefresh = staleDomains.slice(0, MAX_DOMAINS_PER_RUN);
 
     const refreshed = [];
-    for (const domain of staleDomains) {
+
+    if (domainsToRefresh.length === 0) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ refreshed, notice: 'No domains queued for refresh' }));
+      return;
+    }
+
+    if (domainsToRefresh.length < staleDomains.length) {
+      console.info('[Cron Apollo News] Capping refresh to', domainsToRefresh.length, 'of', staleDomains.length, 'stale domains this run.');
+    }
+    for (const domain of domainsToRefresh) {
       try {
         const rawArticles = await fetchApolloNewsForDomain(domain);
         if (rawArticles && rawArticles.length > 0) {
