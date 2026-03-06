@@ -58,10 +58,21 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
   const deviceRef = useRef<Device | null>(null)
+  const currentCallRef = useRef<Call | null>(null)
   const isInitializing = useRef(false)
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
   const wasOfflineRef = useRef(false)
+
+  const hasLiveCall = useCallback((call: Call | null) => {
+    if (!call) return false
+    const status = call.status()
+    return status === 'connecting' || status === 'ringing' || status === 'open' || status === 'reconnecting'
+  }, [])
+
+  useEffect(() => {
+    currentCallRef.current = currentCall
+  }, [currentCall])
 
   /** Request microphone permission so the browser prompts the user; release stream immediately. Returns true if granted. */
   const requestMicrophonePermission = useCallback(async (): Promise<{ granted: boolean; denied: boolean }> => {
@@ -161,30 +172,40 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         throw new Error('No token received from server')
       }
 
-      // If we already have a device, try to update the token instead of destroying it
-      // This is CRITICAL for not dropping calls mid-call during a refresh.
+      // If we already have a device, try to update the token first.
       if (deviceRef.current && deviceRef.current.state !== 'destroyed') {
         const d = deviceRef.current
-
-        if (currentCall) {
-          console.log('[Voice] Call in progress, updating token instead of re-initializing device')
-          try {
-            d.updateToken(data.token)
-            // Still set the refresh timer for next time
-            if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current)
-            tokenRefreshTimer.current = setInterval(initDevice, 50 * 60 * 1000)
+        const callInProgress = hasLiveCall(currentCallRef.current)
+        if (callInProgress) {
+          console.log('[Voice] Call in progress, updating token without re-initializing device')
+        }
+        try {
+          d.updateToken(data.token)
+          // Keep refresh timer alive even when we only update token
+          if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current)
+          tokenRefreshTimer.current = setInterval(initDevice, 50 * 60 * 1000)
+          if (callInProgress || d.state === 'registered' || d.state === 'registering') {
             return
-          } catch (updateError) {
-            console.error('[Voice] Failed to update token, will attempt full re-init:', updateError)
-            // Fall through to full re-init if update fails
           }
+        } catch (updateError) {
+          if (callInProgress) {
+            console.error('[Voice] Token update failed during active call. Skipping device teardown to protect call:', updateError)
+            return
+          }
+          console.error('[Voice] Failed to update token, attempting full re-init:', updateError)
         }
       }
 
       // Cleanup existing device before creating new one if we get here
       if (deviceRef.current) {
+        if (hasLiveCall(currentCallRef.current)) {
+          console.warn('[Voice] Active call detected. Skipping device cleanup to avoid dropping call.')
+          return
+        }
         const d = deviceRef.current
         console.log('[Voice] Cleaning up existing device... State:', d.state)
+        setIsReady(false)
+        setDevice(null)
 
         try {
           if (d.state === 'registered' || d.state === 'registering') {
@@ -470,7 +491,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       isInitializing.current = false
     }
-  }, [requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, user])
+  }, [requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, user, hasLiveCall])
 
   useEffect(() => {
     initDevice()
@@ -497,6 +518,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && deviceRef.current) {
         const d = deviceRef.current
+        if (hasLiveCall(currentCallRef.current)) {
+          return
+        }
         // If device is in error state or not registered, try to re-init
         if (d.state === 'destroyed' || d.state === 'unregistered') {
           console.log('[Voice] Tab became visible and device not registered, re-initializing...')
@@ -508,7 +532,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [initDevice])
+  }, [initDevice, hasLiveCall])
 
   // Harden against network drops (e.g. WiFi blip, VPN switch): recover when browser comes back online
   useEffect(() => {
@@ -547,10 +571,11 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     const handleDeviceChange = () => {
       console.log('[Voice] Hardware device change detected (Mic/Speaker plugged or unplugged)')
       // If we are in a call, this might be why it went silent.
-      if (deviceRef.current && currentCall) {
+      if (deviceRef.current && hasLiveCall(currentCallRef.current)) {
         toast.info('Hardware change detected', {
           description: 'Your audio device were updated. Re-connecting audio path...'
         })
+        return
       }
       // Re-initialize to pick up new default icons/paths
       initDevice()
@@ -571,10 +596,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
       }
     }
-  }, [initDevice, setActive, setStatus, user])
+  }, [initDevice, setActive, setStatus, user, hasLiveCall])
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
-    if (!device || !isReady) {
+    const callInProgress = hasLiveCall(currentCallRef.current)
+    const deviceDestroyed = !!device && device.state === 'destroyed'
+    const deviceUsable = !!device && !deviceDestroyed && (isReady || callInProgress)
+
+    if (!deviceUsable) {
       // Request microphone permission first so user gets the browser prompt instead of "not ready"
       const perm = await requestMicrophonePermission()
       if (!perm.granted) {
@@ -731,7 +760,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       })
       setStatus('error')
     }
-  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus])
+  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, hasLiveCall])
 
   const disconnect = useCallback(() => {
     if (currentCall) {
