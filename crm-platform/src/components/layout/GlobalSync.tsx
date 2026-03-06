@@ -51,6 +51,15 @@ export function GlobalSync() {
             queryClient.invalidateQueries({ queryKey: ['emails-count'] })
           }
 
+          const invalidateDossierState = async () => {
+            await queryClient.invalidateQueries({ queryKey: ['account'] })
+            await queryClient.invalidateQueries({ queryKey: ['accounts'] })
+            await queryClient.invalidateQueries({ queryKey: ['contact'] })
+            await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+            await queryClient.refetchQueries({ queryKey: ['account'], type: 'active' })
+            await queryClient.refetchQueries({ queryKey: ['contact'], type: 'active' })
+          }
+
           if (oldRecord.status !== 'completed' && newRecord.status === 'completed') {
             if (isOwner) {
               toast('Contract Secured', {
@@ -59,8 +68,8 @@ export function GlobalSync() {
             }
             invalidateDeals()
             invalidateEmails()
+            void invalidateDossierState()
             queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
-            queryClient.invalidateQueries({ queryKey: ['accounts'] })
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           } else if (oldRecord.status !== 'opened' && newRecord.status === 'opened') {
             if (isOwner) {
