@@ -90,7 +90,6 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
         margin: 0 auto;
         padding: 24px;
         box-sizing: border-box;
-        min-height: 100vh;
         overflow-x: auto; /* Allow horizontal scroll for wide content */
       }
       a { color: #002FA7; text-decoration: underline; }
@@ -188,7 +187,6 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
           box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
           border-radius: 8px;
           margin: 10px;
-          min-height: calc(100% - 20px);
         }
       `}
     `
@@ -318,6 +316,7 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
+      if (event.source !== iframeRef.current?.contentWindow) return
       if (event.data.type === 'setHeight' && typeof event.data.height === 'number') {
         // Add a bit of buffer
         setIframeHeight(`${event.data.height + 20}px`)

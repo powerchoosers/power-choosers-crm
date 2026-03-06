@@ -50,36 +50,59 @@ export function useEmailIdentityMap(addresses: string[]) {
       const map: Record<string, EmailIdentity> = {}
       const chunks = chunk(normalized, 100)
 
-      for (const c of chunks) {
-        let query: any = supabase
-          .from('contacts')
-          .select('id, email, name, firstName, lastName, accountId, accounts(name, domain, logo_url)')
-          .in('email', c)
+      const emailOrFilter = (emails: string[]) =>
+        emails.map((e) => `email.ilike.${e}`).join(',')
 
-        if (role !== 'admin' && user?.id) {
-          query = query.eq('ownerId', user.id)
+      for (const c of chunks) {
+        const selectClause = 'id, email, name, firstName, lastName, accountId, ownerId, accounts(name, domain, logo_url)'
+
+        const querySets: any[] = []
+        if (role === 'admin') {
+          querySets.push(
+            supabase
+              .from('contacts')
+              .select(selectClause)
+              .or(emailOrFilter(c))
+          )
+        } else if (user?.id) {
+          querySets.push(
+            supabase
+              .from('contacts')
+              .select(selectClause)
+              .eq('ownerId', user.id)
+              .or(emailOrFilter(c))
+          )
+          querySets.push(
+            supabase
+              .from('contacts')
+              .select(selectClause)
+              .is('ownerId', null)
+              .or(emailOrFilter(c))
+          )
         }
 
-        const { data, error } = await query
-        if (error) throw error
+        for (const query of querySets) {
+          const { data, error } = await query
+          if (error) throw error
 
-        for (const row of data || []) {
-          const key = extractEmailAddress(row.email)
-          if (!key) continue
-          const displayName =
-            row.name ||
-            [row.firstName, row.lastName].filter(Boolean).join(' ').trim() ||
-            row.email
-          map[key] = {
-            id: row.id,
-            email: row.email,
-            displayName,
-            firstName: row.firstName || undefined,
-            lastName: row.lastName || undefined,
-            accountId: row.accountId || null,
-            accountName: row.accounts?.name || null,
-            accountDomain: row.accounts?.domain || null,
-            accountLogoUrl: row.accounts?.logo_url || null,
+          for (const row of data || []) {
+            const key = extractEmailAddress(row.email)
+            if (!key) continue
+            const displayName =
+              row.name ||
+              [row.firstName, row.lastName].filter(Boolean).join(' ').trim() ||
+              row.email
+            map[key] = {
+              id: row.id,
+              email: row.email,
+              displayName,
+              firstName: row.firstName || undefined,
+              lastName: row.lastName || undefined,
+              accountId: row.accountId || null,
+              accountName: row.accounts?.name || null,
+              accountDomain: row.accounts?.domain || null,
+              accountLogoUrl: row.accounts?.logo_url || null,
+            }
           }
         }
       }
