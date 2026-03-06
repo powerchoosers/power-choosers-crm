@@ -54,7 +54,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
   const { user } = useAuth()
   const pathname = usePathname()
-  const { setStatus, setActive } = useCallStore()
+  const { setStatus, setActive, setCallHealth } = useCallStore()
 
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
   const deviceRef = useRef<Device | null>(null)
@@ -310,6 +310,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       newDevice.on('warning', (name, data) => {
         console.warn('[Voice] Device warning:', name, data || {})
+        setCallHealth(name === 'constant-audio-input-level' ? 'poor' : 'fair')
 
         // Signal user if we detect quality issues
         if (name === 'audio-level-sample' && data && data.inputLevel === 0) {
@@ -327,6 +328,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       newDevice.on('error', (error) => {
         console.error('[Voice] Device error:', error)
+        setCallHealth('poor')
 
         // Don't show toast for "transport unavailable" as we'll try to recover
         // Also only show toasts if we are in the platform area
@@ -415,6 +417,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
                 setCurrentCall(call)
                 setActive(true)
                 setStatus('connected')
+                setCallHealth('good')
                 toast.dismiss(toastId)
 
                 // Track Health Monitor: Check for silence via WebRTC getStats()
@@ -460,6 +463,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           setCurrentCall(null)
           setActive(false)
           setStatus('ended')
+          setCallHealth('good')
         })
 
         call.on('disconnect', () => {
@@ -468,6 +472,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           setActive(false)
           setStatus('ended')
           setMetadata(null)
+          setCallHealth('good')
         })
       })
 
@@ -491,7 +496,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       isInitializing.current = false
     }
-  }, [requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, user, hasLiveCall])
+  }, [requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, user, hasLiveCall])
 
   useEffect(() => {
     initDevice()
@@ -548,6 +553,16 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       const hadBeenOffline = wasOfflineRef.current
       wasOfflineRef.current = false
+
+      if (hasLiveCall(currentCallRef.current)) {
+        if (hadBeenOffline) {
+          toast.info('Connection restored', {
+            description: 'Call is still active.',
+            duration: 3000,
+          })
+        }
+        return
+      }
 
       // Clear phantom call state (actual call already dropped when network was lost)
       setCurrentCall(null)
@@ -709,6 +724,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setCurrentCall(call)
         setStatus('connected')
         setActive(true)
+        setCallHealth('good')
 
         // Track Health Monitor: Check for silence via WebRTC getStats()
         const monitorMediaHealth = async () => {
@@ -743,6 +759,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setStatus('ended')
         setActive(false)
         setMetadata(null)
+        setCallHealth('good')
       })
 
       call.on('error', (error) => {
@@ -751,6 +768,15 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setCurrentCall(null)
         setStatus('error')
         setActive(false)
+        setCallHealth('poor')
+      })
+
+      call.on('warning', () => {
+        setCallHealth('fair')
+      })
+
+      call.on('warning-cleared', () => {
+        setCallHealth('good')
       })
 
     } catch (error: any) {
@@ -760,7 +786,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       })
       setStatus('error')
     }
-  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, hasLiveCall])
+  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, hasLiveCall])
 
   const disconnect = useCallback(() => {
     if (currentCall) {
@@ -769,8 +795,9 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       setStatus('ended')
       setActive(false)
       setMetadata(null)
+      setCallHealth('good')
     }
-  }, [currentCall, setActive, setStatus])
+  }, [currentCall, setActive, setStatus, setCallHealth])
 
   const sendDigits = useCallback((digits: string) => {
     if (currentCall) {
