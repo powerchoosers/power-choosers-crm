@@ -1390,7 +1390,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 onClick={() => handleAcquire(person, 'email')}
                                 disabled={revealState.revealingEmail || revealState.revealingPhone}
                                 className={cn(
-                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border text-[9px] font-mono transition-all uppercase tracking-widest min-w-0 w-full",
+                                  "group/field flex items-center gap-2 px-2 py-1 rounded-xl bg-zinc-950/20 border text-[9px] font-mono uppercase tracking-[0.3em] min-w-0 w-full justify-center",
                                   revealState.revealingEmail
                                     ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
                                     : "border-white/5 text-zinc-500 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
@@ -1404,13 +1404,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                   </>
                                 ) : (
                                   <>
-                                    <Globe className="w-3 h-3 shrink-0 text-zinc-600 group-hover/field:text-[#002FA7]" />
-                                    <span className="relative inline-flex items-center justify-center min-w-[112px] whitespace-nowrap">
-                                      <span className="tracking-[0.2em] transition-opacity duration-150 group-hover/field:opacity-0">••••••••••••</span>
-                                      <span className="absolute inset-0 flex items-center justify-center opacity-0 translate-y-[2px] transition-all duration-150 group-hover/field:opacity-100 group-hover/field:translate-y-0 text-[#8ba6ff] tracking-[0.2em]">
+                                    <Globe className="w-3 h-3 shrink-0 text-zinc-500" />
+                                    <div className="relative flex-1 flex items-center justify-center">
+                                      <span className="tracking-[0.5em] text-zinc-500 transition-opacity duration-150 group-hover/field:opacity-0">
+                                        ••••••••••••
+                                      </span>
+                                      <span className="absolute inset-0 flex items-center justify-center opacity-0 tracking-[0.3em] text-[#8ba6ff] transition-all duration-150 group-hover/field:opacity-100">
                                         REVEAL
                                       </span>
-                                    </span>
+                                    </div>
                                   </>
                                 )}
                               </button>
@@ -1459,11 +1461,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 onClick={() => handleAcquire(person, 'phone')}
                                 disabled={revealState.revealingPhone || revealState.revealingEmail}
                                 className={cn(
-                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-mono transition-all uppercase tracking-widest shrink-0 min-w-0 w-full",
+                                  "group/field flex items-center gap-2 px-2 py-1 rounded-xl border text-[9px] font-mono uppercase tracking-[0.3em] min-w-0 w-full justify-center",
                                   revealState.revealingEmail && "border-white/5 text-zinc-700 bg-zinc-950/20",
                                   revealState.revealingPhone
                                     ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
-                                    : "border-white/5 text-zinc-500 bg-zinc-950/20 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
+                                    : "border-white/5 text-zinc-500 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
                                 )}
                                 title="Reveal Phone"
                               >
@@ -1474,13 +1476,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                   </>
                                 ) : (
                                   <>
-                                    <Phone className="w-3 h-3 shrink-0 text-zinc-600 group-hover/field:text-[#002FA7]" />
-                                    <span className="relative inline-flex items-center justify-center min-w-[112px] whitespace-nowrap">
-                                      <span className="tracking-[0.2em] transition-opacity duration-150 group-hover/field:opacity-0">••••••••••••</span>
-                                      <span className="absolute inset-0 flex items-center justify-center opacity-0 translate-y-[2px] transition-all duration-150 group-hover/field:opacity-100 group-hover/field:translate-y-0 text-[#8ba6ff] tracking-[0.2em]">
+                                    <Phone className="w-3 h-3 shrink-0 text-zinc-500" />
+                                    <div className="relative flex-1 flex items-center justify-center">
+                                      <span className="tracking-[0.5em] text-zinc-500 transition-opacity duration-150 group-hover/field:opacity-0">
+                                        ••••••••••••
+                                      </span>
+                                      <span className="absolute inset-0 flex items-center justify-center opacity-0 tracking-[0.3em] text-[#8ba6ff] transition-all duration-150 group-hover/field:opacity-100">
                                         REVEAL
                                       </span>
-                                    </span>
+                                    </div>
                                   </>
                                 )}
                               </button>
