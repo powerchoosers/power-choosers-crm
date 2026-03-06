@@ -8,10 +8,11 @@ import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js'
  * Decoupled from Google SDK to use standard OpenAI-compatible completions/embeddings
  */
 
-const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY') || 'REDACTED_OPENROUTER_KEY'
+const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY')
+if (!OPENROUTER_API_KEY) {
+    console.error('OPENROUTER_API_KEY is not set in Supabase Secrets')
+}
 const DB_URL = Deno.env.get('SUPABASE_DB_URL')
-
-if (!OPENROUTER_API_KEY) console.error('OPENROUTER_API_KEY missing')
 
 const sql = postgres(DB_URL!)
 
