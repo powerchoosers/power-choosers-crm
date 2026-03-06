@@ -43,11 +43,13 @@ export function requireApolloWebhookSecret(req, res) {
   const providedQuery = typeof req.query?.secret === 'string' ? req.query.secret : '';
   const providedSecret = (providedHeader || providedQuery || '').trim();
 
-  if (!configuredSecret && process.env.NODE_ENV !== 'production') {
+  // Secret is optional. If not configured, allow webhook requests.
+  // This preserves legacy behavior where Apollo webhooks worked without a secret.
+  if (!configuredSecret) {
     return true;
   }
 
-  if (!configuredSecret || providedSecret !== configuredSecret) {
+  if (providedSecret !== configuredSecret) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized webhook' }));
     return false;
