@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Mail, ChevronRight, ChevronDown, Check, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react'
+import { Eye, MousePointer2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { Email } from '@/hooks/useEmails'
 import { EmailContent } from './EmailContent'
@@ -12,9 +12,10 @@ import { useEntityEmails } from '@/hooks/useEntityEmails'
 interface EntityEmailFeedProps {
     emails: string[]
     title?: string
+    density?: 'compact' | 'full'
 }
 
-export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: EntityEmailFeedProps) {
+export function EntityEmailFeed({ emails, title = 'Email Intelligence', density = 'full' }: EntityEmailFeedProps) {
     const { data: fetchEmails, isLoading } = useEntityEmails(emails)
     const [expandedId, setExpandedId] = useState<string | null>(null)
 
@@ -45,7 +46,9 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: Entity
                         <AnimatePresence initial={false}>
                             {validEmails.map((email) => {
                                 const isExpanded = expandedId === email.id
-                                const isSent = email.type === 'sent' || email.from.includes('nodalpoint') || email.from.includes(emails[0] ? '' : '') // naive fallback
+                                const isSent = email.type === 'sent'
+                                const openCount = email.openCount || 0
+                                const clickCount = email.clickCount || 0
 
                                 return (
                                     <motion.div
@@ -84,6 +87,32 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence' }: Entity
                                                         {email.type === 'sent' ? (Array.isArray(email.to) ? email.to.join(', ') : email.to) : email.from}
                                                     </span>
                                                 </div>
+
+                                                {isSent ? (
+                                                    density === 'compact' ? (
+                                                        <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 w-fit">
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 tabular-nums">
+                                                                <Eye className="w-3 h-3 text-emerald-400" />
+                                                                {openCount}
+                                                            </span>
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 tabular-nums">
+                                                                <MousePointer2 className="w-3 h-3 text-[#002FA7]" />
+                                                                {clickCount}
+                                                            </span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="mt-1 inline-flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 w-fit">
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                                                                <Eye className="w-3 h-3 text-emerald-400" />
+                                                                Opened <span className="tabular-nums text-zinc-200">{openCount}</span>
+                                                            </span>
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                                                                <MousePointer2 className="w-3 h-3 text-[#002FA7]" />
+                                                                Clicked <span className="tabular-nums text-zinc-200">{clickCount}</span>
+                                                            </span>
+                                                        </div>
+                                                    )
+                                                ) : null}
 
                                                 {!isExpanded && email.snippet && (
                                                     <div className="text-xs text-zinc-500 mt-1 truncate max-w-full">

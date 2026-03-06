@@ -104,6 +104,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                 <EntityEmailFeed
                     emails={contacts?.map(c => c.email).filter(Boolean) as string[] || []}
                     title="Email Intelligence"
+                    density="compact"
                 />
             </div>
         </div>

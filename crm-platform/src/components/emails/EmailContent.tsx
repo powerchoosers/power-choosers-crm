@@ -12,13 +12,18 @@ interface EmailContentProps {
   className?: string
   subject?: string
   printTrigger?: boolean
+  initialLightMode?: boolean
 }
 
-export const EmailContent: React.FC<EmailContentProps> = ({ html, text, className, subject, printTrigger }) => {
+export const EmailContent: React.FC<EmailContentProps> = ({ html, text, className, subject, printTrigger, initialLightMode = false }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [iframeHeight, setIframeHeight] = useState('500px')
-  const [isLightMode, setIsLightMode] = useState(false)
+  const [isLightMode, setIsLightMode] = useState(initialLightMode)
   const [isExpanded, setIsExpanded] = useState(false)
+
+  useEffect(() => {
+    setIsLightMode(initialLightMode)
+  }, [initialLightMode])
 
   const handlePrint = useCallback(() => {
     iframeRef.current?.contentWindow?.print()
@@ -44,10 +49,12 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
 
     // Preliminary cleanup for common layout breakers
     const processedHtml = html
+      .replace(/src=(["'])http:\/\//gi, 'src=$1https://')
       .replace(/position:\s*fixed/gi, 'position: static')
       .replace(/position:\s*absolute/gi, 'position: static')
       .replace(/width:\s*\d+vw/gi, 'width: 100%')
       .replace(/height:\s*\d+vh/gi, 'height: auto')
+      .replace(/<img([^>]*?)src=(["'])cid:[^"']+\2([^>]*)>/gi, '<span class="cid-placeholder">[Inline image not available in this view]</span>')
 
     // Remove tracking pixel to prevent self-open counting
     // Matches <img src=".../api/email/track/..." ... />
@@ -95,6 +102,16 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
         margin: 10px auto; /* Center images */
         border-radius: 4px;
         object-fit: contain;
+      }
+      img[src=""], img:not([src]) { display: none !important; }
+      .cid-placeholder {
+        display: inline-block;
+        margin: 8px 0;
+        font-size: 12px;
+        color: #71717a;
+        border: 1px dashed #3f3f46;
+        border-radius: 8px;
+        padding: 6px 10px;
       }
       table { 
         border-collapse: collapse; 
@@ -276,6 +293,9 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
               // Wait for images to load
               const images = document.getElementsByTagName('img');
               for (let img of images) {
+                img.addEventListener('error', () => {
+                  img.style.display = 'none';
+                });
                 if (img.complete) {
                   updateHeight();
                 } else {

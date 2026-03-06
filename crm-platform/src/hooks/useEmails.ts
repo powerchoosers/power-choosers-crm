@@ -5,10 +5,12 @@ import { toast } from 'sonner'
 
 export interface EmailAttachment {
   filename: string
-  mimeType: string
-  attachmentId: string
-  size: number
-  messageId: string
+  mimeType?: string
+  attachmentId?: string
+  size?: number
+  messageId?: string
+  provider?: string
+  downloadUnavailable?: boolean
 }
 
 export interface Email {
@@ -17,6 +19,7 @@ export interface Email {
   from: string
   fromName?: string | null
   to: string | string[]
+  threadId?: string | null
   html?: string
   text?: string
   snippet?: string
@@ -26,7 +29,6 @@ export interface Email {
   type: 'received' | 'sent' | 'scheduled' | 'draft'
   status?: string
   ownerId: string
-  gmailMessageId?: string
   openCount?: number
   clickCount?: number
   attachments?: EmailAttachment[]
@@ -93,6 +95,22 @@ function applyCommonEmailExclusions(query: any) {
 function applyEmailSearch(query: any, searchQuery?: string) {
   if (!searchQuery) return query
   return query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
+}
+
+function stripHtml(value?: string | null) {
+  if (!value) return ''
+  return String(value)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'all') {
@@ -164,14 +182,18 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
 
           const date = item.timestamp || item.createdAt || item.created_at
 
+          const plainText = stripHtml(item.text)
+          const plainHtml = stripHtml(item.html)
+          const plainSnippet = stripHtml(item.snippet)
+
           return {
             id: item.id,
             subject: item.subject,
             from: item.from,
             to: item.to,
             html: item.html,
-            text: item.text,
-            snippet: item.text?.slice(0, 100) || item.snippet,
+            text: plainText || plainHtml || plainSnippet,
+            snippet: (plainText || plainHtml || plainSnippet).slice(0, 140),
             date: date,
             timestamp: date ? new Date(date).getTime() : Date.now(),
             unread: !item.is_read,

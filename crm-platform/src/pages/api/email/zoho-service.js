@@ -267,6 +267,38 @@ export class ZohoMailService {
         }
     }
 
+    /**
+     * Download a message attachment from Zoho.
+     */
+    async downloadAttachment(userEmail, messageId, attachmentId, folderId = 'inbox') {
+        const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
+        const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
+
+        const candidates = [
+            `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachments/${attachmentId}`,
+            `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}`,
+            `${this.baseUrl}/accounts/${accountId}/messages/attachments/${attachmentId}`,
+        ];
+
+        let lastStatus = 0;
+        let lastText = '';
+
+        for (const url of candidates) {
+            const response = await fetch(url, {
+                headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+            });
+            if (response.ok) {
+                const contentType = response.headers.get('content-type') || 'application/octet-stream';
+                const fileBuffer = Buffer.from(await response.arrayBuffer());
+                return { fileBuffer, contentType };
+            }
+            lastStatus = response.status;
+            lastText = await response.text().catch(() => '');
+        }
+
+        throw new Error(`Zoho Attachment API error: ${lastStatus} - ${lastText}`);
+    }
+
     async initialize(userEmail) {
         // Now actually useful for pre-checking tokens
         try {
