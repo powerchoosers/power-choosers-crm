@@ -91,7 +91,7 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
         onClick={() => router.push('/network/contracts')}
         className="w-full text-left"
       >
-      <div className="flex items-center gap-2 mb-1.5 pr-24">
+      <div className="flex items-center gap-2 mb-1.5 pr-32">
         <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', STAGE_DOT[deal.stage])} />
         <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-300 truncate flex-1">
           {deal.title}
@@ -99,7 +99,7 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
       </div>
 
       {latestSigRequest && (
-        <div className="absolute top-3 right-3 flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-black/40">
+        <div className="absolute top-3 right-10 flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-white/5 bg-black/40">
           <span className={cn(
             "h-1.5 w-1.5 rounded-full flex-shrink-0",
             latestSigRequest.status === 'completed' || latestSigRequest.status === 'signed' ? 'bg-emerald-500' :
