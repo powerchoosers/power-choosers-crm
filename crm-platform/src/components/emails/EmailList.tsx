@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
 import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check, Paperclip } from 'lucide-react'
-import { Email } from '@/hooks/useEmails'
+import { Email, EmailListFilter } from '@/hooks/useEmails'
 import { cn } from '@/lib/utils'
 
 interface EmailListProps {
+  filter: EmailListFilter
+  onFilterChange: (filter: EmailListFilter) => void
   emails: Email[]
   isLoading: boolean
   onRefresh: () => void
@@ -13,6 +15,8 @@ interface EmailListProps {
   onSelectEmail: (email: Email) => void
   selectedEmailId?: string
   totalEmails?: number
+  totalReceived?: number
+  totalSent?: number
   hasNextPage?: boolean
   fetchNextPage?: () => void
   isFetchingNextPage?: boolean
@@ -29,6 +33,8 @@ interface EmailListProps {
 }
 
 export function EmailList({
+  filter,
+  onFilterChange,
   emails,
   isLoading,
   onRefresh,
@@ -36,6 +42,8 @@ export function EmailList({
   onSelectEmail,
   selectedEmailId,
   totalEmails,
+  totalReceived,
+  totalSent,
   hasNextPage,
   fetchNextPage,
   isFetchingNextPage,
@@ -46,7 +54,6 @@ export function EmailList({
   totalAvailable,
   onSelectCount,
 }: EmailListProps) {
-  const [filter, setFilter] = useState<'all' | 'received' | 'sent'>('all')
   const [internalPage, setInternalPage] = useState(1)
 
   const currentPage = externalPage || internalPage
@@ -55,23 +62,18 @@ export function EmailList({
   const itemsPerPage = 15
 
   const filteredEmails = emails.filter(email => {
-    if (filter === 'all') {
-      // All nodes: show received + CRM-sent only (exclude Gmail-synced sent)
-      // CRM-sent IDs start with 'gmail_' or 'zoho_', Gmail-synced sent IDs are plain like '19c34a3c149e256b'
-      if (email.type === 'sent') {
-        return email.id.startsWith('gmail_') || email.id.startsWith('zoho_')
-      }
-      return true
-    }
+    if (filter === 'all') return true
     if (filter === 'received') return email.type === 'received'
-    if (filter === 'sent') {
-      // Uplink out: only emails sent through CRM (tracking IDs start with 'gmail_' or 'zoho_')
-      // Gmail-synced sent emails have plain IDs like '19c34a3c149e256b'
-      // CRM-sent emails have IDs like 'gmail_1738881234567_abc123def' or 'zoho_1738881234567_abc123def'
-      return email.type === 'sent' && (email.id.startsWith('gmail_') || email.id.startsWith('zoho_'))
-    }
+    if (filter === 'sent') return email.type === 'sent'
     return email.type === filter
   })
+
+  const totalForActiveFilter = (() => {
+    if (filter === 'all') return totalEmails ?? filteredEmails.length
+    if (filter === 'received') return totalReceived ?? filteredEmails.length
+    if (filter === 'sent') return totalSent ?? filteredEmails.length
+    return filteredEmails.length
+  })()
 
   // Auto-reset to page 1 if the filter changes and makes the current page invalid
   useEffect(() => {
@@ -179,26 +181,6 @@ export function EmailList({
       <div className="flex-none p-4 border-b border-white/5 nodal-recessed flex items-center justify-between z-10">
         <div className="bg-black/40 border border-white/5 rounded-lg px-2 py-1.5 flex items-center gap-2 relative">
           <div className="relative inline-flex">
-            {filter === 'all' && (
-              <motion.div
-                layoutId="emails-filter-pill"
-                className="absolute inset-0 rounded-md bg-white/10"
-                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
-              />
-            )}
-            <button
-              type="button"
-              onClick={() => { setFilter('all'); setCurrentPage(1); }}
-              className={cn(
-                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
-                filter === 'all' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
-              )}
-              title="All Nodes"
-            >
-              All_Nodes
-            </button>
-          </div>
-          <div className="relative inline-flex">
             {filter === 'received' && (
               <motion.div
                 layoutId="emails-filter-pill"
@@ -208,7 +190,7 @@ export function EmailList({
             )}
             <button
               type="button"
-              onClick={() => { setFilter('received'); setCurrentPage(1); }}
+              onClick={() => { onFilterChange('received'); setCurrentPage(1); }}
               className={cn(
                 "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
                 filter === 'received' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
@@ -228,7 +210,7 @@ export function EmailList({
             )}
             <button
               type="button"
-              onClick={() => { setFilter('sent'); setCurrentPage(1); }}
+              onClick={() => { onFilterChange('sent'); setCurrentPage(1); }}
               className={cn(
                 "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
                 filter === 'sent' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
@@ -238,9 +220,29 @@ export function EmailList({
               Uplink_Out
             </button>
           </div>
+          <div className="relative inline-flex">
+            {filter === 'all' && (
+              <motion.div
+                layoutId="emails-filter-pill"
+                className="absolute inset-0 rounded-md bg-white/10"
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => { onFilterChange('all'); setCurrentPage(1); }}
+              className={cn(
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                filter === 'all' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+              )}
+              title="All Nodes"
+            >
+              All_Nodes
+            </button>
+          </div>
         </div>
         <div className="text-[10px] text-zinc-600 font-mono uppercase tracking-[0.2em]">
-          Total_Entropy: <span className="text-zinc-400 tabular-nums">{filteredEmails.length}</span>
+          Total_Entropy: <span className="text-zinc-400 tabular-nums">{totalForActiveFilter}</span>
         </div>
       </div>
 
@@ -422,7 +424,7 @@ export function EmailList({
           <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
             <span>Sync_Block {showingStart}–{showingEnd}</span>
             <div className="h-1 w-1 rounded-full bg-zinc-800" />
-            <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{filteredEmails.length}</span></span>
+            <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalForActiveFilter}</span></span>
           </div>
         </div>
         <div className="flex items-center gap-2">
