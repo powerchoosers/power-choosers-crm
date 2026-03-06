@@ -27,11 +27,13 @@ interface CallState {
     metadata?: any
   } | null
   sentiment: 'connect' | 'interest' | 'lock' | 'hangup' | null
+  callHealth: 'good' | 'fair' | 'poor'
   setActive: (active: boolean) => void
   setStatus: (status: CallState['status']) => void
   setPhoneNumber: (phone: string) => void
   setMetadata: (metadata: CallState['metadata']) => void
   setSentiment: (sentiment: CallState['sentiment']) => void
+  setCallHealth: (health: CallState['callHealth']) => void
   initiateCall: (phone: string, metadata?: CallState['metadata']) => void
   clearCallTrigger: () => void
   callTriggered: boolean
@@ -46,18 +48,21 @@ export const useCallStore = create<CallState>((set) => ({
   callSessionId: 0,
   metadata: null,
   sentiment: null,
+  callHealth: 'good',
   callTriggered: false,
   isCallHUDOpen: false,
   setActive: (active) => set((state) => ({
     isActive: active,
     // Auto-close HUD when call ends
     isCallHUDOpen: active ? state.isCallHUDOpen : false,
-    sentiment: active ? state.sentiment : null // Reset sentiment on call end
+    sentiment: active ? state.sentiment : null, // Reset sentiment on call end
+    callHealth: active ? state.callHealth : 'good'
   })),
   setStatus: (status) => set({ status }),
   setPhoneNumber: (phoneNumber) => set({ phoneNumber }),
   setMetadata: (metadata) => set({ metadata }),
   setSentiment: (sentiment) => set({ sentiment }),
+  setCallHealth: (callHealth) => set({ callHealth }),
   setIsCallHUDOpen: (isCallHUDOpen) => set({ isCallHUDOpen }),
   initiateCall: (phoneNumber, metadata = null) => set((state) => ({
     phoneNumber,
@@ -65,6 +70,7 @@ export const useCallStore = create<CallState>((set) => ({
     callTriggered: true,
     callSessionId: state.callSessionId + 1,
     sentiment: null, // Reset on new call
+    callHealth: 'good',
   })),
   clearCallTrigger: () => set({ callTriggered: false }),
 }))

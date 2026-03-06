@@ -109,6 +109,7 @@ export function TopBar() {
     callSessionId,
     sentiment,
     setSentiment,
+    callHealth,
   } = useCallStore()
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
@@ -264,7 +265,6 @@ export function TopBar() {
   const callbarDomain = callbarAccount?.domain || displayMetadata?.domain || ''
   const activeCallContactId = displayMetadata?.contactId || displayMetadata?.metadata?.contactId || ''
   const activeCallAccountId = displayMetadata?.accountId || displayMetadata?.metadata?.accountId || ''
-  const activeCallAccountName = displayMetadata?.account || callbarAccount?.name || ''
 
 
   // Listen for scroll on the main content container (passive + rAF throttle for smooth scroll)
@@ -463,6 +463,44 @@ export function TopBar() {
     router.push(`/network/accounts/${activeCallAccountId}`)
   }, [activeCallAccountId, router])
 
+  const handleOpenActiveDossier = useCallback(() => {
+    if (activeCallContactId) {
+      handleOpenContactDossier()
+      return
+    }
+    if (activeCallAccountId) {
+      handleOpenAccountDossier()
+    }
+  }, [activeCallContactId, activeCallAccountId, handleOpenContactDossier, handleOpenAccountDossier])
+
+  const callHealthStyles = useMemo(() => {
+    if (callHealth === 'poor') {
+      return {
+        border: 'border-rose-500/40',
+        bg: 'bg-rose-500/10',
+        text: 'text-rose-400',
+        bar: 'bg-rose-500/50',
+        dot: 'bg-rose-500',
+      }
+    }
+    if (callHealth === 'fair') {
+      return {
+        border: 'border-amber-500/40',
+        bg: 'bg-amber-500/10',
+        text: 'text-amber-400',
+        bar: 'bg-amber-500/50',
+        dot: 'bg-amber-500',
+      }
+    }
+    return {
+      border: 'border-emerald-500/40',
+      bg: 'bg-emerald-500/10',
+      text: 'text-emerald-500',
+      bar: 'bg-emerald-500/50',
+      dot: 'bg-emerald-500',
+    }
+  }, [callHealth])
+
   return (
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
     <header className={cn(
@@ -549,12 +587,12 @@ export function TopBar() {
                     />
                     <div className="flex flex-col min-w-0">
                       <div className="text-sm font-medium text-white leading-none mb-1 flex items-center gap-2 truncate">
-                        {activeCallContactId ? (
+                        {(activeCallContactId || activeCallAccountId) ? (
                           <button
                             type="button"
-                            onClick={handleOpenContactDossier}
-                            className="truncate text-left hover:text-[#002FA7] transition-colors"
-                            title="Open contact dossier"
+                            onClick={handleOpenActiveDossier}
+                            className="truncate text-left transition-transform duration-200 hover:scale-[1.04] origin-left"
+                            title={activeCallContactId ? "Open contact dossier" : "Open account dossier"}
                           >
                             {displayMetadata?.name || phoneNumber || "Unknown Caller"}
                           </button>
@@ -562,23 +600,8 @@ export function TopBar() {
                           <span className="truncate">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</span>
                         )}
                       </div>
-                      <div className="text-[10px] text-zinc-500 lowercase truncate flex items-center gap-1">
-                        {activeCallAccountId && activeCallAccountName ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={handleOpenAccountDossier}
-                              className="truncate text-left hover:text-[#002FA7] transition-colors"
-                              title="Open account dossier"
-                            >
-                              {activeCallAccountName}
-                            </button>
-                            <span className="text-zinc-600">•</span>
-                          </>
-                        ) : null}
-                        <span className="truncate">
-                          {selectedNumberName ? `via ${selectedNumberName}` : 'via Default'}
-                        </span>
+                      <div className="text-[10px] text-zinc-500 lowercase truncate">
+                        {selectedNumberName ? `via ${selectedNumberName}` : 'via Default'}
                       </div>
                     </div>
                   </div>
@@ -588,7 +611,11 @@ export function TopBar() {
                     <motion.div
                       layout
                       transition={{ layout: { type: "spring", bounce: 0, duration: 0.4 } }}
-                      className="flex items-center gap-2 px-2 py-0.5 border border-dotted border-emerald-500/40 rounded-lg bg-emerald-500/10 overflow-hidden"
+                      className={cn(
+                        "flex items-center gap-2 px-2 py-0.5 border border-dotted rounded-lg overflow-hidden",
+                        callHealthStyles.border,
+                        callHealthStyles.bg
+                      )}
                     >
                       <AnimatePresence mode="popLayout">
                         {status === 'connected' && (
@@ -604,7 +631,7 @@ export function TopBar() {
                               {[...Array(5)].map((_, i) => (
                                 <motion.div
                                   key={i}
-                                  className="w-[1.5px] bg-emerald-500/50 rounded-full flex-shrink-0"
+                                  className={cn("w-[1.5px] rounded-full flex-shrink-0", callHealthStyles.bar)}
                                   initial={{ height: "2px" }}
                                   animate={{ height: ["2px", "8px", "2px"] }}
                                   transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: "easeInOut" }}
@@ -617,9 +644,12 @@ export function TopBar() {
 
                       <motion.div
                         layout
-                        className="text-[10px] text-emerald-500 font-mono uppercase tracking-widest font-semibold flex items-center gap-1.5 whitespace-nowrap"
+                        className={cn(
+                          "text-[10px] font-mono uppercase tracking-widest font-semibold flex items-center gap-1.5 whitespace-nowrap",
+                          callHealthStyles.text
+                        )}
                       >
-                        {status === 'connected' && <span className="w-1 h-1 bg-emerald-500 rounded-full animate-pulse flex-shrink-0" />}
+                        {status === 'connected' && <span className={cn("w-1 h-1 rounded-full animate-pulse flex-shrink-0", callHealthStyles.dot)} />}
                         {status === 'dialing' ? (
                           <span className="flex items-center">
                             Dialing
@@ -648,7 +678,7 @@ export function TopBar() {
                               {[...Array(5)].map((_, i) => (
                                 <motion.div
                                   key={i}
-                                  className="w-[1.5px] bg-emerald-500/50 rounded-full flex-shrink-0"
+                                  className={cn("w-[1.5px] rounded-full flex-shrink-0", callHealthStyles.bar)}
                                   initial={{ height: "2px" }}
                                   animate={{ height: ["2px", "8px", "2px"] }}
                                   transition={{ repeat: Infinity, duration: 1.2, delay: (4 - i) * 0.15, ease: "easeInOut" }}
