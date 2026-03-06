@@ -154,6 +154,59 @@ export default function EmailDetailPage() {
     setTimeout(() => setIsPrintRequested(false), 100)
   }
 
+  const parseMailbox = (value: string) => {
+    const v = String(value || '').trim()
+    const angleMatch = v.match(/^(.*)<\s*([^>]+)\s*>\s*$/)
+    if (angleMatch) {
+      const name = angleMatch[1].trim().replace(/^"|"$/g, '')
+      const address = angleMatch[2].trim()
+      return { name: name || null, address: address || null }
+    }
+    return { name: null, address: v || null }
+  }
+
+  const fromValue = email?.from || ''
+  const toList = email ? (Array.isArray(email.to) ? email.to : [email.to]) : []
+  const fromMailbox = parseMailbox(fromValue)
+  const identityAddresses = [fromValue, ...toList].map((addr) => extractEmailAddress(String(addr || ''))).filter(Boolean)
+  const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
+  const fromAddressKey = extractEmailAddress(fromValue)
+  const fromContact = contactByEmail[fromAddressKey]
+  const toResolved = toList.map((raw) => {
+    const key = extractEmailAddress(String(raw || ''))
+    return {
+      raw: String(raw || ''),
+      contact: contactByEmail[key],
+      key,
+    }
+  })
+
+  const displayFromName = fromContact?.displayName || (email?.type === 'sent' ? (email.fromName || null) : fromMailbox.name) || fromValue
+  const displayFromAddress = (email?.type === 'sent' ? fromValue : fromMailbox.address) || null
+  const replyToAddress = email?.type === 'received' ? (fromMailbox.address || '') : (toList[0] || '')
+  const replySubject = email?.subject?.toLowerCase().startsWith('re:') ? email.subject : `Re: ${email?.subject || ''}`
+
+  const stripHtml = (value: string) => value
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  const escapeHtml = (value: string) => value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+
+  const quotedBody = email?.html
+    ? email.html
+    : `<pre style="white-space: pre-wrap; margin: 0;">${escapeHtml(email?.text || email?.snippet || '')}</pre>`
+
+  const quotedHeader = `<p style="margin: 0 0 8px 0; color: #71717a; font-size: 12px;">On ${email ? format(new Date(email.date), 'PPpp') : ''}, ${escapeHtml(String(displayFromName))} wrote:</p>`
+  const quotedThread = `<blockquote style="margin: 12px 0 0 0; padding-left: 12px; border-left: 2px solid #3f3f46;">${quotedHeader}${quotedBody}</blockquote>`
+
   if (isLoading) {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4">
@@ -170,58 +223,6 @@ export default function EmailDetailPage() {
       </div>
     )
   }
-
-  const parseMailbox = (value: string) => {
-    const v = String(value || '').trim()
-    const angleMatch = v.match(/^(.*)<\s*([^>]+)\s*>\s*$/)
-    if (angleMatch) {
-      const name = angleMatch[1].trim().replace(/^"|"$/g, '')
-      const address = angleMatch[2].trim()
-      return { name: name || null, address: address || null }
-    }
-    return { name: null, address: v || null }
-  }
-
-  const fromMailbox = parseMailbox(email.from)
-  const toList = Array.isArray(email.to) ? email.to : [email.to]
-  const identityAddresses = [email.from, ...toList].map((addr) => extractEmailAddress(String(addr || ''))).filter(Boolean)
-  const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
-  const fromAddressKey = extractEmailAddress(email.from)
-  const fromContact = contactByEmail[fromAddressKey]
-  const toResolved = toList.map((raw) => {
-    const key = extractEmailAddress(String(raw || ''))
-    return {
-      raw: String(raw || ''),
-      contact: contactByEmail[key],
-      key,
-    }
-  })
-
-  const displayFromName = fromContact?.displayName || (email.type === 'sent' ? (email.fromName || null) : fromMailbox.name) || email.from
-  const displayFromAddress = (email.type === 'sent' ? email.from : fromMailbox.address) || null
-  const replyToAddress = email.type === 'received' ? (fromMailbox.address || '') : (toList[0] || '')
-  const replySubject = email.subject?.toLowerCase().startsWith('re:') ? email.subject : `Re: ${email.subject}`
-
-  const stripHtml = (value: string) => value
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  const escapeHtml = (value: string) => value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-
-  const quotedBody = email.html
-    ? email.html
-    : `<pre style="white-space: pre-wrap; margin: 0;">${escapeHtml(email.text || email.snippet || '')}</pre>`
-
-  const quotedHeader = `<p style="margin: 0 0 8px 0; color: #71717a; font-size: 12px;">On ${format(new Date(email.date), 'PPpp')}, ${escapeHtml(String(displayFromName))} wrote:</p>`
-  const quotedThread = `<blockquote style="margin: 12px 0 0 0; padding-left: 12px; border-left: 2px solid #3f3f46;">${quotedHeader}${quotedBody}</blockquote>`
 
   const handleReply = async () => {
     if (!user?.email) {
