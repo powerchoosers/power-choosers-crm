@@ -26,9 +26,7 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto">
-        <NextBestActionRail />
-      </div>
+      <NextBestActionRail />
 
       {/* Zone 1: Telemetry header (physics-based metrics) */}
       <KPIGrid />
