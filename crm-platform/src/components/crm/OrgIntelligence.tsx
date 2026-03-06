@@ -1,5 +1,5 @@
 'use client'
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Users, Search, Lock, Unlock, ShieldCheck, Loader2, ChevronLeft, ChevronRight, Globe, MapPin, Linkedin, Phone, ExternalLink, ChevronDown, ChevronUp, Sparkles, Mail } from 'lucide-react';
 import Image from 'next/image';
@@ -76,6 +76,12 @@ interface ApolloCompany {
   revenue?: string;
 }
 
+interface RevealState {
+  revealingEmail: boolean;
+  revealingPhone: boolean;
+  phoneTimedOut: boolean;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -88,13 +94,36 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const [contactsLoading, setContactsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [acquiringEmail, setAcquiringEmail] = useState<string | null>(null);
+  const [revealStates, setRevealStates] = useState<Record<string, RevealState>>({});
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+  const phoneRevealTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const { initiateCall } = useCallStore();
   const queryClient = useQueryClient();
   const setLastEnrichedAccountId = useUIStore((s) => s.setLastEnrichedAccountId);
   const setLastEnrichedContactId = useUIStore((s) => s.setLastEnrichedContactId);
   const CONTACTS_PER_PAGE = 5;
+
+  const patchRevealState = (personId: string, patch: Partial<RevealState>) => {
+    setRevealStates((prev) => {
+      const current = prev[personId] || {
+        revealingEmail: false,
+        revealingPhone: false,
+        phoneTimedOut: false
+      };
+      return {
+        ...prev,
+        [personId]: { ...current, ...patch }
+      };
+    });
+  };
+
+  const clearPhoneRevealTimeout = (personId: string) => {
+    const timer = phoneRevealTimeouts.current[personId];
+    if (timer) {
+      clearTimeout(timer);
+      delete phoneRevealTimeouts.current[personId];
+    }
+  };
 
   const handleCompanyCall = (phone: string, name: string) => {
     const logoUrl = (accountLogoUrl && accountLogoUrl.trim()) || companySummary?.logoUrl;
@@ -222,6 +251,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
     loadCache();
   }, [domain, companyName, accountId]);
+
+  useEffect(() => {
+    return () => {
+      Object.keys(phoneRevealTimeouts.current).forEach((personId) => {
+        clearPhoneRevealTimeout(personId);
+      });
+    };
+  }, []);
 
   const handleEnrichAccount = async () => {
     if (!accountId || !companySummary) {
@@ -380,7 +417,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     const revealEmails = type === 'email' || type === 'phone' || type === 'both';
     const revealPhones = type === 'phone' || type === 'both';
 
-    setAcquiringEmail(person.id);
+    const shouldAnimateEmailOnPhoneReveal = type === 'phone' && (!person.email || person.email === 'N/A');
+    patchRevealState(person.id, {
+      revealingEmail: type === 'email' || type === 'both' || shouldAnimateEmailOnPhoneReveal,
+      revealingPhone: type === 'phone' || type === 'both',
+      phoneTimedOut: false
+    });
+
+    if (type === 'phone' || type === 'both') {
+      clearPhoneRevealTimeout(person.id);
+      phoneRevealTimeouts.current[person.id] = setTimeout(() => {
+        patchRevealState(person.id, { revealingPhone: false, revealingEmail: false, phoneTimedOut: true });
+        toast.warning(`No phone data returned for ${person.firstName || person.name || 'this contact'} after 40 seconds.`);
+      }, 40000);
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -539,6 +589,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const newPhonesTyped: PhoneEntry[] = (enriched.phones || []).map((ph: { number?: string; type?: string }) =>
         ph?.number ? { number: ph.number, type: ph.type } : null
       ).filter(Boolean) as PhoneEntry[];
+      const hasImmediatePhones = newPhonesTyped.length > 0;
       const existingNormalized: PhoneEntry[] = (person.phones || []).map((e) => (typeof e === 'string' ? e : e));
       const existingNums = new Set(existingNormalized.map(phoneDisplayNumber));
       const mergedPhones: PhoneEntry[] = [...existingNormalized];
@@ -568,6 +619,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       );
 
       setData(updatedData);
+      patchRevealState(person.id, {
+        revealingEmail: false,
+        revealingPhone: type === 'phone' || type === 'both' ? !hasImmediatePhones : false,
+        phoneTimedOut: false
+      });
+      if (hasImmediatePhones) {
+        clearPhoneRevealTimeout(person.id);
+      }
 
       // 4. Save updated contact list to cache so refresh doesn't lose revealed data
       saveToCache(companySummary, updatedData);
@@ -577,11 +636,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       if ((type === 'phone' || type === 'both') && crmId) {
         toast.info('Phone numbers can take a few minutes. Checking in background.', { duration: 5000 });
         const apolloPersonId = person.id;
-        const maxAttempts = 30; // 5 min at 10s interval
+        const maxAttempts = 4; // 40s total at 10s interval
         const intervalMs = 10000;
         let attempts = 0;
         const pollForPhones = async () => {
-          if (attempts >= maxAttempts) return;
+          if (attempts >= maxAttempts) {
+            patchRevealState(person.id, { revealingPhone: false, revealingEmail: false, phoneTimedOut: true });
+            clearPhoneRevealTimeout(person.id);
+            return;
+          }
           attempts += 1;
           try {
             const res = await fetch(`/api/apollo/phone-retrieve?personId=${encodeURIComponent(apolloPersonId)}`, {
@@ -629,6 +692,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 });
                 const displayName = person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact';
                 toast.success(`Phone numbers for ${displayName} received & saved.`);
+                patchRevealState(person.id, { revealingPhone: false, revealingEmail: false, phoneTimedOut: false });
+                clearPhoneRevealTimeout(person.id);
               }
               return;
             }
@@ -639,9 +704,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
     } catch (error) {
       console.error('Acquisition Error:', error);
+      clearPhoneRevealTimeout(person.id);
+      patchRevealState(person.id, { revealingEmail: false, revealingPhone: false });
       toast.error('Failed to reveal contact details');
-    } finally {
-      setAcquiringEmail(null);
     }
   };
 
@@ -1239,6 +1304,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               ) : paginatedData.length > 0 ? (
                 <AnimatePresence initial={false} mode="popLayout">
                   {paginatedData.map((person) => (
+                    (() => {
+                      const revealState = revealStates[person.id] || {
+                        revealingEmail: false,
+                        revealingPhone: false,
+                        phoneTimedOut: false
+                      };
+                      return (
                     <motion.div
                       key={person.id}
                       layout
@@ -1292,36 +1364,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 <Linkedin className="w-2.5 h-2.5" />
                               </a>
                             ) : null
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleAcquire(person, 'email')}
-                                disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                                title="Reveal Email"
-                              >
-                                {acquiringEmail === person.id ? (
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                                ) : (
-                                  <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                                )}
-                                Email
-                              </button>
-                              <button
-                                onClick={() => handleAcquire(person, 'phone')}
-                                disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
-                                title="Reveal Phone"
-                              >
-                                {acquiringEmail === person.id ? (
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
-                                ) : (
-                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
-                                )}
-                                Phone
-                              </button>
-                            </div>
-                          )}
+                          ) : null}
                         </div>
                       </div>
 
@@ -1332,32 +1375,48 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                           <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 items-center">
                             {/* Email Column */}
                             {person.email !== 'N/A' ? (
-                              <div
+                              <motion.div
+                                initial={{ opacity: 0.8, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
                                 className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter min-w-0"
                                 title={person.email}
                               >
                                 <Globe className="w-2.5 h-2.5 text-zinc-600 shrink-0" />
                                 <span className="truncate">{person.email}</span>
-                              </div>
+                              </motion.div>
                             ) : (
                               <button
                                 onClick={() => handleAcquire(person, 'email')}
-                                disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest"
+                                disabled={revealState.revealingEmail || revealState.revealingPhone}
+                                className={cn(
+                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border text-[9px] font-mono transition-all uppercase tracking-widest min-w-0",
+                                  revealState.revealingEmail
+                                    ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
+                                    : "border-white/5 text-zinc-500 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
+                                )}
                                 title="Reveal Email"
                               >
-                                {acquiringEmail === person.id ? (
+                                {revealState.revealingEmail ? (
                                   <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
                                 ) : (
-                                  <Mail className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                  <Globe className="w-2.5 h-2.5 text-zinc-600 group-hover/field:text-[#002FA7]" />
                                 )}
-                                Email
+                                <span className="truncate">{revealState.revealingEmail ? 'Revealing_Email...' : '••••••••••••'}</span>
+                                <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-600 group-hover/field:text-[#8ba6ff] transition-colors">
+                                  {revealState.revealingEmail ? 'SYNC' : 'REVEAL'}
+                                </span>
                               </button>
                             )}
 
                             {/* Phone Column — W: Work direct, M: Mobile, O: Other */}
                             {person.phones && person.phones.length > 0 ? (
-                              <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+                              <motion.div
+                                initial={{ opacity: 0.8, y: 4 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+                                className="flex items-center gap-1.5 shrink-0 flex-wrap"
+                              >
                                 {person.phones.map((entry, idx) => {
                                   const num = phoneDisplayNumber(entry);
                                   const prefix = phoneTypePrefix(entry, idx);
@@ -1387,23 +1446,41 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                     </button>
                                   );
                                 })}
-                              </div>
+                              </motion.div>
                             ) : (
                               <button
                                 onClick={() => handleAcquire(person, 'phone')}
-                                disabled={acquiringEmail === person.id}
-                                className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10 transition-all group/btn disabled:opacity-50 uppercase tracking-widest shrink-0"
+                                disabled={revealState.revealingPhone}
+                                className={cn(
+                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-mono transition-all uppercase tracking-widest shrink-0",
+                                  revealState.revealingPhone
+                                    ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
+                                    : "border-white/5 text-zinc-500 bg-zinc-950/20 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
+                                )}
                                 title="Reveal Phone"
                               >
-                                {acquiringEmail === person.id ? (
+                                {revealState.revealingPhone ? (
                                   <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
                                 ) : (
-                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/btn:text-[#002FA7]" />
+                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/field:text-[#002FA7]" />
                                 )}
-                                Phone
+                                {revealState.revealingPhone ? 'Revealing_Phone...' : '••••••••••••'}
+                                <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-600 group-hover/field:text-[#8ba6ff] transition-colors">
+                                  {revealState.revealingPhone ? 'SYNC' : 'REVEAL'}
+                                </span>
                               </button>
                             )}
                           </div>
+
+                          {revealState.phoneTimedOut && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-[8px] font-mono uppercase tracking-[0.2em] text-amber-500"
+                            >
+                              Phone reveal returned no data in 40s.
+                            </motion.div>
+                          )}
 
                           {/* Location Row */}
                           {person.location && (
@@ -1414,18 +1491,59 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-4 opacity-40 select-none pointer-events-none">
-                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 items-center">
+                          <button
+                            onClick={() => handleAcquire(person, 'email')}
+                            disabled={revealState.revealingEmail || revealState.revealingPhone}
+                            className={cn(
+                              "group/field flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest min-w-0 px-2 py-1 rounded-md border transition-all",
+                              revealState.revealingEmail
+                                ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
+                                : "border-white/5 text-zinc-600 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
+                            )}
+                            title="Reveal email (fast)"
+                          >
                             <Globe className="w-2.5 h-2.5" />
-                            ••••••••••••
-                          </div>
-                          <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                            <span className={cn("truncate", revealState.revealingEmail && "animate-pulse text-[#8ba6ff]")}>
+                              {revealState.revealingEmail ? 'Revealing_Email...' : '••••••••••••'}
+                            </span>
+                            <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-700 group-hover/field:text-[#8ba6ff] transition-colors">
+                              {revealState.revealingEmail ? 'SYNC' : 'REVEAL'}
+                            </span>
+                          </button>
+                          <button
+                            onClick={() => handleAcquire(person, 'phone')}
+                            disabled={revealState.revealingPhone}
+                            className={cn(
+                              "group/field flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded-md border transition-all",
+                              revealState.revealingPhone
+                                ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
+                                : "border-white/5 text-zinc-600 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
+                            )}
+                            title="Reveal phone + email (full reveal)"
+                          >
                             <Phone className="w-2.5 h-2.5" />
-                            ••••••••••••
-                          </div>
+                            <span className={cn(revealState.revealingPhone && "animate-pulse text-[#8ba6ff]")}>
+                              {revealState.revealingPhone ? 'Revealing_Phone...' : '••••••••••••'}
+                            </span>
+                            <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-700 group-hover/field:text-[#8ba6ff] transition-colors">
+                              {revealState.revealingPhone ? 'SYNC' : 'REVEAL'}
+                            </span>
+                          </button>
+                          {revealState.phoneTimedOut && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 6 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="col-span-2 text-[8px] font-mono uppercase tracking-[0.2em] text-amber-500"
+                            >
+                              Phone reveal returned no data in 40s.
+                            </motion.div>
+                          )}
                         </div>
                       )}
                     </motion.div>
+                      );
+                    })()
                   ))}
                 </AnimatePresence>
               ) : (
