@@ -65,7 +65,6 @@ interface RevealActionButtonProps {
   disabled?: boolean;
   onClick: () => void;
   title?: string;
-  loadingLabel: string;
 }
 
 function RevealActionButton({
@@ -74,7 +73,6 @@ function RevealActionButton({
   disabled,
   onClick,
   title,
-  loadingLabel,
 }: RevealActionButtonProps) {
   return (
     <button
@@ -95,14 +93,14 @@ function RevealActionButton({
         {revealing ? (
           <>
             <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#8ba6ff]" />
-            <span className="text-[9px] font-mono tracking-[0.2em] text-[#8ba6ff] whitespace-nowrap">{loadingLabel}</span>
+            <span className="text-[9px] font-mono tracking-[0.2em] text-[#8ba6ff] whitespace-nowrap">Revealing</span>
           </>
         ) : (
           <>
             <Icon className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
             <div className="relative flex-1 min-w-0 flex items-center justify-center">
               <span className="block w-full text-center text-[10px] tracking-[0.16em] text-zinc-500 whitespace-nowrap overflow-hidden transition-opacity duration-150 group-hover/field:opacity-0">
-                ••••••••••••••
+                •••••••••
               </span>
               <span className="absolute inset-0 flex items-center justify-center text-[#8ba6ff] text-[9px] font-semibold tracking-[0.28em] opacity-0 transition-opacity duration-200 group-hover/field:opacity-100">
                 REVEAL
@@ -1508,11 +1506,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 initial={{ opacity: 0.8, y: 4 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                                className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-400 uppercase tracking-tighter min-w-0 w-full"
+                                className="flex flex-col items-start gap-0.5 min-w-0 w-full"
                                 title={person.email}
                               >
-                                <Globe className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                                <span className="truncate">{person.email}</span>
+                                <div className="flex items-center gap-1.5 min-w-0 w-full">
+                                  <Globe className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                  <span className="truncate text-[9px] font-mono text-zinc-300 uppercase tracking-tighter">
+                                    {person.email}
+                                  </span>
+                                </div>
+                                <span className="pl-5 text-[8px] font-mono text-zinc-500 tracking-[0.18em] uppercase">
+                                  EMAIL
+                                </span>
                               </motion.div>
                             ) : (
                               <RevealActionButton
@@ -1521,7 +1526,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 disabled={revealState.revealingEmail || revealState.revealingPhone}
                                 onClick={() => handleAcquire(person, 'email')}
                                 title="Reveal Email"
-                                loadingLabel="Revealing_Email..."
                               />
                             )}
 
@@ -1531,7 +1535,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 initial={{ opacity: 0.8, y: 4 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                                className="flex flex-wrap gap-2 min-w-0 w-full"
+                                className="flex flex-col gap-1 min-w-0 w-full"
                               >
                                 {person.phones.map((entry, idx) => {
                                   const num = phoneDisplayNumber(entry);
@@ -1559,7 +1563,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                         });
                                         toast.info(`Calling ${callName}...`);
                                       }}
-                                      className="w-full flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-colors uppercase min-w-0"
+                                      className="w-full flex flex-col items-start gap-0.5 text-zinc-400 hover:text-white transition-colors uppercase min-w-0"
                                       title={num}
                                     >
                                       <div className="flex items-center gap-1.5 w-full min-w-0">
@@ -1582,7 +1586,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 disabled={revealState.revealingPhone || revealState.revealingEmail}
                                 onClick={() => handleAcquire(person, 'phone')}
                                 title="Reveal Phone"
-                                loadingLabel="Revealing_Phone..."
                               />
                             )}
                           </div>
@@ -1615,7 +1618,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             disabled={revealState.revealingEmail || revealState.revealingPhone}
                             onClick={() => handleAcquire(person, 'email')}
                             title="Reveal email (fast)"
-                            loadingLabel="Revealing_Email..."
                           />
                           <RevealActionButton
                             icon={Phone}
@@ -1623,7 +1625,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             disabled={revealState.revealingPhone || revealState.revealingEmail}
                             onClick={() => handleAcquire(person, 'phone')}
                             title="Reveal phone + email (full reveal)"
-                            loadingLabel="Revealing_Phone..."
                           />
                           {(revealState.phoneTimedOut || (revealState.phoneWarned && revealState.revealingPhone)) && (
                             <motion.div
