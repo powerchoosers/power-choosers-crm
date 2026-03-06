@@ -3,6 +3,7 @@ import { VelocityTrackerV3 } from "@/components/dashboard/ActivityChart";
 import { SignalMatrix } from "@/components/dashboard/SignalMatrix";
 import { ForensicLogStream } from "@/components/dashboard/ForensicLogStream";
 import { TaskManagement } from "@/components/dashboard/TaskManagement";
+import { NextBestActionRail } from "@/components/dashboard/NextBestActionRail";
 
 export default function Home() {
   return (
@@ -23,6 +24,10 @@ export default function Home() {
             System_Operational
           </span>
         </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto">
+        <NextBestActionRail />
       </div>
 
       {/* Zone 1: Telemetry header (physics-based metrics) */}
