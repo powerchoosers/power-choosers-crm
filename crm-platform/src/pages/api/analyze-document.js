@@ -249,7 +249,32 @@ export default async function handler(req, res) {
     };
 
     const documentType = documentTypeMap[type];
-    if (documentType) {
+    const { data: existingDocument } = await supabaseAdmin
+      .from('documents')
+      .select('id, metadata')
+      .eq('account_id', accountId)
+      .eq('storage_path', filePath)
+      .maybeSingle();
+
+    if (existingDocument?.id) {
+      const nextMetadata = {
+        ...(existingDocument.metadata || {}),
+        ai_extraction: {
+          type,
+          data,
+          analyzed_at: new Date().toISOString(),
+          source: 'analyze-document'
+        }
+      };
+
+      const documentUpdates = { metadata: nextMetadata };
+      if (documentType) documentUpdates.document_type = documentType;
+
+      await supabaseAdmin
+        .from('documents')
+        .update(documentUpdates)
+        .eq('id', existingDocument.id);
+    } else if (documentType) {
       await supabaseAdmin
         .from('documents')
         .update({ document_type: documentType })
@@ -258,10 +283,13 @@ export default async function handler(req, res) {
     }
 
     const updates = {};
-    if (data.contract_end_date) updates.contract_end_date = data.contract_end_date;
-    if (data.strike_price) updates.current_rate = String(data.strike_price);
-    if (data.supplier) updates.electricity_supplier = data.supplier;
-    if (data.annual_usage) updates.annual_usage = String(data.annual_usage);
+    const shouldApplyUsageFieldsNow = type === 'BILL' || type === 'USAGE_DATA';
+    if (shouldApplyUsageFieldsNow) {
+      if (data.contract_end_date) updates.contract_end_date = data.contract_end_date;
+      if (data.strike_price) updates.current_rate = String(data.strike_price);
+      if (data.supplier) updates.electricity_supplier = data.supplier;
+      if (data.annual_usage) updates.annual_usage = String(data.annual_usage);
+    }
 
     if (data.monthly_kwh && data.peak_demand_kw && data.billing_days) {
       const hoursInPeriod = data.billing_days * 24;
@@ -289,9 +317,6 @@ export default async function handler(req, res) {
     if (type === 'BILL') {
       updates.status = 'Active';
       dealStageToSet = 'AUDITING';
-    } else if (type === 'SIGNED_CONTRACT') {
-      updates.status = 'Customer';
-      dealStageToSet = 'SECURED';
     }
 
     if (Object.keys(updates).length > 0) {

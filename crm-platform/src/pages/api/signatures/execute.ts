@@ -276,7 +276,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // Advance account lifecycle: Active Load → Customer on contract execution
         if (request.account_id) {
-            await supabaseAdmin.from('accounts').update({ status: 'Customer' }).eq('id', request.account_id);
+            const extracted = request.document?.metadata?.ai_extraction?.data || null;
+            const accountUpdates: Record<string, any> = { status: 'Customer' };
+
+            // Apply contract economics only at execution time.
+            if (extracted?.contract_end_date) accountUpdates.contract_end_date = extracted.contract_end_date;
+            if (extracted?.strike_price) accountUpdates.current_rate = String(extracted.strike_price);
+            if (extracted?.supplier) accountUpdates.electricity_supplier = extracted.supplier;
+            if (extracted?.annual_usage) accountUpdates.annual_usage = String(extracted.annual_usage);
+
+            await supabaseAdmin.from('accounts').update(accountUpdates).eq('id', request.account_id);
+            await supabaseAdmin.from('contacts').update({ status: 'Customer' }).eq('accountId', request.account_id);
         }
 
         // 8. Email Delivery
