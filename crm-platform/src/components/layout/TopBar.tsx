@@ -13,7 +13,7 @@ import { useVoice } from '@/context/VoiceContext'
 import { toast } from 'sonner'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
-import { usePathname, useParams } from 'next/navigation'
+import { usePathname, useParams, useRouter } from 'next/navigation'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
@@ -116,6 +116,7 @@ export function TopBar() {
   const { connect, disconnect, sendDigits, metadata: voiceMetadata } = useVoice()
   const pathname = usePathname()
   const params = useParams()
+  const router = useRouter()
 
   const { data: marketPulse, isError: isMarketError } = useMarketPulse()
   const queryClient = useQueryClient()
@@ -261,6 +262,9 @@ export function TopBar() {
   // Merge: direct DB data wins over whatever came through metadata chain
   const callbarLogoUrl = callbarAccount?.logoUrl || displayMetadata?.logoUrl || ''
   const callbarDomain = callbarAccount?.domain || displayMetadata?.domain || ''
+  const activeCallContactId = displayMetadata?.contactId || displayMetadata?.metadata?.contactId || ''
+  const activeCallAccountId = displayMetadata?.accountId || displayMetadata?.metadata?.accountId || ''
+  const activeCallAccountName = displayMetadata?.account || callbarAccount?.name || ''
 
 
   // Listen for scroll on the main content container (passive + rAF throttle for smooth scroll)
@@ -449,6 +453,16 @@ export function TopBar() {
     setStoreMetadata(null)
   }
 
+  const handleOpenContactDossier = useCallback(() => {
+    if (!activeCallContactId) return
+    router.push(`/network/contacts/${activeCallContactId}`)
+  }, [activeCallContactId, router])
+
+  const handleOpenAccountDossier = useCallback(() => {
+    if (!activeCallAccountId) return
+    router.push(`/network/accounts/${activeCallAccountId}`)
+  }, [activeCallAccountId, router])
+
   return (
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
     <header className={cn(
@@ -535,10 +549,36 @@ export function TopBar() {
                     />
                     <div className="flex flex-col min-w-0">
                       <div className="text-sm font-medium text-white leading-none mb-1 flex items-center gap-2 truncate">
-                        <span className="truncate">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</span>
+                        {activeCallContactId ? (
+                          <button
+                            type="button"
+                            onClick={handleOpenContactDossier}
+                            className="truncate text-left hover:text-[#002FA7] transition-colors"
+                            title="Open contact dossier"
+                          >
+                            {displayMetadata?.name || phoneNumber || "Unknown Caller"}
+                          </button>
+                        ) : (
+                          <span className="truncate">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</span>
+                        )}
                       </div>
-                      <div className="text-[10px] text-zinc-500 lowercase truncate">
-                        {selectedNumberName ? `via ${selectedNumberName}` : 'via Default'}
+                      <div className="text-[10px] text-zinc-500 lowercase truncate flex items-center gap-1">
+                        {activeCallAccountId && activeCallAccountName ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handleOpenAccountDossier}
+                              className="truncate text-left hover:text-[#002FA7] transition-colors"
+                              title="Open account dossier"
+                            >
+                              {activeCallAccountName}
+                            </button>
+                            <span className="text-zinc-600">•</span>
+                          </>
+                        ) : null}
+                        <span className="truncate">
+                          {selectedNumberName ? `via ${selectedNumberName}` : 'via Default'}
+                        </span>
                       </div>
                     </div>
                   </div>

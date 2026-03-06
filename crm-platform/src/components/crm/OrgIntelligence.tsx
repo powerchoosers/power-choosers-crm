@@ -1390,7 +1390,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 onClick={() => handleAcquire(person, 'email')}
                                 disabled={revealState.revealingEmail || revealState.revealingPhone}
                                 className={cn(
-                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border text-[9px] font-mono transition-all uppercase tracking-widest min-w-0",
+                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md bg-zinc-950/20 border text-[9px] font-mono transition-all uppercase tracking-widest min-w-0 w-full",
                                   revealState.revealingEmail
                                     ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
                                     : "border-white/5 text-zinc-500 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
@@ -1403,7 +1403,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                   <Globe className="w-2.5 h-2.5 text-zinc-600 group-hover/field:text-[#002FA7]" />
                                 )}
                                 <span className="truncate">{revealState.revealingEmail ? 'Revealing_Email...' : '••••••••••••'}</span>
-                                <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-600 group-hover/field:text-[#8ba6ff] transition-colors">
+                                <span
+                                  className={cn(
+                                    "ml-auto text-[8px] tracking-[0.2em] text-zinc-600 transition-all duration-200",
+                                    revealState.revealingEmail
+                                      ? "opacity-100"
+                                      : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
+                                  )}
+                                >
                                   {revealState.revealingEmail ? 'SYNC' : 'REVEAL'}
                                 </span>
                               </button>
@@ -1450,9 +1457,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             ) : (
                               <button
                                 onClick={() => handleAcquire(person, 'phone')}
-                                disabled={revealState.revealingPhone}
+                                disabled={revealState.revealingPhone || revealState.revealingEmail}
                                 className={cn(
-                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-mono transition-all uppercase tracking-widest shrink-0",
+                                  "group/field flex items-center gap-1.5 px-2 py-1 rounded-md border text-[9px] font-mono transition-all uppercase tracking-widest shrink-0 min-w-0 w-full",
+                                  revealState.revealingEmail && "border-white/5 text-zinc-700 bg-zinc-950/20",
                                   revealState.revealingPhone
                                     ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
                                     : "border-white/5 text-zinc-500 bg-zinc-950/20 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
@@ -1464,8 +1472,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 ) : (
                                   <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/field:text-[#002FA7]" />
                                 )}
-                                {revealState.revealingPhone ? 'Revealing_Phone...' : '••••••••••••'}
-                                <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-600 group-hover/field:text-[#8ba6ff] transition-colors">
+                                <span className="truncate">{revealState.revealingPhone ? 'Revealing_Phone...' : '••••••••••••'}</span>
+                                <span
+                                  className={cn(
+                                    "ml-auto text-[8px] tracking-[0.2em] text-zinc-600 transition-all duration-200",
+                                    revealState.revealingPhone
+                                      ? "opacity-100"
+                                      : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
+                                  )}
+                                >
                                   {revealState.revealingPhone ? 'SYNC' : 'REVEAL'}
                                 </span>
                               </button>
@@ -1491,12 +1506,12 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                           )}
                         </div>
                       ) : (
-                        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1 items-center">
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1 items-center">
                           <button
                             onClick={() => handleAcquire(person, 'email')}
                             disabled={revealState.revealingEmail || revealState.revealingPhone}
                             className={cn(
-                              "group/field flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest min-w-0 px-2 py-1 rounded-md border transition-all",
+                              "group/field flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest min-w-0 w-full px-2 py-1 rounded-md border transition-all",
                               revealState.revealingEmail
                                 ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
                                 : "border-white/5 text-zinc-600 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
@@ -1507,15 +1522,23 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <span className={cn("truncate", revealState.revealingEmail && "animate-pulse text-[#8ba6ff]")}>
                               {revealState.revealingEmail ? 'Revealing_Email...' : '••••••••••••'}
                             </span>
-                            <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-700 group-hover/field:text-[#8ba6ff] transition-colors">
+                            <span
+                              className={cn(
+                                "ml-auto text-[8px] tracking-[0.2em] text-zinc-700 transition-all duration-200",
+                                revealState.revealingEmail
+                                  ? "opacity-100"
+                                  : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
+                              )}
+                            >
                               {revealState.revealingEmail ? 'SYNC' : 'REVEAL'}
                             </span>
                           </button>
                           <button
                             onClick={() => handleAcquire(person, 'phone')}
-                            disabled={revealState.revealingPhone}
+                            disabled={revealState.revealingPhone || revealState.revealingEmail}
                             className={cn(
-                              "group/field flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest px-2 py-1 rounded-md border transition-all",
+                              "group/field flex items-center gap-1.5 text-[9px] font-mono uppercase tracking-widest min-w-0 w-full px-2 py-1 rounded-md border transition-all",
+                              revealState.revealingEmail && "border-white/5 text-zinc-700 bg-zinc-950/20",
                               revealState.revealingPhone
                                 ? "border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10"
                                 : "border-white/5 text-zinc-600 hover:text-white hover:border-[#002FA7] hover:bg-[#002FA7]/10"
@@ -1523,10 +1546,17 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             title="Reveal phone + email (full reveal)"
                           >
                             <Phone className="w-2.5 h-2.5" />
-                            <span className={cn(revealState.revealingPhone && "animate-pulse text-[#8ba6ff]")}>
+                            <span className={cn("truncate", revealState.revealingPhone && "animate-pulse text-[#8ba6ff]")}>
                               {revealState.revealingPhone ? 'Revealing_Phone...' : '••••••••••••'}
                             </span>
-                            <span className="ml-auto text-[8px] tracking-[0.2em] text-zinc-700 group-hover/field:text-[#8ba6ff] transition-colors">
+                            <span
+                              className={cn(
+                                "ml-auto text-[8px] tracking-[0.2em] text-zinc-700 transition-all duration-200",
+                                revealState.revealingPhone
+                                  ? "opacity-100"
+                                  : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
+                              )}
+                            >
                               {revealState.revealingPhone ? 'SYNC' : 'REVEAL'}
                             </span>
                           </button>
