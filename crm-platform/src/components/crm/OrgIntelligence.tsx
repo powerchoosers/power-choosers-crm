@@ -50,6 +50,13 @@ function phoneTypePrefix(entry: PhoneEntry, index: number): 'W' | 'M' | 'O' {
   return 'O';
 }
 
+const PHONE_REVEAL_WARNING_MS = 60_000;
+const PHONE_REVEAL_TIMEOUT_MS = 120_000;
+const PHONE_REVEAL_POLL_INTERVAL_MS = 10_000;
+const PHONE_REVEAL_MAX_ATTEMPTS = Math.ceil(PHONE_REVEAL_TIMEOUT_MS / PHONE_REVEAL_POLL_INTERVAL_MS);
+const PHONE_REVEAL_WARNING_SECONDS = PHONE_REVEAL_WARNING_MS / 1000;
+const PHONE_REVEAL_TIMEOUT_SECONDS = PHONE_REVEAL_TIMEOUT_MS / 1000;
+
 type RevealIcon = ComponentType<SVGProps<SVGSVGElement>>;
 
 interface RevealActionButtonProps {
@@ -525,7 +532,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       clearAllPhoneRevealTimers(person.id);
       phoneRevealWarningTimeouts.current[person.id] = setTimeout(() => {
         patchRevealState(person.id, { phoneWarned: true });
-      }, 40000);
+      }, PHONE_REVEAL_WARNING_MS);
       phoneRevealTimeouts.current[person.id] = setTimeout(() => {
         patchRevealState(person.id, {
           revealingPhone: false,
@@ -533,8 +540,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           phoneTimedOut: true,
           phoneWarned: true
         });
-        toast.warning(`No phone data returned for ${person.firstName || person.name || 'this contact'} after 60 seconds.`);
-      }, 60000);
+        toast.warning(
+          `No phone data returned for ${person.firstName || person.name || 'this contact'} after ${PHONE_REVEAL_TIMEOUT_MS / 1000} seconds.`
+        );
+      }, PHONE_REVEAL_TIMEOUT_MS);
     }
 
     try {
@@ -742,8 +751,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       if ((type === 'phone' || type === 'both') && crmId) {
         toast.info('Phone numbers can take a few minutes. Checking in background.', { duration: 5000 });
         const apolloPersonId = person.id;
-        const maxAttempts = 6; // 60s total at 10s interval
-        const intervalMs = 10000;
+        const maxAttempts = PHONE_REVEAL_MAX_ATTEMPTS;
+        const intervalMs = PHONE_REVEAL_POLL_INTERVAL_MS;
         let attempts = 0;
         const pollForPhones = async () => {
           if (attempts >= maxAttempts) {
@@ -1579,8 +1588,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               className="text-[8px] font-mono uppercase tracking-[0.2em] text-amber-500"
                             >
                               {revealState.phoneTimedOut
-                                ? 'Phone reveal returned no data after 60 seconds.'
-                                : 'Phone reveal still pending after 40 seconds; continuing to poll.'}
+                                ? `Phone reveal returned no data after ${PHONE_REVEAL_TIMEOUT_SECONDS} seconds.`
+                                : `Phone reveal still pending after ${PHONE_REVEAL_WARNING_SECONDS} seconds; continuing to poll.`}
                             </motion.div>
                           )}
 
@@ -1617,8 +1626,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               className="col-span-2 text-[8px] font-mono uppercase tracking-[0.2em] text-amber-500"
                             >
                               {revealState.phoneTimedOut
-                                ? 'Phone reveal returned no data after 60 seconds.'
-                                : 'Phone reveal still pending after 40 seconds; continuing to poll.'}
+                                ? `Phone reveal returned no data after ${PHONE_REVEAL_TIMEOUT_SECONDS} seconds.`
+                                : `Phone reveal still pending after ${PHONE_REVEAL_WARNING_SECONDS} seconds; continuing to poll.`}
                             </motion.div>
                           )}
                         </div>
