@@ -33,20 +33,81 @@ export interface Email {
 }
 
 const PAGE_SIZE = 50
+export type EmailListFilter = 'all' | 'received' | 'sent'
 
-export function useEmails(searchQuery?: string) {
+const SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {
+  'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
+}
+
+function getOwnerScope(userEmail: string) {
+  const normalized = userEmail.toLowerCase()
+  const shared = SHARED_INBOX_OWNERS_BY_USER[normalized] || []
+  return Array.from(new Set([normalized, ...shared]))
+}
+
+function applyOwnerScope(query: any, userEmail: string) {
+  const owners = getOwnerScope(userEmail)
+  const ownerConditions = owners.flatMap(owner => [
+    `metadata->>ownerId.eq.${owner}`,
+    `ownerId.eq.${owner}`,
+  ])
+  return query.or(ownerConditions.join(','))
+}
+
+async function applyNonAdminEmailScope(query: any, user: any) {
+  if (!user?.email) return query
+
+  let scoped = applyOwnerScope(query, user.email)
+
+  // Contact-based scoping for non-admin users
+  const { data: contactList } = await supabase
+    .from('contacts')
+    .select('email')
+    .eq('ownerId', user.id)
+
+  const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
+
+  if (validEmails.length > 0) {
+    const conditions: string[] = []
+    validEmails.forEach(e => {
+      conditions.push(`from.ilike.*${e}*`)
+      conditions.push(`to.cs.["${e}"]`)
+    })
+    scoped = scoped.or(conditions.join(','))
+  }
+
+  return scoped
+}
+
+function applyCommonEmailExclusions(query: any) {
+  return query
+    .not('subject', 'ilike', '%mailwarming%')
+    .not('subject', 'ilike', '%mail warming%')
+    .not('subject', 'ilike', '%test email%')
+    .not('from', 'ilike', '%apollo.io%')
+    .not('from', 'ilike', '%mailwarm%')
+    .not('from', 'ilike', '%lemwarm%')
+    .not('from', 'ilike', '%warmup%')
+}
+
+function applyEmailSearch(query: any, searchQuery?: string) {
+  if (!searchQuery) return query
+  return query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
+}
+
+export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'all') {
   const { user, role, loading, profile } = useAuth()
   const queryClient = useQueryClient()
 
   const emailsQuery = useInfiniteQuery({
-    queryKey: ['emails', user?.email ?? 'guest', role, searchQuery],
+    queryKey: ['emails', user?.email ?? 'guest', role, searchQuery, typeFilter],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       if (loading) return { emails: [], nextCursor: null }
       if (!user?.email) return { emails: [], nextCursor: null }
 
       try {
-        let query = supabase
+        let query: any = supabase
           .from('emails')
           .select('*', { count: 'exact' })
 
@@ -54,43 +115,14 @@ export function useEmails(searchQuery?: string) {
           // Admin sees all emails across all connected inboxes (nodalpoint.io, getnodalpoint.com, signal@)
           // No ownership filter — unified inbox across all 3 Zoho addresses
         } else {
-          // Non-admin: scope to emails owned by this user
-          if (!user.email) return { emails: [], nextCursor: null }
-          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
-
-          // Also apply contact-based filter: only show emails from/to their contacts
-          // contacts.ownerId is the user's UUID (user.id), NOT user.email
-          const { data: contactList } = await supabase
-            .from('contacts')
-            .select('email')
-            .eq('ownerId', user.id)
-
-          const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
-
-          if (validEmails.length > 0) {
-            const conditions: string[] = []
-            validEmails.forEach(e => {
-              conditions.push(`from.ilike.*${e}*`)
-              conditions.push(`to.cs.["${e}"]`)
-            })
-            query = query.or(conditions.join(','))
-          }
-          // If no contacts yet, still show all owned emails (don't blank the inbox)
+          query = await applyNonAdminEmailScope(query, user)
         }
-        // -----------------------------------------------
 
-        // Filter out mailwarming and automated emails
-        query = query
-          .not('subject', 'ilike', '%mailwarming%')
-          .not('subject', 'ilike', '%mail warming%')
-          .not('subject', 'ilike', '%test email%')
-          .not('from', 'ilike', '%apollo.io%')
-          .not('from', 'ilike', '%mailwarm%')
-          .not('from', 'ilike', '%lemwarm%')
-          .not('from', 'ilike', '%warmup%')
-
-        if (searchQuery) {
-          query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
+        query = applyEmailSearch(applyCommonEmailExclusions(query), searchQuery)
+        if (typeFilter === 'sent') {
+          query = query.in('type', ['sent', 'uplink_out'])
+        } else if (typeFilter === 'received') {
+          query = query.in('type', ['received', 'uplink_in'])
         }
 
         const from = pageParam * PAGE_SIZE
@@ -115,7 +147,7 @@ export function useEmails(searchQuery?: string) {
           throw error
         }
 
-        const emails = data.map(item => {
+        const emails = data.map((item: any) => {
           // Normalize type from legacy or current formats
           let type: Email['type'] = 'received'
           const rawType = String(item.type || '').toLowerCase()
@@ -216,6 +248,7 @@ export function useEmails(searchQuery?: string) {
       // Invalidate and refetch emails immediately
       queryClient.invalidateQueries({ queryKey: ['emails'] });
       queryClient.invalidateQueries({ queryKey: ['emails-count'] });
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] });
       // Force refetch after a small delay to ensure backend has processed
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ['emails'] });
@@ -255,7 +288,7 @@ export function useSearchEmails(queryTerm: string) {
 
         if (role !== 'admin') {
           if (!user.email) return []
-          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
+          query = applyOwnerScope(query, user.email)
         }
 
         // Filter out mailwarming emails
@@ -299,47 +332,17 @@ export function useEmailsCount(searchQuery?: string) {
       if (loading || !user || !user.email) return 0
 
       try {
-        let query = supabase
+        let query: any = supabase
           .from('emails')
           .select('id', { count: 'exact', head: true })
 
         if (role === 'admin') {
           // Admin: count across all inboxes, no filtering
         } else {
-          query = query.eq('metadata->>ownerId', user.email.toLowerCase())
-
-          // Contact-based scoping for non-admin
-          const { data: contactList } = await supabase
-            .from('contacts')
-            .select('email')
-            .eq('ownerId', user.id)
-
-          const validEmails = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]
-
-          if (validEmails.length > 0) {
-            const conditions: string[] = []
-            validEmails.forEach(e => {
-              conditions.push(`from.ilike.*${e}*`)
-              conditions.push(`to.cs.["${e}"]`)
-            })
-            query = query.or(conditions.join(','))
-          }
+          query = await applyNonAdminEmailScope(query, user)
         }
-        // -----------------------------------------------
 
-        // Filter out mailwarming emails
-        query = query
-          .not('subject', 'ilike', '%mailwarming%')
-          .not('subject', 'ilike', '%mail warming%')
-          .not('subject', 'ilike', '%test email%')
-          .not('from', 'ilike', '%apollo.io%')
-          .not('from', 'ilike', '%mailwarm%')
-          .not('from', 'ilike', '%lemwarm%')
-          .not('from', 'ilike', '%warmup%')
-
-        if (searchQuery) {
-          query = query.or(`subject.ilike.%${searchQuery}%,from.ilike.%${searchQuery}%,text.ilike.%${searchQuery}%`)
-        }
+        query = applyEmailSearch(applyCommonEmailExclusions(query), searchQuery)
 
         const { count, error } = await query
 
@@ -368,5 +371,68 @@ export function useEmailsCount(searchQuery?: string) {
     },
     enabled: !loading && !!user && !!user?.email,
     staleTime: 1000 * 60 * 2, // 2 minutes
+  })
+}
+
+export function useEmailTypeCounts(searchQuery?: string) {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['emails-type-counts', user?.email, role, searchQuery],
+    queryFn: async () => {
+      if (loading || !user || !user.email) {
+        return { all: 0, sent: 0, received: 0 }
+      }
+
+      const buildBase = async () => {
+        let query: any = supabase
+          .from('emails')
+          .select('id', { count: 'exact', head: true })
+
+        if (role !== 'admin') query = await applyNonAdminEmailScope(query, user)
+
+        return applyEmailSearch(applyCommonEmailExclusions(query), searchQuery)
+      }
+
+      const [allRes, sentRes, receivedRes] = await Promise.all([
+        (async () => {
+          const query = await buildBase()
+          return query
+        })(),
+        (async () => {
+          const query = await buildBase()
+          return query.in('type', ['sent', 'uplink_out'])
+        })(),
+        (async () => {
+          const query = await buildBase()
+          return query.in('type', ['received', 'uplink_in'])
+        })()
+      ])
+
+      const allError = allRes.error
+      const sentError = sentRes.error
+      const receivedError = receivedRes.error
+
+      if (allError || sentError || receivedError) {
+        const error = allError || sentError || receivedError
+        if (error?.message === 'FetchUserError: Request was aborted' || error?.message?.includes('abort')) {
+          throw error
+        }
+        console.error('Supabase error fetching email type counts:', {
+          allError,
+          sentError,
+          receivedError
+        })
+        throw error
+      }
+
+      return {
+        all: allRes.count || 0,
+        sent: sentRes.count || 0,
+        received: receivedRes.count || 0
+      }
+    },
+    enabled: !loading && !!user && !!user?.email,
+    staleTime: 1000 * 60 * 2,
   })
 }

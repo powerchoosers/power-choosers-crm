@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEmails, useEmailsCount, Email } from '@/hooks/useEmails'
+import { useEmails, useEmailsCount, useEmailTypeCounts, Email, EmailListFilter } from '@/hooks/useEmails'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
@@ -28,6 +28,7 @@ export default function EmailsPage() {
 
   const [searchTerm, setSearchTerm] = useState(searchQuery)
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
+  const [emailFilter, setEmailFilter] = useState<EmailListFilter>('all')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const hasRunAutoSync = useRef(false)
 
@@ -40,8 +41,9 @@ export default function EmailsPage() {
     return () => clearTimeout(timer)
   }, [searchTerm, setSearch])
 
-  const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch)
+  const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch, emailFilter)
   const { data: totalEmails } = useEmailsCount(debouncedSearch)
+  const { data: emailTypeCounts } = useEmailTypeCounts(debouncedSearch)
   const { performSync, isSyncing } = useZohoSync()
   const queryClient = useQueryClient()
   const router = useRouter()
@@ -53,7 +55,19 @@ export default function EmailsPage() {
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
 
   const emails = data?.pages.flatMap(page => page.emails) || []
-  const effectiveTotal = totalEmails ?? emails.length
+  const effectiveTotal =
+    emailFilter === 'sent'
+      ? (emailTypeCounts?.sent ?? emails.length)
+      : emailFilter === 'received'
+        ? (emailTypeCounts?.received ?? emails.length)
+        : (totalEmails ?? emails.length)
+
+  // Hydrate all pages in background so filtered table views have full-node coverage.
+  useEffect(() => {
+    if (!isLoadingEmails && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage()
+    }
+  }, [isLoadingEmails, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const handleSync = () => {
     if (!user) return
@@ -122,12 +136,20 @@ export default function EmailsPage() {
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <EmailList
+          filter={emailFilter}
+          onFilterChange={(next) => {
+            setEmailFilter(next)
+            setPage(0)
+            setSelectedIds(new Set())
+          }}
           emails={emails}
           isLoading={isLoadingEmails}
           onRefresh={handleSync}
           isSyncing={isSyncing}
           onSelectEmail={(email) => router.push(`/network/emails/${email.id}`)}
           totalEmails={totalEmails}
+          totalReceived={emailTypeCounts?.received}
+          totalSent={emailTypeCounts?.sent}
           hasNextPage={hasNextPage}
           fetchNextPage={fetchNextPage}
           isFetchingNextPage={isFetchingNextPage}
