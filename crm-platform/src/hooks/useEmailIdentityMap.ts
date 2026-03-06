@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 
 export interface EmailIdentity {
   id: string
@@ -13,6 +14,7 @@ export interface EmailIdentity {
   accountName?: string | null
   accountDomain?: string | null
   accountLogoUrl?: string | null
+  avatarUrl?: string | null
 }
 
 export function extractEmailAddress(value?: string | null): string {
@@ -38,7 +40,7 @@ export function useEmailIdentityMap(addresses: string[]) {
       const email = extractEmailAddress(a)
       if (email) dedup.add(email)
     }
-    return Array.from(dedup)
+    return Array.from(dedup).sort()
   }, [addresses])
 
   return useQuery({
@@ -54,7 +56,7 @@ export function useEmailIdentityMap(addresses: string[]) {
         emails.map((e) => `email.ilike.${e}`).join(',')
 
       for (const c of chunks) {
-        const selectClause = 'id, email, name, firstName, lastName, accountId, ownerId, accounts(name, domain, logo_url)'
+        const selectClause = 'id, email, name, firstName, lastName, accountId, ownerId, metadata, accounts(name, domain, logo_url)'
 
         const querySets: any[] = []
         if (role === 'admin') {
@@ -102,6 +104,7 @@ export function useEmailIdentityMap(addresses: string[]) {
               accountName: row.accounts?.name || null,
               accountDomain: row.accounts?.domain || null,
               accountLogoUrl: row.accounts?.logo_url || null,
+              avatarUrl: resolveContactPhotoUrl(row) || null,
             }
           }
         }
@@ -110,6 +113,11 @@ export function useEmailIdentityMap(addresses: string[]) {
       return map
     },
     enabled: !loading && normalized.length > 0 && !!(user || role === 'admin'),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 1000 * 60 * 30,
+    gcTime: 1000 * 60 * 60,
+    refetchOnMount: false,
+    refetchOnWindowFocus: false,
+    retry: 1,
+    placeholderData: (previousData) => previousData,
   })
 }

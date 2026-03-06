@@ -43,7 +43,7 @@ function getDaysUntilJune() {
  * - Company call (logoUrl or domain set): shows logo img → Clearbit fallback → Building2
  * - Contact call (no logoUrl, no domain): shows ContactAvatar with the contact's name
  */
-function CallBarIcon({ logoUrl, domain, name, contactName }: { logoUrl?: string; domain?: string; name: string; contactName?: string }) {
+function CallBarIcon({ logoUrl, domain, name, contactName, photoUrl }: { logoUrl?: string; domain?: string; name: string; contactName?: string; photoUrl?: string }) {
   const clearbitUrl = domain ? `https://logo.clearbit.com/${domain.replace(/^https?:\/\//i, '').split('/')[0].toLowerCase()}` : null
   const [src, setSrc] = useState<string | null>(logoUrl || clearbitUrl)
   const [failed, setFailed] = useState(false)
@@ -67,6 +67,7 @@ function CallBarIcon({ logoUrl, domain, name, contactName }: { logoUrl?: string;
     return (
       <ContactAvatar
         name={contactName || name}
+        photoUrl={photoUrl}
         size={32}
         className="rounded-[14px] shrink-0"
       />
@@ -530,6 +531,7 @@ export function TopBar() {
                       domain={callbarDomain || undefined}
                       name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
                       contactName={displayMetadata?.name || undefined}
+                      photoUrl={displayMetadata?.photoUrl || undefined}
                     />
                     <div className="flex flex-col min-w-0">
                       <div className="text-sm font-medium text-white leading-none mb-1 flex items-center gap-2 truncate">

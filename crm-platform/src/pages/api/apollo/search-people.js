@@ -5,6 +5,7 @@
  */
 
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation, requireApolloAuth } from './_utils.js';
+import { supabaseAdmin } from '@/lib/supabase';
 
 /**
  * Enrich organization data using Apollo Enrichment API
@@ -66,6 +67,14 @@ export default async function handler(req, res) {
     } = req.body || {};
 
     const APOLLO_API_KEY = getApiKey();
+
+    const normalizeDomain = (value) => String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .split('/')[0]
+      .split(':')[0];
 
     // Apollo mixed_people/api_search: send EITHER q_organization_domains_list (array) OR q_organization_domains (single), not both (422 if both sent)
     const hasDomainsList = Array.isArray(q_organization_domains_list) && q_organization_domains_list.length > 0;
@@ -236,6 +245,74 @@ export default async function handler(req, res) {
       });
     }
     // --- END ENRICHMENT STEP ---
+
+    // Persist searchable cache for Org Intelligence / Apollo panel re-use.
+    // We keep the same shape used elsewhere in apollo_searches: { company, contacts, timestamp }.
+    try {
+      const firstOrg = rawPeople.find((p) => p?.organization)?.organization || null;
+      const fallbackDomain = hasDomainsList
+        ? normalizeDomain(q_organization_domains_list[0])
+        : normalizeDomain(singleDomain);
+      const companyDomain = normalizeDomain(firstOrg?.primary_domain || firstOrg?.domain || fallbackDomain || '');
+      const companyName = firstOrg?.name || q_organization_name || '';
+
+      const companySummary = {
+        id: firstOrg?.id || '',
+        name: companyName,
+        domain: companyDomain,
+        description: firstOrg?.short_description || firstOrg?.seo_description || '',
+        employees: firstOrg?.estimated_num_employees || firstOrg?.employee_count || null,
+        industry: firstOrg?.industry || (firstOrg?.industries && firstOrg.industries[0]) || '',
+        city: firstOrg?.city || '',
+        state: firstOrg?.state || '',
+        country: firstOrg?.country || '',
+        address: firstOrg?.raw_address || firstOrg?.street_address || '',
+        logoUrl: firstOrg?.logo_url || null,
+        linkedin: firstOrg?.linkedin_url || '',
+        companyPhone: firstOrg?.phone || firstOrg?.sanitized_phone || '',
+        zip: firstOrg?.postal_code || '',
+        revenue: firstOrg?.annual_revenue_printed || ''
+      };
+
+      const contactsForCache = people.map((person) => ({
+        id: person.id,
+        name: person.name || `${person.firstName || ''} ${person.lastName || ''}`.trim(),
+        firstName: person.firstName || '',
+        lastName: person.lastName || '',
+        photoUrl: person.photoUrl || '',
+        title: person.title || '',
+        email: person.email || 'N/A',
+        status: person.emailStatus === 'verified' ? 'verified' : 'unverified',
+        isMonitored: false,
+        location: person.location || '',
+        linkedin: person.linkedin || '',
+        phones: []
+      }));
+
+      const cacheData = {
+        company: companySummary,
+        contacts: contactsForCache,
+        timestamp: Date.now(),
+        source: 'search-people'
+      };
+
+      const keys = [];
+      if (companyDomain) keys.push(companyDomain);
+      if (companyName && !keys.includes(companyName)) keys.push(companyName);
+
+      if (keys.length > 0 && supabaseAdmin) {
+        const rows = keys.map((key) => ({
+          key,
+          data: cacheData,
+          updated_at: new Date().toISOString()
+        }));
+        await supabaseAdmin
+          .from('apollo_searches')
+          .upsert(rows, { onConflict: 'key' });
+      }
+    } catch (cacheError) {
+      console.warn('[Apollo Search People] Cache upsert failed:', cacheError?.message || cacheError);
+    }
 
     // Construct pagination manually
     const total_entries = searchData.total_entries || searchData.pagination?.total_entries || 0;

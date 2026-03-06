@@ -338,6 +338,7 @@ export default function TargetDetailPage() {
           >
             <ContactAvatar
               name={contact.name}
+              photoUrl={contact.avatarUrl}
               size={36}
               className="w-9 h-9 transition-all"
               textClassName="text-[10px]"

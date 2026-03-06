@@ -67,6 +67,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
       }
       : {
         name: contact.name,
+        photoUrl: contact.avatarUrl,
         account: contact.companyName || contact.company,
         title: contact.title,
         logoUrl: contact.logoUrl,

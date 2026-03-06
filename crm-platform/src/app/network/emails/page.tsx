@@ -99,17 +99,56 @@ export default function EmailsPage() {
 
   const handleConfirmDelete = async () => {
     const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+
+    const idSet = new Set(ids)
+    const sentDeleted = emails.filter((email) => idSet.has(email.id) && email.type === 'sent').length
+    const receivedDeleted = emails.filter((email) => idSet.has(email.id) && email.type === 'received').length
+
+    queryClient.setQueriesData({ queryKey: ['emails'] }, (oldData: any) => {
+      if (!oldData?.pages) return oldData
+      return {
+        ...oldData,
+        pages: oldData.pages.map((page: any) => ({
+          ...page,
+          emails: Array.isArray(page?.emails)
+            ? page.emails.filter((email: Email) => !idSet.has(email.id))
+            : page?.emails,
+        })),
+      }
+    })
+
+    queryClient.setQueriesData({ queryKey: ['emails-count'] }, (oldCount: any) => {
+      if (typeof oldCount !== 'number') return oldCount
+      return Math.max(0, oldCount - ids.length)
+    })
+
+    queryClient.setQueriesData({ queryKey: ['emails-type-counts'] }, (oldCounts: any) => {
+      if (!oldCounts || typeof oldCounts !== 'object') return oldCounts
+      return {
+        ...oldCounts,
+        all: Math.max(0, (oldCounts.all ?? 0) - ids.length),
+        sent: Math.max(0, (oldCounts.sent ?? 0) - sentDeleted),
+        received: Math.max(0, (oldCounts.received ?? 0) - receivedDeleted),
+      }
+    })
+
     const { error } = await supabase
       .from('emails')
       .update({ is_deleted: true })
       .in('id', ids)
     if (error) {
       toast.error('Failed to delete emails')
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
       return
     }
     toast.success(`${ids.length} email${ids.length > 1 ? 's' : ''} deleted`)
     setSelectedIds(new Set())
     queryClient.invalidateQueries({ queryKey: ['emails'] })
+    queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+    queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
   }
 
   return (

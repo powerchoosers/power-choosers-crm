@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 
 export interface Contact {
   id: string
@@ -136,6 +137,10 @@ type ContactMetadata = {
   primaryPhoneField?: string
   email?: string
   notes?: string
+  avatarUrl?: string
+  avatar_url?: string
+  photoUrl?: string
+  photo_url?: string
   general?: {
     firstName?: string
     lastName?: string
@@ -150,6 +155,10 @@ type ContactMetadata = {
     companyName?: string
     domain?: string
     notes?: string
+    avatarUrl?: string
+    avatar_url?: string
+    photoUrl?: string
+    photo_url?: string
   }
   contact?: {
     firstName?: string
@@ -160,6 +169,16 @@ type ContactMetadata = {
     phone?: string
     mobile?: string
     otherPhone?: string
+    avatarUrl?: string
+    avatar_url?: string
+    photoUrl?: string
+    photo_url?: string
+  }
+  original_apollo_data?: {
+    photoUrl?: string
+    photo_url?: string
+    avatarUrl?: string
+    avatar_url?: string
   }
 }
 
@@ -220,6 +239,10 @@ type ContactRow = {
   website?: string | null
   notes?: string | null
   metadata?: ContactMetadata | string | null
+  avatarUrl?: string | null
+  avatar_url?: string | null
+  photoUrl?: string | null
+  photo_url?: string | null
   accounts?: AccountJoin | AccountJoin[] | null
 }
 
@@ -299,6 +322,7 @@ export function useAccountContacts(accountId: string) {
       }
 
       return (data || []).map(row => {
+        const metadata = normalizeMetadata((row as ContactRow).metadata)
         const fName = row.firstName || row.first_name || ''
         const lName = row.lastName || row.last_name || ''
         return {
@@ -313,6 +337,7 @@ export function useAccountContacts(accountId: string) {
           lastName: lName,
           email: row.email || '',
           phone: row.phone || '',
+          avatarUrl: resolveContactPhotoUrl(row, metadata),
           title: row.title || '',
           accountId: row.accountId,
           company: '', // Default for required field
@@ -360,6 +385,7 @@ export function useSearchContacts(queryTerm: string) {
 
         return (data as ContactRow[]).map(item => {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts;
+          const metadata = normalizeMetadata(item.metadata)
 
           const fName = item.firstName || item.first_name || item.firstname || item.FirstName;
           const lName = item.lastName || item.last_name || item.lastname || item.LastName;
@@ -376,6 +402,7 @@ export function useSearchContacts(queryTerm: string) {
             id: item.id,
             name: fullName,
             email: item.email || '',
+            avatarUrl: resolveContactPhotoUrl(item, metadata),
             company: account?.name || '',
             logoUrl: account?.logo_url || '',
           };
@@ -515,6 +542,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             name: fullName,
             firstName: fName as string,
             lastName: lName as string,
+            avatarUrl: resolveContactPhotoUrl(item, metadata),
             email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
             mobile: item.mobile || metadata?.mobile || '',
@@ -716,6 +744,7 @@ export function useContact(id: string) {
       return {
         id: typedData.id,
         name: fullName,
+        avatarUrl: resolveContactPhotoUrl(typedData, metadata),
         email: typedData.email || '',
         notes: typedData.notes || '',
         phone: typedData.phone || typedData.mobile || typedData.workPhone || typedData.otherPhone || '',

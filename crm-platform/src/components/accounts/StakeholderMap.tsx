@@ -43,6 +43,7 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
               {/* Avatar with Target Badge */}
               <ContactAvatar
                 name={contact.name || ''}
+                photoUrl={contact.avatarUrl}
                 size={32}
                 className="w-8 h-8 rounded-[14px]"
                 textClassName="text-[10px]"

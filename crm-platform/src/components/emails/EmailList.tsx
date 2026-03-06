@@ -347,6 +347,7 @@ export function EmailList({
                   {primaryContact ? (
                     <ContactAvatar
                       name={primaryContact.displayName}
+                      photoUrl={primaryContact.avatarUrl}
                       size={36}
                       className="rounded-[10px]"
                       textClassName="text-[10px]"

@@ -2,11 +2,13 @@
 
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState } from 'react'
 
 export type ContactHealthScore = 'active' | 'warming' | 'cold'
 
 interface ContactAvatarProps {
   name: string
+  photoUrl?: string | null
   size?: number
   className?: string
   textClassName?: string
@@ -34,6 +36,7 @@ const HEALTH_DOT: Record<ContactHealthScore, { bg: string; shadow: string; label
 
 export function ContactAvatar({
   name,
+  photoUrl,
   size = 32,
   className,
   textClassName,
@@ -42,6 +45,14 @@ export function ContactAvatar({
   healthScore,
   healthLoading = false,
 }: ContactAvatarProps) {
+  const [imageFailed, setImageFailed] = useState(false)
+  const [imageLoaded, setImageLoaded] = useState(false)
+
+  useEffect(() => {
+    setImageFailed(false)
+    setImageLoaded(false)
+  }, [photoUrl])
+
   const initials = name
     .split(' ')
     .filter(Boolean)
@@ -49,6 +60,8 @@ export function ContactAvatar({
     .join('')
     .slice(0, 2)
     .toUpperCase()
+  const resolvedInitials = initials || '?'
+  const showPhoto = Boolean(photoUrl && !imageFailed)
 
   const showBadge = showListBadge || showTargetBadge
   const health = healthScore ? HEALTH_DOT[healthScore] : null
@@ -60,18 +73,54 @@ export function ContactAvatar({
         animate={{ opacity: 1, scale: 1 }}
         className={cn(
           'rounded-[14px]',
-          'nodal-glass flex items-center justify-center border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-zinc-900/80',
+          'relative nodal-glass flex items-center justify-center border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)] overflow-hidden shrink-0 bg-zinc-900/80',
           className
         )}
         style={{ width: size, height: size }}
       >
-        <span className={cn(
-          'font-semibold text-white/90 tracking-tighter',
-          size > 48 ? 'text-xl' : size > 32 ? 'text-sm' : 'text-[10px]',
-          textClassName
-        )}>
-          {initials}
-        </span>
+        <AnimatePresence mode="wait" initial={false}>
+          {showPhoto && imageLoaded ? (
+            <motion.img
+              key={`photo-${photoUrl}`}
+              src={photoUrl || ''}
+              alt={name}
+              loading="lazy"
+              initial={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+              transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+              className="w-full h-full object-cover"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <motion.span
+              key={`initials-${name}-${photoUrl || 'none'}`}
+              initial={{ opacity: 0.75, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+              className={cn(
+                'font-semibold text-white/90 tracking-tighter',
+                size > 48 ? 'text-xl' : size > 32 ? 'text-sm' : 'text-[10px]',
+                textClassName
+              )}
+            >
+              {resolvedInitials}
+            </motion.span>
+          )}
+        </AnimatePresence>
+
+        {showPhoto && !imageLoaded && (
+          <img
+            src={photoUrl || ''}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
+            onLoad={() => setImageLoaded(true)}
+            onError={() => setImageFailed(true)}
+          />
+        )}
       </motion.div>
 
       {/* Health badge — top-LEFT corner */}

@@ -192,6 +192,7 @@ export function GlobalSearch() {
                         >
                           <ContactAvatar
                             name={contact.name}
+                            photoUrl={contact.avatarUrl}
                             size={32}
                             className="w-8 h-8 transition-all"
                           />

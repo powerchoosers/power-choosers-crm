@@ -8,6 +8,7 @@ interface CallState {
   callSessionId: number
   metadata: {
     name?: string
+    photoUrl?: string
     account?: string
     title?: string
     logoUrl?: string

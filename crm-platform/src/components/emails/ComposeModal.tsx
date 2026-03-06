@@ -620,6 +620,7 @@ function SearchResultsDropdown({
             >
               <ContactAvatar
                 name={contact.name}
+                photoUrl={contact.avatarUrl}
                 size={32}
                 className="w-8 h-8 rounded-lg"
               />

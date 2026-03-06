@@ -9,6 +9,7 @@ import { Phone } from 'lucide-react'
 /** Meta shape for incoming call (matches VoiceContext VoiceMetadata). */
 export interface IncomingCallMeta {
   name?: string
+  photoUrl?: string
   account?: string
   title?: string
   logoUrl?: string
@@ -59,7 +60,7 @@ export function IncomingCallToast({
           className="shrink-0 border border-white/5"
         />
       ) : contactName ? (
-        <ContactAvatar name={contactName} size={INCOMING_AVATAR_SIZE} />
+        <ContactAvatar name={contactName} photoUrl={meta?.photoUrl} size={INCOMING_AVATAR_SIZE} />
       ) : (
         <div
           className="shrink-0 rounded-[14px] bg-black/20 border border-white/5 flex items-center justify-center text-zinc-400"

@@ -381,6 +381,7 @@ export function RightPanel() {
                                 entityName,
                                 entityType: isContactPage ? 'contact' : 'account',
                                 entityLogoUrl: account?.logoUrl,
+                                entityPhotoUrl: isContactPage ? ((contact as any)?.avatarUrl || (contact as any)?.photoUrl) : undefined,
                                 entityDomain: account?.domain,
                                 contactId: isContactPage ? entityId : undefined,
                                 accountId: isAccountPage ? entityId : undefined,

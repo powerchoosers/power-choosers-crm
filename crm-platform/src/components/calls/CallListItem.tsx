@@ -36,6 +36,7 @@ interface CallListItemProps {
   accountName?: string
   /** Contact name for customer avatar when customerAvatar === 'contact' (e.g. contact dossier) */
   contactName?: string
+  contactPhotoUrl?: string
   /** Use contact letter glyph for customer in transcript instead of company icon */
   customerAvatar?: 'company' | 'contact'
   variant?: 'default' | 'minimal'
@@ -50,7 +51,7 @@ function formatTime(seconds: number): string {
 
 const squircleAvatar = "rounded-[14px] shrink-0 overflow-hidden bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
 
-export function CallListItem({ call, contactId, accountId, accountLogoUrl, accountDomain, accountName, contactName, customerAvatar = 'company', variant = 'default' }: CallListItemProps) {
+export function CallListItem({ call, contactId, accountId, accountLogoUrl, accountDomain, accountName, contactName, contactPhotoUrl, customerAvatar = 'company', variant = 'default' }: CallListItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -518,7 +519,12 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                             </div>
                           ) : customerAvatar === 'contact' && contactName ? (
                             <div className="mt-1 shrink-0">
-                              <ContactAvatar name={contactName} size={24} className="rounded-[8px]" />
+                              <ContactAvatar
+                                name={contactName}
+                                photoUrl={contactPhotoUrl}
+                                size={24}
+                                className="rounded-[8px]"
+                              />
                             </div>
                           ) : (accountLogoUrl || accountDomain) ? (
                             <div className="mt-1 shrink-0">
