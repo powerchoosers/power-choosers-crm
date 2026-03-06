@@ -11,6 +11,7 @@ import { IncomingCallToast } from '@/components/calls/IncomingCallToast'
 
 interface VoiceMetadata {
   name?: string
+  photoUrl?: string
   account?: string
   title?: string
   logoUrl?: string
@@ -86,6 +87,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           const meta: VoiceMetadata = {}
           if (data.contact) {
             meta.name = data.contact.name
+            meta.photoUrl = data.contact.avatarUrl || data.contact.photoUrl
             meta.account = data.contact.account
             meta.title = data.contact.title
             meta.contactId = data.contact.id

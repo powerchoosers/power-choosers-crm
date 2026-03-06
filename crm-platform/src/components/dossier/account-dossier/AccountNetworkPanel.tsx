@@ -86,6 +86,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                                                     accountName={account?.name}
                                                     customerAvatar={isContactCall ? 'contact' : 'company'}
                                                     contactName={contactForCall?.name ?? contactForCall?.firstName ?? ''}
+                                                    contactPhotoUrl={contactForCall?.avatarUrl || contactForCall?.photoUrl}
                                                     variant="minimal"
                                                 />
                                             </motion.div>

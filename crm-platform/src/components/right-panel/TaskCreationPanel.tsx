@@ -63,7 +63,7 @@ function parseTimeToDate(date: Date, timeStr: string): Date {
 
 export function TaskCreationPanel() {
     const { taskContext, setRightPanelMode, setTaskContext } = useUIStore()
-    const { entityId, entityName, entityType, entityLogoUrl, entityDomain } = taskContext || { entityId: '', entityType: 'account' }
+    const { entityId, entityName, entityType, entityLogoUrl, entityPhotoUrl, entityDomain } = taskContext || { entityId: '', entityType: 'account' }
     const queryClient = useQueryClient()
 
     const [isReady, setIsReady] = useState(false)
@@ -253,7 +253,7 @@ export function TaskCreationPanel() {
                     </div>
                     <div className="px-4 py-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center gap-4">
                         {entityType === 'contact' ? (
-                            <ContactAvatar name={entityName || 'Contact'} size={40} />
+                            <ContactAvatar name={entityName || 'Contact'} photoUrl={entityPhotoUrl} size={40} />
                         ) : (
                             <CompanyIcon
                                 logoUrl={entityLogoUrl}

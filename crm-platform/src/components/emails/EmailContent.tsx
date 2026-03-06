@@ -75,6 +75,7 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
       :root {
         color-scheme: ${isLightMode ? 'light' : 'dark'};
       }
+      html,
       body {
         margin: 0;
         padding: 0;
@@ -84,6 +85,8 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
         background-color: ${isLightMode ? '#ffffff' : '#09090b'};
         overflow: hidden; /* Let parent handle scrolling */
         word-wrap: break-word;
+        min-height: 0 !important;
+        height: auto !important;
       }
       .email-wrapper {
         max-width: 100%;
@@ -91,6 +94,14 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
         padding: 24px;
         box-sizing: border-box;
         overflow-x: auto; /* Allow horizontal scroll for wide content */
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
+      }
+      .email-wrapper * {
+        min-height: 0 !important;
+        height: auto !important;
+        max-height: none !important;
       }
       a { color: #002FA7; text-decoration: underline; }
       img { 
@@ -208,10 +219,17 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
             function updateHeight() {
               const body = document.body;
               const html = document.documentElement;
-              const height = Math.max(
-                body.scrollHeight, body.offsetHeight, 
-                html.clientHeight, html.scrollHeight, html.offsetHeight
-              );
+              const measureHeight = () => {
+                const wrapper = document.querySelector('.email-wrapper');
+                if (wrapper) {
+                  return Math.max(wrapper.scrollHeight, wrapper.offsetHeight);
+                }
+                return Math.max(
+                  body.scrollHeight, body.offsetHeight,
+                  html.clientHeight, html.scrollHeight, html.offsetHeight
+                );
+              };
+              const height = measureHeight();
               window.parent.postMessage({ type: 'setHeight', height: height }, '*');
             }
 
