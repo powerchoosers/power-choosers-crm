@@ -3,6 +3,79 @@ import { supabaseAdmin } from '@/lib/supabase';
 import crypto from 'crypto';
 import { ZohoMailService } from '../email/zoho-service';
 
+const SIGNATURE_EXPIRY_TIME_ZONE = 'America/Chicago';
+const SIGNATURE_EXPIRY_HOUR = 16;
+
+function getChicagoDateParts(date: Date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: SIGNATURE_EXPIRY_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  }).formatToParts(date);
+
+  const getPart = (type: Intl.DateTimeFormatPartTypes) =>
+    Number(parts.find((part) => part.type === type)?.value || '0');
+
+  return {
+    year: getPart('year'),
+    month: getPart('month'),
+    day: getPart('day'),
+    hour: getPart('hour')
+  };
+}
+
+function getTimeZoneOffsetMinutes(date: Date, timeZone: string) {
+  const timeZoneName = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    timeZoneName: 'shortOffset',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  }).formatToParts(date).find((part) => part.type === 'timeZoneName')?.value || 'GMT+0';
+
+  const match = timeZoneName.match(/GMT([+-])(\d{1,2})(?::?(\d{2}))?/i);
+  if (!match) return 0;
+
+  const sign = match[1] === '-' ? -1 : 1;
+  const hours = Number(match[2]);
+  const minutes = Number(match[3] || '0');
+  return sign * (hours * 60 + minutes);
+}
+
+function getNextFourPmChicagoIso(referenceDate = new Date()) {
+  const chicago = getChicagoDateParts(referenceDate);
+  const shouldUseTomorrow = chicago.hour >= SIGNATURE_EXPIRY_HOUR;
+  const targetDateUtc = new Date(Date.UTC(
+    chicago.year,
+    chicago.month - 1,
+    chicago.day + (shouldUseTomorrow ? 1 : 0)
+  ));
+
+  const targetLocalAsUtc = Date.UTC(
+    targetDateUtc.getUTCFullYear(),
+    targetDateUtc.getUTCMonth(),
+    targetDateUtc.getUTCDate(),
+    SIGNATURE_EXPIRY_HOUR,
+    0,
+    0,
+    0
+  );
+
+  // Resolve zone offset at the target wall-clock time (handles DST shifts).
+  let utcMillis = targetLocalAsUtc;
+  for (let i = 0; i < 2; i += 1) {
+    const offsetMinutes = getTimeZoneOffsetMinutes(new Date(utcMillis), SIGNATURE_EXPIRY_TIME_ZONE);
+    utcMillis = targetLocalAsUtc - offsetMinutes * 60 * 1000;
+  }
+
+  return new Date(utcMillis).toISOString();
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -60,6 +133,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 3. Generate a secure random token
     const token = crypto.randomBytes(32).toString('hex');
 
+    const expiresAt = getNextFourPmChicagoIso();
+    const expiresAtDisplay = new Date(expiresAt).toLocaleString('en-US', {
+      timeZone: SIGNATURE_EXPIRY_TIME_ZONE,
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+      timeZoneName: 'short'
+    });
+
     // 4. Create the signature request record
     const { data: requestRecord, error: insertError } = await supabaseAdmin
       .from('signature_requests')
@@ -72,7 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         signature_fields: signatureFields || [],
         metadata: { agentEmail: userEmail },
         status: 'pending',
-        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+        expires_at: expiresAt
       })
       .select()
       .single();
@@ -111,6 +196,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:32px; color:#f4f4f5;">
           ${message || 'Please review and sign the following document at your earliest convenience.'}
+        </p>
+
+        <p style="font-family:sans-serif; font-size:13px; line-height:1.6; margin-bottom:24px; color:#a1a1aa;">
+          This secure link expires at ${expiresAtDisplay} if not signed.
         </p>
 
         <div style="text-align:center; margin-bottom:32px;">
