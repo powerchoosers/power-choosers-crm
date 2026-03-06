@@ -88,7 +88,7 @@ export default async function handler(req, res) {
     // Best-effort: record an open event if Supabase is available and id looks valid
     try {
       if (supabaseAdmin && trackingId && trackingId.length > 0) {
-        // Validate tracking ID format (should start with 'gmail_' or be a valid ID)
+        // Validate tracking ID format (zoho/sig tracked IDs or a valid legacy ID)
         if (!trackingId.match(/^[a-zA-Z0-9_-]+$/)) {
           logger.warn('[Email Track] Invalid tracking ID format:', { trackingId: trackingId.substring(0, 50) });
           setPixelHeaders(res);

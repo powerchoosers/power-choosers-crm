@@ -5,6 +5,51 @@ import { getValidAccessTokenForUser } from './zoho-token-manager.js';
 import logger from '../_logger.js';
 import crypto from 'crypto';
 
+function stripHtml(value) {
+    if (!value) return '';
+    return String(value)
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/&amp;/gi, '&')
+        .replace(/&lt;/gi, '<')
+        .replace(/&gt;/gi, '>')
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;/gi, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function extractZohoAttachments(summary, content, messageId) {
+    const candidates = []
+        .concat(Array.isArray(summary?.attachments) ? summary.attachments : [])
+        .concat(Array.isArray(summary?.attachmentInfo) ? summary.attachmentInfo : [])
+        .concat(Array.isArray(content?.attachments) ? content.attachments : [])
+        .concat(Array.isArray(content?.attachmentInfo) ? content.attachmentInfo : []);
+
+    if (candidates.length === 0) return [];
+
+    return candidates.map((att, idx) => {
+        const attachmentId =
+            att?.attachmentId ||
+            att?.attachment_id ||
+            att?.id ||
+            att?.partId ||
+            att?.storeName ||
+            null;
+        return {
+            filename: att?.attachmentName || att?.fileName || att?.name || `Attachment-${idx + 1}`,
+            mimeType: att?.contentType || att?.mimeType || att?.type || 'application/octet-stream',
+            size: typeof att?.size === 'number' ? att.size : Number(att?.size || 0),
+            attachmentId,
+            messageId: String(messageId),
+            provider: 'zoho',
+            downloadUnavailable: !attachmentId,
+        };
+    });
+}
+
 export default async function handler(req, res) {
     if (cors(req, res)) return;
 
@@ -104,6 +149,10 @@ export default async function handler(req, res) {
 function parseZohoMessage(summary, content, ownerEmail) {
     const receivedTime = summary.receivedTime || Date.now();
     const zohoId = String(summary.messageId);
+    const attachmentMeta = extractZohoAttachments(summary, content, zohoId);
+    const rawHtml = content.content || '';
+    const rawText = content.summary || content.textContent || content.plainText || '';
+    const plainText = rawText || stripHtml(rawHtml);
 
     // Zoho summary usually contains sender, subject, etc.
     const emailData = {
@@ -111,8 +160,8 @@ function parseZohoMessage(summary, content, ownerEmail) {
         from: summary.sender,
         to: [ownerEmail], // Store as array to match DB jsonb 'to' column
         subject: summary.subject,
-        text: content.content || '',
-        html: content.content || '', // Zoho content API might return HTML directly
+        text: plainText,
+        html: rawHtml, // Zoho content API might return HTML directly
         timestamp: new Date(parseInt(receivedTime)).toISOString(),
         type: 'received',
         createdAt: new Date().toISOString(),
@@ -133,6 +182,7 @@ function parseZohoMessage(summary, content, ownerEmail) {
             zohoFolder: summary.folderName || 'inbox',
             sentTime: summary.sentTime,
             hasAttachments: summary.hasAttachments,
+            attachments: attachmentMeta,
             emailType: 'received'
         }
     };

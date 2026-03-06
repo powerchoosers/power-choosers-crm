@@ -3,11 +3,17 @@ import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
 import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check, Paperclip } from 'lucide-react'
 import { Email, EmailListFilter } from '@/hooks/useEmails'
+import type { EmailIdentity } from '@/hooks/useEmailIdentityMap'
+import { extractEmailAddress } from '@/hooks/useEmailIdentityMap'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { cn } from '@/lib/utils'
 
 interface EmailListProps {
   filter: EmailListFilter
   onFilterChange: (filter: EmailListFilter) => void
+  contactByEmail?: Record<string, EmailIdentity>
+  onOpenContact?: (contactId: string) => void
   emails: Email[]
   isLoading: boolean
   onRefresh: () => void
@@ -35,6 +41,8 @@ interface EmailListProps {
 export function EmailList({
   filter,
   onFilterChange,
+  contactByEmail = {},
+  onOpenContact,
   emails,
   isLoading,
   onRefresh,
@@ -278,6 +286,20 @@ export function EmailList({
             const hasClicks = clickCount > 0
             const rowIndex = (currentPage - 1) * itemsPerPage + index + 1
             const isSelected = selectedIds.has(email.id)
+            const toList = Array.isArray(email.to) ? email.to : [email.to]
+            const primaryEmail = email.type === 'sent'
+              ? extractEmailAddress(String(toList[0] || ''))
+              : extractEmailAddress(String(email.from || ''))
+            const primaryContact = contactByEmail[primaryEmail]
+            const recipientLabels = toList.map((raw) => {
+              const addr = extractEmailAddress(String(raw || ''))
+              const matched = contactByEmail[addr]
+              return matched?.displayName || String(raw || '')
+            })
+            const participantLabel = email.type === 'sent'
+              ? `To: ${recipientLabels.join(', ')}`
+              : (primaryContact?.displayName || email.from)
+            const fallbackDomain = primaryEmail.includes('@') ? primaryEmail.split('@')[1] : undefined
 
             return (
               <div
@@ -322,23 +344,46 @@ export function EmailList({
                   {email.unread && (
                     <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
                   )}
-                  <div className={cn(
-                    "w-9 h-9 rounded-2xl nodal-glass flex items-center justify-center text-[10px] font-mono font-semibold border border-white/10 shadow-sm transition-all",
-                    email.type === 'sent' ? "text-zinc-500" : "text-white"
-                  )}>
-                    {email.type === 'sent' ? 'NP' : (typeof email.from === 'string' ? email.from?.[0]?.toUpperCase() : '?')}
-                  </div>
+                  {primaryContact ? (
+                    <ContactAvatar
+                      name={primaryContact.displayName}
+                      size={36}
+                      className="rounded-[10px]"
+                      textClassName="text-[10px]"
+                    />
+                  ) : (
+                    <CompanyIcon
+                      name={primaryEmail || 'Unknown'}
+                      domain={fallbackDomain}
+                      size={36}
+                      roundedClassName="rounded-[10px]"
+                    />
+                  )}
                 </div>
 
                 {/* Participant */}
                 <div className="col-span-3 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={cn(
-                      "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]",
-                      email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
-                    )}>
-                      {email.type === 'sent' ? `To: ${Array.isArray(email.to) ? email.to.join(', ') : email.to}` : email.from}
-                    </span>
+                    {primaryContact && onOpenContact ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onOpenContact(primaryContact.id) }}
+                        className={cn(
+                          "text-sm truncate font-mono tracking-tight transition-all origin-left hover:scale-[1.03] hover:text-white underline-offset-4 hover:underline cursor-pointer",
+                          email.unread ? "font-semibold text-white" : "text-zinc-300"
+                        )}
+                        title={`Open ${primaryContact.displayName} dossier`}
+                      >
+                        {participantLabel}
+                      </button>
+                    ) : (
+                      <span className={cn(
+                        "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]",
+                        email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
+                      )}>
+                        {participantLabel}
+                      </span>
+                    )}
                     {email.type === 'sent' ? (
                       <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
                     ) : (
