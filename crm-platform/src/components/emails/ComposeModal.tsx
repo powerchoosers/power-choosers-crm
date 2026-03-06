@@ -244,8 +244,154 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+function stripCodeFences(value: string): string {
+  const raw = (value || '').trim()
+  if (!raw) return ''
+  const fenced = raw.match(/^```(?:html|json|text|markdown)?\s*([\s\S]*?)\s*```$/i)
+  return fenced ? fenced[1].trim() : raw
+}
+
+function htmlToPlainText(value: string): string {
+  return (value || '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '- ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+}
+
+function cleanParsedSubject(value: string | null): string | null {
+  if (!value) return null
+  const cleaned = value
+    .replace(/^\s*["'`]+|["'`]+\s*$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return null
+  if (/^(body|email body|message)\s*[:\-]?$/i.test(cleaned)) return null
+  return cleaned
+}
+
+function cleanParsedBody(value: string): string {
+  return (value || '')
+    .replace(/^\s*(?:body|email body|message)\s*[:\-]\s*/i, '')
+    .replace(/(?:\r?\n|\s*<br\s*\/?>\s*)\s*body\s*$/i, '')
+    .trim()
+}
+
+function looksLikeStandaloneSubjectLine(line: string): boolean {
+  const trimmed = (line || '').trim()
+  if (!trimmed) return false
+  if (trimmed.length < 4 || trimmed.length > 90) return false
+  if (/^(hi|hello|dear)\b/i.test(trimmed)) return false
+  if (/[,:;]\s*$/.test(trimmed)) return false
+  if (/^(subject|body|email body|message)\b/i.test(trimmed)) return false
+  const words = trimmed.split(/\s+/).length
+  return words >= 2 && words <= 14
+}
+
+function parseAiEmailOutput(rawValue: string): { subject: string | null; body: string } {
+  const raw = stripCodeFences(rawValue)
+  if (!raw) return { subject: null, body: '' }
+
+  const looksJson = raw.startsWith('{') && raw.endsWith('}')
+  if (looksJson) {
+    try {
+      const parsed = JSON.parse(raw)
+      if (parsed && typeof parsed === 'object') {
+        const candidateSubject = cleanParsedSubject(
+          parsed.subject ?? parsed.emailSubject ?? parsed.title ?? null
+        )
+        const candidateBodyRaw = parsed.body ?? parsed.content ?? parsed.emailBody ?? parsed.message ?? parsed.html ?? ''
+        const candidateBody = Array.isArray(candidateBodyRaw)
+          ? candidateBodyRaw.join('\n')
+          : String(candidateBodyRaw || '')
+        if (candidateSubject || candidateBody.trim()) {
+          return { subject: candidateSubject, body: cleanParsedBody(candidateBody) }
+        }
+      }
+    } catch {
+      // Fall through to text/html parsing.
+    }
+  }
+
+  const plain = htmlToPlainText(raw)
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  const plainLines = plain.split('\n')
+  const subjectLineIndex = plainLines.findIndex((line) => /^\s*subject\s*[:\-]\s*.+/i.test(line))
+
+  if (subjectLineIndex >= 0) {
+    const line = plainLines[subjectLineIndex] || ''
+    const subMatch = line.match(/^\s*subject\s*[:\-]\s*(.+)$/i)
+    const parsedSubject = cleanParsedSubject(subMatch?.[1] ?? null)
+    const plainBody = plainLines.slice(subjectLineIndex + 1).join('\n').trim()
+
+    if (/<\/?[a-z][\s\S]*>/i.test(raw)) {
+      const htmlWithoutSubject = raw
+        .replace(
+          /^\s*(?:<p[^>]*>\s*)?(?:<strong>\s*)?subject\s*[:\-]\s*(?:<\/strong>\s*)?/i,
+          ''
+        )
+        .replace(/^\s*[^<\r\n]+(?:<\/p>)?\s*(?:<br\s*\/?>|\r?\n)+/i, '')
+      return {
+        subject: parsedSubject,
+        body: cleanParsedBody(htmlWithoutSubject || plainBody),
+      }
+    }
+
+    return { subject: parsedSubject, body: cleanParsedBody(plainBody) }
+  }
+
+  // Fallback: if the first short line looks like a subject and the next line starts the body, split it.
+  if (plainLines.length >= 2 && looksLikeStandaloneSubjectLine(plainLines[0])) {
+    const inferredSubject = cleanParsedSubject(plainLines[0])
+    const inferredBody = cleanParsedBody(plainLines.slice(1).join('\n'))
+    if (inferredSubject && inferredBody) {
+      return { subject: inferredSubject, body: inferredBody }
+    }
+  }
+
+  return { subject: null, body: cleanParsedBody(raw) }
+}
+
+function buildFallbackSubject(emailType: EmailTypeId, context: ComposeContext | null, to: string): string {
+  const company = (context?.companyName || context?.accountName || '').trim()
+  const contactName = (context?.contactName || '').trim()
+  const contactFirst = contactName ? contactName.split(/\s+/)[0] : ''
+  const toName = to.includes('@') ? to.split('@')[0] : to
+  const target = company || contactFirst || toName || 'your team'
+
+  switch (emailType) {
+    case 'post_call':
+      return `Follow-up for ${target}`
+    case 'cold_first_touch':
+      return `Quick note for ${target}`
+    case 'cold_followup':
+      return `Following up with ${target}`
+    case 'followup':
+      return `Next step for ${target}`
+    case 'internal':
+      return `Internal update: ${target}`
+    case 'support':
+      return `Support update for ${target}`
+    case 'professional':
+    default:
+      return `Update for ${target}`
+  }
+}
+
 function aiBodyToEditorHtml(body: string): string {
-  const raw = (body || '').trim()
+  const raw = (body || '')
+    .replace(/&lt;\s*br\s*\/?\s*&gt;/gi, '\n')
+    .replace(/&lt;\s*\/p\s*&gt;/gi, '\n\n')
+    .replace(/&nbsp;/gi, ' ')
+    .trim()
   if (!raw) return ''
 
   // If model already returned HTML, keep it as-is.
@@ -755,7 +901,7 @@ function ComposePanel({
           setEmailTypeId('post_call')
           toast(`Switched to Post-Call mode`, {
             description: `${ctx.intelligence.transcripts.length} recent call transcript${ctx.intelligence.transcripts.length > 1 ? 's' : ''} found — AI will reference your call.`,
-            icon: '📞',
+            icon: <Check className="w-4 h-4 text-emerald-400" />,
             duration: 4000,
           })
         }
@@ -901,6 +1047,8 @@ OUTPUT FORMAT:
 - Then a blank line, then the email body.
 - The email body MUST start with the greeting (e.g. "Jenny,") followed by a BLANK LINE before the body content begins.
 - If the directive is body-only, output only the body with no SUBJECT line.
+- SUBJECT REQUIREMENT: Always include a subject line for new email generation.
+- SUBJECT PERSONALIZATION: Prefer company name in subject when known; if no company is known, use contact first name.
 - Return ONLY the requested content. No meta-commentary.`
     }
 
@@ -986,15 +1134,9 @@ OUTPUT FORMAT:
         if (salvageIdx > 0 && raw.slice(salvageIdx).trim().length > 40) {
           // Use the salvaged content — strip the refusal prefix
           const salvaged = raw.slice(salvageIdx).trim()
-          const lines = salvaged.split(/\r?\n/)
-          const subjectLineIndex = lines.findIndex((line: string) => /^\s*SUBJECT:\s*.+/.test(line))
-          let newBody = salvaged
-          let parsedSubject: string | null = null
-          if (subjectLineIndex >= 0) {
-            const subMatch = lines[subjectLineIndex].match(/^\s*SUBJECT:\s*(.+)$/i)
-            if (subMatch) parsedSubject = subMatch[1].trim()
-            newBody = lines.slice(subjectLineIndex + 1).join('\n').replace(/^\s*\n+/, '').trim()
-          }
+          const parsed = parseAiEmailOutput(salvaged)
+          const parsedSubject = parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '') : null)
+          let newBody = parsed.body || salvaged
           newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
           setPendingSubjectFromAi(parsedSubject)
           setPendingAiContent(newBody)
@@ -1005,20 +1147,9 @@ OUTPUT FORMAT:
         setAiError('Model declined to generate; try another model or rephrase.')
         return
       }
-      let newBody = raw
-      let parsedSubject: string | null = null
-      const lines = raw.split(/\r?\n/)
-      const subjectLineIndex = lines.findIndex((line: string) => /^\s*SUBJECT:\s*.+/.test(line))
-      if (subjectLineIndex >= 0) {
-        const subjectLine = lines[subjectLineIndex]
-        const subMatch = subjectLine.match(/^\s*SUBJECT:\s*(.+)$/i)
-        if (subMatch) parsedSubject = subMatch[1].trim()
-        newBody = lines
-          .slice(subjectLineIndex + 1)
-          .join('\n')
-          .replace(/^\s*\n+/, '')
-          .trim()
-      }
+      const parsed = parseAiEmailOutput(raw)
+      const parsedSubject = parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '') : null)
+      let newBody = parsed.body || raw
 
       // Force double newline after greeting if missing
       newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
@@ -1032,7 +1163,7 @@ OUTPUT FORMAT:
     } finally {
       setIsAiLoading(false)
     }
-  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId, context, foundryContext])
+  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId, context, foundryContext, to])
 
   // Fetch available foundry templates
   const { data: foundryAssets } = useQuery<any[]>({
