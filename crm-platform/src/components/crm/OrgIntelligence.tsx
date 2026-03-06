@@ -428,8 +428,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       clearPhoneRevealTimeout(person.id);
       phoneRevealTimeouts.current[person.id] = setTimeout(() => {
         patchRevealState(person.id, { revealingPhone: false, revealingEmail: false, phoneTimedOut: true });
-        toast.warning(`No phone data returned for ${person.firstName || person.name || 'this contact'} after 40 seconds.`);
-      }, 40000);
+        toast.warning(`No phone data returned for ${person.firstName || person.name || 'this contact'} after 60 seconds.`);
+      }, 60000);
     }
 
     try {
@@ -636,7 +636,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       if ((type === 'phone' || type === 'both') && crmId) {
         toast.info('Phone numbers can take a few minutes. Checking in background.', { duration: 5000 });
         const apolloPersonId = person.id;
-        const maxAttempts = 4; // 40s total at 10s interval
+        const maxAttempts = 6; // 60s total at 10s interval
         const intervalMs = 10000;
         let attempts = 0;
         const pollForPhones = async () => {
@@ -1398,21 +1398,21 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 title="Reveal Email"
                               >
                                 {revealState.revealingEmail ? (
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                  <>
+                                    <Loader2 className="w-3 h-3 shrink-0 animate-spin text-[#002FA7]" />
+                                    <span className="whitespace-nowrap">Revealing_Email...</span>
+                                  </>
                                 ) : (
-                                  <Globe className="w-2.5 h-2.5 text-zinc-600 group-hover/field:text-[#002FA7]" />
+                                  <>
+                                    <Globe className="w-3 h-3 shrink-0 text-zinc-600 group-hover/field:text-[#002FA7]" />
+                                    <span className="relative inline-flex items-center justify-center min-w-[112px] whitespace-nowrap">
+                                      <span className="tracking-[0.2em] transition-opacity duration-150 group-hover/field:opacity-0">••••••••••••</span>
+                                      <span className="absolute inset-0 flex items-center justify-center opacity-0 translate-y-[2px] transition-all duration-150 group-hover/field:opacity-100 group-hover/field:translate-y-0 text-[#8ba6ff] tracking-[0.2em]">
+                                        REVEAL
+                                      </span>
+                                    </span>
+                                  </>
                                 )}
-                                <span className="truncate">{revealState.revealingEmail ? 'Revealing_Email...' : '••••••••••••'}</span>
-                                <span
-                                  className={cn(
-                                    "ml-auto text-[8px] tracking-[0.2em] text-zinc-600 transition-all duration-200",
-                                    revealState.revealingEmail
-                                      ? "opacity-100"
-                                      : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
-                                  )}
-                                >
-                                  {revealState.revealingEmail ? 'SYNC' : 'REVEAL'}
-                                </span>
                               </button>
                             )}
 
@@ -1468,21 +1468,21 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 title="Reveal Phone"
                               >
                                 {revealState.revealingPhone ? (
-                                  <Loader2 className="w-2.5 h-2.5 animate-spin text-[#002FA7]" />
+                                  <>
+                                    <Loader2 className="w-3 h-3 shrink-0 animate-spin text-[#002FA7]" />
+                                    <span className="whitespace-nowrap">Revealing_Phone...</span>
+                                  </>
                                 ) : (
-                                  <Phone className="w-2.5 h-2.5 text-zinc-600 group-hover/field:text-[#002FA7]" />
+                                  <>
+                                    <Phone className="w-3 h-3 shrink-0 text-zinc-600 group-hover/field:text-[#002FA7]" />
+                                    <span className="relative inline-flex items-center justify-center min-w-[112px] whitespace-nowrap">
+                                      <span className="tracking-[0.2em] transition-opacity duration-150 group-hover/field:opacity-0">••••••••••••</span>
+                                      <span className="absolute inset-0 flex items-center justify-center opacity-0 translate-y-[2px] transition-all duration-150 group-hover/field:opacity-100 group-hover/field:translate-y-0 text-[#8ba6ff] tracking-[0.2em]">
+                                        REVEAL
+                                      </span>
+                                    </span>
+                                  </>
                                 )}
-                                <span className="truncate">{revealState.revealingPhone ? 'Revealing_Phone...' : '••••••••••••'}</span>
-                                <span
-                                  className={cn(
-                                    "ml-auto text-[8px] tracking-[0.2em] text-zinc-600 transition-all duration-200",
-                                    revealState.revealingPhone
-                                      ? "opacity-100"
-                                      : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
-                                  )}
-                                >
-                                  {revealState.revealingPhone ? 'SYNC' : 'REVEAL'}
-                                </span>
                               </button>
                             )}
                           </div>
@@ -1518,20 +1518,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             )}
                             title="Reveal email (fast)"
                           >
-                            <Globe className="w-2.5 h-2.5" />
-                            <span className={cn("truncate", revealState.revealingEmail && "animate-pulse text-[#8ba6ff]")}>
-                              {revealState.revealingEmail ? 'Revealing_Email...' : '••••••••••••'}
-                            </span>
-                            <span
-                              className={cn(
-                                "ml-auto text-[8px] tracking-[0.2em] text-zinc-700 transition-all duration-200",
-                                revealState.revealingEmail
-                                  ? "opacity-100"
-                                  : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
-                              )}
-                            >
-                              {revealState.revealingEmail ? 'SYNC' : 'REVEAL'}
-                            </span>
+                            {revealState.revealingEmail ? (
+                              <>
+                                <Loader2 className="w-3 h-3 shrink-0 animate-spin text-[#002FA7]" />
+                                <span className={cn("whitespace-nowrap animate-pulse text-[#8ba6ff]")}>Revealing_Email...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Globe className="w-3 h-3 shrink-0" />
+                                <span className="relative inline-flex items-center justify-center min-w-[112px] whitespace-nowrap">
+                                  <span className="tracking-[0.2em] transition-opacity duration-150 group-hover/field:opacity-0">••••••••••••</span>
+                                  <span className="absolute inset-0 flex items-center justify-center opacity-0 translate-y-[2px] transition-all duration-150 group-hover/field:opacity-100 group-hover/field:translate-y-0 text-[#8ba6ff] tracking-[0.2em]">
+                                    REVEAL
+                                  </span>
+                                </span>
+                              </>
+                            )}
                           </button>
                           <button
                             onClick={() => handleAcquire(person, 'phone')}
@@ -1545,20 +1547,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             )}
                             title="Reveal phone + email (full reveal)"
                           >
-                            <Phone className="w-2.5 h-2.5" />
-                            <span className={cn("truncate", revealState.revealingPhone && "animate-pulse text-[#8ba6ff]")}>
-                              {revealState.revealingPhone ? 'Revealing_Phone...' : '••••••••••••'}
-                            </span>
-                            <span
-                              className={cn(
-                                "ml-auto text-[8px] tracking-[0.2em] text-zinc-700 transition-all duration-200",
-                                revealState.revealingPhone
-                                  ? "opacity-100"
-                                  : "opacity-0 translate-x-1 group-hover/field:opacity-100 group-hover/field:translate-x-0 group-hover/field:text-[#8ba6ff]"
-                              )}
-                            >
-                              {revealState.revealingPhone ? 'SYNC' : 'REVEAL'}
-                            </span>
+                            {revealState.revealingPhone ? (
+                              <>
+                                <Loader2 className="w-3 h-3 shrink-0 animate-spin text-[#002FA7]" />
+                                <span className={cn("whitespace-nowrap animate-pulse text-[#8ba6ff]")}>Revealing_Phone...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Phone className="w-3 h-3 shrink-0" />
+                                <span className="relative inline-flex items-center justify-center min-w-[112px] whitespace-nowrap">
+                                  <span className="tracking-[0.2em] transition-opacity duration-150 group-hover/field:opacity-0">••••••••••••</span>
+                                  <span className="absolute inset-0 flex items-center justify-center opacity-0 translate-y-[2px] transition-all duration-150 group-hover/field:opacity-100 group-hover/field:translate-y-0 text-[#8ba6ff] tracking-[0.2em]">
+                                    REVEAL
+                                  </span>
+                                </span>
+                              </>
+                            )}
                           </button>
                           {revealState.phoneTimedOut && (
                             <motion.div
