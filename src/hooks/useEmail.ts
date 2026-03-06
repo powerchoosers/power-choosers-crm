@@ -2,6 +2,37 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { Email } from './useEmails'
 
+function normalizeAttachments(raw: any, provider?: string) {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((att: any) => ({
+      filename: att.filename || att.attachmentName || att.name || 'Attachment',
+      mimeType: att.mimeType || att.type || att.contentType || undefined,
+      size: typeof att.size === 'number' ? att.size : undefined,
+      messageId: att.messageId || att.zohoMessageId || undefined,
+      attachmentId: att.attachmentId || att.storeName || att.attachmentPath || undefined,
+      provider: att.provider || provider || undefined,
+      downloadUnavailable: !!att.downloadUnavailable,
+    }))
+    .filter((att: any) => !!att.filename)
+}
+
+function stripHtml(value?: string | null) {
+  if (!value) return ''
+  return String(value)
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export function useEmail(id: string) {
   return useQuery({
     queryKey: ['email', id],
@@ -20,14 +51,20 @@ export function useEmail(id: string) {
       }
       
       if (data) {
+        const provider = data.metadata?.provider || null
+        const normalizedAttachments = normalizeAttachments(data.metadata?.attachments || data.attachments, provider)
+        const plainText = stripHtml(data.text)
+        const plainHtml = stripHtml(data.html)
         return {
           id: data.id,
           subject: data.subject,
           from: data.from,
+          fromName: data.metadata?.fromName || null,
           to: data.to,
+          threadId: data.threadId || data.metadata?.threadId || null,
           html: data.html,
-          text: data.text,
-          snippet: data.text?.slice(0, 100),
+          text: plainText || plainHtml,
+          snippet: (plainText || plainHtml || '').slice(0, 140),
           date: data.timestamp || data.created_at,
           timestamp: new Date(data.timestamp || data.created_at).getTime(),
           unread: !data.is_read,
@@ -36,7 +73,7 @@ export function useEmail(id: string) {
           ownerId: data.metadata?.ownerId,
           openCount: data.openCount,
           clickCount: data.clickCount,
-          attachments: data.attachments || data.metadata?.attachments
+          attachments: normalizedAttachments
         } as Email
       }
       return null

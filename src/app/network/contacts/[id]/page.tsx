@@ -278,6 +278,7 @@ export default function ContactDossierPage() {
                 <EntityEmailFeed
                   emails={[s.editEmail].filter(Boolean) as string[]}
                   title="Email Intelligence"
+                  density="full"
                 />
               </div>
             </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEmails, useEmailsCount, useEmailTypeCounts, Email, EmailListFilter } from '@/hooks/useEmails'
+import { extractEmailAddress, useEmailIdentityMap } from '@/hooks/useEmailIdentityMap'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
@@ -55,6 +56,11 @@ export default function EmailsPage() {
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
 
   const emails = data?.pages.flatMap(page => page.emails) || []
+  const identityAddresses = emails.flatMap((e) => {
+    const toList = Array.isArray(e.to) ? e.to : [e.to]
+    return [e.from, ...toList].map((addr) => extractEmailAddress(String(addr || ''))).filter(Boolean)
+  })
+  const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
   const effectiveTotal =
     emailFilter === 'sent'
       ? (emailTypeCounts?.sent ?? emails.length)
@@ -147,6 +153,8 @@ export default function EmailsPage() {
           onRefresh={handleSync}
           isSyncing={isSyncing}
           onSelectEmail={(email) => router.push(`/network/emails/${email.id}`)}
+          onOpenContact={(contactId) => router.push(`/network/contacts/${contactId}`)}
+          contactByEmail={contactByEmail}
           totalEmails={totalEmails}
           totalReceived={emailTypeCounts?.received}
           totalSent={emailTypeCounts?.sent}

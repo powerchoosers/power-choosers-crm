@@ -15,6 +15,24 @@ import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import { generateNodalSignature } from '@/lib/signature';
 import logger from '../_logger.js';
 
+function normalizeComposerAttachments(attachments, uploadedAttachments = []) {
+    if (!Array.isArray(attachments) || attachments.length === 0) return [];
+
+    return attachments.map((att, idx) => {
+        const uploaded = uploadedAttachments[idx] || {};
+        return {
+            filename: att?.filename || uploaded?.attachmentName || 'Attachment',
+            mimeType: att?.type || 'application/octet-stream',
+            size: typeof att?.size === 'number' ? att.size : 0,
+            provider: 'zoho',
+            attachmentId: uploaded?.storeName || uploaded?.attachmentPath || null,
+            attachmentPath: uploaded?.attachmentPath || null,
+            messageId: null,
+            downloadUnavailable: true
+        };
+    });
+}
+
 export default async function handler(req, res) {
     logger.info(`[Zoho] Incoming request: ${req.method} ${req.url}`, 'zoho-send');
     if (cors(req, res)) return;
@@ -189,6 +207,8 @@ export default async function handler(req, res) {
             return;
         }
 
+        const normalizedAttachments = normalizeComposerAttachments(attachments);
+
         // Create email record in Supabase BEFORE sending (for tracking)
         if (supabaseAdmin && deliverability.enableTracking) {
             try {
@@ -219,6 +239,7 @@ export default async function handler(req, res) {
                         ownerId: ownerEmail,
                         assignedTo: ownerEmail,
                         createdBy: ownerEmail,
+                        attachments: normalizedAttachments,
                         replies: []
                     }
                 };
@@ -268,6 +289,14 @@ export default async function handler(req, res) {
         // Update email record with sent status and Zoho message ID
         if (supabaseAdmin && deliverability.enableTracking) {
             try {
+                const attachmentsWithMessageId = normalizedAttachments.map((att, idx) => ({
+                    ...att,
+                    messageId: result.messageId || null,
+                    attachmentId: att.attachmentId || uploadedAttachments[idx]?.storeName || uploadedAttachments[idx]?.attachmentPath || null,
+                    attachmentPath: att.attachmentPath || uploadedAttachments[idx]?.attachmentPath || null,
+                    downloadUnavailable: !((att.attachmentId || uploadedAttachments[idx]?.storeName || uploadedAttachments[idx]?.attachmentPath) && result.messageId)
+                }));
+
                 const { error } = await supabaseAdmin
                     .from('emails')
                     .update({
@@ -279,7 +308,8 @@ export default async function handler(req, res) {
                             sentAt: new Date().toISOString(),
                             zohoMessageId: result.messageId,
                             messageId: result.messageId,
-                            threadId: threadId || null
+                            threadId: threadId || null,
+                            attachments: attachmentsWithMessageId
                         }
                     })
                     .eq('id', trackingId);
