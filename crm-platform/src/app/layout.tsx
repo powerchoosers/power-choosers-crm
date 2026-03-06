@@ -3,6 +3,7 @@ import Providers from './providers'
 import { Toaster } from 'sonner'
 import { Inter } from 'next/font/google'
 import type { Metadata, Viewport } from 'next'
+import ApolloTracker from '@/components/apollo-tracker'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -39,6 +40,7 @@ export default function RootLayout({
         className="bg-zinc-950 text-zinc-100 font-sans selection:bg-[#002FA7]"
         suppressHydrationWarning
       >
+        <ApolloTracker />
         <Providers>
           <>
             {children}
