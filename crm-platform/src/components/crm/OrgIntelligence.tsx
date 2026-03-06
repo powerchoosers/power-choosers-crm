@@ -40,14 +40,14 @@ function phoneDisplayNumber(entry: PhoneEntry): string {
   return typeof entry === 'string' ? entry : entry.number;
 }
 
-/** Returns W / M / O for Work direct, Mobile, Other for display in revealed results */
-function phoneTypePrefix(entry: PhoneEntry, index: number): 'W' | 'M' | 'O' {
+/** Returns human-readable phone type label for display in revealed results */
+function phoneTypeLabel(entry: PhoneEntry, index: number): 'MOBILE' | 'WORK DIRECT' | 'OTHER' {
   const type = typeof entry === 'string' ? '' : (entry.type || '').toLowerCase();
-  if (type.includes('mobile')) return 'M';
-  if (type.includes('direct') || type.includes('work')) return 'W';
-  if (type.includes('other') || type.includes('home')) return 'O';
-  if (typeof entry === 'string') return (['M', 'W', 'O'] as const)[index] ?? 'O';
-  return 'O';
+  if (type.includes('mobile')) return 'MOBILE';
+  if (type.includes('direct') || type.includes('work')) return 'WORK DIRECT';
+  if (type.includes('other') || type.includes('home')) return 'OTHER';
+  if (typeof entry === 'string') return (['MOBILE', 'WORK DIRECT', 'OTHER'] as const)[index] ?? 'OTHER';
+  return 'OTHER';
 }
 
 const PHONE_REVEAL_WARNING_MS = 60_000;
@@ -83,7 +83,7 @@ function RevealActionButton({
       title={title}
       disabled={disabled}
       className={cn(
-        'relative overflow-hidden flex items-center gap-3 px-3 py-1.5 rounded-xl border text-[9px] tracking-[0.35em]',
+        'group/field relative overflow-hidden flex items-center gap-2 px-2.5 py-1.5 rounded-xl border',
         'font-mono uppercase transition-all duration-200 w-full justify-center min-w-0',
         revealing
           ? 'border-[#002FA7]/40 text-[#8ba6ff] bg-[#002FA7]/10'
@@ -91,20 +91,20 @@ function RevealActionButton({
         disabled && 'opacity-70 pointer-events-none'
       )}
     >
-      <div className="relative z-10 flex items-center gap-2 w-full justify-center">
+      <div className="relative z-10 flex items-center gap-2 w-full justify-center min-w-0">
         {revealing ? (
           <>
-            <Loader2 className="w-4 h-4 shrink-0 animate-spin text-[#8ba6ff]" />
-            <span className="text-[9px] font-mono tracking-[0.25em] text-[#8ba6ff]">{loadingLabel}</span>
+            <Loader2 className="w-3.5 h-3.5 shrink-0 animate-spin text-[#8ba6ff]" />
+            <span className="text-[9px] font-mono tracking-[0.2em] text-[#8ba6ff] whitespace-nowrap">{loadingLabel}</span>
           </>
         ) : (
           <>
-            <Icon className="w-4 h-4 shrink-0 text-zinc-400" />
-            <div className="flex flex-1 items-center justify-center relative px-1">
-              <span className="flex-1 text-center text-[10px] tracking-[0.45em] text-zinc-500 transition-opacity duration-150 opacity-100 group-hover/field:opacity-0">
+            <Icon className="w-3.5 h-3.5 shrink-0 text-zinc-400" />
+            <div className="relative flex-1 min-w-0 flex items-center justify-center">
+              <span className="block w-full text-center text-[10px] tracking-[0.16em] text-zinc-500 whitespace-nowrap overflow-hidden transition-opacity duration-150 group-hover/field:opacity-0">
                 ••••••••••••••
               </span>
-              <span className="absolute inset-0 flex items-center justify-center text-[#8ba6ff] text-[9px] font-semibold tracking-[0.35em] opacity-0 transition-all duration-200 group-hover/field:opacity-100">
+              <span className="absolute inset-0 flex items-center justify-center text-[#8ba6ff] text-[9px] font-semibold tracking-[0.28em] opacity-0 transition-opacity duration-200 group-hover/field:opacity-100">
                 REVEAL
               </span>
             </div>
@@ -1535,7 +1535,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                               >
                                 {person.phones.map((entry, idx) => {
                                   const num = phoneDisplayNumber(entry);
-                                  const prefix = phoneTypePrefix(entry, idx);
+                                  const label = phoneTypeLabel(entry, idx);
                                   return (
                                     <button
                                       key={num}
@@ -1559,12 +1559,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                         });
                                         toast.info(`Calling ${callName}...`);
                                       }}
-                                      className="flex items-center gap-1.5 px-2 py-1 rounded-xl border border-white/5 text-[9px] font-mono text-zinc-400 hover:text-white transition-colors uppercase tracking-tighter min-w-0"
+                                      className="w-full flex flex-col items-start gap-0.5 px-2 py-1.5 rounded-xl border border-white/5 text-zinc-400 hover:text-white transition-colors uppercase min-w-0"
                                       title={num}
                                     >
-                                      <Phone className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                                      <span className="text-zinc-500 font-semibold">{prefix}:</span>
-                                      {num}
+                                      <div className="flex items-center gap-1.5 w-full min-w-0">
+                                        <Phone className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+                                        <span className="font-mono text-[9px] text-zinc-300 whitespace-nowrap">
+                                          {num}
+                                        </span>
+                                      </div>
+                                      <span className="pl-5 font-mono text-[8px] text-zinc-500 tracking-[0.18em]">
+                                        {label}
+                                      </span>
                                     </button>
                                   );
                                 })}
