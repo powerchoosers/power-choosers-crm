@@ -360,29 +360,54 @@ function parseAiEmailOutput(rawValue: string): { subject: string | null; body: s
   return { subject: null, body: cleanParsedBody(raw) }
 }
 
-function buildFallbackSubject(emailType: EmailTypeId, context: ComposeContext | null, to: string): string {
+function buildFallbackSubject(
+  emailType: EmailTypeId,
+  context: ComposeContext | null,
+  to: string,
+  foundryContext: FoundryContext | null
+): string {
   const company = (context?.companyName || context?.accountName || '').trim()
   const contactName = (context?.contactName || '').trim()
   const contactFirst = contactName ? contactName.split(/\s+/)[0] : ''
   const toName = to.includes('@') ? to.split('@')[0] : to
   const target = company || contactFirst || toName || 'your team'
 
+  const cleanTopic = (value?: string | null): string | null => {
+    if (!value) return null
+    const sanitized = value
+      .replace(/[\r\n]+/g, ' ')
+      .replace(/["'“”‘’]+/g, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+    if (!sanitized) return null
+    const trimmed = sanitized.split(' ').slice(0, 8).join(' ')
+    return trimmed.length > 40 ? `${trimmed.slice(0, 37)}…` : trimmed
+  }
+
+  const contextTopic = cleanTopic(context?.contextForAi)
+  const transcriptTopic = cleanTopic(
+    foundryContext?.intelligence.summary ||
+      foundryContext?.intelligence.transcripts[0] ||
+      context?.contextForAi
+  )
+  const topic = contextTopic || transcriptTopic
+
   switch (emailType) {
     case 'post_call':
-      return `Follow-up for ${target}`
+      return topic ? `Follow-up on ${topic} — ${target}` : `Follow-up for ${target}`
     case 'cold_first_touch':
-      return `Quick note for ${target}`
+      return topic ? `Quick note on ${topic} for ${target}` : `Quick note for ${target}`
     case 'cold_followup':
-      return `Following up with ${target}`
+      return topic ? `Following up on ${topic} — ${target}` : `Following up with ${target}`
     case 'followup':
-      return `Next step for ${target}`
+      return topic ? `Next step on ${topic} — ${target}` : `Next step for ${target}`
     case 'internal':
-      return `Internal update: ${target}`
+      return topic ? `Internal update: ${topic}` : `Internal update: ${target}`
     case 'support':
-      return `Support update for ${target}`
+      return topic ? `Support update: ${topic}` : `Support update for ${target}`
     case 'professional':
     default:
-      return `Update for ${target}`
+      return topic ? `Update on ${topic} — ${target}` : `Update for ${target}`
   }
 }
 
@@ -422,13 +447,16 @@ function normalizeEditorHtmlForEmail(html: string): string {
       const styleValue = styleMatch[2]
       const hasMargin = /(^|;)\s*margin\s*:/i.test(styleValue)
       const needsSemicolon = styleValue.trim() !== '' && !styleValue.trim().endsWith(';')
-      const mergedStyle = hasMargin
-        ? styleValue
-        : `${styleValue}${needsSemicolon ? ';' : ''}margin:0;`
+      let mergedStyle = hasMargin
+        ? styleValue.replace(/margin\s*:[^;]+;/i, 'margin:0 0 0.75rem;')
+        : `${styleValue}${needsSemicolon ? ';' : ''} margin:0 0 0.75rem;`
+      if (!/line-height\s*:/i.test(mergedStyle)) {
+        mergedStyle += `${mergedStyle.trim().endsWith(';') ? '' : ';'} line-height:1.45;`
+      }
       return `<p${attrs.replace(styleMatch[0], ` style=${quote}${mergedStyle}${quote}`)}>`
     }
 
-    return `<p${attrs} style="margin:0;">`
+    return `<p${attrs} style="margin:0 0 0.75rem; line-height:1.45;">`
   })
 }
 
@@ -1135,7 +1163,8 @@ OUTPUT FORMAT:
           // Use the salvaged content — strip the refusal prefix
           const salvaged = raw.slice(salvageIdx).trim()
           const parsed = parseAiEmailOutput(salvaged)
-          const parsedSubject = parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '') : null)
+          const parsedSubject =
+            parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext) : null)
           let newBody = parsed.body || salvaged
           newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
           setPendingSubjectFromAi(parsedSubject)
@@ -1148,7 +1177,8 @@ OUTPUT FORMAT:
         return
       }
       const parsed = parseAiEmailOutput(raw)
-      const parsedSubject = parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '') : null)
+      const parsedSubject =
+        parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext) : null)
       let newBody = parsed.body || raw
 
       // Force double newline after greeting if missing
