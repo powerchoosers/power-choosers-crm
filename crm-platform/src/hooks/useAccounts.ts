@@ -370,6 +370,64 @@ export function useAccount(id: string) {
   })
 }
 
+// ---------------------------------------------------------------------------
+// Bill intelligence for contracts detail page
+// Fetches forensic account data + meters populated by /api/analyze-document
+// ---------------------------------------------------------------------------
+export function useAccountBillIntelligence(accountId: string | undefined) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['account-bill-intel', accountId, user?.email ?? 'guest'],
+    queryFn: async () => {
+      if (!accountId) return null
+
+      const { data: acc } = await supabase
+        .from('accounts')
+        .select('electricity_supplier, current_rate, annual_usage, load_factor, metadata')
+        .eq('id', accountId)
+        .single()
+
+      const { data: meters } = await supabase
+        .from('meters')
+        .select('id, esid, service_address, rate, end_date, status')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+
+      const { data: docs } = await supabase
+        .from('documents')
+        .select('id, name, metadata, created_at')
+        .eq('account_id', accountId)
+        .order('created_at', { ascending: false })
+        .limit(20)
+
+      const latestBill = docs?.find(
+        d => d.metadata?.ai_extraction?.type === 'BILL'
+      )
+
+      return {
+        electricitySupplier: acc?.electricity_supplier ?? null as string | null,
+        currentRate: acc?.current_rate ?? null as string | null,
+        annualUsage: acc?.annual_usage ?? null as string | null,
+        loadFactor: acc?.load_factor ?? null as number | null,
+        usageHistory: (acc?.metadata?.usageHistory ?? []) as Array<{
+          month: string; kwh: number; billed_kw: number;
+          actual_kw: number; tdsp_charges: number
+        }>,
+        meters: (meters ?? []) as Array<{
+          id: string; esid: string; service_address: string;
+          rate: string; end_date: string; status: string
+        }>,
+        latestBillName: latestBill?.name ?? null as string | null,
+        latestBillDate: latestBill?.created_at ?? null as string | null,
+        latestBillData: latestBill?.metadata?.ai_extraction?.data ?? null,
+      }
+    },
+    enabled: !!accountId && !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
 export function useAccountsCount(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
 

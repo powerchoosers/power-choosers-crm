@@ -12,9 +12,12 @@ import {
   Building2,
   FileSignature,
   ArrowUpRight,
+  FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDeal, useUpdateDeal } from '@/hooks/useDeals'
+import { useAccountBillIntelligence } from '@/hooks/useAccounts'
+import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel'
 import { useUIStore } from '@/store/uiStore'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -419,6 +422,116 @@ function CommissionPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Bill Intelligence Panel — surfaces analyze-document data for this account
+// ---------------------------------------------------------------------------
+
+function BillIntelligencePanel({
+  intel,
+}: {
+  intel: ReturnType<typeof useAccountBillIntelligence>['data']
+}) {
+  if (!intel) return null
+
+  const hasUsage = intel.usageHistory.length > 0
+  const hasMeters = intel.meters.length > 0
+  const hasAnyData = hasUsage || hasMeters || !!intel.electricitySupplier
+
+  return (
+    <div className="nodal-glass rounded-2xl flex flex-col overflow-hidden flex-none">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+        <div className="flex items-center gap-2">
+          <FileText className="w-4 h-4 text-zinc-400" />
+          <div>
+            <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-500">
+              Bill Intelligence
+            </p>
+            {intel.latestBillDate && (
+              <p className="text-zinc-600 text-[9px] mt-0.5 font-mono">
+                Last ingested: {format(new Date(intel.latestBillDate), 'MMM d, yyyy')}
+                {intel.latestBillName && ` — ${intel.latestBillName}`}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {!hasAnyData ? (
+        <div className="p-8 text-center">
+          <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">
+            No bill data ingested. Upload a bill via the account Data Locker to populate this panel.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-5 p-5">
+          {/* Asset summary */}
+          {(intel.electricitySupplier || intel.currentRate || intel.annualUsage || intel.loadFactor != null) && (
+            <div className="grid grid-cols-2 gap-x-8 gap-y-3">
+              {intel.electricitySupplier && (
+                <DataRow label="Supplier" value={intel.electricitySupplier} />
+              )}
+              {intel.currentRate && (
+                <DataRow label="Ingested Rate" value={`${intel.currentRate} ¢/kWh`} />
+              )}
+              {intel.annualUsage && (
+                <DataRow
+                  label="Annual Usage"
+                  value={`${Number(intel.annualUsage).toLocaleString()} kWh`}
+                />
+              )}
+              {intel.loadFactor != null && (
+                <DataRow
+                  label="Load Factor"
+                  value={`${(intel.loadFactor * 100).toFixed(1)}%`}
+                />
+              )}
+            </div>
+          )}
+
+          {/* Meters */}
+          {hasMeters && (
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-600 mb-2">
+                Meters ({intel.meters.length})
+              </p>
+              <div className="rounded-xl overflow-hidden border border-white/5">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-zinc-900/60">
+                    <tr>
+                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600">ESID</th>
+                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600">Address</th>
+                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600 text-right">Rate</th>
+                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600 text-right">End Date</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/[0.03]">
+                    {intel.meters.map((m) => (
+                      <tr key={m.id} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400">{m.esid ?? '—'}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400 truncate max-w-[180px]">{m.service_address ?? '—'}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400 text-right">{m.rate ?? '—'}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400 text-right">
+                          {m.end_date ? format(new Date(m.end_date), 'MMM yyyy') : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 12-Month Usage Profile */}
+          <div className="min-h-[340px]">
+            <UsageProfilePanel usageHistory={intel.usageHistory} />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -429,6 +542,7 @@ export default function ContractDetailPage() {
 
   const { data: deal, isLoading } = useDeal(id)
   const updateDeal = useUpdateDeal()
+  const { data: billIntel } = useAccountBillIntelligence(deal?.accountId)
   const { setRightPanelMode, setDealContext } = useUIStore()
 
   // Brief state
@@ -716,6 +830,9 @@ export default function ContractDetailPage() {
             briefGenerated={briefGenerated}
             onGenerate={generateBrief}
           />
+
+          {/* Bill Intelligence */}
+          <BillIntelligencePanel intel={billIntel} />
         </div>
 
         {/* RIGHT — Sidebar panels */}
