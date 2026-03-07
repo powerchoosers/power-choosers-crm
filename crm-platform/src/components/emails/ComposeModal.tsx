@@ -381,7 +381,7 @@ function buildFallbackSubject(
       .trim()
     if (!sanitized) return null
     const trimmed = sanitized.split(' ').slice(0, 8).join(' ')
-    return trimmed.length > 40 ? `${trimmed.slice(0, 37)}…` : trimmed
+    return trimmed.length > 40 ? `${trimmed.slice(0, 37)}...` : trimmed
   }
 
   const contextTopic = cleanTopic(context?.contextForAi)
@@ -394,21 +394,37 @@ function buildFallbackSubject(
 
   switch (emailType) {
     case 'post_call':
-      return topic ? `Follow-up on ${topic} — ${target}` : `Follow-up for ${target}`
+      return topic ? `Follow-up on ${topic}: ${target}` : `Follow-up for ${target}`
     case 'cold_first_touch':
       return topic ? `Quick note on ${topic} for ${target}` : `Quick note for ${target}`
     case 'cold_followup':
-      return topic ? `Following up on ${topic} — ${target}` : `Following up with ${target}`
+      return topic ? `Following up on ${topic}: ${target}` : `Following up with ${target}`
     case 'followup':
-      return topic ? `Next step on ${topic} — ${target}` : `Next step for ${target}`
+      return topic ? `Next step on ${topic}: ${target}` : `Next step for ${target}`
     case 'internal':
       return topic ? `Internal update: ${topic}` : `Internal update: ${target}`
     case 'support':
       return topic ? `Support update: ${topic}` : `Support update for ${target}`
     case 'professional':
     default:
-      return topic ? `Update on ${topic} — ${target}` : `Update for ${target}`
+      return topic ? `Update on ${topic}: ${target}` : `Update for ${target}`
   }
+}
+
+function isGenericAiSubject(value: string | null): boolean {
+  const normalized = (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  if (!normalized) return true
+
+  const words = normalized.split(' ').length
+  if (/^(following up|follow up|quick follow up|checking in|touching base)$/.test(normalized)) return true
+  if (/^(following up from our call|follow up from our call|post call follow up)$/.test(normalized)) return true
+  if (/^(following up|follow up|quick follow up|checking in|touching base)\b/.test(normalized) && words <= 6) return true
+
+  return false
 }
 
 function aiBodyToEditorHtml(body: string): string {
@@ -1163,8 +1179,12 @@ OUTPUT FORMAT:
           // Use the salvaged content — strip the refusal prefix
           const salvaged = raw.slice(salvageIdx).trim()
           const parsed = parseAiEmailOutput(salvaged)
-          const parsedSubject =
-            parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext) : null)
+          const fallbackSubject = !isRefinementMode
+            ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext)
+            : null
+          const parsedSubject = !isRefinementMode && isGenericAiSubject(parsed.subject)
+            ? fallbackSubject
+            : (parsed.subject || fallbackSubject)
           let newBody = parsed.body || salvaged
           newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
           setPendingSubjectFromAi(parsedSubject)
@@ -1177,8 +1197,12 @@ OUTPUT FORMAT:
         return
       }
       const parsed = parseAiEmailOutput(raw)
-      const parsedSubject =
-        parsed.subject || (!isRefinementMode ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext) : null)
+      const fallbackSubject = !isRefinementMode
+        ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext)
+        : null
+      const parsedSubject = !isRefinementMode && isGenericAiSubject(parsed.subject)
+        ? fallbackSubject
+        : (parsed.subject || fallbackSubject)
       let newBody = parsed.body || raw
 
       // Force double newline after greeting if missing

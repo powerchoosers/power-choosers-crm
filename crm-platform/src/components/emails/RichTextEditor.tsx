@@ -57,7 +57,7 @@ export function RichTextEditor({ content, onChange, placeholder, className, auto
                 class: cn(
                     'prose prose-invert prose-sm max-w-none w-full min-h-[150px] focus:outline-none font-sans leading-relaxed',
                     '[&_ul]:list-outside [&_ul]:ml-4 [&_ol]:list-outside [&_ol]:ml-4',
-                    '[&_p]:m-0',
+                    '[&_p]:mt-0 [&_p]:mb-3 [&_p:last-child]:mb-0',
                     className
                 ),
             },
