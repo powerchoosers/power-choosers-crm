@@ -6,6 +6,7 @@ import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import { Color } from '@tiptap/extension-color'
 import Image from '@tiptap/extension-image'
+import HardBreak from '@tiptap/extension-hard-break'
 import { cn } from '@/lib/utils'
 import { useEffect } from 'react'
 
@@ -43,6 +44,19 @@ export function RichTextEditor({ content, onChange, placeholder, className, auto
             Underline,
             TextStyle,
             Color,
+            HardBreak.extend({
+                addKeyboardShortcuts() {
+                    return {
+                        Enter: () => {
+                            // Keep list behavior native; elsewhere Enter should be a single line break.
+                            if (this.editor.isActive('bulletList') || this.editor.isActive('orderedList')) {
+                                return false
+                            }
+                            return this.editor.commands.setHardBreak()
+                        },
+                    }
+                },
+            }),
             Image.configure({
                 inline: true,
                 allowBase64: true,
