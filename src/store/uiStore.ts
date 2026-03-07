@@ -4,11 +4,12 @@ import { type DealStage } from '@/types/deals'
 export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'SEND_PORTAL_ACCESS';
 
 export interface SignatureRequestContext {
-  documentId: string
-  documentName: string
+  documentId?: string
+  documentName?: string
   documentUrl?: string
   storagePath?: string
   accountId?: string
+  dealId?: string
 }
 
 export interface IngestionContext {
@@ -47,6 +48,8 @@ export interface DealContext {
   closeDate?: string
   probability?: number
   yearlyCommission?: number
+  sellRate?: number
+  metadata?: Record<string, unknown>
 }
 
 export interface PortalAccessContext {
