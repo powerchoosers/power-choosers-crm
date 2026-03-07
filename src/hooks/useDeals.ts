@@ -171,6 +171,40 @@ export function useDealsByContact(contactId?: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Single deal fetch (for /network/contracts/[id] page)
+// ---------------------------------------------------------------------------
+export function useDeal(id: string | undefined) {
+  const { user, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['deal', QUERY_BUSTER, id],
+    queryFn: async () => {
+      if (!id) return null
+      const { data, error } = await supabase
+        .from('deals')
+        .select('*, signature_requests(id, status, created_at, updated_at)')
+        .eq('id', id)
+        .single()
+      if (error) throw error
+
+      // Fetch account name/domain
+      let account: { name: string; domain?: string } | undefined
+      if (data.accountId) {
+        const { data: acc } = await supabase
+          .from('accounts')
+          .select('name, domain')
+          .eq('id', data.accountId)
+          .single()
+        if (acc) account = { name: acc.name, domain: acc.domain }
+      }
+      return { ...data, account } as Deal
+    },
+    enabled: !!id && !loading && !!user,
+    staleTime: 1000 * 60 * 5,
+  })
+}
+
+// ---------------------------------------------------------------------------
 // Create deal
 // ---------------------------------------------------------------------------
 export function useCreateDeal() {
@@ -257,6 +291,7 @@ export function useUpdateDeal() {
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      queryClient.invalidateQueries({ queryKey: ['deal'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       if (data?.accountId) {
         queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })

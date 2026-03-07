@@ -44,7 +44,7 @@ export const DealTableRow = memo(function DealTableRow({
             )}
             onClick={() => {
                 saveScroll()
-                router.push(`/network/accounts/${row.original.accountId}`)
+                router.push(`/network/contracts/${row.original.id}`)
             }}
         >
             {row.getVisibleCells().map((cell) => (
