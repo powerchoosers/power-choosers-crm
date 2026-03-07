@@ -17,6 +17,7 @@ import {
     DollarSign
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
+import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -37,6 +38,7 @@ interface AccountResult {
 
 export function DealCreationPanel() {
     const { dealContext, rightPanelMode, setRightPanelMode, setDealContext } = useUIStore()
+    const { role } = useAuth()
     const createDeal = useCreateDeal()
     const updateDeal = useUpdateDeal()
     const queryClient = useQueryClient()
@@ -51,13 +53,29 @@ export function DealCreationPanel() {
     const [stage, setStage] = useState<DealStage>('IDENTIFIED')
     const [amount, setAmount] = useState('')
     const [annualUsage, setAnnualUsage] = useState('')
+    const [sellRate, setSellRate] = useState('')
     const [mills, setMills] = useState('')
     const [contractLength, setContractLength] = useState('')
     const [closeDate, setCloseDate] = useState('')
     const [probability, setProbability] = useState('50')
-    const [yearlyCommission, setYearlyCommission] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
     const isEditMode = dealContext?.mode === 'edit' && !!dealContext?.dealId
+    const commissionRate = role === 'admin' ? 0.7 : 0.5
+    const commissionLabel = role === 'admin' ? 'Admin' : 'Agent'
+    const payoutCommissionPreview = useMemo(() => {
+        const value = Number(amount)
+        if (!Number.isFinite(value) || value <= 0) return ''
+        return (value * commissionRate).toFixed(2)
+    }, [amount, commissionRate])
+
+    const recalcAmountFromUsageAndSellRate = (usageValue: string, sellRateValue: string) => {
+        const usageNum = Number(usageValue.replace(/[^0-9]/g, ''))
+        const rateNum = Number(sellRateValue)
+        if (Number.isFinite(usageNum) && usageNum > 0 && Number.isFinite(rateNum) && rateNum > 0) {
+            const calculatedAmount = (usageNum * rateNum) / 100
+            setAmount(calculatedAmount.toFixed(2))
+        }
+    }
 
     // Auto-skip step 1 and resolve metadata if account context is provided
     useEffect(() => {
@@ -73,11 +91,15 @@ export function DealCreationPanel() {
                         ? Math.trunc(dealContext.annualUsage).toLocaleString()
                         : ''
                 )
+                const existingSellRate =
+                    typeof dealContext.sellRate === 'number'
+                        ? dealContext.sellRate
+                        : Number((dealContext.metadata as any)?.sellRate)
+                setSellRate(Number.isFinite(existingSellRate) ? String(existingSellRate) : '')
                 setMills(dealContext.mills?.toString() || '')
                 setContractLength(dealContext.contractLength?.toString() || '')
                 setCloseDate(dealContext.closeDate ? dealContext.closeDate.slice(0, 10) : '')
                 setProbability(dealContext.probability?.toString() || '50')
-                setYearlyCommission(dealContext.yearlyCommission?.toString() || '')
                 return
             }
 
@@ -100,6 +122,7 @@ export function DealCreationPanel() {
                         if (!title) setTitle(dealContext.defaultTitle || `${data.name} - New Opportunity`)
                         if (!annualUsage && data.annual_usage) setAnnualUsage(parseInt(data.annual_usage).toLocaleString())
                         if (!closeDate && data.contract_end_date) setCloseDate(data.contract_end_date.slice(0, 10))
+                        if (!sellRate && data.current_rate) setSellRate(String(data.current_rate))
                         if (!mills) {
                             const dbMills = data.metadata?.mills
                             setMills(dbMills || '0.0070')
@@ -119,6 +142,7 @@ export function DealCreationPanel() {
                     if (data) {
                         if (!annualUsage && data.annual_usage) setAnnualUsage(parseInt(data.annual_usage).toLocaleString())
                         if (!closeDate && data.contract_end_date) setCloseDate(data.contract_end_date.slice(0, 10))
+                        if (!sellRate && data.current_rate) setSellRate(String(data.current_rate))
                         if (!mills) {
                             const dbMills = data.metadata?.mills
                             setMills(dbMills || '0.0070')
@@ -177,6 +201,23 @@ export function DealCreationPanel() {
 
         setIsCommitting(true)
         try {
+            const amountNum = amount ? Number(amount) : undefined
+            const annualUsageNum = annualUsage ? Number(annualUsage.replace(/[^0-9.-]+/g, "")) : undefined
+            const millsNum = mills ? Number(mills) : undefined
+            const contractLengthNum = contractLength ? Number(contractLength) : undefined
+            const probabilityNum = probability ? Number(probability) : undefined
+            const sellRateNum = sellRate ? Number(sellRate) : undefined
+            const computedCommission =
+                typeof amountNum === 'number' && Number.isFinite(amountNum)
+                    ? Number((amountNum * commissionRate).toFixed(2))
+                    : undefined
+            const nextMetadata = {
+                ...(dealContext?.metadata || {}),
+                ...(typeof sellRateNum === 'number' && Number.isFinite(sellRateNum)
+                    ? { sellRate: sellRateNum }
+                    : {}),
+            }
+
             if (isEditMode && dealContext.dealId) {
                 await updateDeal.mutateAsync({
                     id: dealContext.dealId,
@@ -184,13 +225,14 @@ export function DealCreationPanel() {
                     accountId: dealContext.accountId,
                     contactId: dealContext.contactId || undefined,
                     stage,
-                    amount: amount ? Number(amount) : undefined,
-                    annualUsage: annualUsage ? Number(annualUsage.replace(/[^0-9.-]+/g, "")) : undefined,
-                    mills: mills ? Number(mills) : undefined,
-                    contractLength: contractLength ? Number(contractLength) : undefined,
+                    amount: amountNum,
+                    annualUsage: annualUsageNum,
+                    mills: millsNum,
+                    contractLength: contractLengthNum,
                     closeDate: closeDate || undefined,
-                    probability: probability ? Number(probability) : undefined,
-                    yearlyCommission: yearlyCommission ? Number(yearlyCommission) : undefined,
+                    probability: probabilityNum,
+                    yearlyCommission: computedCommission,
+                    metadata: nextMetadata,
                 })
             } else {
                 await createDeal.mutateAsync({
@@ -198,13 +240,14 @@ export function DealCreationPanel() {
                     accountId: dealContext.accountId,
                     contactId: dealContext.contactId,
                     stage: stage,
-                    amount: amount ? Number(amount) : undefined,
-                    annualUsage: annualUsage ? Number(annualUsage.replace(/[^0-9.-]+/g, "")) : undefined,
-                    mills: mills ? Number(mills) : undefined,
-                    contractLength: contractLength ? Number(contractLength) : undefined,
+                    amount: amountNum,
+                    annualUsage: annualUsageNum,
+                    mills: millsNum,
+                    contractLength: contractLengthNum,
                     closeDate: closeDate || undefined,
-                    probability: probability ? Number(probability) : undefined,
-                    yearlyCommission: yearlyCommission ? Number(yearlyCommission) : undefined,
+                    probability: probabilityNum,
+                    yearlyCommission: computedCommission,
+                    metadata: nextMetadata,
                 })
                 toast.success('CONTRACT_INITIALIZED // VECTOR_LOCKED')
             }
@@ -226,11 +269,11 @@ export function DealCreationPanel() {
         setStage('IDENTIFIED')
         setAmount('')
         setAnnualUsage('')
+        setSellRate('')
         setMills('')
         setContractLength('')
         setCloseDate('')
         setProbability('50')
-        setYearlyCommission('')
     }
 
     return (
@@ -437,14 +480,7 @@ export function DealCreationPanel() {
                                                 }
                                                 const usageCommas = parseInt(cleaned).toLocaleString()
                                                 setAnnualUsage(usageCommas)
-
-                                                // calculate deal amount based on usage & mills
-                                                const usageNum = parseInt(cleaned)
-                                                const tmpMills = parseFloat(mills)
-                                                if (!isNaN(usageNum) && !isNaN(tmpMills)) {
-                                                    const calculatedAmount = usageNum * tmpMills
-                                                    setAmount(calculatedAmount.toFixed(2))
-                                                }
+                                                recalcAmountFromUsageAndSellRate(usageCommas, sellRate)
                                             }}
                                             placeholder="0"
                                             className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
@@ -452,7 +488,23 @@ export function DealCreationPanel() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Sell_Rate_(¢/kWh)</label>
+                                        <Input
+                                            type="text"
+                                            value={sellRate}
+                                            onChange={(e) => {
+                                                const cleaned = e.target.value
+                                                    .replace(/[^0-9.]/g, '')
+                                                    .replace(/(\..*)\./g, '$1')
+                                                setSellRate(cleaned)
+                                                recalcAmountFromUsageAndSellRate(annualUsage, cleaned)
+                                            }}
+                                            placeholder="8.70"
+                                            className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
+                                        />
+                                    </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Margin_Mills</label>
                                         <Input
@@ -465,14 +517,6 @@ export function DealCreationPanel() {
                                                     const num = parseInt(val, 10)
                                                     const formattedMills = (num / 10000).toFixed(4)
                                                     setMills(formattedMills)
-
-                                                    // calculate deal amount based on usage & mills
-                                                    const usageNum = parseInt(annualUsage.replace(/[^0-9]/g, ''))
-                                                    const tmpMills = parseFloat(formattedMills)
-                                                    if (!isNaN(usageNum) && !isNaN(tmpMills)) {
-                                                        const calculatedAmount = usageNum * tmpMills
-                                                        setAmount(calculatedAmount.toFixed(2))
-                                                    }
                                                 } else {
                                                     setMills('')
                                                 }
@@ -483,13 +527,13 @@ export function DealCreationPanel() {
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
-                                            <DollarSign className="w-3 h-3" /> Commission_Est
+                                            <DollarSign className="w-3 h-3" /> {commissionLabel}_Commission_({Math.round(commissionRate * 100)}%)
                                         </label>
                                         <Input
-                                            type="number"
-                                            value={yearlyCommission}
-                                            onChange={(e) => setYearlyCommission(e.target.value)}
+                                            type="text"
+                                            value={payoutCommissionPreview}
                                             placeholder="0"
+                                            readOnly
                                             className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
                                         />
                                     </div>
