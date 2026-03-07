@@ -222,7 +222,7 @@ function ForensicBriefModule({
   onGenerate: () => void
 }) {
   return (
-    <div className="nodal-glass rounded-2xl p-6 flex flex-col gap-4 flex-1 min-h-0">
+    <div className="nodal-glass rounded-2xl p-6 flex flex-col gap-4">
       <div className="flex items-center justify-between flex-none">
         <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
           Forensic Brief
@@ -232,25 +232,26 @@ function ForensicBriefModule({
           disabled={briefLoading}
           className={cn(
             'flex items-center gap-2 px-3 py-1.5 rounded-lg border font-mono text-[10px] uppercase tracking-wider transition-all',
-            briefLoading
-              ? 'border-zinc-800 text-zinc-700 cursor-wait'
-              : 'border-[#002FA7]/40 text-[#002FA7] bg-[#002FA7]/5 hover:bg-[#002FA7]/10 hover:border-[#002FA7]/70'
+          briefLoading
+            ? 'border-zinc-800 text-white cursor-wait bg-black/30'
+            : 'border-[#002FA7]/40 text-white bg-[#002FA7]/40 hover:bg-[#002FA7]/60 hover:border-[#002FA7]'
           )}
         >
           {briefLoading ? (
             <>
-              {/* Terminal block cursor — not a spinner */}
-              <span className="inline-block w-2 h-3 bg-[#002FA7]/50 animate-pulse" />
-              Analyzing...
+              <span className="inline-block w-2 h-3 bg-white/70 animate-pulse" />
+              <span className="text-white">Analyzing...</span>
             </>
           ) : (
             <>
               {briefGenerated ? (
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw className="w-3 h-3 text-white" />
               ) : (
-                <Zap className="w-3 h-3" />
+                <Zap className="w-3 h-3 text-white" />
               )}
-              {briefGenerated ? 'Regenerate' : 'Generate Forensic Brief'}
+              <span className="text-white">
+                {briefGenerated ? 'Regenerate' : 'Generate Forensic Brief'}
+              </span>
             </>
           )}
         </button>
