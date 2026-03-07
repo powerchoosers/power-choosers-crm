@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Plus,
@@ -67,6 +67,18 @@ export function DealCreationPanel() {
         if (!Number.isFinite(value) || value <= 0) return ''
         return (value * commissionRate).toFixed(2)
     }, [amount, commissionRate])
+
+    const normalizeMillsValue = useCallback((value: number) => {
+        let result = value
+        while (result > 20) {
+            result /= 10
+        }
+        return Math.min(result, 20)
+    }, [])
+
+    const formatMills = useCallback((value: number) => {
+        return value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })
+    }, [])
 
     const recalcAmountFromUsageAndSellRate = (usageValue: string, sellRateValue: string) => {
         const usageNum = Number(usageValue.replace(/[^0-9]/g, ''))
@@ -511,17 +523,17 @@ export function DealCreationPanel() {
                                             type="text"
                                             value={mills}
                                             onChange={(e) => {
-                                                const val = e.target.value.replace(/[^\d]/g, '')
-                                                if (val) {
-                                                    // Auto format to decimal like 0.0070
-                                                    const num = parseInt(val, 10)
-                                                    const formattedMills = (num / 10000).toFixed(4)
-                                                    setMills(formattedMills)
-                                                } else {
+                                                const cleaned = e.target.value.replace(/[^0-9.]/g, '')
+                                                if (!cleaned) {
                                                     setMills('')
+                                                    return
                                                 }
+                                                const numeric = Number(cleaned)
+                                                if (!Number.isFinite(numeric)) return
+                                                const normalized = normalizeMillsValue(numeric)
+                                                setMills(formatMills(normalized))
                                             }}
-                                            placeholder="0.0070"
+                                            placeholder="8.0"
                                             className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
                                         />
                                     </div>
