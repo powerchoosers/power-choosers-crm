@@ -1663,12 +1663,11 @@ Return exactly one subject line.`,
     <motion.div
       key="compose-panel"
       initial={{ y: "100%", opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
+      animate={{ y: 0, opacity: 1, height: isMinimized ? 60 : 500 }}
       exit={{ y: "100%", opacity: 0 }}
-      transition={{ type: "spring", damping: 25, stiffness: 300 }}
+      transition={{ type: "spring", damping: 26, stiffness: 280 }}
       className={cn(
-        "fixed bottom-0 right-4 sm:right-10 z-[100] w-full sm:w-[500px] bg-zinc-950 nodal-monolith-edge rounded-t-xl shadow-2xl flex flex-col overflow-hidden",
-        isMinimized ? "h-[60px]" : "h-[500px]"
+        "fixed bottom-0 right-4 sm:right-10 z-[100] w-full sm:w-[500px] bg-zinc-950 nodal-monolith-edge rounded-t-xl shadow-2xl flex flex-col overflow-hidden"
       )}
     >
       <div
@@ -1700,11 +1699,12 @@ Return exactly one subject line.`,
         </div>
       </div>
 
-      <div
-        className={cn(
-          "flex flex-col h-[calc(100%-60px)] bg-zinc-950 transition-all duration-300",
-          isMinimized ? "opacity-0 invisible" : "opacity-100 visible"
-        )}
+      <motion.div
+        initial={false}
+        animate={isMinimized ? { opacity: 0, y: 10 } : { opacity: 1, y: 0 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="flex flex-col h-[calc(100%-60px)] bg-zinc-950"
+        style={{ pointerEvents: isMinimized ? 'none' : 'auto' }}
       >
         {/* Fixed Header Section */}
         <div className="flex-none px-6 py-4 border-b border-white/5 bg-zinc-950/50 backdrop-blur-md space-y-2 z-20">
@@ -2369,7 +2369,7 @@ Return exactly one subject line.`,
             </Button>
           </div>
         </div>
-      </div>
+      </motion.div>
     </motion.div>
   )
 }
