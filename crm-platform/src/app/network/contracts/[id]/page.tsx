@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { differenceInDays, format } from 'date-fns'
 import Link from 'next/link'
@@ -336,7 +336,14 @@ function AccountIntelPanel({ deal }: { deal: Deal }) {
 
 function SignaturePanel({ deal }: { deal: Deal }) {
   const sigRequests = deal.signature_requests || []
-  const latest = sigRequests[0] ?? null
+  // Do not trust array order from upstream; always derive newest request locally.
+  const latest =
+    sigRequests.length > 0
+      ? [...sigRequests].sort(
+          (a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )[0]
+      : null
 
   const statusColor = (status: string) => {
     if (status === 'completed' || status === 'signed') return 'text-emerald-400'
@@ -537,7 +544,6 @@ function BillIntelligencePanel({
 
 export default function ContractDetailPage() {
   const params = useParams()
-  const router = useRouter()
   const id = params?.id as string
 
   const { data: deal, isLoading } = useDeal(id)
@@ -603,6 +609,10 @@ export default function ContractDetailPage() {
 
   const handleStageChange = async (newStage: DealStage) => {
     if (!deal || stageUpdating) return
+    if (newStage === deal.stage) {
+      setStageEditing(false)
+      return
+    }
     setStageUpdating(true)
     setStageEditing(false)
     try {
@@ -623,6 +633,9 @@ export default function ContractDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deal, account: deal.account }),
       })
+      if (!res.ok) {
+        throw new Error(`Brief API failed with status ${res.status}`)
+      }
       const json = await res.json()
       if (json.brief) {
         setBrief(json.brief)
