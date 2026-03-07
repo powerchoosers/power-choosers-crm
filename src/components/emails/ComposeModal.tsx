@@ -460,9 +460,22 @@ function isGenericAiSubject(value: string | null): boolean {
   if (/^follow(?:ing)?\s+up\s+on\s+good\s+talking/.test(normalized)) return true
   if (/^(following up|follow up|quick follow up|checking in|touching base)$/.test(normalized)) return true
   if (/^(following up from our call|follow up from our call|post call follow up)$/.test(normalized)) return true
+  if (/^(following up from our call|follow up from our call)\b/.test(normalized)) return true
   if (/^(following up|follow up|quick follow up|checking in|touching base)\b/.test(normalized) && words <= 6) return true
 
   return false
+}
+
+function normalizeSubjectOutput(value: string | null): string | null {
+  if (!value) return null
+  const firstLine = value.split('\n').find((line) => line.trim().length > 0) || ''
+  const cleaned = firstLine
+    .replace(/^\s*subject\s*[:\-]\s*/i, '')
+    .replace(/^["'`]+|["'`]+$/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 70)
+  return cleaned || null
 }
 
 function aiBodyToEditorHtml(body: string): string {
@@ -1184,6 +1197,70 @@ OUTPUT FORMAT:
     setContentBeforeAi(content)
     setShowUndoAi(false)
     setIsAiLoading(true)
+    const deriveLiquidSubject = async (candidate: string | null, bodyTextOrHtml: string): Promise<string | null> => {
+      if (isRefinementMode) return normalizeSubjectOutput(candidate)
+
+      const normalizedCandidate = normalizeSubjectOutput(candidate)
+      const shouldForceDynamicSubject = emailTypeId === 'followup' || emailTypeId === 'post_call'
+      if (normalizedCandidate && !isGenericAiSubject(normalizedCandidate) && !shouldForceDynamicSubject) {
+        return normalizedCandidate
+      }
+
+      const bodyPlain = htmlToPlainText(bodyTextOrHtml || '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+        .slice(0, 1400)
+
+      const contextLabel = [
+        context?.companyName || context?.accountName || '',
+        context?.contactName || '',
+      ].filter(Boolean).join(' | ') || '(none)'
+
+      try {
+        const subjectRes = await fetch('/api/gemini/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: `You generate one email subject line only.
+Rules:
+- Must reflect the actual BODY content and situation.
+- 4 to 9 words, max 65 characters.
+- Avoid cliches: "following up", "checking in", "touching base".
+- No quotes, no markdown, no explanation.
+- Output one plain text subject line only.`,
+              },
+              {
+                role: 'user',
+                content: `RECIPIENT_CONTEXT: ${contextLabel}
+ORIGINAL_DIRECTIVE: ${finalDirective || '(none)'}
+BODY:
+${bodyPlain}
+
+Return exactly one subject line.`,
+              },
+            ],
+            model: selectedModel,
+            userProfile: { firstName: profile?.firstName || signerName.split(' ')[0] || 'Lewis' },
+          }),
+        })
+        const subjectData = await subjectRes.json()
+        const aiSubject = normalizeSubjectOutput(
+          typeof subjectData?.content === 'string' ? subjectData.content : null
+        )
+        if (aiSubject && !isGenericAiSubject(aiSubject)) {
+          return aiSubject
+        }
+      } catch {
+        // Fall through to deterministic fallback below.
+      }
+
+      const fallback = buildFallbackSubject(emailTypeId, context, to || '', foundryContext, bodyTextOrHtml)
+      return normalizeSubjectOutput(normalizedCandidate) || fallback
+    }
     try {
       const systemPrompt = buildEmailSystemPrompt()
       const userContent = isRefinementMode
@@ -1221,12 +1298,7 @@ OUTPUT FORMAT:
           const salvaged = raw.slice(salvageIdx).trim()
           const parsed = parseAiEmailOutput(salvaged)
           let newBody = parsed.body || salvaged
-          const fallbackSubject = !isRefinementMode
-            ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext, newBody)
-            : null
-          const parsedSubject = !isRefinementMode && isGenericAiSubject(parsed.subject)
-            ? fallbackSubject
-            : (parsed.subject || fallbackSubject)
+          const parsedSubject = await deriveLiquidSubject(parsed.subject, newBody)
           newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
           setPendingSubjectFromAi(parsedSubject)
           setPendingAiContent(newBody)
@@ -1239,12 +1311,7 @@ OUTPUT FORMAT:
       }
       const parsed = parseAiEmailOutput(raw)
       let newBody = parsed.body || raw
-      const fallbackSubject = !isRefinementMode
-        ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext, newBody)
-        : null
-      const parsedSubject = !isRefinementMode && isGenericAiSubject(parsed.subject)
-        ? fallbackSubject
-        : (parsed.subject || fallbackSubject)
+      const parsedSubject = await deriveLiquidSubject(parsed.subject, newBody)
 
       // Force double newline after greeting if missing
       newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
