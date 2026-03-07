@@ -37,6 +37,10 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
     const inactiveToggle = isCrm
         ? 'text-zinc-500 hover:text-zinc-200 border border-transparent'
         : 'text-zinc-500 hover:text-white border border-transparent';
+    const panelClasses = isCrm
+        ? 'bg-black/70 border-[rgba(255,255,255,0.08)] shadow-[0_35px_60px_rgba(0,0,0,0.65)]'
+        : 'bg-zinc-900 shadow-lg';
+    const chartAreaBg = isCrm ? 'bg-black/20' : '';
 
     if (!usageHistory || usageHistory.length === 0) {
         return (
@@ -86,7 +90,7 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
     };
 
     return (
-        <div className="rounded-2xl flex flex-col overflow-hidden border border-white/5 bg-zinc-900 shadow-lg h-full">
+        <div className={`rounded-2xl flex flex-col overflow-hidden border border-white/5 h-full ${panelClasses}`}>
             {/* Header / Toggle */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
                 <div className="flex items-center gap-2">
@@ -129,7 +133,7 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
                             transition={{ duration: 0.2 }}
-                            className="absolute inset-0 p-4"
+                            className={`absolute inset-0 p-4 ${chartAreaBg}`}
                         >
                             <ResponsiveContainer width="100%" height="100%">
                                 <ComposedChart data={usageHistory} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
