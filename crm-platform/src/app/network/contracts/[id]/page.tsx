@@ -19,6 +19,7 @@ import { useDeal, useUpdateDeal } from '@/hooks/useDeals'
 import { useAccountBillIntelligence } from '@/hooks/useAccounts'
 import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel'
 import { useUIStore } from '@/store/uiStore'
+import { useAuth } from '@/context/AuthContext'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
@@ -58,6 +59,15 @@ function fmtCurrency(val?: number | null) {
   if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`
   if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`
   return `$${val.toLocaleString()}`
+}
+
+function parseNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(/[^0-9.-]/g, ''))
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
 }
 
 function DataRow({
@@ -335,7 +345,13 @@ function AccountIntelPanel({ deal }: { deal: Deal }) {
 // Right panel: Signature Status
 // ---------------------------------------------------------------------------
 
-function SignaturePanel({ deal }: { deal: Deal }) {
+function SignaturePanel({
+  deal,
+  onCreateRequest,
+}: {
+  deal: Deal
+  onCreateRequest: () => void
+}) {
   const sigRequests = deal.signature_requests || []
   // Do not trust array order from upstream; always derive newest request locally.
   const latest =
@@ -376,14 +392,15 @@ function SignaturePanel({ deal }: { deal: Deal }) {
           No active signature request
         </div>
       )}
-      <Link
-        href="/network/vault"
-        className="flex items-center gap-2 font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors group"
+      <button
+        type="button"
+        onClick={() => onCreateRequest()}
+        className="w-full flex items-center gap-2 font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors group"
       >
         <FileSignature className="w-3 h-3 flex-none" />
         <span>{latest ? 'New Signature Request' : 'Request Signature'}</span>
         <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-none" />
-      </Link>
+      </button>
     </div>
   )
 }
@@ -395,9 +412,11 @@ function SignaturePanel({ deal }: { deal: Deal }) {
 function CommissionPanel({
   deal,
   commissionPct,
+  commissionValue,
 }: {
   deal: Deal
   commissionPct: number | null
+  commissionValue: number | null
 }) {
   return (
     <div className="nodal-glass rounded-2xl p-5 space-y-3">
@@ -406,8 +425,8 @@ function CommissionPanel({
       </span>
       <div>
         <div className="font-mono text-xl text-zinc-100 tabular-nums">
-          {fmtCurrency(deal.yearlyCommission)}
-          {deal.yearlyCommission && (
+          {fmtCurrency(commissionValue)}
+          {commissionValue && (
             <span className="text-zinc-600 text-xs ml-1">/yr</span>
           )}
         </div>
@@ -545,12 +564,17 @@ function BillIntelligencePanel({
 
 export default function ContractDetailPage() {
   const params = useParams()
+  const { role } = useAuth()
   const id = params?.id as string
+  const commissionRate = role === 'admin' ? 0.7 : 0.5
+  const commissionLabel = role === 'admin'
+    ? 'Admin Commission / yr'
+    : 'Agent Commission / yr'
 
   const { data: deal, isLoading } = useDeal(id)
   const updateDeal = useUpdateDeal()
   const { data: billIntel } = useAccountBillIntelligence(deal?.accountId)
-  const { setRightPanelMode, setDealContext } = useUIStore()
+  const { setRightPanelMode, setDealContext, setSignatureRequestContext } = useUIStore()
 
   // Brief state
   const [briefLoading, setBriefLoading] = useState(false)
@@ -567,21 +591,32 @@ export default function ContractDetailPage() {
 
   const metrics = useMemo(() => {
     if (!deal) return null
-    const rateInCents = deal.mills != null ? deal.mills / 10 : null
-    const annualUsageMWh = deal.annualUsage != null ? deal.annualUsage / 1000 : null
+    const rateInCents = parseNumber((deal.metadata as any)?.sellRate)
+    const annualUsageKWh = parseNumber(deal.account?.annualUsage)
     const daysToClose = deal.closeDate
       ? differenceInDays(new Date(deal.closeDate), new Date())
       : null
+    const commissionValue =
+      deal.amount != null && deal.amount > 0
+        ? Number((deal.amount * commissionRate).toFixed(2))
+        : null
     const commissionPct =
-      deal.yearlyCommission != null && deal.amount != null && deal.amount > 0
-        ? (deal.yearlyCommission / deal.amount) * 100
+      commissionValue != null && deal.amount != null && deal.amount > 0
+        ? (commissionValue / deal.amount) * 100
         : null
     const impliedSpend =
       deal.annualUsage != null && deal.mills != null
         ? (deal.annualUsage * deal.mills) / 1000
         : null
-    return { rateInCents, annualUsageMWh, daysToClose, commissionPct, impliedSpend }
-  }, [deal])
+    return {
+      rateInCents,
+      annualUsageKWh,
+      commissionValue,
+      daysToClose,
+      commissionPct,
+      impliedSpend,
+    }
+  }, [deal, commissionRate])
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -604,6 +639,8 @@ export default function ContractDetailPage() {
       closeDate: deal.closeDate,
       probability: deal.probability,
       yearlyCommission: deal.yearlyCommission,
+      sellRate: parseNumber((deal.metadata as any)?.sellRate) ?? undefined,
+      metadata: (deal.metadata as Record<string, unknown>) || {},
     })
     setRightPanelMode('CREATE_DEAL')
   }
@@ -623,6 +660,15 @@ export default function ContractDetailPage() {
     } finally {
       setStageUpdating(false)
     }
+  }
+
+  const handleOpenSignatureRequest = () => {
+    if (!deal) return
+    setSignatureRequestContext({
+      accountId: deal.accountId,
+      dealId: deal.id,
+    })
+    setRightPanelMode('CREATE_SIGNATURE_REQUEST')
   }
 
   const generateBrief = async () => {
@@ -739,21 +785,21 @@ export default function ContractDetailPage() {
 
         <div className="nodal-void-card p-4">
           <div className="font-mono text-2xl text-zinc-50 tabular-nums leading-none">
-            {metrics?.annualUsageMWh != null
-              ? `${Number(metrics.annualUsageMWh.toFixed(0)).toLocaleString()}`
+            {metrics?.annualUsageKWh != null
+              ? `${Number(metrics.annualUsageKWh.toFixed(0)).toLocaleString()}`
               : '—'}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600 mt-1.5">
-            MWh / Year
+            KWh / Year
           </div>
         </div>
 
         <div className="nodal-void-card p-4">
           <div className="font-mono text-2xl text-zinc-50 tabular-nums leading-none">
-            {fmtCurrency(deal.yearlyCommission)}
+            {fmtCurrency(metrics?.commissionValue ?? null)}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600 mt-1.5">
-            Commission / yr
+            {commissionLabel}
           </div>
         </div>
       </div>
@@ -852,8 +898,12 @@ export default function ContractDetailPage() {
         {/* RIGHT — Sidebar panels */}
         <div className="col-span-4 flex flex-col gap-4 overflow-y-auto np-scroll">
           <AccountIntelPanel deal={deal} />
-          <SignaturePanel deal={deal} />
-          <CommissionPanel deal={deal} commissionPct={metrics?.commissionPct ?? null} />
+          <SignaturePanel deal={deal} onCreateRequest={handleOpenSignatureRequest} />
+          <CommissionPanel
+            deal={deal}
+            commissionPct={metrics?.commissionPct ?? null}
+            commissionValue={metrics?.commissionValue ?? null}
+          />
         </div>
       </div>
     </div>

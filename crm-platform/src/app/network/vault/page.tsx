@@ -195,7 +195,7 @@ export default function VaultPage() {
           const result = await res.json()
           if (res.ok && result.analysis?.type) {
             const t = result.analysis.type
-            if (t === 'SIGNED_CONTRACT' || t === 'BILL') {
+            if (t === 'SIGNED_CONTRACT' || t === 'CONTRACT' || t === 'BILL') {
               toast.success('Asset Secured. Account Status Upgraded to Customer.', { id: toastId })
             } else {
               toast.success(`Document labeled: ${t === 'USAGE_DATA' ? 'Telemetry' : t === 'PROPOSAL' ? 'Proposal' : 'Ingested'}.`, { id: toastId })

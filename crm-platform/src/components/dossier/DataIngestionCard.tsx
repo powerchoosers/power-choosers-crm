@@ -184,7 +184,15 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             toast.error('AI Extraction Failed', { id: toastId });
           } else {
             const t = result.analysis?.type;
-            const label = t === 'SIGNED_CONTRACT' ? 'CONTRACT INGESTED' : t === 'BILL' ? 'BILL ANALYZED' : t === 'USAGE_DATA' ? 'TELEMETRY LABELED' : t === 'PROPOSAL' ? 'PROPOSAL LABELED' : 'DATA NODES UPDATED';
+            const label = t === 'SIGNED_CONTRACT' || t === 'CONTRACT'
+              ? 'CONTRACT INGESTED'
+              : t === 'BILL'
+                ? 'BILL ANALYZED'
+                : t === 'USAGE_DATA'
+                  ? 'TELEMETRY LABELED'
+                  : t === 'PROPOSAL'
+                    ? 'PROPOSAL LABELED'
+                    : 'DATA NODES UPDATED';
             toast.success(`${label}: Data Nodes Updated`, { id: toastId });
 
             // ============================================

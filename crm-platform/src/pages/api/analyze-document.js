@@ -102,6 +102,7 @@ export default async function handler(req, res) {
     
     Task 1: Classify the document type.
     - "SIGNED_CONTRACT": A signed Energy Service Agreement (ESA) or similar binding contract.
+    - "CONTRACT": An unsigned contract, draft contract, MSA, ESA template, or execution-ready agreement without signature.
     - "BILL": A standard utility bill, invoice, or monthly statement. This explicitly includes documents titled in Spanish such as "recibo", "factura", "recibos luz", "servicio electrico" or any variation indicating a utility bill.
     - "USAGE_DATA": Usage/telemetry: ERCOT or utility usage summaries, OncorSummaryUsageData, annual usage, 12-month or 13-month usage, CSV usage data profiles.
     - "PROPOSAL": Sales proposals, RFP responses, quotes, pricing proposals.
@@ -118,7 +119,7 @@ export default async function handler(req, res) {
 
     Return ONLY a JSON object:
     {
-      "type": "SIGNED_CONTRACT" | "BILL" | "USAGE_DATA" | "PROPOSAL" | "OTHER",
+      "type": "SIGNED_CONTRACT" | "CONTRACT" | "BILL" | "USAGE_DATA" | "PROPOSAL" | "OTHER",
       "data": {
         "contract_end_date": "YYYY-MM-DD" or null,
         "strike_price": number or null,
@@ -242,6 +243,7 @@ export default async function handler(req, res) {
     // 5. Update Database
     const documentTypeMap = {
       SIGNED_CONTRACT: 'CONTRACT',
+      CONTRACT: 'CONTRACT',
       BILL: 'INVOICE',
       USAGE_DATA: 'USAGE_DATA',
       PROPOSAL: 'PROPOSAL',

@@ -188,14 +188,20 @@ export function useDeal(id: string | undefined) {
       if (error) throw error
 
       // Fetch account name/domain
-      let account: { name: string; domain?: string } | undefined
+      let account: { name: string; domain?: string; annualUsage?: string | number } | undefined
       if (data.accountId) {
         const { data: acc } = await supabase
           .from('accounts')
-          .select('name, domain')
+          .select('name, domain, annual_usage')
           .eq('id', data.accountId)
           .single()
-        if (acc) account = { name: acc.name, domain: acc.domain }
+        if (acc) {
+          account = {
+            name: acc.name,
+            domain: acc.domain,
+            annualUsage: acc.annual_usage,
+          }
+        }
       }
       return { ...data, account } as Deal
     },

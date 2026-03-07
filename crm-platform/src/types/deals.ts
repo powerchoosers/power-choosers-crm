@@ -40,6 +40,7 @@ export interface Deal {
   account?: {
     name: string
     domain?: string
+    annualUsage?: string | number
   }
   signature_requests?: {
     id: string
@@ -62,6 +63,7 @@ export interface CreateDealInput {
   yearlyCommission?: number
   closeDate?: string
   probability?: number
+  metadata?: Record<string, unknown>
 }
 
 export interface UpdateDealInput {
