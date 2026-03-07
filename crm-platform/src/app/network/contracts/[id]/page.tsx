@@ -484,13 +484,13 @@ function BillIntelligencePanel({
       </div>
 
       {!hasAnyData ? (
-        <div className="p-8 text-center">
-          <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">
+        <div className="p-8 bg-black/40 border border-white/5 rounded-b-2xl">
+          <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
             No bill data ingested. Upload a bill via the account Data Locker to populate this panel.
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-5 p-5">
+        <div className="flex flex-col gap-5 p-5 bg-black/40 border-t border-white/5">
           {/* Asset summary */}
           {(intel.electricitySupplier || intel.currentRate || intel.annualUsage || intel.loadFactor != null) && (
             <div className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -517,27 +517,27 @@ function BillIntelligencePanel({
 
           {/* Meters */}
           {hasMeters && (
-            <div>
-              <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-600 mb-2">
+            <div className="rounded-xl border border-white/5 bg-black/50 overflow-hidden">
+              <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400 px-4 py-3">
                 Meters ({intel.meters.length})
               </p>
-              <div className="rounded-xl overflow-hidden border border-white/5">
+              <div className="overflow-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-zinc-900/60">
-                    <tr>
-                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600">ESID</th>
-                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600">Address</th>
-                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600 text-right">Rate</th>
-                      <th className="px-3 py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600 text-right">End Date</th>
+                  <thead className="bg-black/70 border-b border-white/5">
+                    <tr className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                      <th className="px-3 py-2 text-zinc-500">ESID</th>
+                      <th className="px-3 py-2 text-zinc-500">Address</th>
+                      <th className="px-3 py-2 text-right text-zinc-500">Rate</th>
+                      <th className="px-3 py-2 text-right text-zinc-500">End Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.03]">
+                  <tbody className="divide-y divide-white/[0.03] bg-black/40">
                     {intel.meters.map((m) => (
-                      <tr key={m.id} className="hover:bg-white/[0.02] transition-colors">
-                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400">{m.esid ?? '—'}</td>
-                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400 truncate max-w-[180px]">{m.service_address ?? '—'}</td>
-                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400 text-right">{m.rate ?? '—'}</td>
-                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-400 text-right">
+                    <tr key={m.id} className="hover:bg-white/5 transition-colors">
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-300">{m.esid ?? '—'}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-300 truncate max-w-[180px]">{m.service_address ?? '—'}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-300 text-right">{m.rate ?? '—'}</td>
+                        <td className="px-3 py-2 font-mono text-[10px] text-zinc-300 text-right">
                           {m.end_date ? format(new Date(m.end_date), 'MMM yyyy') : '—'}
                         </td>
                       </tr>
