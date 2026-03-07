@@ -13,6 +13,7 @@ import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CheckCircle, Eye } from 'lucide-react'
+import { GlobalComposeModal } from '@/components/emails/GlobalComposeModal'
 
 
 function WarRoomKeyListener() {
@@ -74,6 +75,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           <ChunkLoadErrorHandler />
           <WarRoomKeyListener />
           <WarRoomOverlay />
+          <GlobalComposeModal />
           {children}
         </VoiceProvider>
       </AuthProvider>
