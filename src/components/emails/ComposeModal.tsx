@@ -423,22 +423,25 @@ function buildFallbackSubject(
   )
   const topic = bodyTopic || contextTopic || transcriptTopic
 
+  const conversationalTopic = (topic || 'update').toLowerCase()
+  const conversationalTarget = target === 'your team' ? '' : target
+
   switch (emailType) {
     case 'post_call':
-      return cleanSubject(topic ? `Follow-up on ${topic}: ${target}` : `Follow-up for ${target}`)
+      return cleanSubject(conversationalTarget ? `${conversationalTopic} for ${conversationalTarget}` : `${conversationalTopic} details`)
     case 'cold_first_touch':
-      return cleanSubject(topic ? `Quick note on ${topic} for ${target}` : `Quick note for ${target}`)
+      return cleanSubject(conversationalTarget ? `${conversationalTopic} for ${conversationalTarget}` : `${conversationalTopic} details`)
     case 'cold_followup':
-      return cleanSubject(topic ? `Following up on ${topic}: ${target}` : `Following up with ${target}`)
+      return cleanSubject(conversationalTarget ? `${conversationalTopic} for ${conversationalTarget}` : `${conversationalTopic} details`)
     case 'followup':
-      return cleanSubject(topic ? `Next step on ${topic}: ${target}` : `Next step for ${target}`)
+      return cleanSubject(conversationalTarget ? `${conversationalTopic} for ${conversationalTarget}` : `${conversationalTopic} details`)
     case 'internal':
-      return cleanSubject(topic ? `Internal update: ${topic}` : `Internal update: ${target}`)
+      return cleanSubject(conversationalTarget ? `internal update for ${conversationalTarget}` : `internal update`)
     case 'support':
-      return cleanSubject(topic ? `Support update: ${topic}` : `Support update for ${target}`)
+      return cleanSubject(conversationalTarget ? `support update for ${conversationalTarget}` : `support update`)
     case 'professional':
     default:
-      return cleanSubject(topic ? `Update on ${topic}: ${target}` : `Update for ${target}`)
+      return cleanSubject(conversationalTarget ? `${conversationalTopic} for ${conversationalTarget}` : `${conversationalTopic} details`)
   }
 }
 
@@ -476,6 +479,15 @@ function normalizeSubjectOutput(value: string | null): string | null {
     .trim()
     .slice(0, 70)
   return cleaned || null
+}
+
+function isTitleCaseHeavy(value: string | null): boolean {
+  const subject = (value || '').trim()
+  if (!subject) return false
+  const tokens = subject.split(/\s+/).filter((t) => /[A-Za-z]/.test(t))
+  if (tokens.length < 5) return false
+  const titleLike = tokens.filter((t) => /^[A-Z][a-z]+$/.test(t)).length
+  return titleLike / tokens.length > 0.65
 }
 
 function aiBodyToEditorHtml(body: string): string {
@@ -710,7 +722,7 @@ SUBJECT: ${subject || '(no subject)'}
 
 GREETING: "Hi [firstname]," or "Good talking with you, [firstname]," followed by exactly TWO (2) line breaks. NEVER put the body on the same line as the greeting.
 CLOSING: "Best," or "Thanks," followed by the SENDER's first name only (warm, informal).
-SUBJECT (when generating): Reference the call or topic. Examples: "Following up from our call", "Quick follow-up: [topic from call]", "Next step from today's call". 4–7 words.
+SUBJECT (when generating): Reference the call topic directly in sentence case. Keep it specific to what was discussed. Avoid generic templates like "following up from our call". 4–9 words.
 
 ${DELIVERABILITY_RULES}
 - Light formatting is fine. No heavy bullet lists unless specifically requested. Output ONLY the email body (or SUBJECT: + body when generating). No meta-commentary.`,
@@ -1146,6 +1158,9 @@ OUTPUT FORMAT:
 - If the directive is body-only, output only the body with no SUBJECT line.
 - SUBJECT REQUIREMENT: Always include a subject line for new email generation.
 - SUBJECT PERSONALIZATION: Prefer company name in subject when known; if no company is known, use contact first name.
+- SUBJECT STYLE: sentence case only. Do NOT capitalize every major word.
+- SUBJECT QUALITY: tie subject directly to the body's real topic (agreement, rates, proposal, next step), not generic labels.
+- SUBJECT BANS: avoid template openers like "following up", "quick follow-up", "checking in", "touching base".
 - Return ONLY the requested content. No meta-commentary.`
     }
 
@@ -1229,7 +1244,10 @@ OUTPUT FORMAT:
 Rules:
 - Must reflect the actual BODY content and situation.
 - 4 to 9 words, max 65 characters.
-- Avoid cliches: "following up", "checking in", "touching base".
+- Use sentence case, not title case.
+- Avoid cliches/templates: "following up", "quick follow-up", "checking in", "touching base".
+- Do not start with: "follow-up", "following up", "quick follow-up", "next step".
+- Must include at least one concrete topic from BODY (e.g. rates, agreement, proposal, locations).
 - No quotes, no markdown, no explanation.
 - Output one plain text subject line only.`,
               },
@@ -1237,6 +1255,7 @@ Rules:
                 role: 'user',
                 content: `RECIPIENT_CONTEXT: ${contextLabel}
 ORIGINAL_DIRECTIVE: ${finalDirective || '(none)'}
+PREVIOUS_SUBJECT_CANDIDATE: ${normalizedCandidate || '(none)'}
 BODY:
 ${bodyPlain}
 
@@ -1251,7 +1270,7 @@ Return exactly one subject line.`,
         const aiSubject = normalizeSubjectOutput(
           typeof subjectData?.content === 'string' ? subjectData.content : null
         )
-        if (aiSubject && !isGenericAiSubject(aiSubject)) {
+        if (aiSubject && !isGenericAiSubject(aiSubject) && !isTitleCaseHeavy(aiSubject)) {
           return aiSubject
         }
       } catch {
