@@ -364,13 +364,21 @@ function buildFallbackSubject(
   emailType: EmailTypeId,
   context: ComposeContext | null,
   to: string,
-  foundryContext: FoundryContext | null
+  foundryContext: FoundryContext | null,
+  body: string
 ): string {
   const company = (context?.companyName || context?.accountName || '').trim()
   const contactName = (context?.contactName || '').trim()
   const contactFirst = contactName ? contactName.split(/\s+/)[0] : ''
   const toName = to.includes('@') ? to.split('@')[0] : to
   const target = company || contactFirst || toName || 'your team'
+
+  const cleanSubject = (value: string): string =>
+    value
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\s+([:;,])/g, '$1')
+      .trim()
+      .slice(0, 70)
 
   const cleanTopic = (value?: string | null): string | null => {
     if (!value) return null
@@ -384,30 +392,52 @@ function buildFallbackSubject(
     return trimmed.length > 40 ? `${trimmed.slice(0, 37)}...` : trimmed
   }
 
+  const bodyText = htmlToPlainText(body || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+  const bodyLines = bodyText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .filter((line) => !/^(hi|hello|dear)\b/i.test(line))
+    .filter((line) => !/^(best|thanks|sincerely|regards)\b/i.test(line))
+  const bodyPreview = bodyLines.join(' ').toLowerCase()
+  const bodyTopic = (() => {
+    if (!bodyPreview) return null
+    if (/(pricing|price|rates?|rate)\b/.test(bodyPreview)) return 'electricity pricing'
+    if (/(contract|agreement|renewal|terms?)\b/.test(bodyPreview)) return 'contract options'
+    if (/(locations?|sites?|facilit(y|ies))\b/.test(bodyPreview)) return 'your locations'
+    if (/(proposal|pdf|attachment|attached)\b/.test(bodyPreview)) return 'the attached proposal'
+    if (/(call|conversation|spoke|talked)\b/.test(bodyPreview)) return 'our call'
+    const firstSentence = cleanTopic(bodyLines.join(' ').split(/[.!?]/)[0] || '')
+    return firstSentence
+  })()
+
   const contextTopic = cleanTopic(context?.contextForAi)
   const transcriptTopic = cleanTopic(
     foundryContext?.intelligence.summary ||
       foundryContext?.intelligence.transcripts[0] ||
       context?.contextForAi
   )
-  const topic = contextTopic || transcriptTopic
+  const topic = bodyTopic || contextTopic || transcriptTopic
 
   switch (emailType) {
     case 'post_call':
-      return topic ? `Follow-up on ${topic}: ${target}` : `Follow-up for ${target}`
+      return cleanSubject(topic ? `Follow-up on ${topic}: ${target}` : `Follow-up for ${target}`)
     case 'cold_first_touch':
-      return topic ? `Quick note on ${topic} for ${target}` : `Quick note for ${target}`
+      return cleanSubject(topic ? `Quick note on ${topic} for ${target}` : `Quick note for ${target}`)
     case 'cold_followup':
-      return topic ? `Following up on ${topic}: ${target}` : `Following up with ${target}`
+      return cleanSubject(topic ? `Following up on ${topic}: ${target}` : `Following up with ${target}`)
     case 'followup':
-      return topic ? `Next step on ${topic}: ${target}` : `Next step for ${target}`
+      return cleanSubject(topic ? `Next step on ${topic}: ${target}` : `Next step for ${target}`)
     case 'internal':
-      return topic ? `Internal update: ${topic}` : `Internal update: ${target}`
+      return cleanSubject(topic ? `Internal update: ${topic}` : `Internal update: ${target}`)
     case 'support':
-      return topic ? `Support update: ${topic}` : `Support update for ${target}`
+      return cleanSubject(topic ? `Support update: ${topic}` : `Support update for ${target}`)
     case 'professional':
     default:
-      return topic ? `Update on ${topic}: ${target}` : `Update for ${target}`
+      return cleanSubject(topic ? `Update on ${topic}: ${target}` : `Update for ${target}`)
   }
 }
 
@@ -420,6 +450,9 @@ function isGenericAiSubject(value: string | null): boolean {
   if (!normalized) return true
 
   const words = normalized.split(' ').length
+  if (normalized.length > 68) return true
+  if (/\b(i|we|our)\b/.test(normalized) && words > 8) return true
+  if (/\bat\b.+\bwe\b/.test(normalized)) return true
   if (/^(following up|follow up|quick follow up|checking in|touching base)$/.test(normalized)) return true
   if (/^(following up from our call|follow up from our call|post call follow up)$/.test(normalized)) return true
   if (/^(following up|follow up|quick follow up|checking in|touching base)\b/.test(normalized) && words <= 6) return true
@@ -1179,13 +1212,13 @@ OUTPUT FORMAT:
           // Use the salvaged content — strip the refusal prefix
           const salvaged = raw.slice(salvageIdx).trim()
           const parsed = parseAiEmailOutput(salvaged)
+          let newBody = parsed.body || salvaged
           const fallbackSubject = !isRefinementMode
-            ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext)
+            ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext, newBody)
             : null
           const parsedSubject = !isRefinementMode && isGenericAiSubject(parsed.subject)
             ? fallbackSubject
             : (parsed.subject || fallbackSubject)
-          let newBody = parsed.body || salvaged
           newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
           setPendingSubjectFromAi(parsedSubject)
           setPendingAiContent(newBody)
@@ -1197,13 +1230,13 @@ OUTPUT FORMAT:
         return
       }
       const parsed = parseAiEmailOutput(raw)
+      let newBody = parsed.body || raw
       const fallbackSubject = !isRefinementMode
-        ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext)
+        ? buildFallbackSubject(emailTypeId, context, to || '', foundryContext, newBody)
         : null
       const parsedSubject = !isRefinementMode && isGenericAiSubject(parsed.subject)
         ? fallbackSubject
         : (parsed.subject || fallbackSubject)
-      let newBody = parsed.body || raw
 
       // Force double newline after greeting if missing
       newBody = newBody.replace(/^((?:Hi|Hello|Dear)?[ \t]*[A-Za-z]+(?: [A-Za-z]+)?,)[ \t\r\n]*/i, '$1\n\n')
