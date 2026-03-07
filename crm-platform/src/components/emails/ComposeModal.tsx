@@ -405,13 +405,14 @@ function buildFallbackSubject(
   const bodyPreview = bodyLines.join(' ').toLowerCase()
   const bodyTopic = (() => {
     if (!bodyPreview) return null
-    if (/(pricing|price|rates?|rate)\b/.test(bodyPreview)) return 'electricity pricing'
+    if (/(electricity|energy)\b/.test(bodyPreview) && /(pricing|price|rates?|rate)\b/.test(bodyPreview)) return 'electricity pricing'
+    if (/(electricity|energy)\b/.test(bodyPreview) && /(agreement|agreements|contract|renewal|terms?)\b/.test(bodyPreview)) return 'electricity agreements'
+    if (/(pricing|price|rates?|rate)\b/.test(bodyPreview)) return 'pricing options'
     if (/(contract|agreement|renewal|terms?)\b/.test(bodyPreview)) return 'contract options'
     if (/(locations?|sites?|facilit(y|ies))\b/.test(bodyPreview)) return 'your locations'
     if (/(proposal|pdf|attachment|attached)\b/.test(bodyPreview)) return 'the attached proposal'
     if (/(call|conversation|spoke|talked)\b/.test(bodyPreview)) return 'our call'
-    const firstSentence = cleanTopic(bodyLines.join(' ').split(/[.!?]/)[0] || '')
-    return firstSentence
+    return null
   })()
 
   const contextTopic = cleanTopic(context?.contextForAi)
@@ -453,6 +454,10 @@ function isGenericAiSubject(value: string | null): boolean {
   if (normalized.length > 68) return true
   if (/\b(i|we|our)\b/.test(normalized) && words > 8) return true
   if (/\bat\b.+\bwe\b/.test(normalized)) return true
+  if (/(good|great)\s+talking\s+with\s+you/.test(normalized)) return true
+  if (/i\s+wanted\s+to\s+follow\s+up/.test(normalized)) return true
+  if (/as\s+we\s+discussed/.test(normalized)) return true
+  if (/^follow(?:ing)?\s+up\s+on\s+good\s+talking/.test(normalized)) return true
   if (/^(following up|follow up|quick follow up|checking in|touching base)$/.test(normalized)) return true
   if (/^(following up from our call|follow up from our call|post call follow up)$/.test(normalized)) return true
   if (/^(following up|follow up|quick follow up|checking in|touching base)\b/.test(normalized) && words <= 6) return true
@@ -909,6 +914,8 @@ function ComposePanel({
   const [aiError, setAiError] = useState<string | null>(null)
   const [pendingAiContent, setPendingAiContent] = useState<string | null>(null)
   const [pendingSubjectFromAi, setPendingSubjectFromAi] = useState<string | null>(null)
+  const [isApplyingAi, setIsApplyingAi] = useState(false)
+  const [showAiApplyEffect, setShowAiApplyEffect] = useState(false)
   const [contentBeforeAi, setContentBeforeAi] = useState('')
   const [showUndoAi, setShowUndoAi] = useState(false)
   const [subjectAnimationKey, setSubjectAnimationKey] = useState(0)
@@ -1172,6 +1179,7 @@ OUTPUT FORMAT:
     const finalDirective = effectiveDirective || (isRefinementMode ? refinementFallbackByType[effectiveTypeForRecap] : '')
     if (!finalDirective && !isRefinementMode) return
     if (isRefinementMode && !content.trim()) return
+    setAiRailOpen(false)
     setAiError(null)
     setContentBeforeAi(content)
     setShowUndoAi(false)
@@ -1447,16 +1455,25 @@ OUTPUT FORMAT:
   const acceptAiContent = useCallback(() => {
     const body = pendingAiContent ?? ''
     const subj = pendingSubjectFromAi
-    setContent(aiBodyToEditorHtml(body))
-    if (subj != null && subj.trim() !== '') {
-      setSubject(subj.trim())
-      setSubjectAnimationKey((k) => k + 1)
-    }
-    setPendingAiContent(null)
-    setPendingSubjectFromAi(null)
-    // Show undo option only if there was prior content to restore
-    if (contentBeforeAi.trim()) setShowUndoAi(true)
-  }, [pendingAiContent, pendingSubjectFromAi, contentBeforeAi])
+    if (isApplyingAi) return
+    setIsApplyingAi(true)
+    setAiRailOpen(false)
+
+    window.setTimeout(() => {
+      setContent(aiBodyToEditorHtml(body))
+      if (subj != null && subj.trim() !== '') {
+        setSubject(subj.trim())
+        setSubjectAnimationKey((k) => k + 1)
+      }
+      setPendingAiContent(null)
+      setPendingSubjectFromAi(null)
+      // Show undo option only if there was prior content to restore
+      if (contentBeforeAi.trim()) setShowUndoAi(true)
+      setIsApplyingAi(false)
+      setShowAiApplyEffect(true)
+      window.setTimeout(() => setShowAiApplyEffect(false), 620)
+    }, 180)
+  }, [pendingAiContent, pendingSubjectFromAi, contentBeforeAi, isApplyingAi])
 
   const discardAiContent = useCallback(() => {
     setPendingAiContent(null)
@@ -1736,17 +1753,29 @@ OUTPUT FORMAT:
             {pendingAiContent !== null && (
               <motion.div
                 initial={{ opacity: 0, y: -8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
+                animate={isApplyingAi ? { opacity: 0, y: -14, scale: 0.96 } : { opacity: 1, y: 0, scale: 1 }}
+                transition={{ duration: isApplyingAi ? 0.18 : 0.22, ease: 'easeOut' }}
                 className="rounded-lg border border-[#002FA7]/30 bg-[#002FA7]/5 overflow-hidden"
               >
                 <div className="px-3 py-2 border-b border-white/10 flex items-center justify-between">
                   <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">AI suggestion — preview</span>
                   <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={acceptAiContent} className="h-7 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={acceptAiContent}
+                      disabled={isApplyingAi}
+                      className="h-7 text-[10px] text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 gap-1"
+                    >
                       <Check className="w-3 h-3" /> Replace with this
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={discardAiContent} className="h-7 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={discardAiContent}
+                      disabled={isApplyingAi}
+                      className="h-7 text-[10px] text-zinc-400 hover:text-red-400 hover:bg-red-500/10 gap-1"
+                    >
                       <RotateCcw className="w-3 h-3" /> Discard
                     </Button>
                   </div>
@@ -1815,18 +1844,31 @@ OUTPUT FORMAT:
                       </div>
                     ) : (
                       // Show rich text editor for regular emails
-                      <RichTextEditor
-                        content={content}
-                        onChange={(val) => {
-                          setContent(val)
-                          if (pendingAiContent) {
-                            setPendingAiContent(null)
-                            setPendingSubjectFromAi(null)
-                          }
-                        }}
-                        className="w-full"
-                        onEditorReady={handleEditorReady}
-                      />
+                      <div className="relative">
+                        <RichTextEditor
+                          content={content}
+                          onChange={(val) => {
+                            setContent(val)
+                            if (pendingAiContent) {
+                              setPendingAiContent(null)
+                              setPendingSubjectFromAi(null)
+                            }
+                          }}
+                          className="w-full"
+                          onEditorReady={handleEditorReady}
+                        />
+                        <AnimatePresence>
+                          {showAiApplyEffect && (
+                            <motion.div
+                              initial={{ opacity: 0, scale: 0.995 }}
+                              animate={{ opacity: [0, 0.32, 0], scale: [0.995, 1, 1.002] }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.62, ease: 'easeOut' }}
+                              className="pointer-events-none absolute inset-0 rounded-md border border-[#002FA7]/30 bg-gradient-to-r from-transparent via-[#002FA7]/20 to-transparent"
+                            />
+                          )}
+                        </AnimatePresence>
+                      </div>
                     )}
                     {isAiLoading && (
                       <div className="absolute inset-0 min-h-[120px] bg-zinc-950/80 rounded-lg border border-[#002FA7]/20">
