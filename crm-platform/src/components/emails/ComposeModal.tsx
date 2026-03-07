@@ -562,7 +562,7 @@ const EMAIL_TYPES: EmailTypeConfig[] = [
 CRITICAL: You MUST output actual email content (subject + body or body only). NEVER output questions about the prompt, meta-commentary, instructions, or suggestions. If the user provides specific notes or a prompt, you MUST preserve their exact facts, numbers, and intent. Do NOT override their message with generic filler.
 
 STRUCTURE: TRIGGER (one observable: operational peak, tariff change, expansion, or vertical-specific trigger) → PAIN (one sentence, in plain English, using vertical-specific angle if provided: e.g. for restaurants "dinner rush can set demand charges that crush margins", for warehouses "one busy loading window can set 12 months of charges", for schools "empty buildings in August still set 12 months of charges", generic fallback "summer peaks locking in next year's costs") → PROOF (brief peer/similar facility) → One question as CTA.
-ANGLES: If VERTICAL-SPECIFIC ANGLE is provided above, use that angle automatically. Otherwise, vary between: summer peaks & transmission charges, winter ratchet effect, pass-through/non-commodity charges, budget volatility, operational peaks. Do not repeat the same angle in every email.
+ANGLES: If VERTICAL-SPECIFIC ANGLE is provided above, use it as supporting context, not a rigid script. If USER CONTEXT includes a named person, prior conversation, or specific business detail, lead with that first and let the angle support the second sentence. If no user context is provided, vary between: summer peaks & transmission charges, winter ratchet effect, pass-through/non-commodity charges, budget volatility, operational peaks.
 WORD COUNT: Entire email 40–80 words (first-touch sweet spot for reply rates).
 LANGUAGE: Use plain English that ops, finance, and facility managers understand. Do NOT use jargon (4CP, ratchet, TDU, pass-through, demand charge, coincident peak, non-commodity) unless RECIPIENT CONTEXT explicitly indicates the recipient is an energy manager, director of energy, or similar. When in doubt, describe the mechanism in plain language (e.g. "summer peaks that lock in next year's transmission costs", "one winter spike that can set your delivery charges for the next 12 months", "charges from your utility that aren't the energy commodity").
 SENDER: ${signerName}
@@ -584,7 +584,7 @@ CTA: Always end with one clear question in plain English. Vary your CTA style ra
 - Soft suggestion: "Worth a quick look on your side?"
 Do not use "4CP exposure", "modeling", "mitigating", or "on your radar" in the closing question unless the recipient is an energy manager. Do not combine multiple asks in one email. Avoid repeating the same CTA wording across emails.
 
-PERSONALIZATION (use RECIPIENT CONTEXT when provided): You may mention the recipient's title or company **once** in the first sentence, but only if you tie it directly to a concrete responsibility or pain (e.g. "As VP of Operations at [Company], you're the one who feels it when summer peaks lock in next year's transmission charges."). If contextForAi includes recent activity (new warehouse, expansion, cost-focus, locations like DFW, company news), you may reference **one** of those naturally in the first sentence — make it feel like you know their world, not like you're restating their website. If VERTICAL-SPECIFIC ANGLE is provided, use that angle automatically (e.g. for restaurants: dinner rush/margins; for warehouses: loading windows; for schools: empty buildings in August). Do not spend more than one sentence on personalization; move quickly to the cost problem and question.
+PERSONALIZATION (use RECIPIENT CONTEXT when provided): You may mention the recipient's title or company **once** in the first sentence, but only if you tie it directly to a concrete responsibility or pain (e.g. "As VP of Operations at [Company], you're the one who feels it when summer peaks lock in next year's transmission charges."). If contextForAi includes recent activity (new warehouse, expansion, cost-focus, locations like DFW, company news), you may reference **one** of those naturally in the first sentence — make it feel like you know their world, not like you're restating their website. If USER CONTEXT mentions a specific person or touchpoint (for example "Wanda told me you handle agreements"), that must be the opener. If company context includes concrete details like certifications, product lines, or served industries, include one specific detail naturally. If VERTICAL-SPECIFIC ANGLE is provided, use it as support, not as the opener when user context is specific.
 GUARDRAILS: Do not over-praise (no "esteemed", "renowned"). Do not write long clauses about their job description; use title only to anchor a specific outcome ("you feel it when…", "you're the one who sees…", "you're the person who gets the call when…"). If no meaningful personalization data is provided, skip title and start directly with the business problem. Use natural, slightly uneven sentences — it should feel like one person writing a quick note, not a marketing email.
 
 ${DELIVERABILITY_RULES}
@@ -929,6 +929,7 @@ function ComposePanel({
   // AI Command Rail state
   const [aiRailOpen, setAiRailOpen] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
+  const [selectedGenerationDirective, setSelectedGenerationDirective] = useState('')
   const [emailTypeId, setEmailTypeId] = useState<EmailTypeId>('cold_first_touch')
   // Ref always holds the current emailTypeId — prevents stale closure in async buildFoundryContext callback
   const emailTypeIdRef = useRef<EmailTypeId>('cold_first_touch')
@@ -964,6 +965,10 @@ function ComposePanel({
 
   // Hidden file input for inserting images via the floating toolbar
   const toolbarImageInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setSelectedGenerationDirective('')
+  }, [emailTypeId])
   const uploadToolbarImage = async (file: File) => {
     const { toast } = await import('sonner')
     const toastId = toast.loading('Uploading image...')
@@ -1008,11 +1013,6 @@ function ComposePanel({
         // Uses emailTypeIdRef (always current) instead of emailTypeId to avoid stale closure.
         if (ctx.intelligence.transcripts.length > 0 && emailTypeIdRef.current === 'cold_first_touch') {
           setEmailTypeId('post_call')
-          toast(`Switched to Post-Call mode`, {
-            description: `${ctx.intelligence.transcripts.length} recent call transcript${ctx.intelligence.transcripts.length > 1 ? 's' : ''} found — AI will reference your call.`,
-            icon: <Check className="w-4 h-4 text-emerald-400" />,
-            duration: 4000,
-          })
         }
       })
       .catch(err => console.error('[ComposeModal] Failed to load foundry context:', err))
@@ -1056,9 +1056,10 @@ function ComposePanel({
   /** Subject suggests a meeting recap; use Professional tone so we don't apply cold outreach refinement. */
   const subjectSuggestsMeetingRecap = (s: string) => /meeting\s+recap/i.test((s || '').trim())
 
-  const buildEmailSystemPrompt = useCallback(() => {
+  const buildEmailSystemPrompt = useCallback((activeDirective = '') => {
     const effectiveConfig = subjectSuggestsMeetingRecap(subject) ? (EMAIL_TYPES.find((t) => t.id === 'professional') ?? emailTypeConfig) : emailTypeConfig
     let base = effectiveConfig.getSystemPrompt({ signerName, to: to || '', subject: subject || '' })
+    const directiveMentionsContractTiming = /\b(contract|renewal|renew|expiry|expiration|end date|agreement term)\b/i.test(activeDirective)
     if (context && (context.contactName || context.companyName || context.contactTitle || context.accountName || context.contextForAi || context.industry || context.accountDescription)) {
       const lines: string[] = []
       if (context.contactName || context.contactTitle || context.companyName || context.accountName) {
@@ -1076,7 +1077,7 @@ function ComposePanel({
       const isColdOrOutreach = effectiveConfig.id === 'cold_first_touch' || effectiveConfig.id === 'cold_followup'
       if (isColdOrOutreach) {
         const industryAngle = getIndustryAngle(context.industry, context.companyName || context.accountName)
-        lines.push('VERTICAL-SPECIFIC ANGLE (use this automatically; do not mention "vertical" or "angle" in the email):')
+        lines.push('VERTICAL-SPECIFIC ANGLE (supporting context only; use only if it strengthens USER CONTEXT. Do not mention "vertical" or "angle" in the email):')
         lines.push(industryAngle)
       }
       // Account description (filtered to avoid generic "what they do" language)
@@ -1102,7 +1103,7 @@ function ComposePanel({
     const hasContextAngle = context && (context.industry || context.companyName || context.accountName)
     if (isColdOrOutreach && !hasContextAngle) {
       const universalAngle = getUniversalEnergyAngle()
-      base += `\n\nVERTICAL-SPECIFIC ANGLE (use this automatically; do not mention "vertical" or "angle" in the email):\n${universalAngle}`
+      base += `\n\nVERTICAL-SPECIFIC ANGLE (supporting context when no user-specific trigger is given; do not mention "vertical" or "angle" in the email):\n${universalAngle}`
     }
 
     // Inject deep context from Supabase: energy profile + call transcripts
@@ -1117,6 +1118,15 @@ function ComposePanel({
         if (energy.contractEnd) deepLines.push(`- Contract Expiry: ${energy.contractEnd} — this is a live trigger if upcoming`)
         if (energy.annualUsage) deepLines.push(`- Annual Usage: ${energy.annualUsage}`)
         if (energy.loadZone) deepLines.push(`- ERCOT Load Zone: ${energy.loadZone}`)
+      }
+      if (directiveMentionsContractTiming) {
+        if (energy.contractEnd) {
+          deepLines.push('')
+          deepLines.push(`CONTRACT TIMING DIRECTIVE: User asked for contract/renewal framing. If it fits naturally, reference the actual contract expiry date (${energy.contractEnd}) and explain the risk of waiting until renewal window.`)
+        } else {
+          deepLines.push('')
+          deepLines.push('CONTRACT TIMING DIRECTIVE: User asked for contract/renewal framing, but no contract date is available. Explain the risk of waiting until renewal without inventing a date.')
+        }
       }
       if (intelligence.transcripts.length > 0) {
         deepLines.push('')
@@ -1173,17 +1183,31 @@ OUTPUT FORMAT:
     return base
   }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context, emailTypeId, sendAsPlainText, foundryContext])
 
+  const combineAiDirective = useCallback((typedPrompt: string, angleOrPresetDirective?: string) => {
+    const typed = (typedPrompt || '').trim()
+    const preset = (angleOrPresetDirective || '').trim()
+
+    if (typed && preset) {
+      return `USER CONTEXT (highest priority: preserve these facts and this intent):
+${typed}
+
+ANGLE / STYLE PREFERENCE (secondary: use only if it supports USER CONTEXT):
+${preset}
+
+Write one email where USER CONTEXT leads and the angle is supporting context only.`
+    }
+
+    return typed || preset
+  }, [])
+
   const generateEmailWithAi = useCallback(async (directive: string) => {
-    // Auto-select angle based on industry if no directive provided and industry is present
+    // Auto-build a directive only when the user/preset did not provide one.
     let effectiveDirective = directive.trim()
     if (!effectiveDirective) {
       if (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') {
-        // Auto-generate directive from industry angle (always present now — universal fallback if no match)
-        const industryAngle = getIndustryAngle(context?.industry, context?.companyName || context?.accountName)
-        const angleMatch = industryAngle.match(/ANGLES:\s*([\s\S]+?)(?:\n\n|$)/)
-        const angleHint = angleMatch ? angleMatch[1].split('"').filter(Boolean)[0]?.trim() : ''
+        // Fallback only: if there is no user directive, guide the model with broad cold-email shape.
         const wordCount = emailTypeId === 'cold_first_touch' ? '40–70' : '80–120'
-        effectiveDirective = `Write a ${wordCount} word ${emailTypeId === 'cold_first_touch' ? 'first-touch cold' : 'cold follow-up'} email using the VERTICAL-SPECIFIC ANGLE provided above.${angleHint ? ` Lead with: ${angleHint}` : ''} Focus on the operational pain, not generic energy savings. Plain text, minimal sign-off.`
+        effectiveDirective = `Write a ${wordCount} word ${emailTypeId === 'cold_first_touch' ? 'first-touch cold' : 'cold follow-up'} email. If USER CONTEXT exists, lead with that exact context. Use VERTICAL-SPECIFIC ANGLE only as supporting context. Focus on one concrete business risk, not generic energy savings. Plain text, minimal sign-off.`
       } else if (emailTypeId === 'post_call') {
         const hasTranscripts = (foundryContext?.intelligence.transcripts.length ?? 0) > 0
         const hasCallNotes = !!(context?.contextForAi && /call|spoke|talked|conversation|meeting/i.test(context.contextForAi))
@@ -1281,7 +1305,7 @@ Return exactly one subject line.`,
       return normalizeSubjectOutput(normalizedCandidate) || fallback
     }
     try {
-      const systemPrompt = buildEmailSystemPrompt()
+      const systemPrompt = buildEmailSystemPrompt(finalDirective)
       const userContent = isRefinementMode
         ? `Apply the refinement task. Current email body:\n\n---\n${content}\n---`
         : finalDirective
@@ -2192,15 +2216,15 @@ Return exactly one subject line.`,
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault()
-                        generateEmailWithAi(aiPrompt)
+                        generateEmailWithAi(combineAiDirective(aiPrompt, isRefinementMode ? '' : selectedGenerationDirective))
                       }
                     }}
                     className="flex-1 min-w-[160px] h-8 bg-transparent border-white/10 rounded-lg text-[11px] font-mono placeholder:text-zinc-500 focus:ring-0 focus:border-[#002FA7]/30"
                   />
                   <Button
                     size="sm"
-                    onClick={() => generateEmailWithAi(aiPrompt)}
-                    disabled={isAiLoading || (!aiPrompt.trim() && !isRefinementMode) || (isRefinementMode && !content.trim())}
+                    onClick={() => generateEmailWithAi(combineAiDirective(aiPrompt, isRefinementMode ? '' : selectedGenerationDirective))}
+                    disabled={isAiLoading || ((!aiPrompt.trim() && !selectedGenerationDirective.trim()) && !isRefinementMode) || (isRefinementMode && !content.trim())}
                     className="h-8 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white text-[10px] font-mono uppercase"
                   >
                     {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Generate'}
@@ -2231,9 +2255,17 @@ Return exactly one subject line.`,
                       <button
                         key={chip.label}
                         type="button"
-                        onClick={() => generateEmailWithAi(chip.directive)}
+                        onClick={() => {
+                          setSelectedGenerationDirective(chip.directive)
+                          if (!aiPrompt.trim()) {
+                            generateEmailWithAi(chip.directive)
+                          }
+                        }}
                         disabled={isAiLoading}
-                        className="text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors"
+                        className={cn(
+                          'text-[10px] font-mono px-2.5 py-1 rounded-lg border border-white/10 bg-white/5 text-zinc-400 hover:bg-white/10 hover:text-zinc-200 transition-colors',
+                          selectedGenerationDirective === chip.directive && 'border-[#002FA7]/60 text-zinc-100 bg-[#002FA7]/15'
+                        )}
                       >
                         {chip.label}
                       </button>
@@ -2247,12 +2279,17 @@ Return exactly one subject line.`,
                   </div>
                 )}
                 {!isLoadingContext && (emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup') && (
-                  <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-1">
-                    {context?.industry
-                      ? `Angle: ${context.industry} vertical`
-                      : context?.companyName || context?.accountName
-                        ? `Angle: auto-selected for ${context.companyName || context.accountName}`
-                        : 'Angle: universal (no industry context)'}
+                  <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-1 space-y-0.5">
+                    <div>
+                      {context?.industry
+                        ? `Angle: ${context.industry} vertical`
+                        : context?.companyName || context?.accountName
+                          ? `Angle: auto-selected for ${context.companyName || context.accountName}`
+                          : 'Angle: universal (no industry context)'}
+                    </div>
+                    {selectedGenerationDirective.trim() && (
+                      <div className="text-[#002FA7]/80">Prompt priority: your typed context first, selected angle second</div>
+                    )}
                   </div>
                 )}
                 {!isLoadingContext && emailTypeId === 'post_call' && (
