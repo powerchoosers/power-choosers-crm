@@ -7,7 +7,6 @@ import { extractEmailAddress, useEmailIdentityMap } from '@/hooks/useEmailIdenti
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
-import { ComposeModal } from '@/components/emails/ComposeModal'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import { Button } from "@/components/ui/button"
@@ -20,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
+import { useComposeStore } from '@/store/composeStore'
 
 const AUTO_SYNC_DELAY_MS = 5 * 1000 // 5 seconds after load
 
@@ -52,8 +52,8 @@ export default function EmailsPage() {
   // No manual sync trigger needed here as GlobalSync handles it, 
   // but we keep the manual button for forced refresh.
 
-  const [isComposeOpen, setIsComposeOpen] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
+  const openCompose = useComposeStore((s) => s.openCompose)
 
   const emails = data?.pages.flatMap(page => page.emails) || []
   const identityAddresses = emails.flatMap((e) => {
@@ -160,7 +160,7 @@ export default function EmailsPage() {
         onSearchChange={setSearchTerm}
         primaryAction={{
           label: "Compose",
-          onClick: () => setIsComposeOpen(true),
+          onClick: () => openCompose({ to: '', subject: '', context: null }),
           icon: <Plus size={18} className="mr-2" />
         }}
         secondaryAction={{
@@ -215,11 +215,6 @@ export default function EmailsPage() {
         onClear={() => setSelectedIds(new Set())}
         onAction={handleBulkAction}
         onSelectCount={handleSelectCount}
-      />
-
-      <ComposeModal
-        isOpen={isComposeOpen}
-        onClose={() => setIsComposeOpen(false)}
       />
 
       <DestructModal

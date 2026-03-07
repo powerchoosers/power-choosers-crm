@@ -7,10 +7,11 @@ import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
-import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeModal'
+import type { ComposeContext } from '@/components/emails/ComposeModal'
 import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { useComposeStore } from '@/store/composeStore'
 
 // Modular Components
 import { useContactDossierState } from '@/hooks/useContactDossierState'
@@ -27,6 +28,7 @@ export default function ContactDossierPage() {
 
   // Centralized State Hook
   const s = useContactDossierState(id)
+  const openCompose = useComposeStore((state) => state.openCompose)
 
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
   const [isRecalibrating, setIsRecalibrating] = useState(false)
@@ -245,7 +247,7 @@ export default function ContactDossierPage() {
                 setEditAnnualUsage={s.setEditAnnualUsage}
                 editMills={s.editMills}
                 setEditMills={s.setEditMills}
-                onEmailClick={() => s.setIsComposeOpen(true)}
+                onEmailClick={() => openCompose({ to: s.editEmail || '', subject: '', context: composeContext })}
                 onIngestionComplete={handleIngestionComplete}
                 toggleEditing={s.toggleEditing}
               />
@@ -286,13 +288,6 @@ export default function ContactDossierPage() {
         </div>
       </div>
 
-      <ComposeModal
-        isOpen={s.isComposeOpen}
-        onClose={() => s.setIsComposeOpen(false)}
-        to={s.editEmail}
-        subject=""
-        context={composeContext}
-      />
     </div>
   )
 }

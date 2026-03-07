@@ -41,7 +41,6 @@ import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Badge } from '@/components/ui/badge'
 import { ContactAvatar, type ContactHealthScore } from '@/components/ui/ContactAvatar'
-import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeModal'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import FilterCommandDeck from '@/components/network/FilterCommandDeck'
@@ -72,6 +71,7 @@ import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { toast } from 'sonner'
+import { useComposeStore } from '@/store/composeStore'
 
 const PAGE_SIZE = 50
 
@@ -114,10 +114,9 @@ export default function PeoplePage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [newPerson, setNewPerson] = useState({ firstName: '', lastName: '', email: '', phone: '', company: '', title: '' })
-  const [isComposeOpen, setIsComposeOpen] = useState(false)
-  const [composeTarget, setComposeTarget] = useState<{ email: string; name: string; company: string } | null>(null)
   const [isSequenceModalOpen, setIsSequenceModalOpen] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const openCompose = useComposeStore((s) => s.openCompose)
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
@@ -498,12 +497,16 @@ export default function PeoplePage() {
               <button
                 className="h-8 w-8 icon-button-forensic flex items-center justify-center"
                 onClick={() => {
-                  setComposeTarget({
-                    email: contact.email || '',
-                    name: contact.name,
-                    company: contact.company || ''
+                  openCompose({
+                    to: contact.email || '',
+                    subject: '',
+                    context: {
+                      contactName: contact.name,
+                      companyName: contact.company || undefined,
+                      contactId: contact.id,
+                      accountId: contact.accountId || undefined,
+                    }
                   })
-                  setIsComposeOpen(true)
                 }}
                 disabled={!contact.email}
                 title={contact.email ? `Email ${contact.name}` : 'No email available'}
@@ -773,17 +776,6 @@ export default function PeoplePage() {
         onClose={() => setIsSequenceModalOpen(false)}
         selectedContactIds={Object.keys(rowSelection).filter(Boolean)}
         onSuccess={() => setRowSelection({})}
-      />
-
-      <ComposeModal
-        isOpen={isComposeOpen}
-        onClose={() => {
-          setIsComposeOpen(false)
-          setComposeTarget(null)
-        }}
-        to={composeTarget?.email}
-        subject=""
-        context={composeTarget ? { contactName: composeTarget.name, companyName: composeTarget.company || undefined } : null}
       />
 
       {/* Add Person Modal */}
