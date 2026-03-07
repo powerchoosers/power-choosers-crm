@@ -1930,7 +1930,11 @@ Return exactly one subject line.`,
                       </div>
                     ) : (
                       // Show rich text editor for regular emails
-                      <div className="relative">
+                      <motion.div
+                        animate={showAiApplyEffect ? { scale: [0.96, 1, 1.001], opacity: [0.5, 1, 1] } : { scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.45, ease: 'easeOut' }}
+                        className="relative"
+                      >
                         <RichTextEditor
                           content={content}
                           onChange={(val) => {
@@ -1954,7 +1958,7 @@ Return exactly one subject line.`,
                             />
                           )}
                         </AnimatePresence>
-                      </div>
+                      </motion.div>
                     )}
                     {isAiLoading && (
                       <div className="absolute inset-0 min-h-[120px] bg-zinc-950/80 rounded-lg border border-[#002FA7]/20">
