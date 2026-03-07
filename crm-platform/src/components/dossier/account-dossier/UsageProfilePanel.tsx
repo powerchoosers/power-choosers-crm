@@ -17,10 +17,26 @@ interface UsageMonth {
 
 interface UsageProfilePanelProps {
     usageHistory?: UsageMonth[];
+    theme?: 'default' | 'crm';
 }
 
-export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
+export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProfilePanelProps) {
     const [viewMode, setViewMode] = useState<'graph' | 'table'>('graph');
+    const isCrm = theme === 'crm';
+
+    const chartFillStart = isCrm ? '#002FA7' : '#52525b';
+    const chartFillEnd = isCrm ? '#0b173d' : '#27272a';
+    const lineColor = isCrm ? '#5b84ff' : '#d4d4d8';
+    const axisTickColor = isCrm ? '#6b7280' : '#71717a';
+    const gridColor = isCrm ? 'rgba(0, 47, 167, 0.22)' : 'rgba(255,255,255,0.05)';
+    const headerBg = isCrm ? 'bg-black/40' : 'bg-zinc-900/90';
+    const rowHoverBg = isCrm ? 'hover:bg-[#002FA7]/8' : 'hover:bg-zinc-900/40';
+    const activeToggle = isCrm
+        ? 'bg-[#002FA7]/15 text-[#7f9cff] border border-[#002FA7]/35 shadow-sm'
+        : 'bg-zinc-800 text-white border border-white/10 shadow-sm';
+    const inactiveToggle = isCrm
+        ? 'text-zinc-500 hover:text-zinc-200 border border-transparent'
+        : 'text-zinc-500 hover:text-white border border-transparent';
 
     if (!usageHistory || usageHistory.length === 0) {
         return (
@@ -85,8 +101,8 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                     <button
                         onClick={() => setViewMode('graph')}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'graph'
-                            ? 'bg-zinc-800 text-white border border-white/10 shadow-sm'
-                            : 'text-zinc-500 hover:text-white border border-transparent'
+                            ? activeToggle
+                            : inactiveToggle
                             }`}
                     >
                         <BarChart3 className="w-3 h-3" /> Graph
@@ -94,8 +110,8 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                     <button
                         onClick={() => setViewMode('table')}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'table'
-                            ? 'bg-zinc-800 text-white border border-white/10 shadow-sm'
-                            : 'text-zinc-500 hover:text-white border border-transparent'
+                            ? activeToggle
+                            : inactiveToggle
                             }`}
                     >
                         <Table2 className="w-3 h-3" /> Table
@@ -119,22 +135,22 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                 <ComposedChart data={usageHistory} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                                     <defs>
                                         <linearGradient id="colorKwh" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#52525b" stopOpacity={0.8} />
-                                            <stop offset="95%" stopColor="#27272a" stopOpacity={0.2} />
+                                            <stop offset="5%" stopColor={chartFillStart} stopOpacity={0.8} />
+                                            <stop offset="95%" stopColor={chartFillEnd} stopOpacity={0.2} />
                                         </linearGradient>
                                     </defs>
                                     <XAxis
                                         dataKey="month"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
+                                        tick={{ fill: axisTickColor, fontSize: 10, fontFamily: 'monospace' }}
                                         dy={10}
                                     />
                                     <YAxis
                                         yAxisId="left"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
+                                        tick={{ fill: axisTickColor, fontSize: 10, fontFamily: 'monospace' }}
                                         tickFormatter={(value) => value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value}
                                     />
                                     <YAxis
@@ -142,13 +158,13 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                         orientation="right"
                                         axisLine={false}
                                         tickLine={false}
-                                        tick={{ fill: '#71717a', fontSize: 10, fontFamily: 'monospace' }}
+                                        tick={{ fill: axisTickColor, fontSize: 10, fontFamily: 'monospace' }}
                                         tickFormatter={(value) => `${value} kW`}
                                     />
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                     <Tooltip content={<CustomTooltip />} />
                                     <Bar yAxisId="left" dataKey="kwh" name="Total kWh" fill="url(#colorKwh)" radius={[4, 4, 0, 0]} barSize={40} />
-                                    <Line yAxisId="right" type="monotone" dataKey="billed_kw" name="Billed Demand" stroke="#d4d4d8" strokeWidth={2} dot={{ r: 3, fill: '#d4d4d8', strokeWidth: 0 }} activeDot={{ r: 5 }} />
+                                    <Line yAxisId="right" type="monotone" dataKey="billed_kw" name="Billed Demand" stroke={lineColor} strokeWidth={2} dot={{ r: 3, fill: lineColor, strokeWidth: 0 }} activeDot={{ r: 5 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </motion.div>
@@ -162,7 +178,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                             className="absolute inset-0 np-scroll overflow-y-auto"
                         >
                             <table className="w-full text-left border-collapse">
-                                <thead className="bg-zinc-900/90 backdrop-blur-md sticky top-0 z-10 border-b border-white/5">
+                                <thead className={`${headerBg} backdrop-blur-md sticky top-0 z-10 border-b border-white/5`}>
                                     <tr>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium">Month</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">kWh Usage</th>
@@ -173,7 +189,7 @@ export function UsageProfilePanel({ usageHistory }: UsageProfilePanelProps) {
                                 </thead>
                                 <tbody className="divide-y divide-white/[0.02]">
                                     {usageHistory.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-zinc-900/40 transition-colors">
+                                        <tr key={idx} className={`${rowHoverBg} transition-colors`}>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-200">{row.month}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-300 text-right">{row.kwh?.toLocaleString() ?? '—'}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{row.billed_kw?.toLocaleString() ?? '—'}</td>
