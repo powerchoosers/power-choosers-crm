@@ -229,11 +229,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       const newDevice = new Device(data.token, {
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
         enableImprovedSignalingErrorPrecision: true,
-        logLevel: 1, // Enable debug logging to catch silent drops
+        logLevel: 0, // Quiet, only surface warnings/errors
         edge: ['ashburn', 'roaming'],
         maxCallSignalingTimeoutMs: 30000,
         tokenRefreshMs: 30000, // Refresh 30s before expiry
       })
+
+      newDevice.setLogLevel(0)
 
       // Ported from legacy phone.js: Set audio constraints for better quality
       if (newDevice.audio) {
