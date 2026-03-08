@@ -668,23 +668,29 @@ export function NodeIngestion() {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0 }}
       transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
-      className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden"
+      className="h-full flex flex-col bg-zinc-950 border-white/5 text-white relative overflow-hidden shadow-2xl"
     >
 
       {/* HEADER - Forensic Style */}
-      <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 nodal-recessed">
-        <div className="flex items-center gap-2">
-          {type === 'ACCOUNT' ? <Building2 className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />}
+      <div className="h-24 px-6 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="h-8 w-8 rounded-lg bg-[#002FA7]/40 border border-[#002FA7]/60 flex items-center justify-center">
+            {type === 'ACCOUNT' ? <Building2 className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />}
+          </div>
           <span className="font-mono text-[10px] tracking-widest text-zinc-300 uppercase">
             INITIALIZE_{type}_NODE
           </span>
         </div>
-        <button onClick={resetProtocol} className="text-zinc-500 hover:text-white text-[10px] font-mono tracking-wider transition-colors">
+        <button
+          onClick={resetProtocol}
+          className="text-zinc-500 hover:text-zinc-300 text-[10px] font-mono tracking-wider transition-colors"
+          title="Cancel"
+        >
           [ ESC ]
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 custom-scrollbar">
         <AnimatePresence mode="wait">
 
           {/* STEP 1: SIGNAL ACQUISITION (or Rapid Contact Injection with Context Lock) */}
@@ -783,11 +789,11 @@ export function NodeIngestion() {
                     <Button
                       onClick={handleCommit}
                       disabled={isCommitting || (!firstName && !lastName)}
-                      className="w-full bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold h-10 tracking-tight flex items-center justify-center gap-2"
+                      className="w-full h-10 rounded-xl bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"
                     >
                       {isCommitting ? (
                         <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <Loader2 className="w-4 h-4 animate-spin text-white" />
                           COMMITTING...
                         </>
                       ) : isExistingRecord ? (
@@ -1145,11 +1151,11 @@ export function NodeIngestion() {
                 <Button
                   onClick={handleCommit}
                   disabled={isCommitting || (type === 'ACCOUNT' ? !entityName : (!firstName && !lastName))}
-                  className="w-full bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold h-10 tracking-tight flex items-center justify-center gap-2"
+                  className="w-full h-10 rounded-xl bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"
                 >
                   {isCommitting ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin text-white" />
                       COMMITTING...
                     </>
                   ) : isExistingRecord ? (
