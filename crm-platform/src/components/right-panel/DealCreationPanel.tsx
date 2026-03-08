@@ -512,7 +512,10 @@ export function DealCreationPanel() {
                                             <SelectTrigger className="h-11 bg-black/40 border-white/5 text-sm font-mono text-zinc-300 rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
                                                 <SelectValue placeholder="SELECT MILLIS" />
                                             </SelectTrigger>
-                                            <SelectContent className="bg-zinc-950 border-white/10 max-h-48 overflow-y-auto">
+                                            <SelectContent
+                                                position="popper"
+                                                className="bg-zinc-950 border-white/10 max-h-36"
+                                            >
                                                 {millOptions.map((option) => (
                                                     <SelectItem
                                                         key={option}
