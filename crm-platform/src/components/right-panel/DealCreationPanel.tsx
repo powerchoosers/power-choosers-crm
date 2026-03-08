@@ -521,9 +521,6 @@ export function DealCreationPanel() {
                                                         ¢/kWh
                                                     </span>
                                                 </div>
-                                                <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                                                    {sellRate ? `${sellRate}¢/kWh` : 'No sell rate'}
-                                                </p>
                                             </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
@@ -551,11 +548,8 @@ export function DealCreationPanel() {
                                                 ))}
                                             </SelectContent>
                                             </Select>
-                                            <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                                                {mills ? `${mills} mills` : 'No margin'}
-                                            </p>
+                                            </div>
                                         </div>
-                                    </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                                             <DollarSign className="w-3 h-3 inline" /> {commissionLabel} Commission ({Math.round(commissionRate * 100)}%)
