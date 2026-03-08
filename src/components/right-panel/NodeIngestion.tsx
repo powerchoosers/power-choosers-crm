@@ -828,7 +828,7 @@ export function NodeIngestion() {
                             className={panelTheme.field}
                             autoFocus
                           />
-                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <div className="absolute right-3 inset-y-0 flex items-center">
                             {isScanning || isSearchingName ? (
                               <div className="w-3.5 h-3.5 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
                             ) : (
@@ -907,7 +907,7 @@ export function NodeIngestion() {
                           className={panelTheme.field}
                           autoFocus
                         />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <div className="absolute right-3 inset-y-0 flex items-center">
                           {isScanning ? (
                             <div className="w-3.5 h-3.5 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
                           ) : (
