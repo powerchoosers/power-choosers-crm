@@ -10,6 +10,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
+import { formatMillValue } from '@/lib/mills'
 
 export function useContactDossierState(id: string) {
     const params = useParams()
@@ -134,13 +135,13 @@ export function useContactDossierState(id: string) {
                 setEditStrikePrice(account.currentRate || '')
                 setEditAnnualUsage(account.annualUsage || '')
                 setEditContractEnd(account.contractEnd ? String(account.contractEnd).slice(0, 10) : '')
-                setEditMills(account.mills || '0.0070')
+                setEditMills(formatMillValue(account.mills ?? account.metadata?.mills))
             } else {
                 setEditSupplier(contact.electricitySupplier || '')
                 setEditStrikePrice(contact.currentRate || '')
                 setEditAnnualUsage(contact.annualUsage || '')
                 setEditContractEnd(contact.contractEnd ? String(contact.contractEnd).slice(0, 10) : '')
-                setEditMills((contact as any)?.mills || '0.0070')
+                setEditMills(formatMillValue((contact as any)?.mills ?? (contact as any)?.metadata?.mills))
             }
         }
     }, [contact, account, isEditing])

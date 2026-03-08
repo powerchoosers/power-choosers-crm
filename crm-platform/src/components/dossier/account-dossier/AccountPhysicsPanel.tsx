@@ -5,7 +5,9 @@ import { motion } from 'framer-motion'
 import { format } from 'date-fns'
 import { AccountUplinkCard } from '@/components/accounts/AccountUplinkCard'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { formatMillValue, millDecimal, millOptions } from '@/lib/mills'
 
 interface AccountPhysicsPanelProps {
     account: any
@@ -236,40 +238,40 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                             "text-3xl font-mono tabular-nums tracking-tighter text-green-500/80 transition-all duration-800",
                             glowingFields.has('revenue') && "text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]"
                         )}>
-                            <ForensicDataPoint
-                                value={(() => {
-                                    const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
-                                    const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
-                                    const millsFloat = parseFloat(String(editMills).replace(/[^\d.]/g, '')) || 0.0070;
-                                    return (usage * millsFloat).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
-                                })()}
-                                valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
-                                inline
-                            />
+                        <ForensicDataPoint
+                            value={(() => {
+                                const usageStr = isEditing ? editAnnualUsage : (account.annualUsage || '0');
+                                const usage = parseInt(usageStr.toString().replace(/[^0-9]/g, '')) || 0;
+                                const millsDecimal = millDecimal(editMills);
+                                return (usage * millsDecimal).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
+                            })()}
+                            valueClassName="text-3xl font-mono tabular-nums tracking-tighter text-green-500/80"
+                            inline
+                        />
                         </div>
                         {isEditing ? (
                             <div className="mt-3">
                                 <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Deal Mills</div>
-                                <input
-                                    type="text"
-                                    value={editMills}
-                                    onChange={(e) => {
-                                        const val = e.target.value.replace(/[^\d]/g, '')
-                                        if (val) {
-                                            const num = parseInt(val, 10)
-                                            setEditMills((num / 10000).toFixed(4))
-                                        } else {
-                                            setEditMills('')
-                                        }
-                                    }}
-                                    onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                    className="w-1/2 bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 tabular-nums"
-                                    placeholder="0.0070"
-                                />
+                                <Select value={editMills || ''} onValueChange={setEditMills}>
+                                    <SelectTrigger className="w-1/2 bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 tabular-nums">
+                                        <SelectValue placeholder="SELECT MILLIS" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-zinc-950 border-white/10 max-h-48 overflow-y-auto">
+                                        {millOptions.map((option) => (
+                                            <SelectItem
+                                                key={option}
+                                                value={option}
+                                                className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10"
+                                            >
+                                                {`${option} mills`}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         ) : (
                             <div className="text-[9px] font-mono text-zinc-600 mt-1 uppercase tracking-widest">
-                                Calculated at <span className={cn(glowingFields.has('mills') && "text-emerald-400 transition-colors")}>{editMills || '0.0070'}</span> margin base
+                                Calculated at <span className={cn(glowingFields.has('mills') && "text-emerald-400 transition-colors")}>{formatMillValue(editMills) || '0.50'}</span> margin base
                             </div>
                         )}
                     </div>
