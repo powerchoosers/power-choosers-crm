@@ -12,6 +12,7 @@ import { useSearchTargets } from '@/hooks/useTargets'
 import { useRouter } from 'next/navigation'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { AnimatePresence, motion } from 'framer-motion'
 
 export function GlobalSearch() {
   const [query, setQuery] = useState('')
@@ -47,6 +48,10 @@ export function GlobalSearch() {
           setTimeout(() => inputRef.current?.focus(), 10)
         }
       }
+      if (e.key === 'Escape' && isOpen) {
+        e.preventDefault()
+        setIsOpen(false)
+      }
     }
 
     document.addEventListener('keydown', down)
@@ -61,6 +66,8 @@ export function GlobalSearch() {
     (filteredTasks?.length || 0) +
     (filteredCalls?.length || 0) +
     (filteredEmails?.length || 0) > 0
+  const shouldShowResults = query.length >= 2
+  const shouldShowSkeletons = shouldShowResults && isSearching && !hasResults
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -92,19 +99,10 @@ export function GlobalSearch() {
     }
   }
 
-  const handleProspect = (type: 'people' | 'account') => {
-    setIsOpen(false)
-    if (type === 'people') {
-      router.push('/network/people?mode=prospect')
-    } else {
-      router.push('/network/accounts?mode=prospect')
-    }
-  }
-
   return (
     <div ref={containerRef} className="relative w-full">
       <div className="relative group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-signal transition-colors" size={18} />
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-zinc-200 transition-colors" size={18} />
         <input
           ref={inputRef}
           type="text"
@@ -113,13 +111,15 @@ export function GlobalSearch() {
             setQuery(e.target.value)
             setIsOpen(true)
           }}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            if (query) setIsOpen(true)
+          }}
           placeholder="Query Database [CMD+K]..."
-          className="w-full h-12 bg-zinc-950/90 backdrop-blur-md border border-white/5 rounded-full pl-12 pr-16 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-[#002FA7]/40 focus:bg-zinc-900/80 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]"
+          className="w-full h-12 bg-zinc-950/90 backdrop-blur-md border border-white/5 rounded-full pl-12 pr-16 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/50 focus-visible:ring-white/50 focus-visible:ring-offset-0 focus-visible:shadow-[0_0_16px_rgba(255,255,255,0.38)] transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]"
         />
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
           {isSearching && (
-            <Loader2 className="animate-spin text-signal" size={16} />
+            <Loader2 className="animate-spin text-zinc-200" size={16} />
           )}
           {query && (
             <button
@@ -136,45 +136,39 @@ export function GlobalSearch() {
         </div>
       </div>
 
-      {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 glass-panel rounded-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-200">
-          <div className="p-2 max-h-[70vh] overflow-y-auto np-scroll nodal-recessed">
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2 p-1">
-              <button
-                onClick={() => handleProspect('people')}
-                className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group"
-              >
-                <Users size={18} className="text-zinc-400 group-hover:text-signal transition-colors" />
-                <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-200 uppercase tracking-wider">People</span>
-              </button>
-              <button
-                onClick={() => handleProspect('account')}
-                className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group"
-              >
-                <Building2 size={18} className="text-zinc-400 group-hover:text-signal transition-colors" />
-                <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-200 uppercase tracking-wider">Accounts</span>
-              </button>
-              <button
-                onClick={() => { setIsOpen(false); router.push('/network/tasks?action=new') }}
-                className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group"
-              >
-                <Plus size={18} className="text-zinc-400 group-hover:text-signal transition-colors" />
-                <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-200 uppercase tracking-wider">Task</span>
-              </button>
-              <button
-                onClick={() => { setIsOpen(false); router.push('/network/analysis') }}
-                className="flex flex-col items-center justify-center gap-2 p-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 transition-all group"
-              >
-                <Sparkles size={18} className="text-zinc-400 group-hover:text-signal transition-colors" />
-                <span className="text-[10px] font-medium text-zinc-400 group-hover:text-zinc-200 uppercase tracking-wider">4CP AI</span>
-              </button>
-            </div>
-
-            {query && query.length >= 2 && (
+      <AnimatePresence>
+        {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: -6, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -6, scale: 0.98 }}
+          transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+          className="absolute top-full left-0 right-0 mt-2 glass-panel rounded-2xl overflow-hidden z-50"
+        >
+          <motion.div
+            layout
+            transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+            className={`max-h-[70vh] flex flex-col nodal-recessed ${shouldShowResults ? 'min-h-[22rem]' : ''}`}
+          >
+          <div className="p-2 flex-1 overflow-y-auto np-scroll">
+            {shouldShowResults && (
               <>
-                <div className="h-px bg-white/5 my-2 mx-2" />
+                {shouldShowSkeletons && (
+                  <div className="space-y-2 px-2 py-1">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={`search-skeleton-${index}`}
+                        className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.02] border border-white/5 animate-pulse"
+                      >
+                        <div className="w-8 h-8 rounded-2xl bg-white/10" />
+                        <div className="min-w-0 flex-1 space-y-1.5">
+                          <div className="h-3.5 w-1/3 rounded bg-white/10" />
+                          <div className="h-2.5 w-1/2 rounded bg-white/[0.08]" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {/* People Section */}
                 {filteredContacts.length > 0 && (
@@ -372,7 +366,7 @@ export function GlobalSearch() {
                   </div>
                 )}
 
-                {!isSearching && !hasResults && query.length >= 2 && (
+                {!isSearching && !hasResults && shouldShowResults && (
                   <div className="p-8 text-center">
                     <Search className="mx-auto h-8 w-8 text-zinc-700 mb-3" />
                     <div className="text-zinc-500 text-sm">
@@ -391,14 +385,23 @@ export function GlobalSearch() {
                 Type at least 2 characters to search...
               </div>
             )}
-
-            <div className="border-t border-white/5 mt-2 pt-2 px-3 py-1.5 flex justify-between items-center text-[10px] text-zinc-600">
-              <span>Press <kbd className="font-sans bg-white/5 px-1 rounded text-zinc-500">Esc</kbd> to close</span>
-              <span>Global Search</span>
-            </div>
           </div>
-        </div>
+          <div className="border-t border-white/5 px-3 py-2 flex justify-between items-center text-[10px] text-zinc-600 shrink-0 bg-zinc-950/70 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="text-left text-[10px] text-zinc-600 hover:text-white transition-colors flex items-center gap-1"
+            >
+              <span>Press</span>
+              <kbd className="font-sans bg-white/5 px-1 rounded text-zinc-500">Esc</kbd>
+              <span>to close</span>
+            </button>
+            <span>Global Search</span>
+          </div>
+          </motion.div>
+        </motion.div>
       )}
+      </AnimatePresence>
     </div>
   )
 }
