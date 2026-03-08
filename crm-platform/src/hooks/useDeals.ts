@@ -56,15 +56,15 @@ export function useDeals(filters?: DealsFilters) {
 
       // Batch-fetch account names for the returned deals
       const accountIds = [...new Set((data || []).map(d => d.accountId).filter(Boolean))]
-      let accountMap: Record<string, { name: string; domain?: string }> = {}
+      let accountMap: Record<string, { name: string; domain?: string; logo_url?: string }> = {}
 
       if (accountIds.length > 0) {
         const { data: accounts } = await supabase
           .from('accounts')
-          .select('id, name, domain')
+          .select('id, name, domain, logo_url')
           .in('id', accountIds)
         if (accounts) {
-          accounts.forEach(a => { accountMap[a.id] = { name: a.name, domain: a.domain } })
+          accounts.forEach(a => { accountMap[a.id] = { name: a.name, domain: a.domain, logo_url: a.logo_url } })
         }
       }
 
@@ -140,7 +140,32 @@ export function useDealsByAccount(accountId?: string) {
         .eq('accountId', accountId)
         .order('createdAt', { ascending: false })
       if (error) throw error
-      return (data || []) as Deal[]
+
+      const deals = (data || []) as Deal[]
+      const accountIds = [...new Set(deals.map((d) => d.accountId).filter(Boolean))]
+      let accountMap: Record<string, { name: string; domain?: string; logo_url?: string; annualUsage?: string | number }> = {}
+
+      if (accountIds.length > 0) {
+        const { data: accounts } = await supabase
+          .from('accounts')
+          .select('id, name, domain, logo_url, annual_usage')
+          .in('id', accountIds)
+        if (accounts) {
+          accounts.forEach((a) => {
+            accountMap[a.id] = {
+              name: a.name,
+              domain: a.domain,
+              logo_url: a.logo_url,
+              annualUsage: a.annual_usage,
+            }
+          })
+        }
+      }
+
+      return deals.map((d) => ({
+        ...d,
+        account: accountMap[d.accountId] || d.account,
+      })) as Deal[]
     },
     enabled: !!accountId && !loading && !!user,
     staleTime: 1000 * 60 * 5,
@@ -163,7 +188,32 @@ export function useDealsByContact(contactId?: string) {
         .eq('contactId', contactId)
         .order('createdAt', { ascending: false })
       if (error) throw error
-      return (data || []) as Deal[]
+
+      const deals = (data || []) as Deal[]
+      const accountIds = [...new Set(deals.map((d) => d.accountId).filter(Boolean))]
+      let accountMap: Record<string, { name: string; domain?: string; logo_url?: string; annualUsage?: string | number }> = {}
+
+      if (accountIds.length > 0) {
+        const { data: accounts } = await supabase
+          .from('accounts')
+          .select('id, name, domain, logo_url, annual_usage')
+          .in('id', accountIds)
+        if (accounts) {
+          accounts.forEach((a) => {
+            accountMap[a.id] = {
+              name: a.name,
+              domain: a.domain,
+              logo_url: a.logo_url,
+              annualUsage: a.annual_usage,
+            }
+          })
+        }
+      }
+
+      return deals.map((d) => ({
+        ...d,
+        account: accountMap[d.accountId] || d.account,
+      })) as Deal[]
     },
     enabled: !!contactId && !loading && !!user,
     staleTime: 1000 * 60 * 5,
@@ -187,12 +237,12 @@ export function useDeal(id: string | undefined) {
         .single()
       if (error) throw error
 
-      // Fetch account name/domain
-      let account: { name: string; domain?: string; annualUsage?: string | number } | undefined
+      // Fetch account context for icon/name/rate math displays.
+      let account: { name: string; domain?: string; annualUsage?: string | number; logo_url?: string } | undefined
       if (data.accountId) {
         const { data: acc } = await supabase
           .from('accounts')
-          .select('name, domain, annual_usage')
+          .select('name, domain, annual_usage, logo_url')
           .eq('id', data.accountId)
           .single()
         if (acc) {
@@ -200,6 +250,7 @@ export function useDeal(id: string | undefined) {
             name: acc.name,
             domain: acc.domain,
             annualUsage: acc.annual_usage,
+            logo_url: acc.logo_url,
           }
         }
       }

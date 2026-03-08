@@ -285,19 +285,22 @@ function CompanyIconInner({
             </motion.div>
           )}
         </AnimatePresence>
-        <motion.div
-          initial={false}
-          animate={{ opacity: isLoaded ? 1 : 0, scale: isLoaded ? 1 : 0.98 }}
-          transition={{ duration: 0.2, ease: 'easeOut' }}
-          className="absolute inset-0 w-full h-full"
-        >
-          <img
-            src={currentSrc}
-            {...imgCommon}
-            loading="lazy"
-            decoding="async"
-          />
-        </motion.div>
+        <AnimatePresence mode="wait">
+          {currentSrc && (
+            <motion.img
+              key={`logo-${currentSrc}`}
+              src={currentSrc}
+              {...imgCommon}
+              loading="lazy"
+              decoding="async"
+              initial={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+              transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+              className={cn('w-full h-full object-cover', roundedClassName)}
+            />
+          )}
+        </AnimatePresence>
 
         <div className={cn('absolute inset-0 pointer-events-none ring-1 ring-white/20', roundedClassName)} />
         <AnimatePresence>
