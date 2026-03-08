@@ -318,6 +318,7 @@ function AccountIntelPanel({ deal }: { deal: Deal }) {
       <div className="flex items-center gap-3">
         <CompanyIcon
           domain={deal.account?.domain}
+          logoUrl={deal.account?.logoUrl ?? deal.account?.logo_url}
           name={deal.account?.name || deal.accountId}
           size={36}
         />
@@ -633,6 +634,8 @@ export default function ContractDetailPage() {
       dealId: deal.id,
       accountId: deal.accountId,
       accountName: deal.account?.name,
+      accountLogoUrl: deal.account?.logoUrl ?? deal.account?.logo_url,
+      accountDomain: deal.account?.domain,
       contactId: deal.contactId,
       defaultTitle: deal.title,
       stage: deal.stage,
@@ -755,6 +758,7 @@ export default function ContractDetailPage() {
           <div className="flex items-center gap-3 min-w-0">
             <CompanyIcon
               domain={deal.account?.domain}
+              logoUrl={deal.account?.logoUrl ?? deal.account?.logo_url}
               name={deal.account?.name || deal.title}
               size={32}
             />

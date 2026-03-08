@@ -41,6 +41,8 @@ export interface Deal {
     name: string
     domain?: string
     annualUsage?: string | number
+    logoUrl?: string
+    logo_url?: string
   }
   signature_requests?: {
     id: string
