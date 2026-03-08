@@ -57,9 +57,11 @@ const ACTIVE_STAGES: DealStage[] = [
 
 function fmtCurrency(val?: number | null) {
   if (val == null) return '—'
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`
-  return `$${val.toLocaleString()}`
+  const hasFractional = Math.abs(val % 1) > 0
+  return `$${val.toLocaleString(undefined, {
+    minimumFractionDigits: hasFractional ? 2 : 0,
+    maximumFractionDigits: hasFractional ? 2 : 0,
+  })}`
 }
 
 function parseNumber(value: unknown): number | null {
@@ -733,6 +735,16 @@ export default function ContractDetailPage() {
       : `${metrics.daysToClose}d remaining`
     : null
 
+  const contractLengthMonths =
+    deal?.contractLength != null ? Number(deal.contractLength) : null
+  const totalValueFromAnnual =
+    metrics?.impliedSpend != null &&
+    contractLengthMonths != null &&
+    contractLengthMonths > 0
+      ? metrics.impliedSpend * (contractLengthMonths / 12)
+      : null
+  const totalValue = totalValueFromAnnual ?? deal?.amount ?? null
+
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
@@ -767,10 +779,10 @@ export default function ContractDetailPage() {
       <div className="grid grid-cols-4 gap-3 flex-none">
         <div className="nodal-void-card p-4">
           <div className="font-mono text-2xl text-zinc-50 tabular-nums leading-none">
-            {fmtCurrency(deal.amount)}
+            {fmtCurrency(totalValue)}
           </div>
           <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600 mt-1.5">
-            Annual Value
+            Total Value
           </div>
         </div>
 
@@ -865,10 +877,10 @@ export default function ContractDetailPage() {
                 }
               />
               <DataRow
-                label="Spend Verify"
+                label="Annual Value"
                 value={
                   metrics?.impliedSpend != null
-                    ? `${fmtCurrency(metrics.impliedSpend)} implied`
+                    ? fmtCurrency(metrics.impliedSpend)
                     : null
                 }
                 muted
