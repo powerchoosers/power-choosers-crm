@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { millDecimal } from '@/lib/mills'
 
 export interface Account {
   id: string
@@ -745,8 +746,9 @@ export function useUpdateAccount() {
           // Recalculate amount if usage or mills changed
           const usage = dealUpdates.annualUsage || (latestDeal as any).annualUsage
           const mills = dealUpdates.mills || (latestDeal as any).mills
-          if (usage && mills) {
-            dealUpdates.amount = Number((usage * mills).toFixed(2))
+          const millsDecimal = millDecimal(mills)
+          if (usage && millsDecimal) {
+            dealUpdates.amount = Number((usage * millsDecimal).toFixed(2))
           }
 
           if (Object.keys(dealUpdates).length > 0) {

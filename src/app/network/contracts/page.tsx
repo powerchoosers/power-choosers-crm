@@ -32,6 +32,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { millDecimal } from '@/lib/mills'
 import { useDeals, useDealsCount, useCreateDeal, useUpdateDeal, useDeleteDeal, useDealsStats } from '@/hooks/useDeals'
 import { type Deal, type DealStage, DEAL_STAGES } from '@/types/deals'
 import { differenceInDays, format, subMonths, isAfter } from 'date-fns'
@@ -133,7 +134,7 @@ function fmtUsage(val?: number) {
 
 function fmtMills(val?: number) {
   if (val === undefined || val === null) return '—'
-  return val.toFixed(4)
+  return val.toFixed(2)
 }
 
 // ---------------------------------------------------------------------------
@@ -227,9 +228,10 @@ function DealForm({ form, onChange, onAccountSelect }: DealFormProps) {
     // Auto-calculate amount if usage or mills changes
     if (key === 'annualUsage' || key === 'mills') {
       const usage = parseFloat(nextForm.annualUsage.replace(/[^0-9.-]/g, '')) || 0
-      const mills = parseFloat(nextForm.mills.replace(/[^0-9.-]/g, '')) || 0
-      if (usage && mills) {
-        nextForm.amount = (usage * mills).toFixed(2)
+      const sanitizedMills = nextForm.mills.replace(/[^0-9.]/g, '')
+      const millsDecimal = millDecimal(sanitizedMills)
+      if (usage && millsDecimal) {
+        nextForm.amount = (usage * millsDecimal).toFixed(2)
       }
     }
 

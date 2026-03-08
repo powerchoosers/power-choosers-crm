@@ -15,6 +15,7 @@ import {
   FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatMillValue, millDecimal } from '@/lib/mills'
 import { useDeal, useUpdateDeal } from '@/hooks/useDeals'
 import { useAccountBillIntelligence } from '@/hooks/useAccounts'
 import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel'
@@ -462,11 +463,17 @@ function BillIntelligencePanel({
   const hasUsage = intel.usageHistory.length > 0
   const hasMeters = intel.meters.length > 0
   const hasAnyData = hasUsage || hasMeters || !!intel.electricitySupplier
+  const crmBg = 'bg-black/30'
 
   return (
-    <div className="nodal-glass rounded-2xl flex flex-col overflow-hidden flex-none bg-black/30 border border-white/5">
+    <div className="nodal-glass rounded-2xl flex flex-col overflow-hidden flex-none">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-black/30">
+      <div
+        className={cn(
+          'flex items-center justify-between px-5 py-4 border-b border-white/[0.03]',
+          crmBg
+        )}
+      >
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-zinc-400" />
           <div>
@@ -484,13 +491,13 @@ function BillIntelligencePanel({
       </div>
 
       {!hasAnyData ? (
-        <div className="p-8 bg-black/30 border border-white/5 rounded-b-2xl">
+        <div className={cn('p-8 border-t border-white/5', crmBg)}>
           <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
             No bill data ingested. Upload a bill via the account Data Locker to populate this panel.
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-5 p-5 bg-black/30 border-t border-white/5">
+        <div className={cn('flex flex-col gap-5 p-5 border-t border-white/5', crmBg)}>
           {/* Asset summary */}
           {(intel.electricitySupplier || intel.currentRate || intel.annualUsage || intel.loadFactor != null) && (
             <div className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -517,13 +524,13 @@ function BillIntelligencePanel({
 
           {/* Meters */}
           {hasMeters && (
-            <div className="rounded-2xl border border-white/5 bg-black/30 overflow-hidden">
+            <div className={cn('rounded-2xl border border-white/5 overflow-hidden', crmBg)}>
               <div className="px-4 py-3 border-b border-white/5 font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400">
                 Meters ({intel.meters.length})
               </div>
-              <div className="overflow-auto">
+              <div className={cn('overflow-auto', crmBg)}>
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-black/30 border-b border-white/5">
+                  <thead className="border-b border-white/5">
                     <tr className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
                       <th className="px-3 py-2 text-zinc-500">ESID</th>
                       <th className="px-3 py-2 text-zinc-500">Address</th>
@@ -531,7 +538,7 @@ function BillIntelligencePanel({
                       <th className="px-3 py-2 text-right text-zinc-500">End Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.03] bg-black/30">
+                  <tbody className="divide-y divide-white/[0.03]">
                     {intel.meters.map((m) => (
                       <tr key={m.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-3 py-2 font-mono text-[10px] text-zinc-300">{m.esid ?? '—'}</td>
@@ -604,9 +611,10 @@ export default function ContractDetailPage() {
       commissionValue != null && deal.amount != null && deal.amount > 0
         ? (commissionValue / deal.amount) * 100
         : null
+    const millsDecimal = millDecimal(deal.mills)
     const impliedSpend =
-      deal.annualUsage != null && deal.mills != null
-        ? (deal.annualUsage * deal.mills) / 1000
+      deal.annualUsage != null && millsDecimal > 0
+        ? deal.annualUsage * millsDecimal
         : null
     return {
       rateInCents,
@@ -855,9 +863,11 @@ export default function ContractDetailPage() {
                 }
               />
               <DataRow
-                label="Mills / kWh"
+                label="Mills"
                 value={
-                  deal.mills != null ? `${deal.mills.toFixed(4)} mills` : null
+                  deal.mills != null && formatMillValue(deal.mills)
+                    ? `${formatMillValue(deal.mills)} mills`
+                    : null
                 }
               />
               <DataRow
