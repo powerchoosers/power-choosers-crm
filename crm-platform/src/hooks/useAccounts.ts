@@ -263,7 +263,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
             currentRate: data.current_rate || '',
             status: data.status || 'PROSPECT',
             meters: data.metadata?.meters || [],
-            mills: data.metadata?.mills || '0.0070',
+            mills: data.metadata?.mills || '',
             metadata: data.metadata || {}
           }
         }) as Account[];
@@ -360,7 +360,7 @@ export function useAccount(id: string) {
         annualUsage: data.annual_usage || '',
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',
-        mills: data.metadata?.mills || '0.0070', // try direct column first, then metadata
+        mills: data.metadata?.mills || '',
         status: data.status || 'PROSPECT',
         meters,
         metadata: data.metadata || {}
@@ -726,34 +726,36 @@ export function useUpdateAccount() {
 
       // Synchronize with the latest active deal
       if (dbUpdates.annual_usage || dbUpdates.contract_end_date || (dbUpdates.metadata && (dbUpdates.metadata as any).mills)) {
-        const { data: latestDeal } = await supabase
+        const { data: accountDeals } = await supabase
           .from('deals')
-          .select('id, amount')
+          .select('id, annualUsage, mills')
           .eq('accountId', id)
           .neq('stage', 'TERMINATED')
           .order('createdAt', { ascending: false })
-          .limit(1)
-          .maybeSingle()
 
-        if (latestDeal) {
-          const dealUpdates: any = {}
-          if (dbUpdates.annual_usage) dealUpdates.annualUsage = Number(dbUpdates.annual_usage)
-          if (dbUpdates.contract_end_date) dealUpdates.closeDate = dbUpdates.contract_end_date
-          if (dbUpdates.metadata && (dbUpdates.metadata as any).mills) {
-            dealUpdates.mills = Number((dbUpdates.metadata as any).mills)
-          }
+        if (accountDeals?.length) {
+          await Promise.all(
+            accountDeals.map(async (deal: any) => {
+              const dealUpdates: any = {}
+              if (dbUpdates.annual_usage) dealUpdates.annualUsage = Number(dbUpdates.annual_usage)
+              if (dbUpdates.contract_end_date) dealUpdates.closeDate = dbUpdates.contract_end_date
+              if (dbUpdates.metadata && (dbUpdates.metadata as any).mills) {
+                dealUpdates.mills = Number((dbUpdates.metadata as any).mills)
+              }
 
-          // Recalculate amount if usage or mills changed
-          const usage = dealUpdates.annualUsage || (latestDeal as any).annualUsage
-          const mills = dealUpdates.mills || (latestDeal as any).mills
-          const millsDecimal = millDecimal(mills)
-          if (usage && millsDecimal) {
-            dealUpdates.amount = Number((usage * millsDecimal).toFixed(2))
-          }
+              // Recalculate amount for each active deal using shared account usage + mills inputs.
+              const usage = dealUpdates.annualUsage ?? deal.annualUsage
+              const mills = dealUpdates.mills ?? deal.mills
+              const millsValue = millDecimal(mills)
+              if (usage && millsValue) {
+                dealUpdates.amount = Number((usage * millsValue).toFixed(2))
+              }
 
-          if (Object.keys(dealUpdates).length > 0) {
-            await supabase.from('deals').update(dealUpdates).eq('id', latestDeal.id)
-          }
+              if (Object.keys(dealUpdates).length > 0) {
+                await supabase.from('deals').update(dealUpdates).eq('id', deal.id)
+              }
+            })
+          )
         }
       }
 
@@ -766,6 +768,8 @@ export function useUpdateAccount() {
       queryClient.invalidateQueries({ queryKey: ['contact'] })
       queryClient.invalidateQueries({ queryKey: ['deals'] })
       queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
+      queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
+      queryClient.invalidateQueries({ queryKey: ['deal'] })
     }
   })
 }

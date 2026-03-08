@@ -245,13 +245,13 @@ export function useCreateDeal() {
 
         // Sync to account
         const accountUpdates: any = {}
-        if (data.annualUsage) accountUpdates.annual_usage = String(data.annualUsage)
-        if (data.mills) {
+        if (data.annualUsage != null) accountUpdates.annual_usage = String(data.annualUsage)
+        if (data.mills != null) {
           // Fetch current account to merge metadata
           const { data: acc } = await supabase.from('accounts').select('metadata').eq('id', data.accountId).single()
           accountUpdates.metadata = { ...(acc?.metadata || {}), mills: String(data.mills) }
         }
-        if (data.closeDate) accountUpdates.contract_end_date = data.closeDate
+        if (data.closeDate != null) accountUpdates.contract_end_date = data.closeDate
 
         if (Object.keys(accountUpdates).length > 0) {
           await supabase.from('accounts').update(accountUpdates).eq('id', data.accountId)
@@ -311,12 +311,12 @@ export function useUpdateDeal() {
 
         // Sync to account
         const accountUpdates: any = {}
-        if (data.annualUsage) accountUpdates.annual_usage = String(data.annualUsage)
-        if (data.mills) {
+        if (data.annualUsage != null) accountUpdates.annual_usage = String(data.annualUsage)
+        if (data.mills != null) {
           const { data: acc } = await supabase.from('accounts').select('metadata').eq('id', data.accountId).single()
           accountUpdates.metadata = { ...(acc?.metadata || {}), mills: String(data.mills) }
         }
-        if (data.closeDate) accountUpdates.contract_end_date = data.closeDate
+        if (data.closeDate != null) accountUpdates.contract_end_date = data.closeDate
 
         if (Object.keys(accountUpdates).length > 0) {
           await supabase.from('accounts').update(accountUpdates).eq('id', data.accountId)
