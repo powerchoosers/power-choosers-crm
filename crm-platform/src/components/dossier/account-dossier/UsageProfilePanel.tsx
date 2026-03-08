@@ -24,21 +24,21 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
     const [viewMode, setViewMode] = useState<'graph' | 'table'>('graph');
     const isCrm = theme === 'crm';
 
-    const chartFillStart = isCrm ? '#002FA7' : '#52525b';
-    const chartFillEnd = isCrm ? '#0b173d' : '#27272a';
-    const lineColor = isCrm ? '#5b84ff' : '#d4d4d8';
-    const axisTickColor = isCrm ? '#6b7280' : '#71717a';
-    const gridColor = isCrm ? 'rgba(0, 47, 167, 0.22)' : 'rgba(255,255,255,0.05)';
+    const chartFillStart = isCrm ? 'rgba(255,255,255,0.08)' : '#52525b';
+    const chartFillEnd = isCrm ? 'rgba(255,255,255,0.02)' : '#27272a';
+    const lineColor = '#d4d4d8';
+    const axisTickColor = isCrm ? '#9ca3af' : '#71717a';
+    const gridColor = isCrm ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.05)';
     const headerBg = isCrm ? 'bg-black/30' : 'bg-zinc-900/90';
-    const rowHoverBg = isCrm ? 'hover:bg-[#002FA7]/8' : 'hover:bg-zinc-900/40';
+    const rowHoverBg = isCrm ? 'hover:bg-white/5' : 'hover:bg-zinc-900/40';
     const activeToggle = isCrm
-        ? 'bg-[#002FA7]/15 text-[#7f9cff] border border-[#002FA7]/35 shadow-sm'
+        ? 'bg-black/30 text-white border border-white/10 shadow-sm'
         : 'bg-zinc-800 text-white border border-white/10 shadow-sm';
     const inactiveToggle = isCrm
-        ? 'text-zinc-500 hover:text-zinc-200 border border-transparent'
+        ? 'text-zinc-400 hover:text-zinc-200 border border-transparent'
         : 'text-zinc-500 hover:text-white border border-transparent';
     const panelClasses = isCrm
-        ? 'bg-black/30 border-white/5'
+        ? 'bg-black/30 border border-white/5 shadow-none'
         : 'bg-zinc-900 shadow-lg';
     const chartAreaBg = isCrm ? 'bg-black/30' : '';
     const emptyPanelBg = isCrm ? 'bg-black/30' : 'bg-zinc-900';
@@ -103,7 +103,7 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
                     </div>
                 </div>
 
-                <div className="flex bg-zinc-950/50 rounded-lg p-1 border border-white/5">
+                <div className={`flex rounded-lg p-1 border border-white/5 ${isCrm ? 'bg-black/30' : 'bg-zinc-950/50'}`}>
                     <button
                         onClick={() => setViewMode('graph')}
                         className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'graph'
