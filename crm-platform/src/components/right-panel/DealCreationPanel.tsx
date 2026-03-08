@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Plus,
@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { cn } from '@/lib/utils'
+import { millOptions, formatMillValue } from '@/lib/mills'
 
 interface AccountResult {
     id: string
@@ -68,18 +69,6 @@ export function DealCreationPanel() {
         return (value * commissionRate).toFixed(2)
     }, [amount, commissionRate])
 
-    const normalizeMillsValue = useCallback((value: number) => {
-        let result = value
-        while (result > 20) {
-            result /= 10
-        }
-        return Math.min(result, 20)
-    }, [])
-
-    const formatMills = useCallback((value: number) => {
-        return value.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 2 })
-    }, [])
-
     const recalcAmountFromUsageAndSellRate = (usageValue: string, sellRateValue: string) => {
         const usageNum = Number(usageValue.replace(/[^0-9]/g, ''))
         const rateNum = Number(sellRateValue)
@@ -108,7 +97,7 @@ export function DealCreationPanel() {
                         ? dealContext.sellRate
                         : Number((dealContext.metadata as any)?.sellRate)
                 setSellRate(Number.isFinite(existingSellRate) ? String(existingSellRate) : '')
-                setMills(dealContext.mills?.toString() || '')
+                setMills(formatMillValue(dealContext.mills))
                 setContractLength(dealContext.contractLength?.toString() || '')
                 setCloseDate(dealContext.closeDate ? dealContext.closeDate.slice(0, 10) : '')
                 setProbability(dealContext.probability?.toString() || '50')
@@ -137,7 +126,7 @@ export function DealCreationPanel() {
                         if (!sellRate && data.current_rate) setSellRate(String(data.current_rate))
                         if (!mills) {
                             const dbMills = data.metadata?.mills
-                            setMills(dbMills || '0.0070')
+                            setMills(formatMillValue(dbMills ?? 10))
                         }
                     }
                 }
@@ -157,7 +146,7 @@ export function DealCreationPanel() {
                         if (!sellRate && data.current_rate) setSellRate(String(data.current_rate))
                         if (!mills) {
                             const dbMills = data.metadata?.mills
-                            setMills(dbMills || '0.0070')
+                            setMills(formatMillValue(dbMills ?? 10))
                         }
                     }
                 }
@@ -500,7 +489,7 @@ export function DealCreationPanel() {
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-3 gap-4">
+                                <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Sell_Rate_(¢/kWh)</label>
                                         <Input
@@ -519,23 +508,40 @@ export function DealCreationPanel() {
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Margin_Mills</label>
-                                        <Input
-                                            type="text"
-                                            value={mills}
-                                            onChange={(e) => {
-                                                const cleaned = e.target.value.replace(/[^0-9.]/g, '')
-                                                if (!cleaned) {
-                                                    setMills('')
-                                                    return
-                                                }
-                                                const numeric = Number(cleaned)
-                                                if (!Number.isFinite(numeric)) return
-                                                const normalized = normalizeMillsValue(numeric)
-                                                setMills(formatMills(normalized))
-                                            }}
-                                            placeholder="8.0"
-                                            className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
-                                        />
+                                        <Select value={mills} onValueChange={setMills}>
+                                            <SelectTrigger className="h-11 bg-black/40 border-white/5 text-sm font-mono text-zinc-300 rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
+                                                <SelectValue placeholder="SELECT MILLIS" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-zinc-950 border-white/10 max-h-48 overflow-y-auto">
+                                                {millOptions.map((option) => (
+                                                    <SelectItem
+                                                        key={option}
+                                                        value={option}
+                                                        className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10"
+                                                    >
+                                                        {`${option} mills`}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Term (Months)</label>
+                                        <Select value={contractLength} onValueChange={setContractLength}>
+                                            <SelectTrigger className="h-11 bg-black/40 border-white/5 text-sm font-mono text-zinc-300 rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
+                                                <SelectValue placeholder="LENGTH" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-zinc-950 border-white/10">
+                                                {['12', '24', '36', '48', '60'].map((m) => (
+                                                    <SelectItem key={m} value={m} className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10">
+                                                        {m} MO
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-1.5">
@@ -549,22 +555,6 @@ export function DealCreationPanel() {
                                             className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-11"
                                         />
                                     </div>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Term (Months)</label>
-                                    <Select value={contractLength} onValueChange={setContractLength}>
-                                        <SelectTrigger className="h-11 bg-black/40 border-white/5 text-sm font-mono text-zinc-300 rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
-                                            <SelectValue placeholder="LENGTH" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-950 border-white/10">
-                                            {['12', '24', '36', '48', '60'].map((m) => (
-                                                <SelectItem key={m} value={m} className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10">
-                                                    {m} MO
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
                                 </div>
                             </div>
 

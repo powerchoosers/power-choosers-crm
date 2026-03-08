@@ -236,6 +236,9 @@ export function useCreateDeal() {
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      if (data?.id) {
+        queryClient.invalidateQueries({ queryKey: ['deal', QUERY_BUSTER, data.id] })
+      }
       if (data?.accountId) {
         queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
         queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
@@ -297,6 +300,9 @@ export function useUpdateDeal() {
     },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
+      if (data?.id) {
+        queryClient.invalidateQueries({ queryKey: ['deal', QUERY_BUSTER, data.id] })
+      }
       queryClient.invalidateQueries({ queryKey: ['deal'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       if (data?.accountId) {
