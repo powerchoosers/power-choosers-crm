@@ -466,7 +466,7 @@ function BillIntelligencePanel({
   return (
     <div className="nodal-glass rounded-2xl flex flex-col overflow-hidden flex-none">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-black/30">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-zinc-400" />
           <div>

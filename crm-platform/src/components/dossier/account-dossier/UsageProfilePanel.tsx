@@ -29,7 +29,7 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
     const lineColor = isCrm ? '#5b84ff' : '#d4d4d8';
     const axisTickColor = isCrm ? '#6b7280' : '#71717a';
     const gridColor = isCrm ? 'rgba(0, 47, 167, 0.22)' : 'rgba(255,255,255,0.05)';
-    const headerBg = isCrm ? 'bg-black/40' : 'bg-zinc-900/90';
+    const headerBg = isCrm ? 'bg-black/30' : 'bg-zinc-900/90';
     const rowHoverBg = isCrm ? 'hover:bg-[#002FA7]/8' : 'hover:bg-zinc-900/40';
     const activeToggle = isCrm
         ? 'bg-[#002FA7]/15 text-[#7f9cff] border border-[#002FA7]/35 shadow-sm'
@@ -38,13 +38,15 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
         ? 'text-zinc-500 hover:text-zinc-200 border border-transparent'
         : 'text-zinc-500 hover:text-white border border-transparent';
     const panelClasses = isCrm
-        ? 'bg-black/70 border-[rgba(255,255,255,0.08)] shadow-[0_35px_60px_rgba(0,0,0,0.65)]'
+        ? 'bg-black/30 border-white/5'
         : 'bg-zinc-900 shadow-lg';
-    const chartAreaBg = isCrm ? 'bg-black/20' : '';
+    const chartAreaBg = isCrm ? 'bg-black/30' : '';
+    const emptyPanelBg = isCrm ? 'bg-black/30' : 'bg-zinc-900';
+    const emptyBodyBg = isCrm ? 'bg-black/30' : 'bg-zinc-900';
 
     if (!usageHistory || usageHistory.length === 0) {
         return (
-            <div className="rounded-2xl flex flex-col overflow-hidden border border-white/5 opacity-80 h-full bg-zinc-900">
+            <div className={`rounded-2xl flex flex-col overflow-hidden border border-white/5 opacity-80 h-full ${emptyPanelBg}`}>
                 <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
                     <Activity className="w-4 h-4 text-zinc-300" />
                     <div>
@@ -52,7 +54,7 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
                         <p className="text-zinc-600 text-[9px] mt-0.5">[NO DATA AVAILABLE]</p>
                     </div>
                 </div>
-                <div className="flex-1 flex items-center justify-center p-8 text-center bg-zinc-900">
+                <div className={`flex-1 flex items-center justify-center p-8 text-center ${emptyBodyBg}`}>
                     <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest max-w-xs">
                         Ingest a usage data file or CSV into the Data Locker to generate the 12-month usage profile.
                     </p>
