@@ -155,7 +155,7 @@ export function GlobalSearch() {
               <>
                 {shouldShowSkeletons && (
                   <div className="space-y-2 px-2 py-1">
-                    {Array.from({ length: 4 }).map((_, index) => (
+                    {Array.from({ length: 6 }).map((_, index) => (
                       <div
                         key={`search-skeleton-${index}`}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-xl bg-white/[0.02] border border-white/5 animate-pulse"
