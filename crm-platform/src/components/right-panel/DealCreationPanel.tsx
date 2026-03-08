@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
     Plus,
@@ -14,7 +14,9 @@ import {
     ChevronRight,
     Target,
     Zap,
-    DollarSign
+    DollarSign,
+    FileText,
+    SlidersHorizontal
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 import { useAuth } from '@/context/AuthContext'
@@ -28,7 +30,7 @@ import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { cn } from '@/lib/utils'
-import { millOptions, formatMillValue } from '@/lib/mills'
+import { millOptions, formatMillValue, millDecimal } from '@/lib/mills'
 
 interface AccountResult {
     id: string
@@ -69,14 +71,14 @@ export function DealCreationPanel() {
         return (value * commissionRate).toFixed(2)
     }, [amount, commissionRate])
 
-    const recalcAmountFromUsageAndSellRate = (usageValue: string, sellRateValue: string) => {
-        const usageNum = Number(usageValue.replace(/[^0-9]/g, ''))
-        const rateNum = Number(sellRateValue)
-        if (Number.isFinite(usageNum) && usageNum > 0 && Number.isFinite(rateNum) && rateNum > 0) {
-            const calculatedAmount = (usageNum * rateNum) / 100
+    const recalcAmountFromUsageAndMills = useCallback((usageValue: string, millsValue: string) => {
+        const usageNum = Number(usageValue.replace(/[^0-9]/g, '')) || 0
+        const millsDecimalValue = millDecimal(millsValue)
+        if (Number.isFinite(usageNum) && usageNum > 0 && millsDecimalValue > 0) {
+            const calculatedAmount = usageNum * millsDecimalValue
             setAmount(calculatedAmount.toFixed(2))
         }
-    }
+    }, [])
 
     // Auto-skip step 1 and resolve metadata if account context is provided
     useEffect(() => {
@@ -405,19 +407,19 @@ export function DealCreationPanel() {
 
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Contract Title</label>
-                                    <Input
-                                        value={title}
-                                        onChange={(e) => setTitle(e.target.value)}
-                                        placeholder="e.g. Q3 Energy Procurement"
-                                        className="bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-9"
-                                    />
+                                        <Input
+                                            value={title}
+                                            onChange={(e) => setTitle(e.target.value)}
+                                            placeholder="e.g. Q3 Energy Procurement"
+                                            className="bg-black/30 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-9 w-full"
+                                        />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Vector_Phase</label>
                                         <Select value={stage} onValueChange={(v) => setStage(v as DealStage)}>
-                                            <SelectTrigger className="h-9 bg-black/40 border-white/5 text-[10px] font-mono uppercase tracking-widest text-zinc-300 rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
+                                            <SelectTrigger className="h-9 w-full bg-black/30 border-white/5 text-[10px] font-mono uppercase tracking-widest text-zinc-300 rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-zinc-950 border-white/10">
@@ -439,7 +441,7 @@ export function DealCreationPanel() {
                                                 max="100"
                                                 value={probability}
                                                 onChange={(e) => setProbability(e.target.value)}
-                                                className="bg-black/40 border-white/5 text-sm font-mono text-white text-center rounded-xl h-9"
+                                                className="bg-black/30 border-white/5 text-sm font-mono text-white text-center rounded-xl h-9 w-full"
                                             />
                                         </div>
                                     </div>
@@ -459,23 +461,8 @@ export function DealCreationPanel() {
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                                                <DollarSign className="w-3 h-3 inline" /> Estimated Annual Value
-                                            </label>
-                                            <Input
-                                                type="text"
-                                                value={amount}
-                                                onChange={(e) => {
-                                                    const cleaned = e.target.value.replace(/[^0-9.]/g, '')
-                                                    setAmount(cleaned)
-                                                }}
-                                                placeholder="0"
-                                                className="bg-black/40 border border-white/10 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] rounded-xl h-9"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                                                <Zap className="w-3 h-3 inline" /> Estimated Annual Usage
+                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                                <Zap className="w-3 h-3 inline" /> Annual Usage
                                             </label>
                                             <Input
                                                 type="text"
@@ -488,72 +475,18 @@ export function DealCreationPanel() {
                                                     }
                                                     const usageCommas = parseInt(cleaned).toLocaleString()
                                                     setAnnualUsage(usageCommas)
-                                                    recalcAmountFromUsageAndSellRate(usageCommas, sellRate)
+                                                    recalcAmountFromUsageAndMills(usageCommas, mills)
                                                 }}
                                                 placeholder="0"
-                                                className="bg-black/40 border border-white/10 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] rounded-xl h-9"
+                                                className="bg-black/30 border border-white/10 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] rounded-xl h-9"
                                             />
                                         </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                                                    Sell Rate
-                                                </label>
-                                                <div className="relative">
-                                                    <Input
-                                                        type="text"
-                                                        value={sellRate}
-                                                        onChange={(e) => {
-                                                            const cleaned = e.target.value
-                                                                .replace(/[^0-9.]/g, '')
-                                                                .replace(/(\..*)\./g, '$1')
-                                                            setSellRate(cleaned)
-                                                            recalcAmountFromUsageAndSellRate(annualUsage, cleaned)
-                                                        }}
-                                                        placeholder="8.70"
-                                                        className="bg-black/40 border border-white/10 text-sm font-mono text-white pr-12 placeholder:text-zinc-800 focus:border-[#002FA7] rounded-xl h-9 w-full"
-                                                    />
-                                                    <span className="absolute inset-y-0 right-3 flex items-center text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                                                        ¢/kWh
-                                                    </span>
-                                                </div>
-                                                <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                                                    {sellRate ? `${sellRate}¢/kWh` : 'No sell rate'}
-                                                </p>
-                                            </div>
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                                                Margin Mills
-                                            </label>
-                                            <Select value={mills} onValueChange={setMills}>
-                                            <SelectTrigger className="h-9 bg-black/40 border border-white/10 text-sm font-mono text-zinc-300 rounded-xl focus:border-[#002FA7] focus:ring-[#002FA7]/40">
-                                                    <SelectValue placeholder="Select mills" />
-                                                </SelectTrigger>
-                                                <SelectContent position="popper" className="bg-zinc-950 border-white/10 max-h-36">
-                                                    {millOptions.map((option) => (
-                                                        <SelectItem
-                                                            key={option}
-                                                            value={option}
-                                                            className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10"
-                                                        >
-                                                            {`${option} mills`}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                                                {mills ? `${mills} mills` : 'No margin'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                                                Contract Length
+                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                                <Clock className="w-3 h-3 inline" /> Term
                                             </label>
                                             <Select value={contractLength} onValueChange={setContractLength}>
-                                            <SelectTrigger className="h-9 bg-black/40 border border-white/10 text-sm font-mono text-zinc-300 rounded-xl focus:border-[#002FA7] focus:ring-[#002FA7]/40">
+                                                <SelectTrigger className="h-9 w-full bg-black/30 border border-white/10 text-sm font-mono text-zinc-300 rounded-xl focus:border-[#002FA7] focus:ring-[#002FA7]/40">
                                                     <SelectValue placeholder="Length" />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-zinc-950 border-white/10">
@@ -565,17 +498,74 @@ export function DealCreationPanel() {
                                                 </SelectContent>
                                             </Select>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                                                {commissionLabel} Commission ({Math.round(commissionRate * 100)}%)
-                                            </label>
-                                            <div className="bg-black/40 border border-white/10 text-sm font-mono text-white rounded-xl h-10 flex items-center justify-center">
-                                                {payoutCommissionPreview || '0.00'}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                    <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                                        <FileText className="w-3 h-3 inline" /> Sell Rate
+                                                    </label>
+                                                <div className="relative">
+                                                    <Input
+                                                        type="text"
+                                                        value={sellRate}
+                                                        onChange={(e) => {
+                                                            const cleaned = e.target.value
+                                                                .replace(/[^0-9.]/g, '')
+                                                                .replace(/(\..*)\./g, '$1')
+                                                            setSellRate(cleaned)
+                                                        }}
+                                                        placeholder="8.70"
+                                                        className="bg-black/30 border border-white/10 text-sm font-mono text-white pr-12 placeholder:text-zinc-800 focus:border-[#002FA7] rounded-xl h-9 w-full"
+                                                    />
+                                                    <span className="absolute inset-y-0 right-3 flex items-center text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+                                                        ¢/kWh
+                                                    </span>
+                                                </div>
+                                                <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+                                                    {sellRate ? `${sellRate}¢/kWh` : 'No sell rate'}
+                                                </p>
                                             </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                                <SlidersHorizontal className="w-3 h-3 inline" /> Margin Mills
+                                            </label>
+                                            <Select
+                                                value={mills}
+                                                onValueChange={(value) => {
+                                                    setMills(value)
+                                                    recalcAmountFromUsageAndMills(annualUsage, value)
+                                                }}
+                                            >
+                                            <SelectTrigger className="h-9 w-full bg-black/30 border border-white/10 text-sm font-mono text-zinc-300 rounded-xl focus:border-[#002FA7] focus:ring-[#002FA7]/40">
+                                                    <SelectValue placeholder="Select mills" />
+                                                </SelectTrigger>
+                                            <SelectContent position="popper" className="bg-zinc-950 border-white/10 max-h-36">
+                                                {millOptions.map((option) => (
+                                                    <SelectItem
+                                                        key={option}
+                                                        value={option}
+                                                        className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10"
+                                                    >
+                                                        {option}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                            </Select>
                                             <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                                                Auto-updates on save
+                                                {mills ? `${mills} mills` : 'No margin'}
                                             </p>
                                         </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                            <DollarSign className="w-3 h-3 inline" /> {commissionLabel} Commission ({Math.round(commissionRate * 100)}%)
+                                        </label>
+                                        <div className="bg-black/30 border border-white/10 text-sm font-mono text-white rounded-xl h-9 flex items-center justify-center">
+                                            {payoutCommissionPreview || '0.00'}
+                                        </div>
+                                        <p className="text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+                                            Auto-updates on save
+                                        </p>
                                     </div>
                                 </div>
 
@@ -594,26 +584,8 @@ export function DealCreationPanel() {
                                             type="date"
                                             value={closeDate}
                                             onChange={(e) => setCloseDate(e.target.value)}
-                                            className="bg-black/40 border border-white/10 text-sm font-mono text-white focus:border-[#002FA7] rounded-xl h-10"
+                                            className="bg-black/30 border border-white/10 text-sm font-mono text-white focus:border-[#002FA7] rounded-xl h-10"
                                         />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                                            Probability (%)
-                                        </span>
-                                        <div className="flex items-center gap-3">
-                                            <Input
-                                                type="number"
-                                                min="0"
-                                                max="100"
-                                                value={probability}
-                                                onChange={(e) => setProbability(e.target.value)}
-                                                className="bg-black/40 border border-white/10 text-sm font-mono text-white text-center rounded-xl h-10"
-                                            />
-                                            <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-[0.3em]">
-                                                Pipeline confidence
-                                            </span>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
