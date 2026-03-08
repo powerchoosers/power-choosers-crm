@@ -464,7 +464,7 @@ function BillIntelligencePanel({
   const hasAnyData = hasUsage || hasMeters || !!intel.electricitySupplier
 
   return (
-    <div className="nodal-glass rounded-2xl flex flex-col overflow-hidden flex-none">
+    <div className="nodal-glass rounded-2xl flex flex-col overflow-hidden flex-none bg-black/30 border border-white/5">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 bg-black/30">
         <div className="flex items-center gap-2">
@@ -517,10 +517,10 @@ function BillIntelligencePanel({
 
           {/* Meters */}
           {hasMeters && (
-            <div className="rounded-xl border border-white/5 bg-black/30 overflow-hidden">
-              <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400 px-4 py-3">
+            <div className="rounded-2xl border border-white/5 bg-black/30 overflow-hidden">
+              <div className="px-4 py-3 border-b border-white/5 font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400">
                 Meters ({intel.meters.length})
-              </p>
+              </div>
               <div className="overflow-auto">
                 <table className="w-full text-left border-collapse">
                   <thead className="bg-black/30 border-b border-white/5">
@@ -533,7 +533,7 @@ function BillIntelligencePanel({
                   </thead>
                   <tbody className="divide-y divide-white/[0.03] bg-black/30">
                     {intel.meters.map((m) => (
-                    <tr key={m.id} className="hover:bg-white/5 transition-colors">
+                      <tr key={m.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-3 py-2 font-mono text-[10px] text-zinc-300">{m.esid ?? '—'}</td>
                         <td className="px-3 py-2 font-mono text-[10px] text-zinc-300 truncate max-w-[180px]">{m.service_address ?? '—'}</td>
                         <td className="px-3 py-2 font-mono text-[10px] text-zinc-300 text-right">{m.rate ?? '—'}</td>
