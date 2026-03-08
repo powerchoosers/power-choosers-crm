@@ -46,7 +46,9 @@ export function DealCreationPanel() {
     const updateDeal = useUpdateDeal()
     const queryClient = useQueryClient()
 
-    const [step, setStep] = useState<'SELECT_ACCOUNT' | 'DEAL_DETAILS'>('SELECT_ACCOUNT')
+    const [step, setStep] = useState<'SELECT_ACCOUNT' | 'DEAL_DETAILS'>(
+        () => (dealContext?.accountId ? 'DEAL_DETAILS' : 'SELECT_ACCOUNT')
+    )
     const [searchQuery, setSearchQuery] = useState('')
     const [searchResults, setSearchResults] = useState<AccountResult[]>([])
     const [isSearching, setIsSearching] = useState(false)
@@ -103,6 +105,28 @@ export function DealCreationPanel() {
                 setContractLength(dealContext.contractLength?.toString() || '')
                 setCloseDate(dealContext.closeDate ? dealContext.closeDate.slice(0, 10) : '')
                 setProbability(dealContext.probability?.toString() || '50')
+
+                // Edit-mode can be opened from several surfaces; some only provide accountId.
+                // Hydrate account name/logo/domain here so the linked-account block never shows "Unlabeled Node".
+                if (!dealContext.accountName || !dealContext.accountLogoUrl || !dealContext.accountDomain) {
+                    const hydrateAccountContext = async () => {
+                        const { data } = await supabase
+                            .from('accounts')
+                            .select('name, logo_url, domain')
+                            .eq('id', dealContext.accountId)
+                            .single()
+
+                        if (data) {
+                            setDealContext({
+                                ...dealContext,
+                                accountName: dealContext.accountName || data.name,
+                                accountLogoUrl: dealContext.accountLogoUrl || data.logo_url,
+                                accountDomain: dealContext.accountDomain || data.domain,
+                            })
+                        }
+                    }
+                    hydrateAccountContext()
+                }
                 return
             }
 
