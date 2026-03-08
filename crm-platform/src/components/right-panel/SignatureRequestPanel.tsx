@@ -108,6 +108,14 @@ export function SignatureRequestPanel() {
     }
   }, [selectedDocumentId, contractDocuments])
 
+  const handleContactSelection = (value: string) => {
+    setSelectedContactId(value === '__none__' ? '' : value)
+  }
+
+  const handleDealLinkSelection = (value: string) => {
+    setSelectedDealId(value === '__none__' ? '' : value)
+  }
+
   const handleClose = () => {
     setSignatureRequestContext(null)
     setRightPanelMode('DEFAULT')
@@ -417,13 +425,13 @@ export function SignatureRequestPanel() {
             ) : contacts && contacts.length > 0 ? (
                 <Select
                   value={selectedContactId}
-                  onValueChange={(value) => setSelectedContactId(value)}
+                  onValueChange={(value) => handleContactSelection(value)}
                 >
                   <SelectTrigger className="h-9 w-full bg-black/30 border border-white/10 rounded-xl px-3 text-sm font-mono text-white focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all">
                     <SelectValue placeholder="Select contact" />
                   </SelectTrigger>
                   <SelectContent className="bg-zinc-950 border-white/10 text-white">
-                    <SelectItem value="" className="text-[10px] font-mono text-zinc-500">
+                    <SelectItem value="__none__" className="text-[10px] font-mono text-zinc-500">
                       -- Select Contact --
                     </SelectItem>
                     {contacts.map((c: Contact) => {
@@ -461,13 +469,13 @@ export function SignatureRequestPanel() {
             ) : deals && deals.length > 0 ? (
               <Select
                 value={selectedDealId}
-                onValueChange={(value) => setSelectedDealId(value)}
+                onValueChange={(value) => handleDealLinkSelection(value)}
               >
                 <SelectTrigger className="h-9 w-full bg-black/30 border border-white/10 rounded-xl px-3 text-sm font-mono text-white focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all">
                   <SelectValue placeholder="Link contract/deal (optional)" />
                 </SelectTrigger>
                 <SelectContent className="bg-zinc-950 border-white/10 text-white">
-                  <SelectItem value="" className="text-[10px] font-mono text-zinc-500">
+                  <SelectItem value="__none__" className="text-[10px] font-mono text-zinc-500">
                     -- None --
                   </SelectItem>
                   {deals.map((d) => (
