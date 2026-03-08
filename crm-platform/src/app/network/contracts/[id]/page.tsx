@@ -463,17 +463,11 @@ function BillIntelligencePanel({
   const hasUsage = intel.usageHistory.length > 0
   const hasMeters = intel.meters.length > 0
   const hasAnyData = hasUsage || hasMeters || !!intel.electricitySupplier
-  const crmBg = 'bg-black/30'
 
   return (
     <div className="nodal-glass rounded-2xl flex flex-col overflow-hidden flex-none">
       {/* Header */}
-      <div
-        className={cn(
-          'flex items-center justify-between px-5 py-4 border-b border-white/[0.03]',
-          crmBg
-        )}
-      >
+      <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.03]">
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-zinc-400" />
           <div>
@@ -491,13 +485,13 @@ function BillIntelligencePanel({
       </div>
 
       {!hasAnyData ? (
-        <div className={cn('p-8 border-t border-white/5', crmBg)}>
+        <div className="p-8 border-t border-white/5">
           <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
             No bill data ingested. Upload a bill via the account Data Locker to populate this panel.
           </p>
         </div>
       ) : (
-        <div className={cn('flex flex-col gap-5 p-5 border-t border-white/5', crmBg)}>
+        <div className="flex flex-col gap-5 p-5 border-t border-white/5">
           {/* Asset summary */}
           {(intel.electricitySupplier || intel.currentRate || intel.annualUsage || intel.loadFactor != null) && (
             <div className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -524,11 +518,11 @@ function BillIntelligencePanel({
 
           {/* Meters */}
           {hasMeters && (
-            <div className={cn('rounded-2xl border border-white/5 overflow-hidden', crmBg)}>
+            <div className="rounded-2xl border border-white/5 overflow-hidden">
               <div className="px-4 py-3 border-b border-white/5 font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400">
                 Meters ({intel.meters.length})
               </div>
-              <div className={cn('overflow-auto', crmBg)}>
+              <div className="overflow-auto">
                 <table className="w-full text-left border-collapse">
                   <thead className="border-b border-white/5">
                     <tr className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">

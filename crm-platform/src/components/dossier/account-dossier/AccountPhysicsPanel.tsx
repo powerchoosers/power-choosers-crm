@@ -256,7 +256,10 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                                     <SelectTrigger className="w-1/2 bg-black/40 border border-white/5 rounded-lg px-3 py-2 text-sm font-mono text-[#002FA7] focus:outline-none focus:border-[#002FA7]/50 tabular-nums">
                                         <SelectValue placeholder="SELECT MILLIS" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-zinc-950 border-white/10 max-h-48 overflow-y-auto">
+                                    <SelectContent
+                                        position="popper"
+                                        className="bg-zinc-950 border-white/10 max-h-36"
+                                    >
                                         {millOptions.map((option) => (
                                             <SelectItem
                                                 key={option}
