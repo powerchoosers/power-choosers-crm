@@ -484,13 +484,13 @@ function BillIntelligencePanel({
       </div>
 
       {!hasAnyData ? (
-        <div className="p-8 bg-black/40 border border-white/5 rounded-b-2xl">
+        <div className="p-8 bg-black/30 border border-white/5 rounded-b-2xl">
           <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
             No bill data ingested. Upload a bill via the account Data Locker to populate this panel.
           </p>
         </div>
       ) : (
-        <div className="flex flex-col gap-5 p-5 bg-black/40 border-t border-white/5">
+        <div className="flex flex-col gap-5 p-5 bg-black/30 border-t border-white/5">
           {/* Asset summary */}
           {(intel.electricitySupplier || intel.currentRate || intel.annualUsage || intel.loadFactor != null) && (
             <div className="grid grid-cols-2 gap-x-8 gap-y-3">
@@ -517,13 +517,13 @@ function BillIntelligencePanel({
 
           {/* Meters */}
           {hasMeters && (
-            <div className="rounded-xl border border-white/5 bg-black/50 overflow-hidden">
+            <div className="rounded-xl border border-white/5 bg-black/30 overflow-hidden">
               <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-zinc-400 px-4 py-3">
                 Meters ({intel.meters.length})
               </p>
               <div className="overflow-auto">
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-black/70 border-b border-white/5">
+                  <thead className="bg-black/30 border-b border-white/5">
                     <tr className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
                       <th className="px-3 py-2 text-zinc-500">ESID</th>
                       <th className="px-3 py-2 text-zinc-500">Address</th>
@@ -531,7 +531,7 @@ function BillIntelligencePanel({
                       <th className="px-3 py-2 text-right text-zinc-500">End Date</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-white/[0.03] bg-black/40">
+                  <tbody className="divide-y divide-white/[0.03] bg-black/30">
                     {intel.meters.map((m) => (
                     <tr key={m.id} className="hover:bg-white/5 transition-colors">
                         <td className="px-3 py-2 font-mono text-[10px] text-zinc-300">{m.esid ?? '—'}</td>
