@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, X, Clock, Calendar, AlertTriangle, CheckCircle, Building2 } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { ChevronLeft, ChevronRight, Clock, Calendar, AlertTriangle, CheckCircle, Building2 } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import {
@@ -19,7 +19,6 @@ import {
     setMinutes,
     addDays
 } from 'date-fns'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useTasks, type Task } from '@/hooks/useTasks'
@@ -29,6 +28,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
+import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const PRIORITIES = ['Low', 'Medium', 'High'] as const
@@ -216,10 +216,12 @@ export function TaskCreationPanel() {
         }
     }
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         setRightPanelMode('DEFAULT')
         setTaskContext(null)
-    }
+    }, [setRightPanelMode, setTaskContext])
+
+    useEscClose(handleClose)
 
     if (!isReady) return null
 
@@ -229,22 +231,22 @@ export function TaskCreationPanel() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
             transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
-            className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden"
+            className={panelTheme.shell}
         >
             {/* HEADER */}
-            <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 nodal-recessed">
-                <div className="flex items-center gap-2">
+            <div className={panelTheme.header}>
+                <div className={panelTheme.headerTitleWrap}>
                     <Clock className="w-4 h-4 text-white" />
                     <span className="font-mono text-[10px] tracking-widest text-zinc-300 uppercase">
                         INITIALIZE_TASK_VECTOR
                     </span>
                 </div>
-                <button onClick={handleClose} className="text-zinc-500 hover:text-white text-[10px] font-mono tracking-wider transition-colors">
+                <button onClick={handleClose} className={panelTheme.closeButton}>
                     [ ESC ]
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-0 custom-scrollbar space-y-8">
+            <div className={`${panelTheme.body} space-y-8`}>
                 {/* ENTITY CONTEXT */}
                 <div className="space-y-2">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
@@ -275,7 +277,7 @@ export function TaskCreationPanel() {
                         <Calendar className="w-3 h-3" /> Temporal_Target
                     </div>
 
-                    <div className="bg-black/40 rounded-xl border border-white/5 p-4 space-y-4">
+                    <div className="bg-black/30 rounded-xl border border-white/10 p-4 space-y-4">
                         <div className="flex items-center justify-between">
                             <button
                                 type="button"
@@ -341,7 +343,7 @@ export function TaskCreationPanel() {
                                     value={timeStr}
                                     onChange={(e) => handleTimeChange(e.target.value)}
                                     placeholder="09:00"
-                                    className="w-32 h-12 bg-black/40 border border-white/5 rounded-xl p-3 text-lg font-mono text-white text-center focus:border-[#002FA7] outline-none transition-all"
+                                    className={`${panelTheme.field} w-32 text-center`}
                                     maxLength={5}
                                 />
                                 <div className="flex flex-1 gap-2">
@@ -351,7 +353,7 @@ export function TaskCreationPanel() {
                                             type="button"
                                             onClick={() => setAmpm(mode)}
                                             className={cn(
-                                                "flex-1 h-12 rounded-xl text-xs font-mono border transition-all",
+                                                "flex-1 h-9 rounded-xl text-xs font-mono border transition-all",
                                                 ampm === mode
                                                     ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white"
                                                     : "bg-black/20 border-white/5 text-zinc-500 hover:text-zinc-300"
@@ -383,7 +385,7 @@ export function TaskCreationPanel() {
                                 type="button"
                                 onClick={() => setSendCalendarInvite(!sendCalendarInvite)}
                                 className={cn(
-                                    "w-full h-12 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all flex items-center justify-between px-4 relative group",
+                                    "w-full h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all flex items-center justify-between px-4 relative group",
                                     sendCalendarInvite
                                         ? "bg-[#002FA7]/10 border-[#002FA7]/50 text-white shadow-[0_0_20px_-10px_#002FA7]"
                                         : "bg-black/20 border-white/5 text-zinc-500 hover:text-white/80"
@@ -409,7 +411,7 @@ export function TaskCreationPanel() {
                                     type="button"
                                     onClick={() => setPriority(p)}
                                     className={cn(
-                                        'flex-1 py-3 rounded-xl text-[10px] font-mono uppercase tracking-widest transition-all border',
+                                        'flex-1 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest transition-all border',
                                         p === 'Low' && 'border-zinc-800 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400',
                                         p === 'Low' && priority === p && 'bg-zinc-500/10 border-zinc-500 text-zinc-300',
                                         p === 'Medium' && 'border-amber-900/50 text-amber-900 hover:border-amber-500 hover:text-amber-500',
@@ -429,7 +431,7 @@ export function TaskCreationPanel() {
                 <div className="space-y-4">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Operational_Vector</div>
                     <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
-                        <SelectTrigger className="w-full h-12 bg-black/40 border-white/5 text-zinc-300 font-mono text-xs rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
+                        <SelectTrigger className={`${panelTheme.selectTrigger} text-xs`}>
                             <SelectValue placeholder="Select Vector" />
                         </SelectTrigger>
                         <SelectContent className="bg-zinc-950 border-white/10">
@@ -453,7 +455,7 @@ export function TaskCreationPanel() {
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Input operational briefing..."
-                        className="w-full h-32 bg-black/40 border border-white/5 rounded-xl p-4 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] outline-none transition-all resize-none"
+                        className={`${panelTheme.textarea} h-32 p-4 placeholder:text-zinc-800`}
                     />
                 </div>
 
@@ -462,11 +464,11 @@ export function TaskCreationPanel() {
                     <Button
                         onClick={handleSubmit}
                         disabled={isCommitting || !entityId}
-                        className="w-full h-11 bg-white text-black hover:bg-zinc-200 font-mono text-xs font-bold tracking-[0.2em] uppercase flex items-center justify-center gap-3 transition-all active:scale-[0.98]"
+                        className={panelTheme.cta}
                     >
                         {isCommitting ? (
                             <>
-                                <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                                <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                                 INITIATING...
                             </>
                         ) : (

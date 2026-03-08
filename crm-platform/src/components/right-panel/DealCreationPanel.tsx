@@ -31,6 +31,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { cn } from '@/lib/utils'
 import { millOptions, formatMillValue, millDecimal } from '@/lib/mills'
+import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
 
 interface AccountResult {
     id: string
@@ -286,7 +287,7 @@ export function DealCreationPanel() {
         }
     }
 
-    const handleClose = () => {
+    const handleClose = useCallback(() => {
         setRightPanelMode('DEFAULT')
         setDealContext(null)
         // Reset internal state
@@ -301,7 +302,9 @@ export function DealCreationPanel() {
         setContractLength('')
         setCloseDate('')
         setProbability('50')
-    }
+    }, [setDealContext, setRightPanelMode])
+
+    useEscClose(handleClose)
 
     return (
         <motion.div
@@ -309,22 +312,22 @@ export function DealCreationPanel() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0 }}
             transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
-            className="h-full flex flex-col bg-zinc-950 text-white relative overflow-hidden"
+            className={panelTheme.shell}
         >
             {/* HEADER */}
-            <div className="h-14 border-b border-white/5 flex items-center justify-between px-6 nodal-recessed">
-                <div className="flex items-center gap-2">
+            <div className={panelTheme.header}>
+                <div className={panelTheme.headerTitleWrap}>
                     <Target className="w-4 h-4 text-[#002FA7]" />
                     <span className="font-mono text-[10px] tracking-widest text-zinc-300 uppercase">
                         INITIALIZE_CONTRACT_VECTOR
                     </span>
                 </div>
-                <button onClick={handleClose} className="text-zinc-500 hover:text-white text-[10px] font-mono tracking-wider transition-colors">
+                <button onClick={handleClose} className={panelTheme.closeButton}>
                     [ ESC ]
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 custom-scrollbar space-y-8">
+            <div className={`${panelTheme.body} space-y-8`}>
                 <AnimatePresence mode="wait">
                     {step === 'SELECT_ACCOUNT' ? (
                         <motion.div
@@ -346,7 +349,7 @@ export function DealCreationPanel() {
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         placeholder="> SEARCH_ACCOUNTS..."
-                                        className="w-full h-12 bg-black/40 border-white/5 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 rounded-xl transition-all pl-10"
+                                        className={`${panelTheme.field} pl-10`}
                                         autoFocus
                                     />
                                     <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600 group-focus-within:text-[#002FA7] transition-colors" />
@@ -435,7 +438,7 @@ export function DealCreationPanel() {
                                             value={title}
                                             onChange={(e) => setTitle(e.target.value)}
                                             placeholder="e.g. Q3 Energy Procurement"
-                                            className="bg-black/30 border-white/5 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] transition-all rounded-xl h-9 w-full"
+                                            className={panelTheme.field}
                                         />
                                 </div>
 
@@ -443,7 +446,7 @@ export function DealCreationPanel() {
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Vector_Phase</label>
                                         <Select value={stage} onValueChange={(v) => setStage(v as DealStage)}>
-                                            <SelectTrigger className="h-9 w-full bg-black/30 border-white/5 text-[10px] font-mono uppercase tracking-widest text-zinc-300 rounded-xl focus:ring-[#002FA7]/50 focus:border-[#002FA7]">
+                                            <SelectTrigger className={`${panelTheme.selectTrigger} text-[10px] uppercase tracking-widest`}>
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-zinc-950 border-white/10">
@@ -465,7 +468,7 @@ export function DealCreationPanel() {
                                                 max="100"
                                                 value={probability}
                                                 onChange={(e) => setProbability(e.target.value)}
-                                                className="bg-black/30 border-white/5 text-sm font-mono text-white text-center rounded-xl h-9 w-full"
+                                                className={`${panelTheme.field} text-center`}
                                             />
                                         </div>
                                     </div>
@@ -502,7 +505,7 @@ export function DealCreationPanel() {
                                                     recalcAmountFromUsageAndMills(usageCommas, mills)
                                                 }}
                                                 placeholder="0"
-                                                className="bg-black/30 border border-white/10 text-sm font-mono text-white placeholder:text-zinc-800 focus:border-[#002FA7] rounded-xl h-9"
+                                                className={panelTheme.field}
                                             />
                                         </div>
                                         <div className="space-y-1">
@@ -510,7 +513,7 @@ export function DealCreationPanel() {
                                                 <Clock className="w-3 h-3 inline" /> Term
                                             </label>
                                             <Select value={contractLength} onValueChange={setContractLength}>
-                                                <SelectTrigger className="h-9 w-full bg-black/30 border border-white/10 text-sm font-mono text-zinc-300 rounded-xl focus:border-[#002FA7] focus:ring-[#002FA7]/40">
+                                                <SelectTrigger className={panelTheme.selectTrigger}>
                                                     <SelectValue placeholder="Length" />
                                                 </SelectTrigger>
                                                 <SelectContent className="bg-zinc-950 border-white/10">
@@ -539,7 +542,7 @@ export function DealCreationPanel() {
                                                             setSellRate(cleaned)
                                                         }}
                                                         placeholder="8.70"
-                                                        className="bg-black/30 border border-white/10 text-sm font-mono text-white pr-12 placeholder:text-zinc-800 focus:border-[#002FA7] rounded-xl h-9 w-full"
+                                                        className={`${panelTheme.field} pr-12`}
                                                     />
                                                     <span className="absolute inset-y-0 right-3 flex items-center text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
                                                         ¢/kWh
@@ -557,7 +560,7 @@ export function DealCreationPanel() {
                                                     recalcAmountFromUsageAndMills(annualUsage, value)
                                                 }}
                                             >
-                                            <SelectTrigger className="h-9 w-full bg-black/30 border border-white/10 text-sm font-mono text-zinc-300 rounded-xl focus:border-[#002FA7] focus:ring-[#002FA7]/40">
+                                            <SelectTrigger className={panelTheme.selectTrigger}>
                                                     <SelectValue placeholder="Select mills" />
                                                 </SelectTrigger>
                                             <SelectContent position="popper" className="bg-zinc-950 border-white/10 max-h-36">
@@ -602,7 +605,7 @@ export function DealCreationPanel() {
                                             type="date"
                                             value={closeDate}
                                             onChange={(e) => setCloseDate(e.target.value)}
-                                            className="bg-black/30 border border-white/10 text-sm font-mono text-white focus:border-[#002FA7] rounded-xl h-10"
+                                            className={panelTheme.field}
                                         />
                                     </div>
                                 </div>
@@ -613,7 +616,7 @@ export function DealCreationPanel() {
                                 <Button
                                     onClick={handleCommit}
                                     disabled={isCommitting || !title.trim() || !dealContext?.accountId}
-                                    className="w-full h-12 bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-mono text-xs font-bold tracking-[0.3em] uppercase flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-[0_15px_30px_rgba(0,47,167,0.5)]"
+                                    className={panelTheme.cta}
                                 >
                                     {isCommitting ? (
                                         <>

@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
+import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme';
 
 // REAL API ENRICHMENT
 const getApolloAuthHeaders = async (includeContentType: boolean = false): Promise<Record<string, string>> => {
@@ -662,18 +663,20 @@ export function NodeIngestion() {
     setState('');
   };
 
+  useEscClose(() => resetProtocol(), showVerifyModal);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0 }}
       transition={{ type: "tween", duration: 0.25, ease: "easeInOut" }}
-      className="h-full flex flex-col bg-zinc-950 border-white/5 text-white relative overflow-hidden shadow-2xl"
+      className={panelTheme.shell}
     >
 
       {/* HEADER - Forensic Style */}
-      <div className="h-24 px-6 border-b border-white/5 bg-zinc-950/80 backdrop-blur-xl flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-3">
+      <div className={panelTheme.header}>
+        <div className={panelTheme.headerTitleWrap}>
           <div className="h-8 w-8 rounded-lg bg-[#002FA7]/40 border border-[#002FA7]/60 flex items-center justify-center">
             {type === 'ACCOUNT' ? <Building2 className="w-4 h-4 text-white" /> : <User className="w-4 h-4 text-white" />}
           </div>
@@ -683,14 +686,14 @@ export function NodeIngestion() {
         </div>
         <button
           onClick={resetProtocol}
-          className="text-zinc-500 hover:text-zinc-300 text-[10px] font-mono tracking-wider transition-colors"
+          className={panelTheme.closeButton}
           title="Cancel"
         >
           [ ESC ]
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-6 pt-6 pb-8 custom-scrollbar">
+      <div className={panelTheme.body}>
         <AnimatePresence mode="wait">
 
           {/* STEP 1: SIGNAL ACQUISITION (or Rapid Contact Injection with Context Lock) */}
@@ -741,7 +744,7 @@ export function NodeIngestion() {
                           ref={firstNameInputRef}
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="First Name"
                         />
                       </div>
@@ -750,7 +753,7 @@ export function NodeIngestion() {
                         <input
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="Last Name"
                         />
                       </div>
@@ -760,7 +763,7 @@ export function NodeIngestion() {
                       <input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="nodal-input w-full"
+                        className={panelTheme.field}
                         placeholder="e.g. CEO, Energy Manager"
                       />
                     </div>
@@ -770,7 +773,7 @@ export function NodeIngestion() {
                         <input
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="email@example.com"
                         />
                       </div>
@@ -779,7 +782,7 @@ export function NodeIngestion() {
                         <input
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="+1 (555) 000-0000"
                         />
                       </div>
@@ -789,7 +792,7 @@ export function NodeIngestion() {
                     <Button
                       onClick={handleCommit}
                       disabled={isCommitting || (!firstName && !lastName)}
-                      className="w-full h-10 rounded-xl bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                      className={panelTheme.cta}
                     >
                       {isCommitting ? (
                         <>
@@ -822,12 +825,12 @@ export function NodeIngestion() {
                             }}
                             onKeyDown={(e) => e.key === 'Enter' && handleSmartSearch()}
                             placeholder="company.com or Company Name"
-                            className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
+                            className={panelTheme.field}
                             autoFocus
                           />
-                          <div className="absolute right-4 top-4">
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2">
                             {isScanning || isSearchingName ? (
-                              <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
+                              <div className="w-3.5 h-3.5 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
                             ) : (
                               <button onClick={handleSmartSearch} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
                                 <Search className="w-4 h-4" />
@@ -901,12 +904,12 @@ export function NodeIngestion() {
                           onChange={(e) => setIdentifier(e.target.value)}
                           onKeyDown={(e) => e.key === 'Enter' && handleScan()}
                           placeholder="linkedin.com/in/..."
-                          className="w-full bg-black/40 nodal-monolith-edge rounded-lg p-4 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all"
+                          className={panelTheme.field}
                           autoFocus
                         />
-                        <div className="absolute right-4 top-4">
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
                           {isScanning ? (
-                            <div className="w-4 h-4 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
+                            <div className="w-3.5 h-3.5 border-2 border-zinc-600 border-t-[#002FA7] rounded-full animate-spin" />
                           ) : (
                             <button onClick={handleScan} className="text-zinc-600 hover:text-[#002FA7] transition-colors">
                               <ArrowRight className="w-4 h-4" />
@@ -970,7 +973,7 @@ export function NodeIngestion() {
                       <input
                         value={entityName}
                         onChange={(e) => setEntityName(e.target.value)}
-                        className="nodal-input w-full"
+                        className={panelTheme.field}
                         placeholder="Legal Entity Name"
                       />
                     </div>
@@ -979,7 +982,7 @@ export function NodeIngestion() {
                       <textarea
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        className="nodal-input w-full min-h-[60px] resize-none"
+                        className={`${panelTheme.textarea} min-h-[60px]`}
                         placeholder="Company overview..."
                         rows={3}
                       />
@@ -993,7 +996,7 @@ export function NodeIngestion() {
                         <input
                           value={firstName}
                           onChange={(e) => setFirstName(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="First Name"
                         />
                       </div>
@@ -1002,7 +1005,7 @@ export function NodeIngestion() {
                         <input
                           value={lastName}
                           onChange={(e) => setLastName(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="Last Name"
                         />
                       </div>
@@ -1024,7 +1027,7 @@ export function NodeIngestion() {
                       <input
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
-                        className="nodal-input w-full"
+                        className={panelTheme.field}
                         placeholder="e.g. CEO, Energy Manager"
                       />
                     </div>
@@ -1034,7 +1037,7 @@ export function NodeIngestion() {
                         <input
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="email@example.com"
                         />
                       </div>
@@ -1043,7 +1046,7 @@ export function NodeIngestion() {
                         <input
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="+1 (555) 000-0000"
                         />
                       </div>
@@ -1054,7 +1057,7 @@ export function NodeIngestion() {
                         <input
                           value={city}
                           onChange={(e) => setCity(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="City"
                         />
                       </div>
@@ -1063,7 +1066,7 @@ export function NodeIngestion() {
                         <input
                           value={state}
                           onChange={(e) => setState(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="TX"
                         />
                       </div>
@@ -1079,7 +1082,7 @@ export function NodeIngestion() {
                         <input
                           value={revenue}
                           onChange={(e) => setRevenue(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="Unknown"
                         />
                       </div>
@@ -1088,7 +1091,7 @@ export function NodeIngestion() {
                         <input
                           value={employees}
                           onChange={(e) => setEmployees(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="Unknown"
                         />
                       </div>
@@ -1099,7 +1102,7 @@ export function NodeIngestion() {
                         <input
                           value={phone}
                           onChange={(e) => setPhone(e.target.value)}
-                          className="nodal-input w-full"
+                          className={panelTheme.field}
                           placeholder="+1 (555) 000-0000"
                         />
                       </div>
@@ -1108,7 +1111,7 @@ export function NodeIngestion() {
                         <input
                           value={scanResult?.linkedin || ''}
                           readOnly
-                          className="nodal-input w-full opacity-60"
+                          className={`${panelTheme.field} opacity-60`}
                           placeholder="linkedin.com/company/..."
                         />
                       </div>
@@ -1139,7 +1142,7 @@ export function NodeIngestion() {
                         value={address}
                         onChange={(e) => setAddress(e.target.value)}
                         placeholder="Service Address (Meter Location)"
-                        className="w-full bg-black/40 nodal-monolith-edge rounded p-2 pl-10 text-xs font-mono text-white focus:border-[#002FA7] outline-none"
+                        className={`${panelTheme.field} pl-10 text-xs`}
                       />
                     </div>
                   </div>
@@ -1151,7 +1154,7 @@ export function NodeIngestion() {
                 <Button
                   onClick={handleCommit}
                   disabled={isCommitting || (type === 'ACCOUNT' ? !entityName : (!firstName && !lastName))}
-                  className="w-full h-10 rounded-xl bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-mono text-xs uppercase tracking-widest flex items-center justify-center gap-2"
+                  className={panelTheme.cta}
                 >
                   {isCommitting ? (
                     <>
