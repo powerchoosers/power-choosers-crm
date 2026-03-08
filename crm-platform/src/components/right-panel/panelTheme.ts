@@ -9,9 +9,9 @@ export const panelTheme = {
   closeButton: 'text-zinc-500 hover:text-zinc-300 text-[10px] font-mono tracking-wider transition-colors',
   body: 'flex-1 overflow-y-auto px-6 pt-6 pb-8 custom-scrollbar',
   field:
-    'w-full h-9 bg-black/30 border border-white/10 rounded-xl px-3 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all',
+    'w-full h-9 bg-zinc-950/90 border border-white/10 rounded-xl px-3 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all',
   selectTrigger:
-    'w-full h-9 bg-black/30 border border-white/10 rounded-xl px-3 text-sm font-mono text-zinc-300 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50',
+    'w-full h-9 bg-zinc-950/90 border border-white/10 rounded-xl px-3 text-sm font-mono text-zinc-300 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50',
   textarea:
     'w-full bg-black/30 border border-white/10 rounded-xl px-3 py-2 text-sm font-mono text-white placeholder:text-zinc-700 focus:border-[#002FA7] focus:ring-1 focus:ring-[#002FA7]/50 outline-none transition-all resize-none',
   cta:
@@ -30,4 +30,3 @@ export function useEscClose(onClose: () => void, disabled = false) {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [onClose, disabled])
 }
-
