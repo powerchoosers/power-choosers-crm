@@ -40,6 +40,18 @@ import { TaskInjectionPopover } from '../crm/TaskInjectionPopover'
 import { mapLocationToZone } from '@/lib/market-mapping'
 import { useWeather } from '@/hooks/useWeather'
 
+function isDueToday(dueDate?: string): boolean {
+  if (!dueDate) return false
+  const parsed = new Date(dueDate)
+  if (Number.isNaN(parsed.getTime())) return false
+  const now = new Date()
+  return (
+    parsed.getFullYear() === now.getFullYear() &&
+    parsed.getMonth() === now.getMonth() &&
+    parsed.getDate() === now.getDate()
+  )
+}
+
 export function RightPanel() {
   const { rightPanelMode, setRightPanelMode, setTaskContext } = useUIStore()
   const pathname = usePathname()
@@ -71,7 +83,7 @@ export function RightPanel() {
   const { isError: isMarketError } = useMarketPulse()
 
   const taskCounts = useMemo(() => {
-    const tasks = tasksData?.pages.flatMap(page => page.tasks) || []
+    const tasks = (tasksData?.pages.flatMap(page => page.tasks) || []).filter((task) => isDueToday(task.dueDate))
     const completedCount = tasks.filter(t => t.status === 'Completed').length
     const totalCount = tasks.length
     return { completed: completedCount, total: totalCount }

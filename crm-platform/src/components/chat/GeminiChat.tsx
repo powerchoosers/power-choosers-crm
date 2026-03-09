@@ -151,7 +151,7 @@ function ProseWithArtifacts({ text, revealFirstWords }: { text: string; revealFi
       {parts.map((segment, i) => {
         if (segment === '•') {
           return (
-            <span key={i} className="text-[#002FA7] font-bold mr-1 drop-shadow-[0_0_3px_rgba(0,47,167,0.5)]">
+            <span key={i} className="text-[#002FA7] font-semibold mr-1">
               •
             </span>
           )
@@ -161,7 +161,7 @@ function ProseWithArtifacts({ text, revealFirstWords }: { text: string; revealFi
           return (
             <span
               key={i}
-              className="font-sans font-bold text-white bg-white/10 px-1 rounded-sm border border-white/5 tracking-tight tabular-nums shadow-[0_0_10px_-2px_rgba(255,255,255,0.2)]"
+              className="font-sans font-semibold text-white tracking-tight tabular-nums"
             >
               {match[1]}
             </span>
@@ -237,6 +237,12 @@ function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }
 }
 
 type ContextInfo = { type: string; id?: string | string[]; displayLabel?: string }
+
+const NO_RESULT_PATTERN = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don't find)/i
+
+function isNoResultResponse(text: string): boolean {
+  return NO_RESULT_PATTERN.test(text || '')
+}
 
 function FlightCheckBlock({
   items,
@@ -1039,7 +1045,6 @@ export function GeminiChatPanel() {
   const resetCounter = useGeminiStore((state) => state.resetCounter)
   const resetSession = useGeminiStore((state) => state.resetSession)
 
-  const proactiveReportTriggered = useRef(false)
 
   const setIsHistoryOpen = (open: boolean) => {
     if (open !== isHistoryOpen) toggleHistory()
@@ -1050,12 +1055,19 @@ export function GeminiChatPanel() {
     if (resetCounter > 0) {
       setMessages([])
       setCurrentSessionId(null)
-      proactiveReportTriggered.current = false
+      sessionIdRef.current = null
+      pendingSessionPromiseRef.current = null
     }
   }, [resetCounter])
   const [historySessions, setHistorySessions] = useState<ChatSession[]>([])
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const sessionIdRef = useRef<string | null>(null)
+  const pendingSessionPromiseRef = useRef<Promise<string | null> | null>(null)
   const storeContext = useGeminiStore((state) => state.activeContext)
+
+  useEffect(() => {
+    sessionIdRef.current = currentSessionId
+  }, [currentSessionId])
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
@@ -1112,22 +1124,50 @@ export function GeminiChatPanel() {
     }
   }, [contextInfo.type])
 
-  const trySuggestions = useMemo(() => [
-    "Accounts expiring in 2026",
-    "Who's at this company?",
-    "Market volatility",
-  ], [])
+  const trySuggestions = useMemo(() => {
+    if (contextInfo.type === 'account') {
+      return [
+        'Run deep-dive forensic analysis for this account',
+        'Find alternate phone numbers for this company on the internet',
+        "Who's at this company?",
+      ]
+    }
+    if (contextInfo.type === 'contact') {
+      return [
+        'Run deep-dive forensic analysis for this contact',
+        "Find this contact's direct phone or office number online",
+        'Draft a follow-up email for this contact',
+      ]
+    }
+    return [
+      'Accounts expiring in 2026',
+      "Who's at this company?",
+      'Market volatility',
+    ]
+  }, [contextInfo.type])
 
   // Fetch History
   useEffect(() => {
     if (isHistoryOpen) {
       const fetchSessions = async () => {
-        const { data } = await supabase.from('chat_sessions').select('*').order('created_at', { ascending: false }).limit(20)
+        let query = supabase
+          .from('chat_sessions')
+          .select('*')
+          .order('updated_at', { ascending: false })
+          .limit(30)
+
+        if ((contextInfo.type === 'account' || contextInfo.type === 'contact') && typeof contextInfo.id === 'string') {
+          query = query.eq('context_type', contextInfo.type).eq('context_id', contextInfo.id)
+        } else if (contextInfo.type === 'dashboard' || contextInfo.type === 'general') {
+          query = query.in('context_type', ['dashboard', 'general'])
+        }
+
+        const { data } = await query
         setHistorySessions((data || []) as ChatSession[])
       }
       fetchSessions()
     }
-  }, [isHistoryOpen])
+  }, [isHistoryOpen, contextInfo.type, contextInfo.id])
 
   const loadSession = async (sessionId: string) => {
     const { data } = await supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
@@ -1139,35 +1179,70 @@ export function GeminiChatPanel() {
         timestamp: new Date(m.created_at).getTime()
       })))
       setCurrentSessionId(sessionId)
+      sessionIdRef.current = sessionId
       setIsHistoryOpen(false)
     }
   }
 
-  const saveMessageToDb = async (role: 'user' | 'model', content: string) => {
-    try {
-      let sessionId = currentSessionId
-      if (!sessionId) {
-        // Create new session
-        const { data } = await supabase.from('chat_sessions').insert({
-          title: content.slice(0, 30) + (content.length > 30 ? '...' : ''),
-          context_type: contextInfo.type,
-          context_id: ('id' in contextInfo && typeof contextInfo.id === 'string') ? contextInfo.id : null,
-        }).select().single()
+  const buildSessionTitle = useCallback((seed: string) => {
+    const text = seed.trim()
+    const cleanedContext = (contextInfo.displayLabel || contextInfo.type || 'general')
+      .replace(/^TARGET:\s*/i, '')
+      .replace(/^ACTIVE_CONTEXT:\s*/i, '')
+      .trim()
+    const dateLabel = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const lower = text.toLowerCase()
+    let intent = 'Chat'
+    if (lower.includes('deep-dive forensic analysis')) intent = 'Forensic Brief'
+    else if (/(phone|number|dial)/.test(lower)) intent = 'Phone Hunt'
+    else if (/(email|draft)/.test(lower)) intent = 'Email Draft'
+    else if (/(who|contact|decision maker)/.test(lower)) intent = 'Contact Lookup'
+    const contextPart = cleanedContext && !/global_/i.test(cleanedContext) ? cleanedContext : 'General'
+    return `${contextPart} - ${intent} - ${dateLabel}`.slice(0, 96)
+  }, [contextInfo.displayLabel, contextInfo.type])
 
-        if (data) {
-          const newSession = data as ChatSession
-          sessionId = newSession.id
-          setCurrentSessionId(newSession.id)
-          setHistorySessions(prev => [newSession, ...prev])
-        }
+  const ensureSessionId = useCallback(async (seedText: string): Promise<string | null> => {
+    if (sessionIdRef.current) return sessionIdRef.current
+    if (pendingSessionPromiseRef.current) return pendingSessionPromiseRef.current
+
+    pendingSessionPromiseRef.current = (async () => {
+      const contextId = typeof contextInfo.id === 'string' ? contextInfo.id : null
+      const title = buildSessionTitle(seedText)
+      const { data, error } = await supabase.from('chat_sessions').insert({
+        title,
+        context_type: contextInfo.type,
+        context_id: contextId,
+      }).select().single()
+
+      if (error || !data) {
+        console.error('Failed to create session:', error)
+        return null
       }
 
+      const newSession = data as ChatSession
+      sessionIdRef.current = newSession.id
+      setCurrentSessionId(newSession.id)
+      setHistorySessions((prev) => [newSession, ...prev.filter((s) => s.id !== newSession.id)])
+      return newSession.id
+    })()
+
+    try {
+      return await pendingSessionPromiseRef.current
+    } finally {
+      pendingSessionPromiseRef.current = null
+    }
+  }, [buildSessionTitle, contextInfo.id, contextInfo.type])
+
+  const saveMessageToDb = async (role: 'user' | 'model', content: string) => {
+    try {
+      const sessionId = await ensureSessionId(content)
       if (sessionId) {
         await supabase.from('chat_messages').insert({
           session_id: sessionId,
           role,
           content
         })
+        await supabase.from('chat_sessions').update({ updated_at: new Date().toISOString() }).eq('id', sessionId)
       }
     } catch (err) {
       console.error('Failed to save message:', err)
@@ -1178,6 +1253,7 @@ export function GeminiChatPanel() {
   const [lastProvider, setLastProvider] = useState<string>('openrouter')
   const [lastModel, setLastModel] = useState<string>('google/gemini-2.5-flash')
   const [selectedModel, setSelectedModel] = useState<string>('google/gemini-2.5-flash')
+  const [internetAssistEnabled, setInternetAssistEnabled] = useState(true)
   const [diagnostics, setDiagnostics] = useState<Diagnostic[] | null>(null)
   const [showDiagnostics, setShowDiagnostics] = useState(false)
 
@@ -1257,27 +1333,6 @@ export function GeminiChatPanel() {
       }
     ])
   }, [isOpen, messages.length, contextInfo.type, contextInfo.id, hasContextId, isAccountOrContact, params?.id, profile?.firstName])
-
-  const sendWithMessageRef = useRef<(text: string) => Promise<void>>(null as unknown as (text: string) => Promise<void>)
-  useEffect(() => {
-    if (!isOpen || messages.length !== 0 || !isAccountOrContact || !hasContextId || proactiveReportTriggered.current) return
-    proactiveReportTriggered.current = true
-    const syntheticPrompt =
-      contextInfo.type === 'contact'
-        ? `Perform a deep-dive forensic analysis for this contact. Use '•' for all points and organize into:
-           • INDUSTRY_INTEL: Analyze their title/company.
-           • INTERACTION_TRACE: Review calls/transcripts for momentum.
-           • STRATEGY: Role-specific selling points and NEPQ-style next steps.
-           • RISK_ASSESSMENT: Actual business risks.
-           Provide a high-agency situation report. Be concise but strategic.`
-        : `Perform a deep-dive forensic analysis for this account. Use '•' for all points and organize into:
-           • INDUSTRY_INTEL: Sector-specific energy pressure points.
-           • INTERACTION_TRACE: Current sales cycle stage based on calls.
-           • STRATEGY: Top selling points based on profile/news.
-           • RISK_ASSESSMENT: Actual business risks.
-           Provide a high-agency situation report. Be concise but strategic.`
-    sendWithMessageRef.current?.(syntheticPrompt)
-  }, [isOpen, messages.length, isAccountOrContact, hasContextId, contextInfo.type])
 
   const getProvider = (model: string) => {
     if (model.includes('/') || model.startsWith('openai/') || model.startsWith('anthropic/') || model.startsWith('google/') || model.startsWith('meta-llama/') || model.startsWith('mistralai/') || model.startsWith('nvidia/')) return 'OpenRouter'
@@ -1414,7 +1469,7 @@ SELECT * FROM hybrid_search_accounts(
     if (!messageText.trim()) return
     const current = messagesRef.current
     const userMessage: GeminiMessage = { role: 'user', content: messageText.trim(), id: crypto.randomUUID(), timestamp: Date.now() }
-    saveMessageToDb('user', messageText.trim())
+    await saveMessageToDb('user', messageText.trim())
     const updatedMessages = [...current, userMessage]
     const firstUserIndex = updatedMessages.findIndex((m) => m.role === 'user')
     const relevantHistory = firstUserIndex >= 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
@@ -1434,6 +1489,7 @@ SELECT * FROM hybrid_search_accounts(
           messages: messagesForApi,
           context: contextInfo,
           model: selectedModel,
+          webSearchMode: internetAssistEnabled ? 'crm_plus_web' : 'crm_only',
           userProfile: { firstName: profile?.firstName || 'Trey' }
         })
       })
@@ -1460,7 +1516,7 @@ SELECT * FROM hybrid_search_accounts(
         timestamp: Date.now(),
         ...(showNewsCard ? { componentData: { type: 'company_news', articles: apolloNewsSignals } } : {})
       }])
-      saveMessageToDb('model', data.content)
+      await saveMessageToDb('model', data.content)
     } catch (err: unknown) {
       console.error('Chat error:', err)
       const errorWithDiagnostics = err as { diagnostics?: Diagnostic[] }
@@ -1482,8 +1538,7 @@ SELECT * FROM hybrid_search_accounts(
     } finally {
       setIsLoading(false)
     }
-  }, [contextInfo, selectedModel, profile?.firstName, apolloNewsSignals])
-  sendWithMessageRef.current = sendWithMessage
+  }, [contextInfo, selectedModel, profile?.firstName, apolloNewsSignals, internetAssistEnabled])
 
   const handleSend = async () => {
     const messageText = input.trim()
@@ -1491,6 +1546,47 @@ SELECT * FROM hybrid_search_accounts(
     setInput('')
     await sendWithMessage(messageText)
   }
+
+  const noResultActions = useMemo(() => {
+    if (contextInfo.type === 'account') {
+      return [
+        {
+          label: 'Search Internet Numbers',
+          prompt: 'Find alternate corporate phone numbers for this company from the internet, include source URLs, and mark the highest-confidence number.'
+        },
+        {
+          label: 'Find Decision Makers',
+          prompt: 'Find likely decision-maker names and titles for energy agreements at this company.'
+        },
+        {
+          label: 'Build Research Checklist',
+          prompt: 'Create a short checklist to fill missing phone and contact data for this account.'
+        }
+      ]
+    }
+    if (contextInfo.type === 'contact') {
+      return [
+        {
+          label: 'Search Contact Number',
+          prompt: 'Search the internet for this contact or company phone number and include source URLs.'
+        },
+        {
+          label: 'Find Alternate Contact',
+          prompt: 'Find other contacts at this company who likely handle energy decisions.'
+        },
+        {
+          label: 'Build Research Checklist',
+          prompt: 'Create a short checklist to fill missing contact data before the next call.'
+        }
+      ]
+    }
+    return [
+      {
+        label: 'Search Internet',
+        prompt: 'Search the internet for better contact details and provide source URLs with confidence.'
+      }
+    ]
+  }, [contextInfo.type])
 
   return (
     <motion.div
@@ -1808,6 +1904,22 @@ SELECT * FROM hybrid_search_accounts(
                           }
                         })}
                       </div>
+                      {isNoResultResponse(m.content) && (
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Next move:</span>
+                          {noResultActions.map((action) => (
+                            <button
+                              key={`${m.id || i}-${action.label}`}
+                              type="button"
+                              onClick={() => void sendWithMessage(action.prompt)}
+                              disabled={isLoading}
+                              className="text-[10px] font-sans text-zinc-300 hover:text-white border border-white/10 hover:border-white/20 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {action.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                       {(() => {
                         if (!m.componentData || !isRecord(m.componentData)) return null
                         const componentType = (m.componentData as { type?: string }).type
@@ -1912,6 +2024,19 @@ SELECT * FROM hybrid_search_accounts(
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setInternetAssistEnabled((v) => !v)}
+                className={cn(
+                  'h-6 px-2 rounded-md border text-[9px] font-mono uppercase tracking-wider transition-colors',
+                  internetAssistEnabled
+                    ? 'text-[#002FA7] border-[#002FA7]/40 bg-[#002FA7]/10'
+                    : 'text-zinc-500 border-white/10 bg-white/5'
+                )}
+                title={internetAssistEnabled ? 'Internet assist enabled' : 'Internet assist disabled'}
+              >
+                {internetAssistEnabled ? 'WEB ON' : 'WEB OFF'}
+              </button>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
               <span className="text-[10px] font-sans text-emerald-500/80 uppercase tracking-tighter leading-none">
                 {contextInfo.displayLabel}
