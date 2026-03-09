@@ -29,6 +29,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   const [selectedVariantIndex, setSelectedVariantIndex] = useState(0) // 0 = primary, 1+ = variants[n-1]
   const [selectedGatekeeperIndex, setSelectedGatekeeperIndex] = useState(0)
   const [loadingVector, setLoadingVector] = useState<string | null>(null)
+  const [activeVector, setActiveVector] = useState<string | null>(null)
   const [liveInput, setLiveInput] = useState('')
   const { generateScript } = useAI()
   const { metadata: storeMetadata, isActive } = useCallStore()
@@ -55,6 +56,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   }
 
   const handleVectorClick = async (vector: string) => {
+    setActiveVector(vector)
     setLoadingVector(vector)
     setAiResponse(null)
 
@@ -143,7 +145,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
         </div>
       </div>
 
-      {/* 2. NEURAL STREAM (Expanded) */}
+      {/* 2. Script Output */}
       <ScrollArea className="flex-1">
         <div className="p-6 flex flex-col gap-6">
           <AnimatePresence mode="wait">
@@ -159,7 +161,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                 {aiResponse.gatekeeperVariants && aiResponse.gatekeeperVariants.length > 0 && selectedVariantIndex === 0 && (
                   <>
                     <ScriptStep
-                      label="Gatekeeper (company line)"
+                      label="Gatekeeper opener"
                       content={aiResponse.gatekeeperVariants[selectedGatekeeperIndex] ?? aiResponse.gatekeeperVariants[0]}
                       delay={0}
                       accent
@@ -192,16 +194,16 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                     : (aiResponse.variants?.[selectedVariantIndex - 1] ?? { opener: aiResponse.opener, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close })
                   return (
                     <>
-                      <ScriptStep label="The Opener" content={script.opener ?? ''} delay={0.1} />
-                      <ScriptStep label="The Hook" content={script.hook ?? ''} delay={0.2} />
-                      <ScriptStep label="The Disturb" content={script.disturb ?? ''} delay={0.3} accent />
-                      <ScriptStep label="The Close" content={script.close ?? ''} delay={0.4} />
+                      <ScriptStep label="Opener" content={script.opener ?? ''} delay={0.1} />
+                      <ScriptStep label="Hook question" content={script.hook ?? ''} delay={0.2} />
+                      <ScriptStep label="Problem question" content={script.disturb ?? ''} delay={0.3} accent />
+                      <ScriptStep label="Next-step ask" content={script.close ?? ''} delay={0.4} />
                     </>
                   )
                 })()}
                 {aiResponse.variants && aiResponse.variants.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest w-full">Variants</span>
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest w-full">Alternate versions</span>
                     <button
                       type="button"
                       onClick={() => setSelectedVariantIndex(0)}
@@ -236,7 +238,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
               <div key="empty" className="py-20 flex flex-col items-center justify-center text-center opacity-40">
                 <Sparkles size={32} className="text-zinc-700 animate-pulse mb-4" />
                 <div className="text-xs font-mono text-zinc-600 uppercase tracking-[0.3em]">
-                  Awaiting Vector Trigger...
+                  Pick a script type to start
                 </div>
               </div>
             )}
@@ -244,15 +246,24 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
         </div>
       </ScrollArea>
 
-      {/* 3. TACTICAL DECK (Condensed) */}
+      {/* 3. Action Deck */}
       <div className="p-6 bg-zinc-950/20 border-t border-white/5 space-y-6">
+        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+          <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+            Call objective
+          </div>
+          <div className="mt-1 text-xs font-sans text-zinc-300">
+            Book the meeting first. If not, ask for a bill review. If still no, ask permission to send a note.
+          </div>
+        </div>
+
         {/* Rapid Context Input */}
         <div className="relative">
           <input
             value={liveInput}
             onChange={(e) => setLiveInput(e.target.value)}
             onKeyDown={handleLiveContext}
-            placeholder="INJECT LIVE CONTEXT..."
+            placeholder="Type what they just said, then press Enter..."
             className="w-full bg-black/40 border border-white/10 rounded-2xl px-5 py-4 text-xs font-mono text-white placeholder:text-zinc-700 focus:border-white/40 focus:ring-1 focus:ring-white/20 outline-none pr-14 transition-all shadow-inner"
           />
           <button
@@ -265,32 +276,40 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
         </div>
 
         {/* Vector Deck */}
-        <div className="grid grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <VectorButton
-            label="Open"
+            label="Cold Open"
+            hint="book meeting first"
             icon={Zap}
-            color="text-zinc-100"
+            tone="blue"
+            active={activeVector === 'OPENER'}
             loading={loadingVector === 'OPENER'}
             onClick={() => handleVectorClick('OPENER')}
           />
           <VectorButton
-            label="Price"
+            label="Price Objection"
+            hint="validate, then clarify"
             icon={ShieldAlert}
-            color="text-red-500"
+            tone="red"
+            active={activeVector === 'OBJECTION_PRICE'}
             loading={loadingVector === 'OBJECTION_PRICE'}
             onClick={() => handleVectorClick('OBJECTION_PRICE')}
           />
           <VectorButton
-            label="Email"
+            label="Send Follow-up"
+            hint="ask one clarifier first"
             icon={Mail}
-            color="text-amber-500"
+            tone="amber"
+            active={activeVector === 'OBJECTION_EMAIL'}
             loading={loadingVector === 'OBJECTION_EMAIL'}
             onClick={() => handleVectorClick('OBJECTION_EMAIL')}
           />
           <VectorButton
-            label="Pulse"
+            label="Market Proof"
+            hint="tie data to business impact"
             icon={BarChart3}
-            color="text-emerald-500"
+            tone="emerald"
+            active={activeVector === 'MARKET_DATA'}
             loading={loadingVector === 'MARKET_DATA'}
             onClick={() => handleVectorClick('MARKET_DATA')}
           />
@@ -300,17 +319,65 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   )
 }
 
-function VectorButton({ label, icon: Icon, color, loading, onClick }: any) {
+function VectorButton({
+  label,
+  hint,
+  icon: Icon,
+  tone,
+  loading,
+  active,
+  onClick
+}: {
+  label: string
+  hint: string
+  icon: any
+  tone: 'blue' | 'red' | 'amber' | 'emerald'
+  loading: boolean
+  active: boolean
+  onClick: () => void
+}) {
+  const isEngaged = loading || active
+  const toneStyles: Record<'blue' | 'red' | 'amber' | 'emerald', string> = {
+    blue: 'border-[color:var(--color-pc-blue)]/50 bg-[color:var(--color-pc-blue)]/15 shadow-[0_0_20px_rgba(0,47,167,0.3)]',
+    red: 'border-red-500/40 bg-red-500/10 shadow-[0_0_18px_rgba(239,68,68,0.2)]',
+    amber: 'border-amber-500/40 bg-amber-500/10 shadow-[0_0_18px_rgba(245,158,11,0.2)]',
+    emerald: 'border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_18px_rgba(16,185,129,0.2)]'
+  }
+
+  const toneIconStyles: Record<'blue' | 'red' | 'amber' | 'emerald', string> = {
+    blue: 'text-[color:var(--color-pc-blue)]',
+    red: 'text-red-300',
+    amber: 'text-amber-300',
+    emerald: 'text-emerald-300'
+  }
+
   return (
     <button
       onClick={onClick}
       disabled={loading}
-      className="py-4 px-2 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/5 flex flex-col items-center gap-3 transition-all group active:scale-95 disabled:opacity-50 min-w-0"
+      className={cn(
+        'min-w-0 rounded-2xl border px-3 py-3.5 text-left transition-all active:scale-[0.98] disabled:opacity-50',
+        'flex flex-col items-start gap-2.5 bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20',
+        isEngaged && toneStyles[tone]
+      )}
     >
-      <Icon size={20} className={cn("transition-colors", loading ? "animate-pulse" : "text-white group-hover:" + color)} />
-      <span className="text-[10px] font-mono uppercase text-zinc-500 group-hover:text-zinc-300 tracking-tighter truncate w-full text-center">
-        {loading ? '...' : label}
-      </span>
+      <Icon
+        size={18}
+        className={cn(
+          'transition-colors text-zinc-300',
+          loading && 'animate-pulse',
+          isEngaged && toneIconStyles[tone],
+          !isEngaged && tone === 'blue' && 'hover:text-[color:var(--color-pc-blue)]'
+        )}
+      />
+      <div className="min-w-0 w-full">
+        <div className={cn('text-[11px] font-mono uppercase tracking-wide text-zinc-200 truncate', isEngaged && 'text-white')}>
+          {loading ? 'Running...' : label}
+        </div>
+        <div className="mt-1 text-[10px] font-sans text-zinc-500 leading-tight truncate">
+          {hint}
+        </div>
+      </div>
     </button>
   )
 }
@@ -318,9 +385,9 @@ function VectorButton({ label, icon: Icon, color, loading, onClick }: any) {
 function NeuralScan() {
   const [step, setStep] = useState(0)
   const steps = [
-    "> ACCESSING_GRID_TELEMETRY...",
-    "> CALCULATING_VARIANCE...",
-    "> SYNTHESIZING_PROTOCOL..."
+    "> REVIEWING ACCOUNT CONTEXT...",
+    "> BUILDING LOW-PRESSURE TALK TRACK...",
+    "> DRAFTING NEXT-STEP ASK..."
   ]
 
   useEffect(() => {
