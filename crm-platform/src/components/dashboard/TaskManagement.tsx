@@ -67,15 +67,15 @@ export function TaskManagement() {
 
       {/* Metrics Row */}
       <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-3">
+        <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Overdue</p>
           <p className="text-xl font-mono tabular-nums text-rose-500 font-bold">{metrics.overdue}</p>
         </div>
-        <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-3">
+        <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Pending</p>
           <p className="text-xl font-mono tabular-nums text-amber-500 font-bold">{metrics.pending}</p>
         </div>
-        <div className="bg-white/[0.02] border border-white/[0.05] rounded-xl p-3">
+        <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Total</p>
           <p className="text-xl font-mono tabular-nums text-zinc-300 font-bold">{metrics.total}</p>
         </div>
@@ -85,7 +85,7 @@ export function TaskManagement() {
         {tasks.map((task) => (
           <div 
             key={task.id} 
-            className="flex items-center justify-between p-3 rounded-xl bg-white/[0.02] border border-white/[0.03] hover:bg-white/[0.05] hover:border-white/10 transition-all cursor-pointer group/item"
+          className="flex items-center justify-between p-3 rounded-xl bg-transparent border border-white/[0.03] hover:border-white/10 transition-all cursor-pointer group/item"
           >
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0">

@@ -90,6 +90,13 @@ export function mapLocationToZone(city?: string, state?: string, rawLocation?: s
   return ERCOT_ZONES.NORTH;
 }
 
+export const LOAD_ZONE_COLOR_MAP: Record<ErcotZone, string> = {
+  [ERCOT_ZONES.NORTH]: '#002FA7',
+  [ERCOT_ZONES.HOUSTON]: '#22c55e',
+  [ERCOT_ZONES.WEST]: '#f59e0b',
+  [ERCOT_ZONES.SOUTH]: '#ef4444',
+} as const;
+
 /**
  * Calculates a volatility index (0-100) based on real-time market metrics.
  */

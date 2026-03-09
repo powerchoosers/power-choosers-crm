@@ -50,7 +50,7 @@ export function SequenceAssignmentModal({ isOpen, onClose, selectedContactIds, o
             <DialogContent className="sm:max-w-md bg-zinc-950 border-white/10 text-white p-0 overflow-hidden gap-0">
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="text-lg font-semibold tracking-tight text-white flex items-center gap-2">
-                        <GitMerge className="w-5 h-5 text-blue-500" />
+                        <GitMerge className="w-5 h-5 text-[#002FA7]" />
                         Initiate Protocol
                     </DialogTitle>
                     <div className="text-xs text-zinc-500 font-mono mt-1">
@@ -63,7 +63,7 @@ export function SequenceAssignmentModal({ isOpen, onClose, selectedContactIds, o
                         placeholder="Search protocols..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="bg-white/5 border-white/10 text-white placeholder:text-zinc-600 font-mono text-xs focus:ring-blue-500/50"
+                        className="bg-white/5 border-white/10 text-white placeholder:text-zinc-600 font-mono text-xs focus:ring-[#002FA7]/50"
                         autoFocus
                     />
 
@@ -84,7 +84,7 @@ export function SequenceAssignmentModal({ isOpen, onClose, selectedContactIds, o
                                     className={cn(
                                         "w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-all flex items-center justify-between group",
                                         selectedProtocolId === protocol.id
-                                            ? "bg-blue-600 text-white shadow-lg shadow-blue-900/20"
+                                            ? "bg-[#002FA7] text-white shadow-lg shadow-[#002FA7]/40"
                                             : "bg-white/5 text-zinc-300 hover:bg-white/10 hover:text-white"
                                     )}
                                 >

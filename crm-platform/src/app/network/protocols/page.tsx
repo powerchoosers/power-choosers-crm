@@ -253,7 +253,7 @@ export default function ProtocolsPage() {
             <div className="flex flex-col items-center justify-center h-full text-zinc-500">
                 <GitMerge className="h-12 w-12 mb-4 opacity-20" />
                 <p>No protocols found</p>
-                {globalFilter && <Button variant="link" onClick={() => setGlobalFilter('')} className="text-indigo-400">Clear search</Button>}
+                {globalFilter && <Button variant="link" onClick={() => setGlobalFilter('')} className="text-[#002FA7]">Clear search</Button>}
             </div>
             ) : (
             <Table>

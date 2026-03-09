@@ -173,6 +173,12 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
+  --toast-background: rgba(9, 9, 11, 0.92);
+  --toast-background-hover: rgba(15, 15, 17, 0.95);
+  --toast-border: rgba(255, 255, 255, 0.05);
+  --toast-border-hover: rgba(255, 255, 255, 0.12);
+  --toast-foreground: oklch(0.985 0.002 247.839);
+  --toast-description: oklch(0.551 0.027 264.364);
 
   --sidebar: oklch(0.13 0.028 261.692);
   /* zinc-950 */
@@ -198,6 +204,24 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  [data-sonner-toast][data-styled='true'] {
+    border: 1px solid var(--toast-border) !important;
+    background: var(--toast-background) !important;
+    border-radius: var(--radius) !important;
+    box-shadow: 0 20px 55px rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  [data-sonner-toast][data-styled='true'] [data-title] {
+    color: var(--toast-foreground) !important;
+  }
+
+  [data-sonner-toast][data-styled='true'] [data-description],
+  [data-sonner-toast][data-styled='true'] [data-icon] svg {
+    color: var(--toast-description) !important;
   }
 }
 

@@ -426,16 +426,16 @@ export default function PeoplePage() {
 
           return (
             <div className="flex items-center gap-2">
-              <div className={cn(
+                <div className={cn(
                 "w-1.5 h-1.5 rounded-full",
                 isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
-                  isLead ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" :
+                  isLead ? "bg-[#002FA7] shadow-[0_0_8px_rgba(0,47,167,0.5)]" :
                     "bg-zinc-600"
               )} />
               <span className={cn(
                 "text-[10px] font-mono uppercase tracking-wider tabular-nums",
                 isCustomer ? "text-emerald-500" :
-                  isLead ? "text-blue-500/80" :
+                  isLead ? "text-[#002FA7]/80" :
                     "text-zinc-500"
               )}>
                 {isCustomer ? 'Client' : status}
@@ -870,7 +870,7 @@ export default function PeoplePage() {
                 <Button
                   onClick={handleCreatePerson}
                   disabled={createContact.isPending || (!newPerson.firstName.trim() && !newPerson.lastName.trim())}
-                  className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-5"
+                  className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-xs uppercase tracking-widest px-5"
                 >
                   {createContact.isPending ? 'Adding...' : 'Add Person'}
                 </Button>

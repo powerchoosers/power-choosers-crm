@@ -240,13 +240,13 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
                   {!isAccountMode && availableProtocols.length > 0 && (
                     <div className="p-2">
                       <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 px-2 py-1.5 flex items-center gap-1.5">
-                        <GitMerge className="w-3 h-3 text-blue-400" /> PROTOCOLS
+                        <GitMerge className="w-3 h-3 text-[#002FA7]" /> PROTOCOLS
                       </div>
                       {availableProtocols.map((p) => (
                         <button
                           key={p.id}
                           onClick={() => handleAddToProtocol(p.id)}
-                          className="w-full text-left px-3 py-2 rounded hover:bg-blue-500/10 hover:text-blue-400 transition-colors text-xs font-mono text-zinc-400"
+                          className="w-full text-left px-3 py-2 rounded hover:bg-[#002FA7]/10 hover:text-[#002FA7] transition-colors text-xs font-mono text-zinc-400"
                         >
                           {p.name}
                         </button>
@@ -275,10 +275,10 @@ export function VectorControlModule({ contactId, accountId }: VectorControlModul
               {showCreateOptions && (
                 <div className={cn('p-2', hasResults && 'border-t border-white/10', 'space-y-1')}>
                   {!isAccountMode && (
-                    <button
-                      onClick={handleCreateProtocol}
-                      className="w-full text-left px-3 py-2 rounded bg-blue-500/10 border border-blue-500/30 text-blue-400 hover:bg-blue-500/20 transition-colors text-xs font-mono flex items-center gap-2"
-                    >
+                      <button
+                        onClick={handleCreateProtocol}
+                        className="w-full text-left px-3 py-2 rounded bg-[#002FA7]/10 border border-[#002FA7]/30 text-[#002FA7] hover:bg-[#002FA7]/20 transition-colors text-xs font-mono flex items-center gap-2"
+                      >
                       <Plus className="w-3 h-3" /> Create New Protocol: &quot;{searchQuery.trim()}&quot;
                     </button>
                   )}

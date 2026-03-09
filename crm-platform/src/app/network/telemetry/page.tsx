@@ -298,7 +298,7 @@ export default function TelemetryPage() {
                   style={{
                     left: `${((Math.max(0, (grid.total_capacity ?? 0) - 3000)) / (grid.total_capacity ?? 1)) * 100}%`,
                   }}
-                  title="Reserve threshold (Capacity - 3000 MW)"
+                  aria-label="Reserve threshold (Capacity - 3000 MW)"
                 />
               )}
             </div>

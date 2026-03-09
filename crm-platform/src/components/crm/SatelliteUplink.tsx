@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { MapPin, Satellite, Wifi, Loader2, Search, Copy, CheckCircle2 } from 'lucide-react';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -20,6 +20,7 @@ interface SatelliteUplinkProps {
   longitude?: number | null;
   accountId?: string; // For contacts, the account ID to save coordinates to
   onSyncComplete?: () => void;
+  onMapReveal?: (el: HTMLDivElement | null) => void;
 }
 
 export default function SatelliteUplink({
@@ -33,7 +34,8 @@ export default function SatelliteUplink({
   latitude,
   longitude,
   accountId,
-  onSyncComplete
+  onSyncComplete,
+  onMapReveal
 }: SatelliteUplinkProps) {
   const [isActive, setIsActive] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +49,8 @@ export default function SatelliteUplink({
   const [selectedPOI, setSelectedPOI] = useState<any | null>(null);
   const [nearbyBusinesses, setNearbyBusinesses] = useState<any[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [pendingBottomAlign, setPendingBottomAlign] = useState(false);
+  const mapPanelRef = useRef<HTMLDivElement | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -88,6 +92,17 @@ export default function SatelliteUplink({
     fetchShadowIntel();
   }, [isActive, coordinates]);
 
+  const revealMap = () => {
+    // If map is already expanded, align immediately on next frame.
+    if (isActive && coordinates) {
+      requestAnimationFrame(() => onMapReveal?.(mapPanelRef.current));
+      return;
+    }
+    // If map is about to expand, wait for animation completion.
+    setPendingBottomAlign(true);
+    setIsActive(true);
+  };
+
   const handleCopyNamed = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
@@ -123,7 +138,7 @@ export default function SatelliteUplink({
 
     // If we already have coordinates and address, just show it
     if (coordinates && activeAddress) {
-      setIsActive(true)
+      revealMap();
       return
     }
 
@@ -156,7 +171,7 @@ export default function SatelliteUplink({
               lat: Number(searchData.location.latitude),
               lng: Number(searchData.location.longitude),
             });
-            setIsActive(true);
+            revealMap();
             setIsLoading(false);
             return;
           }
@@ -210,7 +225,7 @@ export default function SatelliteUplink({
       const coords = await geocodeAddress(resolvedAddress);
       if (coords) {
         setCoordinates(coords);
-        setIsActive(true);
+        revealMap();
 
         // PERSIST COORDINATES TO DATABASE (One-time cost, lifetime free)
         // Always save to accounts table - contacts use account location (business location, not personal address)
@@ -258,7 +273,7 @@ export default function SatelliteUplink({
       if (coords) {
         setCoordinates(coords);
         setActiveAddress(searchInput);
-        setIsActive(true);
+        revealMap();
         setIsSearchOpen(false);
         setSearchInput('');
         toast.success('Location Found', { description: searchInput });
@@ -298,6 +313,15 @@ export default function SatelliteUplink({
   // All hooks must run before any conditional return (Rules of Hooks)
   const mapExpanded = isActive && !!coordinates;
   const stableCoordinates = useMemo(() => coordinates, [coordinates?.lat, coordinates?.lng]);
+
+  useEffect(() => {
+    if (!pendingBottomAlign || !mapExpanded) return;
+    const timer = setTimeout(() => {
+      onMapReveal?.(mapPanelRef.current);
+      setPendingBottomAlign(false);
+    }, 430);
+    return () => clearTimeout(timer);
+  }, [mapExpanded, onMapReveal, pendingBottomAlign]);
 
   if (!mapboxToken) {
     return (
@@ -364,6 +388,7 @@ export default function SatelliteUplink({
 
       {/* BODY: The Map – animates height when map is active */}
       <motion.div
+        ref={mapPanelRef}
         className={cn(
           "relative w-full nodal-module-glass flex flex-col items-center justify-center overflow-hidden",
           (!isActive || !coordinates) && !isLoading ? "opacity-70" : "opacity-100"
@@ -371,6 +396,11 @@ export default function SatelliteUplink({
         initial={false}
         animate={{ height: mapExpanded ? 384 : 128 }}
         transition={{ duration: 0.4, ease: 'easeInOut' }}
+        onAnimationComplete={() => {
+          if (!pendingBottomAlign) return;
+          onMapReveal?.(mapPanelRef.current);
+          setPendingBottomAlign(false);
+        }}
       >
         {isLoading ? (
           <div className="flex flex-col items-center gap-2 absolute inset-0 justify-center z-10 bg-black/50 backdrop-blur-sm">

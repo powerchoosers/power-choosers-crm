@@ -539,7 +539,7 @@ export default function CallsPage() {
                 <Button
                   onClick={handleLogCall}
                   disabled={logCall.isPending || !newCall.phoneNumber.trim()}
-                  className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest px-5"
+                  className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-xs uppercase tracking-widest px-5"
                 >
                   {logCall.isPending ? 'Logging...' : 'Log Call'}
                 </Button>

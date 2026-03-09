@@ -556,8 +556,8 @@ export function TopBar() {
                 {isActive && (
                   <button
                     onClick={() => setIsShowingCallBar(true)}
-                    className="h-[50px] px-4 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all duration-300 shrink-0"
-                    title="Return to Call"
+                  className="h-[50px] px-4 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all duration-300 shrink-0"
+                    aria-label="Return to Call"
                   >
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                     <Phone size={14} />
@@ -592,7 +592,7 @@ export function TopBar() {
                             type="button"
                             onClick={handleOpenActiveDossier}
                             className="truncate text-left transition-transform duration-200 hover:scale-[1.04] origin-left"
-                            title={activeCallContactId ? "Open contact dossier" : "Open account dossier"}
+                            aria-label={activeCallContactId ? "Open contact dossier" : "Open account dossier"}
                           >
                             {displayMetadata?.name || phoneNumber || "Unknown Caller"}
                           </button>
@@ -740,7 +740,6 @@ export function TopBar() {
                           "icon-button-forensic p-1.5 rounded-[12px] focus:outline-none focus-visible:ring-0",
                           isDialpadOpen && "text-white [&_svg]:scale-[1.15]"
                         )}
-                        title="Dialpad (DTMF)"
                         aria-label="Toggle dialpad"
                         aria-haspopup="menu"
                         aria-expanded={isDialpadOpen ? 'true' : 'false'}
@@ -795,7 +794,6 @@ export function TopBar() {
                     <button
                       onClick={() => setIsShowingCallBar(false)}
                       className="icon-button-forensic p-1.5"
-                      title="Open Search"
                       aria-label="Open Search"
                     >
                       <Search size={16} />
@@ -807,7 +805,6 @@ export function TopBar() {
                         handleHangup();
                       }}
                       className="group flex items-center justify-center min-w-[32px] min-h-[32px] w-[32px] h-[32px] shrink-0 ml-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-500 hover:bg-rose-500/20 hover:text-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.2)] transition-all duration-300 hover:scale-[1.12]"
-                      title="Hang up"
                       aria-label="Hang up"
                     >
                       <Phone size={16} className="transition-transform duration-300 group-hover:rotate-[135deg]" />
@@ -891,17 +888,17 @@ export function TopBar() {
             />
 
             {/* Refresh Data */}
-            <button
-              onClick={handleRefresh}
-              className="icon-button-forensic w-9 h-9"
-              title="Refresh Data"
-            >
+              <button
+                onClick={handleRefresh}
+                className="icon-button-forensic w-9 h-9"
+                aria-label="Refresh Data"
+              >
               <RefreshCw size={22} />
             </button>
 
             <button
               className="icon-button-forensic w-9 h-9 relative"
-              title="Notifications"
+              aria-label="Open Notifications"
             >
               <Bell size={22} />
               <span className="absolute top-2 right-2.5 w-2 h-2 bg-signal rounded-full border border-zinc-900" />
@@ -922,7 +919,7 @@ export function TopBar() {
                   "icon-button-forensic w-9 h-9 relative overflow-hidden transition-all duration-300",
                   isCallHUDOpen ? "text-emerald-500 scale-110 shadow-[0_0_15px_rgba(16,185,129,0.4)] bg-emerald-500/10 border-emerald-500/30" : "text-emerald-500/70"
                 )}
-                title={isCallHUDOpen ? "Close Neural HUD" : "Open Neural HUD"}
+                aria-label={isCallHUDOpen ? "Close Neural HUD" : "Open Neural HUD"}
               >
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -948,7 +945,7 @@ export function TopBar() {
                   "icon-button-forensic w-9 h-9 relative overflow-hidden",
                   isDialerOpen && "text-white scale-110"
                 )}
-                title={isDialerOpen ? "Close Dialer" : "Open Dialer"}
+                aria-label={isDialerOpen ? "Close Dialer" : "Open Dialer"}
               >
                 <AnimatePresence mode="wait">
                   <motion.div
@@ -1008,7 +1005,7 @@ export function TopBar() {
                 </div>
                 <Button
                   onClick={handleCall}
-                  className="w-full bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-xs uppercase tracking-widest h-10 rounded-xl shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] border border-blue-400/30 relative z-10 transition-all active:scale-95"
+                  className="w-full bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-xs uppercase tracking-widest h-10 rounded-xl shadow-[0_0_20px_rgba(0,47,167,0.4)] hover:shadow-[0_0_30px_rgba(0,47,167,0.6)] border border-[#002FA7]/30 relative z-10 transition-all active:scale-95"
                 >
                   Execute Call
                 </Button>
