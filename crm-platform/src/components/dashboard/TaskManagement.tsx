@@ -1,58 +1,40 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { CheckCircle2, Circle, Clock, AlertCircle, Plus } from 'lucide-react';
-import { PriorityBadge } from '@/components/ui/PriorityBadge';
+import React, { useMemo } from 'react'
+import { CheckCircle2, Circle, Clock, AlertCircle, Plus } from 'lucide-react'
+import { format } from 'date-fns'
+import { PriorityBadge } from '@/components/ui/PriorityBadge'
+import { useTasks, useTaskMetrics, type Task } from '@/hooks/useTasks'
+import { useUIStore } from '@/store/uiStore'
 
-interface Task {
-  id: string;
-  title: string;
-  status: 'pending' | 'completed' | 'overdue';
-  priority: 'high' | 'medium' | 'low';
-  dueDate: string;
+function isOverdue(task: Task): boolean {
+  if (task.status === 'Completed') return false
+  if (!task.dueDate) return false
+  const due = new Date(task.dueDate)
+  return !Number.isNaN(due.getTime()) && due.getTime() < Date.now()
 }
 
-const tasks: Task[] = [
-  {
-    id: '1',
-    title: 'Audit Acme Manufacturing Bill History',
-    status: 'overdue',
-    priority: 'high',
-    dueDate: '2026-01-27'
-  },
-  {
-    id: '2',
-    title: 'Follow up with Downtown Office Complex',
-    status: 'pending',
-    priority: 'medium',
-    dueDate: '2026-01-30'
-  },
-  {
-    id: '3',
-    title: 'Review 4CP Curtailment Strategy',
-    status: 'pending',
-    priority: 'high',
-    dueDate: '2026-02-01'
-  },
-  {
-    id: '4',
-    title: 'Update Market Volatility Protocol',
-    status: 'completed',
-    priority: 'low',
-    dueDate: '2026-01-25'
-  }
-];
+function formatDueDate(dueDate?: string) {
+  if (!dueDate) return '--'
+  const d = new Date(dueDate)
+  if (Number.isNaN(d.getTime())) return dueDate
+  return format(d, 'yyyy-MM-dd')
+}
 
 export function TaskManagement() {
-  const metrics = {
-    overdue: tasks.filter(t => t.status === 'overdue').length,
-    pending: tasks.filter(t => t.status === 'pending').length,
-    total: tasks.length
-  };
+  const { data: tasksData, isLoading } = useTasks()
+  const { data: metrics, isLoading: isMetricsLoading } = useTaskMetrics()
+  const { setRightPanelMode, setTaskContext } = useUIStore()
+
+  const tasks = useMemo(() => {
+    const allTasks = tasksData?.pages.flatMap((page) => page.tasks) || []
+    return allTasks
+      .filter((task) => task.status !== 'Completed')
+      .slice(0, 6)
+  }, [tasksData])
 
   return (
     <div className="nodal-void-card p-6 flex flex-col h-full relative overflow-hidden group">
-      {/* Top light source catch */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       <div className="mb-6 flex items-center justify-between">
@@ -60,77 +42,84 @@ export function TaskManagement() {
           <h3 className="text-lg font-medium text-white tracking-tight">Task Management</h3>
           <p className="text-xs text-zinc-500 uppercase tracking-widest font-mono">Operational Directives</p>
         </div>
-        <button className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400">
+        <button
+          className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400"
+          type="button"
+          onClick={() => {
+            setTaskContext(null)
+            setRightPanelMode('CREATE_TASK')
+          }}
+          aria-label="Create task"
+        >
           <Plus className="w-4 h-4" />
         </button>
       </div>
 
-      {/* Metrics Row */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Overdue</p>
-          <p className="text-xl font-mono tabular-nums text-rose-500 font-bold">{metrics.overdue}</p>
+          <p className="text-xl font-mono tabular-nums text-rose-500 font-bold">{isMetricsLoading ? '--' : (metrics?.overdue ?? 0)}</p>
         </div>
         <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Pending</p>
-          <p className="text-xl font-mono tabular-nums text-amber-500 font-bold">{metrics.pending}</p>
+          <p className="text-xl font-mono tabular-nums text-amber-500 font-bold">{isMetricsLoading ? '--' : (metrics?.pending ?? 0)}</p>
         </div>
         <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Total</p>
-          <p className="text-xl font-mono tabular-nums text-zinc-300 font-bold">{metrics.total}</p>
+          <p className="text-xl font-mono tabular-nums text-zinc-300 font-bold">{isMetricsLoading ? '--' : (metrics?.total ?? 0)}</p>
         </div>
       </div>
 
       <div className="space-y-2 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800 np-scroll flex-1">
-        {tasks.map((task) => (
-          <div 
-            key={task.id} 
-          className="flex items-center justify-between p-3 rounded-xl bg-transparent border border-white/[0.03] hover:border-white/10 transition-all cursor-pointer group/item"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0">
-                {task.status === 'completed' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                ) : task.status === 'overdue' ? (
-                  <AlertCircle className="w-4 h-4 text-rose-500" />
-                ) : (
-                  <Circle className="w-4 h-4 text-zinc-600 group-hover/item:text-zinc-400 transition-colors" />
-                )}
-              </div>
-              <div>
-                <p className={`text-sm font-medium transition-colors ${
-                  task.status === 'completed' ? 'text-zinc-500 line-through' : 'text-zinc-200 group-hover/item:text-white'
-                }`}>
-                  {task.title}
-                </p>
-                <div className="flex items-center gap-2 mt-1">
-                  <PriorityBadge priority={task.priority} labelStyle="suffix" />
-                  <div className="flex items-center gap-1 text-[10px] text-zinc-600 font-mono tabular-nums">
-                    <Clock className="w-3 h-3" />
-                    {task.dueDate}
+        {isLoading ? (
+          <div className="text-sm text-zinc-500 font-mono px-2 py-8 text-center">Loading tasks...</div>
+        ) : tasks.length === 0 ? (
+          <div className="text-sm text-zinc-500 font-mono px-2 py-8 text-center">No active tasks yet.</div>
+        ) : (
+          tasks.map((task) => {
+            const overdue = isOverdue(task)
+            const completed = task.status === 'Completed'
+
+            return (
+              <div
+                key={task.id}
+                className="flex items-center justify-between p-3 rounded-xl bg-transparent border border-white/[0.03] hover:border-white/10 transition-all"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    {completed ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    ) : overdue ? (
+                      <AlertCircle className="w-4 h-4 text-rose-500" />
+                    ) : (
+                      <Circle className="w-4 h-4 text-zinc-600 transition-colors" />
+                    )}
+                  </div>
+                  <div>
+                    <p className={`text-sm font-medium transition-colors ${completed ? 'text-zinc-500 line-through' : 'text-zinc-200'}`}>
+                      {task.title}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <PriorityBadge priority={task.priority} labelStyle="suffix" />
+                      <div className="flex items-center gap-1 text-[10px] text-zinc-600 font-mono tabular-nums">
+                        <Clock className="w-3 h-3" />
+                        {formatDueDate(task.dueDate)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </div>
-        ))}
+            )
+          })
+        )}
       </div>
 
       <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-        <div className="flex items-center gap-2">
-          <div className="flex -space-x-1">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="w-4 h-4 rounded-2xl bg-zinc-800 border border-zinc-950 flex items-center justify-center text-[8px] font-bold text-zinc-500">
-                {String.fromCharCode(64 + i)}
-              </div>
-            ))}
-          </div>
-          Active_Agents
-        </div>
-        <div className="flex items-center gap-1 hover:text-white cursor-pointer transition-colors">
-          Manage_Vault
+        <div>Live_Task_Queue</div>
+        <div className="text-zinc-600">
+          {isMetricsLoading ? '--' : `${metrics?.pending ?? 0}_Open`}
         </div>
       </div>
     </div>
-  );
+  )
 }
