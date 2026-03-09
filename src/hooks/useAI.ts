@@ -101,7 +101,7 @@ function parseFromLabeledText(rawText: string, fallback: ScriptResult): ScriptRe
 /** Strip markdown code fences and parse JSON; normalize to ScriptResult (gatekeeper + variants). */
 function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
   const fallback: ScriptResult = {
-    opener: "I'm not sure if you're the right person to speak with...",
+    opener: "I'm not sure if you're the right person to speak with, so help me out for a second.",
     hook: `I noticed some ${riskVector} that might be impacting your operations.`,
     disturb: "Usually, when that happens, it leads to waste that nobody's tracking.",
     close: "Would you be opposed to a brief look at the data to see if that's the case?"
