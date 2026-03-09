@@ -13,6 +13,18 @@ const EXIT_DELAY_MS = 180
 const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
 const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
 
+function isDueToday(dueDate?: string): boolean {
+  if (!dueDate) return false
+  const parsed = new Date(dueDate)
+  if (Number.isNaN(parsed.getTime())) return false
+  const now = new Date()
+  return (
+    parsed.getFullYear() === now.getFullYear() &&
+    parsed.getMonth() === now.getMonth() &&
+    parsed.getDate() === now.getDate()
+  )
+}
+
 function TaskRow({
   task,
   isCompleted,
@@ -83,7 +95,10 @@ export default function GlobalTasksWidget() {
   const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const tasks = useMemo(() => tasksData?.pages.flatMap(page => page.tasks) || [], [tasksData])
+  const tasks = useMemo(() => {
+    const allTasks = tasksData?.pages.flatMap(page => page.tasks) || []
+    return allTasks.filter((task) => isDueToday(task.dueDate))
+  }, [tasksData])
   const pendingTasks = useMemo(
     () => tasks.filter(t => (t.status ?? 'Pending') !== 'Completed').slice(0, DISPLAY_LIMIT + 1),
     [tasks]
@@ -176,7 +191,7 @@ export default function GlobalTasksWidget() {
               className="text-center py-6 border border-dashed border-white/5 rounded-2xl"
             >
               <CheckSquare size={20} className="mx-auto text-zinc-800 mb-2" />
-              <p className="text-[10px] font-mono text-zinc-700 uppercase">Agenda Clear</p>
+              <p className="text-[10px] font-mono text-zinc-700 uppercase">Today Agenda Clear</p>
             </motion.div>
           )}
         </AnimatePresence>

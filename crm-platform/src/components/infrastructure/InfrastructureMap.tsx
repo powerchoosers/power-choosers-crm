@@ -14,6 +14,29 @@ const HOVER_DELAY_MS = 1000;
 /** Time to keep card open after leaving marker so user can move to card and click Open dossier */
 const CARD_CLOSE_DELAY_MS = 2000;
 
+function isContractActive(contractEnd?: string | null) {
+  if (!contractEnd) return false;
+  const endDate = new Date(contractEnd);
+  if (Number.isNaN(endDate.getTime())) return false;
+  endDate.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return endDate >= today;
+}
+
+function isCustomerStatus(status?: string | null) {
+  return (status ?? '').trim().toUpperCase() === 'CUSTOMER';
+}
+
+function isTrueActiveLoadAccount(account: { status?: string | null; contract_end_date?: string | null }) {
+  const normalized = (account.status ?? '').trim().toUpperCase();
+  return normalized === 'ACTIVE_LOAD' || isContractActive(account.contract_end_date);
+}
+
+function isInfrastructureEligibleAccount(account: { status?: string | null; contract_end_date?: string | null }) {
+  return isCustomerStatus(account.status) || isTrueActiveLoadAccount(account);
+}
+
 type MapNode = {
   id: string;
   name: string;
@@ -48,9 +71,7 @@ export default function InfrastructureMap() {
     south: marketPulse?.prices?.south ?? 22.40
   }), [marketPulse]);
 
-  const STATUS_LIST = ['ACTIVE_LOAD', 'CUSTOMER', 'active', 'customer', 'Customer'];
-
-  // Fetch contacts whose accounts are load/customer (org-wide, no owner filter so customers show)
+  // Fetch contacts org-wide, then apply "customer + true active load" filtering client-side.
   const { data: contactsData, isLoading: contactsLoading } = useInfiniteQuery({
     queryKey: ['contacts-infrastructure', user?.email],
     initialPageParam: 0,
@@ -58,8 +79,7 @@ export default function InfrastructureMap() {
       if (!user) return { contacts: [], nextCursor: null };
       const q = supabase
         .from('contacts')
-        .select('*, accounts!inner(id, name, city, state, industry, annual_usage, status, latitude, longitude, logo_url, domain)', { count: 'exact' })
-        .in('accounts.status', STATUS_LIST);
+        .select('*, accounts!inner(id, name, city, state, industry, annual_usage, contract_end_date, status, latitude, longitude, logo_url, domain)', { count: 'exact' });
       const PAGE_SIZE = 1000;
       const from = pageParam * PAGE_SIZE;
       const to = from + PAGE_SIZE - 1;
@@ -71,14 +91,13 @@ export default function InfrastructureMap() {
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
 
-  // Fetch load/customer accounts that may have no contacts (so customers still show on map)
+  // Fetch accounts that may have no contacts, then apply the same eligibility rule.
   const { data: accountsData } = useQuery({
     queryKey: ['accounts-infrastructure-map'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('accounts')
-        .select('id, name, city, state, industry, annual_usage, status, latitude, longitude, logo_url, domain')
-        .in('status', STATUS_LIST)
+        .select('id, name, city, state, industry, annual_usage, contract_end_date, status, latitude, longitude, logo_url, domain')
         .limit(2000);
       if (error) throw error;
       return data || [];
@@ -89,7 +108,14 @@ export default function InfrastructureMap() {
   // Flatten contacts and map to nodes; then add account-only nodes for accounts not already represented
   const nodes = useMemo(() => {
     if (!contactsData) return [];
-    const contactNodes = contactsData.pages.flatMap(page => page.contacts).map(contact => {
+    const eligibleContacts = contactsData.pages
+      .flatMap(page => page.contacts)
+      .filter(contact => {
+        const account = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts;
+        return isInfrastructureEligibleAccount(account ?? {});
+      });
+
+    const contactNodes = eligibleContacts.map(contact => {
       const account = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts;
 
       // Determine location - prioritizing metadata/direct fields if available
@@ -150,9 +176,8 @@ export default function InfrastructureMap() {
 
       // Account status for marker: ACTIVE_LOAD/active = blue (active load), CUSTOMER/customer = green
       const rawStatus = (account?.status ?? '').toString().trim();
-      const upper = rawStatus.toUpperCase();
-      const isCustomer = upper === 'CUSTOMER';
-      const isActiveLoad = upper === 'ACTIVE_LOAD' || rawStatus.toLowerCase() === 'active';
+      const isCustomer = isCustomerStatus(rawStatus);
+      const isActiveLoad = isTrueActiveLoadAccount(account ?? {});
 
       const logoUrl = (account as any)?.logo_url ?? (account as any)?.logoUrl ?? null;
       const domain = (account as any)?.domain ?? null;
@@ -176,7 +201,9 @@ export default function InfrastructureMap() {
       } as MapNode;
     });
     const accountIdsFromContacts = new Set(contactNodes.map(n => n.accountId).filter(Boolean));
-    const accountsOnly = (accountsData || []).filter((a: any) => !accountIdsFromContacts.has(a.id));
+    const accountsOnly = (accountsData || []).filter((a: any) =>
+      !accountIdsFromContacts.has(a.id) && isInfrastructureEligibleAccount(a)
+    );
     const toNum = (v: unknown): number | null => {
       if (v == null || v === '') return null;
       const n = typeof v === 'number' ? v : Number(v);
@@ -187,9 +214,8 @@ export default function InfrastructureMap() {
       const state = acc.state || '';
       const zone = mapLocationToZone(city, state);
       const rawStatus = (acc.status ?? '').toString().trim();
-      const upper = rawStatus.toUpperCase();
-      const isCustomer = upper === 'CUSTOMER';
-      const isActiveLoad = upper === 'ACTIVE_LOAD' || rawStatus.toLowerCase() === 'active';
+      const isCustomer = isCustomerStatus(rawStatus);
+      const isActiveLoad = isTrueActiveLoadAccount(acc);
       let lat = toNum(acc.latitude);
       let lng = toNum(acc.longitude);
       if (lat == null || lng == null) {

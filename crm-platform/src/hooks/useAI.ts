@@ -258,8 +258,10 @@ OUTPUT (valid JSON only):
               content: userContent
             }
           ],
-          model: 'google/gemini-2.5-flash',
-          jsonMode: true
+          // Use native Gemini route (not OpenRouter) for tighter JSON behavior in call scripting.
+          model: 'gemini-2.5-flash',
+          jsonMode: true,
+          temperature: 0.45
         }),
       })
 

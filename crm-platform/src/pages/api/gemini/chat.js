@@ -189,6 +189,21 @@ const tools = [
         }
       },
       {
+        name: 'find_public_company_phone',
+        description: 'Find public phone numbers from the open web (official site + public directories/search snippets). Use this when user asks for another number not in CRM or asks to check online/internet.',
+        parameters: {
+          type: 'object',
+          properties: {
+            company_name: { type: 'string', description: 'Company name (e.g. "Three Way Logistics")' },
+            domain: { type: 'string', description: 'Company domain (e.g. "threeway.com")' },
+            city: { type: 'string', description: 'Optional city filter' },
+            state: { type: 'string', description: 'Optional state filter' },
+            account_id: { type: 'string', description: 'Optional CRM account ID to auto-resolve company/domain' },
+            limit: { type: 'number', description: 'Max phone candidates (default 8)' }
+          }
+        }
+      },
+      {
         name: 'get_account_details',
         description: 'Get full details for a specific account (company) by ID, including energy metrics and documents.',
         parameters: {
@@ -336,6 +351,134 @@ const scoreAccountMatch = (account, query) => {
   }
 
   return score;
+};
+
+const normalizeDomain = (value) => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  let d = raw.toLowerCase();
+  d = d.replace(/^https?:\/\//, '').replace(/^www\./, '');
+  d = d.split('/')[0].trim();
+  return d;
+};
+
+const normalizePhoneDigits = (value) => String(value || '').replace(/\D/g, '');
+
+const prettyPhone = (digitsRaw) => {
+  const digits = normalizePhoneDigits(digitsRaw);
+  const ten = digits.length > 10 ? digits.slice(-10) : digits;
+  if (ten.length === 10) return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`;
+  return digitsRaw;
+};
+
+const extractPhonesFromText = (text) => {
+  const src = String(text || '');
+  if (!src) return [];
+  const regex = /(?:\+?1[\s.\-]?)?(?:\(?\d{3}\)?[\s.\-]?)\d{3}[\s.\-]?\d{4}/g;
+  const out = [];
+  let m;
+  while ((m = regex.exec(src)) !== null) {
+    const raw = m[0];
+    const digits = normalizePhoneDigits(raw);
+    if (digits.length < 10) continue;
+    out.push({ raw: prettyPhone(raw), digits: digits.length > 10 ? digits.slice(-10) : digits });
+  }
+  return out;
+};
+
+const fetchTextWithTimeout = async (url, timeoutMs = 8000) => {
+  try {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), timeoutMs);
+    const response = await fetch(url, {
+      method: 'GET',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'NodalPointCRM/1.0 (+phone-discovery)' }
+    });
+    clearTimeout(t);
+    if (!response.ok) return null;
+    return await response.text();
+  } catch (_) {
+    return null;
+  }
+};
+
+const findPublicCompanyPhones = async ({ company_name, domain, city, state, limit = 8 }) => {
+  const companyName = String(company_name || '').trim();
+  const normalizedDomain = normalizeDomain(domain);
+  const cap = Math.max(1, Math.min(Number(limit) || 8, 15));
+  const seen = new Set();
+  const matches = [];
+
+  const pushPhones = (phones, sourceUrl, sourceLabel, confidence) => {
+    for (const p of phones) {
+      if (!p || !p.digits || p.digits.length < 10) continue;
+      if (seen.has(p.digits)) continue;
+      seen.add(p.digits);
+      matches.push({
+        phone: p.raw,
+        digits: p.digits,
+        source_url: sourceUrl,
+        source: sourceLabel,
+        confidence
+      });
+      if (matches.length >= cap) break;
+    }
+  };
+
+  const officialPages = [];
+  if (normalizedDomain) {
+    const base = `https://${normalizedDomain}`;
+    officialPages.push(base, `${base}/contact`, `${base}/contact-us`, `${base}/about`, `${base}/locations`);
+  }
+
+  for (const page of officialPages) {
+    if (matches.length >= cap) break;
+    const html = await fetchTextWithTimeout(page, 7000);
+    if (!html) continue;
+    pushPhones(extractPhonesFromText(html), page, 'official_site', 0.9);
+  }
+
+  const webQuery = [companyName, city, state, 'phone number'].filter(Boolean).join(' ');
+  if (webQuery) {
+    const ddgUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(webQuery)}`;
+    const ddgHtml = await fetchTextWithTimeout(ddgUrl, 10000);
+
+    if (ddgHtml) {
+      // Snippet-level phones from search result page
+      pushPhones(extractPhonesFromText(ddgHtml), ddgUrl, 'search_snippet', 0.55);
+
+      // Follow a few result links to discover alternative numbers
+      const linkRegex = /uddg=([^"&]+)/g;
+      const resultUrls = [];
+      let linkMatch;
+      while ((linkMatch = linkRegex.exec(ddgHtml)) !== null && resultUrls.length < 4) {
+        try {
+          const decoded = decodeURIComponent(linkMatch[1]);
+          if (/^https?:\/\//i.test(decoded) && !resultUrls.includes(decoded)) {
+            resultUrls.push(decoded);
+          }
+        } catch (_) {
+          // ignore bad encoded link
+        }
+      }
+
+      for (const u of resultUrls) {
+        if (matches.length >= cap) break;
+        const page = await fetchTextWithTimeout(u, 7000);
+        if (!page) continue;
+        pushPhones(extractPhonesFromText(page), u, 'public_directory_or_site', 0.7);
+      }
+    }
+  }
+
+  return {
+    company_name: companyName || null,
+    domain: normalizedDomain || null,
+    candidates: matches.slice(0, cap),
+    searched_count: officialPages.length + 1,
+    searched_sources: [...officialPages, webQuery ? `duckduckgo:${webQuery}` : null].filter(Boolean)
+  };
 };
 
 const toolHandlers = {
@@ -1205,6 +1348,35 @@ const toolHandlers = {
     const data = await response.json();
     return data.organization || null;
   },
+  find_public_company_phone: async ({ company_name, domain, city, state, account_id, limit = 8 }) => {
+    let resolvedName = company_name;
+    let resolvedDomain = domain;
+    let resolvedCity = city;
+    let resolvedState = state;
+
+    if (account_id && (!resolvedName || !resolvedDomain)) {
+      const { data: account } = await supabaseAdmin
+        .from('accounts')
+        .select('name, domain, city, state, metadata')
+        .eq('id', account_id)
+        .maybeSingle();
+      if (account) {
+        const metadata = account.metadata || {};
+        resolvedName = resolvedName || account.name;
+        resolvedDomain = resolvedDomain || account.domain || metadata.domain || metadata.website;
+        resolvedCity = resolvedCity || account.city || metadata.city;
+        resolvedState = resolvedState || account.state || metadata.state;
+      }
+    }
+
+    return await findPublicCompanyPhones({
+      company_name: resolvedName,
+      domain: resolvedDomain,
+      city: resolvedCity,
+      state: resolvedState,
+      limit
+    });
+  },
   get_energy_news: async () => {
     const rssUrl = 'https://news.google.com/rss/search?q=%28Texas+energy%29+OR+ERCOT+OR+%22Texas+electricity%22&hl=en-US&gl=US&ceid=US:en';
     const response = await fetch(rssUrl, { headers: { 'User-Agent': 'PowerChoosersCRM/1.0' } });
@@ -1246,6 +1418,11 @@ export default async function handler(req, res) {
     }
 
     const { messages, userProfile, jsonMode } = req.body;
+    const requestedTemperatureRaw = req.body?.temperature;
+    const requestedTemperature = Number.isFinite(requestedTemperatureRaw)
+      ? Math.min(1, Math.max(0, Number(requestedTemperatureRaw)))
+      : undefined;
+    const generationTemperature = requestedTemperature ?? (jsonMode ? 0.45 : 0.7);
     if (!messages || !Array.isArray(messages)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid messages format' }));
@@ -1559,11 +1736,106 @@ export default async function handler(req, res) {
       const p = String(prompt || '').trim();
       if (!p) return false;
 
+      const lower = p.toLowerCase();
+      const webSearchMode = String(req.body?.webSearchMode || 'crm_plus_web');
+      const asksForPhone = /(phone\s*number|number\s+for|phone\s+for|another\s+number|other\s+number|alternate\s+number|different\s+number|dial|call\s+them)/.test(lower);
+      const asksForInternet = /(internet|online|web|website|search|look up|find)/.test(lower);
+      const internetPhoneIntent = asksForPhone && asksForInternet;
+
+      if (internetPhoneIntent && webSearchMode !== 'crm_only') {
+        const diagnostics = [
+          { model: 'supabase', provider: 'grounded', status: 'attempting', reason: 'PHONE_WEB_DISCOVERY' }
+        ];
+
+        try {
+          const requestContext = req.body?.context;
+          let accountId = requestContext?.type === 'account' && requestContext?.id ? String(requestContext.id) : null;
+
+          if (!accountId && requestContext?.type === 'contact' && requestContext?.id) {
+            const c = await toolHandlers.get_contact_details({ contact_id: String(requestContext.id) });
+            accountId = c?.accountId || c?.account_id || c?.linked_account_id || c?.linkedAccountId || c?.accounts?.id || null;
+          }
+
+          let account = null;
+          if (accountId) {
+            account = await toolHandlers.get_account_details({ account_id: accountId });
+          } else {
+            const q = stripSearchPreamble(p);
+            const r = await toolHandlers.list_accounts({ search: q, limit: 1 });
+            const records = r?.data ?? r ?? [];
+            if (Array.isArray(records) && records.length > 0) {
+              accountId = String(records[0].id);
+              account = await toolHandlers.get_account_details({ account_id: accountId });
+            }
+          }
+
+          if (!account) return false;
+
+          const accountMetadata = account.metadata || {};
+          const companyName = account.name || 'this company';
+          const companyDomain = normalizeDomain(account.domain || accountMetadata.domain || accountMetadata.website);
+          const crmPhone = account.companyPhone || account.phone || accountMetadata.companyPhone || accountMetadata.phone || null;
+          const crmPhoneDigits = normalizePhoneDigits(crmPhone);
+
+          let apolloPhone = null;
+          if (companyDomain) {
+            try {
+              const enrichment = await toolHandlers.enrich_organization({ domain: companyDomain });
+              apolloPhone = enrichment?.phone || enrichment?.raw_phone_number || null;
+            } catch (_) {
+              // Optional enrichment, ignore failures
+            }
+          }
+
+          const webFindings = await toolHandlers.find_public_company_phone({
+            company_name: companyName,
+            domain: companyDomain,
+            city: account.city || accountMetadata.city,
+            state: account.state || accountMetadata.state,
+            account_id: accountId || undefined,
+            limit: 8
+          });
+
+          const candidates = Array.isArray(webFindings?.candidates) ? webFindings.candidates : [];
+          const alternate = candidates.find((c) => {
+            const d = normalizePhoneDigits(c?.phone || c?.digits);
+            return d && d.length >= 10 && (!crmPhoneDigits || d.slice(-10) !== crmPhoneDigits.slice(-10));
+          }) || candidates[0] || null;
+
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+
+          const narrative = alternate
+            ? `${firstName}, I checked the CRM, Apollo, and public web sources. I found an alternate number for ${companyName}: **${alternate.phone}**.`
+            : `${firstName}, I checked the CRM, Apollo, and public web sources for ${companyName}, but I did not find a reliable alternate number beyond what is already on file.`;
+
+          const source = alternate?.source_url || alternate?.source || (apolloPhone ? 'Apollo Enrichment' : 'Web Search');
+          const foundPhone = alternate?.phone || apolloPhone || 'Not Found';
+          const idCard = buildJsonBlock('identity_card', {
+            type: 'account',
+            id: accountId || account.id || '',
+            name: companyName,
+            industry: account.industry || accountMetadata.industry || 'unknown',
+            status: 'active',
+            initials: String(companyName).split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase(),
+            domain: companyDomain || undefined,
+            contractEndDate: account.contract_end_date || 'Not in CRM',
+            discoveredPhone: foundPhone,
+            discoveredSource: source,
+            sourceReliability: alternate?.confidence >= 0.85 ? 'Official Site' : (alternate ? 'Medium' : 'Low')
+          });
+
+          respondGrounded(`${narrative} ${idCard}`, diagnostics);
+          return true;
+        } catch (e) {
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'failed', error: e?.message || 'PHONE_DISCOVERY_FAILED' });
+          respondGrounded(`${firstName}, I tried an online phone discovery pass but hit an error. Please retry and I will run it again.`, diagnostics);
+          return true;
+        }
+      }
+
       // Grounded path DISABLED: user wants full LLM so they get identity_card (clickable dossier links),
       // contract end dates in containers, and rich components—not the backend-built table-only response.
       return false;
-
-      const lower = p.toLowerCase();
       // Intent locking: force full LLM for who/phone/email/call/said so grounded path does not return generic company info
       const forceFullLLM = /\b(who|phone|email|call|said)\b/.test(lower);
       if (forceFullLLM) return false;
@@ -1969,10 +2241,17 @@ export default async function handler(req, res) {
     if (!jsonMode && await maybeHandleGroundedCrmRequest()) return;
 
     const buildSystemPrompt = () => {
+      const webMode = String(req.body?.webSearchMode || 'crm_plus_web');
+      const webEnabled = webMode !== 'crm_only';
       return `
         You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
         Your tone is professional, technical, and high-agency.
         You prioritize data-driven insights over conversational filler.
+        RESPONSE_FORMAT:
+        - Lead with the direct answer in the first sentence.
+        - Then give 1 short "why" line tied to evidence.
+        - Then give 1 short "next move" line.
+        - Do NOT use long preambles like "I've compiled..." unless explicitly requested.
         DO NOT include bracketed citations like [1], [source.com], or markdown links to external sites.
         TEXAS CONTEXT: We operate in the Texas deregulated energy market (ERCOT). Ensure all advice and terminology (4CP, TDSP, Load Zones) are relevant to Texas. Forbid UK references (e.g., Citizens Advice).
 
@@ -1981,6 +2260,7 @@ export default async function handler(req, res) {
         - ALWAYS address them by their first name (${firstName}) in your initial greeting or when appropriate.
         - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
+        - WEB_MODE: ${webEnabled ? 'CRM_PLUS_WEB (internet assist enabled)' : 'CRM_ONLY (internet assist disabled)'}
 
         FORENSIC_INTELLIGENCE_PROTOCOL:
         - Your mission is to provide strategic sales intelligence. Move beyond simple data retrieval.
@@ -2013,7 +2293,12 @@ export default async function handler(req, res) {
 
         PERSON vs COMPANY (CRITICAL):
         - If the user asks to find a PERSON (e.g. "find a Louis", "someone named X", "who works at this company", "a person that works for this company"), you MUST use \`list_contacts\` with the person's name in \`search\` and, when the user is on an account page, \`accountId\` from context. Do NOT use \`list_accounts\` for person names.
-        - If the user asks for "phone number", "contact info", or "number for the [X] location" for "this company" or the current account: use the context \`account_id\` (when on an account page), then \`get_account_details\` and \`list_contacts({ accountId })\`; then \`get_contact_details\` for contacts that have phone data. Return the actual phone from the CRM; if none, say so.
+        - If the user asks for "phone number", "contact info", or "number for the [X] location" for "this company" or the current account: use the context \`account_id\` (when on an account page), then \`get_account_details\` and \`list_contacts({ accountId })\`; then \`get_contact_details\` for contacts that have phone data.
+        - If the user asks for an "alternate number", "another number", "number on the internet", "check online", or "other corporate number":
+          1. Check CRM first (\`get_account_details\`, \`list_contacts\`).
+          2. Run \`enrich_organization\` when domain is known.
+          3. Run \`find_public_company_phone\` to search official/public web sources.
+          4. Report CRM number vs discovered web number and source.
         - If the user asks "what calls do you see", "my recent calls", "do you have access to my call", or similar: use \`search_interactions({ query: "calls" })\` or \`search_transcripts\` to find call data. Do NOT run \`list_accounts\` for call-related queries.
         - If the user asks about "important emails", "any emails", "my inbox", or "unread emails": use \`search_emails\` or \`search_interactions({ query: "email" })\` to find email data. Do NOT run \`list_accounts\` for email-related queries.
 
@@ -2042,6 +2327,7 @@ export default async function handler(req, res) {
         - DO NOT use names like "Pacific Energy Solutions", "Global Manufacturing Inc.", "Apex Manufacturing", "Vertex Energy", "Summit Industrial", "Horizon Power Systems", or "Pinnacle Energy Group". These are hallucinations.
         - If the user asks for "outreach this week" and you find no data, do not create a fake list. Say: "${firstName}, I don't see any accounts scheduled for outreach this week in the CRM."
         - Accuracy is the ONLY priority for CRM data. If you are 99% sure but haven't run a tool, you are 0% sure. RUN THE TOOL.
+        - If tools return no result, do not stop at "not found." Offer 2-3 immediate next actions and include a \`flight_check\` JSON block with actionable steps.
 
         HYBRID_SEARCH_AWARENESS:
         - The \`list_accounts\` and \`list_contacts\` tools use a tiered Hybrid Search (Exact Match > Starts With > FTS > Semantic).
@@ -2077,10 +2363,10 @@ export default async function handler(req, res) {
 
         WEB_SEARCH_RESTRICTION:
         - YOU ARE NOT A GENERAL SEARCH ENGINE.
-        - You ONLY search the web for:
-          1. General energy market news (via \`get_energy_news\`).
-          2. Finding NEW prospects that are NOT in the CRM (via \`search_prospects\`).
-          3. Enriching a company domain (via \`enrich_organization\`).
+        - ${webEnabled
+          ? 'Internet assist is ON. You may use web-enabled tools for phone discovery and market/news/prospect enrichment, but CRM checks still come first.'
+          : 'Internet assist is OFF. Stay in CRM-only mode unless a grounded phone discovery route is already running.'}
+        - When web search is used, prefer official company domains and disclose source in output.
         - DO NOT search the web for "Who works at [Company in CRM]?" if you haven't searched the CRM first.
         - If the user asks about a record you can't find, ask for clarification instead of guessing from the web.
 
@@ -2226,7 +2512,7 @@ export default async function handler(req, res) {
         model: model,
         messages: currentMessages,
         tools: openAiTools,
-        temperature: 0.7,
+        temperature: generationTemperature,
         max_tokens: 2048,
       };
 
@@ -2552,6 +2838,9 @@ export default async function handler(req, res) {
     }
 
     if (!geminiApiKey) {
+      if (jsonMode) {
+        throw new Error('JSON mode requires Gemini; refusing Perplexity fallback for structured output.');
+      }
       const content = await callPerplexity(null, routingDiagnostics);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ content, provider: 'perplexity', model: perplexityModel, diagnostics: routingDiagnostics }));
@@ -2660,7 +2949,7 @@ export default async function handler(req, res) {
           history: validHistory,
           generationConfig: {
             maxOutputTokens: 2048,
-            temperature: 0.7,
+            temperature: generationTemperature,
             responseMimeType: jsonMode ? 'application/json' : 'text/plain',
           },
         });
@@ -2788,7 +3077,7 @@ export default async function handler(req, res) {
     }
 
     // Fallback to Perplexity if no Gemini model succeeded
-    if (perplexityApiKey) {
+    if (perplexityApiKey && !jsonMode) {
       routingDiagnostics.push({
         provider: 'perplexity',
         model: perplexityModel,

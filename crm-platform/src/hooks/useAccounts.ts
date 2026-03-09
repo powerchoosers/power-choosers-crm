@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { millDecimal } from '@/lib/mills'
+import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
 
 export interface Account {
   id: string
@@ -107,6 +108,20 @@ export interface AccountFilters {
 }
 
 const PAGE_SIZE = 50
+
+function resolveAccountLoadZone(data: any): ErcotZone {
+  const metadataZone =
+    data?.metadata?.loadZone ||
+    data?.metadata?.load_zone ||
+    data?.metadata?.ercotZone ||
+    data?.metadata?.ercot_zone
+
+  if (typeof metadataZone === 'string' && metadataZone.startsWith('LZ_')) {
+    return metadataZone as ErcotZone
+  }
+
+  return mapLocationToZone(data?.city, data?.state, data?.address)
+}
 
 export function useSearchAccounts(queryTerm: string) {
   const { user, role, loading } = useAuth()
@@ -237,6 +252,11 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         }
 
         const accounts = data.map(data => {
+          const city = data.city || ''
+          const state = data.state || ''
+          const location = city ? `${city}, ${state}` : (data.address || '')
+          const loadZone = resolveAccountLoadZone(data)
+
           return {
             id: data.id,
             name: data.name || 'Unknown Account',
@@ -247,7 +267,9 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
             contractEnd: data.contract_end_date || '',
             employees: data.employees?.toString() || '',
             revenue: data.revenue || '',
-            location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+            location,
+            city,
+            state,
             serviceAddresses: data.service_addresses || [],
             address: data.address || '',
             updated: data.updatedAt || new Date().toISOString(),
@@ -257,7 +279,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
             linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
             // Forensic/Asset Fields
             loadFactor: data.metadata?.loadFactor ?? 0.45,
-            loadZone: data.metadata?.loadZone || 'LZ_NORTH',
+            loadZone,
             annualUsage: data.annual_usage || '',
             electricitySupplier: data.electricity_supplier || '',
             currentRate: data.current_rate || '',
@@ -333,6 +355,11 @@ export function useAccount(id: string) {
         meters = data.metadata?.meters || []
       }
 
+      const city = data.city || ''
+      const state = data.state || ''
+      const location = city ? `${city}, ${state}` : (data.address || '')
+      const loadZone = resolveAccountLoadZone(data)
+
       return {
         id: data.id,
         name: data.name || 'Unknown Account',
@@ -344,7 +371,9 @@ export function useAccount(id: string) {
         contractEnd: data.contract_end_date || '',
         employees: data.employees?.toString() || '',
         revenue: data.revenue || '',
-        location: data.city ? `${data.city}, ${data.state || ''}` : (data.address || ''),
+        location,
+        city,
+        state,
         latitude: data.latitude != null ? Number(data.latitude) : null,
         longitude: data.longitude != null ? Number(data.longitude) : null,
         serviceAddresses: data.service_addresses || [],
@@ -356,7 +385,7 @@ export function useAccount(id: string) {
         linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
         // Forensic/Asset Fields
         loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
-        loadZone: data.load_zone || data.metadata?.loadZone || 'LZ_NORTH',
+        loadZone,
         annualUsage: data.annual_usage || '',
         electricitySupplier: data.electricity_supplier || '',
         currentRate: data.current_rate || '',

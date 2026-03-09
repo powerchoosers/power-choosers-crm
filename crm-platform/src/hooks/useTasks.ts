@@ -232,7 +232,7 @@ export function useTaskMetrics() {
     queryKey: ['tasks-metrics', user?.email, role],
     queryFn: async () => {
       if (loading || !user || !user.email) {
-        return { overdue: 0, pending: 0, total: 0 }
+        return { completed: 0, pending: 0, total: 0 }
       }
 
       const applyOwnerFilter = (query: any) => {
@@ -243,34 +243,45 @@ export function useTaskMetrics() {
       }
 
       try {
-        const nowIso = new Date().toISOString()
+        const start = new Date()
+        start.setHours(0, 0, 0, 0)
+        const end = new Date(start)
+        end.setDate(end.getDate() + 1)
+        const startIso = start.toISOString()
+        const endIso = end.toISOString()
 
         const totalPromise = applyOwnerFilter(
-          supabase.from('tasks').select('id', { count: 'exact', head: true })
+          supabase.from('tasks').select('id', { count: 'exact', head: true }).gte('dueDate', startIso).lt('dueDate', endIso)
         )
         const pendingPromise = applyOwnerFilter(
-          supabase.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'Completed')
-        )
-        const overduePromise = applyOwnerFilter(
           supabase
             .from('tasks')
             .select('id', { count: 'exact', head: true })
             .neq('status', 'Completed')
-            .lt('dueDate', nowIso)
+            .gte('dueDate', startIso)
+            .lt('dueDate', endIso)
+        )
+        const completedPromise = applyOwnerFilter(
+          supabase
+            .from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'Completed')
+            .gte('dueDate', startIso)
+            .lt('dueDate', endIso)
         )
 
-        const [totalResult, pendingResult, overdueResult] = await Promise.all([
+        const [totalResult, pendingResult, completedResult] = await Promise.all([
           totalPromise,
           pendingPromise,
-          overduePromise,
+          completedPromise,
         ])
 
         if (totalResult.error) throw totalResult.error
         if (pendingResult.error) throw pendingResult.error
-        if (overdueResult.error) throw overdueResult.error
+        if (completedResult.error) throw completedResult.error
 
         return {
-          overdue: overdueResult.count || 0,
+          completed: completedResult.count || 0,
           pending: pendingResult.count || 0,
           total: totalResult.count || 0,
         }
@@ -278,7 +289,7 @@ export function useTaskMetrics() {
         if (error?.name !== 'AbortError' && error?.message !== 'Fetch is aborted') {
           console.error('Error fetching task metrics:', error.message || error)
         }
-        return { overdue: 0, pending: 0, total: 0 }
+        return { completed: 0, pending: 0, total: 0 }
       }
     },
     enabled: !loading && !!user && !!user?.email,
