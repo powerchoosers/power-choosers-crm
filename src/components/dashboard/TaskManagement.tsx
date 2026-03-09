@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { KeyboardEvent, useMemo } from 'react'
 import { CheckCircle2, Circle, Clock, AlertCircle, Plus } from 'lucide-react'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
@@ -27,6 +27,13 @@ export function TaskManagement() {
   const { data: metrics, isLoading: isMetricsLoading } = useTaskMetrics()
   const { setRightPanelMode, setTaskContext } = useUIStore()
   const router = useRouter()
+
+  const handleTaskKeyDown = (event: KeyboardEvent<HTMLDivElement>, task: Task) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      navigateToTaskTarget(task)
+    }
+  }
 
   const navigateToTaskTarget = (task: Task) => {
     if (task.contactId) {
@@ -99,7 +106,7 @@ export function TaskManagement() {
                 role="button"
                 tabIndex={0}
                 onClick={() => navigateToTaskTarget(task)}
-                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { navigateToTaskTarget(task) } }}
+                onKeyDown={(event) => handleTaskKeyDown(event, task)}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
