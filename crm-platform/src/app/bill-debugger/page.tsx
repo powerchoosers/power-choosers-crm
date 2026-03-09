@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
+import { PageReveal } from '@/components/motion/PageReveal'
 
 // Modular Components
 import { TrustGate } from './components/TrustGate'
@@ -209,70 +210,72 @@ export default function BillDebuggerPage() {
 
             {/* Main Content Hub */}
             <main className="relative z-10 flex-1 flex flex-col items-center justify-center w-full mx-auto py-20">
-                <AnimatePresence mode="wait">
+                <PageReveal className="w-full flex flex-col items-center justify-center">
+                    <AnimatePresence mode="wait">
 
-                    {view === 'trust' && (
-                        <TrustGate key="trust" onNext={() => setView('upload')} />
-                    )}
+                        {view === 'trust' && (
+                            <TrustGate key="trust" onNext={() => setView('upload')} />
+                        )}
 
-                    {view === 'upload' && (
-                        <UploadZone key="upload" onUpload={handleUpload} isAnalyzing={isProcessing} />
-                    )}
+                        {view === 'upload' && (
+                            <UploadZone key="upload" onUpload={handleUpload} isAnalyzing={isProcessing} />
+                        )}
 
-                    {view === 'analyzing' && (
-                        <AnalysisStream key="analyzing" onComplete={() => {
-                            if (errorMsg) {
-                                setView('error')
-                            } else if (extractedData) {
-                                setView('preview')
-                            } else {
-                                if (!isProcessing) setView('error')
-                            }
-                        }} />
-                    )}
+                        {view === 'analyzing' && (
+                            <AnalysisStream key="analyzing" onComplete={() => {
+                                if (errorMsg) {
+                                    setView('error')
+                                } else if (extractedData) {
+                                    setView('preview')
+                                } else {
+                                    if (!isProcessing) setView('error')
+                                }
+                            }} />
+                        )}
 
-                    {view === 'preview' && extractedData && (
-                        <ResultsPreview
-                            key="preview"
-                            data={extractedData}
-                            onUnlock={() => setView('email')}
-                        />
-                    )}
+                        {view === 'preview' && extractedData && (
+                            <ResultsPreview
+                                key="preview"
+                                data={extractedData}
+                                onUnlock={() => setView('email')}
+                            />
+                        )}
 
-                    {view === 'email' && (
-                        <EmailGate key="email" onUnlock={handleEmailUnlock} />
-                    )}
+                        {view === 'email' && (
+                            <EmailGate key="email" onUnlock={handleEmailUnlock} />
+                        )}
 
-                    {view === 'report' && extractedData && (
-                        <FullReport key="report" data={extractedData} email={userEmail} />
-                    )}
+                        {view === 'report' && extractedData && (
+                            <FullReport key="report" data={extractedData} email={userEmail} />
+                        )}
 
-                    {view === 'error' && (
-                        <motion.div
-                            key="error"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="text-center max-w-md px-6"
-                        >
-                            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                                <X className="w-8 h-8" />
-                            </div>
-                            <h2 className="text-2xl font-bold mb-2">Analysis Failed</h2>
-                            <p className="text-zinc-500 mb-8">{errorMsg || 'An unexpected error occurred during analysis.'}</p>
-                            <button
-                                onClick={() => {
-                                    setView('upload')
-                                    setErrorMsg('')
-                                    setExtractedData(null)
-                                }}
-                                className="px-8 py-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors"
+                        {view === 'error' && (
+                            <motion.div
+                                key="error"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                className="text-center max-w-md px-6"
                             >
-                                Try Again
-                            </button>
-                        </motion.div>
-                    )}
+                                <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                                    <X className="w-8 h-8" />
+                                </div>
+                                <h2 className="text-2xl font-bold mb-2">Analysis Failed</h2>
+                                <p className="text-zinc-500 mb-8">{errorMsg || 'An unexpected error occurred during analysis.'}</p>
+                                <button
+                                    onClick={() => {
+                                        setView('upload')
+                                        setErrorMsg('')
+                                        setExtractedData(null)
+                                    }}
+                                    className="px-8 py-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors"
+                                >
+                                    Try Again
+                                </button>
+                            </motion.div>
+                        )}
 
-                </AnimatePresence>
+                    </AnimatePresence>
+                </PageReveal>
             </main>
 
             {/* Technical Micro-copy Footer - PRESERVED */}

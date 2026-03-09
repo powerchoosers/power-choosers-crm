@@ -3,6 +3,7 @@ import { Metadata } from 'next';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { PageReveal } from '@/components/motion/PageReveal';
 
 export const metadata: Metadata = {
     title: 'Nodal Protocol | Booking Interface',
@@ -54,9 +55,11 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
                 <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-[#002FA7]/5 blur-[120px] rounded-full pointer-events-none animate-pulse" />
                 <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-[#002FA7]/3 blur-[100px] rounded-full pointer-events-none" />
 
-                <div className="flex-1 nodal-void-card flex flex-col relative z-10 lg:overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
-                    <BookingInterface email={email} />
-                </div>
+                <PageReveal className="flex-1 relative z-10" delay={0.05}>
+                    <div className="h-full nodal-void-card flex flex-col lg:overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
+                        <BookingInterface email={email} />
+                    </div>
+                </PageReveal>
             </main>
 
             {/* Footer — hidden on mobile to reclaim space */}
