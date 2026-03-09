@@ -414,7 +414,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                 onClick={toggleEditing}
                                 className={cn(
                                     "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
-                                    isEditing ? "text-blue-400 bg-blue-400/10 border border-blue-400/30 shadow-[0_0_15px_rgba(59,130,246,0.2)] scale-110" : "text-zinc-500 hover:text-white"
+                                    isEditing ? "text-[#002FA7] bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-white"
                                 )}
                             >
                                 {isEditing ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
@@ -422,8 +422,8 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                         </div>
                         {!hasTasks && (
                             <div className="flex items-center gap-2">
-                                <div className={cn("h-2 w-2 rounded-full animate-pulse", isEditing ? "bg-blue-500" : "bg-green-500")} />
-                                <span className={cn("text-xs font-mono uppercase tracking-widest", isEditing ? "text-blue-400" : "text-green-500")}>
+                                <div className={cn("h-2 w-2 rounded-full animate-pulse", isEditing ? "bg-[#002FA7]" : "bg-green-500")} />
+                                <span className={cn("text-xs font-mono uppercase tracking-widest", isEditing ? "text-[#002FA7]" : "text-green-500")}>
                                     {isEditing ? "SECURE_FIELD_OVERRIDE" : "ACTIVE_INTELLIGENCE"}
                                 </span>
                             </div>

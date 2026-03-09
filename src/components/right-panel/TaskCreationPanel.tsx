@@ -277,7 +277,7 @@ export function TaskCreationPanel() {
                         <Calendar className="w-3 h-3" /> Temporal_Target
                     </div>
 
-                    <div className="bg-black/30 rounded-xl border border-white/10 p-4 space-y-4">
+                    <div className="bg-transparent rounded-xl border border-white/10 p-4 space-y-4">
                         <div className="flex items-center justify-between">
                             <button
                                 type="button"
@@ -343,20 +343,20 @@ export function TaskCreationPanel() {
                                     value={timeStr}
                                     onChange={(e) => handleTimeChange(e.target.value)}
                                     placeholder="09:00"
-                                    className={`${panelTheme.field} w-32 text-center`}
+                                    className={`${panelTheme.field} w-20 text-center`}
                                     maxLength={5}
                                 />
-                                <div className="flex flex-1 gap-2">
+                                <div className="flex gap-2">
                                     {(['AM', 'PM'] as const).map((mode) => (
                                         <button
                                             key={mode}
                                             type="button"
                                             onClick={() => setAmpm(mode)}
                                             className={cn(
-                                                "flex-1 h-9 rounded-xl text-xs font-mono border transition-all",
+                                                "h-9 px-3 rounded-xl text-xs font-mono border transition-all whitespace-nowrap",
                                                 ampm === mode
                                                     ? "bg-[#002FA7]/20 border-[#002FA7]/50 text-white"
-                                                    : "bg-black/20 border-white/5 text-zinc-500 hover:text-zinc-300"
+                                                    : "bg-transparent border-white/5 text-zinc-500 hover:text-zinc-300"
                                             )}
                                         >
                                             {mode}
@@ -367,7 +367,7 @@ export function TaskCreationPanel() {
                             <button
                                 type="button"
                                 onClick={handleNextHr}
-                                className="w-full py-2 rounded-lg bg-white/5 border border-white/5 text-[10px] font-mono text-zinc-500 hover:text-white transition-all uppercase tracking-widest"
+                                className="w-full py-2 rounded-xl bg-transparent border border-white/5 text-[10px] font-mono text-zinc-500 hover:text-white transition-all uppercase tracking-widest"
                             >
                                 [ Increment_Hour ]
                             </button>
@@ -385,10 +385,10 @@ export function TaskCreationPanel() {
                                 type="button"
                                 onClick={() => setSendCalendarInvite(!sendCalendarInvite)}
                                 className={cn(
-                                    "w-full h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all flex items-center justify-between px-4 relative group",
+                                    "w-full h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all flex items-center justify-center px-4 relative group",
                                     sendCalendarInvite
-                                        ? "bg-[#002FA7]/10 border-[#002FA7]/50 text-white shadow-[0_0_20px_-10px_#002FA7]"
-                                        : "bg-black/20 border-white/5 text-zinc-500 hover:text-white/80"
+                                        ? "bg-transparent border-[#002FA7]/50 text-white shadow-[0_0_20px_-10px_#002FA7]"
+                                        : "bg-transparent border-white/5 text-zinc-500 hover:text-white/80"
                                 )}
                             >
                                 <span className="tracking-[0.2em]">
@@ -455,7 +455,7 @@ export function TaskCreationPanel() {
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         placeholder="Input operational briefing..."
-                        className={`${panelTheme.textarea} h-32 p-4 placeholder:text-zinc-800`}
+                        className={`${panelTheme.textarea} bg-transparent h-32 p-4 placeholder:text-zinc-800`}
                     />
                 </div>
 

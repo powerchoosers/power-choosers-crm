@@ -128,8 +128,8 @@ export function VelocityTrackerV3() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/5 pt-6 mt-auto relative z-10">
-        <div className="flex gap-3 items-center p-3 rounded-lg bg-white/[0.02] border border-white/5 relative overflow-hidden group hover:bg-white/[0.04] transition-colors">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/5 pt-6 mt-auto relative z-10">
+        <div className="flex gap-3 items-center p-3 rounded-lg bg-transparent border border-white/5 relative overflow-hidden transition-colors hover:border-white/10">
           <div className="p-2 rounded-md bg-[#002FA7]/10 text-[#002FA7] border border-[#002FA7]/20">
             <Plug size={16} />
           </div>
@@ -139,7 +139,7 @@ export function VelocityTrackerV3() {
           </div>
         </div>
 
-        <div className="flex gap-3 items-center p-3 rounded-lg bg-white/[0.02] border border-white/5 relative overflow-hidden group hover:bg-white/[0.04] transition-colors">
+        <div className="flex gap-3 items-center p-3 rounded-lg bg-transparent border border-white/5 relative overflow-hidden transition-colors hover:border-white/10">
           <div className="p-2 rounded-md bg-amber-500/10 text-amber-500 border border-amber-500/20">
             <Target size={16} />
           </div>
@@ -149,7 +149,7 @@ export function VelocityTrackerV3() {
           </div>
         </div>
 
-        <div className="flex gap-3 items-center p-3 rounded-lg bg-white/[0.02] border border-white/5 relative overflow-hidden group hover:bg-white/[0.04] transition-colors">
+        <div className="flex gap-3 items-center p-3 rounded-lg bg-transparent border border-white/5 relative overflow-hidden transition-colors hover:border-white/10">
           <div className="p-2 rounded-md bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
             <ShieldCheck size={16} />
           </div>

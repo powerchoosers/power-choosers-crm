@@ -311,12 +311,12 @@ export function IntelligencePanel({
                             </div>
                     )}
                 </div>
-
-                <DataIngestionCard
-                    accountId={contact?.accountId}
-                    onIngestionComplete={onIngestionComplete}
-                />
             </div>
+
+            <DataIngestionCard
+                accountId={contact?.accountId}
+                onIngestionComplete={onIngestionComplete}
+            />
         </div>
     )
 }

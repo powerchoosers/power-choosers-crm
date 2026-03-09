@@ -177,7 +177,7 @@ export function SignalMatrix() {
         <button
           onClick={triggerScrape}
           disabled={isScraping || isRefreshing}
-          className="w-7 h-7 rounded-lg flex items-center justify-center border border-white/10 bg-black/30 text-zinc-500 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/10 transition-all disabled:opacity-40"
+          className="w-7 h-7 rounded-lg flex items-center justify-center border border-white/10 bg-transparent text-zinc-500 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/10 transition-all disabled:opacity-40"
           title="Initiate Deep Scan"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${(isScraping || isRefreshing) ? 'animate-spin' : ''}`} />
@@ -221,7 +221,7 @@ export function SignalMatrix() {
             {isLoading && (
               <div className="space-y-2">
                 {[1, 2, 3, 4].map((i) => (
-                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-black/20 border border-white/5 animate-pulse">
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-transparent border border-white/5 animate-pulse">
                     <div className="w-8 h-8 rounded-[14px] bg-white/5 flex-shrink-0" />
                     <div className="flex-1 space-y-2">
                       <div className="h-2.5 bg-white/5 rounded w-24" />
@@ -262,7 +262,7 @@ export function SignalMatrix() {
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.04, duration: 0.25 }}
                     onClick={() => setSelectedSignal(signal)}
-                    className="group flex items-start gap-3 p-3 rounded-xl bg-black/20 border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all cursor-pointer relative overflow-hidden"
+                    className="group flex items-start gap-3 p-3 rounded-xl bg-transparent border border-white/5 hover:bg-zinc-950/90 hover:border-white/10 transition-all cursor-pointer relative overflow-hidden"
                   >
                     {/* Signal type icon */}
                     <div className={`w-8 h-8 rounded-[14px] border flex items-center justify-center flex-shrink-0 ${cfg.bg} ${cfg.border}`}>
@@ -324,7 +324,7 @@ export function SignalMatrix() {
             {MONITOR_SIGNALS.map((s) => (
               <div
                 key={s.id}
-                className="group flex items-start gap-3 p-3 rounded-xl bg-black/20 border border-white/5 hover:bg-white/5 hover:border-white/10 transition-all"
+                className="group flex items-start gap-3 p-3 rounded-xl bg-transparent border border-white/5 hover:bg-zinc-950/90 hover:border-white/10 transition-all"
               >
                 <div
                   className={`w-8 h-8 rounded-[14px] border flex items-center justify-center flex-shrink-0 ${s.type === 'risk'

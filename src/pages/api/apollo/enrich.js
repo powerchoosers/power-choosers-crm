@@ -191,6 +191,15 @@ export default async function handler(req, res) {
 }
 
 function mapApolloContactToLushaFormat(apolloPerson) {
+  const clean = (value) => {
+    if (typeof value !== 'string') return '';
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const lowered = trimmed.toLowerCase();
+    if (lowered === 'null' || lowered === 'undefined' || lowered === 'n/a') return '';
+    return trimmed;
+  };
+
   // Extract phone numbers
   const phones = (apolloPerson.phone_numbers || [])
     .map(p => ({
@@ -217,12 +226,16 @@ function mapApolloContactToLushaFormat(apolloPerson) {
     (p.type || '').toLowerCase().includes('work')
   );
 
+  const firstName = clean(apolloPerson.first_name);
+  const lastName = clean(apolloPerson.last_name);
+  const fullName = clean(apolloPerson.name) || [firstName, lastName].filter(Boolean).join(' ').trim();
+
   return {
     contactId: apolloPerson.id,
     id: apolloPerson.id,
-    firstName: apolloPerson.first_name || '',
-    lastName: apolloPerson.last_name || '',
-    fullName: apolloPerson.name || `${apolloPerson.first_name} ${apolloPerson.last_name}`.trim(),
+    firstName: firstName,
+    lastName: lastName,
+    fullName: fullName,
     jobTitle: apolloPerson.title || apolloPerson.headline || '',
     companyName: apolloPerson.organization?.name || '',
     companyId: apolloPerson.organization_id || '',
