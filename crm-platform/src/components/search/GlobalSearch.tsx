@@ -115,7 +115,7 @@ export function GlobalSearch() {
             if (query) setIsOpen(true)
           }}
           placeholder="Query Database [CMD+K]..."
-          className="w-full h-12 bg-zinc-950/90 backdrop-blur-md border border-white/5 rounded-full pl-12 pr-16 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/50 focus-visible:ring-white/50 focus-visible:ring-offset-0 focus-visible:shadow-[0_0_16px_rgba(255,255,255,0.38)] transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)]"
+          className="w-full h-12 bg-zinc-950/90 backdrop-blur-md border border-white/5 rounded-full pl-12 pr-16 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-white/40 focus:ring-1 focus:ring-white/30 focus-visible:ring-white/30 focus-visible:ring-offset-0 focus-visible:shadow-[0_0_10px_rgba(255,255,255,0.25)] transition-all shadow-[0_0_12px_rgba(0,0,0,0.4)]"
         />
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
           {isSearching && (
@@ -129,7 +129,7 @@ export function GlobalSearch() {
               <X size={16} />
             </button>
           )}
-          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md border border-white/10 bg-white/5 shadow-inner">
+          <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md border border-white/10 bg-transparent shadow-inner">
             <kbd className="font-mono text-[10px] font-medium text-zinc-500">⌘</kbd>
             <kbd className="font-mono text-[10px] font-medium text-zinc-500">K</kbd>
           </div>

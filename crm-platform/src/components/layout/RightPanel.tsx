@@ -133,6 +133,20 @@ export function RightPanel() {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
 
+  const scrollMapIntoView = useCallback((mapNode: HTMLDivElement | null) => {
+    const container = scrollContainerRef.current
+    if (!container || !mapNode) return
+    const containerRect = container.getBoundingClientRect()
+    const mapRect = mapNode.getBoundingClientRect()
+    // Keep the bottom edge of the map flush with the bottom of the dossier viewport.
+    const deltaToBottom = mapRect.bottom - containerRect.bottom
+    if (deltaToBottom > 0) {
+      const buffer = 24
+      const nextTop = Math.min(container.scrollTop + deltaToBottom + buffer, container.scrollHeight - container.clientHeight)
+      container.scrollTo({ top: nextTop, behavior: 'smooth' })
+    }
+  }, [])
+
 
   const syncScrolledState = useCallback((scrollTop: number) => {
     const value = scrollTop > 10
@@ -427,6 +441,7 @@ export function RightPanel() {
                           latitude={account?.latitude ?? null}
                           longitude={account?.longitude ?? null}
                           accountId={account?.id || contact?.accountId}
+                          onMapReveal={scrollMapIntoView}
                           onSyncComplete={() => {
                             if (isContactPage) refetchContact()
                             else refetchAccount()

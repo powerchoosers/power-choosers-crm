@@ -387,7 +387,7 @@ export default function SettingsPage() {
                           className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/5 group overflow-hidden"
                         >
                           <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-500">
+                            <div className="w-8 h-8 rounded-lg bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
                               <Mail className="w-4 h-4" />
                             </div>
                             <div>
@@ -671,7 +671,7 @@ export default function SettingsPage() {
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
                   <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500">
+                    <div className="w-10 h-10 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
                       <Database className="w-5 h-5" />
                     </div>
                     <div>
@@ -704,7 +704,7 @@ export default function SettingsPage() {
 
                 <div className="flex items-center justify-between p-4 rounded-lg bg-transparent border border-white/5">
                   <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-500/20 flex items-center justify-center text-blue-500">
+                    <div className="w-10 h-10 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
                       <Database className="w-5 h-5" />
                     </div>
                     <div>

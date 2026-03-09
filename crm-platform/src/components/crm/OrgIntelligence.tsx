@@ -16,9 +16,11 @@ import { useCallStore } from '@/store/callStore';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ContactAvatar } from '@/components/ui/ContactAvatar';
+import type { ComposeContext } from '@/components/emails/ComposeModal';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
+import { useComposeStore } from '@/store/composeStore';
 import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/context/AuthContext';
 
@@ -169,6 +171,44 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+function sanitizeContactText(value: unknown): string {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  const lowered = trimmed.toLowerCase();
+  if (lowered === 'null' || lowered === 'undefined' || lowered === 'n/a') return '';
+  return trimmed;
+}
+
+function buildIdentityName(input: { name?: unknown; firstName?: unknown; lastName?: unknown }) {
+  let name = sanitizeContactText(input.name);
+  let firstName = sanitizeContactText(input.firstName);
+  let lastName = sanitizeContactText(input.lastName);
+
+  if ((!firstName || !lastName) && name) {
+    const parts = name.split(/\s+/).filter(Boolean);
+    if (!firstName && parts.length > 0) firstName = parts[0];
+    if (!lastName && parts.length > 1) lastName = parts.slice(1).join(' ');
+  }
+
+  if (!name) {
+    name = [firstName, lastName].filter(Boolean).join(' ').trim();
+  }
+
+  return {
+    name,
+    firstName,
+    lastName
+  };
+}
+
+function buildNameKey(firstName?: unknown, lastName?: unknown): string {
+  const first = sanitizeContactText(firstName).toLowerCase();
+  const last = sanitizeContactText(lastName).toLowerCase();
+  if (!first || !last) return '';
+  return `${first}::${last}`;
+}
+
 export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId, accountLogoUrl, accountDomain }: OrgIntelligenceProps) {
   const { user } = useAuth();
   const [data, setData] = useState<ApolloContactRow[]>([]);
@@ -182,6 +222,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const phoneRevealTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const phoneRevealWarningTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const { initiateCall } = useCallStore();
+  const openCompose = useComposeStore((s) => s.openCompose);
   const queryClient = useQueryClient();
   const setLastEnrichedAccountId = useUIStore((s) => s.setLastEnrichedAccountId);
   const setLastEnrichedContactId = useUIStore((s) => s.setLastEnrichedContactId);
@@ -507,6 +548,62 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   };
 
+  const buildExistingContactLookups = async () => {
+    const empty = {
+      emailToCrmId: new Map<string, string>(),
+      apolloIdToCrmId: new Map<string, string>(),
+      linkedinToCrmId: new Map<string, string>(),
+      nameToCrmId: new Map<string, string>()
+    };
+
+    try {
+      let query = supabase
+        .from('contacts')
+        .select('id, email, firstName, lastName, name, linkedinUrl, metadata');
+
+      if (accountId) {
+        query = query.eq('accountId', accountId);
+      }
+
+      const { data: existingContacts, error } = await query.limit(1000);
+      if (error || !existingContacts) return empty;
+
+      existingContacts.forEach((contact) => {
+        if (!contact?.id) return;
+
+        const email = sanitizeContactText(contact.email).toLowerCase();
+        if (email && !empty.emailToCrmId.has(email)) {
+          empty.emailToCrmId.set(email, contact.id);
+        }
+
+        const linkedin = sanitizeContactText(contact.linkedinUrl).toLowerCase();
+        if (linkedin && !empty.linkedinToCrmId.has(linkedin)) {
+          empty.linkedinToCrmId.set(linkedin, contact.id);
+        }
+
+        const metadata = isRecord(contact.metadata) ? contact.metadata : {};
+        const apolloPersonId = sanitizeContactText(metadata.apollo_person_id);
+        if (apolloPersonId && !empty.apolloIdToCrmId.has(apolloPersonId)) {
+          empty.apolloIdToCrmId.set(apolloPersonId, contact.id);
+        }
+
+        const contactIdentity = buildIdentityName({
+          name: contact.name,
+          firstName: contact.firstName,
+          lastName: contact.lastName
+        });
+        const nameKey = buildNameKey(contactIdentity.firstName, contactIdentity.lastName);
+        if (nameKey && !empty.nameToCrmId.has(nameKey)) {
+          empty.nameToCrmId.set(nameKey, contact.id);
+        }
+      });
+    } catch (err) {
+      console.warn('Failed to build contact lookups:', err);
+    }
+
+    return empty;
+  };
+
   const handleAcquire = async (person: ApolloContactRow, type: 'email' | 'phone' | 'both' = 'both') => {
     if (!accountId) {
       toast.error('No account ID provided for acquisition');
@@ -597,13 +694,29 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const phone0 = immediatePhones[0] ? formatPhoneNumber(immediatePhones[0]) : '';
       const phone1 = immediatePhones[1] ? formatPhoneNumber(immediatePhones[1]) : '';
       const phone2 = immediatePhones[2] ? formatPhoneNumber(immediatePhones[2]) : '';
+      const enrichedIdentity = buildIdentityName({
+        name: enriched.fullName,
+        firstName: enriched.firstName,
+        lastName: enriched.lastName
+      });
+      const personIdentity = buildIdentityName({
+        name: person.name,
+        firstName: person.firstName,
+        lastName: person.lastName
+      });
+      const resolvedIdentity = {
+        name: enrichedIdentity.name || personIdentity.name || 'Unknown Contact',
+        firstName: enrichedIdentity.firstName || personIdentity.firstName || undefined,
+        lastName: enrichedIdentity.lastName || personIdentity.lastName || undefined
+      };
+      const safeEmail = sanitizeContactText(enriched.email) || sanitizeContactText(person.email) || 'N/A';
 
       const contactData: Record<string, unknown> = {
-        name: enriched.fullName || person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Unknown',
-        firstName: enriched.firstName ?? person.firstName,
-        lastName: enriched.lastName ?? person.lastName,
+        name: resolvedIdentity.name,
+        firstName: resolvedIdentity.firstName,
+        lastName: resolvedIdentity.lastName,
         title: enriched.jobTitle || person.title,
-        email: enriched.email || person.email,
+        email: safeEmail,
         accountId: accountId,
         ownerId: user?.id || null,
         status: 'Active',
@@ -643,7 +756,42 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             .update(contactData)
             .eq('id', crmId);
           if (error) throw error;
-        } else if (contactData.email && contactData.email !== 'N/A') {
+        } else if (linkedinUrl) {
+          const { data: byLinkedin } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('accountId', accountId)
+            .eq('linkedinUrl', linkedinUrl)
+            .maybeSingle();
+          if (byLinkedin?.id) {
+            crmId = byLinkedin.id;
+            const { error } = await supabase
+              .from('contacts')
+              .update(contactData)
+              .eq('id', crmId);
+            if (error) throw error;
+          }
+        }
+
+        if (!crmId && resolvedIdentity.firstName && resolvedIdentity.lastName) {
+          const { data: byName } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('accountId', accountId)
+            .ilike('firstName', resolvedIdentity.firstName)
+            .ilike('lastName', resolvedIdentity.lastName)
+            .maybeSingle();
+          if (byName?.id) {
+            crmId = byName.id;
+            const { error } = await supabase
+              .from('contacts')
+              .update(contactData)
+              .eq('id', crmId);
+            if (error) throw error;
+          }
+        }
+
+        if (!crmId && contactData.email && contactData.email !== 'N/A') {
           const { data: existing } = await supabase
             .from('contacts')
             .select('id')
@@ -679,7 +827,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       const typeLabel = type === 'both' ? 'details' : type === 'email' ? 'email' : 'phone';
-      toast.success(`${person.name} ${typeLabel} revealed & synced`);
+      toast.success(`${resolvedIdentity.name} ${typeLabel} revealed & synced`);
 
       // Invalidate and refetch so dossier, people, accounts, targets see changes immediately
       await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId });
@@ -718,13 +866,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           ...p,
           isMonitored: true,
           crmId: crmId,
-          name: enriched.fullName || p.name,
-          firstName: enriched.firstName || p.firstName,
-          lastName: enriched.lastName || p.lastName,
+          name: resolvedIdentity.name,
+          firstName: resolvedIdentity.firstName || p.firstName,
+          lastName: resolvedIdentity.lastName || p.lastName,
           photoUrl: enriched.photoUrl || p.photoUrl,
-          email: enriched.email || p.email,
+          email: safeEmail || p.email,
           title: enriched.jobTitle || p.title,
-          linkedin: enriched.linkedin || p.linkedin,
+          linkedin: sanitizeContactText(enriched.linkedin) || p.linkedin,
           location: enriched.location || p.location,
           phones: mergedPhones
         } : p
@@ -838,6 +986,44 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   };
 
+  const buildComposeContext = (person: ApolloContactRow): ComposeContext => {
+    const contactName =
+      person.name ||
+      [person.firstName, person.lastName].filter(Boolean).join(' ').trim() ||
+      undefined;
+    const accountDisplayName = companySummary?.name || companyName || domain;
+    const contextPieces: string[] = [];
+    const description = companySummary?.description?.trim();
+    if (description) contextPieces.push(description);
+    if (companySummary?.industry) contextPieces.push(`Industry: ${companySummary.industry}`);
+    if (companySummary?.revenue) contextPieces.push(`Revenue: ${companySummary.revenue}`);
+    const locationParts = [companySummary?.city, companySummary?.state, companySummary?.country].filter(Boolean);
+    if (locationParts.length) contextPieces.push(`HQ: ${locationParts.join(', ')}`);
+    if (person.title) contextPieces.push(`Contact Title: ${person.title}`);
+    if (person.location) contextPieces.push(`Contact Location: ${person.location}`);
+
+    return {
+      contactId: person.crmId || undefined,
+      accountId: accountId ?? undefined,
+      contactName,
+      contactTitle: person.title || undefined,
+      companyName: accountDisplayName || undefined,
+      accountName: accountDisplayName || undefined,
+      industry: companySummary?.industry || undefined,
+      accountDescription: description || undefined,
+      contextForAi: contextPieces.length ? contextPieces.join('\n') : undefined
+    };
+  };
+
+  const handleContactEmailClick = (person: ApolloContactRow) => {
+    if (!person.email || person.email === 'N/A') return;
+    openCompose({
+      to: person.email,
+      subject: '',
+      context: buildComposeContext(person)
+    });
+  };
+
   const handleScan = async () => {
     if (!companyName && !domain) {
       toast.error('No company context available for scan.');
@@ -894,23 +1080,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const apolloContacts: unknown[] =
         isRecord(result) && Array.isArray(result.people) ? (result.people as unknown[]) : []
 
-      // Extract all emails to check in Supabase
-      const emailsToCheck = apolloContacts
-        .map((c) => (isRecord(c) && typeof c.email === 'string' ? c.email : null))
-        .filter(Boolean);
-
-      let existingEmails = new Set<string>();
-
-      if (emailsToCheck.length > 0) {
-        const { data: existingContacts, error } = await supabase
-          .from('contacts')
-          .select('email')
-          .in('email', emailsToCheck);
-
-        if (!error && existingContacts) {
-          existingEmails = new Set(existingContacts.map(c => c.email));
-        }
-      }
+      const lookups = await buildExistingContactLookups();
 
       // Fallback: If company summary is still null, try to derive it from the first contact
       if (!currentSummary && apolloContacts.length > 0) {
@@ -937,8 +1107,12 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const mappedData: ApolloContactRow[] = apolloContacts
         .map((contact): ApolloContactRow | null => {
           if (!isRecord(contact)) return null
-          const name = typeof contact.name === 'string' ? contact.name : ''
-          if (!name) return null
+          const identity = buildIdentityName({
+            name: contact.name,
+            firstName: contact.first_name,
+            lastName: contact.last_name
+          });
+          const name = identity.name || 'Contact';
 
           const id = typeof contact.id === 'string' ? contact.id :
             typeof contact.contactId === 'string' ? contact.contactId :
@@ -946,20 +1120,28 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
           if (!id) return null;
 
-          const firstName = typeof contact.first_name === 'string' ? contact.first_name : name.split(' ')[0]
-          const lastName = typeof contact.last_name === 'string' ? contact.last_name : name.split(' ').slice(1).join(' ')
+          const firstName = identity.firstName || name.split(' ')[0] || ''
+          const lastName = identity.lastName || name.split(' ').slice(1).join(' ')
           const title = typeof contact.title === 'string' ? contact.title : undefined
           const email = typeof contact.email === 'string' ? contact.email : 'N/A'
           const emailStatus = typeof contact.email_status === 'string' ? contact.email_status : ''
           const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified'
-          const isMonitored = email !== 'N/A' && existingEmails.has(email)
+          const emailKey = sanitizeContactText(email).toLowerCase();
+          const linkedin = sanitizeContactText(contact.linkedin_url);
+          const linkedInKey = linkedin.toLowerCase();
+          const nameKey = buildNameKey(firstName, lastName);
+          const crmId =
+            lookups.apolloIdToCrmId.get(id) ||
+            (emailKey ? lookups.emailToCrmId.get(emailKey) : undefined) ||
+            (linkedInKey ? lookups.linkedinToCrmId.get(linkedInKey) : undefined) ||
+            (nameKey ? lookups.nameToCrmId.get(nameKey) : undefined);
+          const isMonitored = Boolean(crmId);
 
           const location = [
             typeof contact.city === 'string' ? contact.city : null,
             typeof contact.state === 'string' ? contact.state : null
           ].filter(Boolean).join(', ')
 
-          const linkedin = typeof contact.linkedin_url === 'string' ? contact.linkedin_url : undefined
           const photoUrl = typeof contact.photo_url === 'string'
             ? contact.photo_url
             : (typeof contact.photoUrl === 'string' ? contact.photoUrl : undefined)
@@ -983,6 +1165,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             email,
             status,
             isMonitored,
+            crmId,
             location,
             linkedin,
             photoUrl,
@@ -1047,47 +1230,46 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const apolloContacts: unknown[] =
         isRecord(result) && Array.isArray(result.people) ? (result.people as unknown[]) : [];
 
-      const emailsToCheck = apolloContacts
-        .map((c) => (isRecord(c) && typeof c.email === 'string' ? c.email : null))
-        .filter(Boolean);
-
-      let existingEmails = new Set<string>();
-      if (emailsToCheck.length > 0) {
-        const { data: existingContacts, error } = await supabase
-          .from('contacts')
-          .select('email')
-          .in('email', emailsToCheck);
-        if (!error && existingContacts) {
-          existingEmails = new Set(existingContacts.map(c => c.email));
-        }
-      }
+      const lookups = await buildExistingContactLookups();
 
       const mappedData: ApolloContactRow[] = apolloContacts
         .map((contact): ApolloContactRow | null => {
           if (!isRecord(contact)) return null;
           const c = contact as Record<string, unknown>;
-          const name = (typeof c.name === 'string' ? c.name : '') || [c.first_name, c.last_name, c.firstName, c.lastName].filter(Boolean).join(' ').trim();
-          if (!name) return null;
+          const identity = buildIdentityName({
+            name: c.name,
+            firstName: typeof c.first_name === 'string' ? c.first_name : c.firstName,
+            lastName: typeof c.last_name === 'string' ? c.last_name : c.lastName
+          });
+          const name = identity.name || 'Contact';
 
           const id = typeof c.id === 'string' ? c.id :
             typeof c.contactId === 'string' ? c.contactId :
               typeof c.person_id === 'string' ? c.person_id : '';
           if (!id) return null;
 
-          const firstName = typeof c.first_name === 'string' ? c.first_name : typeof c.firstName === 'string' ? c.firstName : name.split(' ')[0];
-          const lastName = typeof c.last_name === 'string' ? c.last_name : typeof c.lastName === 'string' ? c.lastName : name.split(' ').slice(1).join(' ');
+          const firstName = identity.firstName || name.split(' ')[0] || '';
+          const lastName = identity.lastName || name.split(' ').slice(1).join(' ');
           const title = typeof c.title === 'string' ? c.title : undefined;
           const email = typeof c.email === 'string' ? c.email : 'N/A';
           const emailStatus = typeof c.email_status === 'string' ? c.email_status : '';
           const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified';
-          const isMonitored = email !== 'N/A' && existingEmails.has(email);
+          const linkedin = sanitizeContactText(typeof c.linkedin_url === 'string' ? c.linkedin_url : typeof c.linkedin === 'string' ? c.linkedin : '');
+          const emailKey = sanitizeContactText(email).toLowerCase();
+          const linkedInKey = linkedin.toLowerCase();
+          const nameKey = buildNameKey(firstName, lastName);
+          const crmId =
+            lookups.apolloIdToCrmId.get(id) ||
+            (emailKey ? lookups.emailToCrmId.get(emailKey) : undefined) ||
+            (linkedInKey ? lookups.linkedinToCrmId.get(linkedInKey) : undefined) ||
+            (nameKey ? lookups.nameToCrmId.get(nameKey) : undefined);
+          const isMonitored = Boolean(crmId);
 
           const location = [
             typeof c.city === 'string' ? c.city : null,
             typeof c.state === 'string' ? c.state : null
           ].filter(Boolean).join(', ');
 
-          const linkedin = typeof c.linkedin_url === 'string' ? c.linkedin_url : typeof c.linkedin === 'string' ? c.linkedin : undefined;
           const photoUrl = typeof c.photo_url === 'string'
             ? c.photo_url
             : (typeof c.photoUrl === 'string' ? c.photoUrl : undefined);
@@ -1113,8 +1295,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             email,
             status,
             isMonitored,
+            crmId,
             location,
-            linkedin,
+            linkedin: linkedin || undefined,
             photoUrl,
             phones
           };
@@ -1359,7 +1542,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
                         <h4 className="text-xs font-semibold text-white truncate">{companySummary.name}</h4>
                       </div>
                       {companySummary.linkedin && (
@@ -1438,6 +1621,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                         revealingPhone: false,
                         phoneTimedOut: false
                       };
+                      const identity = buildIdentityName({
+                        name: person.name,
+                        firstName: person.firstName,
+                        lastName: person.lastName
+                      });
+                      const contactFullName = identity.name || 'Contact';
+                      const compactName = `${identity.firstName || contactFullName} ${identity.lastName ? `${identity.lastName.charAt(0)}.` : ''}`.trim();
                       return (
                     <motion.div
                       key={person.id}
@@ -1451,7 +1641,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                         damping: 30,
                         layout: { duration: 0.3 }
                       }}
-                      className="group flex flex-col p-2.5 rounded-xl hover:bg-zinc-950/40 transition-all border border-transparent hover:border-white/5 space-y-2"
+                      className={cn(
+                        'flex flex-col p-2.5 rounded-xl transition-all border border-transparent hover:border-white/5 hover:bg-zinc-950/40 space-y-2',
+                        person.isMonitored && 'bg-zinc-950/40 border-white/5'
+                      )}
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
@@ -1466,8 +1659,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                             <div className="flex items-center gap-1.5 min-w-0">
                             <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
                               {person.isMonitored
-                                ? person.name
-                                : `${person.firstName} ${person.lastName?.charAt(0) || ''}.`
+                                ? contactFullName
+                                : compactName
                               }
                             </span>
                             {person.isMonitored && (
@@ -1506,16 +1699,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                 initial={{ opacity: 0.8, y: 4 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                                className="flex flex-col items-start gap-0.5 min-w-0 w-full"
-                                title={person.email}
+                                className="flex flex-col items-start gap-0.5 min-w-0 w-full group/email"
                               >
-                                <div className="flex items-center gap-1.5 min-w-0 w-full">
-                                  <Globe className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                                  <span className="truncate text-[9px] font-mono text-zinc-300 uppercase tracking-tighter">
+                                <button
+                                  type="button"
+                                  onClick={() => handleContactEmailClick(person)}
+                                  aria-label={`Email ${contactFullName}`}
+                                  className="w-full flex items-center gap-1.5 min-w-0 text-left transition duration-200 transform hover:scale-[1.02] cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002FA7] group"
+                                >
+                                  <Globe className="w-3.5 h-3.5 text-zinc-500 shrink-0 transition-colors duration-200 group-hover:text-white" />
+                                  <span className="truncate text-[9px] font-mono uppercase tracking-tighter text-zinc-300 transition-colors duration-200 group-hover:text-white">
                                     {person.email}
                                   </span>
-                                </div>
-                                <span className="pl-5 text-[8px] font-mono text-zinc-500 tracking-[0.18em] uppercase">
+                                </button>
+                                <span className="pl-5 text-[8px] font-mono text-zinc-500 tracking-[0.18em] uppercase transition duration-200 group-hover/email:text-white">
                                   EMAIL
                                 </span>
                               </motion.div>
@@ -1543,11 +1740,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                   return (
                                     <button
                                       key={num}
+                                      type="button"
+                                      aria-label={`Call ${contactFullName} (${label})`}
                                       onClick={() => {
-                                        const callName =
-                                          person.name ||
-                                          [person.firstName, person.lastName].filter(Boolean).join(' ').trim() ||
-                                          'Contact';
+                                        const callName = contactFullName;
                                         const logoUrl = (accountLogoUrl && accountLogoUrl.trim()) || companySummary?.logoUrl;
                                         const domainForCall =
                                           (accountDomain && accountDomain.trim()) ||
@@ -1563,16 +1759,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                                         });
                                         toast.info(`Calling ${callName}...`);
                                       }}
-                                      className="w-full flex flex-col items-start gap-0.5 text-zinc-400 hover:text-white transition-colors uppercase min-w-0"
-                                      title={num}
+                                      className="w-full flex flex-col items-start gap-0.5 text-zinc-400 uppercase min-w-0 transition duration-200 transform hover:scale-[1.02] hover:text-white cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002FA7] group"
                                     >
                                       <div className="flex items-center gap-1.5 w-full min-w-0">
-                                        <Phone className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-                                        <span className="font-mono text-[9px] text-zinc-300 whitespace-nowrap">
+                                        <Phone className="w-3.5 h-3.5 text-zinc-500 shrink-0 transition-colors duration-200 group-hover:text-white" />
+                                        <span className="font-mono text-[9px] text-zinc-300 whitespace-nowrap transition-colors duration-200 group-hover:text-white">
                                           {num}
                                         </span>
                                       </div>
-                                      <span className="pl-5 font-mono text-[8px] text-zinc-500 tracking-[0.18em]">
+                                      <span className="pl-5 font-mono text-[8px] text-zinc-500 tracking-[0.18em] transition-colors duration-200 group-hover:text-white">
                                         {label}
                                       </span>
                                     </button>

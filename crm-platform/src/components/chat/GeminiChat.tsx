@@ -426,7 +426,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
                       "h-7 font-mono text-[9px] uppercase tracking-widest px-3 transition-all",
                       enriched
                         ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                        : "bg-[#002FA7] hover:bg-blue-600 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                        : "bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
                     )}
                     onClick={handleEnrich}
                     disabled={isEnriching || enriched}
@@ -510,7 +510,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
             </div>
             <Button
               size="sm"
-              className="bg-[#002FA7] hover:bg-blue-600 text-white font-mono text-[10px] uppercase tracking-widest border border-blue-400/30 shadow-[0_0_15px_rgba(0,47,167,0.4)] h-8"
+              className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.4)] h-8"
               onClick={(e) => { e.stopPropagation(); dossier.id && router.push(`/network/people/${dossier.id}`); }}
             >
               INITIATE
@@ -594,7 +594,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); router.push(`/network/accounts/${pos.accountId}`); }}
-                  className="text-[9px] font-mono text-[#002FA7] hover:text-blue-400 uppercase tracking-wider"
+                  className="text-[9px] font-mono text-[#002FA7] hover:text-[#002FA7] uppercase tracking-wider"
                 >
                   Open account →
                 </button>
@@ -1748,7 +1748,7 @@ SELECT * FROM hybrid_search_accounts(
                   /* "Intelligence Block" (AI Response) */
                   <div className="flex justify-start mb-2 relative w-full group">
                     {/* The Neural Line (The glowing spine on the left) */}
-                    <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] via-[#002FA7]/20 to-transparent group-hover:from-blue-400 transition-colors duration-500" />
+                    <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] via-[#002FA7]/20 to-transparent group-hover:from-[#002FA7] transition-colors duration-500" />
 
                     <div className="pl-6 w-full">
                       <div className="flex items-center gap-2 mb-2">
@@ -1976,7 +1976,7 @@ SELECT * FROM hybrid_search_accounts(
               <button
                 type="submit"
                 disabled={isLoading || !input.trim()}
-                className="bg-[#002FA7] hover:bg-blue-600 text-white p-2.5 rounded-xl shadow-[0_0_15px_-3px_rgba(0,47,167,0.5)] transition-all active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed border border-[#002FA7]/30"
+                className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white p-2.5 rounded-xl shadow-[0_0_15px_-3px_rgba(0,47,167,0.5)] transition-all active:scale-95 group disabled:opacity-50 disabled:cursor-not-allowed border border-[#002FA7]/30"
               >
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>

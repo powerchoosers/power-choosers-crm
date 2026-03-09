@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { mapLocationToZone, LOAD_ZONE_COLOR_MAP, type ErcotZone, ERCOT_ZONES } from '@/lib/market-mapping'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { domainToClickableUrl } from '@/lib/url'
 
@@ -22,6 +23,15 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
   const initiateCall = useCallStore((state) => state.initiateCall)
   const [isSearching, setIsSearching] = useState(false)
   const [justUpdated, setJustUpdated] = useState(false)
+  const storedZone = (account.loadZone as ErcotZone | undefined)
+  const locationZone = mapLocationToZone(account.city, account.state)
+  const resolvedZone = storedZone && LOAD_ZONE_COLOR_MAP[storedZone] ? storedZone : locationZone
+  const zoneColor = LOAD_ZONE_COLOR_MAP[resolvedZone] ?? LOAD_ZONE_COLOR_MAP[ERCOT_ZONES.NORTH]
+  const zoneStyle = {
+    color: zoneColor,
+    backgroundColor: `${zoneColor}1f`,
+    borderColor: `${zoneColor}2f`,
+  }
 
   const handleCallClick = () => {
     if (!account.companyPhone || isEditing) return
@@ -284,11 +294,14 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
             <Building2 className="w-4 h-4 text-zinc-500 shrink-0" />
             <div className="flex flex-col items-start min-w-0">
               <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Zone Identifier</span>
-              <span className="font-mono text-[10px] text-[#002FA7] bg-[#002FA7]/5 border border-[#002FA7]/10 px-2 py-0.5 rounded uppercase tracking-widest mt-0.5 truncate max-w-full">
-                {account.loadZone || 'LZ_NORTH'}
-              </span>
+                <span
+                  className="font-mono text-[10px] uppercase tracking-widest mt-0.5 truncate max-w-full px-2 py-0.5 rounded border"
+                  style={zoneStyle}
+                >
+                  {resolvedZone}
+                </span>
+              </div>
             </div>
-          </div>
         </div>
       </div>
     </div>

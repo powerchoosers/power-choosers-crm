@@ -24,7 +24,7 @@ export function ForensicLogStream() {
           </span>
         </div>
       </div>
-      <div className="h-64 overflow-y-auto np-scroll p-4 space-y-1 bg-black/40 font-mono text-[11px] relative">
+      <div className="h-64 overflow-y-auto np-scroll p-4 space-y-1 bg-transparent font-mono text-[11px] relative">
         <AnimatePresence initial={false}>
           {logEntries.length === 0 ? (
             <motion.div

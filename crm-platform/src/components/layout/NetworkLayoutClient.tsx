@@ -11,7 +11,7 @@ import { useAuth } from "@/context/AuthContext";
 import { LoadingOrb } from "@/components/ui/LoadingOrb";
 import { GlobalSync } from "@/components/layout/GlobalSync";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export function NetworkLayoutClient({
   children,
@@ -72,7 +72,13 @@ export function NetworkLayoutClient({
   }
 
   return (
-    <div className={cn(inter.className, "bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-screen w-screen relative")}>
+    <div
+      className={cn(
+        inter.className,
+        inter.variable,
+        "font-sans bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-screen w-screen relative"
+      )}
+    >
       <GlobalSync />
       <TopBar />
       <Sidebar />

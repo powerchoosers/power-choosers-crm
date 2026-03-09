@@ -1001,7 +1001,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                           <Button 
                             onClick={handleCreateList}
                             disabled={!newListName.trim() || createTargetList.isPending}
-                            className="bg-[#002FA7] hover:bg-blue-600 text-white h-9 px-4"
+                            className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white h-9 px-4"
                           >
                             {createTargetList.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
                           </Button>

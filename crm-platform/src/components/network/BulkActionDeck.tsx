@@ -46,7 +46,7 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
           exit={{ y: 100, opacity: 0 }}
           className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50"
         >
-        <div className="bg-zinc-950/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_0_50px_-10px_rgba(0,0,0,0.7)] p-2 pr-6 flex items-center gap-6 whitespace-nowrap">
+        <div className="nodal-void-card nodal-monolith-edge p-2 pr-6 flex items-center gap-6 whitespace-nowrap">
           
           {/* 1. THE COUNTER & CLEAR */}
           <div className="flex items-center gap-3 bg-white/5 rounded-xl px-4 py-2 border border-white/5">
@@ -78,7 +78,7 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
             <button 
               onClick={onClear} 
               className="ml-2 text-zinc-600 hover:text-white transition-colors border-l border-white/10 pl-3"
-              title="Clear Selection"
+              aria-label="Clear Selection"
             >
               <X className="w-3 h-3" />
             </button>
