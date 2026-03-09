@@ -225,6 +225,67 @@ export function useTasksCount(searchQuery?: string) {
   })
 }
 
+export function useTaskMetrics() {
+  const { user, role, loading } = useAuth()
+
+  return useQuery({
+    queryKey: ['tasks-metrics', user?.email, role],
+    queryFn: async () => {
+      if (loading || !user || !user.email) {
+        return { overdue: 0, pending: 0, total: 0 }
+      }
+
+      const applyOwnerFilter = (query: any) => {
+        if (role !== 'admin') {
+          return query.eq('ownerId', user.email)
+        }
+        return query
+      }
+
+      try {
+        const nowIso = new Date().toISOString()
+
+        const totalPromise = applyOwnerFilter(
+          supabase.from('tasks').select('id', { count: 'exact', head: true })
+        )
+        const pendingPromise = applyOwnerFilter(
+          supabase.from('tasks').select('id', { count: 'exact', head: true }).neq('status', 'Completed')
+        )
+        const overduePromise = applyOwnerFilter(
+          supabase
+            .from('tasks')
+            .select('id', { count: 'exact', head: true })
+            .neq('status', 'Completed')
+            .lt('dueDate', nowIso)
+        )
+
+        const [totalResult, pendingResult, overdueResult] = await Promise.all([
+          totalPromise,
+          pendingPromise,
+          overduePromise,
+        ])
+
+        if (totalResult.error) throw totalResult.error
+        if (pendingResult.error) throw pendingResult.error
+        if (overdueResult.error) throw overdueResult.error
+
+        return {
+          overdue: overdueResult.count || 0,
+          pending: pendingResult.count || 0,
+          total: totalResult.count || 0,
+        }
+      } catch (error: any) {
+        if (error?.name !== 'AbortError' && error?.message !== 'Fetch is aborted') {
+          console.error('Error fetching task metrics:', error.message || error)
+        }
+        return { overdue: 0, pending: 0, total: 0 }
+      }
+    },
+    enabled: !loading && !!user && !!user?.email,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
 export function useSearchTasks(queryTerm: string) {
   const { user, role, loading } = useAuth()
 
