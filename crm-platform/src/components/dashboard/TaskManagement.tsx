@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react'
 import { CheckCircle2, Circle, Clock, AlertCircle, Plus } from 'lucide-react'
 import { format } from 'date-fns'
+import { useRouter } from 'next/navigation'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { useTasks, useTaskMetrics, type Task } from '@/hooks/useTasks'
 import { useUIStore } from '@/store/uiStore'
@@ -25,6 +26,17 @@ export function TaskManagement() {
   const { data: tasksData, isLoading } = useTasks()
   const { data: metrics, isLoading: isMetricsLoading } = useTaskMetrics()
   const { setRightPanelMode, setTaskContext } = useUIStore()
+  const router = useRouter()
+
+  const navigateToTaskTarget = (task: Task) => {
+    if (task.contactId) {
+      router.push(`/network/contacts/${task.contactId}`)
+      return
+    }
+    if (task.accountId) {
+      router.push(`/network/accounts/${task.accountId}`)
+    }
+  }
 
   const tasks = useMemo(() => {
     const allTasks = tasksData?.pages.flatMap((page) => page.tasks) || []
@@ -83,7 +95,11 @@ export function TaskManagement() {
             return (
               <div
                 key={task.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-transparent border border-white/[0.03] hover:border-white/10 transition-all"
+                className="flex items-center justify-between p-3 rounded-xl bg-transparent border border-white/[0.03] hover:border-white/10 transition-all cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => navigateToTaskTarget(task)}
+                onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { navigateToTaskTarget(task) } }}
               >
                 <div className="flex items-center gap-3">
                   <div className="flex-shrink-0">
