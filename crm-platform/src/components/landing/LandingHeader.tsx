@@ -24,7 +24,7 @@ export function LandingHeader() {
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl h-16' : 'bg-transparent h-24'}`}
       >
         <div className="w-full px-8 h-full flex items-center justify-between">
-          <div className="z-50 flex items-center gap-2 cursor-pointer">
+          <Link href="/" className="z-50 flex items-center gap-2">
             <Image
               src="/images/nodalpoint.png"
               alt="Nodal Point Logo"
@@ -36,7 +36,7 @@ export function LandingHeader() {
             <span className="font-bold text-xl tracking-tighter text-black">
               Nodal <span className="text-[#002FA7]">Point</span>
             </span>
-          </div>
+          </Link>
           <div className="flex items-center gap-6">
             <Link
               href="/portal"
