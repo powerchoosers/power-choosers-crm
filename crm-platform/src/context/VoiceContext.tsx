@@ -229,7 +229,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       const newDevice = new Device(data.token, {
         codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
         enableImprovedSignalingErrorPrecision: true,
-        logLevel: 0, // Quiet, only surface warnings/errors
+        logLevel: 'silent', // Twilio/loglevel: 0=TRACE (noisy), silent fully suppresses SDK logs
         edge: ['ashburn', 'roaming'],
         maxCallSignalingTimeoutMs: 30000,
         tokenRefreshMs: 30000, // Refresh 30s before expiry

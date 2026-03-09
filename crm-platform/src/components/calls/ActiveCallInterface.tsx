@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Zap,
@@ -37,8 +37,6 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   const { profile } = useAuth()
 
   const metadata = isActive ? (voiceMetadata || storeMetadata) : storeMetadata
-
-  const scrollRef = useRef<HTMLDivElement>(null)
 
   // Use store metadata if props are missing (e.g., during dialing)
   const displayContact = contact || {
@@ -105,14 +103,8 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
     }
   }
 
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
-  }, [aiResponse])
-
   return (
-    <div className="flex flex-col h-full bg-transparent overflow-hidden">
+    <div className="flex flex-col h-full bg-zinc-950/40 backdrop-blur-sm overflow-hidden">
       {/* 1. COMPACT LEVERAGE HUD */}
       <div className="px-6 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-4 min-w-0">
@@ -147,16 +139,18 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
 
       {/* 2. Script Output */}
       <ScrollArea className="flex-1">
-        <div className="p-6 flex flex-col gap-6">
+        <div className="p-4 sm:p-6">
           <AnimatePresence mode="wait">
             {loadingVector ? (
-              <NeuralScan key="loading" />
+              <div className="rounded-2xl border border-white/10 bg-black/40 p-6 sm:p-8">
+                <NeuralScan key="loading" />
+              </div>
             ) : aiResponse ? (
               <motion.div
                 key="result"
                 initial={{ opacity: 0, y: 10, filter: 'blur(10px)' }}
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                className="flex flex-col gap-4"
+                className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-black/45 p-4 sm:p-5"
               >
                 {aiResponse.gatekeeperVariants && aiResponse.gatekeeperVariants.length > 0 && selectedVariantIndex === 0 && (
                   <>
@@ -235,7 +229,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                 )}
               </motion.div>
             ) : (
-              <div key="empty" className="py-20 flex flex-col items-center justify-center text-center opacity-40">
+              <div key="empty" className="rounded-2xl border border-white/10 bg-black/45 py-16 sm:py-20 flex flex-col items-center justify-center text-center opacity-70">
                 <Sparkles size={32} className="text-zinc-700 animate-pulse mb-4" />
                 <div className="text-xs font-mono text-zinc-600 uppercase tracking-[0.3em]">
                   Pick a script type to start
@@ -247,14 +241,9 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
       </ScrollArea>
 
       {/* 3. Action Deck */}
-      <div className="p-6 bg-zinc-950/20 border-t border-white/5 space-y-6">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
-          <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-            Call objective
-          </div>
-          <div className="mt-1 text-xs font-sans text-zinc-300">
-            Book the meeting first. If not, ask for a bill review. If still no, ask permission to send a note.
-          </div>
+      <div className="p-4 sm:p-6 bg-zinc-950/30 border-t border-white/5 space-y-4">
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] font-mono text-zinc-400">
+          Objective: book meeting -&gt; bill review -&gt; permission to send note
         </div>
 
         {/* Rapid Context Input */}
@@ -371,10 +360,10 @@ function VectorButton({
         )}
       />
       <div className="min-w-0 w-full">
-        <div className={cn('text-[11px] font-mono uppercase tracking-wide text-zinc-200 truncate', isEngaged && 'text-white')}>
+        <div className={cn('text-[11px] font-mono uppercase tracking-wide text-zinc-200 leading-tight', isEngaged && 'text-white')}>
           {loading ? 'Running...' : label}
         </div>
-        <div className="mt-1 text-[10px] font-sans text-zinc-500 leading-tight truncate">
+        <div className="mt-1 text-[10px] font-sans text-zinc-500 leading-tight">
           {hint}
         </div>
       </div>
@@ -433,14 +422,16 @@ function ScriptStep({ label, content, delay, accent = false }: { label: string, 
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay }}
       className={cn(
-        "bg-zinc-900/40 border p-4 rounded-xl relative overflow-hidden",
-        accent ? "border-white/20 bg-white/5 shadow-[0_0_15px_rgba(255,255,255,0.05)]" : "border-white/5"
+        "border p-4 rounded-xl relative overflow-hidden",
+        accent
+          ? "border-white/20 bg-white/[0.06] shadow-[0_0_15px_rgba(255,255,255,0.05)]"
+          : "border-white/10 bg-black/35"
       )}
     >
       <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-2">
         {label}
       </div>
-      <p className="text-sm text-zinc-100 leading-relaxed font-sans italic">
+      <p className="text-sm text-zinc-100 leading-relaxed font-sans">
         &quot;{content}&quot;
       </p>
     </motion.div>
