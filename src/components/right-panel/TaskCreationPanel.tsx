@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Clock, Calendar, AlertTriangle, CheckCircle, Building2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Calendar, Search, Loader2 } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import {
@@ -22,6 +22,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { useTasks, type Task } from '@/hooks/useTasks'
+import { useSearchContacts } from '@/hooks/useContacts'
+import { useSearchAccounts } from '@/hooks/useAccounts'
 import { useUIStore } from '@/store/uiStore'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
@@ -63,8 +65,8 @@ function parseTimeToDate(date: Date, timeStr: string): Date {
 
 export function TaskCreationPanel() {
     const { taskContext, setRightPanelMode, setTaskContext } = useUIStore()
-    const { entityId, entityName, entityType, entityLogoUrl, entityPhotoUrl, entityDomain } = taskContext || { entityId: '', entityType: 'account' }
     const queryClient = useQueryClient()
+    const [selectedEntity, setSelectedEntity] = useState(taskContext)
 
     const [isReady, setIsReady] = useState(false)
     const now = new Date()
@@ -85,14 +87,43 @@ export function TaskCreationPanel() {
     const [sendCalendarInvite, setSendCalendarInvite] = useState(false)
     const [notes, setNotes] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
+    const [entityQuery, setEntityQuery] = useState('')
+    const [debouncedEntityQuery, setDebouncedEntityQuery] = useState('')
+
+    const activeEntity = selectedEntity || null
+    const entityId = activeEntity?.entityId || ''
+    const entityName = activeEntity?.entityName || ''
+    const entityType = activeEntity?.entityType || 'account'
+    const entityLogoUrl = activeEntity?.entityLogoUrl
+    const entityPhotoUrl = activeEntity?.entityPhotoUrl
+    const entityDomain = activeEntity?.entityDomain
 
     const taskTypeOptions = entityType === 'contact' ? TASK_TYPES_CONTACT : TASK_TYPES_ACCOUNT
 
     const { addTaskAsync } = useTasks()
+    const { data: contactResults = [], isLoading: isSearchingContacts } = useSearchContacts(debouncedEntityQuery)
+    const { data: accountResults = [], isLoading: isSearchingAccounts } = useSearchAccounts(debouncedEntityQuery)
 
     useEffect(() => {
         setIsReady(true)
     }, [])
+
+    useEffect(() => {
+        setSelectedEntity(taskContext)
+    }, [taskContext])
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedEntityQuery(entityQuery.trim())
+        }, 250)
+        return () => clearTimeout(timer)
+    }, [entityQuery])
+
+    useEffect(() => {
+        if (entityType === 'account' && taskType === 'LinkedIn') {
+            setTaskType('Call')
+        }
+    }, [entityType, taskType])
 
     const calendarDays = useMemo(() => {
         const start = startOfMonth(viewMonth)
@@ -104,6 +135,35 @@ export function TaskCreationPanel() {
     }, [viewMonth])
 
     const isPast = (d: Date) => isBefore(d, startOfDay(now))
+    const isSearchingEntities = isSearchingContacts || isSearchingAccounts
+
+    const handleSelectContact = (contact: { id: string; name: string; avatarUrl?: string; logoUrl?: string }) => {
+        const nextContext = {
+            entityId: contact.id,
+            entityName: contact.name,
+            entityType: 'contact' as const,
+            entityPhotoUrl: contact.avatarUrl,
+            entityLogoUrl: contact.logoUrl,
+        }
+        setSelectedEntity(nextContext)
+        setTaskContext(nextContext)
+        setEntityQuery('')
+        setDebouncedEntityQuery('')
+    }
+
+    const handleSelectAccount = (account: { id: string; name: string; logoUrl?: string; domain?: string }) => {
+        const nextContext = {
+            entityId: account.id,
+            entityName: account.name,
+            entityType: 'account' as const,
+            entityLogoUrl: account.logoUrl,
+            entityDomain: account.domain,
+        }
+        setSelectedEntity(nextContext)
+        setTaskContext(nextContext)
+        setEntityQuery('')
+        setDebouncedEntityQuery('')
+    }
 
     const handleTimeChange = (v: string) => {
         // Allow more flexible typing
@@ -253,22 +313,101 @@ export function TaskCreationPanel() {
                         <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
                         Node_Context
                     </div>
-                    <div className="px-4 py-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center gap-4">
-                        {entityType === 'contact' ? (
-                            <ContactAvatar name={entityName || 'Contact'} photoUrl={entityPhotoUrl} size={40} />
-                        ) : (
-                            <CompanyIcon
-                                logoUrl={entityLogoUrl}
-                                domain={entityDomain}
-                                name={entityName || 'Account'}
-                                size={40}
-                            />
-                        )}
-                        <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">{entityType}</span>
-                            <span className="text-sm font-semibold text-white truncate">{entityName || 'Unlabeled Node'}</span>
+                    {entityId ? (
+                        <div className="px-4 py-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-4 min-w-0">
+                                {entityType === 'contact' ? (
+                                    <ContactAvatar name={entityName || 'Contact'} photoUrl={entityPhotoUrl} size={40} />
+                                ) : (
+                                    <CompanyIcon
+                                        logoUrl={entityLogoUrl}
+                                        domain={entityDomain}
+                                        name={entityName || 'Account'}
+                                        size={40}
+                                    />
+                                )}
+                                <div className="flex flex-col min-w-0">
+                                    <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider">{entityType}</span>
+                                    <span className="text-sm font-semibold text-white truncate">{entityName || 'Unlabeled Node'}</span>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setSelectedEntity(null)
+                                    setTaskContext(null)
+                                }}
+                                className="h-8 px-3 rounded-lg border border-white/10 text-[10px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white hover:border-white/20 transition-all"
+                            >
+                                Change
+                            </button>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="space-y-3 p-4 rounded-xl bg-transparent border border-white/10">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-zinc-600" />
+                                <input
+                                    type="text"
+                                    value={entityQuery}
+                                    onChange={(e) => setEntityQuery(e.target.value)}
+                                    placeholder="Search account or contact..."
+                                    className={`${panelTheme.field} pl-9 pr-3 h-10 text-xs`}
+                                />
+                            </div>
+
+                            {entityQuery.trim().length < 2 ? (
+                                <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                                    Type at least 2 characters to select a node.
+                                </div>
+                            ) : isSearchingEntities ? (
+                                <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    Scanning_Nodes
+                                </div>
+                            ) : (
+                                <div className="max-h-48 overflow-y-auto np-scroll space-y-1 pr-1">
+                                    {contactResults.map((contact) => (
+                                        <button
+                                            key={`contact-${contact.id}`}
+                                            type="button"
+                                            onClick={() => handleSelectContact(contact)}
+                                            className="w-full px-3 py-2 rounded-lg border border-white/5 hover:border-white/15 hover:bg-white/[0.02] transition-all text-left flex items-center gap-2"
+                                        >
+                                            <ContactAvatar name={contact.name} photoUrl={contact.avatarUrl} size={24} />
+                                            <div className="min-w-0">
+                                                <div className="text-xs text-zinc-200 truncate">{contact.name}</div>
+                                                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider truncate">contact</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {accountResults.map((account) => (
+                                        <button
+                                            key={`account-${account.id}`}
+                                            type="button"
+                                            onClick={() => handleSelectAccount(account)}
+                                            className="w-full px-3 py-2 rounded-lg border border-white/5 hover:border-white/15 hover:bg-white/[0.02] transition-all text-left flex items-center gap-2"
+                                        >
+                                            <CompanyIcon
+                                                logoUrl={account.logoUrl}
+                                                domain={account.domain}
+                                                name={account.name}
+                                                size={24}
+                                            />
+                                            <div className="min-w-0">
+                                                <div className="text-xs text-zinc-200 truncate">{account.name}</div>
+                                                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider truncate">account</div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {contactResults.length === 0 && accountResults.length === 0 && (
+                                        <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest px-1 py-2">
+                                            No matching nodes.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* CALENDAR SELECTION */}
