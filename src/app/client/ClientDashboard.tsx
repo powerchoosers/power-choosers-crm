@@ -14,6 +14,7 @@ import { differenceInDays, differenceInMonths, format, parseISO } from 'date-fns
 import { useScrollEffect } from '@/hooks/useScrollEffect';
 import { mapLocationToZone } from '@/lib/market-mapping';
 import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel';
+import { PageReveal } from '@/components/motion/PageReveal';
 
 // ─────────────────────────────────────────────
 // Types
@@ -364,6 +365,7 @@ export function ClientDashboard() {
 
             {/* ── MAIN ── */}
             <main className="flex-1 px-6 xl:px-12 pt-28 pb-16 max-w-[1400px] mx-auto w-full">
+                <PageReveal delay={0.05}>
 
                 {/* Welcome */}
                 <div className="mb-8">
@@ -1034,6 +1036,7 @@ export function ClientDashboard() {
 
                     </div>
                 )}
+                </PageReveal>
             </main>
         </div>
     );

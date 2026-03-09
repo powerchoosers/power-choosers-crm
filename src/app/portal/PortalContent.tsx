@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { ArrowRight, Lock, Activity, Mail, CheckCircle2, CalendarDays, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useScrollEffect } from '@/hooks/useScrollEffect';
+import { PageReveal } from '@/components/motion/PageReveal';
 
 // Blurred dashboard preview cards
 function ForensicPreview() {
@@ -191,7 +192,8 @@ export default function PortalContent() {
 
             {/* Main — padded for fixed header */}
             <main className="flex-1 flex items-center justify-center px-6 pt-28 pb-12">
-                <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <PageReveal className="w-full max-w-5xl" delay={0.05}>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
 
                     {/* LEFT: Login */}
                     <div className="w-full max-w-sm mx-auto lg:mx-0">
@@ -385,7 +387,8 @@ export default function PortalContent() {
                         </div>
                     </div>
 
-                </div>
+                    </div>
+                </PageReveal>
             </main>
 
             {/* Footer */}
