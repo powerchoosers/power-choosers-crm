@@ -235,8 +235,6 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         tokenRefreshMs: 30000, // Refresh 30s before expiry
       })
 
-      newDevice.setLogLevel(0)
-
       // Ported from legacy phone.js: Set audio constraints for better quality
       if (newDevice.audio) {
         newDevice.audio.setAudioConstraints({
