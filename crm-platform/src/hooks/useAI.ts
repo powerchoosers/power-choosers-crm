@@ -30,6 +30,74 @@ function normalizeVariant(o: Record<string, unknown>, fallback: ScriptResult): S
   }
 }
 
+function cleanLine(value: unknown): string {
+  return String(value ?? '')
+    .replace(/^['"`]+|['"`]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isPlaceholderLine(value: string): boolean {
+  const normalized = value.toLowerCase().trim()
+  if (!normalized) return true
+  return normalized === '...' || normalized === '[...]' || normalized === '"..."' || normalized.includes('spoken line here')
+}
+
+function buildScriptResult(source: Record<string, unknown>, fallback: ScriptResult): ScriptResult {
+  const opener = cleanLine(source.opener ?? source.Opener ?? fallback.opener)
+  const hook = cleanLine(source.hook ?? source.Hook ?? fallback.hook)
+  const disturb = cleanLine(source.disturb ?? source.Disturb ?? fallback.disturb)
+  const close = cleanLine(source.close ?? source.Close ?? fallback.close)
+
+  const result: ScriptResult = {
+    opener: isPlaceholderLine(opener) ? fallback.opener : opener,
+    hook: isPlaceholderLine(hook) ? fallback.hook : hook,
+    disturb: isPlaceholderLine(disturb) ? fallback.disturb : disturb,
+    close: isPlaceholderLine(close) ? fallback.close : close
+  }
+
+  const gk = source.gatekeeperVariants
+    ?? (source.gatekeeper != null && cleanLine(source.gatekeeper) ? [cleanLine(source.gatekeeper)] : undefined)
+  if (Array.isArray(gk) && gk.length > 0) {
+    result.gatekeeperVariants = gk
+      .map((s) => cleanLine(s))
+      .filter((s) => s && !isPlaceholderLine(s))
+      .slice(0, 5)
+  }
+  if (Array.isArray(source.variants) && source.variants.length > 0) {
+    result.variants = source.variants
+      .filter((v): v is Record<string, unknown> => v != null && typeof v === 'object' && !Array.isArray(v))
+      .slice(0, 5)
+      .map((v) => normalizeVariant(v, result))
+    if (result.variants.length === 0) delete result.variants
+  }
+  return result
+}
+
+function parseFromLabeledText(rawText: string, fallback: ScriptResult): ScriptResult | null {
+  const text = rawText.replace(/\r/g, '').trim()
+  if (!text) return null
+  const pick = (labels: string[]) => {
+    const labelPattern = labels.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+    const nextPattern = '(?:opener|hook|disturb|problem|close|next[-\\s]?step)'
+    const re = new RegExp(`(?:^|\\n)\\s*(?:${labelPattern})\\s*[:\\-]\\s*([\\s\\S]*?)(?=\\n\\s*(?:${nextPattern})\\s*[:\\-]|$)`, 'i')
+    const match = text.match(re)
+    return cleanLine(match?.[1] ?? '')
+  }
+
+  const opener = pick(['opener'])
+  const hook = pick(['hook'])
+  const disturb = pick(['disturb', 'problem', 'problem question'])
+  const close = pick(['close', 'next-step ask', 'next step ask'])
+  if (!opener && !hook && !disturb && !close) return null
+  return {
+    opener: opener || fallback.opener,
+    hook: hook || fallback.hook,
+    disturb: disturb || fallback.disturb,
+    close: close || fallback.close
+  }
+}
+
 /** Strip markdown code fences and parse JSON; normalize to ScriptResult (gatekeeper + variants). */
 function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
   const fallback: ScriptResult = {
@@ -43,23 +111,7 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
   if (typeof raw === 'string') {
     str = raw.trim()
   } else if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
-    const o = raw as Record<string, unknown>
-    const result: ScriptResult = {
-      opener: String(o.opener ?? o.Opener ?? fallback.opener),
-      hook: String(o.hook ?? o.Hook ?? fallback.hook),
-      disturb: String(o.disturb ?? o.Disturb ?? fallback.disturb),
-      close: String(o.close ?? o.Close ?? fallback.close)
-    }
-    const gk = o.gatekeeperVariants ?? (o.gatekeeper != null && String(o.gatekeeper).trim() ? [String(o.gatekeeper).trim()] : undefined)
-    if (Array.isArray(gk) && gk.length > 0) result.gatekeeperVariants = gk.map((s) => String(s).trim()).filter(Boolean).slice(0, 5)
-    if (Array.isArray(o.variants) && o.variants.length > 0) {
-      result.variants = o.variants
-        .filter((v): v is Record<string, unknown> => v != null && typeof v === 'object' && !Array.isArray(v))
-        .slice(0, 5)
-        .map((v) => normalizeVariant(v, result))
-      if (result.variants.length === 0) delete result.variants
-    }
-    return result
+    return buildScriptResult(raw as Record<string, unknown>, fallback)
   } else {
     return fallback
   }
@@ -70,26 +122,32 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
     .trim()
   try {
     const parsed = JSON.parse(stripped) as Record<string, unknown>
-    if (parsed && typeof parsed === 'object') {
-      const result: ScriptResult = {
-        opener: String(parsed.opener ?? parsed.Opener ?? fallback.opener),
-        hook: String(parsed.hook ?? parsed.Hook ?? fallback.hook),
-        disturb: String(parsed.disturb ?? parsed.Disturb ?? fallback.disturb),
-        close: String(parsed.close ?? parsed.Close ?? fallback.close)
-      }
-      const gk = parsed.gatekeeperVariants ?? (parsed.gatekeeper != null && String(parsed.gatekeeper).trim() ? [String(parsed.gatekeeper).trim()] : undefined)
-      if (Array.isArray(gk) && gk.length > 0) result.gatekeeperVariants = gk.map((s) => String(s).trim()).filter(Boolean).slice(0, 5)
-      if (Array.isArray(parsed.variants) && parsed.variants.length > 0) {
-        result.variants = parsed.variants
-          .filter((v): v is Record<string, unknown> => v != null && typeof v === 'object' && !Array.isArray(v))
-          .slice(0, 5)
-          .map((v) => normalizeVariant(v, result))
-        if (result.variants.length === 0) delete result.variants
-      }
-      return result
-    }
+    if (parsed && typeof parsed === 'object') return buildScriptResult(parsed, fallback)
   } catch {
-    // ignore parse error
+    // If model wraps JSON with prose, recover the largest object block.
+    const firstBrace = stripped.indexOf('{')
+    const lastBrace = stripped.lastIndexOf('}')
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        const extracted = stripped.slice(firstBrace, lastBrace + 1)
+        const parsed = JSON.parse(extracted) as Record<string, unknown>
+        return buildScriptResult(parsed, fallback)
+      } catch {
+        // continue
+      }
+    }
+    const labeled = parseFromLabeledText(stripped, fallback)
+    if (labeled) return labeled
+  }
+  // Last resort: show raw model line instead of generic placeholder text.
+  const usable = cleanLine(stripped.replace(/[{}[\]"]/g, ' '))
+  if (usable && !isPlaceholderLine(usable)) {
+    return {
+      opener: usable,
+      hook: fallback.hook,
+      disturb: fallback.disturb,
+      close: fallback.close
+    }
   }
   return fallback
 }
@@ -202,15 +260,15 @@ Create 2–3 full script variants (opener, hook, disturb, close) and, when compa
 Current vector: ${payload.vector_type}
 ${payload.vector_type === 'LIVE_PIVOT' ? `Live context from the call: "${payload.contact_context.additional_context || 'None'}"` : ''}
 
-OUTPUT (valid JSON only):
+OUTPUT (valid JSON only, no placeholders and no ellipses):
 {
-  ${isCompanyPhone ? '"gatekeeperVariants": ["Structural Audit frame", "Regulatory Shift frame", "Phantom Charge frame", "Internal Referral / NEPQ frame"],\n  ' : ''}"opener": "...",
-  "hook": "...",
-  "disturb": "...",
-  "close": "...",
+  ${isCompanyPhone ? '"gatekeeperVariants": ["<complete gatekeeper line 1>", "<complete gatekeeper line 2>", "<complete gatekeeper line 3>", "<complete gatekeeper line 4>"],\n  ' : ''}"opener": "<complete spoken opener line>",
+  "hook": "<complete spoken hook line>",
+  "disturb": "<complete spoken problem question>",
+  "close": "<complete spoken next-step ask>",
   "variants": [
-    { "opener": "...", "hook": "...", "disturb": "...", "close": "..." },
-    { "opener": "...", "hook": "...", "disturb": "...", "close": "..." }
+    { "opener": "<line>", "hook": "<line>", "disturb": "<line>", "close": "<line>" },
+    { "opener": "<line>", "hook": "<line>", "disturb": "<line>", "close": "<line>" }
   ]
 }
 - When company phone: include gatekeeperVariants (array of 3–4 strings). One per frame: Structural Audit, Regulatory Shift, Phantom Charge Specialist, Internal Referral (NEPQ). Each string is a complete gatekeeper line; agent picks one.
