@@ -357,7 +357,7 @@ export default async function handler(req, res) {
         // Create a new Deal record if none exists
         const { data: accountData } = await supabaseAdmin
           .from('accounts')
-          .select('name')
+          .select('name, ownerId')
           .eq('id', accountId)
           .single();
 
@@ -369,6 +369,7 @@ export default async function handler(req, res) {
             accountId: accountId,
             stage: dealStageToSet,
             probability: dealStageToSet === 'SECURED' ? 100 : 25,
+            ownerId: accountData?.ownerId || null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           });

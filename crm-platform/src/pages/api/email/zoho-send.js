@@ -229,6 +229,9 @@ export default async function handler(req, res) {
                     timestamp: new Date().toISOString(),
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
+                    ownerId: ownerEmail,
+                    assignedTo: ownerEmail,
+                    createdBy: ownerEmail,
                     metadata: {
                         fromName: fromName || null,
                         emailType: 'sent',
