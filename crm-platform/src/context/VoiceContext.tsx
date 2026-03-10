@@ -63,11 +63,16 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
   const wasOfflineRef = useRef(false)
+  const isCallSessionActiveRef = useRef(false)
 
   const hasLiveCall = useCallback((call: Call | null) => {
     if (!call) return false
     const status = call.status()
-    return status === 'connecting' || status === 'ringing' || status === 'open' || status === 'reconnecting'
+    return status === 'pending' || status === 'connecting' || status === 'ringing' || status === 'open' || status === 'reconnecting'
+  }, [])
+
+  const isCallSessionProtected = useCallback(() => {
+    return isCallSessionActiveRef.current || hasLiveCall(currentCallRef.current)
   }, [])
 
   useEffect(() => {
@@ -138,6 +143,12 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
+    // Guardrail: never re-initialize while a call session is active.
+    if (isCallSessionProtected()) {
+      console.log('[Voice] Skipping initDevice because a call session is active')
+      return
+    }
+
     // Prevent overlapping initializations
     if (isInitializing.current) {
       console.log('[Voice] Initialization already in progress, skipping...')
@@ -175,7 +186,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       // If we already have a device, try to update the token first.
       if (deviceRef.current && deviceRef.current.state !== 'destroyed') {
         const d = deviceRef.current
-        const callInProgress = hasLiveCall(currentCallRef.current)
+        const callInProgress = isCallSessionProtected()
         if (callInProgress) {
           console.log('[Voice] Call in progress, updating token without re-initializing device')
         }
@@ -198,7 +209,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       // Cleanup existing device before creating new one if we get here
       if (deviceRef.current) {
-        if (hasLiveCall(currentCallRef.current)) {
+        if (isCallSessionProtected()) {
           console.warn('[Voice] Active call detected. Skipping device cleanup to avoid dropping call.')
           return
         }
@@ -305,6 +316,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       // Twilio Best Practice: Listen for token expiration and update proactively
       newDevice.on('tokenWillExpire', () => {
         console.log('[Voice] Token will expire soon, refreshing...')
+        if (isCallSessionProtected()) {
+          console.log('[Voice] Token refresh deferred because call session is active')
+          return
+        }
         initDevice()
       })
 
@@ -339,6 +354,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
 
         if (error.code === 20101 || error.code === 31204 || error.code === 31009) {
+          if (isCallSessionProtected()) {
+            console.warn('[Voice] Skipping recovery re-init because call session is active')
+            return
+          }
           // Token expired, invalid, or transport lost - trigger re-init with exponential backoff
           console.log('[Voice] Triggering device re-initialization due to error:', error.code)
           isInitializing.current = false // Allow re-init
@@ -414,6 +433,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 call.accept()
+                isCallSessionActiveRef.current = true
                 setCurrentCall(call)
                 setActive(true)
                 setStatus('connected')
@@ -454,6 +474,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
         call.on('cancel', () => {
           console.log('[Voice] Call cancelled by caller')
+          isCallSessionActiveRef.current = false
           toast.dismiss(toastId)
           toast.error('Missed Call', {
             description: `from ${meta?.name || from}`,
@@ -467,6 +488,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         })
 
         call.on('disconnect', () => {
+          isCallSessionActiveRef.current = false
           toast.dismiss(toastId)
           setCurrentCall(null)
           setActive(false)
@@ -496,7 +518,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       isInitializing.current = false
     }
-  }, [requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, user, hasLiveCall])
+  }, [requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, user, isCallSessionProtected])
 
   useEffect(() => {
     initDevice()
@@ -523,7 +545,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && deviceRef.current) {
         const d = deviceRef.current
-        if (hasLiveCall(currentCallRef.current)) {
+        if (isCallSessionProtected()) {
           return
         }
         // If device is in error state or not registered, try to re-init
@@ -537,7 +559,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [initDevice, hasLiveCall])
+  }, [initDevice, isCallSessionProtected])
 
   // Harden against network drops (e.g. WiFi blip, VPN switch): recover when browser comes back online
   useEffect(() => {
@@ -554,7 +576,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       const hadBeenOffline = wasOfflineRef.current
       wasOfflineRef.current = false
 
-      if (hasLiveCall(currentCallRef.current)) {
+      if (isCallSessionProtected()) {
         if (hadBeenOffline) {
           toast.info('Connection restored', {
             description: 'Call is still active.',
@@ -586,7 +608,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     const handleDeviceChange = () => {
       console.log('[Voice] Hardware device change detected (Mic/Speaker plugged or unplugged)')
       // If we are in a call, this might be why it went silent.
-      if (deviceRef.current && hasLiveCall(currentCallRef.current)) {
+      if (deviceRef.current && isCallSessionProtected()) {
         toast.info('Hardware change detected', {
           description: 'Your audio device were updated. Re-connecting audio path...'
         })
@@ -611,10 +633,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         navigator.mediaDevices.removeEventListener('devicechange', handleDeviceChange)
       }
     }
-  }, [initDevice, setActive, setStatus, user, hasLiveCall])
+  }, [initDevice, setActive, setStatus, user, isCallSessionProtected])
 
   const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
-    const callInProgress = hasLiveCall(currentCallRef.current)
+    const callInProgress = isCallSessionProtected()
     const deviceDestroyed = !!device && device.state === 'destroyed'
     const deviceUsable = !!device && !deviceDestroyed && (isReady || callInProgress)
 
@@ -716,6 +738,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       })
 
       // Set dialing status immediately
+      isCallSessionActiveRef.current = true
       setStatus('dialing')
       setActive(true)
       setCurrentCall(call)
@@ -755,6 +778,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       })
 
       call.on('disconnect', () => {
+        isCallSessionActiveRef.current = false
         setCurrentCall(null)
         setStatus('ended')
         setActive(false)
@@ -765,6 +789,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       call.on('error', (error) => {
         console.error('[Voice] Call error:', error)
         toast.error('Call failed', { description: error.message })
+        isCallSessionActiveRef.current = false
         setCurrentCall(null)
         setStatus('error')
         setActive(false)
@@ -786,11 +811,12 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       })
       setStatus('error')
     }
-  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, hasLiveCall])
+  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, isCallSessionProtected])
 
   const disconnect = useCallback(() => {
     if (currentCall) {
       currentCall.disconnect()
+      isCallSessionActiveRef.current = false
       setCurrentCall(null)
       setStatus('ended')
       setActive(false)
