@@ -73,6 +73,7 @@ export function useAccountDossierState(id: string) {
     const [isRecalibrating, setIsRecalibrating] = useState(false)
     const prevAccountRef = useRef<any>(undefined)
     const prevIsEditing = useRef(isEditing)
+    const skipSaveOnNextLockRef = useRef(false)
     const justIngestedRef = useRef(false)
 
     const { pendingTasks } = useEntityTasks(id, account?.name)
@@ -128,6 +129,10 @@ export function useAccountDossierState(id: string) {
         prevIsEditing.current = isEditing
 
         if (wasEditing && !isEditing) {
+            if (skipSaveOnNextLockRef.current) {
+                skipSaveOnNextLockRef.current = false
+                return
+            }
             const triggerSave = async () => {
                 setIsSaving(true)
                 try {
@@ -162,6 +167,14 @@ export function useAccountDossierState(id: string) {
             triggerSave()
         }
     }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editMills, editIndustry, editLocation, editLogoUrl, editSupplier, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
+
+    useEffect(() => {
+        return () => {
+            if (!prevIsEditing.current) return
+            skipSaveOnNextLockRef.current = true
+            setIsEditing(false)
+        }
+    }, [setIsEditing])
 
     useEffect(() => {
         if (account) {
