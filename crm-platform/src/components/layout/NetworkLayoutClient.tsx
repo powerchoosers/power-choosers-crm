@@ -85,11 +85,7 @@ export function NetworkLayoutClient({
       <RightPanel />
       <main className="absolute top-0 bottom-0 left-[70px] right-0 lg:right-80 overflow-y-auto pt-24 pb-8 transition-all duration-300 scroll-smooth np-scroll">
         <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 sm:px-8 lg:px-10">
-          <div className="relative overflow-hidden rounded-[32px] border border-white/5 shadow-[0_35px_80px_rgba(0,0,0,0.55)] bg-zinc-950/40 backdrop-blur-[32px]">
-            <div className="min-h-full">
-              {children}
-            </div>
-          </div>
+          {children}
         </div>
       </main>
     </div>
