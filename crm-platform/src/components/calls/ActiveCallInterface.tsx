@@ -3,10 +3,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Zap,
-  ShieldAlert,
-  Mail,
-  BarChart3,
   Send,
   Sparkles
 } from 'lucide-react'
@@ -242,16 +238,6 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
 
       {/* 3. Action Deck */}
       <div className="p-4 sm:p-6 bg-zinc-950/30 border-t border-white/5 space-y-4">
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] font-mono text-zinc-400">
-          Objective: book meeting -&gt; bill review -&gt; permission to send note
-        </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] font-sans text-zinc-400">
-          Flow: opener -&gt; decision maker -&gt; discovery question -&gt; next step
-        </div>
-        <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] font-sans text-zinc-400">
-          Tone: curiosity first, no rate pitch, no savings promise
-        </div>
-
         {/* Rapid Context Input */}
         <div className="relative">
           <input
@@ -275,7 +261,6 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
           <VectorButton
             label="Open Script"
             hint="best-fit opener"
-            icon={Zap}
             tone="blue"
             active={activeVector === 'OPENER'}
             loading={loadingVector === 'OPENER'}
@@ -284,7 +269,6 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
           <VectorButton
             label="Objection Help"
             hint="validate then clarify"
-            icon={ShieldAlert}
             tone="red"
             active={activeVector === 'OBJECTION_PRICE'}
             loading={loadingVector === 'OBJECTION_PRICE'}
@@ -293,7 +277,6 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
           <VectorButton
             label="Send Follow-up"
             hint="ask one clarifier first"
-            icon={Mail}
             tone="amber"
             active={activeVector === 'OBJECTION_EMAIL'}
             loading={loadingVector === 'OBJECTION_EMAIL'}
@@ -302,7 +285,6 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
           <VectorButton
             label="Context Angle"
             hint="business-impact angle"
-            icon={BarChart3}
             tone="emerald"
             active={activeVector === 'MARKET_DATA'}
             loading={loadingVector === 'MARKET_DATA'}
@@ -317,7 +299,6 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
 function VectorButton({
   label,
   hint,
-  icon: Icon,
   tone,
   loading,
   active,
@@ -325,7 +306,6 @@ function VectorButton({
 }: {
   label: string
   hint: string
-  icon: any
   tone: 'blue' | 'red' | 'amber' | 'emerald'
   loading: boolean
   active: boolean
@@ -339,32 +319,16 @@ function VectorButton({
     emerald: 'border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_18px_rgba(16,185,129,0.2)]'
   }
 
-  const toneIconStyles: Record<'blue' | 'red' | 'amber' | 'emerald', string> = {
-    blue: 'text-[color:var(--color-pc-blue)]',
-    red: 'text-red-300',
-    amber: 'text-amber-300',
-    emerald: 'text-emerald-300'
-  }
-
   return (
     <button
       onClick={onClick}
       disabled={loading}
       className={cn(
-        'min-w-0 rounded-2xl border px-3 py-3.5 text-left transition-all active:scale-[0.98] disabled:opacity-50',
-        'flex flex-col items-start gap-2.5 bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20',
+        'min-w-0 rounded-2xl border px-3 py-3 text-left transition-all active:scale-[0.98] disabled:opacity-50',
+        'flex flex-col items-start gap-1.5 bg-white/[0.03] border-white/10 hover:bg-white/[0.06] hover:border-white/20',
         isEngaged && toneStyles[tone]
       )}
     >
-      <Icon
-        size={18}
-        className={cn(
-          'transition-colors text-zinc-300',
-          loading && 'animate-pulse',
-          isEngaged && toneIconStyles[tone],
-          !isEngaged && tone === 'blue' && 'hover:text-[color:var(--color-pc-blue)]'
-        )}
-      />
       <div className="min-w-0 w-full">
         <div className={cn('text-[11px] font-mono uppercase tracking-wide text-zinc-200 leading-tight', isEngaged && 'text-white')}>
           {loading ? 'Running...' : label}

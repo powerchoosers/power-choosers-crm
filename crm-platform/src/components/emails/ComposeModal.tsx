@@ -715,6 +715,7 @@ TONE: Warm, collegial, direct, peer-to-peer — like continuing a real conversat
 STRUCTURE: Short call reference (1 sentence, natural) → Key takeaway or relevant finding for them (1–2 sentences) → One clear next step or ask (1 sentence). 80–130 words total.
 
 PERSONALIZATION: If CALL INTELLIGENCE or NOTES are provided in the context, reference something specific from the conversation. One specific detail beats three generic lines. Make it feel like you were listening.
+CALL TIMING: Use call timing cues from context. Never say "today" unless the call happened today. If it was older, use wording like "earlier this week", "a few days ago", or "last week" based on the provided timestamp.
 
 SENDER: ${signerName}
 RECIPIENT: ${to || '(not specified)'}
@@ -1003,22 +1004,48 @@ function ComposePanel({
 
   // Deep foundry context: energy profile + call transcripts loaded from Supabase when contact/account is present
   const [foundryContext, setFoundryContext] = useState<FoundryContext | null>(null)
-  useEffect(() => {
+  const hasCallSignalsInContext = useCallback((raw?: string) => {
+    if (!raw) return false
+    return /(call time|recent call history|spoke|talked|conversation|meeting|transcript|ai insight)/i.test(raw)
+  }, [])
+
+  const refreshFoundryContext = useCallback(async () => {
     if (!context?.contactId && !context?.accountId) return
     setIsLoadingContext(true)
-    buildFoundryContext(supabase, context.contactId ?? null, context.accountId ?? null)
-      .then(ctx => {
-        setFoundryContext(ctx)
-        // Auto-suggest post_call mode when there are recent transcripts and user hasn't manually changed type.
-        // Uses emailTypeIdRef (always current) instead of emailTypeId to avoid stale closure.
-        if (ctx.intelligence.transcripts.length > 0 && emailTypeIdRef.current === 'cold_first_touch') {
-          setEmailTypeId('post_call')
-        }
-      })
-      .catch(err => console.error('[ComposeModal] Failed to load foundry context:', err))
-      .finally(() => setIsLoadingContext(false))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [context?.contactId, context?.accountId])
+    try {
+      const ctx = await buildFoundryContext(supabase, context?.contactId ?? null, context?.accountId ?? null)
+      setFoundryContext(ctx)
+
+      const hasTranscripts = (ctx.intelligence.transcripts.length ?? 0) > 0
+      const hasCallNotes = hasCallSignalsInContext(context?.contextForAi)
+      const canAutoPromote = emailTypeIdRef.current === 'cold_first_touch' || emailTypeIdRef.current === 'cold_followup'
+      if ((hasTranscripts || hasCallNotes) && canAutoPromote) {
+        setEmailTypeId('post_call')
+      }
+    } catch (err) {
+      console.error('[ComposeModal] Failed to load foundry context:', err)
+    } finally {
+      setIsLoadingContext(false)
+    }
+  }, [context?.contactId, context?.accountId, context?.contextForAi, hasCallSignalsInContext])
+
+  useEffect(() => {
+    refreshFoundryContext()
+  }, [refreshFoundryContext])
+
+  useEffect(() => {
+    const onCallProcessed = (evt: Event) => {
+      const detail = (evt as CustomEvent<{ contactId?: string; accountId?: string }>).detail
+      if (!detail) return
+      const sameContact = !!context?.contactId && detail.contactId === context.contactId
+      const sameAccount = !!context?.accountId && detail.accountId === context.accountId
+      if (sameContact || sameAccount) {
+        refreshFoundryContext()
+      }
+    }
+    window.addEventListener('nodal:call-processed', onCallProcessed as EventListener)
+    return () => window.removeEventListener('nodal:call-processed', onCallProcessed as EventListener)
+  }, [context?.contactId, context?.accountId, refreshFoundryContext])
 
   // Search suggestions state
   const [toQuery, setToQuery] = useState(initialTo)
@@ -1133,6 +1160,14 @@ function ComposePanel({
         deepLines.push('CALL INTELLIGENCE (for post-call or follow-up emails, reference specific talking points from these transcripts):')
         intelligence.transcripts.slice(0, 2).forEach(t => deepLines.push(t.slice(0, 600)))
       }
+      if ((intelligence.callHistory?.length ?? 0) > 0) {
+        deepLines.push('')
+        deepLines.push('CALL TIMING CUES (use these to avoid wrong time wording):')
+        intelligence.callHistory.slice(0, 3).forEach((entry, idx) => {
+          deepLines.push(`- Call ${idx + 1}: ${entry.localTime} (${entry.relativeTimeHint})`)
+        })
+        deepLines.push('TIMING RULE: Do not say "earlier today" unless timing cue is today. Prefer the relative cue provided.')
+      }
       if (intelligence.summary && intelligence.summary.trim() && !context?.contextForAi?.includes(intelligence.summary.slice(0, 40))) {
         deepLines.push('')
         deepLines.push(`CONTACT NOTES: ${intelligence.summary.slice(0, 400)}`)
@@ -1212,9 +1247,9 @@ Write one email where USER CONTEXT leads and the angle is supporting context onl
         const hasTranscripts = (foundryContext?.intelligence.transcripts.length ?? 0) > 0
         const hasCallNotes = !!(context?.contextForAi && /call|spoke|talked|conversation|meeting/i.test(context.contextForAi))
         if (hasTranscripts || hasCallNotes) {
-          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference the specific topics from the CALL INTELLIGENCE above. Propose one concrete next step.`
+          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference specific topics from CALL INTELLIGENCE and respect CALL TIMING CUES. Do not imply "today" unless the cue says today. Propose one concrete next step.`
         } else {
-          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference our recent conversation naturally. Propose one clear next step.`
+          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference our recent conversation naturally, with correct timing language. Propose one clear next step.`
         }
       }
     }
@@ -2293,9 +2328,9 @@ Return exactly one subject line.`,
                   </div>
                 )}
                 {!isLoadingContext && emailTypeId === 'post_call' && (
-                  <div className={`text-[9px] font-mono uppercase tracking-wider px-1 ${(foundryContext?.intelligence.transcripts.length ?? 0) > 0 ? 'text-emerald-500/70' : 'text-zinc-500'}`}>
-                    {(foundryContext?.intelligence.transcripts.length ?? 0) > 0
-                      ? `✓ ${foundryContext!.intelligence.transcripts.length} call transcript${foundryContext!.intelligence.transcripts.length > 1 ? 's' : ''} loaded — AI will reference call content`
+                  <div className={`text-[9px] font-mono uppercase tracking-wider px-1 ${(foundryContext?.intelligence.callHistory.length ?? 0) > 0 ? 'text-emerald-500/70' : 'text-zinc-500'}`}>
+                    {(foundryContext?.intelligence.callHistory.length ?? 0) > 0
+                      ? `✓ ${(foundryContext!.intelligence.callHistory.length ?? 0)} call signal${(foundryContext!.intelligence.callHistory.length ?? 0) > 1 ? 's' : ''} loaded — AI will use call insights + timing`
                       : context?.contextForAi ? '✓ call notes detected' : 'No prior call data — AI will write a generic warm follow-up'}
                   </div>
                 )}

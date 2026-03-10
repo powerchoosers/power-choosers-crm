@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap, Handshake, FileSignature } from 'lucide-react'
+import { Phone, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap, Handshake, FileSignature, UserRoundSearch } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -923,14 +923,14 @@ export function TopBar() {
               >
                 <AnimatePresence mode="wait">
                   <motion.div
-                    key={isCallHUDOpen ? "close" : "zap"}
+                    key={isCallHUDOpen ? "close" : "user-search"}
                     initial={{ opacity: 0, scale: 0.5 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.5 }}
                     transition={{ duration: 0.2 }}
                     className="flex items-center justify-center"
                   >
-                    {isCallHUDOpen ? <X size={22} /> : <Zap size={22} className="animate-pulse" />}
+                    {isCallHUDOpen ? <X size={22} /> : <UserRoundSearch size={21} />}
                   </motion.div>
                 </AnimatePresence>
               </button>

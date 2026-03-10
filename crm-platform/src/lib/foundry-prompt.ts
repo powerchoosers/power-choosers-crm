@@ -29,7 +29,83 @@ export interface FoundryContext {
     intelligence: {
         transcripts: string[]
         summary: string
+        callHistory: Array<{
+            id: string
+            timestamp: string
+            localTime: string
+            relativeTimeHint: string
+            direction: string
+            status: string
+            durationSeconds: number
+            summary: string
+            transcriptSnippet: string
+            insightsSummary: string
+        }>
     }
+}
+
+function getTzYmd(date: Date, timeZone: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    }).formatToParts(date)
+    const year = parts.find((p) => p.type === 'year')?.value || '1970'
+    const month = parts.find((p) => p.type === 'month')?.value || '01'
+    const day = parts.find((p) => p.type === 'day')?.value || '01'
+    return `${year}-${month}-${day}`
+}
+
+function dayDiffInTz(callDate: Date, now: Date, timeZone: string): number {
+    const callYmd = getTzYmd(callDate, timeZone)
+    const nowYmd = getTzYmd(now, timeZone)
+    const callUtc = new Date(`${callYmd}T00:00:00Z`).getTime()
+    const nowUtc = new Date(`${nowYmd}T00:00:00Z`).getTime()
+    return Math.round((nowUtc - callUtc) / (1000 * 60 * 60 * 24))
+}
+
+function getRelativeTimeHint(callDate: Date, now = new Date(), timeZone = 'America/Chicago'): string {
+    const dayDiff = dayDiffInTz(callDate, now, timeZone)
+    if (dayDiff <= 0) {
+        const hourStr = new Intl.DateTimeFormat('en-US', { timeZone, hour: 'numeric', hour12: false }).format(callDate)
+        const hour = Number(hourStr)
+        if (!Number.isNaN(hour) && hour < 12) return 'earlier this morning'
+        if (!Number.isNaN(hour) && hour < 17) return 'earlier this afternoon'
+        return 'earlier today'
+    }
+    if (dayDiff === 1) return 'yesterday'
+    if (dayDiff <= 3) return `${dayDiff} days ago`
+    if (dayDiff <= 7) return 'earlier this week'
+    if (dayDiff <= 14) return 'about a week ago'
+    return 'earlier this month'
+}
+
+function formatLocalCallTime(date: Date, timeZone = 'America/Chicago'): string {
+    return new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZoneName: 'short'
+    }).format(date)
+}
+
+function parseInsightsSummary(rawInsights: unknown): string {
+    if (!rawInsights) return ''
+    try {
+        const parsed = typeof rawInsights === 'string' ? JSON.parse(rawInsights) : rawInsights
+        if (parsed && typeof parsed === 'object' && 'summary' in parsed && typeof (parsed as { summary?: unknown }).summary === 'string') {
+            return String((parsed as { summary: string }).summary).trim()
+        }
+    } catch {
+        return ''
+    }
+    return ''
 }
 
 /**
@@ -45,7 +121,7 @@ export async function buildFoundryContext(
         contact: { name: '', firstName: '', lastName: '', title: '', email: '', phone: '' },
         company: { name: '', domain: '', industry: '', description: '', city: '', state: '', website: '' },
         energy: { currentRate: '', contractEnd: '', annualUsage: '', supplier: '', loadZone: '', serviceAddress: '' },
-        intelligence: { transcripts: [], summary: '' }
+        intelligence: { transcripts: [], summary: '', callHistory: [] }
     }
 
     try {
@@ -147,10 +223,9 @@ export async function buildFoundryContext(
         if (targetContactId || targetAccountId) {
             let query = supabase
                 .from('calls')
-                .select('transcript, summary, timestamp')
-                .not('transcript', 'is', null)
+                .select('id, transcript, summary, aiInsights, direction, status, duration, timestamp')
                 .order('timestamp', { ascending: false })
-                .limit(3)
+                .limit(5)
 
             if (targetContactId) {
                 query = query.eq('contactId', targetContactId)
@@ -160,9 +235,40 @@ export async function buildFoundryContext(
 
             const { data: calls } = await query
             if (calls) {
-                context.intelligence.transcripts = calls.map((c: any) =>
-                    `[${new Date(c.timestamp).toLocaleDateString()}] Summary: ${c.summary || 'N/A'}\nTranscript Snippet: ${(c.transcript || '').slice(0, 500)}...`
-                )
+                const withContext = (calls as any[])
+                    .filter((c) => c && (c.transcript || c.summary || c.aiInsights))
+                    .map((c) => {
+                        const ts = c.timestamp ? new Date(c.timestamp) : null
+                        const validTs = ts && !Number.isNaN(ts.getTime()) ? ts : null
+                        const localTime = validTs ? formatLocalCallTime(validTs) : 'Unknown time'
+                        const relativeTimeHint = validTs ? getRelativeTimeHint(validTs) : 'recently'
+                        const summary = (c.summary || '').toString().trim()
+                        const transcriptSnippet = (c.transcript || '').toString().slice(0, 500).trim()
+                        const insightsSummary = parseInsightsSummary(c.aiInsights)
+
+                        return {
+                            id: String(c.id || ''),
+                            timestamp: (c.timestamp || '').toString(),
+                            localTime,
+                            relativeTimeHint,
+                            direction: (c.direction || '').toString(),
+                            status: (c.status || '').toString(),
+                            durationSeconds: typeof c.duration === 'number' ? c.duration : 0,
+                            summary,
+                            transcriptSnippet,
+                            insightsSummary
+                        }
+                    })
+
+                context.intelligence.callHistory = withContext
+                context.intelligence.transcripts = withContext.map((entry) => {
+                    const lines = [
+                        `[Call Time: ${entry.localTime}] [Timing Cue: ${entry.relativeTimeHint}]`,
+                        `Summary: ${entry.summary || entry.insightsSummary || 'N/A'}`,
+                        `Transcript Snippet: ${entry.transcriptSnippet || 'N/A'}`
+                    ]
+                    return lines.join('\n')
+                })
             }
         }
     } catch (err) {
