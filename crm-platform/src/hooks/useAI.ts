@@ -74,8 +74,13 @@ function buildScriptResult(source: Record<string, unknown>, fallback: ScriptResu
     close: isPlaceholderLine(close) ? fallback.close : close
   }
 
-  const gk = source.gatekeeperVariants
-    ?? (source.gatekeeper != null && cleanLine(source.gatekeeper) ? [cleanLine(source.gatekeeper)] : undefined)
+  const gatekeeperFromString = typeof source.gatekeeperVariants === 'string'
+    ? extractGatekeeperVariants(`gatekeeperVariants: ${source.gatekeeperVariants}`)
+    : undefined
+  const gk = Array.isArray(source.gatekeeperVariants)
+    ? source.gatekeeperVariants
+    : (gatekeeperFromString
+      ?? (source.gatekeeper != null && cleanLine(source.gatekeeper) ? [cleanLine(source.gatekeeper)] : undefined))
   if (Array.isArray(gk) && gk.length > 0) {
     result.gatekeeperVariants = gk
       .map((s) => neutralizeUnverifiedClaims(cleanLine(s)))
@@ -134,16 +139,25 @@ function parseFromFlattenedKeyValue(rawText: string, fallback: ScriptResult): Sc
   const hook = neutralizeUnverifiedClaims(pick('hook', ['disturb', 'close', 'variants']))
   const disturb = neutralizeUnverifiedClaims(pick('disturb', ['close', 'variants']))
   const close = neutralizeUnverifiedClaims(pick('close', ['variants']))
+  const gatekeeperVariants = extractGatekeeperVariants(text)
 
-  if (!opener && !situation && !hook && !disturb && !close) return null
+  if (!opener && !situation && !hook && !disturb && !close && (!gatekeeperVariants || gatekeeperVariants.length === 0)) {
+    return null
+  }
 
-  return {
+  const result: ScriptResult = {
     opener: !isPlaceholderLine(opener) ? opener : fallback.opener,
     situation: ensureQuestion(situation, fallback.situation),
     hook: ensureQuestion(hook, fallback.hook),
     disturb: ensureQuestion(disturb, fallback.disturb),
     close: !isPlaceholderLine(close) ? close : fallback.close
   }
+
+  if (gatekeeperVariants && gatekeeperVariants.length > 0) {
+    result.gatekeeperVariants = gatekeeperVariants
+  }
+
+  return result
 }
 
 function extractGatekeeperVariants(rawText: string): string[] | undefined {
@@ -186,8 +200,11 @@ function parseFromLooseDelimited(rawText: string, fallback: ScriptResult): Scrip
   const hook = neutralizeUnverifiedClaims(pickLoose(['hook', 'engagement question']))
   const disturb = neutralizeUnverifiedClaims(pickLoose(['disturb', 'problem question', 'problem-awareness question']))
   const close = neutralizeUnverifiedClaims(pickLoose(['close', 'clean next-step ask', 'next-step ask']))
+  const gatekeeperVariants = extractGatekeeperVariants(text)
 
-  if (!opener && !situation && !hook && !disturb && !close) return null
+  if (!opener && !situation && !hook && !disturb && !close && (!gatekeeperVariants || gatekeeperVariants.length === 0)) {
+    return null
+  }
 
   const result: ScriptResult = {
     opener: !isPlaceholderLine(opener) ? opener : fallback.opener,
@@ -197,7 +214,6 @@ function parseFromLooseDelimited(rawText: string, fallback: ScriptResult): Scrip
     close: !isPlaceholderLine(close) ? close : fallback.close
   }
 
-  const gatekeeperVariants = extractGatekeeperVariants(text)
   if (gatekeeperVariants && gatekeeperVariants.length > 0) {
     result.gatekeeperVariants = gatekeeperVariants
   }

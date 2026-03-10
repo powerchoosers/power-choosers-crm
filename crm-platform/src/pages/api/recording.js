@@ -71,6 +71,7 @@ export default async function handler(req, res) {
                     url: mediaUrl,
                     hasRange: !!req.headers.range
                 });
+                res.setHeader('cache-control', 'no-store, no-cache, must-revalidate, private, max-age=0');
                 res.status(status).end();
                 return;
             }
@@ -93,9 +94,8 @@ export default async function handler(req, res) {
             if (!res.getHeader('accept-ranges')) {
                 res.setHeader('accept-ranges', 'bytes');
             }
-            if (!res.getHeader('cache-control')) {
-                res.setHeader('cache-control', 'public, max-age=3600');
-            }
+            // Avoid stale media responses when recordings become available seconds after webhook ingestion.
+            res.setHeader('cache-control', 'no-store, no-cache, must-revalidate, private, max-age=0');
 
             if (req.method === 'HEAD') {
                 res.end();
