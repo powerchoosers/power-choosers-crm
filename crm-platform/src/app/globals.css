@@ -352,6 +352,42 @@
     animation: subtle-pulse 3s infinite;
   }
 
+  .ticker-chip {
+    transition: background-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
+  }
+
+  .ticker-chip:hover {
+    background: rgba(0, 47, 167, 0.06);
+    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.2) inset;
+    transform: translateY(-1px);
+  }
+
+  .metric-counter,
+  .metric-live-value {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .metric-signal-card {
+    position: relative;
+    background: rgba(255, 255, 255, 0.22);
+    border: 1px solid transparent;
+    animation: metric-signal-breathe 6s ease-in-out infinite;
+    transition: border-color 260ms ease, box-shadow 260ms ease, transform 260ms ease;
+  }
+
+  .metric-signal-card:hover {
+    border-color: rgba(0, 47, 167, 0.22);
+    box-shadow: 0 20px 40px -28px rgba(0, 47, 167, 0.55);
+  }
+
+  .metric-live-card {
+    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.08) inset;
+  }
+
+  .metric-live-value {
+    animation: metric-live-pulse 3.6s ease-in-out infinite;
+  }
+
   /* Nodal Ingestion Input Style */
   .nodal-input {
     @apply w-full bg-zinc-900/50 border border-white/10 rounded px-3 py-2 text-xs font-mono text-white placeholder:text-zinc-700 outline-none transition-all;
@@ -381,6 +417,50 @@
     100% {
       transform: translateX(-50%);
     }
+  }
+
+  @keyframes metric-live-pulse {
+
+    0%,
+    100% {
+      text-shadow: 0 0 0 rgba(0, 47, 167, 0);
+    }
+
+    50% {
+      text-shadow: 0 0 16px rgba(0, 47, 167, 0.28);
+    }
+  }
+
+  @keyframes metric-signal-breathe {
+
+    0%,
+    100% {
+      border-color: rgba(0, 47, 167, 0.08);
+      background: rgba(255, 255, 255, 0.2);
+      box-shadow:
+        0 10px 26px -24px rgba(0, 47, 167, 0.2),
+        0 0 0 1px rgba(0, 47, 167, 0.05) inset;
+    }
+
+    50% {
+      border-color: rgba(0, 47, 167, 0.24);
+      background: rgba(255, 255, 255, 0.42);
+      box-shadow:
+        0 24px 42px -30px rgba(0, 47, 167, 0.4),
+        0 0 0 1px rgba(0, 47, 167, 0.16) inset;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-on-scroll,
+  .chart-path,
+  .animate-subtle-pulse,
+  .metric-signal-card,
+  .metric-live-value {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
   }
 }
 
