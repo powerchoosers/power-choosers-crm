@@ -58,7 +58,7 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence', density 
                                         animate={{ opacity: 1, y: 0 }}
                                         className={cn(
                                             "group rounded-xl border transition-all duration-300 overflow-hidden nodal-recessed",
-                                            isExpanded ? "bg-zinc-950/90 border-white/10 shadow-2xl" : "bg-zinc-950/40 border-white/5 hover:bg-zinc-950/80 hover:border-white/10"
+                                            isExpanded ? "bg-zinc-950/40 border-white/10 shadow-2xl" : "bg-zinc-950/40 border-white/5 hover:bg-zinc-950/40 hover:border-white/10"
                                         )}
                                     >
                                         <button
@@ -79,40 +79,42 @@ export function EntityEmailFeed({ emails, title = 'Email Intelligence', density 
                                                     </span>
                                                 </div>
 
-                                                <div className="text-[11px] font-mono text-zinc-500 flex items-center gap-2 truncate">
-                                                    <span className={email.type === 'sent' ? 'text-emerald-500/80' : 'text-[#002FA7]/80'}>
-                                                        {email.type === 'sent' ? 'To: ' : 'From: '}
-                                                    </span>
-                                                    <span className="truncate">
-                                                        {email.type === 'sent' ? (Array.isArray(email.to) ? email.to.join(', ') : email.to) : email.from}
-                                                    </span>
-                                                </div>
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <div className="text-[11px] font-mono text-zinc-500 flex items-center gap-2 min-w-0 flex-1">
+                                                        <span className={email.type === 'sent' ? 'text-emerald-500/80' : 'text-[#002FA7]/80'}>
+                                                            {email.type === 'sent' ? 'To: ' : 'From: '}
+                                                        </span>
+                                                        <span className="truncate block" title={email.type === 'sent' ? (Array.isArray(email.to) ? email.to.join(', ') : email.to) : email.from}>
+                                                            {email.type === 'sent' ? (Array.isArray(email.to) ? email.to.join(', ') : email.to) : email.from}
+                                                        </span>
+                                                    </div>
 
-                                                {isSent ? (
-                                                    density === 'compact' ? (
-                                                        <div className="mt-1 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/5 px-2 py-1 w-fit">
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 tabular-nums">
-                                                                <Eye className="w-3 h-3 text-emerald-400" />
-                                                                {openCount}
-                                                            </span>
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 tabular-nums">
-                                                                <MousePointer2 className="w-3 h-3 text-[#002FA7]" />
-                                                                {clickCount}
-                                                            </span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="mt-1 inline-flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-2.5 py-1 w-fit">
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
-                                                                <Eye className="w-3 h-3 text-emerald-400" />
-                                                                Opened <span className="tabular-nums text-zinc-200">{openCount}</span>
-                                                            </span>
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
-                                                                <MousePointer2 className="w-3 h-3 text-[#002FA7]" />
-                                                                Clicked <span className="tabular-nums text-zinc-200">{clickCount}</span>
-                                                            </span>
-                                                        </div>
-                                                    )
-                                                ) : null}
+                                                    {isSent ? (
+                                                        density === 'compact' ? (
+                                                            <div className="inline-flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-2 py-1 shrink-0">
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 tabular-nums">
+                                                                    <Eye className="w-3 h-3 text-emerald-400" />
+                                                                    {openCount}
+                                                                </span>
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 tabular-nums">
+                                                                    <MousePointer2 className="w-3 h-3 text-[#002FA7]" />
+                                                                    {clickCount}
+                                                                </span>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="inline-flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2.5 py-1 shrink-0">
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                                                                    <Eye className="w-3 h-3 text-emerald-400" />
+                                                                    Opened <span className="tabular-nums text-zinc-200">{openCount}</span>
+                                                                </span>
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                                                                    <MousePointer2 className="w-3 h-3 text-[#002FA7]" />
+                                                                    Clicked <span className="tabular-nums text-zinc-200">{clickCount}</span>
+                                                                </span>
+                                                            </div>
+                                                        )
+                                                    ) : null}
+                                                </div>
 
                                                 {!isExpanded && email.snippet && (
                                                     <div className="text-xs text-zinc-500 mt-1 truncate max-w-full">

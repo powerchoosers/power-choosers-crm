@@ -75,7 +75,7 @@ export default function SignalStream({ accountId }: SignalStreamProps) {
         </span>
       </div>
       <div
-        className="max-h-[180px] overflow-y-auto overflow-x-hidden np-scroll"
+        className="max-h-[180px] overflow-y-auto overflow-x-hidden [overscroll-behavior:auto]"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {isLoading && signals.length === 0 ? (

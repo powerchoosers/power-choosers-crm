@@ -1541,9 +1541,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <h4 className="text-xs font-semibold text-white truncate">{companySummary.name}</h4>
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <h4 className="text-xs font-semibold text-white truncate block w-full" title={companySummary.name}>{companySummary.name}</h4>
                       </div>
                       {companySummary.linkedin && (
                         <a
