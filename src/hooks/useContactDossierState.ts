@@ -95,6 +95,7 @@ export function useContactDossierState(id: string) {
     const prevContactRef = useRef<any>(undefined)
     const lastEnrichedContactId = useUIStore((s) => s.lastEnrichedContactId)
     const prevIsEditing = useRef(isEditing)
+    const skipSaveOnNextLockRef = useRef(false)
 
     // Task Integration
     const { pendingTasks } = useEntityTasks(id, contact?.name)
@@ -153,6 +154,10 @@ export function useContactDossierState(id: string) {
         prevIsEditing.current = isEditing
 
         if (wasEditing && !isEditing) {
+            if (skipSaveOnNextLockRef.current) {
+                skipSaveOnNextLockRef.current = false
+                return
+            }
             const triggerSave = async () => {
                 setIsSaving(true)
                 const fullName = [editFirstName, editLastName].filter(Boolean).join(' ').trim() || editName
@@ -206,6 +211,14 @@ export function useContactDossierState(id: string) {
             triggerSave()
         }
     }, [isEditing, id, editFirstName, editLastName, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editMills, editAnnualUsage, editLocation, editLogoUrl, editWebsite, editLinkedinUrl, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editContractEnd, updateContact, updateAccount, contact])
+
+    useEffect(() => {
+        return () => {
+            if (!prevIsEditing.current) return
+            skipSaveOnNextLockRef.current = true
+            setIsEditing(false)
+        }
+    }, [setIsEditing])
 
     return {
         // Data
