@@ -180,14 +180,15 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                 )}
                 {(() => {
                   const script: ScriptVariant = selectedVariantIndex === 0
-                    ? { opener: aiResponse.opener, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close }
-                    : (aiResponse.variants?.[selectedVariantIndex - 1] ?? { opener: aiResponse.opener, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close })
+                    ? { opener: aiResponse.opener, situation: aiResponse.situation, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close }
+                    : (aiResponse.variants?.[selectedVariantIndex - 1] ?? { opener: aiResponse.opener, situation: aiResponse.situation, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close })
                   return (
                     <>
                       <ScriptStep label="Best-fit opener" content={script.opener ?? ''} delay={0.1} />
-                      <ScriptStep label="Engagement question" content={script.hook ?? ''} delay={0.2} />
-                      <ScriptStep label="Problem-awareness question" content={script.disturb ?? ''} delay={0.3} accent />
-                      <ScriptStep label="Clean next-step ask" content={script.close ?? ''} delay={0.4} />
+                      <ScriptStep label="Situation question" content={script.situation ?? ''} delay={0.2} />
+                      <ScriptStep label="Engagement question" content={script.hook ?? ''} delay={0.3} />
+                      <ScriptStep label="Problem-awareness question" content={script.disturb ?? ''} delay={0.4} accent />
+                      <ScriptStep label="Clean next-step ask" content={script.close ?? ''} delay={0.5} />
                     </>
                   )
                 })()}

@@ -191,7 +191,7 @@ CORE RULES:
 - Do not promise savings or guarantee outcomes.
 - Do not imply prior audits or flagged errors unless explicitly provided in context.
 - Default to Texas/ERCOT framing.
-- First-call objective order: (1) book meeting, (2) get bill, (3) identify decision maker.
+- First-call objective order: (1) book meeting, (2) get bill, (3) permission to send a short note or get introduced to the right person.
 - Preferred value phrase: "costs buried in the electricity bill most companies don't realize are there."
 - Do not use phrases: "hidden electricity cost drivers", "hidden bill costs", "hidden energy costs".
 
