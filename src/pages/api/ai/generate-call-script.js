@@ -171,57 +171,48 @@ Focus on: latest news (past 12 months), leadership (CEO/CFO/Controller), operati
         }
 
         const prompt = `
-You are Lewis Patterson, Lead Energy Strategist at Power Choosers. You are preparing for a cold call to a potential commercial energy client.
-Generate a tailored, professional, and high-leverage call script using the PEACE framework.
+You are Nodal Point's NEPQ Texas cold-call coach for commercial electricity outreach.
 
 CLIENT CONTEXT:
 - Name: ${name}
 - Company: ${company}
 - Industry: ${industry}
-- Location: ${location}
+- Location: ${location || 'Texas'}
 - Current Supplier: ${currentSupplier}
 - Contract End Date: ${contractEnd}
 
 WEB RESEARCH (only use if present; do not invent facts):
 ${researchSummary || '- (no external research found)'}
 
-PEACE FRAMEWORK INSTRUCTIONS:
-1. **Pre-call**: Briefly state the specific angle/leverage for this call (e.g., industry-specific trend, local TDU rate hike, or upcoming contract expiry).
-2. **Opener**: A strong hook. Mention their company and a specific reason for calling today. Avoid generic "how are you" openings.
-3. **Situation**: 
-   - **IF TEXAS (ERCOT)**: Assume they shop for their own rate (deregulation is mandatory). If supplier/contract info is missing, ask how they manage their renewal cycles or who they're currently trusting with their procurement.
-   - **IF OTHER DEREGULATED STATES (e.g., PA, OH, IL, NY, NJ, MD, MA, CT, DE, NH, RI)**: Acknowledge they have the choice between the utility's "default rate" (Price to Compare) and shopping. If info is missing, ask if they are currently riding the utility default or if they've explored the market recently.
-   - **IF DATA IS MISSING**: NEVER use words like "unknown," "unaware," or "visibility." Instead, use a **Discovery Hook**:
-     - *Industry Pivot*: "Usually, companies in ${industry} are either locked into a long-term fixed rate to handle high demand, or they're just riding the utility's default. Where do you guys currently stand?"
-     - *Market Volatility*: "With the recent volatility in ${location}, many facilities are trying to figure out if their current setup is actually protecting them from peak-hour spikes. How have you been handling those delivery charge increases lately?"
-4. **Problem**: Highlight a specific risk or missed opportunity (e.g., "Most companies in ${industry} are seeing 20% spikes in demand charges right now"). CRITICAL: Immediately follow the problem with a fluid, open-ended question that flows naturally from the statement to invite the client to share their experience (e.g., "How has that been impacting your operational budget over the last few months?").
-5. **Solution**: Provide the low-friction next step (The "Broker Audit") and how it solves the problem.
-6. **Close**: A clear call to action to move to the next step.
-7. **Settle**: A brief wrap-up line to confirm the next action and end the call on a high note.
+CORE RULES:
+- Lead with curiosity, not claims.
+- Use short, spoken-language lines.
+- Use plain English and business impact.
+- Do not promise savings or guarantee outcomes.
+- Do not imply prior audits or flagged errors unless explicitly provided in context.
+- Default to Texas/ERCOT framing.
+- First-call objective order: (1) book meeting, (2) get bill, (3) identify decision maker.
+- Preferred value phrase: "costs buried in the electricity bill most companies don't realize are there."
+- Do not use phrases: "hidden electricity cost drivers", "hidden bill costs", "hidden energy costs".
 
-FORMATTING:
-- Use <span class="tone-marker">tags</span> to indicate the recommended tone for specific lines.
-- Use <span class="pause-indicator"></span> for natural pauses.
-- Keep it concise, conversational, and direct.
-- Return ONLY the script text, organized by the labels: Pre-call, Opener, Situation, Problem, Solution, Close, Settle.
+OUTPUT FORMAT:
+Return ONLY script text organized with these labels:
+1) Best-fit opener
+2) Softer alternate opener
+3) Gatekeeper version (if relevant)
+4) Direct-line version (if relevant)
+5) Likely first objection + response
+6) Clean next-step ask
+7) Optional voicemail
 
-RULES:
-- If WEB RESEARCH is empty, do not reference news/people/hires.
-- If WEB RESEARCH has items, weave 1–2 highly relevant specifics into the Opener and Situation.
-- When referencing research, cite it softly as "I saw" / "I noticed" and mention the source type in parentheses if provided.
-- **NEVER** state that you don't know something. Frame lack of data as a diagnostic question.
-- In Texas, assume they are under contract with a 3rd party provider.
-- In other states, assume they might be on the utility's default "Price to Compare" rate unless a supplier is listed.
-- Ensure the Problem section always ends with a conversation-opening question.
+SCRIPT REQUIREMENTS:
+- Opener under 70 words unless context requires longer.
+- Include company name in routing question: "who handles electricity agreements at ${company}?"
+- Start with disarming language ("help me out for a moment", "not sure if you're the right person", "I know this is out of the blue").
+- Objection handling order: Validate -> Clarify -> Problem-expand -> Low-pressure pivot.
+- If research exists, weave in 1-2 relevant specifics naturally without overclaiming.
 
-HIGH_AGENCY_ANALYSIS:
-- Treat the "CLIENT CONTEXT" as a mandatory part of the script's identity. 
-- When the user asks to "mention their company", do not use a placeholder. Use "${company}".
-- When the user asks to "mention their industry", use "${industry}".
-- If the prompt is generic, you MUST override it with the specific details of the target to make the call feel like it's specifically for ${name} at ${company}.
-- A high-agency analyst doesn't read scripts; they have conversations based on facts.
-
-Generate the script now:
+Generate the script now.
 `;
 
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
