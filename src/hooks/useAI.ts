@@ -146,6 +146,26 @@ function parseFromFlattenedKeyValue(rawText: string, fallback: ScriptResult): Sc
   }
 }
 
+function extractGatekeeperVariants(rawText: string): string[] | undefined {
+  const text = rawText.replace(/\r/g, ' ').replace(/\n/g, ' ').trim()
+  if (!text) return undefined
+  const match = text.match(/gatekeepervariants?\s*:\s*([\s\S]*?)(?=\b(?:opener|situation|hook|disturb|problem|close|next[-\s]?step|variants)\b\s*[:\-]|$)/i)
+  const rawGate = cleanLine(match?.[1] ?? '')
+  if (!rawGate) return undefined
+
+  const splitByLikelyVariant = rawGate
+    .split(/\s*,\s*(?=(?:hi|hello|hey|good|lewis|this)\b)/i)
+    .map((v) => cleanLine(v))
+    .filter((v) => v && !isPlaceholderLine(v))
+
+  const variants = (splitByLikelyVariant.length > 1 ? splitByLikelyVariant : rawGate.match(/[^?]+\?/g)?.map((v) => cleanLine(v)) || [])
+    .map((v) => neutralizeUnverifiedClaims(v))
+    .filter((v) => v.length > 10)
+    .slice(0, 5)
+
+  return variants.length > 0 ? variants : undefined
+}
+
 function parseFromLooseDelimited(rawText: string, fallback: ScriptResult): ScriptResult | null {
   const text = rawText.replace(/\r/g, ' ').replace(/\n/g, ' ').trim()
   if (!text) return null
@@ -169,13 +189,20 @@ function parseFromLooseDelimited(rawText: string, fallback: ScriptResult): Scrip
 
   if (!opener && !situation && !hook && !disturb && !close) return null
 
-  return {
+  const result: ScriptResult = {
     opener: !isPlaceholderLine(opener) ? opener : fallback.opener,
     situation: ensureQuestion(situation, fallback.situation),
     hook: ensureQuestion(hook, fallback.hook),
     disturb: ensureQuestion(disturb, fallback.disturb),
     close: !isPlaceholderLine(close) ? close : fallback.close
   }
+
+  const gatekeeperVariants = extractGatekeeperVariants(text)
+  if (gatekeeperVariants && gatekeeperVariants.length > 0) {
+    result.gatekeeperVariants = gatekeeperVariants
+  }
+
+  return result
 }
 
 /** Strip markdown code fences and parse JSON; normalize to ScriptResult (gatekeeper + variants). */
@@ -201,9 +228,15 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
     .replace(/^```(?:json)?\s*\n?/i, '')
     .replace(/\n?```\s*$/i, '')
     .trim()
+  let candidateText = stripped
   try {
-    const parsed = JSON.parse(stripped) as Record<string, unknown>
-    if (parsed && typeof parsed === 'object') return buildScriptResult(parsed, fallback)
+    const parsed = JSON.parse(stripped) as unknown
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return buildScriptResult(parsed as Record<string, unknown>, fallback)
+    }
+    if (typeof parsed === 'string') {
+      candidateText = parsed.trim()
+    }
   } catch {
     // If model wraps JSON with prose, recover the largest object block.
     const firstBrace = stripped.indexOf('{')
@@ -217,15 +250,16 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
         // continue
       }
     }
-    const labeled = parseFromLabeledText(stripped, fallback)
-    if (labeled) return labeled
-    const flattened = parseFromFlattenedKeyValue(stripped, fallback)
-    if (flattened) return flattened
-    const looseDelimited = parseFromLooseDelimited(stripped, fallback)
-    if (looseDelimited) return looseDelimited
+    candidateText = stripped
   }
+  const labeled = parseFromLabeledText(candidateText, fallback)
+  if (labeled) return labeled
+  const flattened = parseFromFlattenedKeyValue(candidateText, fallback)
+  if (flattened) return flattened
+  const looseDelimited = parseFromLooseDelimited(candidateText, fallback)
+  if (looseDelimited) return looseDelimited
   // Last resort: show raw model line instead of generic placeholder text.
-  const usable = cleanLine(stripped.replace(/[{}[\]"]/g, ' '))
+  const usable = cleanLine(candidateText.replace(/[{}[\]"]/g, ' '))
   if (usable && !isPlaceholderLine(usable)) {
     return {
       opener: usable,
