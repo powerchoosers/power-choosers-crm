@@ -528,8 +528,21 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     initDevice()
+  }, [initDevice])
+
+  // Cleanup ONLY on true unmount.
+  // Do not tie teardown to initDevice dependency changes, or a re-created callback
+  // can destroy an active call when tab/window focus shifts.
+  useEffect(() => {
     return () => {
       if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current)
+
+      const callSessionActive = isCallSessionActiveRef.current || hasLiveCall(currentCallRef.current)
+      if (callSessionActive) {
+        console.warn('[Voice] Unmount cleanup skipped because call session is active')
+        return
+      }
+
       if (deviceRef.current) {
         const d = deviceRef.current
         console.log('[Voice] Provider unmounting, destroying device. State:', d.state)
@@ -544,7 +557,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         deviceRef.current = null
       }
     }
-  }, [initDevice])
+  }, [hasLiveCall])
 
   // Handle tab visibility changes - refresh connection when tab becomes active
   useEffect(() => {
