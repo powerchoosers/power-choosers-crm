@@ -281,7 +281,7 @@ export function useCalls(searchQuery?: string) {
           status: status as Call['status'],
           duration: durationStr,
           date: item.timestamp || item.createdAt || '',
-          note: item.summary,
+          note: item.summary || item.ai_summary || undefined,
           recordingUrl: item.recordingUrl || item.recording_url || undefined,
           recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
@@ -378,14 +378,14 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
 
         return {
           id: item.id,
-          callSid: item.callSid || item.id,
+          callSid: item.callSid || item.call_sid || item.id,
           contactName: contact?.name || 'Unknown',
           phoneNumber: item.direction === 'outbound' ? (item.to || '') : (item.from || ''),
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
           date: item.timestamp ?? item.createdAt ?? '',
-          note: item.summary,
+          note: item.summary || item.ai_summary || undefined,
           recordingUrl: item.recordingUrl || item.recording_url || undefined,
           recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
@@ -399,6 +399,7 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
     },
     enabled: !!accountId && !loading && !!user,
     staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval: 20_000, // Poll every 20s so new calls show without refresh (fallback if Realtime misses)
     refetchIntervalInBackground: false,
@@ -413,7 +414,15 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
   useEffect(() => {
     if (!contactId || !user || loading) return
 
-    const channel = supabase
+    const invalidateContactCalls = () => {
+      queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
+      queryClient.invalidateQueries({ queryKey: ['calls'] })
+      if (accountId) queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
+    }
+
+    const channels: Array<ReturnType<typeof supabase.channel>> = []
+
+    const contactChannel = supabase
       .channel(`contact-calls-${contactId}`)
       .on(
         'postgres_changes',
@@ -425,16 +434,38 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
         },
         (payload) => {
           console.log('Real-time call update for contact:', contactId, payload)
-          // Invalidate the contact calls query to refresh the list
-          queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
+          invalidateContactCalls()
         }
       )
       .subscribe()
+    channels.push(contactChannel)
+
+    if (accountId?.trim()) {
+      const accountChannel = supabase
+        .channel(`contact-calls-account-${contactId}-${accountId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'calls',
+            filter: `accountId=eq.${accountId}`,
+          },
+          (payload) => {
+            console.log('Real-time account-level call update for contact:', contactId, accountId, payload)
+            invalidateContactCalls()
+          }
+        )
+        .subscribe()
+      channels.push(accountChannel)
+    }
 
     return () => {
-      supabase.removeChannel(channel)
+      channels.forEach((channel) => {
+        supabase.removeChannel(channel)
+      })
     }
-  }, [contactId, user, loading, queryClient])
+  }, [contactId, accountId, user, loading, queryClient])
 
   return useQuery({
     queryKey: ['contact-calls', contactId, companyPhone ?? '', accountId ?? '', user?.email],
@@ -490,14 +521,14 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
 
         return {
           id: item.id,
-          callSid: item.callSid || item.id,
+          callSid: item.callSid || item.call_sid || item.id,
           contactName: '',
           phoneNumber: item.direction === 'outbound' ? (toVal || '') : (fromVal || ''),
           type: type as Call['type'],
           status: status as Call['status'],
           duration: durationStr,
           date: item.timestamp ?? item.createdAt ?? '',
-          note: item.summary,
+          note: item.summary || item.ai_summary || undefined,
           recordingUrl: item.recordingUrl || item.recording_url || undefined,
           recordingSid: item.recordingSid || item.recording_sid || undefined,
           transcript: item.transcript,
@@ -511,6 +542,7 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
     },
     enabled: !!contactId && !loading && !!user,
     staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval: 20_000, // Poll every 20s so new calls show without refresh (fallback if Realtime misses)
     refetchIntervalInBackground: false,
@@ -554,3 +586,4 @@ export function useLogCall() {
     },
   })
 }
+
