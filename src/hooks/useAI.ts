@@ -4,6 +4,7 @@ import { getNepqTargets } from '@/lib/industry-mapping'
 /** One full script variant (opener, hook, disturb, close). */
 export interface ScriptVariant {
   opener: string
+  situation: string
   hook: string
   disturb: string
   close: string
@@ -12,6 +13,7 @@ export interface ScriptVariant {
 /** Script result: primary script, optional gatekeeper variants (company-phone only), optional full-script variants. */
 export interface ScriptResult {
   opener: string
+  situation: string
   hook: string
   disturb: string
   close: string
@@ -24,6 +26,7 @@ export interface ScriptResult {
 function normalizeVariant(o: Record<string, unknown>, fallback: ScriptResult): ScriptVariant {
   return {
     opener: String(o.opener ?? o.Opener ?? fallback.opener),
+    situation: String(o.situation ?? o.Situation ?? fallback.situation),
     hook: String(o.hook ?? o.Hook ?? fallback.hook),
     disturb: String(o.disturb ?? o.Disturb ?? fallback.disturb),
     close: String(o.close ?? o.Close ?? fallback.close)
@@ -50,16 +53,24 @@ function isPlaceholderLine(value: string): boolean {
   return normalized === '...' || normalized === '[...]' || normalized === '"..."' || normalized.includes('spoken line here')
 }
 
+function ensureQuestion(line: string, fallback: string): string {
+  const cleaned = cleanLine(line)
+  if (!cleaned || isPlaceholderLine(cleaned)) return fallback
+  return cleaned.includes('?') ? cleaned : `${cleaned.replace(/[.!\s]+$/, '')}?`
+}
+
 function buildScriptResult(source: Record<string, unknown>, fallback: ScriptResult): ScriptResult {
   const opener = neutralizeUnverifiedClaims(cleanLine(source.opener ?? source.Opener ?? fallback.opener))
+  const situation = neutralizeUnverifiedClaims(cleanLine(source.situation ?? source.Situation ?? source.situation_question ?? fallback.situation))
   const hook = neutralizeUnverifiedClaims(cleanLine(source.hook ?? source.Hook ?? fallback.hook))
   const disturb = neutralizeUnverifiedClaims(cleanLine(source.disturb ?? source.Disturb ?? fallback.disturb))
   const close = neutralizeUnverifiedClaims(cleanLine(source.close ?? source.Close ?? fallback.close))
 
   const result: ScriptResult = {
     opener: isPlaceholderLine(opener) ? fallback.opener : opener,
-    hook: isPlaceholderLine(hook) ? fallback.hook : hook,
-    disturb: isPlaceholderLine(disturb) ? fallback.disturb : disturb,
+    situation: ensureQuestion(situation, fallback.situation),
+    hook: ensureQuestion(hook, fallback.hook),
+    disturb: ensureQuestion(disturb, fallback.disturb),
     close: isPlaceholderLine(close) ? fallback.close : close
   }
 
@@ -86,21 +97,23 @@ function parseFromLabeledText(rawText: string, fallback: ScriptResult): ScriptRe
   if (!text) return null
   const pick = (labels: string[]) => {
     const labelPattern = labels.map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
-    const nextPattern = '(?:opener|hook|disturb|problem|close|next[-\\s]?step)'
+    const nextPattern = '(?:opener|situation|hook|disturb|problem|close|next[-\\s]?step)'
     const re = new RegExp(`(?:^|\\n)\\s*(?:${labelPattern})\\s*[:\\-]\\s*([\\s\\S]*?)(?=\\n\\s*(?:${nextPattern})\\s*[:\\-]|$)`, 'i')
     const match = text.match(re)
     return cleanLine(match?.[1] ?? '')
   }
 
   const opener = neutralizeUnverifiedClaims(pick(['opener']))
+  const situation = neutralizeUnverifiedClaims(pick(['situation', 'situation question']))
   const hook = neutralizeUnverifiedClaims(pick(['hook']))
   const disturb = neutralizeUnverifiedClaims(pick(['disturb', 'problem', 'problem question']))
   const close = neutralizeUnverifiedClaims(pick(['close', 'next-step ask', 'next step ask']))
-  if (!opener && !hook && !disturb && !close) return null
+  if (!opener && !situation && !hook && !disturb && !close) return null
   return {
     opener: !isPlaceholderLine(opener) ? opener : fallback.opener,
-    hook: !isPlaceholderLine(hook) ? hook : fallback.hook,
-    disturb: !isPlaceholderLine(disturb) ? disturb : fallback.disturb,
+    situation: ensureQuestion(situation, fallback.situation),
+    hook: ensureQuestion(hook, fallback.hook),
+    disturb: ensureQuestion(disturb, fallback.disturb),
     close: !isPlaceholderLine(close) ? close : fallback.close
   }
 }
@@ -109,24 +122,58 @@ function parseFromFlattenedKeyValue(rawText: string, fallback: ScriptResult): Sc
   const text = rawText.replace(/\r/g, '').trim()
   if (!text) return null
 
-  const pick = (key: 'opener' | 'hook' | 'disturb' | 'close', nextKeys: string[]) => {
+  const pick = (key: 'opener' | 'situation' | 'hook' | 'disturb' | 'close', nextKeys: string[]) => {
     const nextPattern = nextKeys.join('|')
     const re = new RegExp(`${key}\\s*:\\s*([\\s\\S]*?)(?=(?:\\s*[\\n,]+\\s*(?:${nextPattern})\\s*:)|$)`, 'i')
     const match = text.match(re)
     return cleanLine(match?.[1] ?? '')
   }
 
-  const opener = neutralizeUnverifiedClaims(pick('opener', ['hook', 'disturb', 'close', 'variants']))
+  const opener = neutralizeUnverifiedClaims(pick('opener', ['situation', 'hook', 'disturb', 'close', 'variants']))
+  const situation = neutralizeUnverifiedClaims(pick('situation', ['hook', 'disturb', 'close', 'variants']))
   const hook = neutralizeUnverifiedClaims(pick('hook', ['disturb', 'close', 'variants']))
   const disturb = neutralizeUnverifiedClaims(pick('disturb', ['close', 'variants']))
   const close = neutralizeUnverifiedClaims(pick('close', ['variants']))
 
-  if (!opener && !hook && !disturb && !close) return null
+  if (!opener && !situation && !hook && !disturb && !close) return null
 
   return {
     opener: !isPlaceholderLine(opener) ? opener : fallback.opener,
-    hook: !isPlaceholderLine(hook) ? hook : fallback.hook,
-    disturb: !isPlaceholderLine(disturb) ? disturb : fallback.disturb,
+    situation: ensureQuestion(situation, fallback.situation),
+    hook: ensureQuestion(hook, fallback.hook),
+    disturb: ensureQuestion(disturb, fallback.disturb),
+    close: !isPlaceholderLine(close) ? close : fallback.close
+  }
+}
+
+function parseFromLooseDelimited(rawText: string, fallback: ScriptResult): ScriptResult | null {
+  const text = rawText.replace(/\r/g, ' ').replace(/\n/g, ' ').trim()
+  if (!text) return null
+
+  const pickLoose = (labels: string[]) => {
+    for (const label of labels) {
+      const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const re = new RegExp(`\\b${escaped}\\b\\s*[:\\-]\\s*([\\s\\S]*?)(?=\\b(?:gatekeepervariants|opener|situation|hook|disturb|problem|close|next[-\\s]?step|variants|engagement question|problem-awareness question)\\b\\s*[:\\-]|$)`, 'i')
+      const match = text.match(re)
+      const value = cleanLine(match?.[1] ?? '')
+      if (value) return value
+    }
+    return ''
+  }
+
+  const opener = neutralizeUnverifiedClaims(pickLoose(['opener', 'best-fit opener']))
+  const situation = neutralizeUnverifiedClaims(pickLoose(['situation', 'situation question']))
+  const hook = neutralizeUnverifiedClaims(pickLoose(['hook', 'engagement question']))
+  const disturb = neutralizeUnverifiedClaims(pickLoose(['disturb', 'problem question', 'problem-awareness question']))
+  const close = neutralizeUnverifiedClaims(pickLoose(['close', 'clean next-step ask', 'next-step ask']))
+
+  if (!opener && !situation && !hook && !disturb && !close) return null
+
+  return {
+    opener: !isPlaceholderLine(opener) ? opener : fallback.opener,
+    situation: ensureQuestion(situation, fallback.situation),
+    hook: ensureQuestion(hook, fallback.hook),
+    disturb: ensureQuestion(disturb, fallback.disturb),
     close: !isPlaceholderLine(close) ? close : fallback.close
   }
 }
@@ -135,8 +182,9 @@ function parseFromFlattenedKeyValue(rawText: string, fallback: ScriptResult): Sc
 function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
   const fallback: ScriptResult = {
     opener: "I'm not sure if you're the right person to speak with, so help me out for a second.",
-    hook: `I noticed some ${riskVector} that might be impacting your operations.`,
-    disturb: "Usually, when that happens, it leads to waste that nobody's tracking.",
+    situation: "When your team reviews electricity agreements, who usually owns that internally?",
+    hook: `Out of curiosity, where do costs feel least clear on your bill today around ${riskVector}?`,
+    disturb: "If nothing changes before renewal, what usually happens to budget certainty?",
     close: "Would you be opposed to a brief look at the data to see if that's the case?"
   }
   if (raw == null) return fallback
@@ -173,12 +221,15 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
     if (labeled) return labeled
     const flattened = parseFromFlattenedKeyValue(stripped, fallback)
     if (flattened) return flattened
+    const looseDelimited = parseFromLooseDelimited(stripped, fallback)
+    if (looseDelimited) return looseDelimited
   }
   // Last resort: show raw model line instead of generic placeholder text.
   const usable = cleanLine(stripped.replace(/[{}[\]"]/g, ' '))
   if (usable && !isPlaceholderLine(usable)) {
     return {
       opener: usable,
+      situation: fallback.situation,
       hook: fallback.hook,
       disturb: fallback.disturb,
       close: fallback.close
@@ -244,7 +295,7 @@ export function useAI() {
         `Call mode: ${isCompanyPhone ? 'Company phone / gatekeeper likely' : 'Direct line'}`,
         `Decision maker titles to target: ${dmList}`,
         `Champion titles to identify: ${championList}`,
-        'Return valid JSON only using opener/hook/disturb/close and optional gatekeeperVariants + variants.'
+        'Return valid JSON only using opener/situation/hook/disturb/close and optional gatekeeperVariants + variants.'
       ].join('\n')
 
       const response = await fetch('/api/gemini/chat', {
