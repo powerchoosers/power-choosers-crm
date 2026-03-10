@@ -33,6 +33,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
   const { profile } = useAuth()
 
   const metadata = isActive ? (voiceMetadata || storeMetadata) : storeMetadata
+  const gatekeeperVariants = (aiResponse?.gatekeeperVariants ?? []).map((line) => String(line || '').trim()).filter(Boolean)
 
   // Use store metadata if props are missing (e.g., during dialing)
   const displayContact = contact || {
@@ -58,7 +59,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
       vector_type: vector,
       contact_context: {
         // Agent Info
-        agent_name: profile?.firstName || 'Trey',
+        agent_name: profile?.firstName || 'Lewis',
         agent_title: profile?.jobTitle || 'Energy Consultant',
 
         // Context Type
@@ -148,18 +149,18 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                 animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-black/45 p-4 sm:p-5"
               >
-                {aiResponse.gatekeeperVariants && aiResponse.gatekeeperVariants.length > 0 && selectedVariantIndex === 0 && (
+                {gatekeeperVariants.length > 0 && (
                   <>
                     <ScriptStep
                       label="Gatekeeper version"
-                      content={aiResponse.gatekeeperVariants[selectedGatekeeperIndex] ?? aiResponse.gatekeeperVariants[0]}
+                      content={gatekeeperVariants[selectedGatekeeperIndex] ?? gatekeeperVariants[0]}
                       delay={0}
                       accent
                     />
-                    {aiResponse.gatekeeperVariants.length > 1 && (
+                    {gatekeeperVariants.length > 1 && (
                       <div className="flex flex-wrap gap-2">
                         <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Gate</span>
-                        {aiResponse.gatekeeperVariants.map((_, i) => (
+                        {gatekeeperVariants.map((_, i) => (
                           <button
                             key={i}
                             type="button"

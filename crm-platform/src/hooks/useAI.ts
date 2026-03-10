@@ -36,6 +36,7 @@ function normalizeVariant(o: Record<string, unknown>, fallback: ScriptResult): S
 function cleanLine(value: unknown): string {
   return String(value ?? '')
     .replace(/^['"`]+|['"`]+$/g, '')
+    .replace(/^[,;]+|[,;]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -274,6 +275,11 @@ function parseScriptContent(raw: unknown, riskVector: string): ScriptResult {
   if (flattened) return flattened
   const looseDelimited = parseFromLooseDelimited(candidateText, fallback)
   if (looseDelimited) return looseDelimited
+  const looksStructured = /\b(?:gatekeepervariants|opener|situation|hook|disturb|problem|close|next[-\s]?step)\b\s*[:\-]/i.test(candidateText)
+  if (looksStructured) {
+    // Do not leak raw key:value payloads into the UI. Fall back to safe defaults.
+    return fallback
+  }
   // Last resort: show raw model line instead of generic placeholder text.
   const usable = cleanLine(candidateText.replace(/[{}[\]"]/g, ' '))
   if (usable && !isPlaceholderLine(usable)) {
