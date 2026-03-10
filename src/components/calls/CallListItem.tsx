@@ -71,6 +71,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const pendingSeekRef = useRef<number | null>(null)
+  const recordingSrcRef = useRef<string | null>(null)
   const { user, profile } = useAuth()
 
   const { status, error, processCall } = useCallProcessor({
@@ -99,10 +100,31 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   const scrubMax = duration > 0 ? duration : fallbackDuration
   const canScrub = scrubMax > 0
 
+  const buildRecordingProxyUrl = () => {
+    if (call.recordingSid) {
+      return `/api/recording?sid=${encodeURIComponent(call.recordingSid)}`
+    }
+    if (!call.recordingUrl) return null
+    return `/api/recording?url=${encodeURIComponent(call.recordingUrl)}`
+  }
+
+  const ensureAudioSource = () => {
+    const el = audioRef.current
+    const proxyUrl = buildRecordingProxyUrl()
+    if (!el || !proxyUrl) return
+    const absoluteProxyUrl = new URL(proxyUrl, window.location.origin).toString()
+    if (recordingSrcRef.current !== absoluteProxyUrl) {
+      recordingSrcRef.current = absoluteProxyUrl
+      el.src = proxyUrl
+      el.load()
+    }
+  }
+
   // Inline audio player: bind to audio element
   useEffect(() => {
     const el = audioRef.current
     if (!el) return
+    ensureAudioSource()
     const syncDuration = () => {
       const d = Number(el.duration)
       if (Number.isFinite(d) && d > 0) {
@@ -112,6 +134,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
           el.currentTime = target
           setCurrentTime(target)
           pendingSeekRef.current = null
+          setIsSeeking(false)
         }
       } else if (fallbackDuration > 0) {
         setDuration(fallbackDuration)
@@ -150,7 +173,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
       el.removeEventListener('pause', onPause)
       el.removeEventListener('seeked', onSeeked)
     }
-  }, [isPlayerOpen, fallbackDuration, isSeeking])
+  }, [call.recordingUrl, call.recordingSid, isPlayerOpen, fallbackDuration, isSeeking])
 
   // Preload logged-in user's avatar for agent icon (host Google photo to avoid CORS)
   useEffect(() => {
@@ -184,14 +207,10 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     setDuration(fallbackDuration > 0 ? fallbackDuration : 0)
     setCurrentTime(0)
     pendingSeekRef.current = null
+    setIsSeeking(false)
     const el = audioRef.current
     if (el) {
-      // Use our backend proxy so Twilio auth is applied (direct Twilio URL requires Basic Auth from browser)
-      const proxyUrl = `/api/recording?url=${encodeURIComponent(call.recordingUrl)}`
-      if (el.src !== window.location.origin + proxyUrl) {
-        el.src = proxyUrl
-      }
-      el.load()
+      ensureAudioSource()
       el.play().catch(() => setIsPlaying(false))
     }
   }
@@ -205,15 +224,16 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
 
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
     const t = Number(e.target.value)
-    setIsSeeking(true)
     setCurrentTime(t)
     const el = audioRef.current
     if (!el) return
     const durationCandidate = Number(el.duration)
     if (Number.isFinite(durationCandidate) && durationCandidate > 0) {
+      setIsSeeking(true)
       el.currentTime = Math.max(0, Math.min(t, durationCandidate))
       return
     }
+    setIsSeeking(false)
     pendingSeekRef.current = t
   }
 
@@ -227,6 +247,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     setIsPlaying(false)
     setCurrentTime(0)
     setDuration(0)
+    setIsSeeking(false)
     pendingSeekRef.current = null
   }
 
