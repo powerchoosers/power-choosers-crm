@@ -1418,6 +1418,10 @@ export default async function handler(req, res) {
     }
 
     const { messages, userProfile, jsonMode } = req.body;
+    const contextPurpose = String(req.body?.contextPurpose || '').trim();
+    const activeCallSafetyAddendum = contextPurpose === 'active_call_script'
+      ? '\n\nACTIVE_CALL_SAFETY: Do not imply prior audits, flagged errors, or reviewed utility files unless explicitly provided by user context. Use uncertainty-first language (possible, might, depending on structure).'
+      : '';
     const requestedTemperatureRaw = req.body?.temperature;
     const requestedTemperature = Number.isFinite(requestedTemperatureRaw)
       ? Math.min(1, Math.max(0, Number(requestedTemperatureRaw)))
@@ -2480,9 +2484,9 @@ export default async function handler(req, res) {
       let currentMessages = [];
 
       // Ensure we have a system prompt
-      const systemContent = hasSystemPrompt
+      const systemContent = (hasSystemPrompt
         ? cleanedMessages.find(m => m.role === 'system')?.content
-        : buildSystemPrompt().trim();
+        : buildSystemPrompt().trim()) + activeCallSafetyAddendum;
       currentMessages.push({ role: 'system', content: systemContent });
 
       // Append history, limited to last 15 exchanges
@@ -2651,9 +2655,9 @@ export default async function handler(req, res) {
 
       // Clearer system prompt for Perplexity to prevent tool hallucinations
       const hasSystemPrompt = cleanedMessages.some(m => m.role === 'system');
-      const baseSystemPrompt = hasSystemPrompt
+      const baseSystemPrompt = (hasSystemPrompt
         ? cleanedMessages.find(m => m.role === 'system')?.content
-        : buildSystemPrompt().trim();
+        : buildSystemPrompt().trim()) + activeCallSafetyAddendum;
 
       const perplexitySystemPrompt = `
         ${baseSystemPrompt}
@@ -2934,9 +2938,9 @@ export default async function handler(req, res) {
           timestamp: new Date().toISOString()
         });
 
-        const systemPrompt = hasSystemPrompt
+        const systemPrompt = (hasSystemPrompt
           ? cleanedMessages.find(m => m.role === 'system')?.content
-          : buildSystemPrompt();
+          : buildSystemPrompt()) + activeCallSafetyAddendum;
 
         console.log(`[Gemini Chat] Attempting request with model: ${modelName}`);
         const model = genAI.getGenerativeModel({
