@@ -107,20 +107,26 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             meta.account = data.contact.account
             meta.title = data.contact.title
             meta.contactId = data.contact.id
-            meta.accountId = data.contact.accountId
+            meta.accountId = data.contact.accountId || data.account?.id || data.account?.accountId
             meta.city = data.contact.city
             meta.state = data.contact.state
-            meta.logoUrl = data.contact.logoUrl
-            meta.domain = data.contact.domain
+            meta.logoUrl = data.contact.logoUrl || data.account?.logoUrl
+            meta.domain = data.contact.domain || data.account?.domain
             meta.isAccountOnly = false
           } else if (data.account) {
             meta.name = data.account.name
+            meta.account = data.account.name
             meta.logoUrl = data.account.logoUrl
             meta.domain = data.account.domain
-            meta.accountId = data.account.id
+            meta.accountId = data.account.id || data.account.accountId
             meta.city = data.account.city
             meta.state = data.account.state
             meta.isAccountOnly = true
+          }
+          // Keep a minimal raw payload for defensive UI fallbacks
+          ;(meta as any).metadata = {
+            contactId: meta.contactId,
+            accountId: meta.accountId
           }
           return meta
         }
