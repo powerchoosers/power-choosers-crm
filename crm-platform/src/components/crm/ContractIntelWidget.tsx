@@ -84,11 +84,11 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
     : null;
 
   return (
-    <div className="w-full text-left group p-3 rounded-lg bg-white/[0.02] border border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.08] transition-all relative overflow-hidden">
+    <div className="w-full text-left group p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-colors relative overflow-hidden">
       {/* Top row: stage dot + title. Stage text removed — badge handles status display */}
       <button
         type="button"
-        onClick={() => router.push('/network/contracts')}
+        onClick={() => router.push(`/network/contracts/${deal.id}`)}
         className="w-full text-left"
       >
       <div className="flex items-center gap-2 mb-1.5 pr-32">
@@ -156,7 +156,7 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="h-6 w-6 rounded-md border border-white/10 bg-black/50 text-zinc-400 hover:text-zinc-200 hover:border-white/20 flex items-center justify-center"
+              className="h-6 w-6 rounded-md nodal-module-glass nodal-monolith-edge text-zinc-400 hover:text-zinc-200 hover:bg-white/5 flex items-center justify-center transition-colors"
               onClick={(e) => e.stopPropagation()}
               aria-label="Contract actions"
             >

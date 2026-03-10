@@ -306,10 +306,11 @@ export function EmailList({
                 key={email.id}
                 onClick={() => onSelectEmail(email)}
                 className={cn(
-                  "group grid grid-cols-12 gap-4 p-3 hover:bg-white/5 cursor-pointer transition-all items-center border-l-2",
+                  "group grid grid-cols-12 gap-4 p-3 cursor-pointer transition-all items-center border-l-2",
                   hasClicks ? "border-[#002FA7]" : selectedEmailId === email.id ? "border-[#002FA7]" : "border-transparent",
                   email.unread ? "bg-[#002FA7]/5" : "",
-                  isSelected ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" : ""
+                  isSelected ? "selected-container border-[#cfd5ff]/30 shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
+                  !isSelected && "hover:bg-white/5"
                 )}
               >
                 {/* Select / Row number */}

@@ -29,7 +29,7 @@ export default function EmailsPage() {
 
   const [searchTerm, setSearchTerm] = useState(searchQuery)
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
-  const [emailFilter, setEmailFilter] = useState<EmailListFilter>('all')
+  const [emailFilter, setEmailFilter] = useState<EmailListFilter>('received')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const hasRunAutoSync = useRef(false)
 

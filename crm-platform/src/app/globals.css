@@ -46,6 +46,12 @@
     border: 1px solid rgba(255, 255, 255, 0.05) !important;
     isolation: isolate;
   }
+  
+  .selected-container {
+    background: var(--card) !important;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.04);
+  }
 
   /* Extreme Glass for floating panels - Optimized for visibility and "pop" */
   .glass-panel {

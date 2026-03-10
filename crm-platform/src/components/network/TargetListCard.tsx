@@ -55,7 +55,7 @@ export const TargetListCard = memo(function TargetListCard({
                 onClick={(e) => isEditing && e.preventDefault()}
                 className={cn(
                     "group relative nodal-module-glass nodal-monolith-edge rounded-2xl p-6 hover:bg-zinc-950/90 hover:border-white/10 transition-all cursor-pointer flex flex-col justify-between h-44",
-                    isEditing && "cursor-default border-[#002FA7]/30 bg-zinc-950/80"
+                    isEditing && "cursor-default selected-container border-white/5"
                 )}
             >
                 {/* Card Header */}
