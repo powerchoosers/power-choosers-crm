@@ -84,6 +84,84 @@ async function resolveInboundPhoneNumbers() {
     return unique;
 }
 
+function extractNormalizedUserNumbers(settings) {
+    if (!settings || typeof settings !== 'object') return [];
+
+    const numbers = [];
+
+    if (settings.selectedPhoneNumber) {
+        numbers.push(settings.selectedPhoneNumber);
+    }
+
+    if (Array.isArray(settings.twilioNumbers)) {
+        settings.twilioNumbers.forEach((entry) => {
+            if (!entry) return;
+            if (typeof entry === 'string') {
+                numbers.push(entry);
+                return;
+            }
+            if (typeof entry === 'object' && entry.number) {
+                numbers.push(entry.number);
+            }
+        });
+    }
+
+    return numbers
+        .map((num) => normalizePhoneNumber(num) || num)
+        .map((num) => digitsOnly(num))
+        .filter(Boolean);
+}
+
+function resolveFallbackAgentIdentity() {
+    if (process.env.TWILIO_DEFAULT_AGENT_IDENTITY) {
+        return process.env.TWILIO_DEFAULT_AGENT_IDENTITY;
+    }
+
+    if (process.env.TWILIO_DEFAULT_AGENT_USER_ID) {
+        return `agent-${process.env.TWILIO_DEFAULT_AGENT_USER_ID}`;
+    }
+
+    return 'agent';
+}
+
+async function resolveInboundTargetIdentity(businessNumber) {
+    const fallbackIdentity = resolveFallbackAgentIdentity();
+    const normalizedBusiness = digitsOnly(businessNumber);
+
+    if (!normalizedBusiness) {
+        return fallbackIdentity;
+    }
+
+    try {
+        const { supabaseAdmin } = await import('../../../lib/supabase.ts');
+
+        const { data: users, error } = await supabaseAdmin
+            .from('users')
+            .select('id, settings')
+            .limit(1000);
+
+        if (error) {
+            logger.warn('[Voice] Failed to load users for inbound routing:', error.message);
+            return fallbackIdentity;
+        }
+
+        const matchedUser = (users || []).find((user) => {
+            const userNumbers = extractNormalizedUserNumbers(user?.settings || {});
+            return userNumbers.some((num) => num === normalizedBusiness);
+        });
+
+        if (matchedUser?.id) {
+            return `agent-${matchedUser.id}`;
+        }
+
+        logger.warn(`[Voice] No user mapped to inbound number ${businessNumber}. Falling back to ${fallbackIdentity}`);
+        return fallbackIdentity;
+    } catch (err) {
+        logger.warn('[Voice] Failed inbound identity resolution, using fallback identity:', err?.message || err);
+        return fallbackIdentity;
+    }
+}
+
 export default async function handler(req, res) {
     // First thing: log that we were reached, before ANY processing
     logger.log('[Voice] ======== HANDLER HIT ========', req.method);
@@ -267,25 +345,11 @@ export default async function handler(req, res) {
             });
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
 
-            // Resolve which agent identity to ring based on the business number dialed
-            let targetIdentity = 'agent';
-            try {
-                const { supabaseAdmin } = await import('../../../lib/supabase.ts');
-                // Check for user who has this number selected or in their Twilio Numbers
-                const { data: userData } = await supabaseAdmin
-                    .from('users')
-                    .select('id, settings')
-                    .or(`settings->>selectedPhoneNumber.eq.${businessNumber},settings->twilioNumbers.cs.[{"number":"${businessNumber}"}]`)
-                    .limit(1)
-                    .maybeSingle();
-
-                if (userData?.id) {
-                    targetIdentity = `agent-${userData.id}`;
-                    logger.log(`[Voice] Resolved inbound target user: ${userData.id} for number ${businessNumber}`);
-                }
-            } catch (err) {
-                logger.warn('[Voice] Failed to resolve target agent identity, falling back to "agent":', err.message);
-            }
+            // Resolve which agent identity to ring based on the business number dialed.
+            // We normalize user-stored settings numbers because settings may store
+            // formatted values (e.g. "+1 (817)-...") while Twilio sends E.164.
+            const targetIdentity = await resolveInboundTargetIdentity(businessNumber);
+            logger.log(`[Voice] Resolved inbound target identity: ${targetIdentity} for number ${businessNumber}`);
 
             const client = dial.client({
                 statusCallback: `${base}/api/twilio/dial-status${cbq}`,
