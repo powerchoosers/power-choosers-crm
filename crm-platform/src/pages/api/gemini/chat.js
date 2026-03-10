@@ -1419,9 +1419,64 @@ export default async function handler(req, res) {
 
     const { messages, userProfile, jsonMode } = req.body;
     const contextPurpose = String(req.body?.contextPurpose || '').trim();
-    const activeCallSafetyAddendum = contextPurpose === 'active_call_script'
-      ? '\n\nACTIVE_CALL_SAFETY: Do not imply prior audits, flagged errors, or reviewed utility files unless explicitly provided by user context. Use uncertainty-first language (possible, might, depending on structure).'
-      : '';
+    const isActiveCallScript = contextPurpose === 'active_call_script';
+    const activeCallSystemPrompt = `You are Nodal Point's NEPQ Texas call coach for commercial electricity outreach.
+
+Core rules:
+- Lead with curiosity, not claims.
+- Use short, spoken-language sentences.
+- Use plain English and business impact.
+- Do not promise savings or guarantee outcomes.
+- Do not imply prior audits, flagged errors, or reviewed utility files unless explicitly provided in context.
+- Default to Texas/ERCOT framing.
+- First-call objective order: 1) book meeting, 2) get bill, 3) identify decision maker.
+- Tone: calm, curious, commercially sharp, peer-to-peer.
+
+Positioning:
+- Preferred value phrase: "costs buried in the electricity bill most companies don't realize are there."
+- Focus on delivery charges, demand-related costs, pass-through structure, renewal timing, budget pressure, and contract risk.
+- Do not lead with rates.
+- Do not use these phrases: "hidden electricity cost drivers", "hidden bill costs", "hidden energy costs".
+
+Cold-call structure:
+1) Disarming opener
+2) Route to decision maker using company name when asking who handles electricity agreements
+3) One engagement question
+4) Low-pressure next-step ask
+
+Opener guidance:
+- Start with a light "out of the blue" pattern interrupt when appropriate.
+- Ask for help early ("help me out for a moment").
+- Keep first opener under 70 words unless asked for longer.
+- Do not over-explain in first 20 seconds.
+
+Objection handling order:
+1) Validate
+2) Clarify
+3) Problem-expand
+4) Low-pressure pivot
+
+Objection anchors:
+- "We already have a broker": separate rate shopping from agreement-structure review.
+- "We're locked in": pivot to pre-renewal planning.
+- "Send me something": ask one clarifier before offering follow-up.
+
+Output rules:
+- Return valid JSON only.
+- No markdown.
+- No placeholders like "...".
+- Keep lines natural for spoken delivery.
+- Use this schema:
+{
+  "gatekeeperVariants": ["..."], // optional, include when company-phone context is implied
+  "opener": "...",
+  "hook": "...",
+  "disturb": "...",
+  "close": "...",
+  "variants": [
+    { "opener": "...", "hook": "...", "disturb": "...", "close": "..." }
+  ]
+}`;
     const requestedTemperatureRaw = req.body?.temperature;
     const requestedTemperature = Number.isFinite(requestedTemperatureRaw)
       ? Math.min(1, Math.max(0, Number(requestedTemperatureRaw)))
@@ -2484,9 +2539,11 @@ export default async function handler(req, res) {
       let currentMessages = [];
 
       // Ensure we have a system prompt
-      const systemContent = (hasSystemPrompt
-        ? cleanedMessages.find(m => m.role === 'system')?.content
-        : buildSystemPrompt().trim()) + activeCallSafetyAddendum;
+      const systemContent = isActiveCallScript
+        ? activeCallSystemPrompt
+        : (hasSystemPrompt
+          ? cleanedMessages.find(m => m.role === 'system')?.content
+          : buildSystemPrompt().trim());
       currentMessages.push({ role: 'system', content: systemContent });
 
       // Append history, limited to last 15 exchanges
@@ -2655,9 +2712,11 @@ export default async function handler(req, res) {
 
       // Clearer system prompt for Perplexity to prevent tool hallucinations
       const hasSystemPrompt = cleanedMessages.some(m => m.role === 'system');
-      const baseSystemPrompt = (hasSystemPrompt
-        ? cleanedMessages.find(m => m.role === 'system')?.content
-        : buildSystemPrompt().trim()) + activeCallSafetyAddendum;
+      const baseSystemPrompt = isActiveCallScript
+        ? activeCallSystemPrompt
+        : (hasSystemPrompt
+          ? cleanedMessages.find(m => m.role === 'system')?.content
+          : buildSystemPrompt().trim());
 
       const perplexitySystemPrompt = `
         ${baseSystemPrompt}
@@ -2938,9 +2997,11 @@ export default async function handler(req, res) {
           timestamp: new Date().toISOString()
         });
 
-        const systemPrompt = (hasSystemPrompt
-          ? cleanedMessages.find(m => m.role === 'system')?.content
-          : buildSystemPrompt()) + activeCallSafetyAddendum;
+        const systemPrompt = isActiveCallScript
+          ? activeCallSystemPrompt
+          : (hasSystemPrompt
+            ? cleanedMessages.find(m => m.role === 'system')?.content
+            : buildSystemPrompt());
 
         console.log(`[Gemini Chat] Attempting request with model: ${modelName}`);
         const model = genAI.getGenerativeModel({

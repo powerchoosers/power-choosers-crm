@@ -40,9 +40,9 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
 
   // Use store metadata if props are missing (e.g., during dialing)
   const displayContact = contact || {
-    name: metadata?.name || 'Unknown Node',
+    name: metadata?.name || 'Unknown Contact',
     title: metadata?.title || 'Operational Lead',
-    company: metadata?.account || 'Unknown Asset',
+    company: metadata?.account || 'Unknown Company',
     industry: metadata?.industry,
     description: metadata?.description,
     linkedinUrl: metadata?.linkedinUrl,
@@ -129,7 +129,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
 
         <div className="flex gap-2 shrink-0">
           <div className="px-2.5 py-1.5 rounded-xl bg-red-500/10 border border-red-500/20 text-[10px] font-mono text-red-400 tabular-nums">
-            {account?.daysRemaining ? `${account.daysRemaining}D` : 'VOID'}
+            {account?.daysRemaining ? `${account.daysRemaining}D` : 'NO END DATE'}
           </div>
           <div className="px-2.5 py-1.5 rounded-xl bg-white/10 border border-white/20 text-[10px] font-mono text-white">
             {account?.loadZone || 'LZ_NORTH'}
@@ -155,7 +155,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                 {aiResponse.gatekeeperVariants && aiResponse.gatekeeperVariants.length > 0 && selectedVariantIndex === 0 && (
                   <>
                     <ScriptStep
-                      label="Gatekeeper opener"
+                      label="Gatekeeper version"
                       content={aiResponse.gatekeeperVariants[selectedGatekeeperIndex] ?? aiResponse.gatekeeperVariants[0]}
                       delay={0}
                       accent
@@ -188,16 +188,16 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
                     : (aiResponse.variants?.[selectedVariantIndex - 1] ?? { opener: aiResponse.opener, hook: aiResponse.hook, disturb: aiResponse.disturb, close: aiResponse.close })
                   return (
                     <>
-                      <ScriptStep label="Opener" content={script.opener ?? ''} delay={0.1} />
-                      <ScriptStep label="Hook question" content={script.hook ?? ''} delay={0.2} />
-                      <ScriptStep label="Problem question" content={script.disturb ?? ''} delay={0.3} accent />
-                      <ScriptStep label="Next-step ask" content={script.close ?? ''} delay={0.4} />
+                      <ScriptStep label="Best-fit opener" content={script.opener ?? ''} delay={0.1} />
+                      <ScriptStep label="Engagement question" content={script.hook ?? ''} delay={0.2} />
+                      <ScriptStep label="Problem-awareness question" content={script.disturb ?? ''} delay={0.3} accent />
+                      <ScriptStep label="Clean next-step ask" content={script.close ?? ''} delay={0.4} />
                     </>
                   )
                 })()}
                 {aiResponse.variants && aiResponse.variants.length > 0 && (
                   <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest w-full">Alternate versions</span>
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest w-full">Softer and alternate versions</span>
                     <button
                       type="button"
                       onClick={() => setSelectedVariantIndex(0)}
@@ -232,7 +232,7 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
               <div key="empty" className="rounded-2xl border border-white/10 bg-black/45 py-16 sm:py-20 flex flex-col items-center justify-center text-center opacity-70">
                 <Sparkles size={32} className="text-zinc-700 animate-pulse mb-4" />
                 <div className="text-xs font-mono text-zinc-600 uppercase tracking-[0.3em]">
-                  Pick a script type to start
+                  Pick a script type to generate your opener
                 </div>
               </div>
             )}
@@ -244,6 +244,12 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
       <div className="p-4 sm:p-6 bg-zinc-950/30 border-t border-white/5 space-y-4">
         <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] font-mono text-zinc-400">
           Objective: book meeting -&gt; bill review -&gt; permission to send note
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] font-sans text-zinc-400">
+          Flow: opener -&gt; decision maker -&gt; discovery question -&gt; next step
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2 text-[11px] font-sans text-zinc-400">
+          Tone: curiosity first, no rate pitch, no savings promise
         </div>
 
         {/* Rapid Context Input */}
@@ -267,8 +273,8 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
         {/* Vector Deck */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <VectorButton
-            label="Cold Open"
-            hint="book meeting first"
+            label="Open Script"
+            hint="best-fit opener"
             icon={Zap}
             tone="blue"
             active={activeVector === 'OPENER'}
@@ -276,8 +282,8 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
             onClick={() => handleVectorClick('OPENER')}
           />
           <VectorButton
-            label="Price Objection"
-            hint="validate, then clarify"
+            label="Objection Help"
+            hint="validate then clarify"
             icon={ShieldAlert}
             tone="red"
             active={activeVector === 'OBJECTION_PRICE'}
@@ -294,8 +300,8 @@ export function ActiveCallInterface({ contact, account }: ActiveCallInterfacePro
             onClick={() => handleVectorClick('OBJECTION_EMAIL')}
           />
           <VectorButton
-            label="Market Proof"
-            hint="tie data to business impact"
+            label="Context Angle"
+            hint="business-impact angle"
             icon={BarChart3}
             tone="emerald"
             active={activeVector === 'MARKET_DATA'}
@@ -374,9 +380,9 @@ function VectorButton({
 function NeuralScan() {
   const [step, setStep] = useState(0)
   const steps = [
-    "> REVIEWING ACCOUNT CONTEXT...",
-    "> BUILDING LOW-PRESSURE TALK TRACK...",
-    "> DRAFTING NEXT-STEP ASK..."
+    "> BUILDING DISARMING OPENER...",
+    "> PREPPING DISCOVERY QUESTION...",
+    "> DRAFTING LOW-PRESSURE NEXT STEP..."
   ]
 
   useEffect(() => {
