@@ -78,10 +78,10 @@ function applyLegacyOwnershipScope(query, user, isAdmin) {
   const email = user?.email ? String(user.email).toLowerCase().trim() : '';
 
   if (uid && email) {
-    return query.or(`ownerId.eq.${uid},ownerId.eq.${email},metadata->>ownerId.eq.${email}`);
+    return query.or(`ownerId.eq.${uid},ownerId.eq.${email},metadata->>ownerId.eq.${email},ownerId.is.null`);
   }
-  if (uid) return query.eq('ownerId', uid);
-  if (email) return query.or(`ownerId.eq.${email},metadata->>ownerId.eq.${email}`);
+  if (uid) return query.or(`ownerId.eq.${uid},ownerId.is.null`);
+  if (email) return query.or(`ownerId.eq.${email},metadata->>ownerId.eq.${email},ownerId.is.null`);
   return query;
 }
 

@@ -536,6 +536,7 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
 
 export function useCreateAccount() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   return useMutation({
     mutationFn: async (newAccount: Omit<Account, 'id'> & { id?: string }) => {
       // Map frontend fields to DB columns
@@ -553,6 +554,7 @@ export function useCreateAccount() {
         city: newAccount.city || newAccount.location?.split(',')[0]?.trim(),
         state: newAccount.state || newAccount.location?.split(',')[1]?.trim(),
         description: newAccount.description || '',
+        ownerId: user?.email || null,
         metadata: {
           sqft: newAccount.sqft,
           occupancy: newAccount.occupancy,
@@ -581,6 +583,7 @@ export function useCreateAccount() {
 
 export function useUpsertAccount() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   return useMutation({
     mutationFn: async (account: Omit<Account, 'id'> & { id?: string }) => {
       // 1. Try to find existing account by domain or name if ID is missing
@@ -633,6 +636,7 @@ export function useUpsertAccount() {
 
       if (!existingId) {
         dbAccount.id = crypto.randomUUID();
+        dbAccount.ownerId = user?.email || null;
         dbAccount.metadata = {
           sqft: account.sqft,
           occupancy: account.occupancy,
