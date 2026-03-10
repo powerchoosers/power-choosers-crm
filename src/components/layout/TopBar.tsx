@@ -777,7 +777,7 @@ export function TopBar() {
                                   onClick={() => {
                                     sendDigits(item.digit);
                                   }}
-                                  className="h-12 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 hover:border-white/20 text-white font-mono text-base transition-all active:scale-95 flex flex-col items-center justify-center gap-0.5"
+                                className="h-12 rounded-xl bg-zinc-950/40 border border-white/10 hover:bg-zinc-950/60 hover:border-white/20 text-zinc-200 font-mono text-base transition-colors active:scale-95 flex flex-col items-center justify-center gap-0.5"
                                 >
                                   <span className="leading-none">{item.digit}</span>
                                   {item.letters && (

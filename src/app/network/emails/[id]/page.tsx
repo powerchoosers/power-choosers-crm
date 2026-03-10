@@ -309,7 +309,7 @@ export default function EmailDetailPage() {
           userEmail: user.email,
           from: user.email,
           fromName,
-          threadId: email.threadId || null,
+          threadId: threadKey,
           attachments: encodedAttachments
         })
       })
@@ -440,7 +440,12 @@ export default function EmailDetailPage() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-white/0 np-scroll" ref={scrollContainerRef}>
+        <motion.div
+          ref={scrollContainerRef}
+          layout
+          transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+          className="flex-1 overflow-y-auto bg-white/0 np-scroll"
+        >
           <AnimatePresence initial={false}>
             {isReplyOpen && (
               <motion.div
@@ -449,7 +454,7 @@ export default function EmailDetailPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.28, ease: [0.19, 1, 0.22, 1] }}
-                className="px-8 pt-6 pb-2 border-b border-white/5"
+                className="px-8 pt-6 pb-2"
                 layout
               >
                 <div className="rounded-xl border border-white/10 bg-black/30 overflow-hidden">
@@ -573,7 +578,11 @@ export default function EmailDetailPage() {
             )}
           </AnimatePresence>
 
-          <div className="px-8 pb-6 space-y-4">
+          <motion.div
+            layout
+            transition={{ type: 'spring', stiffness: 220, damping: 28 }}
+            className="px-8 pt-6 pb-6 space-y-4"
+          >
             <div className="flex items-center justify-between">
               <h2 className="text-[10px] font-mono uppercase tracking-[0.5em] text-zinc-500">Conversation</h2>
               <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-400">
@@ -740,8 +749,8 @@ export default function EmailDetailPage() {
                 </AnimatePresence>
               </div>
             )}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
 
         <div className="p-4 border-t border-white/5 nodal-recessed">
             <button 

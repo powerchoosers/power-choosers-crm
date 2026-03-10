@@ -334,7 +334,10 @@ export default function TargetDetailPage() {
           <Link
             href={`/network/contacts/${contact.id}`}
             className="flex items-center gap-3 group/person whitespace-nowrap"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.stopPropagation()
+              saveScroll()
+            }}
           >
             <ContactAvatar
               name={contact.name}
