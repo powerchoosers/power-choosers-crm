@@ -1429,7 +1429,7 @@ Core rules:
 - Do not promise savings or guarantee outcomes.
 - Do not imply prior audits, flagged errors, or reviewed utility files unless explicitly provided in context.
 - Default to Texas/ERCOT framing.
-- First-call objective order: 1) book meeting, 2) get bill, 3) identify decision maker.
+- First-call objective order: 1) book meeting, 2) get bill, 3) permission to send a short note or get introduced to the right person.
 - Tone: calm, curious, commercially sharp, peer-to-peer.
 
 Positioning:
@@ -1440,9 +1440,10 @@ Positioning:
 
 Cold-call structure:
 1) Disarming opener
-2) Route to decision maker using company name when asking who handles electricity agreements
-3) One engagement question
-4) Low-pressure next-step ask
+2) Situation question (who owns electricity contracts/bills internally)
+3) Engagement question (where costs feel unclear)
+4) Problem-awareness question (impact if unchanged)
+5) Low-pressure next-step ask
 
 Opener guidance:
 - Start with a light "out of the blue" pattern interrupt when appropriate.
@@ -1466,15 +1467,17 @@ Output rules:
 - No markdown.
 - No placeholders like "...".
 - Keep lines natural for spoken delivery.
+- Ensure "situation", "hook", and "disturb" are each written as a direct question ending with "?".
 - Use this schema:
 {
   "gatekeeperVariants": ["..."], // optional, include when company-phone context is implied
   "opener": "...",
+  "situation": "...",
   "hook": "...",
   "disturb": "...",
   "close": "...",
   "variants": [
-    { "opener": "...", "hook": "...", "disturb": "...", "close": "..." }
+    { "opener": "...", "situation": "...", "hook": "...", "disturb": "...", "close": "..." }
   ]
 }`;
     const requestedTemperatureRaw = req.body?.temperature;
