@@ -19,6 +19,72 @@ function norm10(v) {
   }
 }
 
+function getMetadataPhoneCandidates(metadata) {
+  if (!metadata || typeof metadata !== 'object') return [];
+
+  const candidates = [];
+  const push = (val) => {
+    if (val == null) return;
+    if (Array.isArray(val)) {
+      val.forEach(push);
+      return;
+    }
+    candidates.push(String(val));
+  };
+
+  push(metadata.phone);
+  push(metadata.mobile);
+  push(metadata.workPhone);
+  push(metadata.work_phone);
+  push(metadata.workDirectPhone);
+  push(metadata.otherPhone);
+  push(metadata.other_phone);
+
+  const general = metadata.general || {};
+  push(general.phone);
+  push(general.mobile);
+  push(general.workPhone);
+  push(general.otherPhone);
+
+  const contact = metadata.contact || {};
+  push(contact.phone);
+  push(contact.mobile);
+  push(contact.workPhone);
+  push(contact.otherPhone);
+
+  return candidates;
+}
+
+function contactMatchesPhone(contactRow, searchDigits) {
+  const direct = [
+    contactRow?.mobile,
+    contactRow?.workPhone,
+    contactRow?.otherPhone,
+    contactRow?.phone
+  ];
+  const metadataCandidates = getMetadataPhoneCandidates(contactRow?.metadata || {});
+  return [...direct, ...metadataCandidates].some((v) => norm10(v) === searchDigits);
+}
+
+function accountMatchesPhone(accountRow, searchDigits) {
+  const metadataCandidates = getMetadataPhoneCandidates(accountRow?.metadata || {});
+  return [accountRow?.phone, ...metadataCandidates].some((v) => norm10(v) === searchDigits);
+}
+
+function applyLegacyOwnershipScope(query, user, isAdmin) {
+  if (isAdmin) return query;
+
+  const uid = user?.id ? String(user.id).trim() : '';
+  const email = user?.email ? String(user.email).toLowerCase().trim() : '';
+
+  if (uid && email) {
+    return query.or(`ownerId.eq.${uid},ownerId.eq.${email},metadata->>ownerId.eq.${email}`);
+  }
+  if (uid) return query.eq('ownerId', uid);
+  if (email) return query.or(`ownerId.eq.${email},metadata->>ownerId.eq.${email}`);
+  return query;
+}
+
 export default async function handler(req, res) {
   cors(req, res);
 
@@ -106,10 +172,7 @@ export default async function handler(req, res) {
         `)
         .or(orQuery);
 
-      if (!isAdmin) {
-        // Use user.id (UUID), not user.email, to match the ownerId column format
-        query = query.eq('ownerId', user.id);
-      }
+      query = applyLegacyOwnershipScope(query, user, isAdmin);
 
       const { data: contacts, error } = await query.limit(1);
 
@@ -142,6 +205,62 @@ export default async function handler(req, res) {
         // For now, we assume the schema is correct.
         logger.warn('[Search] Contact search error (possibly missing columns):', error.message);
       }
+
+      // Fallback path: if exact DB equality misses formatted numbers, normalize in memory.
+      if (!contactResult) {
+        logger.log('[Search] Contact exact-match miss; running normalized fallback scan...');
+        let fallbackQuery = supabaseAdmin
+          .from('contacts')
+          .select(`
+            id, 
+            firstName, 
+            lastName, 
+            title, 
+            email, 
+            mobile, 
+            workPhone, 
+            otherPhone, 
+            phone, 
+            metadata,
+            accountId,
+            city,
+            state,
+            accounts ( name, domain, logo_url, metadata )
+          `)
+          .or('mobile.not.is.null,workPhone.not.is.null,otherPhone.not.is.null,phone.not.is.null')
+          .limit(2000);
+
+        fallbackQuery = applyLegacyOwnershipScope(fallbackQuery, user, isAdmin);
+
+        const { data: fallbackContacts, error: fallbackError } = await fallbackQuery;
+        if (fallbackError) {
+          logger.warn('[Search] Contact fallback scan failed:', fallbackError.message);
+        } else if (Array.isArray(fallbackContacts) && fallbackContacts.length) {
+          const matched = fallbackContacts.find((row) => contactMatchesPhone(row, searchDigits));
+          if (matched) {
+            logger.log('[Search] Contact fallback matched:', matched.id);
+            contactResult = {
+              id: matched.id,
+              contactId: matched.id,
+              name: `${matched.firstName || ''} ${matched.lastName || ''}`.trim(),
+              firstName: matched.firstName || '',
+              lastName: matched.lastName || '',
+              title: matched.title || '',
+              email: matched.email || '',
+              mobile: matched.mobile || '',
+              workDirectPhone: matched.workPhone || '',
+              otherPhone: matched.otherPhone || '',
+              account: matched.accounts?.name || '',
+              accountId: matched.accountId || '',
+              city: matched.city || '',
+              state: matched.state || '',
+              avatarUrl: matched.metadata?.photoUrl || matched.metadata?.photo_url || matched.metadata?.avatarUrl || matched.metadata?.avatar_url || matched.metadata?.original_apollo_data?.photoUrl || '',
+              domain: matched.accounts?.domain || matched.accounts?.metadata?.domain || matched.accounts?.metadata?.general?.domain || '',
+              logoUrl: matched.accounts?.logo_url || matched.accounts?.metadata?.logo_url || matched.accounts?.metadata?.logoUrl || ''
+            };
+          }
+        }
+      }
     } catch (e) {
       logger.error('[Search] Error searching contacts:', e.message);
     }
@@ -158,9 +277,7 @@ export default async function handler(req, res) {
           .select('id, name, phone, city, state, domain, logo_url, metadata')
           .or(orQueryAccount);
 
-        if (!isAdmin) {
-          accountQuery = accountQuery.eq('ownerId', user.id);
-        }
+        accountQuery = applyLegacyOwnershipScope(accountQuery, user, isAdmin);
 
         const { data: accounts, error } = await accountQuery.limit(1);
 
@@ -178,6 +295,37 @@ export default async function handler(req, res) {
             domain: data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
             logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || ''
           };
+        }
+
+        if (!accountResult) {
+          logger.log('[Search] Account exact-match miss; running normalized fallback scan...');
+          let accountFallbackQuery = supabaseAdmin
+            .from('accounts')
+            .select('id, name, phone, city, state, domain, logo_url, metadata')
+            .or('phone.not.is.null')
+            .limit(2000);
+
+          accountFallbackQuery = applyLegacyOwnershipScope(accountFallbackQuery, user, isAdmin);
+
+          const { data: fallbackAccounts, error: fallbackAccountError } = await accountFallbackQuery;
+          if (fallbackAccountError) {
+            logger.warn('[Search] Account fallback scan failed:', fallbackAccountError.message);
+          } else if (Array.isArray(fallbackAccounts) && fallbackAccounts.length) {
+            const matchedAccount = fallbackAccounts.find((row) => accountMatchesPhone(row, searchDigits));
+            if (matchedAccount) {
+              logger.log('[Search] Account fallback matched:', matchedAccount.id);
+              accountResult = {
+                id: matchedAccount.id,
+                accountId: matchedAccount.id,
+                name: matchedAccount.name || '',
+                companyPhone: matchedAccount.phone || '',
+                city: matchedAccount.city || '',
+                state: matchedAccount.state || '',
+                domain: matchedAccount.domain || matchedAccount.metadata?.domain || matchedAccount.metadata?.general?.domain || '',
+                logoUrl: matchedAccount.logo_url || matchedAccount.metadata?.logo_url || matchedAccount.metadata?.logoUrl || ''
+              };
+            }
+          }
         }
       } catch (e) {
         logger.error('[Search] Error searching accounts:', e.message);
