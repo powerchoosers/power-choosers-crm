@@ -7,8 +7,8 @@ import logger from './_logger.js';
  * "Enforce HTTP Auth on Media" is enabled in the Twilio Console.
  */
 export default async function handler(req, res) {
-    if (req.method !== 'GET') {
-        res.setHeader('Allow', ['GET']);
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+        res.setHeader('Allow', ['GET', 'HEAD']);
         return res.status(405).json({ error: `Method ${req.method} not allowed` });
     }
 
@@ -48,33 +48,72 @@ export default async function handler(req, res) {
         }
 
         const auth = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-        const options = {
-            headers: { 'Authorization': `Basic ${auth}` }
+        const twilioHeaders = {
+            Authorization: `Basic ${auth}`,
+            ...(req.headers.range ? { Range: req.headers.range } : {})
         };
 
-        https.get(mediaUrl, options, (twilioRes) => {
-            if (twilioRes.statusCode >= 400) {
-                logger.error('[RecordingProxy] Twilio fetch failed', { status: twilioRes.statusCode, url: mediaUrl });
-                res.status(twilioRes.statusCode).end();
+        const target = new URL(mediaUrl);
+        const options = {
+            protocol: target.protocol,
+            hostname: target.hostname,
+            port: target.port || 443,
+            path: `${target.pathname}${target.search}`,
+            method: req.method,
+            headers: twilioHeaders
+        };
+
+        const proxyReq = https.request(options, (twilioRes) => {
+            const status = twilioRes.statusCode || 502;
+            if (status >= 400) {
+                logger.error('[RecordingProxy] Twilio fetch failed', {
+                    status,
+                    url: mediaUrl,
+                    hasRange: !!req.headers.range
+                });
+                res.status(status).end();
                 return;
             }
 
-            // Forward relevant headers
-            res.setHeader('Content-Type', twilioRes.headers['content-type'] || 'audio/mpeg');
-            if (twilioRes.headers['content-length']) {
-                res.setHeader('Content-Length', twilioRes.headers['content-length']);
+            // Preserve range-related headers so browser can seek reliably.
+            res.statusCode = status;
+            const passthroughHeaders = [
+                'content-type',
+                'content-length',
+                'content-range',
+                'accept-ranges',
+                'etag',
+                'last-modified',
+                'cache-control'
+            ];
+            passthroughHeaders.forEach((name) => {
+                const value = twilioRes.headers[name];
+                if (value != null) res.setHeader(name, value);
+            });
+            if (!res.getHeader('accept-ranges')) {
+                res.setHeader('accept-ranges', 'bytes');
             }
-            res.setHeader('Accept-Ranges', 'bytes');
-            res.setHeader('Cache-Control', 'public, max-age=3600');
+            if (!res.getHeader('cache-control')) {
+                res.setHeader('cache-control', 'public, max-age=3600');
+            }
 
-            // Pipe the stream directly to the response
+            if (req.method === 'HEAD') {
+                res.end();
+                twilioRes.resume();
+                return;
+            }
+
             twilioRes.pipe(res);
-        }).on('error', (e) => {
+        });
+
+        proxyReq.on('error', (e) => {
             logger.error('[RecordingProxy] Network error', { message: e.message });
             if (!res.writableEnded) {
                 res.status(500).end();
             }
         });
+
+        proxyReq.end();
 
     } catch (err) {
         logger.error('[RecordingProxy] Exception', { message: err.message });

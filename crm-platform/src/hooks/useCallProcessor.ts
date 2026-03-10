@@ -38,10 +38,15 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
           const hasTranscript = !!(row.transcript)
           if (hasInsights || hasTranscript) {
             setStatus('ready')
-            queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
+            if (contactId) queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
             queryClient.invalidateQueries({ queryKey: ['calls'] })
             if (accountId) {
               queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
+            }
+            if (typeof window !== 'undefined') {
+              window.dispatchEvent(new CustomEvent('nodal:call-processed', {
+                detail: { callSid, contactId, accountId }
+              }))
             }
             toast.success('Insights ready', { description: 'Click the eye icon to view call insights.' })
           }
@@ -95,6 +100,11 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
           if (contactId) queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
           queryClient.invalidateQueries({ queryKey: ['calls'] })
           if (accountId) queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('nodal:call-processed', {
+              detail: { callSid, contactId, accountId }
+            }))
+          }
           toast.success('Insights ready', { description: 'View the call to see AI analysis and transcript.' })
         }
 

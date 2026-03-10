@@ -49,6 +49,16 @@ function formatTime(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
+function parseDurationToSeconds(value?: string): number {
+  if (!value) return 0
+  const parts = value.split(':').map((p) => Number(p))
+  if (parts.some((p) => Number.isNaN(p))) return 0
+  if (parts.length === 3) return (parts[0] * 3600) + (parts[1] * 60) + parts[2]
+  if (parts.length === 2) return (parts[0] * 60) + parts[1]
+  if (parts.length === 1) return parts[0]
+  return 0
+}
+
 const squircleAvatar = "rounded-[14px] shrink-0 overflow-hidden bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
 
 export function CallListItem({ call, contactId, accountId, accountLogoUrl, accountDomain, accountName, contactName, contactPhotoUrl, customerAvatar = 'company', variant = 'default' }: CallListItemProps) {
@@ -57,8 +67,10 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
+  const [isSeeking, setIsSeeking] = useState(false)
   const [hostedAvatarUrl, setHostedAvatarUrl] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const pendingSeekRef = useRef<number | null>(null)
   const { user, profile } = useAuth()
 
   const { status, error, processCall } = useCallProcessor({
@@ -83,32 +95,62 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     : call.duration
 
   const isMinimal = variant === 'minimal'
+  const fallbackDuration = parseDurationToSeconds(call.duration)
+  const scrubMax = duration > 0 ? duration : fallbackDuration
+  const canScrub = scrubMax > 0
 
   // Inline audio player: bind to audio element
   useEffect(() => {
     const el = audioRef.current
     if (!el) return
-    const onTimeUpdate = () => setCurrentTime(el.currentTime)
-    const onLoadedMetadata = () => setDuration(el.duration)
+    const syncDuration = () => {
+      const d = Number(el.duration)
+      if (Number.isFinite(d) && d > 0) {
+        setDuration(d)
+        if (pendingSeekRef.current != null) {
+          const target = Math.max(0, Math.min(pendingSeekRef.current, d))
+          el.currentTime = target
+          setCurrentTime(target)
+          pendingSeekRef.current = null
+        }
+      } else if (fallbackDuration > 0) {
+        setDuration(fallbackDuration)
+      }
+    }
+    const onTimeUpdate = () => {
+      if (isSeeking) return
+      setCurrentTime(el.currentTime)
+    }
+    const onLoadedMetadata = () => syncDuration()
+    const onDurationChange = () => syncDuration()
     const onEnded = () => {
       setIsPlaying(false)
       setCurrentTime(0)
     }
     const onPlay = () => setIsPlaying(true)
     const onPause = () => setIsPlaying(false)
+    const onSeeked = () => {
+      setIsSeeking(false)
+      setCurrentTime(el.currentTime)
+    }
     el.addEventListener('timeupdate', onTimeUpdate)
     el.addEventListener('loadedmetadata', onLoadedMetadata)
+    el.addEventListener('durationchange', onDurationChange)
     el.addEventListener('ended', onEnded)
     el.addEventListener('play', onPlay)
     el.addEventListener('pause', onPause)
+    el.addEventListener('seeked', onSeeked)
+    syncDuration()
     return () => {
       el.removeEventListener('timeupdate', onTimeUpdate)
       el.removeEventListener('loadedmetadata', onLoadedMetadata)
+      el.removeEventListener('durationchange', onDurationChange)
       el.removeEventListener('ended', onEnded)
       el.removeEventListener('play', onPlay)
       el.removeEventListener('pause', onPause)
+      el.removeEventListener('seeked', onSeeked)
     }
-  }, [isPlayerOpen])
+  }, [isPlayerOpen, fallbackDuration, isSeeking])
 
   // Preload logged-in user's avatar for agent icon (host Google photo to avoid CORS)
   useEffect(() => {
@@ -139,11 +181,17 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   const openPlayerAndPlay = () => {
     if (!call.recordingUrl) return
     setIsPlayerOpen(true)
+    setDuration(fallbackDuration > 0 ? fallbackDuration : 0)
+    setCurrentTime(0)
+    pendingSeekRef.current = null
     const el = audioRef.current
     if (el) {
       // Use our backend proxy so Twilio auth is applied (direct Twilio URL requires Basic Auth from browser)
       const proxyUrl = `/api/recording?url=${encodeURIComponent(call.recordingUrl)}`
-      el.src = proxyUrl
+      if (el.src !== window.location.origin + proxyUrl) {
+        el.src = proxyUrl
+      }
+      el.load()
       el.play().catch(() => setIsPlaying(false))
     }
   }
@@ -157,9 +205,16 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
 
   const handleScrub = (e: React.ChangeEvent<HTMLInputElement>) => {
     const t = Number(e.target.value)
+    setIsSeeking(true)
     setCurrentTime(t)
     const el = audioRef.current
-    if (el) el.currentTime = t
+    if (!el) return
+    const durationCandidate = Number(el.duration)
+    if (Number.isFinite(durationCandidate) && durationCandidate > 0) {
+      el.currentTime = Math.max(0, Math.min(t, durationCandidate))
+      return
+    }
+    pendingSeekRef.current = t
   }
 
   const closePlayer = () => {
@@ -172,6 +227,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     setIsPlaying(false)
     setCurrentTime(0)
     setDuration(0)
+    pendingSeekRef.current = null
   }
 
   return (
@@ -371,15 +427,16 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                 <input
                   type="range"
                   min={0}
-                  max={duration || 100}
+                  max={scrubMax || 1}
                   step={0.1}
                   value={currentTime}
                   onChange={handleScrub}
+                  disabled={!canScrub}
                   className="flex-1 min-w-0 min-w-[72px] mx-1.5 min-h-[8px] h-2 rounded-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-zinc-700 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:shadow-[0_0_0_2px_rgba(255,255,255,0.3)] [&::-webkit-slider-thumb]:-mt-0.5 [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-zinc-700 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:-mt-0.5"
                   style={{ accentColor: 'white' }}
                 />
                 <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-7 shrink-0 text-left flex-shrink-0 pl-0">
-                  {formatTime(duration)}
+                  {formatTime(scrubMax)}
                 </span>
                 <button
                   type="button"
