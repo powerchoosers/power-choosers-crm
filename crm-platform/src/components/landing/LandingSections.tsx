@@ -6,8 +6,28 @@ import Link from 'next/link'
 import { Activity, Layers, Users, ArrowRight } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 
+const TICKER_ITEMS = [
+  { label: 'ONCOR', sub: 'TDSP' },
+  { label: 'CENTERPOINT', sub: 'TDSP' },
+  { label: 'AEP TEXAS', sub: 'TDSP' },
+  { label: 'TNMP', sub: 'TDSP' },
+  { label: 'TXU ENERGY', sub: 'REP' },
+  { label: 'RELIANT', sub: 'REP' },
+  { label: 'CONSTELLATION', sub: 'REP' },
+  { label: 'DIRECT ENERGY', sub: 'REP' },
+  { label: 'NRG', sub: 'REP' },
+  { label: 'CHAMPION ENERGY', sub: 'REP' },
+  { label: 'CIRRO ENERGY', sub: 'REP' },
+  { label: 'GREEN MOUNTAIN', sub: 'REP' },
+  { label: '100+ TARIFF STRUCTURES', sub: 'MAPPED' },
+  { label: 'DEMAND RATCHET', sub: 'DECODED' },
+  { label: 'SCARCITY ADDER', sub: 'TRACKED' },
+  { label: '4CP EXPOSURE', sub: 'ISOLATED' },
+]
+
 export function LandingSections() {
   const observerRef = useRef<IntersectionObserver | null>(null)
+  const [scrollY, setScrollY] = useState(0)
 
   useEffect(() => {
     observerRef.current = new IntersectionObserver(
@@ -64,6 +84,21 @@ export function LandingSections() {
     }
   }, [])
 
+  useEffect(() => {
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        setScrollY(window.scrollY || 0)
+        ticking = false
+      })
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   // Live ERCOT price — fetch + animate on scroll into view
   const [livePrice, setLivePrice] = useState<number | null>(null)
   const [displayPrice, setDisplayPrice] = useState(0)
@@ -102,6 +137,9 @@ export function LandingSections() {
     obs.observe(el)
     return () => { cancelled = true; obs.disconnect() }
   }, [livePrice])
+
+  const tickerParallax = Math.max(-36, Math.min(36, scrollY * 0.04))
+  const tickerItemsLoop = [...TICKER_ITEMS, ...TICKER_ITEMS]
 
   return (
     <>
@@ -192,59 +230,30 @@ export function LandingSections() {
       </section>
 
       {/* INTELLIGENCE COVERAGE TICKER */}
-      <div className="bg-white border-y border-zinc-100 py-5 overflow-hidden relative">
+      <div className="bg-white border-y border-zinc-100 py-6 overflow-hidden relative">
         {/* Fade edges */}
         <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
         <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
 
-        <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
-          {[
-            { label: 'ONCOR', sub: 'TDSP' },
-            { label: 'CENTERPOINT', sub: 'TDSP' },
-            { label: 'AEP TEXAS', sub: 'TDSP' },
-            { label: 'TNMP', sub: 'TDSP' },
-            { label: 'TXU ENERGY', sub: 'REP' },
-            { label: 'RELIANT', sub: 'REP' },
-            { label: 'CONSTELLATION', sub: 'REP' },
-            { label: 'DIRECT ENERGY', sub: 'REP' },
-            { label: 'NRG', sub: 'REP' },
-            { label: 'CHAMPION ENERGY', sub: 'REP' },
-            { label: 'CIRRO ENERGY', sub: 'REP' },
-            { label: 'GREEN MOUNTAIN', sub: 'REP' },
-            { label: '100+ TARIFF STRUCTURES', sub: 'MAPPED' },
-            { label: 'DEMAND RATCHET', sub: 'DECODED' },
-            { label: 'SCARCITY ADDER', sub: 'TRACKED' },
-            { label: '4CP EXPOSURE', sub: 'ISOLATED' },
-            // Duplicate for seamless loop
-            { label: 'ONCOR', sub: 'TDSP' },
-            { label: 'CENTERPOINT', sub: 'TDSP' },
-            { label: 'AEP TEXAS', sub: 'TDSP' },
-            { label: 'TNMP', sub: 'TDSP' },
-            { label: 'TXU ENERGY', sub: 'REP' },
-            { label: 'RELIANT', sub: 'REP' },
-            { label: 'CONSTELLATION', sub: 'REP' },
-            { label: 'DIRECT ENERGY', sub: 'REP' },
-            { label: 'NRG', sub: 'REP' },
-            { label: 'CHAMPION ENERGY', sub: 'REP' },
-            { label: 'CIRRO ENERGY', sub: 'REP' },
-            { label: 'GREEN MOUNTAIN', sub: 'REP' },
-            { label: '100+ TARIFF STRUCTURES', sub: 'MAPPED' },
-            { label: 'DEMAND RATCHET', sub: 'DECODED' },
-            { label: 'SCARCITY ADDER', sub: 'TRACKED' },
-            { label: '4CP EXPOSURE', sub: 'ISOLATED' },
-          ].map((item, i) => (
-            <div key={i} className="flex items-center shrink-0">
-              <div className="flex items-baseline gap-1.5 px-6">
-                <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
-                  {item.label}
-                </span>
-                <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
-                  {item.sub}
-                </span>
+        <div
+          className="will-change-transform"
+          style={{ transform: `translate3d(${tickerParallax}px, 0, 0)` }}
+        >
+          <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
+            {tickerItemsLoop.map((item, i) => (
+              <div key={`primary-${i}`} className="flex items-center shrink-0">
+                <div className="flex items-baseline gap-1.5 px-6 py-1 rounded-lg ticker-chip">
+                  <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
+                    {item.label}
+                  </span>
+                  <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
+                    {item.sub}
+                  </span>
+                </div>
+                <span className="text-zinc-200 text-xs select-none">·</span>
               </div>
-              <span className="text-zinc-200 text-xs select-none">·</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
       </div>
@@ -348,21 +357,21 @@ export function LandingSections() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
 
             {/* Stat 1: TX commercial spend */}
-            <div className="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll flex flex-col items-center justify-center">
-              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center">
-                $<span className="counter" data-target="25" data-suffix="B+">0</span>
+            <div className="metric-signal-card p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll flex flex-col items-center justify-center">
+              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center font-mono tabular-nums">
+                $<span className="counter metric-counter" data-target="25" data-suffix="B+">0</span>
               </div>
               <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Texas commercial energy spend</div>
               <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">Annually · Source: EIA</div>
             </div>
 
             {/* Stat 2: Live ERCOT price */}
-            <div ref={livePriceRef} className="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-100 flex flex-col items-center justify-center">
-              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center">
+            <div ref={livePriceRef} className="metric-signal-card metric-live-card p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-100 flex flex-col items-center justify-center">
+              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center font-mono tabular-nums">
                 ${livePrice == null ? (
                   <span className="animate-pulse text-zinc-300">--</span>
                 ) : (
-                  <span>{displayPrice.toFixed(2)}</span>
+                  <span className="metric-live-value">{displayPrice.toFixed(2)}</span>
                 )}
               </div>
               <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">ERCOT LZ_South spot price</div>
@@ -373,9 +382,9 @@ export function LandingSections() {
             </div>
 
             {/* Stat 3: Demand charge share */}
-            <div className="p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-200 flex flex-col items-center justify-center">
-              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center">
-                <span className="counter" data-target="40" data-suffix="%">0</span>
+            <div className="metric-signal-card p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-200 flex flex-col items-center justify-center">
+              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center font-mono tabular-nums">
+                <span className="counter metric-counter" data-target="40" data-suffix="%">0</span>
               </div>
               <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Of your bill that isn't usage</div>
               <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">Demand charges · buried in delivery</div>
