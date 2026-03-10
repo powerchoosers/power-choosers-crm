@@ -352,6 +352,64 @@
     animation: subtle-pulse 3s infinite;
   }
 
+  /* Hero breathing orb */
+  .hero-breathe-orb {
+    animation: breathe-orb 8s ease-in-out infinite;
+  }
+
+  /* Word-reveal for hero headline — server-rendered spans, CSS handles the rest */
+  .word-reveal {
+    display: inline-block;
+    opacity: 0;
+    animation: word-reveal 0.35s ease forwards;
+  }
+
+  /* Chart live cursor dot — appears after path draws (2.2s delay) */
+  .chart-cursor-dot {
+    opacity: 0;
+    animation: chart-dot-breathe 2s ease-in-out infinite;
+    animation-delay: 2.2s;
+    animation-fill-mode: forwards;
+  }
+
+  /* Signal connector traveling dot — sequential: 01 travels → 02 travels → 03 travels */
+  .signal-connector-dot {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 8px;
+    height: 8px;
+    border-radius: 9999px;
+    background: #002FA7;
+    box-shadow: 0 0 6px rgba(0, 47, 167, 0.9);
+    animation: signal-connector-seq 12s linear infinite;
+  }
+
+  @keyframes breathe-orb {
+    0%, 100% { transform: scale(0.88); opacity: 0.5; }
+    50% { transform: scale(1.12); opacity: 1; }
+  }
+
+  @keyframes word-reveal {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes chart-dot-breathe {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* Travel happens in first 33% (~4s), hidden and reset for remaining 67% (~8s) */
+  @keyframes signal-connector-seq {
+    0%    { left: -8px;             opacity: 0; }
+    4%    { left: 0%;               opacity: 1; }
+    29%   { left: calc(100% + 8px); opacity: 1; }
+    33%   { left: calc(100% + 8px); opacity: 0; }
+    33.5% { left: -8px;             opacity: 0; }
+    100%  { left: -8px;             opacity: 0; }
+  }
+
   .ticker-chip {
     transition: background-color 220ms ease, box-shadow 220ms ease, transform 220ms ease;
   }
@@ -457,10 +515,15 @@
   .chart-path,
   .animate-subtle-pulse,
   .metric-signal-card,
-  .metric-live-value {
+  .metric-live-value,
+  .hero-breathe-orb,
+  .word-reveal,
+  .chart-cursor-dot,
+  .signal-connector-dot {
     animation: none !important;
     transition: none !important;
     transform: none !important;
+    opacity: 1 !important;
   }
 }
 

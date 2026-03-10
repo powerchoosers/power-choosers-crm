@@ -143,6 +143,35 @@ export function LandingSections() {
 
   return (
     <>
+      {/* INTELLIGENCE COVERAGE TICKER */}
+      <div className="bg-white border-y border-zinc-100 py-6 overflow-hidden relative">
+        {/* Fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+
+        <div
+          className="will-change-transform"
+          style={{ transform: `translate3d(${tickerParallax}px, 0, 0)` }}
+        >
+          <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
+            {tickerItemsLoop.map((item, i) => (
+              <div key={`primary-${i}`} className="flex items-center shrink-0">
+                <div className="flex items-baseline gap-1.5 px-6 py-1 rounded-lg ticker-chip">
+                  <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
+                    {item.label}
+                  </span>
+                  <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
+                    {item.sub}
+                  </span>
+                </div>
+                <span className="text-zinc-200 text-xs select-none">·</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
       {/* ACT 2: THE REALITY (The Problem) */}
       <section className="bg-[#F5F5F7] flex items-center justify-center px-6 py-20">
         <div className="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
@@ -175,6 +204,15 @@ export function LandingSections() {
                 />
                 <text x="390" y="175" textAnchor="end" className="text-[10px] fill-zinc-400 font-mono tracking-widest uppercase">Stability</text>
                 <text x="120" y="15" textAnchor="middle" className="text-[10px] fill-red-500 font-mono tracking-widest uppercase">Volatility Spike</text>
+                {/* Live cursor dot — breathes after path draws */}
+                <circle
+                  className="chart-cursor-dot"
+                  cx="395"
+                  cy="190"
+                  r="3.5"
+                  fill="#002FA7"
+                  style={{ filter: 'drop-shadow(0 0 5px rgba(0,47,167,0.9))' }}
+                />
               </svg>
             </div>
           </div>
@@ -198,7 +236,9 @@ export function LandingSections() {
             <div className="reveal-on-scroll border-l-2 border-[#002FA7]/20 pl-5 py-2 md:border-l-0 md:pl-0 md:py-0 mb-8 md:mb-0">
               <div className="flex items-center mb-6">
                 <span className="font-mono text-3xl font-bold text-[#002FA7] shrink-0">01</span>
-                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200" />
+                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200 relative overflow-hidden">
+                  <div className="signal-connector-dot" style={{ animationDelay: '0s' }} />
+                </div>
               </div>
               <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SUBMIT</p>
               <p className="text-zinc-600 text-sm leading-relaxed font-medium">Upload your energy bill or PDF. Takes 30 seconds.</p>
@@ -208,7 +248,9 @@ export function LandingSections() {
             <div className="reveal-on-scroll delay-100 border-l-2 border-[#002FA7]/20 pl-5 py-2 md:border-l-0 md:pl-0 md:py-0 mb-8 md:mb-0">
               <div className="flex items-center mb-6">
                 <span className="font-mono text-3xl font-bold text-[#002FA7] shrink-0">02</span>
-                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200" />
+                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200 relative overflow-hidden">
+                  <div className="signal-connector-dot" style={{ animationDelay: '4s' }} />
+                </div>
               </div>
               <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">ISOLATE</p>
               <p className="text-zinc-600 text-sm leading-relaxed font-medium">Cost leakage isolated from supplier markup.</p>
@@ -218,7 +260,9 @@ export function LandingSections() {
             <div className="reveal-on-scroll delay-200 border-l-2 border-[#002FA7]/20 pl-5 py-2 md:border-l-0 md:pl-0 md:py-0">
               <div className="flex items-center mb-6">
                 <span className="font-mono text-3xl font-bold text-[#002FA7] shrink-0">03</span>
-                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200" />
+                <div className="hidden md:block ml-4 flex-1 h-px bg-zinc-200 relative overflow-hidden">
+                  <div className="signal-connector-dot" style={{ animationDelay: '8s' }} />
+                </div>
               </div>
               <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SIGNAL</p>
               <p className="text-zinc-600 text-sm leading-relaxed font-medium">Forensic report delivered. No noise.</p>
@@ -228,35 +272,6 @@ export function LandingSections() {
 
         </div>
       </section>
-
-      {/* INTELLIGENCE COVERAGE TICKER */}
-      <div className="bg-white border-y border-zinc-100 py-6 overflow-hidden relative">
-        {/* Fade edges */}
-        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
-
-        <div
-          className="will-change-transform"
-          style={{ transform: `translate3d(${tickerParallax}px, 0, 0)` }}
-        >
-          <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
-            {tickerItemsLoop.map((item, i) => (
-              <div key={`primary-${i}`} className="flex items-center shrink-0">
-                <div className="flex items-baseline gap-1.5 px-6 py-1 rounded-lg ticker-chip">
-                  <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
-                    {item.label}
-                  </span>
-                  <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
-                    {item.sub}
-                  </span>
-                </div>
-                <span className="text-zinc-200 text-xs select-none">·</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
 
       {/* ACT 3: THE PHILOSOPHY (The Code) */}
       <section className="flex items-center justify-center px-6 py-24 bg-[#F5F5F7]">
