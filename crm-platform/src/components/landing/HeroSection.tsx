@@ -12,8 +12,19 @@ export function HeroSection() {
     >
       <div className="max-w-5xl mx-auto text-center z-10">
         <h1 className="text-5xl md:text-8xl font-semibold tracking-tighter leading-tight mb-8 text-zinc-900 break-words">
-          The Texas Grid is<br />
-          Designed to Confuse.
+          <span className="word-reveal" style={{ animationDelay: '0ms' }}>The</span>
+          {' '}
+          <span className="word-reveal" style={{ animationDelay: '40ms' }}>Texas</span>
+          {' '}
+          <span className="word-reveal" style={{ animationDelay: '80ms' }}>Grid</span>
+          {' '}
+          <span className="word-reveal" style={{ animationDelay: '120ms' }}>is</span>
+          <br />
+          <span className="word-reveal" style={{ animationDelay: '160ms' }}>Designed</span>
+          {' '}
+          <span className="word-reveal" style={{ animationDelay: '200ms' }}>to</span>
+          {' '}
+          <span className="word-reveal" style={{ animationDelay: '240ms' }}>Confuse.</span>
         </h1>
         <p className="text-xl md:text-2xl text-zinc-600 font-light tracking-tight mb-12 max-w-2xl mx-auto">
           We view complexity as a design flaw. We fixed it.
@@ -35,6 +46,13 @@ export function HeroSection() {
             <span>Book a Briefing</span>
           </Link>
         </div>
+      </div>
+      {/* BREATHING ORB: Ambient signal presence */}
+      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" aria-hidden>
+        <div
+          className="hero-breathe-orb w-[700px] h-[700px] rounded-full"
+          style={{ background: 'radial-gradient(circle, rgba(0,47,167,0.20) 0%, transparent 65%)' }}
+        />
       </div>
       {/* BACKGROUND TEXTURE: The "Digital Grain" */}
       <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" aria-hidden />
