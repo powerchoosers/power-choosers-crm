@@ -1,7 +1,110 @@
-import { createClient } from '@supabase/supabase-js';
 import { cors } from './_cors.js';
 import logger from './_logger.js';
 import { supabaseAdmin } from '@/lib/supabase';
+
+function normalizeEsid(value) {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (digits.length < 17 || digits.length > 22) return null;
+  return digits;
+}
+
+function normalizeAddress(value) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ');
+}
+
+function normalizeAddressKey(value) {
+  return normalizeAddress(value).toUpperCase();
+}
+
+function extractAddressFromServiceEntry(entry) {
+  if (!entry) return '';
+  if (typeof entry === 'string') return normalizeAddress(entry);
+  if (typeof entry === 'object' && typeof entry.address === 'string') {
+    return normalizeAddress(entry.address);
+  }
+  return '';
+}
+
+function parseNumber(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const parsed = Number(value.replace(/[^0-9.-]/g, ''));
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function monthSortKey(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  // Handles common patterns like "Jan 2026", "January 2026", "2026-01", etc.
+  const timestamp = Date.parse(raw);
+  if (!Number.isNaN(timestamp)) return timestamp;
+
+  const monthMap = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+  };
+  const match = raw.toLowerCase().match(/([a-z]{3,9})\s+(\d{4})/);
+  if (!match) return null;
+  const monthKey = match[1].slice(0, 3);
+  const year = Number(match[2]);
+  const month = monthMap[monthKey];
+  if (month == null || !Number.isFinite(year)) return null;
+  return Date.UTC(year, month, 1);
+}
+
+function normalizeUsageHistory(rows) {
+  if (!Array.isArray(rows)) return [];
+
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== 'object') return null;
+
+      // Actual KWH is the authoritative usage column in utility usage exports.
+      const actualKwh = parseNumber(
+        row.actual_kwh ??
+        row.actualKwh ??
+        row.actualKWH ??
+        row['Actual KWH'] ??
+        row.kwh
+      );
+
+      if (actualKwh == null) return null;
+
+      return {
+        month: String(row.month ?? row.period ?? row.billing_month ?? '').trim(),
+        kwh: actualKwh,
+        billed_kw: parseNumber(row.billed_kw ?? row.billedKw ?? row['Billed KW']) ?? 0,
+        actual_kw: parseNumber(row.actual_kw ?? row.actualKw ?? row.metered_kw ?? row['Metered KW']) ?? 0,
+        tdsp_charges: parseNumber(row.tdsp_charges ?? row.tdspCharges ?? row['TDSP Charges']) ?? 0,
+        esid: normalizeEsid(row.esid ?? row.esi_id ?? row.esiId) || null,
+        service_address: normalizeAddress(row.service_address ?? row.address ?? row.site ?? row.site_name) || null
+      };
+    })
+    .filter(Boolean);
+}
+
+function deriveAnnualUsageFromHistory(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+
+  const withSort = rows
+    .map((row) => ({ row, sortKey: monthSortKey(row.month) }))
+    .filter((x) => x.sortKey != null);
+
+  // Fall back to raw rows if month parsing fails.
+  const source = withSort.length > 0
+    ? withSort.sort((a, b) => b.sortKey - a.sortKey).map((x) => x.row)
+    : rows;
+
+  const latestTwelve = source.slice(0, 12);
+  if (latestTwelve.length === 0) return null;
+
+  const total = latestTwelve.reduce((sum, row) => sum + (parseNumber(row.kwh) || 0), 0);
+  return total > 0 ? Math.round(total) : null;
+}
 
 /**
  * AI-powered document analysis for Nodal Point CRM.
@@ -85,7 +188,13 @@ export default async function handler(req, res) {
     let mimeType = fileData.type || 'application/pdf';
 
     const safeFileName = typeof fileName === 'string' ? fileName : '';
-    const isCsvOrText = mimeType.includes('csv') || mimeType.includes('text') || safeFileName.toLowerCase().endsWith('.csv');
+    const lowerFileName = safeFileName.toLowerCase();
+    const isCsvOrText =
+      mimeType.includes('csv') ||
+      mimeType.includes('text') ||
+      lowerFileName.endsWith('.csv') ||
+      lowerFileName.endsWith('.txt') ||
+      lowerFileName.endsWith('.tsv');
 
     let textContentSnippet = "";
     if (isCsvOrText) {
@@ -115,10 +224,16 @@ export default async function handler(req, res) {
     - contract_end_date: The specific expiration date (YYYY-MM-DD).
     - strike_price: The energy rate (in cents/kWh or $/MWh). Convert to cents (e.g., 0.045).
     - supplier: The name of the retail electricity provider (REP).
-    - annual_usage: IF THIS IS A USAGE DATA FILE (like a CSV or usage profile) spanning 12 or 13 months, CALCULATE the EXACT 12-month annual usage across the most recent 12 months in the file. Otherwise, extract estimated annual kWh if present.
+    - annual_usage: IF THIS IS A USAGE DATA FILE (like a CSV/XLSX usage profile) spanning 12 or 13 months, CALCULATE the EXACT 12-month annual usage across the most recent 12 months in the file.
+      IMPORTANT: when the file has an "Actual KWH" column, use that as the kWh source of truth (not Metered KW or Billed KW).
+      Otherwise, extract estimated annual kWh if present.
     - monthly_kwh: The total kWh consumed in the billing period.
     - billing_days: Number of days in the billing period.
     - esids: An array of ALL ESI ID numbers (17-22 digits) found in the document. Include service addresses if found.
+    - usage_history: When usage data is present, return monthly rows with these exact keys:
+      { "month": "MMM YYYY", "kwh": number, "billed_kw": number|null, "actual_kw": number|null, "tdsp_charges": number|null, "esid": "string|null", "service_address": "string|null" }.
+      If an "Actual KWH" column exists, map that value into "kwh".
+      For multi-site files, include one row per site per month (do not collapse sites together).
 
     Return ONLY a JSON object:
     {
@@ -130,7 +245,8 @@ export default async function handler(req, res) {
         "annual_usage": number or null,
         "monthly_kwh": number or null,
         "billing_days": number or null,
-        "esids": [{ "id": "string", "address": "string" }]
+        "esids": [{ "id": "string", "address": "string" }],
+        "usage_history": [{ "month": "MMM YYYY", "kwh": number, "billed_kw": number, "actual_kw": number, "tdsp_charges": number, "esid": "string", "service_address": "string" }]
       }
     }
     `;
@@ -146,8 +262,9 @@ export default async function handler(req, res) {
       let contentArray = [{ type: 'text', text: prompt }];
       if (!isCsvOrText) {
         const isPdf = mimeType === 'application/pdf';
+        const isImage = mimeType.startsWith('image/');
         const fileUrlContent = isPdf ? base64Data : `data:${mimeType};base64,${base64Data}`;
-        const attachmentType = isPdf ? 'file_url' : 'image_url';
+        const attachmentType = isImage ? 'image_url' : 'file_url';
         contentArray.push({
           type: attachmentType,
           [attachmentType]: { url: fileUrlContent }
@@ -242,6 +359,15 @@ export default async function handler(req, res) {
     logger.log('[Analyze Document] Analysis successful:', analysis.type);
 
     const { type, data } = analysis;
+    const normalizedUsageHistory = normalizeUsageHistory(data?.usage_history);
+    const derivedAnnualUsageFromHistory = deriveAnnualUsageFromHistory(normalizedUsageHistory);
+
+    if (normalizedUsageHistory.length > 0) {
+      data.usage_history = normalizedUsageHistory;
+    }
+    if (derivedAnnualUsageFromHistory != null) {
+      data.annual_usage = derivedAnnualUsageFromHistory;
+    }
 
     // 5. Update Database
     const documentTypeMap = {
@@ -288,6 +414,11 @@ export default async function handler(req, res) {
     }
 
     const updates = {};
+    const { data: accountSnapshot } = await supabaseAdmin
+      .from('accounts')
+      .select('metadata, service_addresses')
+      .eq('id', accountId)
+      .single();
     // Bills and usage data → apply extracted fields immediately
     const shouldApplyUsageFieldsNow = type === 'BILL' || type === 'USAGE_DATA';
     // Signed contracts → apply contract fields to account (supplier, rate, end date, volume)
@@ -306,13 +437,7 @@ export default async function handler(req, res) {
     }
 
     if (data.usage_history && Array.isArray(data.usage_history) && data.usage_history.length > 0) {
-      const { data: currentAcct } = await supabaseAdmin
-        .from('accounts')
-        .select('metadata')
-        .eq('id', accountId)
-        .single();
-
-      const currentMetadata = currentAcct?.metadata || {};
+      const currentMetadata = accountSnapshot?.metadata || {};
       updates.metadata = {
         ...currentMetadata,
         usageHistory: data.usage_history
@@ -388,31 +513,152 @@ export default async function handler(req, res) {
       }
     }
 
-    // Insert Meters
-    if (data.esids && Array.isArray(data.esids) && data.esids.length > 0) {
-      const metersToInsert = data.esids
-        .filter((m) => m?.id)
-        .map((m) => ({
-          account_id: accountId,
-          esid: String(m.id).trim(),
-          service_address: m.address ? String(m.address).trim() : null,
-          status: 'Active',
-          metadata: {
-            source: 'ai_extraction',
-            document: fileName,
-            extracted_at: new Date().toISOString()
-          }
-        }));
+    // Insert/update meters (skip exact duplicates, update changed addresses only)
+    let meterSyncSummary = {
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      conflicts: 0
+    };
 
-      if (metersToInsert.length > 0) {
-        await supabaseAdmin
+    if (data.esids && Array.isArray(data.esids) && data.esids.length > 0) {
+      const nowIso = new Date().toISOString();
+      const incomingByEsid = new Map();
+
+      for (const row of data.esids) {
+        const normalizedEsid = normalizeEsid(row?.id);
+        if (!normalizedEsid) continue;
+
+        const nextAddress = normalizeAddress(row?.address);
+        const existing = incomingByEsid.get(normalizedEsid);
+        if (!existing || (!existing.service_address && nextAddress)) {
+          incomingByEsid.set(normalizedEsid, {
+            esid: normalizedEsid,
+            service_address: nextAddress || null
+          });
+        }
+      }
+
+      const incomingMeters = Array.from(incomingByEsid.values());
+      if (incomingMeters.length > 0) {
+        const esids = incomingMeters.map((m) => m.esid);
+        const { data: existingMeters } = await supabaseAdmin
           .from('meters')
-          .upsert(metersToInsert, { onConflict: 'esid' });
+          .select('id, account_id, esid, service_address, metadata')
+          .in('esid', esids);
+
+        const existingByEsid = new Map(
+          (existingMeters || []).map((m) => [m.esid, m])
+        );
+
+        const metersToInsert = [];
+        const metersToUpdate = [];
+
+        for (const meter of incomingMeters) {
+          const existing = existingByEsid.get(meter.esid);
+          if (!existing) {
+            metersToInsert.push({
+              account_id: accountId,
+              esid: meter.esid,
+              service_address: meter.service_address,
+              status: 'Active',
+              metadata: {
+                source: 'ai_extraction',
+                document: fileName,
+                extracted_at: nowIso,
+                last_seen_at: nowIso
+              }
+            });
+            continue;
+          }
+
+          // ESIDs are globally unique in this schema. Don't reassign across accounts.
+          if (existing.account_id && existing.account_id !== accountId) {
+            meterSyncSummary.conflicts += 1;
+            continue;
+          }
+
+          const incomingAddressKey = normalizeAddressKey(meter.service_address);
+          const existingAddressKey = normalizeAddressKey(existing.service_address);
+          const shouldUpdateAddress =
+            !!incomingAddressKey && incomingAddressKey !== existingAddressKey;
+
+          if (!shouldUpdateAddress) {
+            meterSyncSummary.skipped += 1;
+            continue;
+          }
+
+          metersToUpdate.push({
+            id: existing.id,
+            service_address: meter.service_address,
+            metadata: {
+              ...(existing.metadata || {}),
+              source: 'ai_extraction',
+              document: fileName,
+              extracted_at: nowIso,
+              last_seen_at: nowIso
+            }
+          });
+        }
+
+        if (metersToInsert.length > 0) {
+          await supabaseAdmin
+            .from('meters')
+            .insert(metersToInsert);
+          meterSyncSummary.inserted = metersToInsert.length;
+        }
+
+        if (metersToUpdate.length > 0) {
+          for (const meter of metersToUpdate) {
+            await supabaseAdmin
+              .from('meters')
+              .update({
+                service_address: meter.service_address,
+                metadata: meter.metadata,
+                updated_at: nowIso
+              })
+              .eq('id', meter.id);
+          }
+          meterSyncSummary.updated = metersToUpdate.length;
+        }
       }
     }
 
+    // Keep account-level service address array in sync with newly discovered meter addresses.
+    const existingServiceAddresses = Array.isArray(accountSnapshot?.service_addresses)
+      ? accountSnapshot.service_addresses
+      : [];
+    const existingAddressMap = new Map();
+    for (const entry of existingServiceAddresses) {
+      const addr = extractAddressFromServiceEntry(entry);
+      const key = normalizeAddressKey(addr);
+      if (!key) continue;
+      existingAddressMap.set(key, entry);
+    }
+
+    const { data: accountMeters } = await supabaseAdmin
+      .from('meters')
+      .select('service_address')
+      .eq('account_id', accountId);
+
+    let addressAdded = false;
+    for (const meter of accountMeters || []) {
+      const addr = normalizeAddress(meter.service_address);
+      const key = normalizeAddressKey(addr);
+      if (!key || existingAddressMap.has(key)) continue;
+      existingAddressMap.set(key, { address: addr });
+      addressAdded = true;
+    }
+
+    if (addressAdded) {
+      await supabaseAdmin
+        .from('accounts')
+        .update({ service_addresses: Array.from(existingAddressMap.values()) })
+        .eq('id', accountId);
+    }
+
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, analysis }));
+    res.end(JSON.stringify({ success: true, analysis, meterSync: meterSyncSummary }));
 
   } catch (error) {
     logger.error('[Analyze Document] Error:', error);
