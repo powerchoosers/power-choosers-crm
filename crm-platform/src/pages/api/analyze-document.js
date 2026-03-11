@@ -101,12 +101,15 @@ export default async function handler(req, res) {
     Use the filename as a strong signal for classification (e.g. "OncorSummaryUsageData", "annual usage", "12 month usage", "usage data", ".csv" → USAGE_DATA).
     
     Task 1: Classify the document type.
-    - "SIGNED_CONTRACT": A signed Energy Service Agreement (ESA) or similar binding contract.
-    - "CONTRACT": An unsigned contract, draft contract, MSA, ESA template, or execution-ready agreement without signature.
+    - "SIGNED_CONTRACT": A signed Energy Service Agreement (ESA) or similar binding contract with visible signatures, signature blocks, or executed/countersigned language.
+    - "CONTRACT": An unsigned contract, draft contract, MSA, ESA template, or execution-ready agreement without signature. Also blank contracts awaiting signature.
     - "BILL": A standard utility bill, invoice, or monthly statement. This explicitly includes documents titled in Spanish such as "recibo", "factura", "recibos luz", "servicio electrico" or any variation indicating a utility bill.
     - "USAGE_DATA": Usage/telemetry: ERCOT or utility usage summaries, OncorSummaryUsageData, annual usage, 12-month or 13-month usage, CSV usage data profiles.
-    - "PROPOSAL": Sales proposals, RFP responses, quotes, pricing proposals.
-    - "OTHER": Anything else.
+    - "PROPOSAL": ANY document proposing a service, engagement, or contract to a prospect or customer. This is a BROAD category covering TWO types:
+        TYPE A — Energy Pricing Proposals: Documents with proposed kWh rates, $/MWh pricing, contract terms, and energy cost breakdowns from a supplier or broker. Examples: "First Texas Energy Proposal", "Energy Supply Quote", "Rate Proposal", "Pricing Sheet".
+        TYPE B — Advisory / Pitch / Outreach Proposals: Business development documents, energy audit proposals, broker engagement letters, consulting proposals, tariff forensics presentations, commercial real estate energy proposals, or any document presenting a service offering to a prospect — even if they contain NO energy rates. Examples: "Nodal Point Proposal", "Energy Audit Proposal", "Energy Advisory Presentation", documents addressed to a company presenting services or a program.
+        WHEN IN DOUBT between PROPOSAL and OTHER, classify as PROPOSAL if the document is addressed to a prospect and proposes any kind of engagement.
+    - "OTHER": Anything else that does not fit the above categories.
 
     Task 2: Extract key data fields.
     - contract_end_date: The specific expiration date (YYYY-MM-DD).
@@ -285,8 +288,11 @@ export default async function handler(req, res) {
     }
 
     const updates = {};
+    // Bills and usage data → apply extracted fields immediately
     const shouldApplyUsageFieldsNow = type === 'BILL' || type === 'USAGE_DATA';
-    if (shouldApplyUsageFieldsNow) {
+    // Signed contracts → apply contract fields to account (supplier, rate, end date, volume)
+    const shouldApplyContractFields = type === 'SIGNED_CONTRACT';
+    if (shouldApplyUsageFieldsNow || shouldApplyContractFields) {
       if (data.contract_end_date) updates.contract_end_date = data.contract_end_date;
       if (data.strike_price) updates.current_rate = String(data.strike_price);
       if (data.supplier) updates.electricity_supplier = data.supplier;
@@ -319,6 +325,12 @@ export default async function handler(req, res) {
     if (type === 'BILL') {
       updates.status = 'Active';
       dealStageToSet = 'AUDITING';
+    }
+
+    if (type === 'SIGNED_CONTRACT') {
+      // Signed contract = confirmed customer, move deal to secured
+      updates.status = 'CUSTOMER';
+      dealStageToSet = 'SECURED';
     }
 
     if (Object.keys(updates).length > 0) {
