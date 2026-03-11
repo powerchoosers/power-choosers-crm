@@ -49,16 +49,21 @@ export default function EmailDetailPage() {
   const threadKey = email?.threadId || email?.id
   const threadQueryKey = ['email-thread', threadKey ?? '', ownerEmail, role]
   const { data: threadEmails = [], isLoading: isThreadLoading } = useEmailThread(threadKey)
-  const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null)
+  const [expandedThreadId, setExpandedThreadId] = useState<string | null>(id || null)
+  const initializedThreadRef = useRef<string | null>(null)
 
   useEffect(() => {
-    setExpandedThreadId(null)
+    initializedThreadRef.current = null
   }, [threadKey])
 
   useEffect(() => {
-    if (threadEmails.length === 0) return
-    setExpandedThreadId((prev) => prev ?? threadEmails[0].id)
-  }, [threadEmails])
+    if (!threadKey || threadEmails.length === 0) return
+    if (initializedThreadRef.current === threadKey) return
+
+    const openedEmailInThread = threadEmails.find((threadEmail: Email) => threadEmail.id === id)
+    setExpandedThreadId(openedEmailInThread?.id || threadEmails[0].id)
+    initializedThreadRef.current = threadKey
+  }, [threadKey, threadEmails, id])
 
   useEffect(() => {
     setIsMounted(true)
@@ -551,11 +556,11 @@ export default function EmailDetailPage() {
             {isReplyOpen && (
               <motion.div
                 key="reply-box"
-                initial={{ opacity: 0, y: -12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
+                initial={{ opacity: 0, y: -12, height: 0 }}
+                animate={{ opacity: 1, y: 0, height: 'auto' }}
+                exit={{ opacity: 0, y: -10, height: 0 }}
                 transition={{ duration: 0.28, ease: [0.19, 1, 0.22, 1] }}
-                className="px-8 pt-6 pb-2"
+                className="px-8 pt-6 pb-2 overflow-hidden"
                 layout
               >
                 <div className="rounded-xl border border-white/10 bg-black/30 overflow-hidden">
