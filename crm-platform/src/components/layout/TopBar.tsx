@@ -504,7 +504,7 @@ export function TopBar() {
   return (
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
     <header className={cn(
-      "fixed top-0 left-[70px] right-0 lg:right-80 z-40 flex items-center justify-center h-24 pointer-events-none transition-all duration-300 ease-in-out",
+      "fixed top-0 left-0 lg:left-[70px] right-0 lg:right-80 z-40 flex items-center justify-center h-16 lg:h-24 pointer-events-none transition-all duration-300 ease-in-out",
       "border-b border-transparent"
     )}>
       {/* Visual background and blur layer - Moved here to prevent nested backdrop-filter issues */}
@@ -518,7 +518,7 @@ export function TopBar() {
           />
         )}
       </AnimatePresence>
-      <div className="w-full px-8 flex items-center justify-between gap-6 pointer-events-auto">
+      <div className="w-full px-4 lg:px-8 flex items-center justify-between gap-3 lg:gap-6 pointer-events-auto">
         {/* Operational Sentinel */}
         <div className="flex items-center gap-6 shrink-0">
           <div className="hidden xl:flex flex-col h-8 justify-center">
