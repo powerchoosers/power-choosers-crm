@@ -9,10 +9,10 @@ export default async function handler(req, res) {
         return;
     }
 
-    const { userEmail, messageId, attachmentId, folderId } = req.body || {};
+    const { userEmail, messageId, attachmentId, attachmentPath, folderId } = req.body || {};
 
-    if (!userEmail || !messageId || !attachmentId) {
-        res.status(400).json({ error: 'Missing required fields: userEmail, messageId, attachmentId' });
+    if (!userEmail || !messageId || (!attachmentId && !attachmentPath)) {
+        res.status(400).json({ error: 'Missing required fields: userEmail, messageId, attachmentId or attachmentPath' });
         return;
     }
 
@@ -21,8 +21,9 @@ export default async function handler(req, res) {
         const { fileBuffer, contentType } = await zohoService.downloadAttachment(
             String(userEmail),
             String(messageId),
-            String(attachmentId),
-            folderId ? String(folderId) : 'inbox'
+            attachmentId ? String(attachmentId) : '',
+            folderId ? String(folderId) : 'inbox',
+            attachmentPath ? String(attachmentPath) : ''
         );
 
         res.setHeader('Content-Type', contentType || 'application/octet-stream');

@@ -97,7 +97,8 @@ export default function EmailDetailPage() {
         body: JSON.stringify({
           userEmail: user.email,
           messageId: attachment.messageId,
-          attachmentId: attachment.attachmentId
+          attachmentId: attachment.attachmentId,
+          attachmentPath: attachment.attachmentPath
         })
       })
 
@@ -141,7 +142,8 @@ export default function EmailDetailPage() {
         body: JSON.stringify({
           userEmail: user.email,
           messageId: attachment.messageId,
-          attachmentId: attachment.attachmentId
+          attachmentId: attachment.attachmentId,
+          attachmentPath: attachment.attachmentPath
         })
       })
 

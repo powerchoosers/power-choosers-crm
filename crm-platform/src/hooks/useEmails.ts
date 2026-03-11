@@ -7,6 +7,7 @@ export interface EmailAttachment {
   filename: string
   mimeType?: string
   attachmentId?: string
+  attachmentPath?: string
   size?: number
   messageId?: string
   provider?: string
