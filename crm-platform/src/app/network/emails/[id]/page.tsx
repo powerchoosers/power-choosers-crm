@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Email, EmailAttachment } from '@/hooks/useEmails'
 import { useEmailIdentityMap, extractEmailAddress } from '@/hooks/useEmailIdentityMap'
+import { supabase } from '@/lib/supabase'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
@@ -41,6 +42,7 @@ export default function EmailDetailPage() {
   const [openingAttachment, setOpeningAttachment] = useState<string | null>(null)
   const [iframeLoaded, setIframeLoaded] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
+  const [resolvedReplyAddress, setResolvedReplyAddress] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const ownerEmail = user?.email?.toLowerCase() ?? 'guest'
   const threadKey = email?.threadId || email?.id
@@ -221,12 +223,12 @@ export default function EmailDetailPage() {
   const identityAddresses: string[] = Array.from(
     new Set(
       threadAddressPool
-        .map((addr: string | null | undefined) => extractEmailAddress(String(addr || '')))
+        .map((addr: string | null | undefined) => extractValidAddress(String(addr || '')))
         .filter((address: string): boolean => Boolean(address))
     )
   )
   const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
-  const fromAddressKey = extractEmailAddress(fromValue)
+  const fromAddressKey = extractValidAddress(fromValue)
   const fromContact = contactByEmail[fromAddressKey]
   const toResolved = toList.map((raw) => {
     const key = extractEmailAddress(String(raw || ''))
@@ -238,7 +240,7 @@ export default function EmailDetailPage() {
   })
 
   const displayFromName = fromContact?.displayName || (email?.type === 'sent' ? (email.fromName || null) : fromMailbox.name) || fromValue
-  const displayFromAddress = (email?.type === 'sent' ? fromValue : fromMailbox.address) || null
+  const displayFromAddress = extractValidAddress(email?.type === 'sent' ? fromValue : fromMailbox.address || fromValue) || null
   const currentUserEmail = (user?.email || '').toLowerCase().trim()
   const inferredCounterparty = threadEmails
     .flatMap((message: Email) => {
@@ -250,11 +252,69 @@ export default function EmailDetailPage() {
 
   const replyFromAddress = extractValidAddress(fromMailbox.address || fromValue)
   const replyFromMetadata = extractValidAddress((email as any)?.metadata?.fromAddress)
+  const replyFromContact = extractValidAddress(fromContact?.email)
   const firstToAddress = extractValidAddress(String(toList[0] || ''))
   const replyToAddress = email?.type === 'received'
-    ? (replyFromAddress || replyFromMetadata || inferredCounterparty || '')
-    : (firstToAddress || inferredCounterparty || '')
+    ? (replyFromAddress || replyFromMetadata || replyFromContact || inferredCounterparty || resolvedReplyAddress || '')
+    : (firstToAddress || inferredCounterparty || resolvedReplyAddress || '')
   const replySubject = email?.subject?.toLowerCase().startsWith('re:') ? email.subject : `Re: ${email?.subject || ''}`
+
+  useEffect(() => {
+    let cancelled = false
+
+    const resolveReplyAddressFromContact = async () => {
+      setResolvedReplyAddress('')
+
+      if (!email || email.type !== 'received') return
+      if (replyFromAddress || replyFromMetadata || replyFromContact || inferredCounterparty) return
+
+      const fromName = String(displayFromName || fromValue || '').trim()
+      const ownerScope = (user?.email || '').toLowerCase().trim()
+      if (!fromName) return
+
+      const escapeLike = (value: string) => value.replace(/[%_]/g, (match) => `\\${match}`)
+      const nameLike = `%${escapeLike(fromName)}%`
+
+      const getCandidate = async (owned: boolean) => {
+        let query = supabase
+          .from('contacts')
+          .select('email')
+          .ilike('name', nameLike)
+          .limit(1)
+
+        if (owned && ownerScope) {
+          query = query.eq('ownerId', ownerScope)
+        } else if (!owned) {
+          query = query.is('ownerId', null)
+        }
+
+        const { data } = await query.maybeSingle()
+        return extractValidAddress(data?.email)
+      }
+
+      const ownedCandidate = await getCandidate(true)
+      const sharedCandidate = ownedCandidate ? '' : await getCandidate(false)
+      const fallback = ownedCandidate || sharedCandidate
+
+      if (!cancelled && fallback) {
+        setResolvedReplyAddress(fallback)
+      }
+    }
+
+    resolveReplyAddressFromContact()
+    return () => {
+      cancelled = true
+    }
+  }, [
+    email,
+    user?.email,
+    fromValue,
+    displayFromName,
+    replyFromAddress,
+    replyFromMetadata,
+    replyFromContact,
+    inferredCounterparty
+  ])
 
   const stripHtml = (value: string) => value
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
