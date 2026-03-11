@@ -161,6 +161,41 @@ export function injectTracking(html, trackingId, options = {}) {
 }
 
 /**
+ * Remove previously injected tracking artifacts from quoted/forwarded content
+ * so each new send can get its own fresh tracking ID.
+ * @param {string} html
+ * @returns {string}
+ */
+export function sanitizeExistingTracking(html) {
+  if (!html) return html;
+
+  let cleaned = String(html);
+
+  // Remove old tracking pixel images
+  cleaned = cleaned.replace(
+    /<img\b[^>]*src=["'][^"']*\/api\/email\/track\/[^"']*["'][^>]*>/gi,
+    ''
+  );
+
+  // Unwrap previously tracked click URLs back to their original destination
+  const hrefRegex = /href=(["'])([^"']*\/api\/email\/click\/[^"']+)\1/gi;
+  cleaned = cleaned.replace(hrefRegex, (match, quote, trackedUrl) => {
+    try {
+      const parsed = new URL(trackedUrl, getBaseUrl());
+      const original = parsed.searchParams.get('url');
+      if (original) {
+        return `href=${quote}${decodeURIComponent(original)}${quote}`;
+      }
+    } catch {
+      // keep original href if parsing fails
+    }
+    return match;
+  });
+
+  return cleaned;
+}
+
+/**
  * Check if HTML already has a tracking pixel
  * @param {string} html - The email HTML content
  * @returns {boolean} Whether tracking pixel is already present
@@ -175,6 +210,7 @@ export default {
   generateTrackedLink,
   wrapLinksWithTracking,
   injectTracking,
-  hasTrackingPixel
+  hasTrackingPixel,
+  sanitizeExistingTracking
 };
 

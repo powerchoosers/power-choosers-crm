@@ -11,7 +11,7 @@ export const config = {
 import { cors } from '../_cors.js';
 import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from './zoho-service.js';
-import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
+import { injectTracking, sanitizeExistingTracking } from './tracking-helper.js';
 import { generateNodalSignature } from '@/lib/signature';
 import logger from '../_logger.js';
 import crypto from 'crypto';
@@ -196,14 +196,13 @@ export default async function handler(req, res) {
             }
         }
 
-        // Inject tracking pixel and wrap links for click tracking
-        if (!hasTrackingPixel(trackedContent)) {
-            trackedContent = injectTracking(trackedContent, trackingId, {
-                enableOpenTracking: deliverability.enableTracking,
-                enableClickTracking: deliverability.enableClickTracking
-            });
-            logger.debug('[Zoho] Injected tracking into email:', { trackingId, enableTracking: deliverability.enableTracking });
-        }
+        // Ensure each send gets a fresh tracking ID (especially replies that quote previously tracked content).
+        trackedContent = sanitizeExistingTracking(trackedContent);
+        trackedContent = injectTracking(trackedContent, trackingId, {
+            enableOpenTracking: deliverability.enableTracking,
+            enableClickTracking: deliverability.enableClickTracking
+        });
+        logger.debug('[Zoho] Injected tracking into email:', { trackingId, enableTracking: deliverability.enableTracking });
 
         // Generate plain text version from HTML if needed
         let textContent = '';
