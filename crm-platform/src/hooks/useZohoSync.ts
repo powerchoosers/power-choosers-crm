@@ -4,6 +4,32 @@ import { useAuth } from '@/context/AuthContext';
 import { useSyncStore } from '@/store/syncStore';
 import { supabase } from '@/lib/supabase';
 
+const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {
+    'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
+};
+
+async function getOwnerScope(user: { id?: string; email?: string | null }) {
+    const primary = String(user.email || '').toLowerCase().trim();
+    if (!primary) return [];
+
+    const fallbackShared = FALLBACK_SHARED_INBOX_OWNERS_BY_USER[primary] || [];
+    const owners = new Set<string>([primary, ...fallbackShared]);
+
+    if (user.id) {
+        const { data: connections } = await supabase
+            .from('zoho_connections')
+            .select('email')
+            .eq('user_id', user.id);
+
+        (connections || []).forEach((conn: { email?: string | null }) => {
+            const email = String(conn.email || '').toLowerCase().trim();
+            if (email) owners.add(email);
+        });
+    }
+
+    return Array.from(owners);
+}
+
 /**
  * Hook for automated Zoho Mail synchronization
  */
@@ -19,24 +45,31 @@ export function useZohoSync() {
             syncInProgress.current = true;
             if (!isSilent) setIsSyncing(true);
 
-            console.log(`[Zoho Sync] Initiating sync for ${user.email}...`);
+            const ownerScope = await getOwnerScope({ id: user.id, email: user.email });
+            if (ownerScope.length === 0) return;
+            console.log(`[Zoho Sync] Initiating sync for scope: ${ownerScope.join(', ')}`);
 
-            const response = await fetch('/api/email/zoho-sync', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userEmail: user.email }),
-            });
+            let totalSynced = 0;
+            for (const inboxEmail of ownerScope) {
+                const response = await fetch('/api/email/zoho-sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userEmail: inboxEmail }),
+                });
 
-            const data = await response.json();
+                const data = await response.json();
 
-            if (data.success) {
-                console.log(`[Zoho Sync] Successfully synced ${data.count} emails.`, data.debug || '');
-                setLastSyncTime(Date.now());
-                if (data.count > 0) {
-                    setSyncCount((syncCount || 0) + data.count);
+                if (data.success) {
+                    totalSynced += Number(data.count || 0);
+                    console.log(`[Zoho Sync] ${inboxEmail}: synced ${data.count || 0} emails.`, data.debug || '');
+                } else {
+                    console.error(`[Zoho Sync] ${inboxEmail}: sync failed`, data.error);
                 }
-            } else {
-                console.error('[Zoho Sync] Sync failed:', data.error);
+            }
+
+            setLastSyncTime(Date.now());
+            if (totalSynced > 0) {
+                setSyncCount((syncCount || 0) + totalSynced);
             }
         } catch (error) {
             console.error('[Zoho Sync] Network error:', error);
