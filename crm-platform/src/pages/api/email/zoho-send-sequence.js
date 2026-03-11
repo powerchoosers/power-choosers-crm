@@ -49,7 +49,8 @@ export default async function handler(req, res) {
             tags,
             trackClicks = true,
             trackOpens = true,
-            email_id // Existing record ID from Edge Function
+            contactId,    // HOLE 2 FIX: contact UUID passed from edge function to link email to profile
+            email_id      // Existing record ID from Edge Function
         } = body;
 
         // Validate required fields (allow object or string for to/from)
@@ -180,6 +181,11 @@ export default async function handler(req, res) {
         logger.info(`[Zoho Sequence] Email sent successfully: messageId=${result.messageId}`, 'zoho-send-sequence');
 
         // Logic for CRM Recording / Uplink Out Sync
+        // Map burner domain to primary for ownerId so emails appear under the correct profile
+        const ownerEmail = fromEmail.endsWith('@getnodalpoint.com')
+            ? fromEmail.replace('@getnodalpoint.com', '@nodalpoint.io')
+            : fromEmail;
+
         if (email_id) {
             const { error: updateError } = await supabase
                 .from('emails')
@@ -201,6 +207,48 @@ export default async function handler(req, res) {
                 logger.error('[Zoho Sequence] Failed to update CRM email record:', updateError);
             } else {
                 logger.info(`[Zoho Sequence] Updated CRM email record: ${email_id}`);
+            }
+        } else {
+            // No pre-existing record — create one so the email appears in uplink_out
+            const { error: insertError } = await supabase
+                .from('emails')
+                .insert({
+                    id: trackingId,
+                    to: [toEmail],
+                    subject,
+                    html: htmlContent || '',
+                    text: textContent || '',
+                    from: fromEmail,
+                    type: 'sent',
+                    status: 'sent',
+                    openCount: 0,
+                    clickCount: 0,
+                    opens: [],
+                    clicks: [],
+                    timestamp: new Date().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    ownerId: ownerEmail,
+                    ...(contactId ? { contactId } : {}),
+                    metadata: {
+                        provider: 'zoho',
+                        ownerId: ownerEmail,
+                        fromName,
+                        emailType: 'sent',
+                        isSentEmail: true,
+                        isSequenceEmail: true,
+                        messageId: result.messageId,
+                        zohoMessageId: result.messageId,
+                        sentAt: new Date().toISOString(),
+                        trackingId,
+                        ...((body.metadata && typeof body.metadata === 'object') ? body.metadata : {})
+                    }
+                });
+
+            if (insertError) {
+                logger.error('[Zoho Sequence] Failed to create CRM email record:', insertError.message);
+            } else {
+                logger.info(`[Zoho Sequence] Created CRM email record for sequence send: ${trackingId}`);
             }
         }
 
