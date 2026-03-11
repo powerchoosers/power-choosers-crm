@@ -44,6 +44,7 @@ export default function EmailDetailPage() {
   const [iframeLoaded, setIframeLoaded] = useState(false)
   const [isMounted, setIsMounted] = useState(false)
   const [resolvedReplyAddress, setResolvedReplyAddress] = useState('')
+  const [pendingFocusMessageId, setPendingFocusMessageId] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const ownerEmail = user?.email?.toLowerCase() ?? 'guest'
   const threadKey = email?.threadId || email?.id
@@ -64,6 +65,14 @@ export default function EmailDetailPage() {
     setExpandedThreadId(openedEmailInThread?.id || threadEmails[0].id)
     initializedThreadRef.current = threadKey
   }, [threadKey, threadEmails, id])
+
+  useEffect(() => {
+    if (!pendingFocusMessageId || threadEmails.length === 0) return
+    const sentReply = threadEmails.find((threadEmail: Email) => threadEmail.id === pendingFocusMessageId)
+    if (!sentReply) return
+    setExpandedThreadId(sentReply.id)
+    setPendingFocusMessageId(null)
+  }, [pendingFocusMessageId, threadEmails])
 
   useEffect(() => {
     setIsMounted(true)
@@ -425,11 +434,15 @@ export default function EmailDetailPage() {
         throw new Error(err?.error || err?.message || 'Failed to send reply')
       }
 
+      const payload = await response.json().catch(() => ({}))
+      if (payload?.trackingId) {
+        setPendingFocusMessageId(String(payload.trackingId))
+      }
+
       toast.success('Reply sent')
       setReplyHtml('')
       setReplyAttachments([])
       setIsReplyOpen(false)
-      setExpandedThreadId(null)
       queryClient.invalidateQueries({ queryKey: ['emails'] })
       queryClient.invalidateQueries({ queryKey: ['email', id] })
       queryClient.invalidateQueries({ queryKey: threadQueryKey })
