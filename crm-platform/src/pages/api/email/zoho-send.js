@@ -14,6 +14,7 @@ import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import { generateNodalSignature } from '@/lib/signature';
 import logger from '../_logger.js';
+import crypto from 'crypto';
 
 function extractValidEmail(value) {
     const raw = String(value || '').trim();
@@ -30,6 +31,17 @@ function normalizeRecipientList(raw) {
         .map((value) => extractValidEmail(value))
         .filter(Boolean);
     return Array.from(new Set(normalized));
+}
+
+function deriveThreadId(subject, ownerEmail) {
+    const normalizedSubject = String(subject || '')
+        .replace(/^\s*(re|fw|fwd)\s*:\s*/i, '')
+        .trim()
+        .toLowerCase();
+    const normalizedOwner = String(ownerEmail || '').trim().toLowerCase();
+    if (!normalizedSubject || !normalizedOwner) return null;
+    const hash = crypto.createHash('sha1').update(`${normalizedSubject}|${normalizedOwner}`, 'utf8').digest('hex');
+    return `thr_${hash}`;
 }
 
 function normalizeComposerAttachments(attachments, uploadedAttachments = []) {
@@ -92,6 +104,8 @@ export default async function handler(req, res) {
             res.end(JSON.stringify({ error: 'Missing or invalid recipient email address' }));
             return;
         }
+
+        const resolvedThreadId = threadId || deriveThreadId(subject, ownerEmail);
 
         // Generate unique tracking ID
         const trackingId = `zoho_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -240,6 +254,7 @@ export default async function handler(req, res) {
                     id: trackingId,
                     to: toRecipients,
                     subject,
+                    threadId: resolvedThreadId,
                     html: trackedContent,
                     text: textContent,
                     from: from || ownerEmail || 'noreply@nodalpoint.io',
@@ -265,6 +280,7 @@ export default async function handler(req, res) {
                         assignedTo: ownerEmail,
                         createdBy: ownerEmail,
                         zohoFolder: 'sent',
+                        threadId: resolvedThreadId,
                         attachments: normalizedAttachments,
                         replies: []
                     }
@@ -335,7 +351,7 @@ export default async function handler(req, res) {
                             zohoMessageId: result.messageId,
                             messageId: result.messageId,
                             zohoFolder: 'sent',
-                            threadId: threadId || null,
+                            threadId: resolvedThreadId,
                             attachments: attachmentsWithMessageId
                         }
                     })

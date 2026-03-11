@@ -554,7 +554,7 @@ function BillIntelligencePanel({
 
           {/* 12-Month Usage Profile */}
           <div className="min-h-[340px]">
-            <UsageProfilePanel usageHistory={intel.usageHistory} theme="crm" />
+            <UsageProfilePanel usageHistory={intel.usageHistory} meters={intel.meters} theme="crm" />
           </div>
         </div>
       )}

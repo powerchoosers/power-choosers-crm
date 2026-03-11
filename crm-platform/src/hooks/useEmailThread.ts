@@ -115,6 +115,8 @@ export function useEmailThread(threadKey?: string) {
             unread: !item.is_read,
             type,
             status: item.status,
+            contactId: item.contactId || null,
+            accountId: item.accountId || null,
             ownerId: item.metadata?.ownerId || ownerEmail,
             openCount: item.openCount,
             clickCount: item.clickCount,

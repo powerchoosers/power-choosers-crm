@@ -123,6 +123,10 @@ function extractEmailAddress(value) {
     return email.trim().toLowerCase();
 }
 
+function isLikelyEmail(value) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
+}
+
 function sanitizeFileName(name) {
     return String(name || 'attachment.bin').replace(/[^a-zA-Z0-9._-]/g, '_');
 }
@@ -167,6 +171,103 @@ async function resolveContactAndAccount(ownerEmail, senderEmail) {
         contactId: sharedQuery.data?.id || null,
         accountId: sharedQuery.data?.accountId || null,
     };
+}
+
+async function resolveContactAndAccountFromThread(ownerEmail, threadId) {
+    if (!ownerEmail || !threadId) return { contactId: null, accountId: null };
+
+    const { data: relatedSent } = await supabaseAdmin
+        .from('emails')
+        .select('contactId, accountId, to')
+        .eq('threadId', threadId)
+        .in('type', ['sent', 'uplink_out'])
+        .eq('metadata->>ownerId', ownerEmail)
+        .order('timestamp', { ascending: false, nullsFirst: false })
+        .limit(10);
+
+    const directContacts = Array.from(new Map(
+        (relatedSent || [])
+            .filter((row) => row?.contactId)
+            .map((row) => [row.contactId, { contactId: row.contactId, accountId: row.accountId || null }])
+    ).values());
+
+    if (directContacts.length === 1) {
+        return directContacts[0];
+    }
+    if (directContacts.length > 1) {
+        return { contactId: null, accountId: null };
+    }
+
+    const recipientEmails = Array.from(new Set(
+        (relatedSent || [])
+            .flatMap((row) => (Array.isArray(row?.to) ? row.to : [row?.to]))
+            .map((addr) => extractEmailAddress(addr))
+            .filter((addr) => isLikelyEmail(addr))
+    ));
+
+    if (!recipientEmails.length) return { contactId: null, accountId: null };
+
+    const ownedQuery = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId, email')
+        .eq('ownerId', ownerEmail)
+        .in('email', recipientEmails)
+        .limit(10);
+
+    const ownedMatches = Array.isArray(ownedQuery.data) ? ownedQuery.data : [];
+    if (ownedMatches.length === 1) {
+        return { contactId: ownedMatches[0].id || null, accountId: ownedMatches[0].accountId || null };
+    }
+    if (ownedMatches.length > 1) {
+        return { contactId: null, accountId: null };
+    }
+
+    const sharedQuery = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId, email')
+        .is('ownerId', null)
+        .in('email', recipientEmails)
+        .limit(10);
+
+    const sharedMatches = Array.isArray(sharedQuery.data) ? sharedQuery.data : [];
+    if (sharedMatches.length === 1) {
+        return { contactId: sharedMatches[0].id || null, accountId: sharedMatches[0].accountId || null };
+    }
+    return { contactId: null, accountId: null };
+}
+
+async function resolveContactAndAccountBySenderName(ownerEmail, senderLabel) {
+    const name = String(senderLabel || '').trim();
+    if (!name) return { contactId: null, accountId: null };
+
+    const ownedQuery = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId')
+        .eq('ownerId', ownerEmail)
+        .ilike('name', name)
+        .limit(10);
+
+    const ownedMatches = Array.isArray(ownedQuery.data) ? ownedQuery.data : [];
+    if (ownedMatches.length === 1) {
+        return { contactId: ownedMatches[0].id || null, accountId: ownedMatches[0].accountId || null };
+    }
+    if (ownedMatches.length > 1) {
+        return { contactId: null, accountId: null };
+    }
+
+    const sharedQuery = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId')
+        .is('ownerId', null)
+        .ilike('name', name)
+        .limit(10);
+
+    const sharedMatches = Array.isArray(sharedQuery.data) ? sharedQuery.data : [];
+    if (sharedMatches.length === 1) {
+        return { contactId: sharedMatches[0].id || null, accountId: sharedMatches[0].accountId || null };
+    }
+
+    return { contactId: null, accountId: null };
 }
 
 async function autoIngestInboundAttachments({
@@ -339,7 +440,7 @@ export default async function handler(req, res) {
             // 2. Check for duplicates in Supabase using the primary 'id' column
             const { data: existing } = await supabaseAdmin
                 .from('emails')
-                .select('id, metadata')
+                .select('id, metadata, contactId, accountId, threadId, subject')
                 .eq('id', messageId)
                 .maybeSingle();
 
@@ -368,6 +469,26 @@ export default async function handler(req, res) {
                         logger.warn(`[Zoho Sync] Attachment backfill failed for existing message ${messageId}: ${backfillError?.message || backfillError}`, 'zoho-sync');
                     }
                 }
+
+                if (!existing?.contactId) {
+                    try {
+                        const fallbackThreadId = existing?.threadId || determineThreadId({ subject: msgSummary?.subject || existing?.subject || '', ownerId: userEmail });
+                        const byName = await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || existing?.metadata?.fromAddress || '');
+                        const fallbackIdentity = byName?.contactId ? byName : await resolveContactAndAccountFromThread(userEmail, fallbackThreadId);
+                        if (fallbackIdentity?.contactId) {
+                            await supabaseAdmin
+                                .from('emails')
+                                .update({
+                                    contactId: fallbackIdentity.contactId,
+                                    accountId: fallbackIdentity.accountId,
+                                    updatedAt: new Date().toISOString()
+                                })
+                                .eq('id', messageId);
+                        }
+                    } catch (identityBackfillError) {
+                        logger.warn(`[Zoho Sync] Contact backfill failed for existing message ${messageId}: ${identityBackfillError?.message || identityBackfillError}`, 'zoho-sync');
+                    }
+                }
                 skippedCount++;
                 continue;
             }
@@ -378,10 +499,18 @@ export default async function handler(req, res) {
             // 4. Parse 
             const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
 
-            const senderEmail = extractEmailAddress(fullContent?.fromAddress || msgSummary?.senderAddress || msgSummary?.sender || '');
-            const resolvedIdentity = await resolveContactAndAccount(userEmail, senderEmail);
-            emailDoc.contactId = resolvedIdentity.contactId;
-            emailDoc.accountId = resolvedIdentity.accountId;
+            const senderRaw = fullContent?.fromAddress || msgSummary?.senderAddress || msgSummary?.sender || '';
+            const senderEmail = extractEmailAddress(senderRaw);
+            const byEmail = isLikelyEmail(senderEmail) ? await resolveContactAndAccount(userEmail, senderEmail) : { contactId: null, accountId: null };
+            if (byEmail.contactId) {
+                emailDoc.contactId = byEmail.contactId;
+                emailDoc.accountId = byEmail.accountId;
+            } else {
+                const byName = await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || senderRaw);
+                const fallbackIdentity = byName?.contactId ? byName : await resolveContactAndAccountFromThread(userEmail, emailDoc.threadId);
+                emailDoc.contactId = fallbackIdentity.contactId;
+                emailDoc.accountId = fallbackIdentity.accountId;
+            }
 
             // 5. Ensure thread exists (Must be before email insert due to FK constraint)
             await updateThread(emailDoc);

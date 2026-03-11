@@ -62,6 +62,8 @@ export function useEmail(id: string) {
           from: data.from,
           fromName: data.metadata?.fromName || null,
           to: data.to,
+          contactId: data.contactId || null,
+          accountId: data.accountId || null,
           threadId: data.threadId || data.metadata?.threadId || null,
           html: data.html,
           text: plainText || plainHtml,

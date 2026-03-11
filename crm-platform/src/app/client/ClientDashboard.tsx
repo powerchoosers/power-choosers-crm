@@ -68,6 +68,12 @@ interface SignedDoc {
     downloadUrl: string | null;
 }
 
+interface MeterData {
+    id: string;
+    esid: string | null;
+    service_address: string | null;
+}
+
 // ─────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────
@@ -210,6 +216,7 @@ export function ClientDashboard() {
     const [ercotPrices, setErcotPrices] = useState<ErcotPrices | null>(null);
     const [ercotGrid, setErcotGrid] = useState<ErcotGrid | null>(null);
     const [signedDocs, setSignedDocs] = useState<SignedDoc[]>([]);
+    const [meters, setMeters] = useState<MeterData[]>([]);
     const isScrolled = useScrollEffect((y) => y > 30, false);
 
     useEffect(() => {
@@ -243,6 +250,13 @@ export function ClientDashboard() {
                 .eq('id', accountId)
                 .single();
             if (acct) setAccount(acct);
+
+            const { data: meterData } = await supabase
+                .from('meters')
+                .select('id, esid, service_address')
+                .eq('account_id', accountId)
+                .order('created_at', { ascending: false });
+            setMeters((meterData || []) as MeterData[]);
 
             const { data: dealData } = await supabase
                 .from('deals')
@@ -697,7 +711,7 @@ export function ClientDashboard() {
 
                         {/* ── 12-MONTH USAGE PROFILE ── */}
                         <div className="h-[400px]">
-                            <UsageProfilePanel usageHistory={account?.metadata?.usageHistory} />
+                            <UsageProfilePanel usageHistory={account?.metadata?.usageHistory} meters={meters} />
                         </div>
 
                         {/* ── 3-COL ROW: Savings | Grid Status | Your Contract ── */}

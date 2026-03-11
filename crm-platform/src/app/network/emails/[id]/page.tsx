@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import type { Email, EmailAttachment } from '@/hooks/useEmails'
 import { useEmailIdentityMap, extractEmailAddress } from '@/hooks/useEmailIdentityMap'
+import { useContactIdentityMapByIds } from '@/hooks/useContactIdentityMapByIds'
 import { supabase } from '@/lib/supabase'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -230,8 +231,14 @@ export default function EmailDetailPage() {
     )
   )
   const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
+  const threadContactIds = Array.from(new Set(
+    [email?.contactId, ...threadEmails.map((threadEmail: Email) => threadEmail.contactId)]
+      .map((contactId) => String(contactId || '').trim())
+      .filter(Boolean)
+  ))
+  const { data: contactById = {} } = useContactIdentityMapByIds(threadContactIds)
   const fromAddressKey = extractValidAddress(fromValue)
-  const fromContact = contactByEmail[fromAddressKey]
+  const fromContact = (email?.contactId ? contactById[email.contactId] : undefined) || contactByEmail[fromAddressKey]
   const toResolved = toList.map((raw) => {
     const key = extractEmailAddress(String(raw || ''))
     return {
@@ -700,7 +707,7 @@ export default function EmailDetailPage() {
                     const openCount = threadEmail.openCount || 0
                     const clickCount = threadEmail.clickCount || 0
                     const fromKey = extractEmailAddress(threadEmail.from || '')
-                    const fromContactEntry = fromKey ? contactByEmail[fromKey] : undefined
+                    const fromContactEntry = (threadEmail.contactId ? contactById[threadEmail.contactId] : undefined) || (fromKey ? contactByEmail[fromKey] : undefined)
                     const parsedFrom = parseMailbox(threadEmail.from || '')
                     const displayName = fromContactEntry?.displayName || (threadEmail.type === 'sent'
                       ? (profile?.firstName ? `${profile.firstName} • You` : 'You')
@@ -754,7 +761,7 @@ export default function EmailDetailPage() {
                               </div>
                               <div className="flex items-center gap-3">
                                 {threadEmail.type === 'sent' && (
-                                  <div className="flex items-center gap-3 bg-white/5 rounded px-2 py-1 border border-white/5">
+                                  <div className="flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2.5 py-1 shrink-0">
                                     <div className="flex items-center gap-1">
                                       <Eye
                                         size={12}
