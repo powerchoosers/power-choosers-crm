@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEmail, useMarkEmailAsRead } from '@/hooks/useEmail'
 import { useEmailThread } from '@/hooks/useEmailThread'
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, Eye, MousePointer2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { EmailContent } from '@/components/emails/EmailContent'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
@@ -697,6 +697,8 @@ export default function EmailDetailPage() {
                 <AnimatePresence initial={false}>
                   {threadEmails.map((threadEmail: Email, index: number) => {
                     const isExpanded = expandedThreadId === threadEmail.id
+                    const openCount = threadEmail.openCount || 0
+                    const clickCount = threadEmail.clickCount || 0
                     const fromKey = extractEmailAddress(threadEmail.from || '')
                     const fromContactEntry = fromKey ? contactByEmail[fromKey] : undefined
                     const parsedFrom = parseMailbox(threadEmail.from || '')
@@ -750,9 +752,39 @@ export default function EmailDetailPage() {
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">
-                                {format(new Date(threadEmail.date || Date.now()), 'MMM d, yyyy h:mm a')}
-                              </span>
+                              <div className="flex items-center gap-3">
+                                {threadEmail.type === 'sent' && (
+                                  <div className="flex items-center gap-3 bg-white/5 rounded px-2 py-1 border border-white/5">
+                                    <div className="flex items-center gap-1">
+                                      <Eye
+                                        size={12}
+                                        className={cn(openCount > 0 ? "text-emerald-400" : "text-zinc-600")}
+                                      />
+                                      <span className={cn(
+                                        "text-[10px] font-mono tabular-nums",
+                                        openCount > 2 ? "text-white" : openCount > 0 ? "text-emerald-400" : "text-zinc-600"
+                                      )}>
+                                        {openCount}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <MousePointer2
+                                        size={12}
+                                        className={cn(clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600")}
+                                      />
+                                      <span className={cn(
+                                        "text-[10px] font-mono tabular-nums",
+                                        clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
+                                      )}>
+                                        {clickCount}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                                <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">
+                                  {format(new Date(threadEmail.date || Date.now()), 'MMM d, yyyy h:mm a')}
+                                </span>
+                              </div>
                             </div>
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-zinc-500">
