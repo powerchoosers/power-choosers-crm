@@ -302,7 +302,7 @@ export default async function handler(req, res) {
             // 4. Parse 
             const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
 
-            const senderEmail = extractEmailAddress(msgSummary?.sender || fullContent?.fromAddress || '');
+            const senderEmail = extractEmailAddress(fullContent?.fromAddress || msgSummary?.senderAddress || msgSummary?.sender || '');
             const resolvedIdentity = await resolveContactAndAccount(userEmail, senderEmail);
             emailDoc.contactId = resolvedIdentity.contactId;
             emailDoc.accountId = resolvedIdentity.accountId;
@@ -350,10 +350,13 @@ function parseZohoMessage(summary, content, ownerEmail) {
     const rawText = content.summary || content.textContent || content.plainText || '';
     const plainText = rawText || stripHtml(rawHtml);
 
-    // Zoho summary usually contains sender, subject, etc.
+    const fromAddress = content?.fromAddress || summary?.senderAddress || summary?.sender || '';
+    const replyToAddress = content?.replyToAddress || content?.replyTo || summary?.replyToAddress || summary?.replyTo || null;
+
+    // Prefer concrete email addresses from message content when available.
     const emailData = {
         id: zohoId, // Use Zoho Message ID as primary key
-        from: summary.sender,
+        from: fromAddress,
         to: [ownerEmail], // Store as array to match DB jsonb 'to' column
         subject: summary.subject,
         text: plainText,
@@ -378,6 +381,8 @@ function parseZohoMessage(summary, content, ownerEmail) {
             zohoFolder: summary.folderName || 'inbox',
             sentTime: summary.sentTime,
             hasAttachments: summary.hasAttachments,
+            fromAddress,
+            replyToAddress,
             attachments: attachmentMeta,
             emailType: 'received'
         }

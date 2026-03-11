@@ -15,6 +15,23 @@ import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import { generateNodalSignature } from '@/lib/signature';
 import logger from '../_logger.js';
 
+function extractValidEmail(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    const angle = raw.match(/<\s*([^>]+)\s*>/);
+    const candidate = (angle?.[1] || raw).trim();
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate) ? candidate : '';
+}
+
+function normalizeRecipientList(raw) {
+    const values = Array.isArray(raw) ? raw : [raw];
+    const normalized = values
+        .flatMap((value) => String(value || '').split(','))
+        .map((value) => extractValidEmail(value))
+        .filter(Boolean);
+    return Array.from(new Set(normalized));
+}
+
 function normalizeComposerAttachments(attachments, uploadedAttachments = []) {
     if (!Array.isArray(attachments) || attachments.length === 0) return [];
 
@@ -61,11 +78,18 @@ export default async function handler(req, res) {
 
     try {
         const { to, cc, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun, attachments } = req.body;
-        logger.info(`[Zoho] Attempting to send email to: ${to}, cc: ${cc || 'none'}, subject: ${subject}, user: ${userEmail}, attachments: ${attachments?.length || 0}`, 'zoho-send');
+        const toRecipients = normalizeRecipientList(to);
+        const ccRecipients = normalizeRecipientList(cc);
+        logger.info(`[Zoho] Attempting to send email to: ${toRecipients.join(',') || 'none'}, cc: ${ccRecipients.join(',') || 'none'}, subject: ${subject}, user: ${userEmail}, attachments: ${attachments?.length || 0}`, 'zoho-send');
 
-        if (!to || !subject || !content) {
+        if (!subject || !content) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: 'Missing required fields: to, subject, content' }));
+            return;
+        }
+        if (!toRecipients.length) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing or invalid recipient email address' }));
             return;
         }
 
@@ -76,7 +100,7 @@ export default async function handler(req, res) {
         const isHtmlEmailBoolean = Boolean(isHtmlEmail);
 
         // Detect self-send or internal testing to strengthen deliverability
-        const toAddress = Array.isArray(to) ? to[0] : to;
+        const toAddress = toRecipients[0];
         const isSelfSend = toAddress?.toLowerCase().trim() === ownerEmail.toLowerCase().trim();
         const isInternalTest = toAddress?.toLowerCase().endsWith('@nodalpoint.io') || toAddress?.toLowerCase().endsWith('@getnodalpoint.com');
 
@@ -214,7 +238,7 @@ export default async function handler(req, res) {
             try {
                 const emailRecord = {
                     id: trackingId,
-                    to: Array.isArray(to) ? to : [to],
+                    to: toRecipients,
                     subject,
                     html: trackedContent,
                     text: textContent,
@@ -276,8 +300,8 @@ export default async function handler(req, res) {
         logger.debug('[Zoho] Sending email:', { to, subject, trackingId, userEmail, attachments: attachments?.length || 0, uploaded: uploadedAttachments.length });
 
         const result = await zohoService.sendEmail({
-            to,
-            cc,
+            to: toRecipients,
+            cc: ccRecipients.length ? ccRecipients : undefined,
             subject,
             html: trackedContent,
             text: textContent || undefined,

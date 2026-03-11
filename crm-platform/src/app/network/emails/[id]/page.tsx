@@ -191,6 +191,12 @@ export default function EmailDetailPage() {
     return { name: null, address: v || null }
   }
 
+  const isLikelyEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  const extractValidAddress = (value: string | null | undefined) => {
+    const extracted = extractEmailAddress(String(value || ''))
+    return isLikelyEmail(extracted) ? extracted : ''
+  }
+
   const fromValue = email?.from || ''
   const toList = email ? (Array.isArray(email.to) ? email.to : [email.to]) : []
   const fromMailbox = parseMailbox(fromValue)
@@ -221,7 +227,21 @@ export default function EmailDetailPage() {
 
   const displayFromName = fromContact?.displayName || (email?.type === 'sent' ? (email.fromName || null) : fromMailbox.name) || fromValue
   const displayFromAddress = (email?.type === 'sent' ? fromValue : fromMailbox.address) || null
-  const replyToAddress = email?.type === 'received' ? (fromMailbox.address || '') : (toList[0] || '')
+  const currentUserEmail = (user?.email || '').toLowerCase().trim()
+  const inferredCounterparty = threadEmails
+    .flatMap((message: Email) => {
+      const fromCandidate = extractValidAddress(message.from)
+      const toCandidates = (Array.isArray(message.to) ? message.to : [message.to]).map((addr) => extractValidAddress(String(addr || '')))
+      return [fromCandidate, ...toCandidates]
+    })
+    .find((address: string) => Boolean(address) && address !== currentUserEmail) || ''
+
+  const replyFromAddress = extractValidAddress(fromMailbox.address || fromValue)
+  const replyFromMetadata = extractValidAddress((email as any)?.metadata?.fromAddress)
+  const firstToAddress = extractValidAddress(String(toList[0] || ''))
+  const replyToAddress = email?.type === 'received'
+    ? (replyFromAddress || replyFromMetadata || inferredCounterparty || '')
+    : (firstToAddress || inferredCounterparty || '')
   const replySubject = email?.subject?.toLowerCase().startsWith('re:') ? email.subject : `Re: ${email?.subject || ''}`
 
   const stripHtml = (value: string) => value
