@@ -270,15 +270,22 @@ export class ZohoMailService {
     /**
      * Download a message attachment from Zoho.
      */
-    async downloadAttachment(userEmail, messageId, attachmentId, folderId = 'inbox') {
+    async downloadAttachment(userEmail, messageId, attachmentId, folderId = 'inbox', attachmentPath = '') {
         const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
         const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
 
-        const candidates = [
-            `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachments/${attachmentId}`,
-            `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments/${attachmentId}`,
-            `${this.baseUrl}/accounts/${accountId}/messages/attachments/${attachmentId}`,
-        ];
+        const tokenCandidates = Array.from(new Set(
+            [attachmentId, attachmentPath]
+                .map((v) => String(v || '').trim())
+                .filter(Boolean)
+                .flatMap((v) => [v, encodeURIComponent(v)])
+        ));
+
+        const candidates = tokenCandidates.flatMap((token) => ([
+            `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachments/${token}`,
+            `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments/${token}`,
+            `${this.baseUrl}/accounts/${accountId}/messages/attachments/${token}`,
+        ]));
 
         let lastStatus = 0;
         let lastText = '';

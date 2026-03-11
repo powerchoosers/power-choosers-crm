@@ -25,22 +25,51 @@ function stripHtml(value) {
         .trim();
 }
 
+function toArray(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return value;
+    if (typeof value === 'string') {
+        try {
+            const parsed = JSON.parse(value);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+    if (typeof value === 'object') {
+        return Object.values(value);
+    }
+    return [];
+}
+
 function extractZohoAttachments(summary, content, messageId) {
     const candidates = []
-        .concat(Array.isArray(summary?.attachments) ? summary.attachments : [])
-        .concat(Array.isArray(summary?.attachmentInfo) ? summary.attachmentInfo : [])
-        .concat(Array.isArray(content?.attachments) ? content.attachments : [])
-        .concat(Array.isArray(content?.attachmentInfo) ? content.attachmentInfo : []);
+        .concat(toArray(summary?.attachments))
+        .concat(toArray(summary?.attachmentInfo))
+        .concat(toArray(summary?.attachmentDetails))
+        .concat(toArray(summary?.attachInfo))
+        .concat(toArray(content?.attachments))
+        .concat(toArray(content?.attachmentInfo))
+        .concat(toArray(content?.attachmentDetails))
+        .concat(toArray(content?.attachInfo))
+        .concat(toArray(content?.data?.attachments))
+        .concat(toArray(content?.data?.attachmentInfo))
+        .concat(toArray(content?.data?.attachmentDetails));
 
     if (candidates.length === 0) return [];
 
-    return candidates.map((att, idx) => {
+    const normalized = candidates.map((att, idx) => {
         const attachmentId =
             att?.attachmentId ||
             att?.attachment_id ||
+            att?.attachmentID ||
             att?.id ||
+            att?.aid ||
+            att?.fileId ||
+            att?.file_id ||
             att?.partId ||
             att?.storeName ||
+            att?.resourceId ||
             null;
         return {
             filename: att?.attachmentName || att?.fileName || att?.name || `Attachment-${idx + 1}`,
@@ -52,6 +81,29 @@ function extractZohoAttachments(summary, content, messageId) {
             downloadUnavailable: !attachmentId,
         };
     });
+
+    // Deduplicate when Zoho returns the same attachment in multiple blocks.
+    const seen = new Set();
+    return normalized.filter((att) => {
+        const key = `${att.attachmentId || 'none'}::${att.filename}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
+function hasAttachmentsInPayload(summary, content, attachmentMeta) {
+    if (Array.isArray(attachmentMeta) && attachmentMeta.length > 0) return true;
+    const summaryCount = Number(summary?.attachmentCount || summary?.attachmentsCount || 0);
+    const contentCount = Number(content?.attachmentCount || content?.attachmentsCount || content?.data?.attachmentCount || 0);
+    return Boolean(
+        summary?.hasAttachments ||
+        summary?.hasAttachment ||
+        content?.hasAttachments ||
+        content?.hasAttachment ||
+        summaryCount > 0 ||
+        contentCount > 0
+    );
 }
 
 function formatBytes(bytes, decimals = 2) {
@@ -287,11 +339,35 @@ export default async function handler(req, res) {
             // 2. Check for duplicates in Supabase using the primary 'id' column
             const { data: existing } = await supabaseAdmin
                 .from('emails')
-                .select('id')
+                .select('id, metadata')
                 .eq('id', messageId)
                 .maybeSingle();
 
             if (existing) {
+                // Backfill attachments for previously-synced rows that were saved without attachment metadata.
+                const existingAttachments = Array.isArray(existing?.metadata?.attachments) ? existing.metadata.attachments : [];
+                const hasExistingAttachments = existingAttachments.length > 0;
+                if (!hasExistingAttachments) {
+                    try {
+                        const fullContent = await zohoService.getMessageContent(userEmail, messageId);
+                        const attachmentMeta = extractZohoAttachments(msgSummary, fullContent, messageId);
+                        if (attachmentMeta.length > 0) {
+                            await supabaseAdmin
+                                .from('emails')
+                                .update({
+                                    updatedAt: new Date().toISOString(),
+                                    metadata: {
+                                        ...(existing?.metadata || {}),
+                                        hasAttachments: true,
+                                        attachments: attachmentMeta
+                                    }
+                                })
+                                .eq('id', messageId);
+                        }
+                    } catch (backfillError) {
+                        logger.warn(`[Zoho Sync] Attachment backfill failed for existing message ${messageId}: ${backfillError?.message || backfillError}`, 'zoho-sync');
+                    }
+                }
                 skippedCount++;
                 continue;
             }
@@ -352,6 +428,7 @@ function parseZohoMessage(summary, content, ownerEmail) {
 
     const fromAddress = content?.fromAddress || summary?.senderAddress || summary?.sender || '';
     const replyToAddress = content?.replyToAddress || content?.replyTo || summary?.replyToAddress || summary?.replyTo || null;
+    const hasAttachments = hasAttachmentsInPayload(summary, content, attachmentMeta);
 
     // Prefer concrete email addresses from message content when available.
     const emailData = {
@@ -380,7 +457,7 @@ function parseZohoMessage(summary, content, ownerEmail) {
             zohoMessageId: zohoId,
             zohoFolder: summary.folderName || 'inbox',
             sentTime: summary.sentTime,
-            hasAttachments: summary.hasAttachments,
+            hasAttachments,
             fromAddress,
             replyToAddress,
             attachments: attachmentMeta,

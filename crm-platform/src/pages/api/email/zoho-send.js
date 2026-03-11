@@ -42,7 +42,7 @@ function normalizeComposerAttachments(attachments, uploadedAttachments = []) {
             mimeType: att?.type || 'application/octet-stream',
             size: typeof att?.size === 'number' ? att.size : 0,
             provider: 'zoho',
-            attachmentId: uploaded?.storeName || uploaded?.attachmentPath || null,
+            attachmentId: uploaded?.attachmentPath || uploaded?.storeName || null,
             attachmentPath: uploaded?.attachmentPath || null,
             messageId: null,
             downloadUnavailable: true
@@ -264,6 +264,7 @@ export default async function handler(req, res) {
                         ownerId: ownerEmail,
                         assignedTo: ownerEmail,
                         createdBy: ownerEmail,
+                        zohoFolder: 'sent',
                         attachments: normalizedAttachments,
                         replies: []
                     }
@@ -317,9 +318,9 @@ export default async function handler(req, res) {
                 const attachmentsWithMessageId = normalizedAttachments.map((att, idx) => ({
                     ...att,
                     messageId: result.messageId || null,
-                    attachmentId: att.attachmentId || uploadedAttachments[idx]?.storeName || uploadedAttachments[idx]?.attachmentPath || null,
+                    attachmentId: att.attachmentId || uploadedAttachments[idx]?.attachmentPath || uploadedAttachments[idx]?.storeName || null,
                     attachmentPath: att.attachmentPath || uploadedAttachments[idx]?.attachmentPath || null,
-                    downloadUnavailable: !((att.attachmentId || uploadedAttachments[idx]?.storeName || uploadedAttachments[idx]?.attachmentPath) && result.messageId)
+                    downloadUnavailable: !((att.attachmentId || uploadedAttachments[idx]?.attachmentPath || uploadedAttachments[idx]?.storeName) && result.messageId)
                 }));
 
                 const { error } = await supabaseAdmin
@@ -333,6 +334,7 @@ export default async function handler(req, res) {
                             sentAt: new Date().toISOString(),
                             zohoMessageId: result.messageId,
                             messageId: result.messageId,
+                            zohoFolder: 'sent',
                             threadId: threadId || null,
                             attachments: attachmentsWithMessageId
                         }
