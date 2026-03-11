@@ -11,6 +11,7 @@ function normalizeAttachments(raw: any, provider?: string) {
       size: typeof att.size === 'number' ? att.size : undefined,
       messageId: att.messageId || att.zohoMessageId || undefined,
       attachmentId: att.attachmentId || att.storeName || att.attachmentPath || undefined,
+      attachmentPath: att.attachmentPath || undefined,
       provider: att.provider || provider || undefined,
       downloadUnavailable: !!att.downloadUnavailable,
     }))
