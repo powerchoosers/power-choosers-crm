@@ -80,7 +80,7 @@ export default async function handler(req, res) {
           reveal_personal_emails: revealEmails === true,
           reveal_phone_number: revealPhones === true
         };
-        
+
         // If phone reveals are requested, provide webhook URL
         let webhookUrl = '';
         if (revealPhones === true) {
@@ -94,15 +94,26 @@ export default async function handler(req, res) {
           }
           webhookUrl = `${baseUrl}/api/apollo/phone-webhook`;
         }
-        
+
+        // Helper: validate email is a real address (not 'N/A', 'null', locked placeholder)
+        const isValidEmail = (val) =>
+          val &&
+          typeof val === 'string' &&
+          val !== 'N/A' &&
+          val !== 'null' &&
+          val !== 'undefined' &&
+          !val.includes('email_not_unlocked') &&
+          val.includes('@');
+
         // Strategy 1: Use cached email (BEST - most reliable match)
-        const emailToUse = cachedContact.email || (i === 0 ? email : null);
+        const rawEmail = cachedContact.email || (i === 0 ? email : null);
+        const emailToUse = isValidEmail(rawEmail) ? rawEmail : null;
         if (emailToUse) {
           matchBody.email = emailToUse;
         }
-        // Strategy 1b: Use LinkedIn URL (New Strategy for Rapid Init)
-        else if (i === 0 && linkedinUrl) {
-          matchBody.linkedin_url = linkedinUrl;
+        // Strategy 1b: Use LinkedIn URL (from body param OR cached contact)
+        else if (linkedinUrl || cachedContact.linkedin) {
+          matchBody.linkedin_url = linkedinUrl || cachedContact.linkedin;
         }
         // Strategy 2: Use cached Apollo person ID (GOOD - from previous widget session)
         else if (cachedContact.apolloId || cachedContact.personId || cachedContact.id || (!cachedContact.id && contactId && contactId.length > 15)) {
