@@ -75,9 +75,13 @@ export default function EmailsPage() {
     }
   }, [isLoadingEmails, hasNextPage, isFetchingNextPage, fetchNextPage])
 
-  const handleSync = () => {
+  const handleSync = async () => {
     if (!user) return
-    performSync(false)
+    await performSync(false)
+    queryClient.invalidateQueries({ queryKey: ['emails'] })
+    queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+    queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+    queryClient.refetchQueries({ queryKey: ['emails'], type: 'active' })
   }
 
   const handleSelectionChange = (ids: Set<string>) => setSelectedIds(ids)

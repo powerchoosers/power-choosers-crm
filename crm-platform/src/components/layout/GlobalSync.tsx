@@ -17,7 +17,8 @@ function extractEmailAddress(value?: string | null) {
   if (!raw) return ''
   const angle = raw.match(/<\s*([^>]+)\s*>/)
   const email = angle?.[1] || raw
-  return email.trim().toLowerCase()
+  const normalized = email.trim().toLowerCase()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : ''
 }
 
 function stripHtml(value?: string | null) {
@@ -170,6 +171,12 @@ export function GlobalSync() {
           const userEmail = String(user.email || '').toLowerCase()
           if (ownerId && ownerId !== userEmail) return
 
+          // Always refresh inbox queries on new inbound rows for this owner.
+          // Notification enrichment can fail (e.g., sender is display-name-only), but list refresh should not.
+          queryClient.invalidateQueries({ queryKey: ['emails'] })
+          queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
+          queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+
           // Avoid spam on first sync/load by only notifying for fresh inserts.
           const insertedAt = email.timestamp || email.created_at
           if (insertedAt) {
@@ -236,10 +243,6 @@ export function GlobalSync() {
               duration: 6500,
             }
           )
-
-          queryClient.invalidateQueries({ queryKey: ['emails'] })
-          queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
-          queryClient.invalidateQueries({ queryKey: ['emails-count'] })
         }
       )
       .subscribe((status) => {
