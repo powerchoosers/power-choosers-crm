@@ -610,15 +610,21 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                         </div>
                       </div>
                     )}
-                    {previewDoc?.signedUrl ? (
-                      <iframe
-                        src={`${previewDoc.signedUrl}#view=FitH`}
-                        className="w-full h-full border-0 absolute inset-0"
-                        style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
-                        title={previewDoc?.doc.name}
-                        onLoad={() => setTimeout(() => setIframeLoaded(true), 900)}
-                      />
-                    ) : (
+                    {previewDoc?.signedUrl ? (() => {
+                      const isOffice = /\.(xlsx|xls|docx|doc|pptx|ppt)$/i.test(previewDoc.doc.name);
+                      const iframeSrc = isOffice
+                        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(previewDoc.signedUrl)}`
+                        : `${previewDoc.signedUrl}#view=FitH`;
+                      return (
+                        <iframe
+                          src={iframeSrc}
+                          className="w-full h-full border-0 absolute inset-0"
+                          style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
+                          title={previewDoc?.doc.name}
+                          onLoad={() => setTimeout(() => setIframeLoaded(true), 900)}
+                        />
+                      );
+                    })() : (
                       <div className="flex items-center justify-center w-full h-full text-zinc-500 font-mono text-xs uppercase">
                         Unable to load document preview.
                       </div>
