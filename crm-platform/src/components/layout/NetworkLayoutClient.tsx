@@ -9,7 +9,8 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { LoadingOrb } from "@/components/ui/LoadingOrb";
-import { GlobalSync } from "@/components/layout/GlobalSync";
+import { GlobalSync } from "@/components/layout/GlobalSync"
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -83,8 +84,9 @@ export function NetworkLayoutClient({
       <TopBar />
       <Sidebar />
       <RightPanel />
-      <main className="absolute top-0 bottom-0 left-[70px] right-0 lg:right-80 overflow-y-auto pt-24 pb-8 transition-all duration-300 scroll-smooth np-scroll">
-        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-6 sm:px-8 lg:px-10">
+      <MobileBottomNav />
+      <main className="absolute top-0 bottom-0 left-0 lg:left-[70px] right-0 lg:right-80 overflow-y-auto pt-16 lg:pt-24 pb-20 lg:pb-8 transition-all duration-300 scroll-smooth np-scroll">
+        <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-10">
           {children}
         </div>
       </main>
