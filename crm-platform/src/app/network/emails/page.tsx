@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEmails, useEmailsCount, useEmailTypeCounts, Email, EmailListFilter } from '@/hooks/useEmails'
 import { extractEmailAddress, useEmailIdentityMap } from '@/hooks/useEmailIdentityMap'
+import { useContactIdentityMapByIds } from '@/hooks/useContactIdentityMapByIds'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
@@ -61,6 +62,8 @@ export default function EmailsPage() {
     return [e.from, ...toList].map((addr) => extractEmailAddress(String(addr || ''))).filter(Boolean)
   })
   const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
+  const contactIds = emails.map((email) => email.contactId).filter(Boolean) as string[]
+  const { data: contactById = {} } = useContactIdentityMapByIds(contactIds)
   const effectiveTotal =
     emailFilter === 'sent'
       ? (emailTypeCounts?.sent ?? emails.length)
@@ -198,6 +201,7 @@ export default function EmailsPage() {
           onSelectEmail={(email) => router.push(`/network/emails/${email.id}`)}
           onOpenContact={(contactId) => router.push(`/network/contacts/${contactId}`)}
           contactByEmail={contactByEmail}
+          contactById={contactById}
           totalEmails={totalEmails}
           totalReceived={emailTypeCounts?.received}
           totalSent={emailTypeCounts?.sent}

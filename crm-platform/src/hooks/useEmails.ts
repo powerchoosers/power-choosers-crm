@@ -20,6 +20,8 @@ export interface Email {
   from: string
   fromName?: string | null
   to: string | string[]
+  contactId?: string | null
+  accountId?: string | null
   threadId?: string | null
   html?: string
   text?: string
@@ -213,6 +215,8 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
             subject: item.subject,
             from: item.from,
             to: item.to,
+            contactId: item.contactId || null,
+            accountId: item.accountId || null,
             html: item.html,
             text: plainText || plainHtml || plainSnippet,
             snippet: (plainText || plainHtml || plainSnippet).slice(0, 140),

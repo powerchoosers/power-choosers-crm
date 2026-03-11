@@ -13,6 +13,7 @@ interface EmailListProps {
   filter: EmailListFilter
   onFilterChange: (filter: EmailListFilter) => void
   contactByEmail?: Record<string, EmailIdentity>
+  contactById?: Record<string, EmailIdentity>
   onOpenContact?: (contactId: string) => void
   emails: Email[]
   isLoading: boolean
@@ -42,6 +43,7 @@ export function EmailList({
   filter,
   onFilterChange,
   contactByEmail = {},
+  contactById = {},
   onOpenContact,
   emails,
   isLoading,
@@ -290,7 +292,7 @@ export function EmailList({
             const primaryEmail = email.type === 'sent'
               ? extractEmailAddress(String(toList[0] || ''))
               : extractEmailAddress(String(email.from || ''))
-            const primaryContact = contactByEmail[primaryEmail]
+            const primaryContact = (email.contactId ? contactById[email.contactId] : undefined) || contactByEmail[primaryEmail]
             const recipientLabels = toList.map((raw) => {
               const addr = extractEmailAddress(String(raw || ''))
               const matched = contactByEmail[addr]
@@ -420,7 +422,7 @@ export function EmailList({
                 {/* Telemetry Column - Only show for sent emails filter */}
                 {filter === 'sent' && (
                   <div className="col-span-2 flex items-center">
-                    <div className="flex items-center gap-3 bg-white/5 rounded px-2 py-1 border border-white/5 w-fit">
+                    <div className="flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2.5 py-1 w-fit">
                       {/* Opens */}
                       <div className="flex items-center gap-1">
                         <Eye

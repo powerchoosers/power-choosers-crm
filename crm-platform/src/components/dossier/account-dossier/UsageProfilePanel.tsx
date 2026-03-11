@@ -1,11 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Activity, Table2, BarChart3 } from 'lucide-react';
-import {
-    AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, ComposedChart, Line
-} from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, ComposedChart, Line } from 'recharts';
 
 interface UsageMonth {
     month: string;
@@ -13,16 +11,38 @@ interface UsageMonth {
     billed_kw: number;
     actual_kw: number;
     tdsp_charges: number;
+    esid?: string;
+    site?: string;
+    site_name?: string;
+    service_address?: string;
 }
 
 interface UsageProfilePanelProps {
     usageHistory?: UsageMonth[];
+    meters?: Array<{
+        id?: string;
+        esid?: string | null;
+        service_address?: string | null;
+    }>;
     theme?: 'default' | 'crm';
 }
 
-export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProfilePanelProps) {
+function normalizeSiteLabel(value?: string | null) {
+    return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
+}
+
+function getRowSiteLabel(row: UsageMonth) {
+    return normalizeSiteLabel(
+        row.service_address || row.site_name || row.site || row.esid || ''
+    );
+}
+
+export function UsageProfilePanel({ usageHistory, meters = [], theme = 'default' }: UsageProfilePanelProps) {
     const [viewMode, setViewMode] = useState<'graph' | 'table'>('graph');
+    const [selectedSite, setSelectedSite] = useState<string>('ALL');
     const isCrm = theme === 'crm';
+    const gradientId = useId().replace(/:/g, '_');
+    const normalizedHistory = usageHistory ?? [];
 
     const chartFillStart = isCrm ? 'rgba(255,255,255,0.08)' : '#52525b';
     const chartFillEnd = isCrm ? 'rgba(255,255,255,0.02)' : '#27272a';
@@ -44,7 +64,57 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
     const emptyPanelBg = isCrm ? 'bg-transparent' : 'bg-zinc-900';
     const emptyBodyBg = isCrm ? 'bg-transparent' : 'bg-zinc-900';
 
-    if (!usageHistory || usageHistory.length === 0) {
+    const siteOptions = useMemo(() => {
+        const usageSites = normalizedHistory
+            .map(getRowSiteLabel)
+            .filter(Boolean);
+
+        const meterSites = meters
+            .map((m) => normalizeSiteLabel(m.service_address))
+            .filter(Boolean) as string[];
+
+        return Array.from(new Set([...usageSites, ...meterSites]));
+    }, [meters, normalizedHistory]);
+
+    const hasMultiSite = siteOptions.length > 1;
+    const safeSelectedSite = hasMultiSite
+        ? (selectedSite === 'ALL' || siteOptions.includes(selectedSite) ? selectedSite : 'ALL')
+        : 'ALL';
+
+    const filteredRows = useMemo(() => {
+        if (!hasMultiSite || safeSelectedSite === 'ALL') return normalizedHistory;
+        return normalizedHistory.filter((row) => getRowSiteLabel(row) === safeSelectedSite);
+    }, [hasMultiSite, normalizedHistory, safeSelectedSite]);
+
+    const displayRows = useMemo(() => {
+        if (!hasMultiSite || safeSelectedSite !== 'ALL') return filteredRows;
+
+        const monthOrder: string[] = [];
+        const monthMap: Record<string, UsageMonth> = {};
+
+        for (const row of filteredRows) {
+            const monthKey = row.month || 'Unknown';
+            if (!monthMap[monthKey]) {
+                monthMap[monthKey] = {
+                    month: monthKey,
+                    kwh: 0,
+                    billed_kw: 0,
+                    actual_kw: 0,
+                    tdsp_charges: 0,
+                };
+                monthOrder.push(monthKey);
+            }
+
+            monthMap[monthKey].kwh += Number(row.kwh) || 0;
+            monthMap[monthKey].billed_kw += Number(row.billed_kw) || 0;
+            monthMap[monthKey].actual_kw += Number(row.actual_kw) || 0;
+            monthMap[monthKey].tdsp_charges += Number(row.tdsp_charges) || 0;
+        }
+
+        return monthOrder.map((month) => monthMap[month]);
+    }, [filteredRows, hasMultiSite, safeSelectedSite]);
+
+    if (normalizedHistory.length === 0) {
         return (
             <div className={`rounded-2xl flex flex-col overflow-hidden border border-white/5 opacity-80 h-full ${emptyPanelBg}`}>
                 <div className="px-5 py-4 border-b border-white/5 flex items-center gap-2">
@@ -62,9 +132,6 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
             </div>
         );
     }
-
-    const maxKwh = Math.max(...usageHistory.map(d => d.kwh || 0));
-    const maxDemand = Math.max(...usageHistory.map(d => d.billed_kw || 0));
 
     // Custom Tooltip for Chart
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -94,34 +161,51 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
     return (
         <div className={`rounded-2xl flex flex-col overflow-hidden border border-white/5 h-full ${panelClasses}`}>
             {/* Header / Toggle */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 gap-2">
                 <div className="flex items-center gap-2">
                     <Activity className="w-4 h-4 text-zinc-300" />
                     <div>
                         <p className="font-mono text-[9px] text-zinc-400 uppercase tracking-[0.25em]">12-Month Usage Profile</p>
-                        <p className="text-zinc-600 text-[9px] mt-0.5">Historical energy load profile</p>
+                        <p className="text-zinc-600 text-[9px] mt-0.5">{hasMultiSite ? `Historical energy load profile · ${siteOptions.length} sites` : 'Historical energy load profile'}</p>
                     </div>
                 </div>
 
-                <div className={`flex rounded-lg p-1 border border-white/5 ${isCrm ? 'bg-transparent' : 'bg-zinc-950/50'}`}>
-                    <button
-                        onClick={() => setViewMode('graph')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'graph'
-                            ? activeToggle
-                            : inactiveToggle
-                            }`}
-                    >
-                        <BarChart3 className="w-3 h-3" /> Graph
-                    </button>
-                    <button
-                        onClick={() => setViewMode('table')}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'table'
-                            ? activeToggle
-                            : inactiveToggle
-                            }`}
-                    >
-                        <Table2 className="w-3 h-3" /> Table
-                    </button>
+                <div className="flex items-center gap-2">
+                    {hasMultiSite && (
+                        <select
+                            value={safeSelectedSite}
+                            onChange={(e) => setSelectedSite(e.target.value)}
+                            className={`h-8 rounded-md border border-white/10 px-2 font-mono text-[10px] uppercase tracking-widest bg-transparent text-zinc-300 focus:outline-none focus:border-white/20 ${isCrm ? 'bg-black/20' : 'bg-zinc-950/50'}`}
+                        >
+                            <option value="ALL">All Sites</option>
+                            {siteOptions.map((site) => (
+                                <option key={site} value={site}>
+                                    {site}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+
+                    <div className={`flex rounded-lg p-1 border border-white/5 ${isCrm ? 'bg-transparent' : 'bg-zinc-950/50'}`}>
+                        <button
+                            onClick={() => setViewMode('graph')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'graph'
+                                ? activeToggle
+                                : inactiveToggle
+                                }`}
+                        >
+                            <BarChart3 className="w-3 h-3" /> Graph
+                        </button>
+                        <button
+                            onClick={() => setViewMode('table')}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-[10px] font-mono uppercase tracking-widest transition-all ${viewMode === 'table'
+                                ? activeToggle
+                                : inactiveToggle
+                                }`}
+                        >
+                            <Table2 className="w-3 h-3" /> Table
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -138,9 +222,9 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
                             className={`absolute inset-0 p-4 ${chartAreaBg}`}
                         >
                             <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={usageHistory} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
+                                <ComposedChart data={displayRows} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
                                     <defs>
-                                        <linearGradient id="colorKwh" x1="0" y1="0" x2="0" y2="1">
+                                        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
                                             <stop offset="5%" stopColor={chartFillStart} stopOpacity={0.8} />
                                             <stop offset="95%" stopColor={chartFillEnd} stopOpacity={0.2} />
                                         </linearGradient>
@@ -169,7 +253,7 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
                                     />
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                     <Tooltip content={<CustomTooltip />} />
-                                    <Bar yAxisId="left" dataKey="kwh" name="Total kWh" fill="url(#colorKwh)" radius={[4, 4, 0, 0]} barSize={40} />
+                                    <Bar yAxisId="left" dataKey="kwh" name="Total kWh" fill={`url(#${gradientId})`} radius={[4, 4, 0, 0]} barSize={40} />
                                     <Line yAxisId="right" type="monotone" dataKey="billed_kw" name="Billed Demand" stroke={lineColor} strokeWidth={2} dot={{ r: 3, fill: lineColor, strokeWidth: 0 }} activeDot={{ r: 5 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
@@ -187,6 +271,9 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
                                 <thead className={`${headerBg} backdrop-blur-md sticky top-0 z-10 border-b border-white/5`}>
                                     <tr>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium">Month</th>
+                                        {hasMultiSite && safeSelectedSite !== 'ALL' && (
+                                            <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium">Site</th>
+                                        )}
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">kWh Usage</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Billed kW</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Actual kW</th>
@@ -194,9 +281,12 @@ export function UsageProfilePanel({ usageHistory, theme = 'default' }: UsageProf
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-white/[0.02]">
-                                    {usageHistory.map((row, idx) => (
+                                    {displayRows.map((row, idx) => (
                                         <tr key={idx} className={`${rowHoverBg} transition-colors`}>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-200">{row.month}</td>
+                                            {hasMultiSite && safeSelectedSite !== 'ALL' && (
+                                                <td className="px-4 py-3 font-mono text-sm text-zinc-300">{safeSelectedSite}</td>
+                                            )}
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-300 text-right">{row.kwh?.toLocaleString() ?? '—'}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{row.billed_kw?.toLocaleString() ?? '—'}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{row.actual_kw?.toLocaleString() ?? '—'}</td>
