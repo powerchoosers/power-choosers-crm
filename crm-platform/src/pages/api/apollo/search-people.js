@@ -7,36 +7,6 @@
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation, requireApolloAuth } from './_utils.js';
 import { supabaseAdmin } from '@/lib/supabase';
 
-/**
- * Enrich organization data using Apollo Enrichment API
- * @param {string} domain - Organization domain
- * @param {string} apiKey - Apollo API key
- * @returns {Promise<Object|null>} - Enriched data or null
- */
-async function enrichOrganization(domain, apiKey) {
-  if (!domain) return null;
-  try {
-    const url = `${APOLLO_BASE_URL}/organizations/enrich?domain=${encodeURIComponent(domain)}`;
-    const resp = await fetchWithRetry(url, {
-      method: 'GET',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Content-Type': 'application/json',
-        'X-Api-Key': apiKey
-      }
-    });
-
-    if (!resp.ok) {
-      return null;
-    }
-
-    const data = await resp.json();
-    return data.organization || null;
-  } catch (error) {
-    return null;
-  }
-}
-
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
@@ -123,55 +93,8 @@ export default async function handler(req, res) {
     }
 
     const searchData = await searchResp.json();
-    
-    // --- PEOPLE ENRICHMENT STEP ---
-    // The api_search endpoint returns obfuscated/limited data. We must enrich to get names/linkedin.
+
     const rawPeople = searchData.people || [];
-    if (rawPeople.length > 0) {
-      try {
-        const enrichedMap = new Map();
-        const chunkSize = 10;
-        
-        for (let i = 0; i < rawPeople.length; i += chunkSize) {
-          const chunk = rawPeople.slice(i, i + chunkSize);
-          const details = chunk.map(p => ({ id: p.id }));
-          
-          const bulkMatchUrl = `${APOLLO_BASE_URL}/people/bulk_match`;
-          const bulkResp = await fetchWithRetry(bulkMatchUrl, {
-            method: 'POST',
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Content-Type': 'application/json',
-              'X-Api-Key': APOLLO_API_KEY
-            },
-            body: JSON.stringify({ 
-              details,
-              reveal_personal_emails: false,
-              reveal_phone_number: false
-            })
-          });
-
-          if (bulkResp.ok) {
-            const bulkData = await bulkResp.json();
-            const matches = bulkData.matches || [];
-            matches.forEach(m => {
-              if (m && m.id) enrichedMap.set(m.id, m);
-            });
-          }
-        }
-
-        // Merge enriched data back into rawPeople
-        rawPeople.forEach((p, index) => {
-          const enriched = enrichedMap.get(p.id);
-          if (enriched) {
-            rawPeople[index] = { ...p, ...enriched };
-          }
-        });
-      } catch (err) {
-        console.error('People enrichment error:', err);
-      }
-    }
-    // --- END PEOPLE ENRICHMENT STEP ---
 
     // Map response to a clean format for the frontend
     const people = rawPeople.map(person => {
@@ -219,32 +142,6 @@ export default async function handler(req, res) {
         }
       };
     });
-
-    // --- ENRICHMENT STEP (Optional/Limited for People) ---
-    // Identify unique domains among people to enrich organization data
-    const domainsToEnrich = [...new Set(people
-      .filter(p => p.domain && (!p.organization.industry || !p.organization.employees))
-      .map(p => p.domain)
-    )].slice(0, 5); // Limit to 5 unique domains to save credits
-
-    if (domainsToEnrich.length > 0) {
-      const enrichmentMap = {};
-      await Promise.all(domainsToEnrich.map(async (domain) => {
-        const enriched = await enrichOrganization(domain, APOLLO_API_KEY);
-        if (enriched) enrichmentMap[domain] = enriched;
-      }));
-
-      // Apply enriched data back to all people from those organizations
-      people.forEach(person => {
-        if (person.domain && enrichmentMap[person.domain]) {
-          const enriched = enrichmentMap[person.domain];
-          if (enriched.industry) person.organization.industry = enriched.industry;
-          person.organization.employees = enriched.estimated_num_employees || enriched.employee_count || person.organization.employees;
-          if (enriched.logo_url && !person.organization.logoUrl) person.organization.logoUrl = enriched.logo_url;
-        }
-      });
-    }
-    // --- END ENRICHMENT STEP ---
 
     // Persist searchable cache for Org Intelligence / Apollo panel re-use.
     // We keep the same shape used elsewhere in apollo_searches: { company, contacts, timestamp }.
