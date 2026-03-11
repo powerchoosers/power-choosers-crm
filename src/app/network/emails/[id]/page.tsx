@@ -9,6 +9,7 @@ import { format } from 'date-fns'
 import { EmailContent } from '@/components/emails/EmailContent'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { RichTextEditor } from '@/components/emails/RichTextEditor'
@@ -20,12 +21,6 @@ import type { Email, EmailAttachment } from '@/hooks/useEmails'
 import { useEmailIdentityMap, extractEmailAddress } from '@/hooks/useEmailIdentityMap'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 
 export default function EmailDetailPage() {
   const params = useParams()
@@ -42,7 +37,10 @@ export default function EmailDetailPage() {
   const [replyEditor, setReplyEditor] = useState<Editor | null>(null)
   const [isSendingReply, setIsSendingReply] = useState(false)
   const [replyAttachments, setReplyAttachments] = useState<File[]>([])
-  const [previewAttachment, setPreviewAttachment] = useState<{ filename: string; url: string; mimeType?: string } | null>(null)
+  const [previewAttachment, setPreviewAttachment] = useState<{ attachment: EmailAttachment; filename: string; url: string; mimeType?: string } | null>(null)
+  const [openingAttachment, setOpeningAttachment] = useState<string | null>(null)
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [isMounted, setIsMounted] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const ownerEmail = user?.email?.toLowerCase() ?? 'guest'
   const threadKey = email?.threadId || email?.id
@@ -58,6 +56,10 @@ export default function EmailDetailPage() {
     if (threadEmails.length === 0) return
     setExpandedThreadId((prev) => prev ?? threadEmails[0].id)
   }, [threadEmails])
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   useEffect(() => {
     return () => {
@@ -128,7 +130,8 @@ export default function EmailDetailPage() {
       return
     }
 
-    setDownloadingAttachment(attachment.attachmentId)
+    setIframeLoaded(false)
+    setOpeningAttachment(attachment.attachmentId)
     try {
       const response = await fetch('/api/email/attachment', {
         method: 'POST',
@@ -150,6 +153,7 @@ export default function EmailDetailPage() {
       setPreviewAttachment((prev) => {
         if (prev?.url) URL.revokeObjectURL(prev.url)
         return {
+          attachment,
           filename: attachment.filename || 'attachment',
           url: objectUrl,
           mimeType: attachment.mimeType || blob.type || 'application/octet-stream'
@@ -159,8 +163,16 @@ export default function EmailDetailPage() {
       console.error('Error opening attachment:', error)
       toast.error('Failed to open attachment')
     } finally {
-      setDownloadingAttachment(null)
+      setOpeningAttachment(null)
     }
+  }
+
+  const closeAttachmentPreview = () => {
+    setPreviewAttachment((prev) => {
+      if (prev?.url) URL.revokeObjectURL(prev.url)
+      return null
+    })
+    setIframeLoaded(false)
   }
 
   // Mark as read when the email is loaded
@@ -733,7 +745,11 @@ export default function EmailDetailPage() {
                                         >
                                           <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className="w-10 h-10 rounded-xl nodal-glass flex items-center justify-center border border-white/10 flex-shrink-0">
-                                              <Paperclip className="w-4 h-4 text-zinc-400" />
+                                              {openingAttachment === attachment.attachmentId ? (
+                                                <Loader2 className="w-4 h-4 text-zinc-400 animate-spin" />
+                                              ) : (
+                                                <Paperclip className="w-4 h-4 text-zinc-400" />
+                                              )}
                                             </div>
                                             <div className="min-w-0 flex-1">
                                               <p className="text-sm font-medium text-zinc-200 truncate">{attachment.filename}</p>
@@ -784,39 +800,100 @@ export default function EmailDetailPage() {
         </div>
       </div>
 
-      <Dialog open={!!previewAttachment} onOpenChange={(open) => {
-        if (!open) {
-          setPreviewAttachment((prev) => {
-            if (prev?.url) URL.revokeObjectURL(prev.url)
-            return null
-          })
-        }
-      }}>
-        <DialogContent className="max-w-6xl w-[92vw] h-[88vh] bg-zinc-950 border border-white/10 p-0 overflow-hidden">
-          <DialogHeader className="px-5 py-3 border-b border-white/10 bg-zinc-900/50">
-            <DialogTitle className="text-zinc-200 font-mono text-sm uppercase tracking-widest truncate pr-6">
-              {previewAttachment?.filename}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="w-full h-full bg-zinc-900">
-            {previewAttachment?.mimeType?.startsWith('image/') ? (
-              <div className="w-full h-full flex items-center justify-center p-4">
-                <img
-                  src={previewAttachment.url}
-                  alt={previewAttachment.filename}
-                  className="max-w-full max-h-full object-contain"
-                />
-              </div>
-            ) : (
-              <iframe
-                src={previewAttachment?.url}
-                title={previewAttachment?.filename || 'Attachment Preview'}
-                className="w-full h-full border-0"
+      {isMounted && createPortal(
+        <AnimatePresence>
+          {!!previewAttachment && (
+            <>
+              <motion.div
+                key="preview-backdrop"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="fixed inset-0 z-[200] bg-black/70 backdrop-blur-md"
+                onClick={closeAttachmentPreview}
               />
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+              <motion.div
+                key="preview-panel"
+                initial={{ opacity: 0, scale: 0.97 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.97 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="fixed inset-0 z-[201] flex items-center justify-center p-4 pointer-events-none"
+              >
+                <div
+                  className="w-[78vw] h-[92vh] bg-zinc-950 border border-white/10 shadow-2xl flex flex-col overflow-hidden rounded-2xl pointer-events-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-white/5 bg-zinc-900/50 shrink-0">
+                    <h2 className="text-zinc-200 font-mono text-sm uppercase tracking-widest truncate flex-1 min-w-0 pr-4">
+                      {previewAttachment?.filename}
+                    </h2>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => previewAttachment?.attachment && handleDownloadAttachment(previewAttachment.attachment)}
+                        disabled={!previewAttachment?.attachment || downloadingAttachment === previewAttachment?.attachment?.attachmentId}
+                        className="flex items-center gap-2 px-4 py-1.5 bg-[#002FA7]/20 border border-[#002FA7]/40 text-white rounded-md text-xs font-mono uppercase tracking-widest hover:bg-[#002FA7]/30 transition-colors shadow-[0_0_15px_-5px_#002FA7] disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {downloadingAttachment === previewAttachment?.attachment?.attachmentId ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Download className="w-3.5 h-3.5" />
+                        )}
+                        Download
+                      </button>
+                      <button
+                        onClick={closeAttachmentPreview}
+                        className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10"
+                        title="Close"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 bg-zinc-900 relative overflow-hidden">
+                    {!iframeLoaded && (
+                      <div className="absolute inset-0 z-10 flex flex-col bg-zinc-900 gap-3 p-8">
+                        <div className="w-1/2 h-4 bg-zinc-800 rounded animate-pulse mx-auto" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse mt-4" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="w-4/5 h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse mt-2" />
+                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="w-3/4 h-3 bg-zinc-800/60 rounded animate-pulse" />
+                        <div className="mt-4 text-[10px] font-mono text-zinc-600 uppercase tracking-widest text-center animate-pulse">
+                          Loading document...
+                        </div>
+                      </div>
+                    )}
+
+                    {previewAttachment?.mimeType?.startsWith('image/') ? (
+                      <div className="w-full h-full flex items-center justify-center p-4">
+                        <img
+                          src={previewAttachment.url}
+                          alt={previewAttachment.filename}
+                          className="max-w-full max-h-full object-contain"
+                          onLoad={() => setIframeLoaded(true)}
+                        />
+                      </div>
+                    ) : (
+                      <iframe
+                        src={`${previewAttachment?.url}#view=FitH`}
+                        title={previewAttachment?.filename || 'Attachment Preview'}
+                        className="w-full h-full border-0 absolute inset-0"
+                        style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
+                        onLoad={() => setTimeout(() => setIframeLoaded(true), 900)}
+                      />
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }
