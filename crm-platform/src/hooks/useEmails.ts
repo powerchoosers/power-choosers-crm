@@ -37,18 +37,17 @@ export interface Email {
 const PAGE_SIZE = 50
 export type EmailListFilter = 'all' | 'received' | 'sent'
 
-const SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {
+const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
 }
 
-function getOwnerScope(userEmail: string) {
+function getFallbackOwnerScope(userEmail: string) {
   const normalized = userEmail.toLowerCase()
-  const shared = SHARED_INBOX_OWNERS_BY_USER[normalized] || []
+  const shared = FALLBACK_SHARED_INBOX_OWNERS_BY_USER[normalized] || []
   return Array.from(new Set([normalized, ...shared]))
 }
 
-function applyOwnerScope(query: any, userEmail: string) {
-  const owners = getOwnerScope(userEmail)
+function applyOwnerScope(query: any, owners: string[]) {
   const ownerConditions = owners.flatMap(owner => [
     `metadata->>ownerId.eq.${owner}`,
     `ownerId.eq.${owner}`,
@@ -56,10 +55,31 @@ function applyOwnerScope(query: any, userEmail: string) {
   return query.or(ownerConditions.join(','))
 }
 
+async function resolveOwnerScope(user: any) {
+  const primary = String(user?.email || '').toLowerCase().trim()
+  if (!primary) return []
+
+  const owners = new Set<string>(getFallbackOwnerScope(primary))
+  if (user?.id) {
+    const { data: connections } = await supabase
+      .from('zoho_connections')
+      .select('email')
+      .eq('user_id', user.id)
+
+    ;(connections || []).forEach((conn: { email?: string | null }) => {
+      const email = String(conn.email || '').toLowerCase().trim()
+      if (email) owners.add(email)
+    })
+  }
+
+  return Array.from(owners)
+}
+
 async function applyNonAdminEmailScope(query: any, user: any) {
   if (!user?.email) return query
 
-  let scoped = applyOwnerScope(query, user.email)
+  const owners = await resolveOwnerScope(user)
+  let scoped = applyOwnerScope(query, owners.length ? owners : [String(user.email).toLowerCase().trim()])
 
   // Contact-based scoping for non-admin users
   const { data: contactList } = await supabase
@@ -311,7 +331,8 @@ export function useSearchEmails(queryTerm: string) {
 
         if (role !== 'admin') {
           if (!user.email) return []
-          query = applyOwnerScope(query, user.email)
+          const owners = await resolveOwnerScope(user)
+          query = applyOwnerScope(query, owners.length ? owners : [String(user.email).toLowerCase().trim()])
         }
 
         // Filter out mailwarming emails
