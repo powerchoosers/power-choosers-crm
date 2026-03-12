@@ -199,167 +199,165 @@ export const DossierHeader = memo(function DossierHeader({
                                         />
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-3">
-                                        <AnimatePresence mode="wait">
-                                            {recentlyUpdatedFields.has('name') ? (
-                                                <motion.h1
-                                                    key="name-updated"
-                                                    initial={{ filter: 'blur(6px)', opacity: 0.6 }}
-                                                    animate={{ filter: 'blur(0px)', opacity: 1 }}
-                                                    transition={{ duration: 0.4, ease: 'easeOut' }}
-                                                    className="text-2xl font-semibold tracking-tighter text-white"
-                                                >
-                                                    <ForensicDataPoint
-                                                        value={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
-                                                        copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
-                                                        valueClassName="text-2xl font-semibold tracking-tighter text-white"
-                                                        inline
-                                                        compact
-                                                    />
-                                                </motion.h1>
-                                            ) : (
-                                                <h1 key="name-normal" className="text-2xl font-semibold tracking-tighter text-white">
-                                                    <ForensicDataPoint
-                                                        value={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
-                                                        copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
-                                                        valueClassName="text-2xl font-semibold tracking-tighter text-white"
-                                                        inline
-                                                        compact
-                                                    />
-                                                </h1>
+                                    <AnimatePresence mode="wait">
+                                        {recentlyUpdatedFields.has('name') ? (
+                                            <motion.h1
+                                                key="name-updated"
+                                                initial={{ filter: 'blur(6px)', opacity: 0.6 }}
+                                                animate={{ filter: 'blur(0px)', opacity: 1 }}
+                                                transition={{ duration: 0.4, ease: 'easeOut' }}
+                                                className="text-2xl font-semibold tracking-tighter text-white"
+                                            >
+                                                <ForensicDataPoint
+                                                    value={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                                                    copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                                                    valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                                                    inline
+                                                    compact
+                                                />
+                                            </motion.h1>
+                                        ) : (
+                                            <h1 key="name-normal" className="text-2xl font-semibold tracking-tighter text-white">
+                                                <ForensicDataPoint
+                                                    value={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                                                    copyValue={[editFirstName, editLastName].filter(Boolean).join(' ') || editName || contactName}
+                                                    valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                                                    inline
+                                                    compact
+                                                />
+                                            </h1>
+                                        )}
+                                    </AnimatePresence>
+                                )}
+
+                                {/* THE SIGNAL ARRAY */}
+                                <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
+                                    <div className="flex items-center">
+                                        <button
+                                            onClick={() => {
+                                                if (isEditing) {
+                                                    setActiveEditField(activeEditField === 'website' ? null : 'website')
+                                                } else {
+                                                    const url = editWebsite || contact?.website
+                                                    if (url) window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
+                                                }
+                                            }}
+                                            className={cn(
+                                                "icon-button-forensic p-1.5",
+                                                !editWebsite && !contact?.website && "opacity-50 cursor-not-allowed",
+                                                isEditing && activeEditField === 'website' && "bg-[#002FA7]/20 text-white",
+                                                isEditing && "hover:bg-[#002FA7]/20 transition-colors"
                                             )}
-                                        </AnimatePresence>
+                                            title={isEditing ? "Edit Website" : "Visit Website"}
+                                        >
+                                            <Globe className="w-3.5 h-3.5" />
+                                        </button>
 
-                                        {/* THE SIGNAL ARRAY */}
-                                        <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
-                                            <div className="flex items-center">
-                                                <button
-                                                    onClick={() => {
-                                                        if (isEditing) {
-                                                            setActiveEditField(activeEditField === 'website' ? null : 'website')
-                                                        } else {
-                                                            const url = editWebsite || contact?.website
-                                                            if (url) window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
-                                                        }
-                                                    }}
-                                                    className={cn(
-                                                        "icon-button-forensic p-1.5",
-                                                        !editWebsite && !contact?.website && "opacity-50 cursor-not-allowed",
-                                                        isEditing && activeEditField === 'website' && "bg-[#002FA7]/20 text-white",
-                                                        isEditing && "hover:bg-[#002FA7]/20 transition-colors"
-                                                    )}
-                                                    title={isEditing ? "Edit Website" : "Visit Website"}
+                                        <AnimatePresence>
+                                            {isEditing && activeEditField === 'website' && (
+                                                <motion.div
+                                                    key="website-edit"
+                                                    initial={{ width: 0, opacity: 0 }}
+                                                    animate={{ width: "auto", opacity: 1 }}
+                                                    exit={{ width: 0, opacity: 0 }}
+                                                    className="flex items-center overflow-hidden"
                                                 >
-                                                    <Globe className="w-3.5 h-3.5" />
-                                                </button>
-
-                                                <AnimatePresence>
-                                                    {isEditing && activeEditField === 'website' && (
-                                                        <motion.div
-                                                            key="website-edit"
-                                                            initial={{ width: 0, opacity: 0 }}
-                                                            animate={{ width: "auto", opacity: 1 }}
-                                                            exit={{ width: 0, opacity: 0 }}
-                                                            className="flex items-center overflow-hidden"
-                                                        >
-                                                            <input
-                                                                type="text"
-                                                                value={editWebsite}
-                                                                onChange={(e) => setEditWebsite(e.target.value)}
-                                                                placeholder="WEBSITE URL"
-                                                                className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
-                                                                autoFocus
-                                                                onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
-                                                            />
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                            </div>
-
-                                            <div className="w-px h-3 bg-white/10" />
-
-                                            <div className="flex items-center">
-                                                <button
-                                                    onClick={() => {
-                                                        if (isEditing) {
-                                                            setActiveEditField(activeEditField === 'linkedin' ? null : 'linkedin')
-                                                        } else {
-                                                            const url = editLinkedinUrl || contact?.linkedinUrl
-                                                            if (url) window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
-                                                        }
-                                                    }}
-                                                    className={cn(
-                                                        "icon-button-forensic p-1.5",
-                                                        !editLinkedinUrl && !contact?.linkedinUrl && "opacity-50 cursor-not-allowed",
-                                                        isEditing && activeEditField === 'linkedin' && "bg-[#002FA7]/20 text-white",
-                                                        isEditing && "hover:bg-[#002FA7]/20 transition-colors"
-                                                    )}
-                                                    title={isEditing ? "Edit LinkedIn" : "View LinkedIn"}
-                                                >
-                                                    <Linkedin className="w-3.5 h-3.5" />
-                                                </button>
-
-                                                <AnimatePresence>
-                                                    {isEditing && activeEditField === 'linkedin' && (
-                                                        <motion.div
-                                                            key="linkedin-edit"
-                                                            initial={{ width: 0, opacity: 0 }}
-                                                            animate={{ width: "auto", opacity: 1 }}
-                                                            exit={{ width: 0, opacity: 0 }}
-                                                            className="flex items-center overflow-hidden"
-                                                        >
-                                                            <input
-                                                                type="text"
-                                                                value={editLinkedinUrl}
-                                                                onChange={(e) => setEditLinkedinUrl(e.target.value)}
-                                                                placeholder="LINKEDIN URL"
-                                                                className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
-                                                                autoFocus
-                                                                onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
-                                                            />
-                                                        </motion.div>
-                                                    )}
-                                                </AnimatePresence>
-                                            </div>
-                                        </div>
-
-                                        {/* Status/Sync Indicators */}
-                                        <motion.div layout className="flex items-center gap-2 ml-2 overflow-visible">
-                                            <AnimatePresence>
-                                                {contact.listName && (
-                                                    <motion.div
-                                                        key="list-membership-badge"
-                                                        layout
-                                                        initial={{ opacity: 0, width: 0, scale: 0.92 }}
-                                                        animate={{ opacity: 1, width: 'auto', scale: 1 }}
-                                                        exit={{ opacity: 0, width: 0, scale: 0.92 }}
-                                                        className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm overflow-hidden shrink-0 origin-left"
-                                                    >
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                        <span className="text-[10px] font-mono uppercase tracking-widest font-medium text-emerald-500 whitespace-nowrap">
-                                                            {contact.listName}
-                                                        </span>
-                                                    </motion.div>
-                                                )}
-                                            </AnimatePresence>
-
-                                            {contact.lastContact && (
-                                                <motion.div layout className="flex items-center gap-1.5 px-2 py-0.5 rounded-full nodal-module-glass border border-white/5 shrink-0">
-                                                    <Clock className="w-2.5 h-2.5 text-zinc-600" />
-                                                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
-                                                        {(() => {
-                                                            try {
-                                                                return formatDistanceToNow(new Date(contact.lastContact), { addSuffix: true }).toUpperCase()
-                                                            } catch (e) {
-                                                                return 'UNKNOWN'
-                                                            }
-                                                        })()}
-                                                    </span>
+                                                    <input
+                                                        type="text"
+                                                        value={editWebsite}
+                                                        onChange={(e) => setEditWebsite(e.target.value)}
+                                                        placeholder="WEBSITE URL"
+                                                        className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
+                                                        autoFocus
+                                                        onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                                                    />
                                                 </motion.div>
                                             )}
-                                        </motion.div>
+                                        </AnimatePresence>
                                     </div>
-                                )}
+
+                                    <div className="w-px h-3 bg-white/10" />
+
+                                    <div className="flex items-center">
+                                        <button
+                                            onClick={() => {
+                                                if (isEditing) {
+                                                    setActiveEditField(activeEditField === 'linkedin' ? null : 'linkedin')
+                                                } else {
+                                                    const url = editLinkedinUrl || contact?.linkedinUrl
+                                                    if (url) window.open(url.startsWith('http') ? url : `https://${url}`, '_blank')
+                                                }
+                                            }}
+                                            className={cn(
+                                                "icon-button-forensic p-1.5",
+                                                !editLinkedinUrl && !contact?.linkedinUrl && "opacity-50 cursor-not-allowed",
+                                                isEditing && activeEditField === 'linkedin' && "bg-[#002FA7]/20 text-white",
+                                                isEditing && "hover:bg-[#002FA7]/20 transition-colors"
+                                            )}
+                                            title={isEditing ? "Edit LinkedIn" : "View LinkedIn"}
+                                        >
+                                            <Linkedin className="w-3.5 h-3.5" />
+                                        </button>
+
+                                        <AnimatePresence>
+                                            {isEditing && activeEditField === 'linkedin' && (
+                                                <motion.div
+                                                    key="linkedin-edit"
+                                                    initial={{ width: 0, opacity: 0 }}
+                                                    animate={{ width: "auto", opacity: 1 }}
+                                                    exit={{ width: 0, opacity: 0 }}
+                                                    className="flex items-center overflow-hidden"
+                                                >
+                                                    <input
+                                                        type="text"
+                                                        value={editLinkedinUrl}
+                                                        onChange={(e) => setEditLinkedinUrl(e.target.value)}
+                                                        placeholder="LINKEDIN URL"
+                                                        className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
+                                                        autoFocus
+                                                        onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                                                    />
+                                                </motion.div>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                </div>
+
+                                {/* Status/Sync Indicators */}
+                                <motion.div layout className="flex items-center gap-2 ml-2 overflow-visible">
+                                    <AnimatePresence>
+                                        {contact.listName && (
+                                            <motion.div
+                                                key="list-membership-badge"
+                                                layout
+                                                initial={{ opacity: 0, width: 0, scale: 0.92 }}
+                                                animate={{ opacity: 1, width: 'auto', scale: 1 }}
+                                                exit={{ opacity: 0, width: 0, scale: 0.92 }}
+                                                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur-sm overflow-hidden shrink-0 origin-left"
+                                            >
+                                                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                <span className="text-[10px] font-mono uppercase tracking-widest font-medium text-emerald-500 whitespace-nowrap">
+                                                    {contact.listName}
+                                                </span>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+
+                                    {contact.lastContact && (
+                                        <motion.div layout className="flex items-center gap-1.5 px-2 py-0.5 rounded-full nodal-module-glass border border-white/5 shrink-0">
+                                            <Clock className="w-2.5 h-2.5 text-zinc-600" />
+                                            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                                                {(() => {
+                                                    try {
+                                                        return formatDistanceToNow(new Date(contact.lastContact), { addSuffix: true }).toUpperCase()
+                                                    } catch (e) {
+                                                        return 'UNKNOWN'
+                                                    }
+                                                })()}
+                                            </span>
+                                        </motion.div>
+                                    )}
+                                </motion.div>
 
                                 <AnimatePresence>
                                     {showSynced && (
