@@ -23,6 +23,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import {
   Mail,
   Phone,
@@ -584,6 +585,7 @@ function ProtocolArchitectInner() {
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [activeHandleId, setActiveHandleId] = useState<string | null>(null);
   const [showSequenceIntel, setShowSequenceIntel] = useState(false);
+  const [isClient, setIsClient] = useState(false);
   const [sequenceIntelLoading, setSequenceIntelLoading] = useState(false);
   const [sequenceIntelError, setSequenceIntelError] = useState<string | null>(null);
   const [sequenceIntelRows, setSequenceIntelRows] = useState<SequenceMemberRow[]>([]);
@@ -622,6 +624,10 @@ function ProtocolArchitectInner() {
       setDebugData(d => ({ ...d, totalEdges: edges.length }));
     }
   }, [edges.length, debugMode]);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const fetchSequenceIntel = useCallback(async () => {
     if (!id || id === TEST_PROTOCOL_ID) {
@@ -1508,7 +1514,7 @@ function ProtocolArchitectInner() {
               <Controls className="nodal-module-glass nodal-monolith-edge text-white rounded-xl overflow-hidden shadow-2xl !bottom-4 !left-4" />
 
               <Panel position="top-right" className="m-4">
-                <div className="nodal-module-glass nodal-monolith-edge p-4 rounded-2xl flex flex-col gap-3 min-w-[220px] shadow-2xl">
+                <div className="nodal-module-glass nodal-monolith-edge p-4 rounded-2xl flex flex-col gap-3 w-[220px] max-w-[220px] shadow-2xl">
                   <div className="flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest px-1">
                     <div className="flex items-center gap-2">
                       <Settings2 className="w-3 h-3" /> Canvas_Metrics
@@ -1527,8 +1533,9 @@ function ProtocolArchitectInner() {
                   </div>
                   <div className="mt-2 bg-black/30 border border-white/5 rounded-lg p-2.5">
                     <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Runtime</div>
-                    <div className="text-[10px] font-mono text-zinc-400 leading-relaxed">
-                      Use <span className="text-zinc-200">Sequence_Intel</span> to view active contacts, live step position, and execution status.
+                    <div className="text-[10px] font-mono text-zinc-400 leading-relaxed break-words">
+                      Use <span className="text-zinc-200">Sequence_Intel</span><br />
+                      to view active contacts and live step status.
                     </div>
                   </div>
                 </div>
@@ -2206,23 +2213,24 @@ function ProtocolArchitectInner() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showSequenceIntel && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-md flex items-center justify-center p-6"
-            onClick={() => setShowSequenceIntel(false)}
-          >
+      {isClient && createPortal(
+        <AnimatePresence>
+          {showSequenceIntel && (
             <motion.div
-              initial={{ opacity: 0, y: 12, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 6, scale: 0.98 }}
-              transition={{ duration: 0.2 }}
-              className="w-full max-w-7xl max-h-[88vh] nodal-monolith-edge bg-zinc-950/95 border border-white/10 rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.65)]"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[140] bg-black/72 backdrop-blur-lg flex items-center justify-center p-6"
+              onClick={() => setShowSequenceIntel(false)}
             >
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 6, scale: 0.98 }}
+                transition={{ duration: 0.2 }}
+                className="w-full max-w-[1240px] max-h-[88vh] nodal-monolith-edge bg-zinc-950/95 border border-white/10 rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.65)]"
+                onClick={(e) => e.stopPropagation()}
+              >
               <div className="px-6 py-5 border-b border-white/10 bg-black/30 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Sequence Intel</div>
@@ -2351,10 +2359,12 @@ function ProtocolArchitectInner() {
                   </div>
                 )}
               </div>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* Exit Dialog */}
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
