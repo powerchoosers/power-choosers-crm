@@ -183,22 +183,78 @@ export class ZohoMailService {
         return result.data || [];
     }
 
+    normalizeFolder(folder = {}) {
+        return {
+            ...folder,
+            folderId: folder.folderId || folder.id || null,
+            folderName: folder.folderName || folder.name || '',
+            folderType: String(folder.folderType || folder.type || '').toLowerCase(),
+            path: folder.path || '',
+        };
+    }
+
+    findInboxFolder(folders = []) {
+        return folders
+            .map((folder) => this.normalizeFolder(folder))
+            .find((folder) => {
+                const folderName = String(folder.folderName || '').toLowerCase();
+                const folderType = String(folder.folderType || '').toLowerCase();
+                const path = String(folder.path || '').toLowerCase();
+
+                return (
+                    folderType === 'inbox' ||
+                    folderName === 'inbox' ||
+                    path === '/' ||
+                    path === '/inbox'
+                );
+            }) || null;
+    }
+
+    isFolderIdLike(value) {
+        return /^[0-9]+$/.test(String(value || '').trim());
+    }
+
     /**
      * Helper to resolve 'inbox' or other names to numeric ID
      */
     async resolveFolderId(userEmail, accessToken, accountId, folderNameOrId) {
-        if (!folderNameOrId || folderNameOrId === 'inbox') {
+        const rawFolder = String(folderNameOrId || '').trim();
+
+        if (!rawFolder || rawFolder.toLowerCase() === 'inbox') {
             try {
                 const folders = await this.listFolders(userEmail, accessToken, accountId);
-                const inbox = folders.find(f => f.path === '/' || f.path === '/Inbox' || f.name.toLowerCase() === 'inbox');
-                if (inbox) return inbox.folderId;
+                const inbox = this.findInboxFolder(folders);
+                if (inbox?.folderId) return String(inbox.folderId);
                 logger.warn(`[Zoho Mail] Could not resolve 'inbox' folder ID for ${userEmail}`, 'zoho-service');
             } catch (e) {
                 logger.error(`[Zoho Mail] Error resolving folder ID: ${e.message}`, 'zoho-service');
             }
-            return 'inbox'; // Fallback if listing fails or not found (might fail API but worth a try)
+            return null;
         }
-        return folderNameOrId;
+
+        if (this.isFolderIdLike(rawFolder)) {
+            return rawFolder;
+        }
+
+        try {
+            const folders = await this.listFolders(userEmail, accessToken, accountId);
+            const matchedFolder = folders
+                .map((folder) => this.normalizeFolder(folder))
+                .find((folder) => {
+                    const folderName = String(folder.folderName || '').toLowerCase();
+                    const folderPath = String(folder.path || '').toLowerCase();
+                    const target = rawFolder.toLowerCase();
+                    return folderName === target || folderPath === target;
+                });
+
+            if (matchedFolder?.folderId) {
+                return String(matchedFolder.folderId);
+            }
+        } catch (e) {
+            logger.error(`[Zoho Mail] Error resolving folder '${rawFolder}': ${e.message}`, 'zoho-service');
+        }
+
+        return null;
     }
 
     /**
@@ -212,12 +268,15 @@ export class ZohoMailService {
 
             // Resolve folder ID if needed
             const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
+            if (!resolvedFolderId) {
+                throw new Error(`Zoho inbox folder could not be resolved for ${userEmail}. Check the mailbox folders returned by Zoho for this account.`);
+            }
 
             // Build query params
             const params = new URLSearchParams({
                 limit: limit.toString()
             });
-            if (resolvedFolderId) params.append('folderId', resolvedFolderId);
+            params.append('folderId', resolvedFolderId);
 
             logger.info(`[Zoho Mail] Fetching messages for ${userEmail} (folder: ${resolvedFolderId})...`, 'zoho-service');
 
@@ -250,6 +309,9 @@ export class ZohoMailService {
             const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
             const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
+            if (!resolvedFolderId) {
+                throw new Error(`Zoho folder could not be resolved for message ${messageId}`);
+            }
 
             logger.debug(`[Zoho Mail] Fetching content for message ${messageId}...`, 'zoho-service');
 
@@ -273,6 +335,9 @@ export class ZohoMailService {
     async downloadAttachment(userEmail, messageId, attachmentId, folderId = 'inbox', attachmentPath = '') {
         const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
         const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
+        if (!resolvedFolderId) {
+            throw new Error(`Zoho folder could not be resolved for attachment download on message ${messageId}`);
+        }
 
         const tokenCandidates = Array.from(new Set(
             [attachmentId, attachmentPath]

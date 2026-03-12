@@ -412,7 +412,7 @@ export default async function handler(req, res) {
 
             // Resolve folder for debug info
             const folders = await zohoService.listFolders(userEmail, accessToken, accountId).catch(() => []);
-            const inbox = folders.find(f => f.name.toLowerCase() === 'inbox' || f.path === '/Inbox' || f.path === '/');
+            const inbox = zohoService.findInboxFolder(folders);
 
             res.status(200).json({
                 success: true,
@@ -423,7 +423,7 @@ export default async function handler(req, res) {
                     accountId: accountId,
                     hasToken: !!accessToken,
                     folderCount: folders.length,
-                    inboxFolder: inbox ? { id: inbox.folderId, name: inbox.name, path: inbox.path } : "Not Found"
+                    inboxFolder: inbox ? { id: inbox.folderId, name: inbox.folderName, path: inbox.path, type: inbox.folderType } : "Not Found"
                 }
             });
             return;
