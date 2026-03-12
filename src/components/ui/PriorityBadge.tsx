@@ -2,6 +2,11 @@
 
 import { cn } from '@/lib/utils'
 
+function isProtocolPriority(priority: string | undefined): boolean {
+  const normalized = (priority ?? '').toLowerCase().trim()
+  return normalized.includes('protocol') || normalized.includes('sequence')
+}
+
 /**
  * Matches dashboard TaskManagement priority styling:
  * text-[9px] px-1.5 py-0.5 rounded-sm font-mono uppercase tracking-tighter border
@@ -21,6 +26,7 @@ export function PriorityBadge({
   completed?: boolean
 }) {
   const p = (priority ?? '').toLowerCase()
+  const protocolPriority = isProtocolPriority(priority)
   const base = 'text-[9px] px-1.5 py-0.5 rounded-sm font-mono uppercase tracking-tighter border transition-colors duration-300'
   const style = completed
     ? 'bg-zinc-600/20 text-zinc-500 border-zinc-600/30 line-through'
@@ -30,8 +36,8 @@ export function PriorityBadge({
         ? 'bg-amber-500/10 text-amber-500 border-amber-500/20'
         : p === 'low'
           ? 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
-          : p === 'protocol' || p === 'sequence'
-            ? 'bg-white/10 text-white border-white/20'
+          : protocolPriority
+            ? 'bg-violet-500/15 text-violet-300 border-violet-400/35'
             : 'bg-zinc-500/10 text-zinc-500 border-zinc-500/20'
 
   const label =
@@ -42,7 +48,7 @@ export function PriorityBadge({
           ? 'MEDIUM_PRIORITY'
           : p === 'low'
             ? 'LOW_PRIORITY'
-            : p === 'protocol' || p === 'sequence'
+            : protocolPriority
               ? 'PROTOCOL'
               : (priority ?? '—').toString().toUpperCase()
       : labelStyle === 'short'
@@ -52,10 +58,10 @@ export function PriorityBadge({
             ? 'MED'
             : p === 'low'
               ? 'LOW'
-              : p === 'protocol' || p === 'sequence'
+              : protocolPriority
                 ? 'PROTOCOL'
                 : (priority ?? '—').toString().slice(0, 3).toUpperCase()
-        : p === 'sequence'
+        : protocolPriority
           ? 'Protocol'
           : (priority ?? '—').toString()
 
@@ -72,6 +78,6 @@ export function priorityColorClasses(priority: string | undefined): string {
   if (p === 'high') return 'bg-rose-500/10 text-rose-500'
   if (p === 'medium') return 'bg-amber-500/10 text-amber-500'
   if (p === 'low') return 'bg-zinc-500/10 text-zinc-500'
-  if (p === 'protocol' || p === 'sequence') return 'bg-white/10 text-white'
+  if (isProtocolPriority(priority)) return 'bg-violet-500/15 text-violet-300 border-violet-400/30'
   return 'bg-black/40 text-zinc-400'
 }
