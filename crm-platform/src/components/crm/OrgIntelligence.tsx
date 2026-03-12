@@ -1389,7 +1389,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (crmFallback.length > 0) {
           setData(crmFallback);
           setCurrentPage(1);
-          toast.info('Apollo returned no matches. Showing CRM contacts for this account.');
+          toast.info('No live Apollo matches for this search. Showing synced CRM contacts for this account.');
         } else if (previousData.length > 0) {
           toast.info('No additional matches from Apollo. Showing filtered list from current results.');
         } else {
