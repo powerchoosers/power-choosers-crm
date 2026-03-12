@@ -5,18 +5,9 @@ import { CheckCircle2, Circle, Clock, AlertCircle, Plus } from 'lucide-react'
 import { format } from 'date-fns'
 import { useRouter } from 'next/navigation'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
-import { useTasks, useTaskMetrics, type Task } from '@/hooks/useTasks'
+import { useTasks, type Task } from '@/hooks/useTasks'
 import { useUIStore } from '@/store/uiStore'
-
-function isOverdue(task: Task): boolean {
-  if (task.status === 'Completed') return false
-  if (!task.dueDate) return false
-  const due = new Date(task.dueDate)
-  if (Number.isNaN(due.getTime())) return false
-  const startOfToday = new Date()
-  startOfToday.setHours(0, 0, 0, 0)
-  return due.getTime() < startOfToday.getTime()
-}
+import { compareTasksByDueDate, isOverdue, isPendingTask } from '@/lib/task-date'
 
 function formatDueDate(dueDate?: string) {
   if (!dueDate) return '--'
@@ -25,21 +16,8 @@ function formatDueDate(dueDate?: string) {
   return format(d, 'yyyy-MM-dd')
 }
 
-function isDueToday(dueDate?: string): boolean {
-  if (!dueDate) return false
-  const parsed = new Date(dueDate)
-  if (Number.isNaN(parsed.getTime())) return false
-  const now = new Date()
-  return (
-    parsed.getFullYear() === now.getFullYear() &&
-    parsed.getMonth() === now.getMonth() &&
-    parsed.getDate() === now.getDate()
-  )
-}
-
 export function TaskManagement() {
   const { data: tasksData, isLoading } = useTasks()
-  const { data: metrics, isLoading: isMetricsLoading } = useTaskMetrics()
   const { setRightPanelMode, setTaskContext } = useUIStore()
   const router = useRouter()
 
@@ -63,8 +41,9 @@ export function TaskManagement() {
   const tasks = useMemo(() => {
     const allTasks = tasksData?.pages.flatMap((page) => page.tasks) || []
     return allTasks
-      .filter((task) => isDueToday(task.dueDate))
-      .filter((task) => task.status !== 'Completed')
+      .filter((task) => !!task.dueDate)
+      .filter(isPendingTask)
+      .sort(compareTasksByDueDate)
       .slice(0, 6)
   }, [tasksData])
 
@@ -92,16 +71,16 @@ export function TaskManagement() {
 
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
-          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Completed Today</p>
-          <p className="text-xl font-mono tabular-nums text-emerald-500 font-bold">{isMetricsLoading ? '--' : (metrics?.completed ?? 0)}</p>
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Visible</p>
+          <p className="text-xl font-mono tabular-nums text-zinc-300 font-bold">{tasks.length}</p>
         </div>
         <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
-          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Open Today</p>
-          <p className="text-xl font-mono tabular-nums text-amber-500 font-bold">{isMetricsLoading ? '--' : (metrics?.pending ?? 0)}</p>
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Overdue</p>
+          <p className="text-xl font-mono tabular-nums text-rose-500 font-bold">{tasks.filter((task) => isOverdue(task.dueDate)).length}</p>
         </div>
         <div className="bg-transparent border border-white/[0.05] rounded-xl p-3">
-          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Total Today</p>
-          <p className="text-xl font-mono tabular-nums text-zinc-300 font-bold">{isMetricsLoading ? '--' : (metrics?.total ?? 0)}</p>
+          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-widest mb-1">Upcoming</p>
+          <p className="text-xl font-mono tabular-nums text-amber-500 font-bold">{tasks.filter((task) => !isOverdue(task.dueDate)).length}</p>
         </div>
       </div>
 
@@ -109,10 +88,10 @@ export function TaskManagement() {
         {isLoading ? (
           <div className="text-sm text-zinc-500 font-mono px-2 py-8 text-center">Loading tasks...</div>
         ) : tasks.length === 0 ? (
-          <div className="text-sm text-zinc-500 font-mono px-2 py-8 text-center">No open tasks due today.</div>
+          <div className="text-sm text-zinc-500 font-mono px-2 py-8 text-center">No open dated tasks.</div>
         ) : (
           tasks.map((task) => {
-            const overdue = isOverdue(task)
+            const overdue = isOverdue(task.dueDate)
             const completed = task.status === 'Completed'
 
             return (
@@ -154,9 +133,9 @@ export function TaskManagement() {
       </div>
 
       <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-        <div>Today_Task_Queue</div>
+        <div>Open_Task_Queue</div>
         <div className="text-zinc-600">
-          {isMetricsLoading ? '--' : `${metrics?.pending ?? 0}_Open`}
+          {tasks.length}_Visible
         </div>
       </div>
     </div>
