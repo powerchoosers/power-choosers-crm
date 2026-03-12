@@ -81,6 +81,7 @@ export default async function handler(req, res) {
     const userAgent = req.headers['user-agent'] || '';
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection?.remoteAddress || 'unknown';
     const referer = req.headers.referer || '';
+    const isInternalEmailView = isInternalEmailViewReferer(referer);
 
     // Detect device type
     const deviceType = detectDeviceType(userAgent);
@@ -117,6 +118,17 @@ export default async function handler(req, res) {
 
         // Update in-memory cache first (fast path)
         trackingDedupeCache.set(dedupeKey, now);
+
+        // Skip tracking for internal CRM email-detail views (self-open protection).
+        if (isInternalEmailView) {
+          logger.debug('[Email Track] Internal email view detected, skipping open count:', {
+            trackingId: trackingId.substring(0, 30),
+            referer: String(referer).substring(0, 120)
+          });
+          setPixelHeaders(res);
+          res.end(PIXEL);
+          return;
+        }
 
         // Fetch current email data from Supabase (include metadata so we preserve ownerId for Realtime notifications)
         const { data: currentData, error: fetchError } = await supabaseAdmin
@@ -286,4 +298,20 @@ function maskIp(ip) {
   }
 
   return ip.substring(0, 10) + '***';
+}
+
+/**
+ * True when tracking request came from our internal email detail page.
+ * This prevents Lewis and team internal previews from counting as recipient engagement.
+ * @param {string} referer
+ * @returns {boolean}
+ */
+function isInternalEmailViewReferer(referer) {
+  if (!referer) return false;
+  try {
+    const parsed = new URL(referer);
+    return parsed.pathname.startsWith('/network/emails');
+  } catch {
+    return false;
+  }
 }
