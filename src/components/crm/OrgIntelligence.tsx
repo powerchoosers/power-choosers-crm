@@ -1054,6 +1054,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       // 2. Get Decision Makers (Initial Batch)
+      const hasDomainScope = Boolean(domain && domain.trim());
       const peopleResp = await fetch('/api/apollo/search-people', {
         method: 'POST',
         headers: {
@@ -1063,8 +1064,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         body: JSON.stringify({
           page: 1,
           per_page: 50,
-          q_organization_domains: (initialDomain || website) ? domain : undefined,
-          q_organization_name: companyName || undefined,
+          q_organization_domains: hasDomainScope ? domain : undefined,
+          q_organization_name: !hasDomainScope ? companyName || undefined : undefined,
           person_titles: ['owner', 'founder', 'c-level', 'vp', 'director', 'manager']
         }),
       });
@@ -1201,34 +1202,41 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     const previousData = data;
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      const hasDomainScope = Boolean(domain && domain.trim());
 
-      // Search Apollo by keyword + org only (no person_titles) so we can find employees
-      // outside the initial scan's decision-maker filter (e.g. engineers, coordinators).
-      const peopleResp = await fetch('/api/apollo/search-people', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
-        },
-        body: JSON.stringify({
-          page: 1,
-          per_page: 50,
-          q_keywords: term,
-          q_organization_domains: domain || undefined,
-          q_organization_domains_list: domain ? [domain] : undefined,
-          q_organization_name: companyName || undefined
-          // Intentionally omit person_titles so search returns anyone at the org matching the term
-        }),
-      });
+      // Domain-first query avoids false negatives when CRM account name differs from Apollo org name.
+      const runApolloSearch = async (includeCompanyName: boolean): Promise<unknown[]> => {
+        const peopleResp = await fetch('/api/apollo/search-people', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.access_token}`
+          },
+          body: JSON.stringify({
+            page: 1,
+            per_page: 50,
+            q_keywords: term,
+            q_organization_domains: hasDomainScope ? domain : undefined,
+            q_organization_domains_list: hasDomainScope ? [domain] : undefined,
+            q_organization_name: (!hasDomainScope || includeCompanyName) ? companyName || undefined : undefined
+            // Intentionally omit person_titles so search returns anyone at the org matching the term
+          }),
+        });
 
-      if (!peopleResp.ok) {
-        const errBody = await peopleResp.json().catch(() => ({}));
-        throw new Error(typeof errBody?.error === 'string' ? errBody.error : 'Failed to search Apollo');
+        if (!peopleResp.ok) {
+          const errBody = await peopleResp.json().catch(() => ({}));
+          throw new Error(typeof errBody?.error === 'string' ? errBody.error : 'Failed to search Apollo');
+        }
+
+        const result: unknown = await peopleResp.json();
+        return isRecord(result) && Array.isArray(result.people) ? (result.people as unknown[]) : [];
+      };
+
+      let apolloContacts: unknown[] = await runApolloSearch(false);
+      if (apolloContacts.length === 0 && hasDomainScope && companyName) {
+        // Fallback: add company-name constraint only if domain-only query came back empty.
+        apolloContacts = await runApolloSearch(true);
       }
-
-      const result: unknown = await peopleResp.json();
-      const apolloContacts: unknown[] =
-        isRecord(result) && Array.isArray(result.people) ? (result.people as unknown[]) : [];
 
       const lookups = await buildExistingContactLookups();
 
@@ -1325,7 +1333,64 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           }
         }
       } else {
-        if (previousData.length > 0) {
+        let crmFallback: ApolloContactRow[] = [];
+
+        if (accountId) {
+          const { data: crmContacts, error: crmError } = await supabase
+            .from('contacts')
+            .select('id, firstName, lastName, name, email, title, city, state, linkedinUrl, phone, mobile, workPhone, otherPhone')
+            .eq('accountId', accountId)
+            .limit(200);
+
+          if (!crmError && Array.isArray(crmContacts) && crmContacts.length > 0) {
+            const lowerTerm = term.toLowerCase();
+            crmFallback = crmContacts
+              .filter((c) => {
+                const values = [
+                  sanitizeContactText(c.firstName),
+                  sanitizeContactText(c.lastName),
+                  sanitizeContactText(c.name),
+                  sanitizeContactText(c.email),
+                  sanitizeContactText(c.title),
+                ];
+                return values.some((v) => v.toLowerCase().includes(lowerTerm));
+              })
+              .map((c): ApolloContactRow => {
+                const identity = buildIdentityName({
+                  name: c.name,
+                  firstName: c.firstName,
+                  lastName: c.lastName
+                });
+                const phones = [
+                  sanitizeContactText(c.mobile),
+                  sanitizeContactText(c.workPhone),
+                  sanitizeContactText(c.phone),
+                  sanitizeContactText(c.otherPhone)
+                ].filter(Boolean);
+
+                return {
+                  id: c.id,
+                  crmId: c.id,
+                  name: identity.name || 'Contact',
+                  firstName: identity.firstName || '',
+                  lastName: identity.lastName || '',
+                  title: sanitizeContactText(c.title) || undefined,
+                  email: sanitizeContactText(c.email) || 'N/A',
+                  status: sanitizeContactText(c.email) ? 'verified' : 'unverified',
+                  isMonitored: true,
+                  location: [sanitizeContactText(c.city), sanitizeContactText(c.state)].filter(Boolean).join(', ') || undefined,
+                  linkedin: sanitizeContactText(c.linkedinUrl) || undefined,
+                  phones
+                };
+              });
+          }
+        }
+
+        if (crmFallback.length > 0) {
+          setData(crmFallback);
+          setCurrentPage(1);
+          toast.info('Apollo returned no matches. Showing CRM contacts for this account.');
+        } else if (previousData.length > 0) {
           toast.info('No additional matches from Apollo. Showing filtered list from current results.');
         } else {
           toast.info('No people found for this search.');

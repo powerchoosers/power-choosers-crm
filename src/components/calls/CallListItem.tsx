@@ -6,6 +6,7 @@ import {
   Phone,
   Play,
   Pause,
+  Download,
   X,
   Loader2,
   Check,
@@ -286,6 +287,24 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     pendingSeekRef.current = null
   }
 
+  const downloadRecording = () => {
+    const proxyUrl = buildRecordingProxyUrl()
+    if (!proxyUrl) return
+
+    const callDate = call.date && isValid(new Date(call.date)) ? new Date(call.date) : null
+    const datePart = callDate ? format(callDate, 'yyyy-MM-dd_HHmm') : 'unknown-date'
+    const typePart = (call.type || 'call').toLowerCase()
+    const fileName = `${typePart}-${datePart}.mp3`
+
+    const anchor = document.createElement('a')
+    anchor.href = proxyUrl
+    anchor.download = fileName
+    anchor.rel = 'noopener'
+    document.body.appendChild(anchor)
+    anchor.click()
+    document.body.removeChild(anchor)
+  }
+
   return (
     <div className={cn(
       "group rounded-xl border transition-all duration-300 overflow-hidden nodal-recessed",
@@ -477,6 +496,15 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
             <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 min-w-0">
               <div className="flex items-center min-w-0 gap-0">
                 {!isMinimal && <div className="w-[2.5rem] shrink-0" aria-hidden />}
+                <button
+                  type="button"
+                  onClick={downloadRecording}
+                  className="w-5 h-5 shrink-0 mr-1 rounded-full bg-zinc-700/80 hover:bg-[#002FA7]/60 flex items-center justify-center text-zinc-400 hover:text-zinc-100 transition-colors duration-200 min-w-[20px] min-h-[20px] p-0"
+                  title="Download MP3"
+                  aria-label="Download MP3"
+                >
+                  <Download className="w-3 h-3" />
+                </button>
                 <span className="text-[10px] font-mono tabular-nums text-zinc-500 uppercase tracking-wider w-6 shrink-0 text-left flex-shrink-0 pr-0">
                   {formatTime(currentTime)}
                 </span>
