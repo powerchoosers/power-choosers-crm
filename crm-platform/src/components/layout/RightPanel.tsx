@@ -1,7 +1,7 @@
 'use client'
 
 import {
-  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle, ChevronUp, ChevronDown
+  Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle, ChevronUp
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, usePathname } from 'next/navigation'
@@ -65,7 +65,6 @@ export function RightPanel() {
   const [dossierPanelView, setDossierPanelView] = useState<DossierPanelView>('context')
   /** Hover over header mode strip: reveal other mode (carousel) without switching. */
   const [headerHoverReveal, setHeaderHoverReveal] = useState(false)
-  const [nodeTasksExpanded, setNodeTasksExpanded] = useState(true)
   /** Prevent immediate re-hover after clicking to switch modes. */
   const hoverLockRef = useRef(false)
 
@@ -386,9 +385,8 @@ export function RightPanel() {
 
                       {/* 1. NODE TASKS (Execution) */}
                       <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Node_Tasks</h3>
                           <button
                             className="icon-button-forensic p-1 flex items-center justify-center"
                             type="button"
@@ -408,49 +406,13 @@ export function RightPanel() {
                           >
                             <Plus className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            className="icon-button-forensic p-1 flex items-center justify-center"
-                            type="button"
-                            aria-label={nodeTasksExpanded ? 'Collapse node tasks' : 'Expand node tasks'}
-                            onClick={() => setNodeTasksExpanded((v) => !v)}
-                          >
-                            {nodeTasksExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          </button>
                         </div>
-                      </div>
-                      <motion.div layout>
-                        <AnimatePresence initial={false}>
-                          {nodeTasksExpanded && (
-                            <motion.div
-                              key="expanded-node-tasks"
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.3 }}
-                            >
-                              <ContextTasksWidget
-                                entityId={entityId}
-                                entityName={entityName}
-                                expanded={nodeTasksExpanded}
-                                contactContext={isContactPage ? (contact as Record<string, unknown>) : null}
-                                accountContext={account as Record<string, unknown> | null}
-                              />
-                            </motion.div>
-                          )}
-                          {!nodeTasksExpanded && (
-                            <motion.div
-                              key="collapsed-note"
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.3 }}
-                              className="px-3 py-2 text-[10px] font-mono text-zinc-500 border border-dashed border-white/10 rounded-xl"
-                            >
-                              Node tasks are collapsed. Expand to view full execution steps.
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </motion.div>
+                        <ContextTasksWidget
+                          entityId={entityId}
+                          entityName={entityName}
+                          contactContext={isContactPage ? (contact as Record<string, unknown>) : null}
+                          accountContext={account as Record<string, unknown> | null}
+                        />
                       </div>
 
                       {/* 2. TELEMETRY (Targeting Mode) */}
