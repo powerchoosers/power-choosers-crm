@@ -407,7 +407,12 @@ export function RightPanel() {
                             <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
-                        <ContextTasksWidget entityId={entityId} entityName={entityName} />
+                        <ContextTasksWidget
+                          entityId={entityId}
+                          entityName={entityName}
+                          contactContext={isContactPage ? (contact as Record<string, unknown>) : null}
+                          accountContext={account as Record<string, unknown> | null}
+                        />
                       </div>
 
                       {/* 2. TELEMETRY (Targeting Mode) */}
