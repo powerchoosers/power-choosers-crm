@@ -80,7 +80,7 @@ export function useTasks(searchQuery?: string) {
           .select(`
             *,
             contacts:contacts!tasks_contactId_fkey(
-              id, firstName, lastName, name, email, title, city, state, phone, mobile, workPhone, otherPhone, companyPhone, linkedinUrl, website, metadata
+              id, firstName, lastName, name, email, title, city, state, phone, mobile, workPhone, otherPhone, companyPhone, linkedinUrl, metadata
             ),
             accounts:accounts!tasks_accountId_fkey(
               id, name, industry, domain, description, phone, city, state, address, annual_usage, current_rate, contract_end_date, electricity_supplier, metadata
