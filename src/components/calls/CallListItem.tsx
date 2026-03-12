@@ -72,6 +72,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const pendingSeekRef = useRef<number | null>(null)
   const recordingSrcRef = useRef<string | null>(null)
+  const seekGuardTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { user, profile } = useAuth()
 
   const { status, error, processCall } = useCallProcessor({
@@ -120,6 +121,25 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     }
   }
 
+  const clearSeekGuard = () => {
+    if (seekGuardTimeoutRef.current) {
+      clearTimeout(seekGuardTimeoutRef.current)
+      seekGuardTimeoutRef.current = null
+    }
+  }
+
+  const getSeekableMax = (el: HTMLAudioElement): number => {
+    const durationCandidate = Number(el.duration)
+    if (Number.isFinite(durationCandidate) && durationCandidate > 0) return durationCandidate
+    const seekable = el.seekable
+    if (seekable && seekable.length > 0) {
+      const lastEnd = seekable.end(seekable.length - 1)
+      if (Number.isFinite(lastEnd) && lastEnd > 0) return lastEnd
+    }
+    if (fallbackDuration > 0) return fallbackDuration
+    return 0
+  }
+
   // Inline audio player: bind to audio element
   useEffect(() => {
     const el = audioRef.current
@@ -153,6 +173,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     const onPlay = () => setIsPlaying(true)
     const onPause = () => setIsPlaying(false)
     const onSeeked = () => {
+      clearSeekGuard()
       setIsSeeking(false)
       setCurrentTime(el.currentTime)
     }
@@ -165,6 +186,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     el.addEventListener('seeked', onSeeked)
     syncDuration()
     return () => {
+      clearSeekGuard()
       el.removeEventListener('timeupdate', onTimeUpdate)
       el.removeEventListener('loadedmetadata', onLoadedMetadata)
       el.removeEventListener('durationchange', onDurationChange)
@@ -227,11 +249,23 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     setCurrentTime(t)
     const el = audioRef.current
     if (!el) return
-    const durationCandidate = Number(el.duration)
-    if (Number.isFinite(durationCandidate) && durationCandidate > 0) {
+    const seekMax = getSeekableMax(el)
+    if (seekMax > 0) {
+      const target = Math.max(0, Math.min(t, seekMax))
       setIsSeeking(true)
-      el.currentTime = Math.max(0, Math.min(t, durationCandidate))
-      return
+      clearSeekGuard()
+      seekGuardTimeoutRef.current = setTimeout(() => {
+        setIsSeeking(false)
+        seekGuardTimeoutRef.current = null
+      }, 700)
+      try {
+        el.currentTime = target
+        pendingSeekRef.current = null
+        return
+      } catch {
+        // If the media stream isn't seek-ready yet, queue once metadata/ranges settle.
+        pendingSeekRef.current = target
+      }
     }
     setIsSeeking(false)
     pendingSeekRef.current = t
@@ -248,6 +282,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
     setCurrentTime(0)
     setDuration(0)
     setIsSeeking(false)
+    clearSeekGuard()
     pendingSeekRef.current = null
   }
 
@@ -451,6 +486,7 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
                   max={scrubMax || 1}
                   step={0.1}
                   value={currentTime}
+                  onInput={handleScrub}
                   onChange={handleScrub}
                   disabled={!canScrub}
                   className="flex-1 min-w-0 min-w-[72px] mx-1.5 min-h-[8px] h-2 rounded-full appearance-none bg-transparent cursor-pointer [&::-webkit-slider-runnable-track]:h-2 [&::-webkit-slider-runnable-track]:rounded-full [&::-webkit-slider-runnable-track]:bg-zinc-700 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:border-0 [&::-webkit-slider-thumb]:shadow-[0_0_0_2px_rgba(255,255,255,0.3)] [&::-webkit-slider-thumb]:-mt-0.5 [&::-moz-range-track]:h-2 [&::-moz-range-track]:rounded-full [&::-moz-range-track]:bg-zinc-700 [&::-moz-range-thumb]:w-3 [&::-moz-range-thumb]:h-3 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:border-0 [&::-moz-range-thumb]:-mt-0.5"
