@@ -21,6 +21,7 @@ export default async function handler(req, res) {
     const userAgent = req.headers['user-agent'] || '';
     const ip = req.headers['x-forwarded-for']?.split(',')[0] || req.connection?.remoteAddress || 'unknown';
     const referer = req.headers.referer || '';
+    const isInternalEmailView = isInternalEmailViewReferer(referer);
 
     if (!originalUrl) {
       originalUrl = inferUrlFromPath(req?.url);
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
 
     // Best-effort: record click event if Supabase is available
     try {
-      if (supabaseAdmin && trackingId && trackingId.length > 0) {
+      if (supabaseAdmin && trackingId && trackingId.length > 0 && !isInternalEmailView) {
         // Fetch current email data (include metadata to preserve ownerId for Realtime notifications)
         const { data: currentData, error: fetchError } = await supabaseAdmin
           .from('emails')
@@ -94,6 +95,11 @@ export default async function handler(req, res) {
             if (rpcError) logger.error('[Email Click] RPC Error advancing sequence:', rpcError);
           }
         }
+      } else if (isInternalEmailView) {
+        logger.debug('[Email Click] Internal email view detected, skipping click count:', {
+          trackingId,
+          referer: String(referer).substring(0, 120)
+        });
       }
     } catch (error) {
       // Log error but don't block redirect - tracking is best-effort
@@ -211,5 +217,21 @@ function maskIp(ip) {
   }
 
   return ip.substring(0, 10) + '***';
+}
+
+/**
+ * True when tracking request came from our internal email detail page.
+ * This prevents internal preview clicks from counting as recipient engagement.
+ * @param {string} referer
+ * @returns {boolean}
+ */
+function isInternalEmailViewReferer(referer) {
+  if (!referer) return false;
+  try {
+    const parsed = new URL(referer);
+    return parsed.pathname.startsWith('/network/emails');
+  } catch {
+    return false;
+  }
 }
 
