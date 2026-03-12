@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
@@ -11,6 +11,23 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { formatMillValue } from '@/lib/mills'
+
+function parseDomainFromWebsite(value?: string | null): string | undefined {
+    if (value == null) return undefined
+    const trimmed = value.trim()
+    if (trimmed === '') return ''
+
+    const cleanHost = (host: string) => host.replace(/^www\./i, '').trim()
+
+    try {
+        const candidate = trimmed.match(/^https?:\/\//i) ? new URL(trimmed) : new URL(`https://${trimmed}`)
+        return cleanHost(candidate.hostname)
+    } catch {
+        const withoutScheme = trimmed.replace(/^https?:\/\//i, '')
+        const hostPart = withoutScheme.split(/[/?#]/)[0] || ''
+        return cleanHost(hostPart)
+    }
+}
 
 export function useContactDossierState(id: string) {
     const params = useParams()
@@ -185,18 +202,23 @@ export function useContactDossierState(id: string) {
                         primaryPhoneField: editPrimaryField,
                     })
 
-                    // If linked to an account, sync energy fields back to the Account Dossier as the source of truth
+                    // If linked to an account, sync energy data and the company website domain
                     const accountId = (contact as any)?.accountId || (contact as any)?.linkedAccountId
                     if (accountId) {
                         const cleanedUsage = parseInt(editAnnualUsage.replace(/[^0-9]/g, '')) || 0
-                        await updateAccount.mutateAsync({
+                        const websiteDomain = parseDomainFromWebsite(editWebsite)
+                        const accountPayload: any = {
                             id: accountId,
                             electricitySupplier: editSupplier,
                             currentRate: editStrikePrice,
                             annualUsage: cleanedUsage.toString(),
                             mills: editMills,
                             contractEnd: editContractEnd || undefined
-                        })
+                        }
+                        if (websiteDomain !== undefined) {
+                            accountPayload.domain = websiteDomain
+                        }
+                        await updateAccount.mutateAsync(accountPayload)
                     }
 
                     setShowSynced(true)
