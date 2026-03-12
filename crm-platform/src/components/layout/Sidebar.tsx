@@ -118,7 +118,7 @@ export function Sidebar() {
       layout
       suppressHydrationWarning
       className={cn(
-        "fixed left-0 top-0 bottom-0 z-40 bg-zinc-950 border-r border-white/5 flex flex-col shadow-2xl transition-shadow duration-500"
+        "hidden lg:flex fixed left-0 top-0 bottom-0 z-40 bg-zinc-950 border-r border-white/5 flex-col shadow-2xl transition-shadow duration-500"
       )}
       animate={{
         width: isHovered ? 280 : 70,
