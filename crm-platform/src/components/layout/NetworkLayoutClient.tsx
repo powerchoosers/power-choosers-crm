@@ -77,7 +77,7 @@ export function NetworkLayoutClient({
       className={cn(
         inter.className,
         inter.variable,
-        "font-sans bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-screen w-screen relative"
+        "font-sans bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-[100dvh] w-screen relative"
       )}
     >
       <GlobalSync />
