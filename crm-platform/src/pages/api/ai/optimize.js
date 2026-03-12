@@ -31,11 +31,35 @@ export default async function handler(req, res) {
     try {
       let systemInstruction = '';
       let userContent = '';
+      const hasLinkedIn = !!(contact?.has_linkedin || contact?.linkedin_url || contact?.linkedinUrl);
+      const hasWebsite = !!(contact?.has_website || contact?.website || contact?.domain);
+      const sourceLabel = contact?.source_label || (hasLinkedIn ? 'linkedin' : (hasWebsite ? 'website' : 'public_company_info'));
+      const hasEnergyVector = Array.isArray(vectors) && vectors.some(v => ['energy_context', 'energy_intel'].includes(String(v)));
+      const contactTitle = typeof contact?.title === 'string' && contact.title.trim() ? contact.title.trim() : 'Unknown';
+      const contactIndustry = typeof contact?.industry === 'string' && contact.industry.trim() ? contact.industry.trim() : 'Unknown';
+      const contactLocation = typeof contact?.location === 'string' && contact.location.trim()
+        ? contact.location.trim()
+        : (typeof contact?.city === 'string' && contact.city.trim()
+          ? `${contact.city.trim()}${contact?.state ? `, ${String(contact.state).trim()}` : ''}`
+          : 'Unknown');
+      const supplier = (contact?.electricity_supplier || contact?.supplier || contact?.metadata?.energy?.supplier || 'Unknown');
+      const currentRate = (contact?.current_rate ?? contact?.metadata?.energy?.current_rate ?? 'Unknown');
+      const contractEndRaw = (contact?.contract_end_date || contact?.contractEndDate || null);
+      const contractEndYear = contact?.contract_end_year || (contractEndRaw ? new Date(contractEndRaw).getUTCFullYear() : null);
 
       const dataVectors = [
-        `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contact?.industry || 'Unknown'}) at ${contact?.company || 'Unknown'}`,
-        contact?.location && `- LOCATION: ${contact.location}`,
-        `- ENERGY_INTEL: Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.load_factor || 'Unknown'}, Annual Usage ${contact?.annual_usage || 'Unknown'}, Contract Exp ${contact?.contractEndDate || 'Unknown'}`,
+        `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${contact?.company || 'Unknown'}`,
+        `- ROLE: ${contactTitle}`,
+        `- LOCATION: ${contactLocation}`,
+        `- VECTOR_STATE: energy_enabled=${hasEnergyVector}`,
+        hasEnergyVector
+          ? `- ENERGY_INTEL: Supplier ${supplier}, Current Rate ${currentRate}, Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.load_factor || 'Unknown'}, Annual Usage ${contact?.annual_usage || 'Unknown'}, Contract End Year ${contractEndYear || 'Unknown'}`
+          : '- ENERGY_INTEL: disabled_by_vector',
+        `- SOURCE_TRUTH: source_label=${sourceLabel}, has_linkedin=${hasLinkedIn}, has_website=${hasWebsite}`,
+        contact?.linkedin_url && `- LINKEDIN_URL: ${contact.linkedin_url}`,
+        contact?.linkedinUrl && `- LINKEDIN_URL: ${contact.linkedinUrl}`,
+        contact?.website && `- WEBSITE: ${contact.website}`,
+        contact?.domain && `- DOMAIN: ${contact.domain}`,
         vectors.includes('recent_news') && `- SIGNALS: ${contact?.news || 'No news signals.'}`,
         vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${contact?.transcript || 'No previous call transcripts.'}`,
         contact?.metadata && `- EXTENDED_METADATA: ${JSON.stringify(contact.metadata)}`
@@ -65,6 +89,21 @@ export default async function handler(req, res) {
           6. If you use bullets, this email fails. Use paragraphs only.
           7. NO CITATIONS OR LINKS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
           8. TEXAS DEREGULATED MARKET (ERCOT): We operate in Texas. Use only Texas energy terminology (4CP tags, TDUs, Co-op risks). Forbid UK references (like "Citizens Advice").
+          9. SOURCE TRUTH IS HARD RULE:
+            - If source_label=linkedin (or has_linkedin=true), you may reference LinkedIn once.
+            - If source_label=website (or has_linkedin=false and has_website=true), do NOT mention LinkedIn. Reference website/public company info instead.
+            - If source_label=public_company_info (or has_linkedin=false and has_website=false), do NOT mention LinkedIn or website. Say you were reviewing companies in their industry/area.
+            - Never claim a source that is not supported by SOURCE_TRUTH.
+          10. FIELD USAGE QUALITY RULE:
+            - If ROLE is known, tailor one phrase to that role's business priorities.
+            - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
+            - If LOCATION is known, anchor the observation to that place naturally.
+            - If any field is Unknown, do not invent it and do not force awkward placeholders.
+          11. ENERGY INTEL RULES:
+            - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, 4CP, or contract timing details.
+            - If energy is enabled and supplier is known, you may reference supplier once naturally.
+            - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
+            - Never state certainty about exact contract month/day unless explicitly provided as verified in STRATEGY text.
 
           HIGH_AGENCY_IDENTITY_RESOLUTION:
           - NEVER wait for bracketed variables like {{company}} or {{industry}}.
