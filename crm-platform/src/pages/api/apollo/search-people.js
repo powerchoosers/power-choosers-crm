@@ -47,8 +47,12 @@ export default async function handler(req, res) {
       .split(':')[0];
 
     // Apollo mixed_people/api_search: send EITHER q_organization_domains_list (array) OR q_organization_domains (single), not both (422 if both sent)
-    const hasDomainsList = Array.isArray(q_organization_domains_list) && q_organization_domains_list.length > 0;
-    const singleDomain = q_organization_domains && typeof q_organization_domains === 'string' ? q_organization_domains : undefined;
+    const normalizedDomainsList = Array.isArray(q_organization_domains_list)
+      ? q_organization_domains_list.map(normalizeDomain).filter(Boolean)
+      : [];
+    const hasDomainsList = normalizedDomainsList.length > 0;
+    const rawSingleDomain = q_organization_domains && typeof q_organization_domains === 'string' ? q_organization_domains : undefined;
+    const singleDomain = normalizeDomain(rawSingleDomain);
 
     const searchBody = {
       page,
@@ -62,7 +66,7 @@ export default async function handler(req, res) {
       revenue_range,
     };
     if (hasDomainsList) {
-      searchBody.q_organization_domains_list = q_organization_domains_list;
+      searchBody.q_organization_domains_list = normalizedDomainsList;
     } else if (singleDomain) {
       searchBody.q_organization_domains = singleDomain;
     }
@@ -148,7 +152,7 @@ export default async function handler(req, res) {
     try {
       const firstOrg = rawPeople.find((p) => p?.organization)?.organization || null;
       const fallbackDomain = hasDomainsList
-        ? normalizeDomain(q_organization_domains_list[0])
+        ? normalizedDomainsList[0]
         : normalizeDomain(singleDomain);
       const companyDomain = normalizeDomain(firstOrg?.primary_domain || firstOrg?.domain || fallbackDomain || '');
       const companyName = firstOrg?.name || q_organization_name || '';
@@ -190,7 +194,11 @@ export default async function handler(req, res) {
         company: companySummary,
         contacts: contactsForCache,
         timestamp: Date.now(),
-        source: 'search-people'
+        source: 'search-people',
+        stale: contactsForCache.length === 0,
+        stale_until: contactsForCache.length === 0
+          ? new Date(Date.now() + 15 * 60 * 1000).toISOString()
+          : null
       };
 
       const keys = [];
@@ -198,14 +206,33 @@ export default async function handler(req, res) {
       if (companyName && !keys.includes(companyName)) keys.push(companyName);
 
       if (keys.length > 0 && supabaseAdmin) {
-        const rows = keys.map((key) => ({
-          key,
-          data: cacheData,
-          updated_at: new Date().toISOString()
-        }));
-        await supabaseAdmin
-          .from('apollo_searches')
-          .upsert(rows, { onConflict: 'key' });
+        let shouldWriteCache = true;
+
+        // Guardrail: never overwrite a non-empty cached contact set with an empty result.
+        if (contactsForCache.length === 0) {
+          const { data: existingRows } = await supabaseAdmin
+            .from('apollo_searches')
+            .select('key, data')
+            .in('key', keys);
+
+          const hasExistingNonEmpty = (existingRows || []).some((row) => {
+            const existingContacts = row?.data?.contacts;
+            return Array.isArray(existingContacts) && existingContacts.length > 0;
+          });
+
+          if (hasExistingNonEmpty) shouldWriteCache = false;
+        }
+
+        if (shouldWriteCache) {
+          const rows = keys.map((key) => ({
+            key,
+            data: cacheData,
+            updated_at: new Date().toISOString()
+          }));
+          await supabaseAdmin
+            .from('apollo_searches')
+            .upsert(rows, { onConflict: 'key' });
+        }
       }
     } catch (cacheError) {
       console.warn('[Apollo Search People] Cache upsert failed:', cacheError?.message || cacheError);
@@ -236,7 +263,6 @@ export default async function handler(req, res) {
     }));
   }
 }
-
 
 
 
