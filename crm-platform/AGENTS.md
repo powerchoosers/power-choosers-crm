@@ -1,0 +1,191 @@
+# AGENTS.md
+
+This file gives Codex a fast, reliable briefing for the `crm-platform` repo. It should reduce wasted exploration, not replace reading the code. If this file conflicts with the codebase, trust the code and update this file.
+
+## Who This Project Is For
+
+Nodal Point CRM is a modern CRM for commercial energy procurement and forensic tariff intelligence. The core goal is to help brokers and sales users spot hidden cost leakage, understand account risk quickly, and act fast.
+
+When making product decisions, apply the "CFO test":
+- Could a CFO understand the screen in 3 seconds?
+- Would they trust the data?
+- Would they know what action to take next?
+
+If the answer is no, simplify.
+
+## How To Work With Lewis
+
+- Speak plainly. Avoid unexplained jargon.
+- Do not just agree with ideas. Push back when there is a better path.
+- Explain tradeoffs in simple terms.
+- Be direct and useful, not flattering.
+
+## Stack
+
+- Next.js 16.1.4 with App Router
+- React 19
+- TypeScript with strict mode
+- Tailwind CSS v4
+- Zustand for client state
+- TanStack Query for server state and persistence
+- Supabase for primary data
+- Firestore as legacy read-only reference
+- Radix UI, Lucide, Framer Motion for UI
+
+## Important Paths
+
+- `src/app/` - App Router UI
+- `src/pages/api/` - API routes
+- `src/components/` - reusable UI
+- `src/hooks/` - data hooks and normalization
+- `src/lib/` - utilities, Supabase, Firebase
+- `src/store/` - Zustand stores
+- `src/types/` - shared TypeScript types
+- `src/app/providers.tsx` - global providers
+- `src/lib/supabase.ts` - Supabase client setup
+- `src/hooks/useContacts.ts` - key example of normalization rules
+- `vercel.json` - deploy config, rewrites, cron setup
+
+## Important Routes
+
+- `/network` - main dashboard / war room
+- `/network/accounts/[id]` - account dossier
+- `/network/contacts/[id]` - contact dossier
+- `/network/calls`
+- `/network/emails`
+- `/network/tasks`
+- `/network/telemetry`
+- `/network/infrastructure`
+- `/network/protocols/[id]/builder`
+
+## Local Commands
+
+Run from repo root:
+
+```bash
+npm run dev:turbo
+npm run build
+npm run typecheck
+```
+
+TypeScript must stay clean before shipping changes.
+
+## Data Rules
+
+- Supabase is the main database.
+- Firestore is legacy reference data, not the primary write target.
+- Favor normalized top-level fields first.
+- In hooks, resolve fields in this order when applicable:
+  1. top-level camelCase
+  2. underscored legacy fields
+  3. nested values inside `metadata`
+
+Important relationship:
+- `contacts.accountId` links to `accounts.id`
+
+## UI Rules
+
+The product uses a dark forensic interface, not a generic SaaS style.
+
+Primary visual rules:
+- Use the Nodal blue `#002FA7` as a signal color, not decoration.
+- Prefer existing glass classes over inventing new panel styles:
+  - `nodal-void-card`
+  - `nodal-monolith-edge`
+  - `nodal-module-glass`
+  - `nodal-glass`
+  - `glass-panel`
+- Primary text is typically zinc-based neutral text, not bright white everywhere.
+- Metrics and measured values should lean monospace.
+- Labels and descriptive copy should stay easy to scan.
+
+Avoid:
+- Tooltips as a substitute for unclear UI
+- Random new colors
+- Decorative motion with no meaning
+- Generic default-dashboard patterns when editing core Nodal Point surfaces
+
+## Animation Rules
+
+- Keep most animations under `0.5s`
+- Preferred ease: `[0.23, 1, 0.32, 1]`
+- Motion should support hierarchy or state change, not decoration
+
+## API Conventions
+
+API handlers live under `src/pages/api/[category]/[handler].js`
+
+Expected patterns:
+- Return JSON using `res.status(code).json({ error })` for failures
+- Log useful errors to the console
+- Keep graceful fallbacks in the UI when backend calls fail
+- Validate response `content-type` when working with JSON endpoints
+
+## React And TypeScript Guardrails
+
+- Strict TypeScript is on. Do not weaken types unless there is a strong reason.
+- Use optional chaining for nullable routing/search values like `searchParams?.get(...)`
+- Follow existing app patterns before introducing new abstractions
+- Prefer small focused edits over broad rewrites unless the task requires structural cleanup
+
+## State And Query Notes
+
+Main Zustand stores:
+- `callStore`
+- `geminiStore`
+- `syncStore`
+- `uiStore`
+
+Common TanStack Query key patterns include:
+- `contacts`
+- `accounts-${id}`
+- `market-pulse`
+- `eia-retail-tx`
+
+## Deployment Notes
+
+- Hosted on Vercel
+- Root directory must be `crm-platform`
+- Main required environment values include Supabase, Gemini, Twilio, and Zoho-related secrets
+- Production deploys come from `main`
+
+## Supabase MCP Access
+
+Codex can access the connected Supabase project through the configured MCP tools in this environment. That is the preferred way to inspect schema, run safe queries, check advisors, generate types, and manage migrations.
+
+Use MCP Supabase tools for:
+- listing tables, migrations, branches, extensions, and edge functions
+- running read queries or targeted SQL checks
+- applying schema migrations
+- checking security or performance advisors
+- searching current Supabase docs before making database-specific assumptions
+
+Rules:
+- Do not store secrets, keys, or raw credentials in this file.
+- Prefer MCP access over guessing database structure from app code alone.
+- Use `apply_migration` for DDL changes like creating or altering tables.
+- Use raw SQL execution for data checks or non-DDL queries.
+- If a database change is risky, inspect schema and advisors first.
+
+## Working Rules For Codex
+
+- Read the existing code before assuming architecture.
+- Prefer matching local patterns over introducing a "cleaner" but foreign approach.
+- Do not replace existing design language with generic UI.
+- When changing dossier, dashboard, telemetry, or protocol-builder UI, preserve the forensic command-center feel.
+- Favor concise, understandable solutions over clever ones.
+- If something looks inconsistent or wasteful, call it out clearly instead of working around it silently.
+
+## When Updating This File
+
+Keep this document short and operational.
+
+Add to it when:
+- a repeated repo-specific pitfall appears
+- build or deploy requirements change
+- a major architectural convention becomes stable
+
+Do not add:
+- temporary task notes
+- vague style opinions
+- long explanations better kept in code comments or project docs
