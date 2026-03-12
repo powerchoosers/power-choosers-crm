@@ -93,20 +93,68 @@ async function processJob(job) {
 
 async function handleGeneration(execution, job) {
     const [member] = await sql`
-    SELECT m.id, c.email as contact_email, c."firstName", c."lastName", a.name as company_name
+    SELECT m.id,
+           c.email as contact_email,
+           c."firstName",
+           c."lastName",
+           c.title as contact_title,
+           c.city as contact_city,
+           c.state as contact_state,
+           c."linkedinUrl" as contact_linkedin_url,
+           a.name as company_name,
+           a.domain as account_domain,
+           a.industry as account_industry,
+           a.electricity_supplier as account_supplier,
+           a.current_rate as account_current_rate,
+           a.contract_end_date as account_contract_end_date
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
     LEFT JOIN accounts a ON c."accountId" = a.id
     WHERE m.id = ${execution.member_id}
   `
 
+    const linkedInUrl = member.contact_linkedin_url || null;
+    const accountDomain = member.account_domain || null;
+    const website = accountDomain ? `https://${accountDomain}` : null;
+    const sourceLabel = linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info');
+    const location = member.contact_city
+        ? `${member.contact_city}${member.contact_state ? `, ${member.contact_state}` : ''}`
+        : null;
+    const sourceTruthLine = linkedInUrl
+        ? 'SOURCE_TRUTH: LinkedIn available. You may reference LinkedIn once if natural.'
+        : website
+            ? 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.'
+            : 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
+    const contractEndYear = member.account_contract_end_date
+        ? new Date(member.account_contract_end_date).getUTCFullYear()
+        : null;
+
     const response = await fetch(`${API_BASE_URL}/api/ai/optimize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
         body: JSON.stringify({
-            prompt: execution.metadata?.prompt || 'Draft a personalized follow-up',
+            prompt: `${execution.metadata?.prompt || 'Draft a personalized follow-up'}\n\n${sourceTruthLine}`,
             mode: 'generate_email',
-            contact: { name: `${member.firstName} ${member.lastName}`, email: member.contact_email, company: member.company_name }
+            contact: {
+                name: `${member.firstName} ${member.lastName}`,
+                email: member.contact_email,
+                company: member.company_name,
+                title: member.contact_title || null,
+                industry: member.account_industry || null,
+                electricity_supplier: member.account_supplier || null,
+                current_rate: member.account_current_rate || null,
+                contract_end_date: member.account_contract_end_date || null,
+                contract_end_year: Number.isFinite(contractEndYear) ? contractEndYear : null,
+                city: member.contact_city || null,
+                state: member.contact_state || null,
+                location,
+                linkedin_url: linkedInUrl,
+                domain: accountDomain,
+                website,
+                has_linkedin: !!linkedInUrl,
+                has_website: !!website,
+                source_label: sourceLabel
+            }
         })
     })
 
