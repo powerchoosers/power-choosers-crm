@@ -830,7 +830,7 @@ export function TopBar() {
             mass: 0.8
           }}
           className={cn(
-            "overflow-visible flex flex-col relative h-12 transition-all",
+            "overflow-visible flex flex-col relative h-12 transition-all max-w-[calc(100vw-5rem)] lg:max-w-none",
             isDialerOpen && "group/dialer"
           )}
         >
