@@ -18,14 +18,14 @@ interface ContextTasksWidgetProps {
   entityName?: string
   contactContext?: Record<string, unknown> | null
   accountContext?: Record<string, unknown> | null
-  expanded?: boolean
 }
 
-export default function ContextTasksWidget({ entityId, entityName, contactContext, accountContext, expanded = true }: ContextTasksWidgetProps) {
+export default function ContextTasksWidget({ entityId, entityName, contactContext, accountContext }: ContextTasksWidgetProps) {
   const router = useRouter()
   const { data: tasksData, updateTask } = useTasks()
   const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set())
   const tasks = useMemo(() => {
     if (!entityId) return []
     const allTasks = tasksData?.pages.flatMap(page => page.tasks) || []
@@ -84,13 +84,23 @@ export default function ContextTasksWidget({ entityId, entityName, contactContex
     }
   }
 
+  const toggleTaskExpanded = (taskId: string) => {
+    setExpandedTaskIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(taskId)) next.delete(taskId)
+      else next.add(taskId)
+      return next
+    })
+  }
+
   return (
     <motion.div layout className="space-y-2 overflow-hidden">
       <AnimatePresence initial={false} mode="popLayout">
-        {expanded && listToRender.length > 0 ? (
+        {listToRender.length > 0 ? (
           listToRender.map((task, i) => {
             const isExiting = exitingTask?.task.id === task.id
             const isCompleted = isExiting || (task.status ?? '').toLowerCase() === 'completed'
+            const isExpanded = expandedTaskIds.has(task.id)
             return (
               <motion.div
                 key={task.id}
@@ -133,25 +143,42 @@ export default function ContextTasksWidget({ entityId, entityName, contactContex
                       const description = resolveTaskTemplateText(task.description, variableMap)
                       return (
                         <>
-                    <p
-                      className={cn(
-                        'text-[11px] font-medium truncate transition-colors duration-300',
-                        isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'
-                      )}
-                    >
-                      {title}
-                    </p>
-                    {description && (
-                      <p
-                        className={cn(
-                          'text-[10px] mt-0.5 transition-colors duration-300',
-                          expanded ? 'line-clamp-none' : 'line-clamp-2',
-                          isCompleted ? 'text-zinc-600 line-through' : 'text-zinc-500'
-                        )}
-                      >
-                        {description}
-                      </p>
-                    )}
+                          <div className="flex items-start justify-between gap-2">
+                            <p
+                              className={cn(
+                                'text-[11px] font-medium transition-colors duration-300',
+                                isExpanded ? 'leading-relaxed' : 'truncate',
+                                isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'
+                              )}
+                            >
+                              {title}
+                            </p>
+                            {description && (
+                              <button
+                                type="button"
+                                className="icon-button-forensic p-1 flex items-center justify-center shrink-0"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleTaskExpanded(task.id)
+                                }}
+                                aria-label={isExpanded ? 'Collapse step description' : 'Expand step description'}
+                              >
+                                {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              </button>
+                            )}
+                          </div>
+                          {description && (
+                            <motion.p
+                              layout
+                              className={cn(
+                                'text-[10px] mt-0.5 transition-colors duration-300',
+                                isExpanded ? 'line-clamp-none' : 'line-clamp-4',
+                                isCompleted ? 'text-zinc-600 line-through' : 'text-zinc-500'
+                              )}
+                            >
+                              {description}
+                            </motion.p>
+                          )}
                         </>
                       )
                     })()}

@@ -1,6 +1,6 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -91,6 +91,18 @@ export const DossierHeader = memo(function DossierHeader({
 }: DossierHeaderProps) {
     const router = useRouter()
     const contactName = contact?.name || 'Unknown Contact'
+
+    useEffect(() => {
+        if (!isEditing) {
+            if (activeEditField !== null) {
+                setActiveEditField(null)
+            }
+            return
+        }
+        if (activeEditField == null) {
+            setActiveEditField('website')
+        }
+    }, [activeEditField, isEditing, setActiveEditField])
 
     return (
         <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 nodal-recessed relative z-10">
