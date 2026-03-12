@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useTasks, type Task } from '@/hooks/useTasks'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { cn } from '@/lib/utils'
+import { buildTaskVariableMap, resolveTaskTemplateText } from '@/lib/task-variables'
 
 const EXIT_DELAY_MS = 180
 const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
@@ -15,9 +16,11 @@ const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
 interface ContextTasksWidgetProps {
   entityId: string
   entityName?: string
+  contactContext?: Record<string, unknown> | null
+  accountContext?: Record<string, unknown> | null
 }
 
-export default function ContextTasksWidget({ entityId, entityName }: ContextTasksWidgetProps) {
+export default function ContextTasksWidget({ entityId, entityName, contactContext, accountContext }: ContextTasksWidgetProps) {
   const router = useRouter()
   const { data: tasksData, updateTask } = useTasks()
   const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
@@ -38,6 +41,11 @@ export default function ContextTasksWidget({ entityId, entityName }: ContextTask
   const pendingTasks = useMemo(
     () => tasks.filter(t => (t.status ?? 'Pending') !== 'Completed'),
     [tasks]
+  )
+
+  const panelContextVariables = useMemo(
+    () => buildTaskVariableMap({ contact: contactContext, account: accountContext }),
+    [contactContext, accountContext]
   )
 
   const listWithoutExiting = useMemo(() => {
@@ -115,14 +123,37 @@ export default function ContextTasksWidget({ entityId, entityName }: ContextTask
                     {isCompleted ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Circle size={14} />}
                   </button>
                   <div className="flex-1 min-w-0">
+                    {(() => {
+                      const rowVariables = buildTaskVariableMap({
+                        contact: (task.contacts as Record<string, unknown> | null) || contactContext,
+                        account: (task.accounts as Record<string, unknown> | null) || accountContext,
+                      })
+                      const variableMap = { ...panelContextVariables, ...rowVariables }
+                      const title = resolveTaskTemplateText(task.title, variableMap)
+                      const description = resolveTaskTemplateText(task.description, variableMap)
+                      return (
+                        <>
                     <p
                       className={cn(
                         'text-[11px] font-medium truncate transition-colors duration-300',
                         isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'
                       )}
                     >
-                      {task.title}
+                      {title}
                     </p>
+                    {description && (
+                      <p
+                        className={cn(
+                          'text-[10px] mt-0.5 line-clamp-2 transition-colors duration-300',
+                          isCompleted ? 'text-zinc-600 line-through' : 'text-zinc-500'
+                        )}
+                      >
+                        {description}
+                      </p>
+                    )}
+                        </>
+                      )
+                    })()}
                     <div className="flex items-center gap-2 mt-1">
                       <PriorityBadge priority={task.priority} labelStyle="suffix" completed={isCompleted} />
                     </div>

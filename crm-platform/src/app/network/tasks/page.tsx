@@ -47,6 +47,7 @@ import { TaskTableRow } from '@/components/network/TaskTableRow'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import { toast } from 'sonner'
+import { buildTaskVariableMap, resolveTaskTemplateText } from '@/lib/task-variables'
 
 const PAGE_SIZE = 50
 
@@ -205,6 +206,12 @@ export default function TasksPage() {
       cell: ({ row }) => {
         const task = row.original
         const hasDossier = !!(task.contactId || task.accountId)
+        const variableMap = buildTaskVariableMap({
+          contact: task.contacts as Record<string, unknown> | null,
+          account: task.accounts as Record<string, unknown> | null,
+        })
+        const resolvedTitle = resolveTaskTemplateText(task.title, variableMap)
+        const resolvedDescription = resolveTaskTemplateText(task.description, variableMap)
         return (
           <div className={cn("flex items-center gap-3 group/task", hasDossier && "cursor-pointer")}>
             <div className={cn(
@@ -218,9 +225,9 @@ export default function TasksPage() {
                 "font-medium group-hover/task:scale-[1.02] transition-all origin-left",
                 task.status === 'Completed' ? "text-zinc-500 line-through" : "text-zinc-200 group-hover/task:text-white"
               )}>
-                {task.title}
+                {resolvedTitle}
               </div>
-              {task.description && <div className="text-xs text-zinc-500 truncate max-w-[300px]">{task.description}</div>}
+              {resolvedDescription && <div className="text-xs text-zinc-500 truncate max-w-[300px]">{resolvedDescription}</div>}
             </div>
           </div>
         )

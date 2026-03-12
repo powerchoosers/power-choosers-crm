@@ -20,6 +20,46 @@ export interface Task {
   createdAt: string
   updatedAt?: string
   metadata?: Record<string, unknown> | null
+  contacts?: {
+    id?: string
+    firstName?: string | null
+    lastName?: string | null
+    name?: string | null
+    email?: string | null
+    title?: string | null
+    city?: string | null
+    state?: string | null
+    phone?: string | null
+    mobile?: string | null
+    workPhone?: string | null
+    otherPhone?: string | null
+    companyPhone?: string | null
+    linkedinUrl?: string | null
+    website?: string | null
+    industry?: string | null
+    annualUsage?: string | null
+    currentRate?: string | null
+    contractEnd?: string | null
+    accountDescription?: string | null
+    company?: string | null
+    metadata?: Record<string, unknown> | null
+  } | null
+  accounts?: {
+    id?: string
+    name?: string | null
+    industry?: string | null
+    domain?: string | null
+    description?: string | null
+    phone?: string | null
+    city?: string | null
+    state?: string | null
+    address?: string | null
+    annual_usage?: string | null
+    current_rate?: string | null
+    contract_end_date?: string | null
+    electricity_supplier?: string | null
+    metadata?: Record<string, unknown> | null
+  } | null
 }
 
 const PAGE_SIZE = 50
@@ -37,7 +77,15 @@ export function useTasks(searchQuery?: string) {
 
         let query = supabase
           .from('tasks')
-          .select('*', { count: 'exact' })
+          .select(`
+            *,
+            contacts:contacts!tasks_contactId_fkey(
+              id, firstName, lastName, name, email, title, city, state, phone, mobile, workPhone, otherPhone, companyPhone, linkedinUrl, website, metadata
+            ),
+            accounts:accounts!tasks_accountId_fkey(
+              id, name, industry, domain, description, phone, city, state, address, annual_usage, current_rate, contract_end_date, electricity_supplier, metadata
+            )
+          `, { count: 'exact' })
 
         if (role !== 'admin' && user.email) {
           query = query.eq('ownerId', user.email)
