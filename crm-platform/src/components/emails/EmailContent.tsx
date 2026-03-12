@@ -56,11 +56,26 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
       .replace(/height:\s*\d+vh/gi, 'height: auto')
       .replace(/<img([^>]*?)src=(["'])cid:[^"']+\2([^>]*)>/gi, '<span class="cid-placeholder">[Inline image not available in this view]</span>')
 
-    // Remove tracking pixel to prevent self-open counting
-    // Matches <img src=".../api/email/track/..." ... />
-    const noTrackingHtml = processedHtml.replace(/<img[^>]*src="[^"]*\/api\/email\/track\/[^"]*"[^>]*>/gi, '')
+    // Remove tracking pixel to prevent self-open counting.
+    // Matches <img src=".../api/email/track/..." ... /> with single or double quotes.
+    const noTrackingHtml = processedHtml.replace(/<img[^>]*src=(["'])[^"']*\/api\/email\/track\/[^"']*\1[^>]*>/gi, '')
 
-    return DOMPurify.sanitize(noTrackingHtml, {
+    // Unwrap click-tracked links so internal CRM preview clicks do not increase click counters.
+    // Converts href=".../api/email/click/{id}?url=<encoded>" back to href="<original>".
+    const noTrackedLinksHtml = noTrackingHtml.replace(/href=(["'])([^"']*\/api\/email\/click\/[^"']+)\1/gi, (match, quote, trackedUrl) => {
+      try {
+        const parsed = new URL(trackedUrl, window.location.origin)
+        const original = parsed.searchParams.get('url')
+        if (original) {
+          return `href=${quote}${decodeURIComponent(original)}${quote}`
+        }
+      } catch {
+        // Keep original tracked URL if parsing fails.
+      }
+      return match
+    })
+
+    return DOMPurify.sanitize(noTrackedLinksHtml, {
       ADD_TAGS: ['style'],
       ADD_ATTR: ['target', 'style'],
       USE_PROFILES: { html: true }

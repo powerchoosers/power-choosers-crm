@@ -24,6 +24,43 @@ const jobSchema = z.object({
 const QUEUE_NAME = 'sequence_jobs'
 const API_BASE_URL = 'https://nodal-point-network.vercel.app';
 
+function normalizeMetadata(raw: any): Record<string, any> {
+    if (!raw) return {};
+    if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, any>;
+    if (Array.isArray(raw)) {
+        const out: Record<string, any> = {};
+        for (const item of raw) {
+            if (!item) continue;
+            if (typeof item === 'object' && !Array.isArray(item)) {
+                Object.assign(out, item);
+                continue;
+            }
+            if (typeof item === 'string') {
+                try {
+                    const parsed = JSON.parse(item);
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                        Object.assign(out, parsed);
+                    }
+                } catch {
+                    // ignore invalid json fragments
+                }
+            }
+        }
+        return out;
+    }
+    if (typeof raw === 'string') {
+        try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                return parsed as Record<string, any>;
+            }
+        } catch {
+            return {};
+        }
+    }
+    return {};
+}
+
 Deno.serve(async (req: Request) => {
     console.log('[DEBUG] Received request:', req.method);
 
@@ -71,8 +108,21 @@ async function processJob(job) {
         return;
     }
 
+    const metadata = normalizeMetadata(execution.metadata);
+
+    // Keep DB row metadata in normalized object form for downstream logic.
+    if (JSON.stringify(metadata) !== JSON.stringify(execution.metadata)) {
+        await sql`
+          UPDATE sequence_executions
+          SET metadata = ${JSON.stringify(metadata)}::jsonb, updated_at = NOW()
+          WHERE id = ${execution.id}
+        `;
+    }
+
+    execution.metadata = metadata;
+
     const effectiveType = execution.step_type === 'protocolNode'
-        ? (execution.metadata?.type || 'delay')
+        ? (metadata.type || 'delay')
         : execution.step_type;
 
     if (effectiveType === 'email') {
@@ -92,6 +142,8 @@ async function processJob(job) {
 }
 
 async function handleGeneration(execution, job) {
+    const metadata = normalizeMetadata(execution.metadata);
+
     const [member] = await sql`
     SELECT m.id,
            c.email as contact_email,
@@ -133,7 +185,7 @@ async function handleGeneration(execution, job) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
         body: JSON.stringify({
-            prompt: `${execution.metadata?.prompt || 'Draft a personalized follow-up'}\n\n${sourceTruthLine}`,
+            prompt: `${metadata?.prompt || 'Draft a personalized follow-up'}\n\n${sourceTruthLine}`,
             mode: 'generate_email',
             contact: {
                 name: `${member.firstName} ${member.lastName}`,
@@ -162,16 +214,18 @@ async function handleGeneration(execution, job) {
 
     const result = await response.json()
     const body = result.optimizedContent || result.content
-    const subject = result.subject || execution.metadata?.subject || 'Message from Nodal Point'
+    const subject = result.subject || metadata?.subject || 'Message from Nodal Point'
 
     await sql`
     UPDATE sequence_executions 
-    SET metadata = metadata || ${JSON.stringify({ body, subject })}, status = 'pending_send'
+    SET metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({ body, subject })}::jsonb, status = 'pending_send'
     WHERE id = ${execution.id}
   `
 }
 
 async function handleSend(execution, job) {
+    const metadata = normalizeMetadata(execution.metadata);
+
     const [member] = await sql`
     SELECT m.id, c.email as target_email, c."firstName", c."lastName", 
            s."ownerId" as owner_uuid, u.email as primary_owner_email
@@ -192,8 +246,8 @@ async function handleSend(execution, job) {
         body: JSON.stringify({
             to: { email: member.target_email, name: `${member.firstName} ${member.lastName}` },
             from: { email: fromEmail, name: 'Lewis Patterson' },
-            subject: execution.metadata?.subject || execution.metadata?.aiSubject || 'Message from Nodal Point',
-            html: execution.metadata?.body || execution.metadata?.aiBody,
+            subject: metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point',
+            html: metadata?.body || metadata?.aiBody,
             metadata: { execution_id: execution.id, member_id: member.id }
         })
     })
@@ -202,19 +256,19 @@ async function handleSend(execution, job) {
         const result = await response.json();
 
         // Determine wait window for interaction (default 3 days if not specified)
-        const delayVal = parseInt(execution.metadata?.delay || execution.metadata?.interval || '3');
-        const delayUnit = execution.metadata?.delayUnit || 'days';
+        const delayVal = parseInt(metadata?.delay || metadata?.interval || '3');
+        const delayUnit = metadata?.delayUnit || 'days';
 
         // Update to 'waiting' state
         await sql`
        UPDATE sequence_executions 
        SET status = 'waiting', 
            wait_until = NOW() + (${delayVal} || ' ' || ${delayUnit})::INTERVAL,
-           metadata = metadata || ${JSON.stringify({
+           metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({
             messageId: result.messageId,
             sentAt: new Date().toISOString(),
             from: fromEmail
-        })} 
+        })}::jsonb 
        WHERE id = ${execution.id}
     `
     } else {
