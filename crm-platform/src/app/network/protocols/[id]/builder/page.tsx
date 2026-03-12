@@ -44,7 +44,6 @@ import {
   XCircle,
   CalendarCheck,
   PhoneMissed,
-  Bug,
   FileText,
   Building2,
   Newspaper,
@@ -175,6 +174,46 @@ const FRESH_EDGES: Edge[] = [];
 const TEST_PROTOCOL_ID = '123'; // The hardcoded ID for the demo/test sequence
 
 const DELAY_UNITS = ['minutes', 'hours', 'days', 'weeks', 'months'];
+
+type SequenceMemberRow = {
+  memberId: string;
+  memberStatus: string | null;
+  currentNodeId: string | null;
+  currentNodeLabel: string | null;
+  contactId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  title: string | null;
+  accountName: string | null;
+  updatedAt: string | null;
+  totalEmailsSent: number | null;
+  totalOpens: number | null;
+  totalClicks: number | null;
+  totalReplies: number | null;
+  executionStatus: string | null;
+  executionStepType: string | null;
+  executionScheduledAt: string | null;
+  executionLabel: string | null;
+};
+
+type SequenceIntelResponse = {
+  sequence?: {
+    id: string;
+    name: string | null;
+  };
+  summary?: {
+    totalMembers: number;
+    activeMembers: number;
+    pausedMembers: number;
+    completedMembers: number;
+    queuedExecutions: number;
+    runningExecutions: number;
+    failedExecutions: number;
+  };
+  rows?: SequenceMemberRow[];
+  error?: string;
+};
 
 const DelayCycle = ({ value, unit, nodeId }: { value: string; unit: string; nodeId: string }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -544,7 +583,21 @@ function ProtocolArchitectInner() {
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [activeHandleId, setActiveHandleId] = useState<string | null>(null);
-  const [debugMode, setDebugMode] = useState(false);
+  const [showSequenceIntel, setShowSequenceIntel] = useState(false);
+  const [sequenceIntelLoading, setSequenceIntelLoading] = useState(false);
+  const [sequenceIntelError, setSequenceIntelError] = useState<string | null>(null);
+  const [sequenceIntelRows, setSequenceIntelRows] = useState<SequenceMemberRow[]>([]);
+  const [sequenceIntelName, setSequenceIntelName] = useState<string>('');
+  const [sequenceIntelSummary, setSequenceIntelSummary] = useState<{
+    totalMembers: number;
+    activeMembers: number;
+    pausedMembers: number;
+    completedMembers: number;
+    queuedExecutions: number;
+    runningExecutions: number;
+    failedExecutions: number;
+  } | null>(null);
+  const [debugMode] = useState(false);
   const [debugData, setDebugData] = useState({
     hoverNodeId: '',
     activeHandleId: '',
@@ -569,6 +622,68 @@ function ProtocolArchitectInner() {
       setDebugData(d => ({ ...d, totalEdges: edges.length }));
     }
   }, [edges.length, debugMode]);
+
+  const fetchSequenceIntel = useCallback(async () => {
+    if (!id || id === TEST_PROTOCOL_ID) {
+      setSequenceIntelRows([]);
+      setSequenceIntelSummary(null);
+      setSequenceIntelName('');
+      return;
+    }
+
+    setSequenceIntelLoading(true);
+    setSequenceIntelError(null);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        throw new Error('Please log in again. Session token is missing.');
+      }
+
+      const response = await fetch(`/api/protocols/${id}/sequence-intel`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json() as SequenceIntelResponse;
+
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to load sequence intel');
+      }
+
+      setSequenceIntelRows(Array.isArray(data.rows) ? data.rows : []);
+      setSequenceIntelSummary(data.summary || null);
+      setSequenceIntelName(data.sequence?.name || '');
+    } catch (error: any) {
+      setSequenceIntelRows([]);
+      setSequenceIntelSummary(null);
+      setSequenceIntelName('');
+      setSequenceIntelError(error?.message || 'Failed to load sequence intel');
+    } finally {
+      setSequenceIntelLoading(false);
+    }
+  }, [id]);
+
+  const openSequenceIntel = useCallback(async () => {
+    setShowSequenceIntel(true);
+    await fetchSequenceIntel();
+  }, [fetchSequenceIntel]);
+
+  const formatTimestamp = useCallback((value?: string | null) => {
+    if (!value) return '-';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return '-';
+    return dt.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }, []);
 
   // Phase 4: AI & Preview
   const { data: contactsData } = useContacts();
@@ -1265,14 +1380,15 @@ function ProtocolArchitectInner() {
 
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setDebugMode((v) => !v)}
+            onClick={openSequenceIntel}
+            disabled={id === TEST_PROTOCOL_ID}
             className={cn(
-              "icon-button-forensic font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all",
-              debugMode ? "text-white scale-110 brightness-125" : "text-zinc-400"
+              "icon-button-forensic font-mono text-[10px] uppercase tracking-wider h-9 px-4 rounded-xl flex items-center transition-all text-zinc-400 hover:text-white hover:bg-white/5",
+              id === TEST_PROTOCOL_ID && "opacity-50 cursor-not-allowed"
             )}
-            title={debugMode ? 'Disable Debug' : 'Enable Debug'}
+            title="View active contacts and current sequence step"
           >
-            <Bug className="w-3.5 h-3.5 mr-2" /> {debugMode ? 'Debug_On' : 'Debug_Off'}
+            <Target className="w-3.5 h-3.5 mr-2" /> Sequence_Intel
           </button>
           <button
             onClick={handleSave}
@@ -1287,10 +1403,12 @@ function ProtocolArchitectInner() {
             {isSaving ? 'Saving...' : 'Save_Draft'}
           </button>
           <button
+            onClick={handleSave}
+            disabled={isSaving}
             className="bg-white text-zinc-950 hover:bg-zinc-200 font-mono text-[10px] uppercase tracking-widest font-bold h-9 px-5 rounded-xl shadow-[0_0_30px_-5px_rgba(255,255,255,0.3)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] transition-all"
             title="Deploy Protocol"
           >
-            Deploy_Protocol
+            {isSaving ? 'Deploying...' : 'Deploy_Protocol'}
           </button>
         </div>
       </div>
@@ -1407,29 +1525,12 @@ function ProtocolArchitectInner() {
                       <span className="text-sm font-mono tabular-nums text-zinc-100">{edges.length}</span>
                     </div>
                   </div>
-                  {debugMode && (
-                    <div className="mt-2 bg-black/30 border border-white/5 rounded-lg p-2.5">
-                      <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Debug</div>
-                      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10px] font-mono text-zinc-400">
-                        <div>Hover_Node</div><div className="text-white">{debugData.hoverNodeId || '-'}</div>
-                        <div>Active_Handle</div><div className="text-white">{debugData.activeHandleId || '-'}</div>
-                        <div>Slot_Index</div><div className="text-white">{debugData.slotIndex}</div>
-                        <div>Drop_X</div><div className="text-white">{debugData.rawX}</div>
-                        <div>Drop_Y</div><div className="text-white">{debugData.rawY}</div>
-                        <div>Closest_Node</div><div className="text-white">{debugData.closestNodeId || '-'}</div>
-                        <div>Min_Dist</div><div className="text-white">{debugData.minDistance}</div>
-                        <div>Source_Handle</div><div className="text-white">{debugData.sourceHandle || '-'}</div>
-                        <div>Fallback</div><div className="text-white">{debugData.fallbackUsed ? 'YES' : 'NO'}</div>
-                        <div>New_Node</div><div className="text-white">{debugData.newNodeId || '-'}</div>
-                        <div>Edge_ID</div><div className="text-white">{debugData.edgeId || '-'}</div>
-                        <div className="col-span-2 border-t border-white/5 my-1" />
-                        <div>Node_X</div><div className="text-white">{Math.round(debugData.nodeX)}</div>
-                        <div>Calc_Width</div><div className="text-white">{Math.round(debugData.calculatedWidth)}</div>
-                        <div>Total_Edges</div><div className="text-white">{debugData.totalEdges}</div>
-                        <div className="col-span-2 text-[8px] text-zinc-500 break-all">{JSON.stringify(debugData.outcomesList)}</div>
-                      </div>
+                  <div className="mt-2 bg-black/30 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Runtime</div>
+                    <div className="text-[10px] font-mono text-zinc-400 leading-relaxed">
+                      Use <span className="text-zinc-200">Sequence_Intel</span> to view active contacts, live step position, and execution status.
                     </div>
-                  )}
+                  </div>
                 </div>
               </Panel>
             </ReactFlow>
@@ -2104,6 +2205,156 @@ function ProtocolArchitectInner() {
           </div>
         </div>
       </div>
+
+      <AnimatePresence>
+        {showSequenceIntel && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[80] bg-black/70 backdrop-blur-md flex items-center justify-center p-6"
+            onClick={() => setShowSequenceIntel(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 12, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.98 }}
+              transition={{ duration: 0.2 }}
+              className="w-full max-w-7xl max-h-[88vh] nodal-monolith-edge bg-zinc-950/95 border border-white/10 rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.65)]"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-6 py-5 border-b border-white/10 bg-black/30 flex items-center justify-between">
+                <div>
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Sequence Intel</div>
+                  <div className="text-lg font-semibold tracking-tight text-zinc-100 mt-1">
+                    {sequenceIntelName || `Protocol ${id?.toString().slice(0, 8)}...`}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={fetchSequenceIntel}
+                    disabled={sequenceIntelLoading}
+                    className="icon-button-forensic h-9 px-3 rounded-xl border border-white/10 bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50 flex items-center text-[10px] font-mono uppercase tracking-wider"
+                  >
+                    <RotateCcw className={cn('w-3.5 h-3.5 mr-2', sequenceIntelLoading && 'animate-spin')} />
+                    Refresh
+                  </button>
+                  <button
+                    onClick={() => setShowSequenceIntel(false)}
+                    className="icon-button-forensic h-9 w-9 rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center"
+                    title="Close"
+                  >
+                    <XCircle className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {sequenceIntelSummary && (
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 p-4 border-b border-white/10 bg-black/20">
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Members</div>
+                    <div className="text-sm font-mono text-zinc-100 tabular-nums">{sequenceIntelSummary.totalMembers}</div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Active</div>
+                    <div className="text-sm font-mono text-emerald-400 tabular-nums">{sequenceIntelSummary.activeMembers}</div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Paused</div>
+                    <div className="text-sm font-mono text-amber-400 tabular-nums">{sequenceIntelSummary.pausedMembers}</div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Completed</div>
+                    <div className="text-sm font-mono text-zinc-100 tabular-nums">{sequenceIntelSummary.completedMembers}</div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Queued</div>
+                    <div className="text-sm font-mono text-sky-400 tabular-nums">{sequenceIntelSummary.queuedExecutions}</div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Running</div>
+                    <div className="text-sm font-mono text-[#002FA7] tabular-nums">{sequenceIntelSummary.runningExecutions}</div>
+                  </div>
+                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Failed</div>
+                    <div className="text-sm font-mono text-red-400 tabular-nums">{sequenceIntelSummary.failedExecutions}</div>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 max-h-[58vh] overflow-auto">
+                {sequenceIntelLoading && (
+                  <div className="h-40 flex items-center justify-center text-zinc-400 font-mono text-[11px] uppercase tracking-widest">
+                    <RotateCcw className="w-4 h-4 mr-2 animate-spin" />
+                    Loading Sequence Intel...
+                  </div>
+                )}
+
+                {!sequenceIntelLoading && sequenceIntelError && (
+                  <div className="h-40 flex items-center justify-center">
+                    <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-3">
+                      {sequenceIntelError}
+                    </div>
+                  </div>
+                )}
+
+                {!sequenceIntelLoading && !sequenceIntelError && sequenceIntelRows.length === 0 && (
+                  <div className="h-40 flex items-center justify-center text-zinc-500 font-mono text-[11px] uppercase tracking-widest">
+                    No active contacts in this sequence yet.
+                  </div>
+                )}
+
+                {!sequenceIntelLoading && !sequenceIntelError && sequenceIntelRows.length > 0 && (
+                  <div className="overflow-x-auto rounded-xl border border-white/10">
+                    <table className="w-full min-w-[1150px]">
+                      <thead className="bg-black/40 border-b border-white/10 sticky top-0 z-10">
+                        <tr className="text-left">
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Contact</th>
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Company</th>
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Member Status</th>
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Current Step</th>
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Execution</th>
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Scheduled</th>
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Signals</th>
+                          <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Updated</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sequenceIntelRows.map((row) => {
+                          const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || row.email || 'Unknown';
+                          const currentStep = row.currentNodeLabel || row.currentNodeId || '-';
+                          const executionLabel = row.executionLabel || row.executionStepType || '-';
+                          const signals = `${row.totalEmailsSent}E / ${row.totalOpens}O / ${row.totalClicks}C / ${row.totalReplies}R`;
+                          return (
+                            <tr key={row.memberId} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
+                              <td className="px-3 py-2.5">
+                                <div className="text-sm text-zinc-100">{fullName}</div>
+                                <div className="text-[10px] font-mono text-zinc-500 truncate">{row.title || row.email || '-'}</div>
+                              </td>
+                              <td className="px-3 py-2.5 text-sm text-zinc-300">{row.accountName || '-'}</td>
+                              <td className="px-3 py-2.5">
+                                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-200">{row.memberStatus || '-'}</span>
+                              </td>
+                              <td className="px-3 py-2.5 text-sm text-zinc-200">{currentStep}</td>
+                              <td className="px-3 py-2.5">
+                                <div className="text-sm text-zinc-100">{executionLabel}</div>
+                                <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{row.executionStatus || '-'}</div>
+                              </td>
+                              <td className="px-3 py-2.5 text-sm text-zinc-300">{formatTimestamp(row.executionScheduledAt)}</td>
+                              <td className="px-3 py-2.5 text-[11px] font-mono text-zinc-300 tabular-nums">{signals}</td>
+                              <td className="px-3 py-2.5 text-sm text-zinc-400">{formatTimestamp(row.updatedAt)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Exit Dialog */}
       <Dialog open={showExitDialog} onOpenChange={setShowExitDialog}>
