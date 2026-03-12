@@ -76,9 +76,9 @@ export function useAddContactToProtocol() {
       if (!user?.id) throw new Error('User not authenticated')
 
       const { data, error } = await supabase.rpc('enroll_in_sequence', {
-        sequence_id: sequenceId,
-        contact_ids: [contactId],
-        owner_id: user.id
+        p_sequence_id: sequenceId,
+        p_contact_ids: [contactId],
+        p_owner_id: user.id
       })
 
       if (error) {
@@ -140,9 +140,9 @@ export function useEnrollContactsInProtocol() {
       if (!user?.id) throw new Error('User not authenticated')
 
       const { data, error } = await supabase.rpc('enroll_in_sequence', {
-        sequence_id: sequenceId,
-        contact_ids: contactIds,
-        owner_id: user.id
+        p_sequence_id: sequenceId,
+        p_contact_ids: contactIds,
+        p_owner_id: user.id
       })
 
       if (error) {
