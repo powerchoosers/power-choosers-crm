@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { ListTodo, Circle, CheckCircle2 } from 'lucide-react'
+import { ListTodo, Circle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTasks, type Task } from '@/hooks/useTasks'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -18,14 +18,14 @@ interface ContextTasksWidgetProps {
   entityName?: string
   contactContext?: Record<string, unknown> | null
   accountContext?: Record<string, unknown> | null
+  expanded?: boolean
 }
 
-export default function ContextTasksWidget({ entityId, entityName, contactContext, accountContext }: ContextTasksWidgetProps) {
+export default function ContextTasksWidget({ entityId, entityName, contactContext, accountContext, expanded = true }: ContextTasksWidgetProps) {
   const router = useRouter()
   const { data: tasksData, updateTask } = useTasks()
   const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
   const tasks = useMemo(() => {
     if (!entityId) return []
     const allTasks = tasksData?.pages.flatMap(page => page.tasks) || []
@@ -85,9 +85,9 @@ export default function ContextTasksWidget({ entityId, entityName, contactContex
   }
 
   return (
-    <div className="space-y-2 overflow-hidden">
+    <motion.div layout className="space-y-2 overflow-hidden">
       <AnimatePresence initial={false} mode="popLayout">
-        {listToRender.length > 0 ? (
+        {expanded && listToRender.length > 0 ? (
           listToRender.map((task, i) => {
             const isExiting = exitingTask?.task.id === task.id
             const isCompleted = isExiting || (task.status ?? '').toLowerCase() === 'completed'
@@ -144,7 +144,8 @@ export default function ContextTasksWidget({ entityId, entityName, contactContex
                     {description && (
                       <p
                         className={cn(
-                          'text-[10px] mt-0.5 line-clamp-2 transition-colors duration-300',
+                          'text-[10px] mt-0.5 transition-colors duration-300',
+                          expanded ? 'line-clamp-none' : 'line-clamp-2',
                           isCompleted ? 'text-zinc-600 line-through' : 'text-zinc-500'
                         )}
                       >
@@ -175,6 +176,6 @@ export default function ContextTasksWidget({ entityId, entityName, contactContex
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   )
 }
