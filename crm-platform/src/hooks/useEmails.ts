@@ -317,6 +317,7 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
   return {
     data: emailsQuery.data,
     isLoading: emailsQuery.isLoading,
+    isFetching: emailsQuery.isFetching,
     error: emailsQuery.error,
     fetchNextPage: emailsQuery.fetchNextPage,
     hasNextPage: emailsQuery.hasNextPage,
