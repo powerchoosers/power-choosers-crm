@@ -66,7 +66,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // We don't want to fail the generic request just because telemetry failed, but log it internally
         }
 
-        // 5. Update the request status
+        // 5a. Update email telemetry badges so the sent-mail Telemetry column reflects opens/clicks
+        if (action === 'opened' || action === 'clicked') {
+            try {
+                const tokenShort = (typeof token === 'string' ? token : String(token)).substring(0, 8)
+                // The email sent for this signature request has id starting with sig_ and token prefix
+                const { data: emailRow } = await supabaseAdmin
+                    .from('emails')
+                    .select('id, openCount, clickCount')
+                    .like('id', `sig_%${tokenShort}%`)
+                    .maybeSingle()
+
+                if (emailRow) {
+                    if (action === 'opened') {
+                        await supabaseAdmin
+                            .from('emails')
+                            .update({ openCount: (emailRow.openCount || 0) + 1 })
+                            .eq('id', emailRow.id)
+                    } else if (action === 'clicked') {
+                        await supabaseAdmin
+                            .from('emails')
+                            .update({ clickCount: (emailRow.clickCount || 0) + 1 })
+                            .eq('id', emailRow.id)
+                    }
+                }
+            } catch (emailUpdateErr) {
+                // Non-fatal — telemetry badge update is best-effort
+                console.warn('[Signature Telemetry] Email badge update failed:', emailUpdateErr)
+            }
+        }
+
+        // 5b. Update signature_requests status
+
         // Transition: pending -> opened -> viewed
         if (request.status === 'pending' && action === 'opened') {
             await supabaseAdmin
