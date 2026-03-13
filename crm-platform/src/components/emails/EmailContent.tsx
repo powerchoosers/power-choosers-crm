@@ -56,9 +56,14 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
       .replace(/height:\s*\d+vh/gi, 'height: auto')
       .replace(/<img([^>]*?)src=(["'])cid:[^"']+\2([^>]*)>/gi, '<span class="cid-placeholder">[Inline image not available in this view]</span>')
 
-    // Remove tracking pixel to prevent self-open counting.
+    // Remove email tracking pixel to prevent self-open counting.
     // Matches <img src=".../api/email/track/..." ... /> with single or double quotes.
-    const noTrackingHtml = processedHtml.replace(/<img[^>]*src=(["'])[^"']*\/api\/email\/track\/[^"']*\1[^>]*>/gi, '')
+    const noEmailTrackingHtml = processedHtml.replace(/<img[^>]*src=(['"])[^'"]*\/api\/email\/track\/[^'"]*\1[^>]*>/gi, '')
+
+    // Also remove signature telemetry pixels — prevents expanding a contract email in the CRM
+    // from firing an "opened" event against the client's signing link.
+    const noTrackingHtml = noEmailTrackingHtml.replace(/<img[^>]*src=(['"])[^'"]*\/api\/signatures\/telemetry[^'"]*\1[^>]*>/gi, '')
+
 
     // Unwrap click-tracked links so internal CRM preview clicks do not increase click counters.
     // Converts href=".../api/email/click/{id}?url=<encoded>" back to href="<original>".
