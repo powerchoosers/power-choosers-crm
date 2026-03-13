@@ -1,6 +1,7 @@
 import { cors } from '../_cors.js';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
 import logger from '../_logger.js';
+import { generateForensicSignature } from '@/lib/signature';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -10,6 +11,13 @@ function buildSourceTruthLine(linkedInUrl, website) {
   if (linkedInUrl) return 'SOURCE_TRUTH: LinkedIn available. You may reference LinkedIn once if natural.';
   if (website) return 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.';
   return 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
+}
+
+function senderDomainFromEmail(email) {
+  const raw = String(email || '').trim().toLowerCase();
+  if (!raw.includes('@')) return 'nodalpoint.io';
+  const domain = raw.split('@')[1] || 'nodalpoint.io';
+  return domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') || 'nodalpoint.io';
 }
 
 export default async function handler(req, res) {
@@ -116,16 +124,26 @@ export default async function handler(req, res) {
     if (contact.accountId) {
       const { data: acc } = await supabase
         .from('accounts')
-        .select('name, domain, industry, electricity_supplier, current_rate, contract_end_date')
+        .select('name, domain, industry, city, state, electricity_supplier, current_rate, contract_end_date')
         .eq('id', contact.accountId)
         .maybeSingle();
       account = acc || null;
     }
 
+    const { data: sequence } = await supabase
+      .from('sequences')
+      .select('id, bgvector, metadata, "ownerId"')
+      .eq('id', execution.sequence_id)
+      .maybeSingle();
+
+    const sequenceSender = sequence?.bgvector?.settings?.senderEmail || sequence?.metadata?.sender_email || null;
+
     const linkedInUrl = contact.linkedinUrl || null;
     const accountDomain = account?.domain || null;
     const website = accountDomain ? `https://${accountDomain}` : null;
-    const location = contact.city
+    const location = account?.city
+      ? `${account.city}${account?.state ? `, ${account.state}` : ''}`
+      : contact.city
       ? `${contact.city}${contact.state ? `, ${contact.state}` : ''}`
       : null;
     const sourceTruthLine = buildSourceTruthLine(linkedInUrl, website);
@@ -181,12 +199,49 @@ export default async function handler(req, res) {
     if (!generatedBody) {
       throw new Error('AI generation returned empty body');
     }
+
+    const preferredFrom = String(sequenceSender || '').trim();
+    const fromEmail = preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io';
+    const senderDomain = senderDomainFromEmail(fromEmail);
+    let finalBody = generatedBody;
+
+    if (!finalBody.includes('NODAL_FORENSIC_SIGNATURE') && !finalBody.includes('nodal-signature')) {
+      const lookupEmail = fromEmail.endsWith('@getnodalpoint.com')
+        ? fromEmail.replace('@getnodalpoint.com', '@nodalpoint.io')
+        : fromEmail;
+      const { data: userData } = await supabase
+        .from('users')
+        .select('first_name, last_name, job_title, hosted_photo_url')
+        .eq('email', lookupEmail)
+        .maybeSingle();
+
+      const profile = userData
+        ? {
+          firstName: userData.first_name,
+          lastName: userData.last_name,
+          jobTitle: userData.job_title,
+          hostedPhotoUrl: userData.hosted_photo_url,
+          email: fromEmail
+        }
+        : {
+          firstName: 'Lewis',
+          lastName: 'Patterson',
+          jobTitle: 'Market Architect',
+          email: fromEmail
+        };
+      const signature = generateForensicSignature(profile, { senderEmail: fromEmail, websiteDomain: senderDomain });
+      finalBody = `${finalBody}${signature}`;
+    }
+
     const nowIso = new Date().toISOString();
 
     const nextExecutionMeta = {
       ...executionMeta,
-      body: generatedBody,
+      body: finalBody,
       subject: generatedSubject,
+      from: fromEmail,
+      senderEmail: fromEmail,
+      senderDomain,
       previewGeneratedAt: nowIso,
       reviewAccepted: false,
       emailRecordId: executionMeta.emailRecordId || `seq_exec_${execution.id}`,
@@ -228,11 +283,11 @@ export default async function handler(req, res) {
       id: targetEmailId,
       contactId: contact.id || null,
       accountId: contact.accountId || null,
-      from: preservedFrom,
+      from: preservedFrom || fromEmail,
       to: contact.email ? [contact.email] : [],
       subject: generatedSubject,
-      html: generatedBody,
-      text: generatedBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      html: finalBody,
+      text: finalBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
       status: 'pending_send',
       type: 'scheduled',
       is_read: true,
