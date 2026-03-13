@@ -275,7 +275,8 @@ export default async function handler(req, res) {
                     to: [toEmail],
                     subject,
                     from: fromEmail,
-                    type: 'sent',
+                    // Tracking-only record for pixel/click handlers. Keep out of outbound UI lists.
+                    type: 'tracking',
                     status: 'sent',
                     openCount: 0,
                     clickCount: 0,
@@ -291,6 +292,7 @@ export default async function handler(req, res) {
                         email_id,
                         trackingId,
                         messageId: result.messageId,
+                        isTrackingOnly: true,
                         isSequenceEmail: true,
                         provider: 'zoho'
                     }
