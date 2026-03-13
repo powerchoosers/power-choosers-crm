@@ -1,6 +1,7 @@
 import { cors } from './_cors.js';
 import logger from './_logger.js';
 import { supabaseAdmin } from '@/lib/supabase';
+import * as XLSX from 'xlsx';
 
 function normalizeEsid(value) {
   const digits = String(value ?? '').replace(/\D/g, '');
@@ -196,11 +197,34 @@ export default async function handler(req, res) {
       lowerFileName.endsWith('.txt') ||
       lowerFileName.endsWith('.tsv');
 
+    const isExcel =
+      mimeType.includes('spreadsheetml') ||
+      mimeType.includes('ms-excel') ||
+      lowerFileName.endsWith('.xlsx') ||
+      lowerFileName.endsWith('.xls');
+
     let textContentSnippet = "";
     if (isCsvOrText) {
       const fullText = Buffer.from(arrayBuffer).toString('utf-8');
       // Cap text to avoid overwhelming context, but large enough for monthly/daily interval CSVs
       textContentSnippet = fullText.substring(0, 50000);
+    } else if (isExcel) {
+      // Convert Excel to CSV text so the AI can read it like a CSV
+      try {
+        const workbook = XLSX.read(Buffer.from(arrayBuffer), { type: 'buffer' });
+        const csvParts = [];
+        for (const sheetName of workbook.SheetNames) {
+          const sheet = workbook.Sheets[sheetName];
+          const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+          if (csv.trim()) {
+            csvParts.push(`=== Sheet: ${sheetName} ===\n${csv}`);
+          }
+        }
+        textContentSnippet = csvParts.join('\n\n').substring(0, 50000);
+        logger.log('[Analyze Document] Excel converted to CSV text, length:', textContentSnippet.length);
+      } catch (xlsxErr) {
+        logger.error('[Analyze Document] Excel parse failed:', xlsxErr.message);
+      }
     }
 
     let prompt = `
@@ -251,7 +275,7 @@ export default async function handler(req, res) {
     }
     `;
 
-    if (isCsvOrText) {
+    if (isCsvOrText || isExcel) {
       prompt += `\n\n[DOCUMENT CONTENT START]\n${textContentSnippet}\n[DOCUMENT CONTENT END]\n`;
     }
 
@@ -260,7 +284,8 @@ export default async function handler(req, res) {
     // Helper block to construct message content to avoid sending text files as image_url
     const buildMessageContent = () => {
       let contentArray = [{ type: 'text', text: prompt }];
-      if (!isCsvOrText) {
+      // CSV, text, and Excel files are sent as inline text (no binary attachment)
+      if (!isCsvOrText && !isExcel) {
         const isPdf = mimeType === 'application/pdf';
         const isImage = mimeType.startsWith('image/');
         const fileUrlContent = isPdf ? base64Data : `data:${mimeType};base64,${base64Data}`;
