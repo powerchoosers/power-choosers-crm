@@ -84,11 +84,12 @@ interface DealCardProps {
   deal: Deal
   onEdit: (deal: Deal) => void
   onRequestDelete: (dealId: string) => void
-  onManageSignatures: (deal: Deal) => void
 }
 
-function DealCard({ deal, onEdit, onRequestDelete, onManageSignatures }: DealCardProps) {
+function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
   const router = useRouter()
+  const cancelSignature = useCancelSignatureRequest()
+  const [isSignaturesExpanded, setIsSignaturesExpanded] = useState(false)
   const probPct = STAGE_PROGRESS[deal.stage] ?? 0
   const closeLbl = closeLabel(deal.closeDate)
 
@@ -173,6 +174,82 @@ function DealCard({ deal, onEdit, onRequestDelete, onManageSignatures }: DealCar
       </div>
       </button>
 
+      {/* Expanded Signatures Section */}
+      <AnimatePresence>
+        {isSignaturesExpanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="overflow-hidden"
+          >
+            <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
+              <h4 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500 mb-3">Signature Links</h4>
+              {deal.signature_requests?.length ? (
+                [...deal.signature_requests]
+                  .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                  .map((req) => {
+                    const derivedStatus = getSignatureRequestStatus(req.status, req.expires_at)
+                    
+                    return (
+                      <div 
+                        key={req.id} 
+                        className="flex items-center justify-between p-2 rounded border border-white/5 bg-black/20 group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "h-1.5 w-1.5 rounded-full flex-shrink-0",
+                            derivedStatus === 'signed' ? 'bg-emerald-500' :
+                            derivedStatus === 'expired' ? 'bg-rose-500' :
+                            derivedStatus === 'viewed' ? 'bg-[#002FA7]' : 'bg-amber-500 animate-pulse'
+                          )} />
+                          <div>
+                            <div className={cn(
+                              "font-mono text-[9px] uppercase tracking-wider",
+                              derivedStatus === 'expired' ? 'text-rose-400' : 'text-zinc-300'
+                            )}>
+                              {derivedStatus}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5 font-mono text-[8px] text-zinc-500">
+                              <Clock className="w-2.5 h-2.5" />
+                              {format(new Date(req.created_at), 'MMM d, h:mm a')}
+                            </div>
+                          </div>
+                        </div>
+
+                        {derivedStatus !== 'signed' && (
+                          <button
+                            onClick={async () => {
+                              if (confirm('Cancel this signature request? This will invalidate the link sent to the client.')) {
+                                await cancelSignature.mutateAsync(req.id)
+                                if (deal.signature_requests?.length === 1) {
+                                  setIsSignaturesExpanded(false)
+                                }
+                              }
+                            }}
+                            disabled={cancelSignature.isPending}
+                            className="p-1 rounded hover:bg-rose-500/10 text-zinc-600 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                            title="Cancel Request"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })
+              ) : (
+                <div className="text-center py-4">
+                  <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest">
+                    No signature requests
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="absolute top-2.5 right-2.5">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -197,9 +274,9 @@ function DealCard({ deal, onEdit, onRequestDelete, onManageSignatures }: DealCar
             {deal.signature_requests && deal.signature_requests.length > 0 && (
               <DropdownMenuItem
                 className="hover:bg-white/5 cursor-pointer"
-                onClick={() => onManageSignatures(deal)}
+                onClick={() => setIsSignaturesExpanded(v => !v)}
               >
-                Manage Signatures ({deal.signature_requests.length})
+                {isSignaturesExpanded ? 'Hide Signatures' : `Manage Signatures (${deal.signature_requests.length})`}
               </DropdownMenuItem>
             )}
 
@@ -229,10 +306,8 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
   const { data: accountDeals = [], isLoading: loadingAccount } = useDealsByAccount(accountId)
   const { data: contactDeals = [], isLoading: loadingContact } = useDealsByContact(contactId)
   const deleteDeal = useDeleteDeal()
-  const cancelSignature = useCancelSignatureRequest()
   const { setRightPanelMode, setDealContext } = useUIStore()
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [managingSignaturesDeal, setManagingSignaturesDeal] = useState<Deal | null>(null)
   const [removedDealIds, setRemovedDealIds] = useState<Record<string, true>>({})
 
   // Show deals from the most relevant source; avoid duplicates if both provided
@@ -315,7 +390,6 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
                 deal={deal}
                 onEdit={openEditInRightPanel}
                 onRequestDelete={(dealId) => setDeleteId(dealId)}
-                onManageSignatures={(d) => setManagingSignaturesDeal(d)}
               />
             </motion.div>
           ))}
@@ -345,88 +419,6 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
               className="px-4 py-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 font-mono text-xs hover:bg-rose-500/20 transition-colors disabled:opacity-40"
             >
               {deleteDeal.isPending ? 'Terminating...' : 'Terminate'}
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!managingSignaturesDeal} onOpenChange={v => !v && setManagingSignaturesDeal(null)}>
-        <DialogContent className="bg-zinc-950 border-white/10 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-mono text-sm uppercase tracking-widest text-zinc-200">
-              Manage Signatures
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-3 py-4">
-            {managingSignaturesDeal?.signature_requests?.length ? (
-              [...managingSignaturesDeal.signature_requests]
-                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-                .map((req) => {
-                  const derivedStatus = getSignatureRequestStatus(req.status, req.expires_at);
-                  
-                  return (
-                    <div 
-                      key={req.id} 
-                      className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-white/[0.02] group"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          "h-2 w-2 rounded-full",
-                          derivedStatus === 'signed' ? 'bg-emerald-500' :
-                          derivedStatus === 'expired' ? 'bg-rose-500' :
-                          derivedStatus === 'viewed' ? 'bg-[#002FA7]' : 'bg-amber-500'
-                        )} />
-                        <div>
-                          <div className={cn(
-                            "font-mono text-[10px] uppercase tracking-wider",
-                            derivedStatus === 'expired' ? 'text-rose-400' : 'text-zinc-300'
-                          )}>
-                            {derivedStatus}
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5 font-mono text-[9px] text-zinc-500">
-                            <Clock className="w-2.5 h-2.5" />
-                            {format(new Date(req.created_at), 'MMM d, h:mm a')}
-                          </div>
-                        </div>
-                      </div>
-
-                      {derivedStatus !== 'signed' && (
-                        <button
-                          onClick={async () => {
-                            if (confirm('Cancel this signature request? This will invalidate the link sent to the client.')) {
-                              await cancelSignature.mutateAsync(req.id)
-                              // If we cancelled the last one, close the dialog
-                              if (managingSignaturesDeal.signature_requests?.length === 1) {
-                                setManagingSignaturesDeal(null)
-                              }
-                            }
-                          }}
-                          disabled={cancelSignature.isPending}
-                          className="p-1.5 rounded-md hover:bg-rose-500/10 text-zinc-600 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                          title="Cancel Request"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  )
-                })
-            ) : (
-              <div className="text-center py-8">
-                <p className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest">
-                  No active signature requests
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <button
-              onClick={() => setManagingSignaturesDeal(null)}
-              className="px-4 py-2 rounded-lg border border-white/10 text-zinc-500 font-mono text-xs hover:text-zinc-300 transition-colors"
-            >
-              Close
             </button>
           </div>
         </DialogContent>
