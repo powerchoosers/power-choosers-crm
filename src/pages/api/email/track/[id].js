@@ -169,7 +169,7 @@ export default async function handler(req, res) {
               ...(deviceType === 'bot' ? { botFlagged: true } : {})
             };
 
-            // Update Supabase record
+            // Update tracking record (pixel id)
             await supabaseAdmin
               .from('emails')
               .update({
@@ -179,6 +179,34 @@ export default async function handler(req, res) {
                 metadata
               })
               .eq('id', trackingId);
+
+            // If this is a tracking-only row, also update the parent sent row so UI badges match regular sends.
+            const parentEmailId = existingMeta.email_id || existingMeta.emailId;
+            if (parentEmailId && parentEmailId !== trackingId) {
+              const { data: parentData, error: parentFetchError } = await supabaseAdmin
+                .from('emails')
+                .select('opens, openCount, metadata')
+                .eq('id', parentEmailId)
+                .single();
+
+              if (!parentFetchError && parentData) {
+                const parentOpens = Array.isArray(parentData.opens) ? parentData.opens : [];
+                const parentMeta = parentData.metadata && typeof parentData.metadata === 'object' ? parentData.metadata : {};
+
+                await supabaseAdmin
+                  .from('emails')
+                  .update({
+                    openCount: (parentData.openCount || 0) + 1,
+                    opens: [...parentOpens, openEvent],
+                    updatedAt: openedAt,
+                    metadata: {
+                      ...parentMeta,
+                      lastOpened: openedAt
+                    }
+                  })
+                  .eq('id', parentEmailId);
+              }
+            }
 
             logger.debug('[Email Track] Recorded open:', {
               trackingId: trackingId.substring(0, 30),
