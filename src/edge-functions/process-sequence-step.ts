@@ -24,6 +24,23 @@ const jobSchema = z.object({
 const QUEUE_NAME = 'sequence_jobs'
 const API_BASE_URL = 'https://nodal-point-network.vercel.app';
 
+function appendPreviewUnsubscribeFooter(html: string, email?: string | null): string {
+    const content = String(html || '');
+    const recipient = String(email || '').trim();
+    if (!content || !recipient) return content;
+    if (content.includes('data-nodal-unsubscribe-footer="1"') || content.includes('Unsubscribe or manage preferences')) {
+        return content;
+    }
+    const unsubscribeUrl = `${API_BASE_URL}/unsubscribe?email=${encodeURIComponent(recipient)}`;
+    const footer =
+        `<div data-nodal-unsubscribe-footer="1" style="margin-top:32px;padding-top:16px;border-top:1px solid #3f3f46;font-family:sans-serif;font-size:11px;color:#71717a;text-align:center;line-height:1.6;">` +
+        `<p style="margin:0 0 4px 0;">Nodal Point &middot; Energy Intelligence &middot; Fort Worth, TX</p>` +
+        `<p style="margin:0;">You received this because we identified a potential opportunity for your energy portfolio. ` +
+        `<a href="${unsubscribeUrl}" style="color:#71717a;text-decoration:underline;">Unsubscribe or manage preferences</a></p>` +
+        `</div>`;
+    return `${content}${footer}`;
+}
+
 function normalizeMetadata(raw: any): Record<string, any> {
     if (!raw) return {};
     if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, any>;
@@ -249,9 +266,10 @@ async function handleGeneration(execution, job) {
         throw new Error('AI generation returned empty body');
     }
 
+    const bodyWithFooter = appendPreviewUnsubscribeFooter(body, member.contact_email);
     const metadataPatch = senderEmail
-        ? { body, subject, from: senderEmail, senderEmail, senderDomain }
-        : { body, subject };
+        ? { body: bodyWithFooter, subject, from: senderEmail, senderEmail, senderDomain }
+        : { body: bodyWithFooter, subject };
 
     await sql`
     UPDATE sequence_executions 

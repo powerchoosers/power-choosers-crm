@@ -20,6 +20,29 @@ import { supabaseAdmin as supabase } from '@/lib/supabase';
 import { generateForensicSignature } from '@/lib/signature';
 import logger from '../_logger.js';
 
+function buildUnsubscribeFooter(unsubscribeUrl) {
+    return (
+        `<div data-nodal-unsubscribe-footer="1" style="margin-top:32px;padding-top:16px;border-top:1px solid #3f3f46;font-family:sans-serif;font-size:11px;color:#71717a;text-align:center;line-height:1.6;">` +
+        `<p style="margin:0 0 4px 0;">Nodal Point &middot; Energy Intelligence &middot; Fort Worth, TX</p>` +
+        `<p style="margin:0;">You received this because we identified a potential opportunity for your energy portfolio. ` +
+        `<a href="${unsubscribeUrl}" style="color:#71717a;text-decoration:underline;">Unsubscribe or manage preferences</a></p>` +
+        `</div>`
+    );
+}
+
+function stripExistingUnsubscribeFooter(html) {
+    if (!html || typeof html !== 'string') return { html, hadFooter: false };
+    const markerPattern = /<div[^>]*data-nodal-unsubscribe-footer="1"[^>]*>[\s\S]*?<\/div>\s*$/i;
+    const textPattern = /<div[^>]*>[\s\S]*?Unsubscribe or manage preferences[\s\S]*?<\/div>\s*$/i;
+    if (markerPattern.test(html)) {
+        return { html: html.replace(markerPattern, ''), hadFooter: true };
+    }
+    if (textPattern.test(html)) {
+        return { html: html.replace(textPattern, ''), hadFooter: true };
+    }
+    return { html, hadFooter: false };
+}
+
 export default async function handler(req, res) {
     logger.info(`[Zoho Sequence] Incoming request: ${req.method} ${req.url}`, 'zoho-send-sequence');
     if (cors(req, res)) return;
@@ -84,6 +107,10 @@ export default async function handler(req, res) {
         // Rules: 
         // 1. Only injection if it's not a Foundry template (detected by full-width table or specific marker)
         // 2. Only if content isn't already a full HTML document
+        const strippedFooter = stripExistingUnsubscribeFooter(htmlContent);
+        htmlContent = strippedFooter.html || '';
+        const hadExistingFooter = strippedFooter.hadFooter;
+
         const isFoundry = htmlContent.includes('<!-- FOUNDRY_TEMPLATE -->') || htmlContent.includes('data-foundry');
         const hasSignature = htmlContent.includes('NODAL_FORENSIC_SIGNATURE') || htmlContent.includes('nodal-signature');
 
@@ -146,14 +173,12 @@ export default async function handler(req, res) {
             try {
                 const baseUrl = (process.env.PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app').replace(/\/+$/, '');
                 const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(toEmail)}`;
-                const unsubscribeFooter =
-                    `<div style="margin-top:32px;padding-top:16px;border-top:1px solid #3f3f46;font-family:sans-serif;font-size:11px;color:#71717a;text-align:center;line-height:1.6;">` +
-                    `<p style="margin:0 0 4px 0;">Nodal Point &middot; Energy Intelligence &middot; Fort Worth, TX</p>` +
-                    `<p style="margin:0;">You received this because we identified a potential opportunity for your energy portfolio. ` +
-                    `<a href="${unsubscribeUrl}" style="color:#71717a;text-decoration:underline;">Unsubscribe or manage preferences</a></p>` +
-                    `</div>`;
+                const unsubscribeFooter = buildUnsubscribeFooter(unsubscribeUrl);
                 htmlContent = htmlContent + unsubscribeFooter;
-                logger.info(`[Zoho Sequence] Injected unsubscribe footer for ${toEmail}`, 'zoho-send-sequence');
+                logger.info(
+                    `[Zoho Sequence] ${hadExistingFooter ? 'Repositioned' : 'Injected'} unsubscribe footer for ${toEmail}`,
+                    'zoho-send-sequence'
+                );
             } catch (footerError) {
                 logger.error('[Zoho Sequence] Failed to inject unsubscribe footer:', footerError);
             }
