@@ -423,6 +423,7 @@ async function handleLinkedInTask(execution, job) {
         const label = (metadata?.label || 'LinkedIn Step').trim();
         const prompt = (metadata?.prompt || metadata?.aiBody || 'Complete LinkedIn outreach step for this contact.').trim();
         const ownerEmail = member.owner_email || (String(member.owner_id || '').includes('@') ? member.owner_id : null);
+        const ownerId = member.owner_id && !String(member.owner_id).includes('@') ? String(member.owner_id) : null;
 
         const inserted = await sql`
       INSERT INTO tasks (
@@ -447,18 +448,18 @@ async function handleLinkedInTask(execution, job) {
         NOW(),
         ${member.contact_id},
         ${member.account_id},
-        ${ownerEmail},
+        ${ownerId},
         NOW(),
         NOW(),
         jsonb_build_object(
           'taskType', 'LinkedIn',
           'source', 'sequence',
-          'sequenceExecutionId', ${execution.id},
-          'sequenceId', ${execution.sequence_id},
-          'memberId', ${execution.member_id},
-          'stepType', COALESCE(${execution.step_type}, 'protocolNode'),
-          'execution_id', ${execution.id},
-          'member_id', ${execution.member_id}
+          'sequenceExecutionId', ${String(execution.id)}::text,
+          'sequenceId', ${String(execution.sequence_id)}::text,
+          'memberId', ${String(execution.member_id)}::text,
+          'stepType', ${String(execution.step_type || 'protocolNode')}::text,
+          'execution_id', ${String(execution.id)}::text,
+          'member_id', ${String(execution.member_id)}::text
         )
       )
       RETURNING id
