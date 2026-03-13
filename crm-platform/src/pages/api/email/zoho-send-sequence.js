@@ -140,6 +140,25 @@ export default async function handler(req, res) {
         const finalTrackOpens = isSelfSend ? false : trackOpens;
         const finalTrackClicks = isSelfSend ? false : trackClicks;
 
+        // Unsubscribe Footer Injection
+        // Appended before tracking so the unsubscribe link is also click-tracked.
+        if (htmlContent && !isSelfSend && !isInternalTest) {
+            try {
+                const baseUrl = (process.env.PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app').replace(/\/+$/, '');
+                const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(toEmail)}`;
+                const unsubscribeFooter =
+                    `<div style="margin-top:32px;padding-top:16px;border-top:1px solid #3f3f46;font-family:sans-serif;font-size:11px;color:#71717a;text-align:center;line-height:1.6;">` +
+                    `<p style="margin:0 0 4px 0;">Nodal Point &middot; Energy Intelligence &middot; Fort Worth, TX</p>` +
+                    `<p style="margin:0;">You received this because we identified a potential opportunity for your energy portfolio. ` +
+                    `<a href="${unsubscribeUrl}" style="color:#71717a;text-decoration:underline;">Unsubscribe or manage preferences</a></p>` +
+                    `</div>`;
+                htmlContent = htmlContent + unsubscribeFooter;
+                logger.info(`[Zoho Sequence] Injected unsubscribe footer for ${toEmail}`, 'zoho-send-sequence');
+            } catch (footerError) {
+                logger.error('[Zoho Sequence] Failed to inject unsubscribe footer:', footerError);
+            }
+        }
+
         if (htmlContent && finalTrackOpens && !hasTrackingPixel(htmlContent)) {
             htmlContent = injectTracking(htmlContent, trackingId, {
                 enableOpenTracking: finalTrackOpens,

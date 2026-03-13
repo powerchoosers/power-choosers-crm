@@ -264,7 +264,7 @@ async function handleSend(execution, job) {
     const metadata = normalizeMetadata(execution.metadata);
 
     const [member] = await sql`
-    SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName", 
+    SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
            s."ownerId" as owner_uuid, u.email as primary_owner_email,
            COALESCE(
              s.bgvector->'settings'->>'senderEmail',
@@ -278,6 +278,26 @@ async function handleSend(execution, job) {
     WHERE m.id = ${execution.member_id}
     LIMIT 1
   `
+
+    // Suppression pre-check: skip send if contact has unsubscribed or paused.
+    // spike_only contacts are NOT in suppressions (handled via contact metadata only),
+    // so they will still receive emails from the sequence engine.
+    if (member?.target_email) {
+        const [suppression] = await sql`
+      SELECT id, reason FROM suppressions WHERE id = LOWER(${member.target_email}) LIMIT 1
+    `
+        if (suppression) {
+            console.log(`[DEBUG] Suppressed contact, skipping send: ${member.target_email} (reason: ${suppression.reason})`);
+            await sql`
+        UPDATE sequence_executions
+        SET status = 'skipped',
+            error_message = ${'Suppressed: ' + suppression.reason},
+            updated_at = NOW()
+        WHERE id = ${execution.id}
+      `
+            return;
+        }
+    }
 
     const preferredSender = String(metadata?.senderEmail || metadata?.from || member.sequence_sender_email || '').trim();
     let fromEmail = preferredSender || member.primary_owner_email;
