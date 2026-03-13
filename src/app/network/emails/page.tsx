@@ -67,6 +67,8 @@ export default function EmailsPage() {
   const effectiveTotal =
     emailFilter === 'sent'
       ? (emailTypeCounts?.sent ?? emails.length)
+      : emailFilter === 'scheduled'
+        ? (emailTypeCounts?.scheduled ?? emails.length)
       : emailFilter === 'received'
         ? (emailTypeCounts?.received ?? emails.length)
         : (totalEmails ?? emails.length)
@@ -111,6 +113,7 @@ export default function EmailsPage() {
     const idSet = new Set(ids)
     const sentDeleted = emails.filter((email) => idSet.has(email.id) && email.type === 'sent').length
     const receivedDeleted = emails.filter((email) => idSet.has(email.id) && email.type === 'received').length
+    const scheduledDeleted = emails.filter((email) => idSet.has(email.id) && email.type === 'scheduled').length
 
     queryClient.setQueriesData({ queryKey: ['emails'] }, (oldData: any) => {
       if (!oldData?.pages) return oldData
@@ -137,6 +140,7 @@ export default function EmailsPage() {
         all: Math.max(0, (oldCounts.all ?? 0) - ids.length),
         sent: Math.max(0, (oldCounts.sent ?? 0) - sentDeleted),
         received: Math.max(0, (oldCounts.received ?? 0) - receivedDeleted),
+        scheduled: Math.max(0, (oldCounts.scheduled ?? 0) - scheduledDeleted),
       }
     })
 
@@ -205,6 +209,7 @@ export default function EmailsPage() {
           totalEmails={totalEmails}
           totalReceived={emailTypeCounts?.received}
           totalSent={emailTypeCounts?.sent}
+          totalScheduled={emailTypeCounts?.scheduled}
           hasNextPage={hasNextPage}
           fetchNextPage={fetchNextPage}
           isFetchingNextPage={isFetchingNextPage}

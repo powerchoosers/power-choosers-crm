@@ -24,6 +24,7 @@ interface EmailListProps {
   totalEmails?: number
   totalReceived?: number
   totalSent?: number
+  totalScheduled?: number
   hasNextPage?: boolean
   fetchNextPage?: () => void
   isFetchingNextPage?: boolean
@@ -54,6 +55,7 @@ export function EmailList({
   totalEmails,
   totalReceived,
   totalSent,
+  totalScheduled,
   hasNextPage,
   fetchNextPage,
   isFetchingNextPage,
@@ -82,6 +84,7 @@ export function EmailList({
     if (filter === 'all') return totalEmails ?? filteredEmails.length
     if (filter === 'received') return totalReceived ?? filteredEmails.length
     if (filter === 'sent') return totalSent ?? filteredEmails.length
+    if (filter === 'scheduled') return totalScheduled ?? filteredEmails.length
     return filteredEmails.length
   })()
 
@@ -231,6 +234,26 @@ export function EmailList({
             </button>
           </div>
           <div className="relative inline-flex">
+            {filter === 'scheduled' && (
+              <motion.div
+                layoutId="emails-filter-pill"
+                className="absolute inset-0 rounded-md bg-white/10"
+                transition={{ type: 'spring', stiffness: 350, damping: 30 }}
+              />
+            )}
+            <button
+              type="button"
+              onClick={() => { onFilterChange('scheduled'); setCurrentPage(1); }}
+              className={cn(
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                filter === 'scheduled' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+              )}
+              title="Scheduled Outbound"
+            >
+              Scheduled
+            </button>
+          </div>
+          <div className="relative inline-flex">
             {filter === 'all' && (
               <motion.div
                 layoutId="emails-filter-pill"
@@ -283,13 +306,14 @@ export function EmailList({
       <div className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll">
         <div className="divide-y divide-white/5">
           {paginatedEmails.map((email, index) => {
+            const isOutbound = email.type === 'sent' || email.type === 'scheduled'
             const openCount = email.openCount || 0
             const clickCount = email.clickCount || 0
             const hasClicks = clickCount > 0
             const rowIndex = (currentPage - 1) * itemsPerPage + index + 1
             const isSelected = selectedIds.has(email.id)
             const toList = Array.isArray(email.to) ? email.to : [email.to]
-            const primaryEmail = email.type === 'sent'
+            const primaryEmail = isOutbound
               ? extractEmailAddress(String(toList[0] || ''))
               : extractEmailAddress(String(email.from || ''))
             const primaryContact = (email.contactId ? contactById[email.contactId] : undefined) || contactByEmail[primaryEmail]
@@ -298,7 +322,7 @@ export function EmailList({
               const matched = contactByEmail[addr]
               return matched?.displayName || String(raw || '')
             })
-            const participantLabel = email.type === 'sent'
+            const participantLabel = isOutbound
               ? `To: ${recipientLabels.join(', ')}`
               : (primaryContact?.displayName || email.from)
             const fallbackDomain = primaryEmail.includes('@') ? primaryEmail.split('@')[1] : undefined
@@ -388,7 +412,7 @@ export function EmailList({
                         {participantLabel}
                       </span>
                     )}
-                    {email.type === 'sent' ? (
+                    {isOutbound ? (
                       <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
                     ) : (
                       <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
