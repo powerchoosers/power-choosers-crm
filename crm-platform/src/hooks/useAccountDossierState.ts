@@ -163,7 +163,7 @@ export function useAccountDossierState(id: string) {
                 if ((account?.domain || '') !== (editDomain || '')) changedFields.add('domain')
                 if ((account?.linkedinUrl || '') !== (editLinkedinUrl || '')) changedFields.add('linkedin')
                 if ((account?.contractEnd || '') !== (editContractEnd || '')) changedFields.add('contractEnd')
-                if ((account?.companyPhone || '') !== (editCompanyPhone || '')) changedFields.add('phone')
+                if ((account?.companyPhone || '') !== (editCompanyPhone || '')) changedFields.add('companyPhone')
                 if ((account?.address || '') !== (editAddress || '')) changedFields.add('address')
                 if (changedFields.size) {
                     setRecentlyUpdatedFields(changedFields)
@@ -213,7 +213,7 @@ export function useAccountDossierState(id: string) {
                     })
                     setShowSynced(true)
                     setTimeout(() => setShowSynced(false), 3000)
-                    setTimeout(() => setRecentlyUpdatedFields(new Set()), 1200)
+                    setTimeout(() => setRecentlyUpdatedFields(new Set()), 2000)
                     toast.success('System Synced')
                 } catch (err: any) {
                     for (const [key, value] of previousAccountQueries) {
@@ -352,10 +352,10 @@ export function useAccountDossierState(id: string) {
             if (prev.description !== account.description) changed.add('description')
         }
         prevAccountRef.current = account
-        if (changed.size) {
-            setRecentlyUpdatedFields(changed)
-            setTimeout(() => setRecentlyUpdatedFields(new Set()), 1600)
-        }
+            if (changed.size) {
+                setRecentlyUpdatedFields(changed)
+                setTimeout(() => setRecentlyUpdatedFields(new Set()), 2000)
+            }
     }, [account, isRecalibrating, lastEnrichedAccountId])
 
     return {

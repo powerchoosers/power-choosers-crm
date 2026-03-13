@@ -205,11 +205,14 @@ export function useContactDossierState(id: string) {
                 if ((contact?.linkedinUrl || '') !== (editLinkedinUrl || '')) changedFields.add('linkedin')
                 if ((contact?.website || '') !== (editWebsite || '')) changedFields.add('website')
                 if ((account?.domain || '') !== (websiteDomain ?? account?.domain ?? '')) changedFields.add('website')
+                if ((contact?.notes || '') !== (editNotes || '')) changedFields.add('notes')
                 if ((account?.electricitySupplier || '') !== (editSupplier || '')) changedFields.add('currentSupplier')
                 if ((account?.currentRate || '') !== (editStrikePrice || '')) changedFields.add('strikePrice')
                 if ((account?.annualUsage || '') !== (cleanedUsage.toString() || '')) changedFields.add('annualVolume')
                 if ((formatMillValue(account?.mills ?? account?.metadata?.mills) || '') !== (editMills || '')) changedFields.add('mills')
                 if ((account?.contractEnd ? String(account.contractEnd).slice(0, 10) : '') !== (editContractEnd || '')) changedFields.add('contractEnd')
+                if ((contact?.companyPhone || '') !== (editCompanyPhone || '')) changedFields.add('companyPhone')
+                if ((contact?.phone || '') !== (editPhone || '')) changedFields.add('phone')
 
                 if (changedFields.size) {
                     setRecentlyUpdatedFields(changedFields)
@@ -300,7 +303,7 @@ export function useContactDossierState(id: string) {
 
                     setShowSynced(true)
                     setTimeout(() => setShowSynced(false), 3000)
-                    setTimeout(() => setRecentlyUpdatedFields(new Set()), 1200)
+                    setTimeout(() => setRecentlyUpdatedFields(new Set()), 2000)
                     toast.success('System Synced')
                 } catch (err) {
                     for (const [key, value] of previousContactQueries) {

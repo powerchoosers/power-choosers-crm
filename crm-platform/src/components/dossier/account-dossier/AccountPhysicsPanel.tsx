@@ -12,6 +12,7 @@ import { formatMillValue, millDecimal, millOptions } from '@/lib/mills'
 interface AccountPhysicsPanelProps {
     account: any
     isEditing: boolean
+    isSaving: boolean
     isRecalibrating: boolean
     recentlyUpdatedFields: Set<string>
     glowingFields: Set<string>
@@ -44,6 +45,7 @@ interface AccountPhysicsPanelProps {
 export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
     account,
     isEditing,
+    isSaving,
     isRecalibrating,
     recentlyUpdatedFields,
     glowingFields,
@@ -91,8 +93,10 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
                         logoUrl: editLogoUrl || account.logoUrl
                     }}
                     isEditing={isEditing}
+                    isSaving={isSaving}
                     onEnter={toggleEditing}
                     onUpdate={handleUpdate}
+                    recentlyUpdatedFields={recentlyUpdatedFields}
                 />
 
                 <div className={cn(
