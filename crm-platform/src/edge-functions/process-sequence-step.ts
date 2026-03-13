@@ -168,7 +168,8 @@ async function handleGeneration(execution, job) {
              s.bgvector->'settings'->>'senderEmail',
              s.metadata->>'sender_email',
              u.email
-           ) as sequence_sender_email
+           ) as sequence_sender_email,
+           u.first_name as owner_first_name
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
     LEFT JOIN accounts a ON c."accountId" = a.id
@@ -232,7 +233,8 @@ async function handleGeneration(execution, job) {
                 has_website: !!website,
                 source_label: sourceLabel,
                 sender_email: senderEmail,
-                sender_domain: senderDomain
+                sender_domain: senderDomain,
+                sender_first_name: member.owner_first_name || null
             }
         })
     })
