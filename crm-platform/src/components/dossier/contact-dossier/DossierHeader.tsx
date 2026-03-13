@@ -93,14 +93,8 @@ export const DossierHeader = memo(function DossierHeader({
     const contactName = contact?.name || 'Unknown Contact'
 
     useEffect(() => {
-        if (!isEditing) {
-            if (activeEditField !== null) {
-                setActiveEditField(null)
-            }
-            return
-        }
-        if (activeEditField == null) {
-            setActiveEditField('website')
+        if (!isEditing && activeEditField !== null) {
+            setActiveEditField(null)
         }
     }, [activeEditField, isEditing, setActiveEditField])
 
@@ -269,7 +263,13 @@ export const DossierHeader = memo(function DossierHeader({
                                                         placeholder="WEBSITE URL"
                                                         className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
                                                         autoFocus
-                                                        onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault()
+                                                                setActiveEditField(null)
+                                                                toggleEditing()
+                                                            }
+                                                        }}
                                                     />
                                                 </motion.div>
                                             )}
@@ -315,7 +315,13 @@ export const DossierHeader = memo(function DossierHeader({
                                                         placeholder="LINKEDIN URL"
                                                         className="bg-transparent border-none focus:ring-0 text-[9px] font-mono text-white w-24 placeholder:text-zinc-700 uppercase tracking-widest h-6"
                                                         autoFocus
-                                                        onKeyDown={(e) => e.key === 'Enter' && setActiveEditField(null)}
+                                                        onKeyDown={(e) => {
+                                                            if (e.key === 'Enter') {
+                                                                e.preventDefault()
+                                                                setActiveEditField(null)
+                                                                toggleEditing()
+                                                            }
+                                                        }}
                                                     />
                                                 </motion.div>
                                             )}
@@ -499,7 +505,7 @@ export const DossierHeader = memo(function DossierHeader({
                                 onClick={toggleEditing}
                                 className={cn(
                                     "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
-                                    isEditing ? "text-[#002FA7] bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-white"
+                                    isEditing ? "text-white bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-white"
                                 )}
                             >
                                 {isEditing ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}

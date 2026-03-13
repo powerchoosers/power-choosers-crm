@@ -85,6 +85,8 @@ export function EmailList({
   const setCurrentPage = externalOnPageChange || setInternalPage
 
   const itemsPerPage = 15
+  const [skeletonRowCount, setSkeletonRowCount] = useState(itemsPerPage)
+  const shouldShowSkeletonRows = isLoading || showSkeletonRows
 
   const filteredEmails = emails.filter(email => {
     if (filter === 'all') return true
@@ -111,7 +113,6 @@ export function EmailList({
   // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(filteredEmails.length / itemsPerPage))
   const paginatedEmails = filteredEmails.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
-  const skeletonRowCount = Math.min(itemsPerPage, 6)
   const skeletonRows = Array.from({ length: skeletonRowCount }).map((_, idx) => (
     <div
       key={`skeleton-${idx}`}
@@ -174,16 +175,21 @@ export function EmailList({
     setCurrentPage(newPage)
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4">
-        <Loader2 className="w-8 h-8 animate-spin" />
-        <p>Loading emails...</p>
-      </div>
-    )
-  }
+  useEffect(() => {
+    if (!shouldShowSkeletonRows) return
 
-  if (!showSkeletonRows && emails.length === 0) {
+    const computeRowCount = () => {
+      const containerHeight = scrollContainerRef?.current?.clientHeight || Math.round(window.innerHeight * 0.58)
+      const estimatedRows = Math.ceil(containerHeight / 76) + 2
+      setSkeletonRowCount(Math.max(itemsPerPage, estimatedRows))
+    }
+
+    computeRowCount()
+    window.addEventListener('resize', computeRowCount)
+    return () => window.removeEventListener('resize', computeRowCount)
+  }, [shouldShowSkeletonRows, scrollContainerRef])
+
+  if (!shouldShowSkeletonRows && emails.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4 animate-in fade-in duration-700">
         <div className="w-16 h-16 rounded-2xl nodal-glass flex items-center justify-center border border-white/5 shadow-2xl">
@@ -347,8 +353,8 @@ export function EmailList({
 
       {/* Scrollable List */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll">
-        <div className="divide-y divide-white/5">
-          {showSkeletonRows ? (
+        <div>
+          {shouldShowSkeletonRows ? (
             skeletonRows
           ) : (
             paginatedEmails.map((email, index) => {
@@ -384,14 +390,14 @@ export function EmailList({
                 <div
                   key={email.id}
                   onClick={() => onSelectEmail(email)}
-                  className={cn(
-                    "group grid grid-cols-12 gap-4 p-3 cursor-pointer transition-all items-center border-l-2",
-                    hasClicks ? "border-[#002FA7]" : selectedEmailId === email.id ? "border-[#002FA7]" : "border-transparent",
-                    email.unread ? "bg-[#002FA7]/5" : "",
-                    isSelected ? "selected-container border-[#cfd5ff]/30 shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
-                    !isSelected && "hover:bg-white/5"
-                  )}
-                >
+                className={cn(
+                  "group grid grid-cols-12 gap-4 p-3 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
+                  hasClicks ? "border-l-[#002FA7]" : selectedEmailId === email.id ? "border-l-[#002FA7]" : "border-l-transparent",
+                  email.unread ? "bg-[#002FA7]/8" : "",
+                  isSelected ? "selected-container shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
+                  !isSelected && "hover:bg-white/[0.03]"
+                )}
+              >
                   {/* Select / Row number */}
                   <div className="col-span-1 flex items-center justify-center relative group/select">
                     {onSelectionChange ? (
