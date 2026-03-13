@@ -189,6 +189,9 @@ async function handleGeneration(execution, job) {
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
         body: JSON.stringify({
             prompt: `${metadata?.prompt || 'Draft a personalized follow-up'}\n\n${sourceTruthLine}`,
+            provider: 'openrouter',
+            type: 'email',
+            vectors: Array.isArray(metadata?.vectors) ? metadata.vectors : [],
             mode: 'generate_email',
             contact: {
                 name: `${member.firstName} ${member.lastName}`,
@@ -216,8 +219,12 @@ async function handleGeneration(execution, job) {
     if (!response.ok) throw new Error(`AI generation failed (${response.status})`);
 
     const result = await response.json()
-    const body = result.optimizedContent || result.content
-    const subject = result.subject || metadata?.subject || 'Message from Nodal Point'
+    const body = result.optimized || result.optimizedContent || result.content || ''
+    const subject = result.subject || metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point'
+
+    if (!String(body).trim()) {
+        throw new Error('AI generation returned empty body');
+    }
 
     await sql`
     UPDATE sequence_executions 

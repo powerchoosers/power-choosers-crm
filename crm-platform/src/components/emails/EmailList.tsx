@@ -322,6 +322,7 @@ export function EmailList({
             const actionState = scheduledActionState[email.id] || ''
             const isGenerating = actionState === 'generate' || actionState === 'regenerate'
             const isAccepting = actionState === 'accept'
+            const showRegenerateLabel = hasGeneratedContent || Boolean(email?.metadata?.previewGeneratedAt)
             const openCount = email.openCount || 0
             const clickCount = email.clickCount || 0
             const hasClicks = clickCount > 0
@@ -499,20 +500,24 @@ export function EmailList({
                 {filter === 'scheduled' && (
                   <div className="col-span-2 flex items-center">
                     <div className="flex items-center gap-2">
-                      {!hasGeneratedContent ? (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (!executionId || !onGenerateScheduled || isGenerating) return
-                            onGenerateScheduled(email)
-                          }}
-                          disabled={!executionId || !onGenerateScheduled || isGenerating}
-                          className="icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40"
-                          title={executionId ? 'Generate draft now' : 'Missing execution link'}
-                        >
-                          {isGenerating ? 'Generating...' : 'Generate'}
-                        </button>
-                      ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (!executionId || !onGenerateScheduled || isGenerating) return
+                          onGenerateScheduled(email)
+                        }}
+                        disabled={!executionId || !onGenerateScheduled || isGenerating}
+                        className={cn(
+                          "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40",
+                          showRegenerateLabel ? "text-emerald-400 border-emerald-500/40" : ""
+                        )}
+                        title={executionId ? `${showRegenerateLabel ? 'Regenerate' : 'Generate'} draft now` : 'Missing execution link'}
+                      >
+                        {isGenerating ? 'Generating...' : showRegenerateLabel ? 'Regenerate' : 'Generate'}
+                      </button>
+                    )}
+                    {hasGeneratedContent && (
+                      <>
                         <>
                           <button
                             onClick={(e) => {
