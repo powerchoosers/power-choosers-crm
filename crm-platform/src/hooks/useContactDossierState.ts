@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
@@ -52,6 +53,7 @@ export function useContactDossierState(id: string) {
     const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id, account?.companyPhone, account?.id)
     const updateContact = useUpdateContact()
     const updateAccount = useUpdateAccount()
+    const queryClient = useQueryClient()
     const { isEditing, setIsEditing, toggleEditing } = useUIStore()
     const setContext = useGeminiStore((state) => state.setContext)
 
@@ -112,6 +114,8 @@ export function useContactDossierState(id: string) {
     const prevContactRef = useRef<any>(undefined)
     const lastEnrichedContactId = useUIStore((s) => s.lastEnrichedContactId)
     const prevIsEditing = useRef(isEditing)
+    const prevEditingStateRef = useRef(isEditing)
+    const suppressHydrationRef = useRef(false)
     const skipSaveOnNextLockRef = useRef(false)
 
     // Task Integration
@@ -125,9 +129,16 @@ export function useContactDossierState(id: string) {
     const { updateTask } = useTasks()
     const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
 
+    useEffect(() => {
+        if (prevEditingStateRef.current && !isEditing) {
+            suppressHydrationRef.current = true
+        }
+        prevEditingStateRef.current = isEditing
+    }, [isEditing])
+
     // Sync Logic
     useEffect(() => {
-        if (contact && !isEditing) {
+        if (contact && !isEditing && !suppressHydrationRef.current) {
             const c = contact as any
             const first = c.firstName ?? (contact.name || '').split(/\s+/)[0] ?? ''
             const last = c.lastName ?? (contact.name || '').split(/\s+/).slice(1).join(' ') ?? ''
@@ -181,6 +192,72 @@ export function useContactDossierState(id: string) {
             const triggerSave = async () => {
                 setIsSaving(true)
                 const fullName = [editFirstName, editLastName].filter(Boolean).join(' ').trim() || editName
+                const linkedAccountId = (contact as any)?.accountId || (contact as any)?.linkedAccountId
+                const cleanedUsage = parseInt(editAnnualUsage.replace(/[^0-9]/g, '')) || 0
+                const websiteDomain = parseDomainFromWebsite(editWebsite)
+                const changedFields = new Set<string>()
+
+                if ((contact?.name || '') !== (fullName || '')) changedFields.add('name')
+                if ((contact?.title || '') !== (editTitle || '')) changedFields.add('title')
+                if ((contact?.companyName || contact?.company || '') !== (editCompany || '')) changedFields.add('company')
+                if ((contact?.location || '') !== (editLocation || '')) changedFields.add('location')
+                if ((contact?.logoUrl || contact?.avatarUrl || '') !== (editLogoUrl || '')) changedFields.add('logoUrl')
+                if ((contact?.linkedinUrl || '') !== (editLinkedinUrl || '')) changedFields.add('linkedin')
+                if ((contact?.website || '') !== (editWebsite || '')) changedFields.add('website')
+                if ((account?.domain || '') !== (websiteDomain ?? account?.domain ?? '')) changedFields.add('website')
+                if ((account?.electricitySupplier || '') !== (editSupplier || '')) changedFields.add('currentSupplier')
+                if ((account?.currentRate || '') !== (editStrikePrice || '')) changedFields.add('strikePrice')
+                if ((account?.annualUsage || '') !== (cleanedUsage.toString() || '')) changedFields.add('annualVolume')
+                if ((formatMillValue(account?.mills ?? account?.metadata?.mills) || '') !== (editMills || '')) changedFields.add('mills')
+                if ((account?.contractEnd ? String(account.contractEnd).slice(0, 10) : '') !== (editContractEnd || '')) changedFields.add('contractEnd')
+
+                if (changedFields.size) {
+                    setRecentlyUpdatedFields(changedFields)
+                }
+
+                const previousContactQueries = queryClient.getQueriesData({ queryKey: ['contact'] })
+                const previousAccountQueries = queryClient.getQueriesData({ queryKey: ['account'] })
+
+                queryClient.setQueriesData({ queryKey: ['contact'] }, (cached: any) => {
+                    if (!cached || cached.id !== id) return cached
+                    return {
+                        ...cached,
+                        name: fullName,
+                        firstName: editFirstName,
+                        lastName: editLastName,
+                        title: editTitle,
+                        companyName: editCompany,
+                        phone: editPhone,
+                        email: editEmail,
+                        notes: editNotes,
+                        location: editLocation,
+                        logoUrl: editLogoUrl,
+                        website: editWebsite,
+                        linkedinUrl: editLinkedinUrl,
+                        serviceAddresses: editServiceAddresses,
+                        mobile: editMobile,
+                        workDirectPhone: editWorkDirect,
+                        otherPhone: editOther,
+                        companyPhone: editCompanyPhone,
+                        primaryPhoneField: editPrimaryField,
+                    }
+                })
+
+                if (linkedAccountId) {
+                    queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+                        if (!cached || cached.id !== linkedAccountId) return cached
+                        return {
+                            ...cached,
+                            electricitySupplier: editSupplier,
+                            currentRate: editStrikePrice,
+                            annualUsage: cleanedUsage.toString(),
+                            mills: editMills,
+                            contractEnd: editContractEnd || null,
+                            ...(websiteDomain !== undefined ? { domain: websiteDomain } : {})
+                        }
+                    })
+                }
+
                 try {
                     // Update contact-specific fields
                     await updateContact.mutateAsync({
@@ -206,12 +283,9 @@ export function useContactDossierState(id: string) {
                     })
 
                     // If linked to an account, sync energy data and the company website domain
-                    const accountId = (contact as any)?.accountId || (contact as any)?.linkedAccountId
-                    if (accountId) {
-                        const cleanedUsage = parseInt(editAnnualUsage.replace(/[^0-9]/g, '')) || 0
-                        const websiteDomain = parseDomainFromWebsite(editWebsite)
+                    if (linkedAccountId) {
                         const accountPayload: any = {
-                            id: accountId,
+                            id: linkedAccountId,
                             electricitySupplier: editSupplier,
                             currentRate: editStrikePrice,
                             annualUsage: cleanedUsage.toString(),
@@ -226,10 +300,19 @@ export function useContactDossierState(id: string) {
 
                     setShowSynced(true)
                     setTimeout(() => setShowSynced(false), 3000)
+                    setTimeout(() => setRecentlyUpdatedFields(new Set()), 1200)
                     toast.success('System Synced')
                 } catch (err) {
+                    for (const [key, value] of previousContactQueries) {
+                        queryClient.setQueryData(key, value)
+                    }
+                    for (const [key, value] of previousAccountQueries) {
+                        queryClient.setQueryData(key, value)
+                    }
+                    setRecentlyUpdatedFields(new Set())
                     toast.error('Sync failed')
                 } finally {
+                    suppressHydrationRef.current = false
                     setIsSaving(false)
                 }
             }

@@ -675,7 +675,7 @@ export default function AccountsPage() {
             </DndContext>
             <TableBody>
               {isLoading ? (
-                <ForensicTableSkeleton columns={columns.length} rows={12} />
+                <ForensicTableSkeleton columns={columns.length} rows={12} type="account" />
               ) : table.getRowModel().rows?.length ? (
                 <AnimatePresence mode="popLayout">
                   {table.getRowModel().rows.map((row, index) => (

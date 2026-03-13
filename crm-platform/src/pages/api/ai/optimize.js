@@ -53,7 +53,7 @@ function ensureThanksSignoff(input, senderFirstName) {
 
   const firstName = normalizeSenderFirstName(senderFirstName);
   const hasExactSignoff = new RegExp(
-    `<p[^>]*>\\s*Thanks,\\s*<\\/p>\\s*<p[^>]*>\\s*${firstName}\\s*<\\/p>\\s*$`,
+    `<p[^>]*>\\s*Thanks,\\s*<br\\s*\\/?\\>\\s*${firstName}\\s*<\\/p>\\s*$`,
     'i'
   ).test(html);
   if (hasExactSignoff) return html;
@@ -61,11 +61,11 @@ function ensureThanksSignoff(input, senderFirstName) {
   // Remove common closings at the end so the enforced signoff stays consistent.
   const withoutClose =
     html.replace(
-      /(?:<p[^>]*>\s*(?:Best regards|Regards|Sincerely|Cheers|Thanks|Thank you),?\s*<\/p>\s*<p[^>]*>[\s\S]*?<\/p>\s*)+$/i,
+      /(?:<p[^>]*>\s*(?:Best regards|Regards|Sincerely|Cheers|Thanks|Thank you),?\s*(?:<br\s*\/?>\s*[^<]+)?<\/p>\s*|<p[^>]*>\s*(?:Best regards|Regards|Sincerely|Cheers|Thanks|Thank you),?\s*<\/p>\s*<p[^>]*>[\s\S]*?<\/p>\s*)+$/i,
       ''
     ).trim();
 
-  return `${withoutClose}<p>Thanks,</p><p>${firstName}</p>`;
+  return `${withoutClose}<p>Thanks,<br>${firstName}</p>`;
 }
 
 function cleanCompanyName(input) {

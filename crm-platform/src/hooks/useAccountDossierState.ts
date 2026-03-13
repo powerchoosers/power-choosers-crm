@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useAccountContacts } from '@/hooks/useContacts'
@@ -44,6 +45,7 @@ export function useAccountDossierState(id: string) {
     const contactIds = contacts?.map(c => c.id).filter(Boolean) || []
     const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds)
     const updateAccount = useUpdateAccount()
+    const queryClient = useQueryClient()
 
     const { isEditing, setIsEditing, toggleEditing, lastEnrichedAccountId, setRightPanelMode, setIngestionContext } = useUIStore()
     const setContext = useGeminiStore((state) => state.setContext)
@@ -73,6 +75,8 @@ export function useAccountDossierState(id: string) {
     const [isRecalibrating, setIsRecalibrating] = useState(false)
     const prevAccountRef = useRef<any>(undefined)
     const prevIsEditing = useRef(isEditing)
+    const prevEditingStateRef = useRef(isEditing)
+    const suppressHydrationRef = useRef(false)
     const skipSaveOnNextLockRef = useRef(false)
     const justIngestedRef = useRef(false)
 
@@ -94,7 +98,14 @@ export function useAccountDossierState(id: string) {
     const useGlobalPagination = globalIndex >= 0 && globalTotal > 0
 
     useEffect(() => {
-        if (account && !isEditing) {
+        if (prevEditingStateRef.current && !isEditing) {
+            suppressHydrationRef.current = true
+        }
+        prevEditingStateRef.current = isEditing
+    }, [isEditing])
+
+    useEffect(() => {
+        if (account && !isEditing && !suppressHydrationRef.current) {
             setEditAccountName(account.name || '')
             setEditNotes(account.description || '')
             setEditAnnualUsage(account.annualUsage?.toString() || '')
@@ -138,8 +149,50 @@ export function useAccountDossierState(id: string) {
             }
             const triggerSave = async () => {
                 setIsSaving(true)
+                const cleanedUsage = parseInt(editAnnualUsage.replace(/[^0-9]/g, '')) || 0
+                const changedFields = new Set<string>()
+                if ((account?.name || '') !== (editAccountName || '')) changedFields.add('name')
+                if ((account?.description || '') !== (editNotes || '')) changedFields.add('description')
+                if ((account?.annualUsage || '') !== (cleanedUsage.toString() || '')) changedFields.add('annualVolume')
+                if ((account?.currentRate || '') !== (editStrikePrice || '')) changedFields.add('strikePrice')
+                if ((formatMillValue(account?.mills ?? account?.metadata?.mills) || '') !== (editMills || '')) changedFields.add('mills')
+                if ((account?.industry || '') !== (editIndustry || '')) changedFields.add('industry')
+                if ((account?.location || '') !== (editLocation || '')) changedFields.add('location')
+                if ((account?.logoUrl || '') !== (editLogoUrl || '')) changedFields.add('logoUrl')
+                if ((account?.electricitySupplier || '') !== (editSupplier || '')) changedFields.add('currentSupplier')
+                if ((account?.domain || '') !== (editDomain || '')) changedFields.add('domain')
+                if ((account?.linkedinUrl || '') !== (editLinkedinUrl || '')) changedFields.add('linkedin')
+                if ((account?.contractEnd || '') !== (editContractEnd || '')) changedFields.add('contractEnd')
+                if ((account?.companyPhone || '') !== (editCompanyPhone || '')) changedFields.add('phone')
+                if ((account?.address || '') !== (editAddress || '')) changedFields.add('address')
+                if (changedFields.size) {
+                    setRecentlyUpdatedFields(changedFields)
+                }
+
+                const previousAccountQueries = queryClient.getQueriesData({ queryKey: ['account'] })
+                queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+                    if (!cached || cached.id !== id) return cached
+                    return {
+                        ...cached,
+                        name: editAccountName,
+                        description: editNotes,
+                        annualUsage: cleanedUsage.toString(),
+                        currentRate: editStrikePrice,
+                        mills: editMills,
+                        industry: editIndustry,
+                        location: editLocation,
+                        logoUrl: editLogoUrl,
+                        electricitySupplier: editSupplier,
+                        domain: editDomain,
+                        linkedinUrl: editLinkedinUrl,
+                        meters: editMeters,
+                        contractEnd: editContractEnd || null,
+                        companyPhone: editCompanyPhone,
+                        address: editAddress
+                    }
+                })
+
                 try {
-                    const cleanedUsage = parseInt(editAnnualUsage.replace(/[^0-9]/g, '')) || 0
                     await updateAccount.mutateAsync({
                         id,
                         name: editAccountName,
@@ -160,10 +213,16 @@ export function useAccountDossierState(id: string) {
                     })
                     setShowSynced(true)
                     setTimeout(() => setShowSynced(false), 3000)
+                    setTimeout(() => setRecentlyUpdatedFields(new Set()), 1200)
                     toast.success('System Synced')
                 } catch (err: any) {
+                    for (const [key, value] of previousAccountQueries) {
+                        queryClient.setQueryData(key, value)
+                    }
+                    setRecentlyUpdatedFields(new Set())
                     toast.error(`Sync failed: ${err?.message || 'Unknown error'}`)
                 } finally {
+                    suppressHydrationRef.current = false
                     setIsSaving(false)
                 }
             }

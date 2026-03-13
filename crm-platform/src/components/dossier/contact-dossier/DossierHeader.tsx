@@ -171,7 +171,7 @@ export const DossierHeader = memo(function DossierHeader({
                         </AnimatePresence>
 
                         <div className="flex-1 min-w-0 flex flex-col">
-                            <div className="flex items-center gap-3 mb-0.5">
+                            <div className="flex items-center gap-3 mb-1">
                                 {isEditing ? (
                                     <div className="flex items-center gap-2 flex-1 min-w-0">
                                         <input
@@ -330,7 +330,7 @@ export const DossierHeader = memo(function DossierHeader({
                                 </div>
 
                                 {/* Status/Sync Indicators */}
-                                <motion.div layout className="flex items-center gap-2 ml-2 overflow-visible">
+                                <motion.div layout className="flex items-center gap-2 overflow-visible">
                                     <AnimatePresence>
                                         {contact.listName && (
                                             <motion.div

@@ -389,7 +389,7 @@ export default function TasksPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <ForensicTableSkeleton columns={columns.length} rows={12} />
+                <ForensicTableSkeleton columns={columns.length} rows={12} type="task" />
               ) : isError ? (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
