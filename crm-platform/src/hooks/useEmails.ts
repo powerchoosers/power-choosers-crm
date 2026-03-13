@@ -108,7 +108,8 @@ async function applyNonAdminEmailScope(query: any, user: any) {
 
 function applyCommonEmailExclusions(query: any) {
   return query
-    .neq('is_deleted', true)
+    // Some client builds expose `.not(...)` but not `.neq(...)` on this chained builder.
+    .not('is_deleted', 'eq', true)
     .not('subject', 'ilike', '%mailwarming%')
     .not('subject', 'ilike', '%mail warming%')
     .not('subject', 'ilike', '%test email%')
@@ -349,7 +350,7 @@ export function useSearchEmails(queryTerm: string) {
 
         // Filter out mailwarming emails
         query = query
-          .neq('is_deleted', true)
+          .not('is_deleted', 'eq', true)
           .not('subject', 'ilike', '%mailwarming%')
           .not('subject', 'ilike', '%mail warming%')
           .not('from', 'ilike', '%apollo.io%')

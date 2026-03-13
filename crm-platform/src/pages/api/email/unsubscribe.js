@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { ZohoMailService } from './zoho-service.js';
+import { isUserAdmin } from '@/lib/supabase';
 
 // preference type → suppression reason label
 const REASON_MAP = {
@@ -12,7 +13,59 @@ const REASON_MAP = {
 
 const ALERT_AUTH_EMAIL = 'l.patterson@nodalpoint.io';
 const ALERT_FROM_EMAIL = 'signal@nodalpoint.io';
-const ALERT_TO_EMAIL = 'l.patterson@nodalpoint.io';
+
+function normalizeToPrimaryLoginEmail(email) {
+  const normalized = String(email || '').toLowerCase().trim();
+  if (!normalized) return '';
+  if (normalized.endsWith('@getnodalpoint.com')) {
+    return normalized.replace('@getnodalpoint.com', '@nodalpoint.io');
+  }
+  return normalized;
+}
+
+async function resolveAlertRecipientsForUnsubscribe(targetEmail) {
+  const recipients = new Set([ALERT_AUTH_EMAIL]);
+  const normalizedTarget = String(targetEmail || '').toLowerCase().trim();
+
+  // 1) Include known admins (today backed by isUserAdmin; easy to extend later).
+  try {
+    const { data: users } = await supabaseAdmin
+      .from('users')
+      .select('email');
+
+    (users || []).forEach((u) => {
+      const email = normalizeToPrimaryLoginEmail(u?.email);
+      if (email && isUserAdmin(email)) recipients.add(email);
+    });
+  } catch (error) {
+    logger.warn('[Unsubscribe] Failed to resolve admin recipients:', error?.message || error);
+  }
+
+  // 2) Include owning agents for matching contact(s), mapped to their login domain.
+  try {
+    const { data: contacts } = await supabaseAdmin
+      .from('contacts')
+      .select('id, ownerId')
+      .ilike('email', normalizedTarget);
+
+    const ownerIds = Array.from(new Set((contacts || []).map((c) => c?.ownerId).filter(Boolean)));
+    if (ownerIds.length > 0) {
+      const { data: owners } = await supabaseAdmin
+        .from('users')
+        .select('id, email')
+        .in('id', ownerIds);
+
+      (owners || []).forEach((owner) => {
+        const ownerEmail = normalizeToPrimaryLoginEmail(owner?.email);
+        if (ownerEmail) recipients.add(ownerEmail);
+      });
+    }
+  } catch (error) {
+    logger.warn('[Unsubscribe] Failed to resolve agent recipients:', error?.message || error);
+  }
+
+  return Array.from(recipients);
+}
 
 async function sendUnsubscribeAlert({ email, preferenceType, pauseUntil, updatedContactsCount, pausedSequences, now }) {
   try {
@@ -20,6 +73,12 @@ async function sendUnsubscribeAlert({ email, preferenceType, pauseUntil, updated
     const initialized = await zohoService.initialize(ALERT_AUTH_EMAIL);
     if (!initialized) {
       logger.warn('[Unsubscribe] Alert email skipped: Zoho init failed');
+      return;
+    }
+
+    const recipients = await resolveAlertRecipientsForUnsubscribe(email);
+    if (recipients.length === 0) {
+      logger.warn('[Unsubscribe] Alert email skipped: no recipients resolved');
       return;
     }
 
@@ -32,12 +91,13 @@ async function sendUnsubscribeAlert({ email, preferenceType, pauseUntil, updated
         ${pauseUntil ? `<p><strong>Pause Until:</strong> ${pauseUntil}</p>` : ''}
         <p><strong>Contacts Updated:</strong> ${updatedContactsCount}</p>
         <p><strong>Sequence Members Updated:</strong> ${pausedSequences}</p>
+        <p><strong>Alert Recipients:</strong> ${recipients.join(', ')}</p>
         <p><strong>Timestamp (UTC):</strong> ${now}</p>
       </div>
     `;
 
     await zohoService.sendEmail({
-      to: ALERT_TO_EMAIL,
+      to: recipients,
       subject,
       html,
       userEmail: ALERT_AUTH_EMAIL,
@@ -45,7 +105,7 @@ async function sendUnsubscribeAlert({ email, preferenceType, pauseUntil, updated
       fromName: 'Nodal Point Signal'
     });
 
-    logger.log(`[Unsubscribe] Alert email sent for ${email}`);
+    logger.log(`[Unsubscribe] Alert email sent for ${email} to: ${recipients.join(', ')}`);
   } catch (error) {
     logger.error('[Unsubscribe] Failed to send alert email:', error);
   }

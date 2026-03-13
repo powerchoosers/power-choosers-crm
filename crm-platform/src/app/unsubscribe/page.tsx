@@ -4,6 +4,7 @@ import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import { CheckCircle, Zap, Clock, XCircle, Linkedin } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 type UnsubscribeType = 'permanent' | 'pause_90' | 'spike_only'
 type PageState = 'select' | 'submitting' | 'confirmed' | 'error'
@@ -101,7 +102,12 @@ function UnsubscribeContent() {
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-4 py-16">
       {/* Logo */}
-      <div className="mb-10 flex flex-col items-center gap-3">
+      <motion.div
+        initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        transition={{ duration: 0.7, ease: [0.23, 1, 0.32, 1] }}
+        className="mb-10 flex flex-col items-center gap-3"
+      >
         <Image
           src="/images/nodalpoint-webicon.png"
           alt="Nodal Point"
@@ -110,10 +116,15 @@ function UnsubscribeContent() {
           className="w-10 h-10"
         />
         <span className="text-zinc-500 text-xs tracking-[0.15em] uppercase font-mono">Nodal Point</span>
-      </div>
+      </motion.div>
 
       {/* Card */}
-      <div className="w-full max-w-md bg-zinc-900/60 border border-zinc-800 rounded-2xl p-8 backdrop-blur-sm">
+      <motion.div
+        initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        transition={{ duration: 0.8, delay: 0.1, ease: [0.23, 1, 0.32, 1] }}
+        className="w-full max-w-md bg-zinc-900/60 border border-zinc-800 rounded-2xl p-8 backdrop-blur-sm"
+      >
         {state === 'confirmed' && confirmedType ? (
           <ConfirmedView type={confirmedType} email={email} />
         ) : state === 'error' ? (
@@ -182,12 +193,25 @@ function UnsubscribeContent() {
             </button>
           </>
         )}
-      </div>
+        <a
+          href="https://nodalpoint.io"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-6 w-full inline-flex items-center justify-center py-2.5 rounded-lg border border-zinc-700 text-zinc-300 text-sm hover:text-zinc-100 hover:border-zinc-500 transition-colors"
+        >
+          Visit nodalpoint.io
+        </a>
+      </motion.div>
 
-      <p className="mt-8 text-xs text-zinc-700 text-center max-w-xs">
+      <motion.p
+        initial={{ opacity: 0, y: 16, filter: 'blur(8px)' }}
+        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+        transition={{ duration: 0.7, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
+        className="mt-8 text-xs text-zinc-700 text-center max-w-xs"
+      >
         Nodal Point · Energy Intelligence · Fort Worth, TX<br />
         Your preference will be applied within minutes.
-      </p>
+      </motion.p>
     </div>
   )
 }
