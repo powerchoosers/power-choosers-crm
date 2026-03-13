@@ -285,6 +285,7 @@ async function handleSend(execution, job) {
     const [member] = await sql`
     SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
            s."ownerId" as owner_uuid, u.email as primary_owner_email,
+           u.first_name as owner_first_name,
            COALESCE(
              s.bgvector->'settings'->>'senderEmail',
              s.metadata->>'sender_email',
@@ -350,7 +351,7 @@ async function handleSend(execution, job) {
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
         body: JSON.stringify({
             to: { email: member.target_email, name: `${member.firstName} ${member.lastName}` },
-            from: { email: fromEmail, name: 'Lewis Patterson' },
+            from: { email: fromEmail, name: member.owner_first_name ? `${member.owner_first_name} \u2022 Nodal Point` : 'Nodal Point' },
             subject: metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point',
             html: metadata?.body || metadata?.aiBody,
             email_id: emailRecordId,

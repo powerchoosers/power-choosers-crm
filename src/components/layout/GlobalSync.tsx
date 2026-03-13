@@ -1,7 +1,7 @@
 
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useEmailTrackingNotifications } from '@/hooks/useEmailTrackingNotifications'
@@ -11,6 +11,28 @@ import { toast } from 'sonner'
 import { CheckCircle, Eye, Paperclip } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
+
+const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
+  'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
+}
+
+async function resolveOwnerScope(user: { id?: string; email?: string | null }): Promise<string[]> {
+  const primary = String(user.email || '').toLowerCase().trim()
+  if (!primary) return []
+  const shared = FALLBACK_SHARED_INBOX_OWNERS[primary] || []
+  const owners = new Set<string>([primary, ...shared])
+  if (user.id) {
+    const { data: connections } = await supabase
+      .from('zoho_connections')
+      .select('email')
+      .eq('user_id', user.id)
+    ;(connections || []).forEach((conn: { email?: string | null }) => {
+      const e = String(conn.email || '').toLowerCase().trim()
+      if (e) owners.add(e)
+    })
+  }
+  return Array.from(owners)
+}
 
 function extractEmailAddress(value?: string | null) {
   const raw = String(value || '').trim()
@@ -54,9 +76,16 @@ export function GlobalSync() {
   const { user, loading } = useAuth()
   const { performSync } = useZohoSync()
   const queryClient = useQueryClient()
+  const ownerScopeRef = useRef<string[]>([])
 
   // Real-time email tracking notifications (opens/clicks)
   useEmailTrackingNotifications()
+
+  // Resolve owner scope once on mount (covers shared inboxes like signal@nodalpoint.io)
+  useEffect(() => {
+    if (!user) return
+    resolveOwnerScope(user).then(scope => { ownerScopeRef.current = scope })
+  }, [user])
 
   // Automated Background Sync Lifecycle
   useEffect(() => {
@@ -154,6 +183,7 @@ export function GlobalSync() {
             type?: string
             timestamp?: string
             created_at?: string
+            ownerId?: string
             attachments?: Array<unknown>
             metadata?: {
               ownerId?: string
@@ -167,9 +197,12 @@ export function GlobalSync() {
           const normalizedType = String(email.type || '').toLowerCase()
           if (normalizedType !== 'received' && normalizedType !== 'uplink_in') return
 
-          const ownerId = String(email.metadata?.ownerId || '').toLowerCase()
-          const userEmail = String(user.email || '').toLowerCase()
-          if (ownerId && ownerId !== userEmail) return
+          // Check against full owner scope (primary + shared inboxes like signal@nodalpoint.io)
+          const ownerId = String(email.metadata?.ownerId || email.ownerId || '').toLowerCase()
+          const scope = ownerScopeRef.current.length > 0
+            ? ownerScopeRef.current
+            : [String(user.email || '').toLowerCase()]
+          if (ownerId && !scope.includes(ownerId)) return
 
           // Always refresh inbox queries on new inbound rows for this owner.
           // Notification enrichment can fail (e.g., sender is display-name-only), but list refresh should not.
