@@ -1,6 +1,45 @@
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
+function extractJsonObject(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch (_) {
+    const firstBrace = raw.indexOf('{');
+    const lastBrace = raw.lastIndexOf('}');
+    if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) return null;
+    const candidate = raw.slice(firstBrace, lastBrace + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+function normalizeBodyHtml(input) {
+  const text = String(input || '').trim();
+  if (!text) return '';
+  if (/<\s*p[>\s]/i.test(text)) return text;
+
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (!lines.length) return '';
+
+  return lines.map((line) => `<p>${line}</p>`).join('');
+}
+
+function normalizeSubject(input) {
+  const value = String(input || '').trim();
+  if (!value) return 'Message from Nodal Point';
+  return value.replace(/\s+/g, ' ').slice(0, 140);
+}
+
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
@@ -81,26 +120,33 @@ export default async function handler(req, res) {
           You write cold emails for an Energy Analyst at Nodal Point. You do not sell, you diagnose.
 
           RULES:
-          1. Max 80 words.
+          1. Max 90 words.
           2. 6th grade vocabulary. No corporate jargon.
           3. NO bullet points. Write in 2–3 short paragraphs.
           4. NO em-dashes (—). Use commas or periods.
           5. Start with first name and a comma only. No "Hi" or "Hello."
           6. If you use bullets, this email fails. Use paragraphs only.
           7. NO CITATIONS OR LINKS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
-          8. TEXAS DEREGULATED MARKET (ERCOT): We operate in Texas. Use only Texas energy terminology (4CP tags, TDUs, Co-op risks). Forbid UK references (like "Citizens Advice").
-          9. SOURCE TRUTH IS HARD RULE:
+          8. TEXAS DEREGULATED MARKET (ERCOT): Keep context Texas/ERCOT and forbid UK references (like "Citizens Advice").
+          9. JARGON TRANSLATION RULE:
+            - Never use unexplained acronyms like 4CP, TDU, ESI ID, pass-through, nodal adder, or load zone shorthand in first-touch copy.
+            - Use plain business language first: "energy rate per kWh" and "demand/delivery charges".
+            - If a technical term is necessary, define it in the same sentence in plain English.
+          10. CTA RULE:
+            - First touch should ask for interest with a concrete offer, not a meeting request.
+            - Use one low-friction yes/no question only.
+          11. SOURCE TRUTH IS HARD RULE:
             - If source_label=linkedin (or has_linkedin=true), you may reference LinkedIn once.
             - If source_label=website (or has_linkedin=false and has_website=true), do NOT mention LinkedIn. Reference website/public company info instead.
             - If source_label=public_company_info (or has_linkedin=false and has_website=false), do NOT mention LinkedIn or website. Say you were reviewing companies in their industry/area.
             - Never claim a source that is not supported by SOURCE_TRUTH.
-          10. FIELD USAGE QUALITY RULE:
+          12. FIELD USAGE QUALITY RULE:
             - If ROLE is known, tailor one phrase to that role's business priorities.
             - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
             - If LOCATION is known, anchor the observation to that place naturally.
             - If any field is Unknown, do not invent it and do not force awkward placeholders.
-          11. ENERGY INTEL RULES:
-            - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, 4CP, or contract timing details.
+          13. ENERGY INTEL RULES:
+            - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
             - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
             - Never state certainty about exact contract month/day unless explicitly provided as verified in STRATEGY text.
@@ -203,16 +249,20 @@ export default async function handler(req, res) {
       if (mode === 'optimize_prompt') {
         finalResult = { optimized: generatedContent };
       } else {
-        try {
-          const parsed = JSON.parse(generatedContent);
+        const parsed = extractJsonObject(generatedContent);
+        if (parsed && typeof parsed === 'object') {
+          const bodyCandidate = parsed.body_html || parsed.body || parsed.content || '';
           finalResult = {
-            optimized: parsed.body_html,
-            subject: parsed.subject_line,
-            logic: parsed.logic_reasoning
+            optimized: normalizeBodyHtml(bodyCandidate),
+            subject: normalizeSubject(parsed.subject_line || parsed.subject),
+            logic: parsed.logic_reasoning || parsed.reasoning || null
           };
-        } catch (e) {
+        } else {
           // Fallback if AI didn't return valid JSON despite instructions
-          finalResult = { optimized: generatedContent };
+          finalResult = {
+            optimized: normalizeBodyHtml(generatedContent),
+            subject: normalizeSubject(null)
+          };
         }
       }
 
@@ -261,6 +311,7 @@ export default async function handler(req, res) {
       - Highlight the financial variance, market volatility, or technical risk.
       - NO CITATIONS OR LINKS: Forbid external URLs or bracketed sources.
       - TEXAS/ERCOT SPECIFIC: Avoid UK or non-US energy market references.
+      - Use plain English for energy costs. Prefer "energy rate per kWh" and "demand/delivery charges" over acronyms like 4CP or TDU.
       
       INSTRUCTIONS:
       - Rewrite the draft to be more impactful and aligned with the Nodal Point philosophy.
