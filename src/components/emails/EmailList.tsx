@@ -116,7 +116,7 @@ export function EmailList({
   const skeletonRows = Array.from({ length: skeletonRowCount }).map((_, idx) => (
     <div
       key={`skeleton-${idx}`}
-      className="grid grid-cols-12 gap-4 p-3 border-l-2 border-white/5 bg-zinc-950/30 animate-pulse"
+      className="grid grid-cols-12 gap-4 p-3 border-l-2 border-l-transparent border-b border-white/5 bg-zinc-950/30 animate-pulse"
     >
       <div className="col-span-1 flex items-center justify-center">
         <span className="h-4 w-4 rounded bg-white/10" />

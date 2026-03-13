@@ -821,7 +821,7 @@ export default function ContractsPage() {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <ForensicTableSkeleton columns={columns.length} rows={12} />
+                <ForensicTableSkeleton columns={columns.length} rows={12} type="deal" />
               ) : deals.length ? (
                 <AnimatePresence mode="popLayout">
                   {table.getRowModel().rows.map((row, index) => (
