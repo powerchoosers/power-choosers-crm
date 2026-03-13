@@ -67,7 +67,7 @@ export default async function handler(req, res) {
           const existingMeta = currentData.metadata && typeof currentData.metadata === 'object' ? currentData.metadata : {};
           const metadata = { ...existingMeta, lastClicked: clickedAt };
 
-          // Update Supabase record
+          // Update tracking record (link wrapper id)
           await supabaseAdmin
             .from('emails')
             .update({
@@ -77,6 +77,34 @@ export default async function handler(req, res) {
               metadata
             })
             .eq('id', trackingId);
+
+          // If this is a tracking-only row, also update the parent sent row so UI badges/notifications are correct.
+          const parentEmailId = existingMeta.email_id || existingMeta.emailId;
+          if (parentEmailId && parentEmailId !== trackingId) {
+            const { data: parentData, error: parentFetchError } = await supabaseAdmin
+              .from('emails')
+              .select('clicks, clickCount, metadata')
+              .eq('id', parentEmailId)
+              .single();
+
+            if (!parentFetchError && parentData) {
+              const parentClicks = Array.isArray(parentData.clicks) ? parentData.clicks : [];
+              const parentMeta = parentData.metadata && typeof parentData.metadata === 'object' ? parentData.metadata : {};
+
+              await supabaseAdmin
+                .from('emails')
+                .update({
+                  clickCount: (parentData.clickCount || 0) + 1,
+                  clicks: [...parentClicks, clickEvent],
+                  updatedAt: clickedAt,
+                  metadata: {
+                    ...parentMeta,
+                    lastClicked: clickedAt
+                  }
+                })
+                .eq('id', parentEmailId);
+            }
+          }
 
           logger.debug('[Email Click] Recorded click:', {
             trackingId,
