@@ -20,7 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from 'react'
-import { isAfter, setHours, setMinutes, setSeconds, startOfDay } from 'date-fns'
+import { isAfter, setHours, setMinutes, setSeconds, startOfDay, addDays } from 'date-fns'
 
 // ---------------------------------------------------------------------------
 // Stage indicator styles (compact, for dossier view)
@@ -70,12 +70,18 @@ function getSignatureRequestStatus(reqStatus: string, createdAt: string) {
   if (reqStatus === 'completed' || reqStatus === 'signed') return 'signed'
   if (reqStatus === 'canceled' || reqStatus === 'cancelled') return 'cancelled'
 
-  // Links expire at 4 PM
   const createdDate = new Date(createdAt)
-  const today4PM = setSeconds(setMinutes(setHours(startOfDay(new Date()), 16), 0), 0)
+  const now = new Date()
   
-  // If it was created before today, or it's currently after 4 PM
-  if (isAfter(new Date(), today4PM) || createdDate < startOfDay(new Date())) {
+  // Calculate the specific expiration point for this document
+  // If created before 4 PM, it expires at 4 PM same day.
+  // If created after 4 PM, it expires at 4 PM the next day.
+  let expirationPoint = setSeconds(setMinutes(setHours(startOfDay(createdDate), 16), 0), 0)
+  if (createdDate >= expirationPoint) {
+    expirationPoint = addDays(expirationPoint, 1)
+  }
+
+  if (isAfter(now, expirationPoint)) {
     return 'expired'
   }
 
