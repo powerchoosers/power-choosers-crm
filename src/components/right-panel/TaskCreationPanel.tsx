@@ -137,13 +137,14 @@ export function TaskCreationPanel() {
     const isPast = (d: Date) => isBefore(d, startOfDay(now))
     const isSearchingEntities = isSearchingContacts || isSearchingAccounts
 
-    const handleSelectContact = (contact: { id: string; name: string; avatarUrl?: string; logoUrl?: string }) => {
+    const handleSelectContact = (contact: { id: string; name: string; avatarUrl?: string; logoUrl?: string; accountId?: string }) => {
         const nextContext = {
             entityId: contact.id,
             entityName: contact.name,
             entityType: 'contact' as const,
             entityPhotoUrl: contact.avatarUrl,
             entityLogoUrl: contact.logoUrl,
+            accountId: contact.accountId,
         }
         setSelectedEntity(nextContext)
         setTaskContext(nextContext)
@@ -217,7 +218,7 @@ export function TaskCreationPanel() {
                 status: 'Pending',
                 dueDate: due.toISOString(),
                 contactId: entityType === 'contact' ? entityId : undefined,
-                accountId: entityType === 'account' ? entityId : undefined,
+                accountId: entityType === 'account' ? entityId : activeEntity?.accountId,
                 relatedTo: entityName,
                 relatedType: entityType === 'contact' ? 'Person' : 'Account',
                 metadata: {
