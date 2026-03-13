@@ -405,6 +405,7 @@ export function useSearchContacts(queryTerm: string) {
             avatarUrl: resolveContactPhotoUrl(item, metadata),
             company: account?.name || '',
             logoUrl: account?.logo_url || '',
+            accountId: item.accountId || undefined,
           };
         });
       } catch (err) {

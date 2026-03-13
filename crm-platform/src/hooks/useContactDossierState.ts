@@ -115,7 +115,10 @@ export function useContactDossierState(id: string) {
     const skipSaveOnNextLockRef = useRef(false)
 
     // Task Integration
-    const { pendingTasks } = useEntityTasks(id, contact?.name)
+    const { pendingTasks } = useEntityTasks(id, contact?.name, {
+        contactId: id,
+        accountId: contact?.accountId || (contact as any)?.linkedAccountId
+    })
     const { data: allPendingData } = useAllPendingTasks()
     const allPendingTasks = allPendingData?.allPendingTasks ?? []
     const globalTotal = allPendingData?.totalCount ?? 0
