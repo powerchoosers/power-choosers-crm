@@ -20,7 +20,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from 'react'
-import { isAfter, setHours, setMinutes, setSeconds, startOfDay, addDays } from 'date-fns'
 
 // ---------------------------------------------------------------------------
 // Stage indicator styles (compact, for dossier view)
@@ -66,22 +65,12 @@ function closeLabel(closeDate?: string) {
   return `${days}d`
 }
 
-function getSignatureRequestStatus(reqStatus: string, createdAt: string) {
+function getSignatureRequestStatus(reqStatus: string, expiresAt?: string | null) {
   if (reqStatus === 'completed' || reqStatus === 'signed') return 'signed'
   if (reqStatus === 'canceled' || reqStatus === 'cancelled') return 'cancelled'
 
-  const createdDate = new Date(createdAt)
-  const now = new Date()
-  
-  // Calculate the specific expiration point for this document
-  // If created before 4 PM, it expires at 4 PM same day.
-  // If created after 4 PM, it expires at 4 PM the next day.
-  let expirationPoint = setSeconds(setMinutes(setHours(startOfDay(createdDate), 16), 0), 0)
-  if (createdDate >= expirationPoint) {
-    expirationPoint = addDays(expirationPoint, 1)
-  }
-
-  if (isAfter(now, expirationPoint)) {
+  // Trust the expires_at set by the backend — don't compute it ourselves
+  if (expiresAt && new Date(expiresAt) < new Date()) {
     return 'expired'
   }
 
@@ -109,7 +98,7 @@ function DealCard({ deal, onEdit, onRequestDelete, onManageSignatures }: DealCar
     : null;
 
   const latestSigStatus = latestSigRequestRaw 
-    ? getSignatureRequestStatus(latestSigRequestRaw.status, latestSigRequestRaw.created_at) 
+    ? getSignatureRequestStatus(latestSigRequestRaw.status, latestSigRequestRaw.expires_at) 
     : null;
 
   return (
@@ -374,7 +363,7 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
               [...managingSignaturesDeal.signature_requests]
                 .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                 .map((req) => {
-                  const derivedStatus = getSignatureRequestStatus(req.status, req.created_at);
+                  const derivedStatus = getSignatureRequestStatus(req.status, req.expires_at);
                   
                   return (
                     <div 
