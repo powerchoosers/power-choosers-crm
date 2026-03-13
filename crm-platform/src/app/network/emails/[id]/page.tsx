@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { useEmail, useMarkEmailAsRead } from '@/hooks/useEmail'
 import { useEmailThread } from '@/hooks/useEmailThread'
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Reply, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, Eye, MousePointer2 } from 'lucide-react'
+import { Input } from "@/components/ui/input"
+import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, Eye, MousePointer2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { EmailContent } from '@/components/emails/EmailContent'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
@@ -24,6 +25,8 @@ import { supabase } from '@/lib/supabase'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
+type ComposerMode = 'reply' | 'reply_all' | 'forward'
+
 export default function EmailDetailPage() {
   const params = useParams()
   const router = useRouter()
@@ -35,6 +38,12 @@ export default function EmailDetailPage() {
   const [isPrintRequested, setIsPrintRequested] = useState(false)
   const [downloadingAttachment, setDownloadingAttachment] = useState<string | null>(null)
   const [isReplyOpen, setIsReplyOpen] = useState(false)
+  const [composerMode, setComposerMode] = useState<ComposerMode>('reply')
+  const [composeTargetId, setComposeTargetId] = useState<string | null>(id || null)
+  const [draftTo, setDraftTo] = useState('')
+  const [draftCc, setDraftCc] = useState('')
+  const [draftSubject, setDraftSubject] = useState('')
+  const [showCc, setShowCc] = useState(false)
   const [replyHtml, setReplyHtml] = useState('')
   const [replyEditor, setReplyEditor] = useState<Editor | null>(null)
   const [isSendingReply, setIsSendingReply] = useState(false)
@@ -266,6 +275,28 @@ export default function EmailDetailPage() {
   const displayFromName = fromContact?.displayName || (isOutboundEmail ? (email.fromName || null) : fromMailbox.name) || fromValue
   const displayFromAddress = extractValidAddress(isOutboundEmail ? fromValue : fromMailbox.address || fromValue) || null
   const currentUserEmail = (user?.email || '').toLowerCase().trim()
+  const normalizeRecipients = (value: string | string[] | null | undefined): string[] => {
+    const values = Array.isArray(value) ? value : [value]
+    return Array.from(new Set(
+      values
+        .flatMap((entry) => String(entry || '').split(','))
+        .map((entry) => extractValidAddress(entry))
+        .filter(Boolean)
+    ))
+  }
+  const messageCcValues = (message: Email): string[] => {
+    const ccRaw = (message as any)?.cc
+      || (message as any)?.metadata?.cc
+      || (message as any)?.metadata?.ccRecipients
+      || []
+    return normalizeRecipients(ccRaw)
+  }
+  const toRecipientsText = (values: string[]) => values.join(', ')
+  const addPrefix = (subject: string | undefined, prefix: 'Re:' | 'Fwd:') => {
+    const clean = String(subject || '').trim()
+    if (!clean) return `${prefix} `
+    return clean.toLowerCase().startsWith(prefix.toLowerCase()) ? clean : `${prefix} ${clean}`
+  }
   const inferredCounterparty = threadEmails
     .flatMap((message: Email) => {
       const fromCandidate = extractValidAddress(message.from)
@@ -273,15 +304,48 @@ export default function EmailDetailPage() {
       return [fromCandidate, ...toCandidates]
     })
     .find((address: string) => Boolean(address) && address !== currentUserEmail) || ''
+  const resolveReplyDefaults = (mode: ComposerMode, message: Email) => {
+    const parsedFrom = parseMailbox(message.from || '')
+    const fromAddress = extractValidAddress(parsedFrom.address || message.from)
+      || extractValidAddress((message as any)?.metadata?.fromAddress)
+    const toListForMessage = normalizeRecipients(message.to)
+    const ccListForMessage = messageCcValues(message)
+    const nonSelf = (address: string) => address && address.toLowerCase() !== currentUserEmail
+    const dedupe = (list: string[]) => Array.from(new Set(list.filter(nonSelf)))
 
-  const replyFromAddress = extractValidAddress(fromMailbox.address || fromValue)
-  const replyFromMetadata = extractValidAddress((email as any)?.metadata?.fromAddress)
-  const replyFromContact = extractValidAddress(fromContact?.email)
-  const firstToAddress = extractValidAddress(String(toList[0] || ''))
-  const replyToAddress = email?.type === 'received'
-    ? (replyFromAddress || replyFromMetadata || replyFromContact || inferredCounterparty || resolvedReplyAddress || '')
-    : (firstToAddress || inferredCounterparty || resolvedReplyAddress || '')
-  const replySubject = email?.subject?.toLowerCase().startsWith('re:') ? email.subject : `Re: ${email?.subject || ''}`
+    if (mode === 'forward') {
+      return {
+        to: '',
+        cc: '',
+        subject: addPrefix(message.subject, 'Fwd:')
+      }
+    }
+
+    if (mode === 'reply_all') {
+      const participantPool = dedupe([fromAddress, ...toListForMessage, ...ccListForMessage].filter(Boolean) as string[])
+      const primaryTo = message.type === 'received'
+        ? (fromAddress && nonSelf(fromAddress) ? fromAddress : participantPool[0] || '')
+        : (toListForMessage.find(nonSelf) || participantPool[0] || inferredCounterparty || '')
+      const ccPool = dedupe([
+        ...toListForMessage,
+        ...ccListForMessage
+      ].filter((address) => address !== primaryTo))
+      return {
+        to: primaryTo,
+        cc: toRecipientsText(ccPool),
+        subject: addPrefix(message.subject, 'Re:')
+      }
+    }
+
+    const singleReplyTo = message.type === 'received'
+      ? (fromAddress || inferredCounterparty || resolvedReplyAddress || '')
+      : (toListForMessage.find(nonSelf) || inferredCounterparty || resolvedReplyAddress || '')
+    return {
+      to: singleReplyTo,
+      cc: '',
+      subject: addPrefix(message.subject, 'Re:')
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -290,7 +354,12 @@ export default function EmailDetailPage() {
       setResolvedReplyAddress('')
 
       if (!email || email.type !== 'received') return
-      if (replyFromAddress || replyFromMetadata || replyFromContact || inferredCounterparty) return
+      if (
+        extractValidAddress(fromMailbox.address || fromValue)
+        || extractValidAddress((email as any)?.metadata?.fromAddress)
+        || extractValidAddress(fromContact?.email)
+        || inferredCounterparty
+      ) return
 
       const fromName = String(displayFromName || fromValue || '').trim()
       const ownerScope = (user?.email || '').toLowerCase().trim()
@@ -334,9 +403,8 @@ export default function EmailDetailPage() {
     user?.email,
     fromValue,
     displayFromName,
-    replyFromAddress,
-    replyFromMetadata,
-    replyFromContact,
+    fromMailbox.address,
+    fromContact?.email,
     inferredCounterparty
   ])
 
@@ -354,12 +422,51 @@ export default function EmailDetailPage() {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;')
 
-  const quotedBody = email?.html
-    ? email.html
-    : `<pre style="white-space: pre-wrap; margin: 0;">${escapeHtml(email?.text || email?.snippet || '')}</pre>`
+  const getMessageBodyHtml = (message: Email) => (
+    message?.html
+      ? message.html
+      : `<pre style="white-space: pre-wrap; margin: 0;">${escapeHtml(message?.text || message?.snippet || '')}</pre>`
+  )
 
-  const quotedHeader = `<p style="margin: 0 0 8px 0; color: #71717a; font-size: 12px;">On ${email ? format(new Date(email.date), 'PPpp') : ''}, ${escapeHtml(String(displayFromName))} wrote:</p>`
-  const quotedThread = `<blockquote style="margin: 12px 0 0 0; padding-left: 12px; border-left: 2px solid #3f3f46;">${quotedHeader}${quotedBody}</blockquote>`
+  const buildQuotedThread = (message: Email) => {
+    const parsedFrom = parseMailbox(message.from || '')
+    const author = message.fromName || parsedFrom.name || parsedFrom.address || message.from || 'Unknown'
+    const quotedHeader = `<p style="margin: 0 0 8px 0; color: #71717a; font-size: 12px;">On ${format(new Date(message.date || Date.now()), 'PPpp')}, ${escapeHtml(String(author))} wrote:</p>`
+    return `<blockquote style="margin: 12px 0 0 0; padding-left: 12px; border-left: 2px solid #3f3f46;">${quotedHeader}${getMessageBodyHtml(message)}</blockquote>`
+  }
+
+  const buildForwardedMessage = (message: Email) => {
+    const parsedFrom = parseMailbox(message.from || '')
+    const fromLine = parsedFrom.address || message.from || ''
+    const toLine = toRecipientsText(normalizeRecipients(message.to))
+    const ccLine = toRecipientsText(messageCcValues(message))
+    const detailLines = [
+      '<p style="margin: 16px 0 8px 0; color: #a1a1aa; font-size: 12px;">---------- Forwarded message ----------</p>',
+      `<p style="margin: 0; color: #a1a1aa; font-size: 12px;"><strong>From:</strong> ${escapeHtml(fromLine)}</p>`,
+      `<p style="margin: 0; color: #a1a1aa; font-size: 12px;"><strong>Date:</strong> ${escapeHtml(format(new Date(message.date || Date.now()), 'PPpp'))}</p>`,
+      `<p style="margin: 0; color: #a1a1aa; font-size: 12px;"><strong>Subject:</strong> ${escapeHtml(message.subject || '(No Subject)')}</p>`,
+      `<p style="margin: 0; color: #a1a1aa; font-size: 12px;"><strong>To:</strong> ${escapeHtml(toLine || '-')}</p>`
+    ]
+    if (ccLine) {
+      detailLines.push(`<p style="margin: 0; color: #a1a1aa; font-size: 12px;"><strong>Cc:</strong> ${escapeHtml(ccLine)}</p>`)
+    }
+    return `${detailLines.join('')}<div style="margin-top: 12px;">${getMessageBodyHtml(message)}</div>`
+  }
+
+  const openComposerForMessage = (mode: ComposerMode, message?: Email) => {
+    const target = message || threadEmails.find((threadEmail: Email) => threadEmail.id === expandedThreadId) || email
+    if (!target) return
+    const defaults = resolveReplyDefaults(mode, target)
+    setComposerMode(mode)
+    setComposeTargetId(target.id)
+    setDraftTo(defaults.to)
+    setDraftCc(defaults.cc)
+    setShowCc(Boolean(defaults.cc))
+    setDraftSubject(defaults.subject)
+    setReplyHtml('')
+    setReplyAttachments([])
+    setIsReplyOpen(true)
+  }
 
   if (isLoading) {
     return (
@@ -378,16 +485,25 @@ export default function EmailDetailPage() {
     )
   }
 
-  const handleReply = async () => {
+  const handleSend = async () => {
+    const targetMessage = threadEmails.find((threadEmail: Email) => threadEmail.id === composeTargetId) || email
     if (!user?.email) {
       toast.error('You must be logged in to reply')
       return
     }
-    if (!replyToAddress) {
+    if (!targetMessage) {
+      toast.error('Could not find message context')
+      return
+    }
+
+    const toRecipients = normalizeRecipients(draftTo)
+    const ccRecipients = showCc || draftCc.trim() ? normalizeRecipients(draftCc) : []
+    if (toRecipients.length === 0) {
       toast.error('No valid reply address found')
       return
     }
-    if (!stripHtml(replyHtml)) {
+    const noteText = stripHtml(replyHtml)
+    if (composerMode !== 'forward' && !noteText) {
       toast.error('Reply message is empty')
       return
     }
@@ -396,7 +512,10 @@ export default function EmailDetailPage() {
     try {
       const firstName = profile?.firstName || profile?.name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Nodal Point'
       const fromName = `${firstName} • Nodal Point`
-      const finalHtml = `${replyHtml}${quotedThread}`
+      const finalHtml = composerMode === 'forward'
+        ? `${replyHtml}${buildForwardedMessage(targetMessage)}`
+        : `${replyHtml}${buildQuotedThread(targetMessage)}`
+      const quoteText = stripHtml(targetMessage.text || targetMessage.snippet || '')
 
       const encodedAttachments = await Promise.all(
         replyAttachments.map(async (file) => {
@@ -417,15 +536,16 @@ export default function EmailDetailPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          to: replyToAddress,
-          subject: replySubject,
+          to: toRecipients.join(', '),
+          cc: ccRecipients.length ? ccRecipients.join(', ') : undefined,
+          subject: draftSubject.trim(),
           content: finalHtml,
-          plainTextContent: stripHtml(`${replyHtml}\n\n${stripHtml(email.text || email.snippet || '')}`),
+          plainTextContent: stripHtml(`${noteText}\n\n${quoteText}`),
           isHtmlEmail: true,
           userEmail: user.email,
           from: user.email,
           fromName,
-          threadId: threadKey,
+          threadId: composerMode === 'forward' ? undefined : threadKey,
           attachments: encodedAttachments
         })
       })
@@ -440,15 +560,19 @@ export default function EmailDetailPage() {
         setPendingFocusMessageId(String(payload.trackingId))
       }
 
-      toast.success('Reply sent')
+      toast.success(composerMode === 'forward' ? 'Forward sent' : 'Reply sent')
       setReplyHtml('')
+      setDraftTo('')
+      setDraftCc('')
+      setDraftSubject('')
+      setShowCc(false)
       setReplyAttachments([])
       setIsReplyOpen(false)
       queryClient.invalidateQueries({ queryKey: ['emails'] })
       queryClient.invalidateQueries({ queryKey: ['email', id] })
       queryClient.invalidateQueries({ queryKey: threadQueryKey })
     } catch (error: any) {
-      toast.error(error?.message || 'Failed to send reply')
+      toast.error(error?.message || `Failed to send ${composerMode === 'forward' ? 'forward' : 'reply'}`)
     } finally {
       setIsSendingReply(false)
     }
@@ -580,7 +704,11 @@ export default function EmailDetailPage() {
                 <div className="rounded-xl border border-white/10 bg-black/30 overflow-hidden">
                   <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
                     <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-400">
-                      Replying to <span className="text-zinc-200 normal-case tracking-normal font-sans">{replyToAddress}</span>
+                      {composerMode === 'reply'
+                        ? 'Reply'
+                        : composerMode === 'reply_all'
+                          ? 'Reply all'
+                          : 'Forward'}
                     </div>
                     <button
                       type="button"
@@ -590,6 +718,58 @@ export default function EmailDetailPage() {
                     >
                       <X className="w-4 h-4" />
                     </button>
+                  </div>
+
+                  <div className="px-4 py-3 border-b border-white/10 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-zinc-500 w-8">To</span>
+                      <Input
+                        value={draftTo}
+                        onChange={(e) => setDraftTo(e.target.value)}
+                        placeholder={composerMode === 'forward' ? 'Recipient emails, comma separated' : 'Recipient email'}
+                        className="h-8 bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-[#002FA7]/60 rounded-none px-0 text-sm focus-visible:ring-0"
+                      />
+                      {!showCc && (
+                        <button
+                          type="button"
+                          onClick={() => setShowCc(true)}
+                          className="text-[10px] font-mono text-zinc-500 hover:text-[#002FA7] transition-colors px-2 py-1 rounded hover:bg-white/5"
+                        >
+                          CC
+                        </button>
+                      )}
+                    </div>
+                    {showCc && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-zinc-500 w-8">Cc</span>
+                        <Input
+                          value={draftCc}
+                          onChange={(e) => setDraftCc(e.target.value)}
+                          placeholder="CC emails, comma separated"
+                          className="h-8 bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-[#002FA7]/60 rounded-none px-0 text-sm focus-visible:ring-0"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowCc(false)
+                            setDraftCc('')
+                          }}
+                          className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                          title="Hide CC"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono text-zinc-500 w-8">Sub</span>
+                      <Input
+                        value={draftSubject}
+                        onChange={(e) => setDraftSubject(e.target.value)}
+                        placeholder="Subject"
+                        className="h-8 bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-[#002FA7]/60 rounded-none px-0 text-sm focus-visible:ring-0"
+                      />
+                    </div>
                   </div>
 
                   <div className="px-4 py-2 border-b border-white/10 flex flex-wrap items-center gap-1.5">
@@ -658,7 +838,7 @@ export default function EmailDetailPage() {
                       content={replyHtml}
                       onChange={setReplyHtml}
                       onEditorReady={setReplyEditor}
-                      placeholder="Write your reply..."
+                      placeholder={composerMode === 'forward' ? 'Add a note (optional)...' : 'Write your reply...'}
                       className="min-h-[140px]"
                       autoFocus
                     />
@@ -688,9 +868,9 @@ export default function EmailDetailPage() {
                     <Button variant="ghost" onClick={() => setIsReplyOpen(false)} className="text-zinc-400 hover:text-white hover:bg-white/5">
                       Cancel
                     </Button>
-                    <Button onClick={handleReply} disabled={isSendingReply} className="bg-white text-zinc-950 hover:bg-zinc-200 min-w-[110px]">
+                    <Button onClick={handleSend} disabled={isSendingReply} className="bg-white text-zinc-950 hover:bg-zinc-200 min-w-[130px]">
                       {isSendingReply ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
-                      Send Reply
+                      {composerMode === 'forward' ? 'Send Forward' : 'Send Reply'}
                     </Button>
                   </div>
                 </div>
@@ -844,6 +1024,32 @@ export default function EmailDetailPage() {
                               className="overflow-hidden border-t border-white/5"
                             >
                               <div className="bg-zinc-900/80 p-4 space-y-4">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => openComposerForMessage('reply', threadEmail)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 transition-colors"
+                                  >
+                                    <Reply className="w-3.5 h-3.5" />
+                                    Reply
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openComposerForMessage('reply_all', threadEmail)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 transition-colors"
+                                  >
+                                    <ReplyAll className="w-3.5 h-3.5" />
+                                    Reply all
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openComposerForMessage('forward', threadEmail)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 transition-colors"
+                                  >
+                                    <Forward className="w-3.5 h-3.5" />
+                                    Forward
+                                  </button>
+                                </div>
                                 <EmailContent
                                   html={threadEmail.html}
                                   text={threadEmail.text}
@@ -910,14 +1116,32 @@ export default function EmailDetailPage() {
         </motion.div>
 
         <div className="p-4 border-t border-white/5 nodal-recessed">
-            <button 
-          onClick={() => setIsReplyOpen(true)}
-          className="inline-flex items-center justify-center gap-2.5 bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-11 px-5 rounded-xl transition-all shadow-[0_0_30px_-5px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.4)]"
-          title="Reply to Email"
-        >
-          <Reply className="w-4 h-4" />
-          Reply
-        </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => openComposerForMessage('reply')}
+              className="inline-flex items-center justify-center gap-2.5 bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-11 px-5 rounded-xl transition-all shadow-[0_0_30px_-5px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.4)]"
+              title="Reply to latest message"
+            >
+              <Reply className="w-4 h-4" />
+              Reply
+            </button>
+            <button
+              onClick={() => openComposerForMessage('reply_all')}
+              className="inline-flex items-center justify-center gap-2 bg-black/30 border border-white/10 hover:bg-black/40 text-zinc-200 font-medium h-11 px-4 rounded-xl transition-all"
+              title="Reply all to latest message"
+            >
+              <ReplyAll className="w-4 h-4" />
+              Reply all
+            </button>
+            <button
+              onClick={() => openComposerForMessage('forward')}
+              className="inline-flex items-center justify-center gap-2 bg-black/30 border border-white/10 hover:bg-black/40 text-zinc-200 font-medium h-11 px-4 rounded-xl transition-all"
+              title="Forward latest message"
+            >
+              <Forward className="w-4 h-4" />
+              Forward
+            </button>
+          </div>
         </div>
       </div>
 
