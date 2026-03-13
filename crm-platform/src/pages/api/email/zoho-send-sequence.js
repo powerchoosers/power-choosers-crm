@@ -219,6 +219,44 @@ export default async function handler(req, res) {
             } else {
                 logger.info(`[Zoho Sequence] Updated CRM email record: ${email_id}`);
             }
+
+            // Insert a lightweight tracking record keyed by trackingId so that open/click
+            // handlers (track/[id].js, click/[id].js) can look up member_id and call
+            // advance_sequence_member with the correct signal outcome.
+            // Without this, the pixel fires to zoho_seq_... but no record exists at that ID.
+            const { error: trackInsertError } = await supabase
+                .from('emails')
+                .insert({
+                    id: trackingId,
+                    to: [toEmail],
+                    subject,
+                    from: fromEmail,
+                    type: 'sent',
+                    status: 'sent',
+                    openCount: 0,
+                    clickCount: 0,
+                    opens: [],
+                    clicks: [],
+                    timestamp: new Date().toISOString(),
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    ownerId: ownerEmail,
+                    ...(contactId ? { contactId } : {}),
+                    metadata: {
+                        ...(body.metadata && typeof body.metadata === 'object' ? body.metadata : {}),
+                        email_id,
+                        trackingId,
+                        messageId: result.messageId,
+                        isSequenceEmail: true,
+                        provider: 'zoho'
+                    }
+                });
+
+            if (trackInsertError) {
+                logger.warn('[Zoho Sequence] Failed to insert tracking record:', trackInsertError.message);
+            } else {
+                logger.info(`[Zoho Sequence] Inserted tracking record: ${trackingId}`);
+            }
         } else {
             // No pre-existing record — create one so the email appears in uplink_out
             const { error: insertError } = await supabase
