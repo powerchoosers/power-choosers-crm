@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import type { RefObject } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
 import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check, Paperclip } from 'lucide-react'
@@ -42,6 +43,7 @@ interface EmailListProps {
   onRegenerateScheduled?: (email: Email) => void
   onAcceptScheduled?: (email: Email) => void
   scheduledActionState?: Record<string, string>
+  scrollContainerRef?: RefObject<HTMLDivElement | null>
 }
 
 export function EmailList({
@@ -73,6 +75,7 @@ export function EmailList({
   onRegenerateScheduled,
   onAcceptScheduled,
   scheduledActionState = {},
+  scrollContainerRef,
 }: EmailListProps) {
   const [internalPage, setInternalPage] = useState(1)
 
@@ -312,7 +315,7 @@ export function EmailList({
       </div>
 
       {/* Scrollable List */}
-      <div className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll">
         <div className="divide-y divide-white/5">
           {paginatedEmails.map((email, index) => {
             const isOutbound = email.type === 'sent' || email.type === 'scheduled'
