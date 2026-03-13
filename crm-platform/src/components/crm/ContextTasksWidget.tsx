@@ -8,6 +8,8 @@ import { useTasks, type Task } from '@/hooks/useTasks'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { cn } from '@/lib/utils'
 import { buildTaskVariableMap, resolveTaskTemplateText } from '@/lib/task-variables'
+import { compareTasksByDueDate, isPendingTask } from '@/lib/task-date'
+import { taskMatchesEntityScope } from '@/hooks/useEntityTasks'
 
 const EXIT_DELAY_MS = 180
 const exitTransition = { duration: 0.4, ease: [0.32, 0.72, 0, 1] as const }
@@ -16,11 +18,22 @@ const layoutTransition = { duration: 0.3, ease: [0.32, 0.72, 0, 1] as const }
 interface ContextTasksWidgetProps {
   entityId: string
   entityName?: string
+  contactId?: string
+  accountId?: string
+  includeContactIds?: string[]
   contactContext?: Record<string, unknown> | null
   accountContext?: Record<string, unknown> | null
 }
 
-export default function ContextTasksWidget({ entityId, entityName, contactContext, accountContext }: ContextTasksWidgetProps) {
+export default function ContextTasksWidget({
+  entityId,
+  entityName,
+  contactId,
+  accountId,
+  includeContactIds,
+  contactContext,
+  accountContext
+}: ContextTasksWidgetProps) {
   const router = useRouter()
   const { data: tasksData, updateTask } = useTasks()
   const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
@@ -29,17 +42,13 @@ export default function ContextTasksWidget({ entityId, entityName, contactContex
   const tasks = useMemo(() => {
     if (!entityId) return []
     const allTasks = tasksData?.pages.flatMap(page => page.tasks) || []
-    return allTasks.filter(t => {
-      const matchesId = (t.accountId && t.accountId === entityId) ||
-                       (t.contactId && t.contactId === entityId)
-      const matchesName = entityName && t.relatedTo === entityName
-      const matchesRelatedId = t.relatedTo === entityId
-      return matchesId || matchesName || matchesRelatedId
-    })
-  }, [tasksData, entityId, entityName])
+    return allTasks
+      .filter((task) => taskMatchesEntityScope(task, { entityName, contactId, accountId, includeContactIds }))
+      .sort(compareTasksByDueDate)
+  }, [tasksData, entityId, entityName, contactId, accountId, includeContactIds])
 
   const pendingTasks = useMemo(
-    () => tasks.filter(t => (t.status ?? 'Pending') !== 'Completed'),
+    () => tasks.filter(isPendingTask),
     [tasks]
   )
 

@@ -8,6 +8,7 @@ import { useParams, usePathname } from 'next/navigation'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
+import { useAccountContacts } from '@/hooks/useContacts'
 import { useAccount } from '@/hooks/useAccounts'
 import { useTasks } from '@/hooks/useTasks'
 import { cn } from '@/lib/utils'
@@ -54,6 +55,7 @@ export function RightPanel() {
 
   const { data: contact, refetch: refetchContact } = useContact(isContactPage ? entityId : '')
   const { data: account, refetch: refetchAccount } = useAccount(isAccountPage ? entityId : (contact?.accountId || ''))
+  const { data: accountContacts } = useAccountContacts(isAccountPage ? entityId : '')
 
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -101,6 +103,10 @@ export function RightPanel() {
   }, [account?.id, account?.latitude, account?.longitude, account?.address, account?.city, account?.state])
   const { data: weatherData } = useWeather(accountLocationForWeather)
   const weatherLocationLabel = account?.location || (account?.city && account?.state ? `${account.city}, ${account.state}` : account?.address || '')
+  const accountContactIds = useMemo(
+    () => (accountContacts ?? []).map((c) => c.id).filter(Boolean),
+    [accountContacts]
+  )
 
   /** Effective panel content mode: on dossier use dossierPanelView, else always scanning. */
   const effectiveView: DossierPanelView = isActiveContext ? dossierPanelView : 'scanning'
@@ -399,7 +405,7 @@ export function RightPanel() {
                                 entityPhotoUrl: isContactPage ? ((contact as any)?.avatarUrl || (contact as any)?.photoUrl) : undefined,
                                 entityDomain: account?.domain,
                                 contactId: isContactPage ? entityId : undefined,
-                                accountId: isAccountPage ? entityId : undefined,
+                                accountId: isAccountPage ? entityId : (contact?.accountId || undefined),
                               })
                               setRightPanelMode('CREATE_TASK')
                             }}
@@ -410,6 +416,9 @@ export function RightPanel() {
                         <ContextTasksWidget
                           entityId={entityId}
                           entityName={entityName}
+                          contactId={isContactPage ? entityId : undefined}
+                          accountId={isAccountPage ? entityId : (contact?.accountId || undefined)}
+                          includeContactIds={isAccountPage ? accountContactIds : undefined}
                           contactContext={isContactPage ? (contact as Record<string, unknown>) : null}
                           accountContext={account as Record<string, unknown> | null}
                         />
