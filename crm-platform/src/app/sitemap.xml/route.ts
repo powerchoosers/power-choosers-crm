@@ -10,6 +10,13 @@ const staticPages = [
   { url: 'https://nodalpoint.io/market-data', changefreq: 'weekly', priority: '0.8' },
 ];
 
+type SitemapEntry = {
+  url: string;
+  changefreq: string;
+  priority: string;
+  lastmod?: string;
+};
+
 function escapeXml(text: string | undefined) {
   if (!text) return '';
   return String(text)
@@ -20,8 +27,8 @@ function escapeXml(text: string | undefined) {
     .replace(/'/g, '&apos;');
 }
 
-function generateSitemapXML(staticEntries: typeof staticPages, blogPosts: any[]) {
-  const urls = [...staticEntries];
+function generateSitemapXML(staticEntries: SitemapEntry[], blogPosts: any[]) {
+  const urls: SitemapEntry[] = [...staticEntries];
 
   blogPosts.forEach((post) => {
     const slug = post.slug || post.id;
