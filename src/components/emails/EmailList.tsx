@@ -38,6 +38,10 @@ interface EmailListProps {
   totalAvailable?: number
   /** Called when user chooses "select N" from bulk deck */
   onSelectCount?: (count: number) => void
+  onGenerateScheduled?: (email: Email) => void
+  onRegenerateScheduled?: (email: Email) => void
+  onAcceptScheduled?: (email: Email) => void
+  scheduledActionState?: Record<string, string>
 }
 
 export function EmailList({
@@ -65,6 +69,10 @@ export function EmailList({
   onSelectionChange,
   totalAvailable,
   onSelectCount,
+  onGenerateScheduled,
+  onRegenerateScheduled,
+  onAcceptScheduled,
+  scheduledActionState = {},
 }: EmailListProps) {
   const [internalPage, setInternalPage] = useState(1)
 
@@ -297,8 +305,9 @@ export function EmailList({
         </div>
         <div className="col-span-1" />
         <div className="col-span-3">Entity</div>
-        <div className={filter === 'sent' ? "col-span-3" : "col-span-5"}>Transmission</div>
+        <div className={filter === 'sent' || filter === 'scheduled' ? "col-span-3" : "col-span-5"}>Transmission</div>
         {filter === 'sent' && <div className="col-span-2">Telemetry</div>}
+        {filter === 'scheduled' && <div className="col-span-2">Review</div>}
         <div className="col-span-2 text-right">Timestamp</div>
       </div>
 
@@ -307,6 +316,12 @@ export function EmailList({
         <div className="divide-y divide-white/5">
           {paginatedEmails.map((email, index) => {
             const isOutbound = email.type === 'sent' || email.type === 'scheduled'
+            const executionId = String(email?.metadata?.sequenceExecutionId || '')
+            const hasGeneratedContent = Boolean(String(email.html || '').trim())
+            const isAccepted = Boolean(email?.metadata?.reviewAccepted)
+            const actionState = scheduledActionState[email.id] || ''
+            const isGenerating = actionState === 'generate' || actionState === 'regenerate'
+            const isAccepting = actionState === 'accept'
             const openCount = email.openCount || 0
             const clickCount = email.clickCount || 0
             const hasClicks = clickCount > 0
@@ -421,7 +436,7 @@ export function EmailList({
                 </div>
 
                 {/* Message Preview */}
-                <div className={cn("min-w-0 space-y-1", filter === 'sent' ? "col-span-3" : "col-span-5")}>
+                <div className={cn("min-w-0 space-y-1", filter === 'sent' || filter === 'scheduled' ? "col-span-3" : "col-span-5")}>
                   <div className="flex items-center gap-2">
                     <h4 className={cn(
                       "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1",
@@ -477,6 +492,57 @@ export function EmailList({
                           {clickCount}
                         </span>
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {filter === 'scheduled' && (
+                  <div className="col-span-2 flex items-center">
+                    <div className="flex items-center gap-2">
+                      {!hasGeneratedContent ? (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!executionId || !onGenerateScheduled || isGenerating) return
+                            onGenerateScheduled(email)
+                          }}
+                          disabled={!executionId || !onGenerateScheduled || isGenerating}
+                          className="icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40"
+                          title={executionId ? 'Generate draft now' : 'Missing execution link'}
+                        >
+                          {isGenerating ? 'Generating...' : 'Generate'}
+                        </button>
+                      ) : (
+                        <>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!executionId || !onRegenerateScheduled || isGenerating) return
+                              onRegenerateScheduled(email)
+                            }}
+                            disabled={!executionId || !onRegenerateScheduled || isGenerating}
+                            className="icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40"
+                            title={executionId ? 'Regenerate this draft' : 'Missing execution link'}
+                          >
+                            {isGenerating ? 'Generating...' : 'Regenerate'}
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!executionId || !onAcceptScheduled || isAccepting) return
+                              onAcceptScheduled(email)
+                            }}
+                            disabled={!executionId || !onAcceptScheduled || isAccepting}
+                            className={cn(
+                              "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40",
+                              isAccepted && "border-emerald-500/40 text-emerald-300"
+                            )}
+                            title={executionId ? 'Accept this draft' : 'Missing execution link'}
+                          >
+                            {isAccepting ? 'Saving...' : isAccepted ? 'Accepted' : 'Accept'}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
