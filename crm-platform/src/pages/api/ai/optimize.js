@@ -40,6 +40,19 @@ function normalizeSubject(input) {
   return value.replace(/\s+/g, ' ').slice(0, 140);
 }
 
+function softenFirstTouchEnergyJargon(input, strategy) {
+  const text = String(input || '');
+  const strategyText = String(strategy || '');
+  const isFirstTouch = /first[-\s]?touch|day\s*1|forensic opener/i.test(strategyText);
+  if (!text || !isFirstTouch) return text;
+
+  return text
+    .replace(/\b4CP\b/gi, 'summer peak demand tags')
+    .replace(/\bTDUs\b/g, 'delivery utilities')
+    .replace(/\bTDU\b/g, 'delivery utility')
+    .replace(/\bESI\s*ID\b/gi, 'service meter ID');
+}
+
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
@@ -253,14 +266,14 @@ export default async function handler(req, res) {
         if (parsed && typeof parsed === 'object') {
           const bodyCandidate = parsed.body_html || parsed.body || parsed.content || '';
           finalResult = {
-            optimized: normalizeBodyHtml(bodyCandidate),
+            optimized: softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
             subject: normalizeSubject(parsed.subject_line || parsed.subject),
             logic: parsed.logic_reasoning || parsed.reasoning || null
           };
         } else {
           // Fallback if AI didn't return valid JSON despite instructions
           finalResult = {
-            optimized: normalizeBodyHtml(generatedContent),
+            optimized: softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
             subject: normalizeSubject(null)
           };
         }
