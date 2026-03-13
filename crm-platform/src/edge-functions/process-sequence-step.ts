@@ -93,8 +93,8 @@ Deno.serve(async (req: Request) => {
         for (const job of parseResult.data) {
             console.log('[DEBUG] Processing job:', job.jobId, 'Execution:', job.execution_id);
             try {
-                await processJob(job)
-                results.push({ jobId: job.jobId, status: 'success' });
+                const outcome = await processJob(job)
+                results.push({ jobId: job.jobId, status: 'success', outcome });
             } catch (err) {
                 console.error('[DEBUG] Job failed:', job.jobId, err.message);
                 await sql`
@@ -119,6 +119,7 @@ async function processJob(job) {
 
     const [execution] = await sql`SELECT * FROM sequence_executions WHERE id = ${execution_id}`
     if (!execution) throw new Error(`Execution ${execution_id} not found`)
+    const statusBefore = execution.status;
 
     if (execution.status === 'processing' || execution.status === 'completed' || execution.status === 'waiting') {
         console.log('[DEBUG] Job already handled, status:', execution.status);
@@ -144,9 +145,17 @@ async function processJob(job) {
         : execution.step_type;
 
     if (effectiveType === 'email') {
-        const hasBody = !!(execution.metadata?.body || execution.metadata?.aiBody);
-        if (!hasBody) {
-            await handleGeneration(execution, job)
+        const existingBody = String(execution.metadata?.body || execution.metadata?.aiBody || '').trim();
+        if (!existingBody) {
+            const generatedPatch = await handleGeneration(execution, job);
+            const patchedExecution = {
+                ...execution,
+                metadata: {
+                    ...execution.metadata,
+                    ...generatedPatch
+                }
+            };
+            await handleSend(patchedExecution, job);
         } else {
             await handleSend(execution, job)
         }
@@ -160,6 +169,31 @@ async function processJob(job) {
     }
 
     await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
+    const [postExecution] = await sql`SELECT status, metadata FROM sequence_executions WHERE id = ${execution_id}`;
+    return {
+        type: effectiveType,
+        statusBefore,
+        statusAfter: postExecution?.status || null,
+        hasBodyAfter: !!String(postExecution?.metadata?.body || postExecution?.metadata?.aiBody || '').trim()
+    };
+}
+
+function extractGeneratedBody(result: any): string {
+    const direct = [
+        result?.optimized,
+        result?.optimizedContent,
+        result?.content,
+        result?.body,
+        result?.email,
+        result?.data?.content,
+        result?.data?.body,
+        result?.data?.optimized
+    ];
+    for (const value of direct) {
+        const text = typeof value === 'string' ? value.trim() : '';
+        if (text) return text;
+    }
+    return '';
 }
 
 async function handleGeneration(execution, job) {
@@ -260,11 +294,13 @@ async function handleGeneration(execution, job) {
     if (!response.ok) throw new Error(`AI generation failed (${response.status})`);
 
     const result = await response.json()
-    const body = result.optimized || result.optimizedContent || result.content || ''
+    let body = extractGeneratedBody(result)
     const subject = result.subject || metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point'
 
-    if (!String(body).trim()) {
-        throw new Error('AI generation returned empty body');
+    if (!body) {
+        const firstName = String(member.firstName || '').trim();
+        const companyName = String(member.company_name || 'your team').trim();
+        body = `Hi${firstName ? ` ${firstName}` : ''},\n\nI wanted to share a quick energy-forensics snapshot idea for ${companyName}. If you send your most recent electricity bill, I can reply with 2-3 specific observations worth checking.\n\nInterested?`;
     }
 
     const bodyWithFooter = appendPreviewUnsubscribeFooter(body, member.contact_email);
@@ -272,11 +308,7 @@ async function handleGeneration(execution, job) {
         ? { body: bodyWithFooter, subject, from: senderEmail, senderEmail, senderDomain }
         : { body: bodyWithFooter, subject };
 
-    await sql`
-    UPDATE sequence_executions 
-    SET metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify(metadataPatch)}::jsonb, status = 'pending_send'
-    WHERE id = ${execution.id}
-  `
+    return metadataPatch;
 }
 
 async function handleSend(execution, job) {
@@ -298,6 +330,18 @@ async function handleSend(execution, job) {
     WHERE m.id = ${execution.member_id}
     LIMIT 1
   `
+
+    const targetEmail = String(member?.target_email || '').trim();
+    if (!targetEmail) {
+        await sql`
+      UPDATE sequence_executions
+      SET status = 'skipped',
+          error_message = 'Missing target email',
+          updated_at = NOW()
+      WHERE id = ${execution.id}
+    `;
+        return;
+    }
 
     // Suppression pre-check: skip send if contact has unsubscribed or paused.
     // spike_only contacts are NOT in suppressions (handled via contact metadata only),
@@ -343,17 +387,30 @@ async function handleSend(execution, job) {
     `;
         fromEmail = fallbackConnection[0]?.email || member.primary_owner_email;
     }
+    fromEmail = String(fromEmail || '').trim();
+    if (!fromEmail) {
+        await sql`
+      UPDATE sequence_executions
+      SET status = 'failed',
+          error_message = 'Missing sender email',
+          updated_at = NOW()
+      WHERE id = ${execution.id}
+    `;
+        return;
+    }
 
     const emailRecordId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
+    const htmlBody = String(metadata?.body || metadata?.aiBody || '').trim() ||
+        'Hi there,\n\nIf you share your latest electricity statement, I can reply with a quick 2-3 point forensic snapshot.\n\nInterested?';
 
     const response = await fetch(`${API_BASE_URL}/api/email/zoho-send-sequence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
         body: JSON.stringify({
-            to: { email: member.target_email, name: `${member.firstName} ${member.lastName}` },
+            to: { email: targetEmail, name: `${member.firstName} ${member.lastName}` },
             from: { email: fromEmail, name: member.owner_first_name ? `${member.owner_first_name} \u2022 Nodal Point` : 'Nodal Point' },
             subject: metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point',
-            html: metadata?.body || metadata?.aiBody,
+            html: htmlBody,
             email_id: emailRecordId,
             contactId: member.contact_id || undefined,
             metadata: { execution_id: execution.id, member_id: member.id }
@@ -380,7 +437,8 @@ async function handleSend(execution, job) {
        WHERE id = ${execution.id}
     `
     } else {
-        throw new Error(`Email API failed (${response.status})`)
+        const errorText = await response.text().catch(() => '');
+        throw new Error(`Email API failed (${response.status}): ${errorText.slice(0, 400)}`)
     }
 }
 
