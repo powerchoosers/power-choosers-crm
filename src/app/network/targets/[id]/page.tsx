@@ -736,6 +736,7 @@ export default function TargetDetailPage() {
                 table.getRowModel().rows.map((row) => (
                   <TableRow
                     key={row.id}
+                    data-state={row.getIsSelected() ? 'selected' : undefined}
                     onClick={(e) => {
                       // Don't trigger row click if clicking a link or button
                       if ((e.target as HTMLElement).closest('a') || (e.target as HTMLElement).closest('button')) {
@@ -744,7 +745,12 @@ export default function TargetDetailPage() {
                       saveScroll()
                       router.push(`/network/${isPeopleList ? 'contacts' : 'accounts'}/${row.original.id}`)
                     }}
-                    className="cursor-pointer"
+                    className={cn(
+                      "cursor-pointer border-b border-white/5 border-l-2 transition-colors",
+                      row.getIsSelected()
+                        ? "border-l-[#002FA7] bg-[#002FA7]/8 hover:bg-[#002FA7]/10"
+                        : "border-l-transparent hover:bg-white/[0.03]"
+                    )}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell key={cell.id} className="py-3">
