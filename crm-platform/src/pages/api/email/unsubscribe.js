@@ -2,6 +2,13 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 
+// preference type → suppression reason label
+const REASON_MAP = {
+  permanent: 'unsubscribed',
+  pause_90:  'paused_90_days',
+  spike_only: 'spike_only',
+};
+
 export default async function handler(req, res) {
   if (cors(req, res)) return;
 
@@ -12,7 +19,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email } = req.body;
+    const { email, type = 'permanent' } = req.body;
 
     if (!email) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -20,7 +27,6 @@ export default async function handler(req, res) {
       return;
     }
 
-    // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -28,7 +34,10 @@ export default async function handler(req, res) {
       return;
     }
 
-    logger.log(`[Unsubscribe] Processing unsubscribe for: ${email}`);
+    const validTypes = ['permanent', 'pause_90', 'spike_only'];
+    const preferenceType = validTypes.includes(type) ? type : 'permanent';
+
+    logger.log(`[Unsubscribe] Processing "${preferenceType}" preference for: ${email}`);
 
     if (!supabaseAdmin) {
       logger.error('[Unsubscribe] Supabase client not initialized');
@@ -37,28 +46,36 @@ export default async function handler(req, res) {
       return;
     }
 
-    // 1. Add to suppressions table (Upsert to handle duplicates)
-    // ID is the email address in this table design
-    const { error: suppressionError } = await supabaseAdmin
-      .from('suppressions')
-      .upsert({
-        id: email,
-        reason: 'unsubscribed',
-        details: 'User unsubscribed via web form',
-        source: 'web_form',
-        suppressedAt: new Date().toISOString(),
-        createdAt: new Date().toISOString()
-      });
+    const now = new Date().toISOString();
+    const pauseUntil = preferenceType === 'pause_90'
+      ? new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString()
+      : null;
 
-    if (suppressionError) {
-      logger.error('[Unsubscribe] Error adding to suppressions:', suppressionError);
-      // We continue to try updating the contact record even if suppression table fails
+    // 1. Suppressions table
+    //    permanent + spike_only → add suppression record
+    //    pause_90 → add with expiry metadata; we use reason='paused_90_days' so the suppression
+    //    check in the sequence edge function can distinguish it from permanent removes.
+    if (preferenceType !== 'spike_only') {
+      const { error: suppressionError } = await supabaseAdmin
+        .from('suppressions')
+        .upsert({
+          id: email,
+          reason: REASON_MAP[preferenceType],
+          details: preferenceType === 'pause_90'
+            ? `Pause requested via unsubscribe page. Resume after ${pauseUntil}`
+            : 'User removed via unsubscribe page',
+          source: 'web_form',
+          suppressedAt: now,
+          createdAt: now,
+        });
+
+      if (suppressionError) {
+        logger.error('[Unsubscribe] Error writing suppression:', suppressionError);
+      }
     }
 
-    // 2. Update contact record(s) in contacts table
-    // We update metadata to reflect the unsubscribe status
+    // 2. Update contact metadata
     let updatedContactsCount = 0;
-
     try {
       const { data: contacts, error: fetchError } = await supabaseAdmin
         .from('contacts')
@@ -70,41 +87,31 @@ export default async function handler(req, res) {
       if (contacts && contacts.length > 0) {
         for (const contact of contacts) {
           const currentMeta = contact.metadata || {};
-          const newMeta = {
-            ...currentMeta,
-            emailStatus: 'unsubscribed',
-            emailSuppressed: true,
-            suppressionReason: 'User unsubscribed via web form',
-            suppressedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-          };
+          const metaPatch = preferenceType === 'permanent'
+            ? { emailStatus: 'unsubscribed', emailSuppressed: true, suppressionReason: 'unsubscribed', suppressedAt: now }
+            : preferenceType === 'pause_90'
+            ? { emailStatus: 'paused', emailPausedUntil: pauseUntil, suppressionReason: 'pause_90', suppressedAt: now }
+            : { emailStatus: 'spike_only', emailPreference: 'spike_only', preferenceSetAt: now };
 
           const { error: updateError } = await supabaseAdmin
             .from('contacts')
-            .update({
-              metadata: newMeta,
-              updatedAt: new Date().toISOString()
-            })
+            .update({ metadata: { ...currentMeta, ...metaPatch, updatedAt: now }, updatedAt: now })
             .eq('id', contact.id);
 
-          if (!updateError) {
-            updatedContactsCount++;
-          } else {
-            logger.error(`[Unsubscribe] Failed to update contact ${contact.id}:`, updateError);
-          }
+          if (!updateError) updatedContactsCount++;
+          else logger.error(`[Unsubscribe] Failed to update contact ${contact.id}:`, updateError);
         }
-        logger.log(`[Unsubscribe] Updated ${updatedContactsCount} contact record(s) for: ${email}`);
+        logger.log(`[Unsubscribe] Updated ${updatedContactsCount} contact(s) for ${email}`);
       }
     } catch (err) {
       logger.error('[Unsubscribe] Error updating contacts:', err);
     }
 
-    // 3. Pause active sequences by setting skipEmailSteps = true for all
-    //    sequence_members records where the contact matches this email
+    // 3. Sequence members — always skip email steps regardless of preference type.
+    //    For pause_90, the sequence engine will re-evaluate when the suppression expires.
+    //    For spike_only, the engine should skip standard cadence but can still send spike alerts.
     let pausedSequences = 0;
-
     try {
-      // Find all contacts with this email
       const { data: matchingContacts } = await supabaseAdmin
         .from('contacts')
         .select('id')
@@ -112,21 +119,16 @@ export default async function handler(req, res) {
 
       if (matchingContacts && matchingContacts.length > 0) {
         const contactIds = matchingContacts.map(c => c.id);
-
-        // Set skipEmailSteps = true for all their sequence memberships
-        const { data: updated, error: seqError } = await supabaseAdmin
+        const { error: seqError } = await supabaseAdmin
           .from('sequence_members')
-          .update({
-            skipEmailSteps: true,
-            updatedAt: new Date().toISOString()
-          })
+          .update({ skipEmailSteps: true, updatedAt: now })
           .in('targetId', contactIds);
 
         if (seqError) {
           logger.error('[Unsubscribe] Error pausing sequences:', seqError);
         } else {
-          pausedSequences = Array.isArray(updated) ? updated.length : contactIds.length;
-          logger.log(`[Unsubscribe] Paused email steps for ${contactIds.length} contact(s) in sequences`);
+          pausedSequences = contactIds.length;
+          logger.log(`[Unsubscribe] Paused sequences for ${contactIds.length} contact(s)`);
         }
       }
     } catch (seqErr) {
@@ -136,18 +138,14 @@ export default async function handler(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       success: true,
-      message: 'Successfully unsubscribed',
-      email: email,
-      pausedSequences
+      type: preferenceType,
+      email,
+      pausedSequences,
     }));
 
   } catch (error) {
     logger.error('[Unsubscribe] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      error: 'Failed to process unsubscribe request',
-      message: error.message
-    }));
-    return;
+    res.end(JSON.stringify({ error: 'Failed to process preference', message: error.message }));
   }
 }
