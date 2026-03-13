@@ -515,9 +515,7 @@ export function EmailList({
                       >
                         {isGenerating ? 'Generating...' : showRegenerateLabel ? 'Regenerate' : 'Generate'}
                       </button>
-                    )}
-                    {hasGeneratedContent && (
-                      <>
+                      {hasGeneratedContent && (
                         <>
                           <button
                             onClick={(e) => {
@@ -526,7 +524,7 @@ export function EmailList({
                               onRegenerateScheduled(email)
                             }}
                             disabled={!executionId || !onRegenerateScheduled || isGenerating}
-                            className="icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40"
+                            className="icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40 text-emerald-400 border-emerald-500/40"
                             title={executionId ? 'Regenerate this draft' : 'Missing execution link'}
                           >
                             {isGenerating ? 'Generating...' : 'Regenerate'}
