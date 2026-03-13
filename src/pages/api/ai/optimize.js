@@ -40,6 +40,34 @@ function normalizeSubject(input) {
   return value.replace(/\s+/g, ' ').slice(0, 140);
 }
 
+function normalizeSenderFirstName(input) {
+  const cleaned = String(input || '').replace(/<[^>]*>/g, '').trim();
+  if (!cleaned) return 'Lewis';
+  const first = cleaned.split(/\s+/)[0] || 'Lewis';
+  return first.replace(/[^A-Za-z'-]/g, '') || 'Lewis';
+}
+
+function ensureThanksSignoff(input, senderFirstName) {
+  const html = String(input || '').trim();
+  if (!html) return html;
+
+  const firstName = normalizeSenderFirstName(senderFirstName);
+  const hasExactSignoff = new RegExp(
+    `<p[^>]*>\\s*Thanks,\\s*<\\/p>\\s*<p[^>]*>\\s*${firstName}\\s*<\\/p>\\s*$`,
+    'i'
+  ).test(html);
+  if (hasExactSignoff) return html;
+
+  // Remove common closings at the end so the enforced signoff stays consistent.
+  const withoutClose =
+    html.replace(
+      /(?:<p[^>]*>\s*(?:Best regards|Regards|Sincerely|Cheers|Thanks|Thank you),?\s*<\/p>\s*<p[^>]*>[\s\S]*?<\/p>\s*)+$/i,
+      ''
+    ).trim();
+
+  return `${withoutClose}<p>Thanks,</p><p>${firstName}</p>`;
+}
+
 function cleanCompanyName(input) {
   const raw = String(input || '').trim();
   if (!raw) return 'Unknown';
@@ -302,14 +330,20 @@ export default async function handler(req, res) {
         if (parsed && typeof parsed === 'object') {
           const bodyCandidate = parsed.body_html || parsed.body || parsed.content || '';
           finalResult = {
-            optimized: softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
+            optimized: ensureThanksSignoff(
+              softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
+              contact?.sender_first_name
+            ),
             subject: normalizeSubject(parsed.subject_line || parsed.subject),
             logic: parsed.logic_reasoning || parsed.reasoning || null
           };
         } else {
           // Fallback if AI didn't return valid JSON despite instructions
           finalResult = {
-            optimized: softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
+            optimized: ensureThanksSignoff(
+              softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
+              contact?.sender_first_name
+            ),
             subject: normalizeSubject(null)
           };
         }
