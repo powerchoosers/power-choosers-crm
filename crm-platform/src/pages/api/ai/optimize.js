@@ -194,8 +194,11 @@ export default async function handler(req, res) {
             - Sentence one must mention the account city (or the outreach-friendly company name if no city exists) and tie that place to one concrete operational reality—renewal timing, demand spikes, longer run hours, billing cycle hits, etc.
             - Avoid vague openers like "energy costs are tough" or "utility charges are complex" without grounding them in that specific location and what is shifting now.
           10. SUBJECT RULE:
-            - Subject line must be 2–4 words and include the account city or outreach-friendly company name.
-            - Keep it curious but specific (e.g., "Fort Worth bill check" or "eelco energy questions").
+            - Subject line must be 4–7 words.
+            - Vary the angle: use the account city OR company name as an anchor, OR lead with a cost-specific question, OR reference renewal/contract timing, OR use a "I noticed something" hook.
+            - Do NOT fall back to the same formula every time (avoid always writing "[City] bill check").
+            - Never use "Quick question", "Following up", "Just checking in", or "Reaching out" as subject openers.
+            - Keep it problem-based and specific (e.g., "Fort Worth industrial billing gap", "before your 2027 contract renewal", "who reviews electricity at [Company]?").
           11. JARGON TRANSLATION RULE:
             - Never use unexplained acronyms like 4CP, TDU, ESI ID, pass-through, nodal adder, or load zone shorthand in first-touch copy.
             - Use plain business language first: "energy rate per kWh" and "demand/delivery charges".
