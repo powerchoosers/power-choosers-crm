@@ -253,6 +253,7 @@ export default function EmailDetailPage() {
   const { data: contactById = {} } = useContactIdentityMapByIds(threadContactIds)
   const fromAddressKey = extractValidAddress(fromValue)
   const fromContact = (email?.contactId ? contactById[email.contactId] : undefined) || contactByEmail[fromAddressKey]
+  const isOutboundEmail = email?.type === 'sent' || email?.type === 'scheduled'
   const toResolved = toList.map((raw) => {
     const key = extractEmailAddress(String(raw || ''))
     return {
@@ -262,8 +263,8 @@ export default function EmailDetailPage() {
     }
   })
 
-  const displayFromName = fromContact?.displayName || (email?.type === 'sent' ? (email.fromName || null) : fromMailbox.name) || fromValue
-  const displayFromAddress = extractValidAddress(email?.type === 'sent' ? fromValue : fromMailbox.address || fromValue) || null
+  const displayFromName = fromContact?.displayName || (isOutboundEmail ? (email.fromName || null) : fromMailbox.name) || fromValue
+  const displayFromAddress = extractValidAddress(isOutboundEmail ? fromValue : fromMailbox.address || fromValue) || null
   const currentUserEmail = (user?.email || '').toLowerCase().trim()
   const inferredCounterparty = threadEmails
     .flatMap((message: Email) => {
@@ -486,7 +487,7 @@ export default function EmailDetailPage() {
             <h1 className="text-3xl font-semibold text-white tracking-tighter leading-tight">{email.subject}</h1>
             <div className="flex items-center gap-2">
                 <span className="inline-flex items-center rounded-md bg-black/40 px-2 py-1 text-xs font-medium text-zinc-400 ring-1 ring-inset ring-white/10">
-                    {email.type === 'sent' ? 'Sent' : 'Inbox'}
+                    {isOutboundEmail ? 'Sent' : 'Inbox'}
                 </span>
             </div>
           </div>
@@ -722,15 +723,16 @@ export default function EmailDetailPage() {
                 <AnimatePresence initial={false}>
                   {threadEmails.map((threadEmail: Email, index: number) => {
                     const isExpanded = expandedThreadId === threadEmail.id
+                    const threadIsOutbound = threadEmail.type === 'sent' || threadEmail.type === 'scheduled'
                     const openCount = threadEmail.openCount || 0
                     const clickCount = threadEmail.clickCount || 0
                     const fromKey = extractEmailAddress(threadEmail.from || '')
                     const fromContactEntry = (threadEmail.contactId ? contactById[threadEmail.contactId] : undefined) || (fromKey ? contactByEmail[fromKey] : undefined)
                     const parsedFrom = parseMailbox(threadEmail.from || '')
-                    const displayName = fromContactEntry?.displayName || (threadEmail.type === 'sent'
+                    const displayName = fromContactEntry?.displayName || (threadIsOutbound
                       ? (profile?.firstName ? `${profile.firstName} • You` : 'You')
                       : threadEmail.fromName || parsedFrom.name || threadEmail.from || 'Unknown')
-                    const displaySegment = threadEmail.type === 'sent'
+                    const displaySegment = threadIsOutbound
                       ? `To ${Array.isArray(threadEmail.to) ? threadEmail.to.join(', ') : threadEmail.to}`
                       : `From ${parsedFrom.address || threadEmail.from}`
                     const snippet = threadEmail.snippet || (threadEmail.text || '').slice(0, 140)
@@ -778,7 +780,7 @@ export default function EmailDetailPage() {
                                 )}
                               </div>
                               <div className="flex items-center gap-3">
-                                {threadEmail.type === 'sent' && (
+                                {threadIsOutbound && (
                                   <div className="flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2.5 py-1 shrink-0">
                                     <div className="flex items-center gap-1">
                                       <Eye
@@ -813,7 +815,7 @@ export default function EmailDetailPage() {
                             </div>
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-zinc-500">
-                                {threadEmail.type === 'sent' ? 'Outbound' : 'Inbox'}
+                                {threadIsOutbound ? 'Outbound' : 'Inbox'}
                               </span>
                               <span className="text-xs text-zinc-400 truncate">{displaySegment}</span>
                             </div>
@@ -846,7 +848,7 @@ export default function EmailDetailPage() {
                                   html={threadEmail.html}
                                   text={threadEmail.text}
                                   subject={threadEmail.subject}
-                                  initialLightMode={threadEmail.type === 'sent'}
+                                  initialLightMode={threadIsOutbound}
                                   className="rounded-2xl border border-white/10"
                                 />
                                 {threadEmail.attachments && threadEmail.attachments.length > 0 && (

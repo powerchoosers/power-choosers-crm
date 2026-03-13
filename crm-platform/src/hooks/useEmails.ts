@@ -38,7 +38,7 @@ export interface Email {
 }
 
 const PAGE_SIZE = 50
-export type EmailListFilter = 'all' | 'received' | 'sent'
+export type EmailListFilter = 'all' | 'received' | 'sent' | 'scheduled'
 
 const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -163,6 +163,8 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
         query = applyEmailSearch(applyCommonEmailExclusions(query), searchQuery)
         if (typeFilter === 'sent') {
           query = query.in('type', ['sent', 'uplink_out'])
+        } else if (typeFilter === 'scheduled') {
+          query = query.eq('type', 'scheduled')
         } else if (typeFilter === 'received') {
           query = query.in('type', ['received', 'uplink_in'])
         }
@@ -431,7 +433,7 @@ export function useEmailTypeCounts(searchQuery?: string) {
     queryKey: ['emails-type-counts', user?.email, role, searchQuery],
     queryFn: async () => {
       if (loading || !user || !user.email) {
-        return { all: 0, sent: 0, received: 0 }
+        return { all: 0, sent: 0, received: 0, scheduled: 0 }
       }
 
       const buildBase = async () => {
@@ -444,7 +446,7 @@ export function useEmailTypeCounts(searchQuery?: string) {
         return applyEmailSearch(applyCommonEmailExclusions(query), searchQuery)
       }
 
-      const [allRes, sentRes, receivedRes] = await Promise.all([
+      const [allRes, sentRes, receivedRes, scheduledRes] = await Promise.all([
         (async () => {
           const query = await buildBase()
           return query
@@ -456,22 +458,28 @@ export function useEmailTypeCounts(searchQuery?: string) {
         (async () => {
           const query = await buildBase()
           return query.in('type', ['received', 'uplink_in'])
+        })(),
+        (async () => {
+          const query = await buildBase()
+          return query.eq('type', 'scheduled')
         })()
       ])
 
       const allError = allRes.error
       const sentError = sentRes.error
       const receivedError = receivedRes.error
+      const scheduledError = scheduledRes.error
 
-      if (allError || sentError || receivedError) {
-        const error = allError || sentError || receivedError
+      if (allError || sentError || receivedError || scheduledError) {
+        const error = allError || sentError || receivedError || scheduledError
         if (error?.message === 'FetchUserError: Request was aborted' || error?.message?.includes('abort')) {
           throw error
         }
         console.error('Supabase error fetching email type counts:', {
           allError,
           sentError,
-          receivedError
+          receivedError,
+          scheduledError
         })
         throw error
       }
@@ -479,7 +487,8 @@ export function useEmailTypeCounts(searchQuery?: string) {
       return {
         all: allRes.count || 0,
         sent: sentRes.count || 0,
-        received: receivedRes.count || 0
+        received: receivedRes.count || 0,
+        scheduled: scheduledRes.count || 0
       }
     },
     enabled: !loading && !!user && !!user?.email,

@@ -230,7 +230,7 @@ async function handleSend(execution, job) {
     const metadata = normalizeMetadata(execution.metadata);
 
     const [member] = await sql`
-    SELECT m.id, c.email as target_email, c."firstName", c."lastName", 
+    SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName", 
            s."ownerId" as owner_uuid, u.email as primary_owner_email
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
@@ -243,6 +243,8 @@ async function handleSend(execution, job) {
     const connections = await sql`SELECT email FROM zoho_connections WHERE user_id = ${member.owner_uuid} AND email LIKE '%@getnodalpoint.com' LIMIT 1`
     const fromEmail = connections[0]?.email || member.primary_owner_email;
 
+    const emailRecordId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
+
     const response = await fetch(`${API_BASE_URL}/api/email/zoho-send-sequence`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
@@ -251,6 +253,8 @@ async function handleSend(execution, job) {
             from: { email: fromEmail, name: 'Lewis Patterson' },
             subject: metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point',
             html: metadata?.body || metadata?.aiBody,
+            email_id: emailRecordId,
+            contactId: member.contact_id || undefined,
             metadata: { execution_id: execution.id, member_id: member.id }
         })
     })

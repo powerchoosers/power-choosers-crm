@@ -52,6 +52,15 @@ export function useEmail(id: string) {
       }
       
       if (data) {
+        const rawType = String(data.type || '').toLowerCase()
+        const normalizedType: Email['type'] =
+          rawType === 'sent' || rawType === 'uplink_out'
+            ? 'sent'
+            : rawType === 'scheduled'
+              ? 'scheduled'
+              : rawType === 'draft'
+                ? 'draft'
+                : 'received'
         const provider = data.metadata?.provider || null
         const normalizedAttachments = normalizeAttachments(data.metadata?.attachments || data.attachments, provider)
         const plainText = stripHtml(data.text)
@@ -71,7 +80,7 @@ export function useEmail(id: string) {
           date: data.timestamp || data.created_at,
           timestamp: new Date(data.timestamp || data.created_at).getTime(),
           unread: !data.is_read,
-          type: data.type,
+          type: normalizedType,
           status: data.status,
           ownerId: data.metadata?.ownerId,
           openCount: data.openCount,
