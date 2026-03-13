@@ -36,6 +36,9 @@ export default function EmailsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [scheduledActionState, setScheduledActionState] = useState<Record<string, string>>({})
   const hasRunAutoSync = useRef(false)
+  const [showTabSkeletonRows, setShowTabSkeletonRows] = useState(false)
+  const [tabSkeletonFetchStarted, setTabSkeletonFetchStarted] = useState(false)
+  const previousFilterRef = useRef(emailFilter)
 
   // Debounce search query
   useEffect(() => {
@@ -46,7 +49,7 @@ export default function EmailsPage() {
     return () => clearTimeout(timer)
   }, [searchTerm, setSearch])
 
-  const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage } = useEmails(debouncedSearch, emailFilter)
+  const { data, isLoading: isLoadingEmails, error, fetchNextPage, hasNextPage, isFetchingNextPage, isFetching } = useEmails(debouncedSearch, emailFilter)
   const { data: totalEmails } = useEmailsCount(debouncedSearch)
   const { data: emailTypeCounts } = useEmailTypeCounts(debouncedSearch)
   const { performSync, isSyncing } = useZohoSync()
@@ -88,6 +91,35 @@ export default function EmailsPage() {
       fetchNextPage()
     }
   }, [isLoadingEmails, hasNextPage, isFetchingNextPage, fetchNextPage])
+
+  useEffect(() => {
+    if (previousFilterRef.current !== emailFilter) {
+      previousFilterRef.current = emailFilter
+      setShowTabSkeletonRows(true)
+      setTabSkeletonFetchStarted(false)
+    }
+  }, [emailFilter])
+
+  useEffect(() => {
+    if (!showTabSkeletonRows) return
+    if (isFetching) {
+      if (!tabSkeletonFetchStarted) {
+        setTabSkeletonFetchStarted(true)
+      }
+      return
+    }
+    if (tabSkeletonFetchStarted) {
+      setShowTabSkeletonRows(false)
+      setTabSkeletonFetchStarted(false)
+      return
+    }
+
+    const timer = setTimeout(() => {
+      setShowTabSkeletonRows(false)
+      setTabSkeletonFetchStarted(false)
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [showTabSkeletonRows, isFetching, tabSkeletonFetchStarted])
 
   const handleSync = async () => {
     if (!user) return
@@ -282,6 +314,7 @@ export default function EmailsPage() {
           onRegenerateScheduled={(email) => runScheduledReviewAction(email, 'regenerate')}
           onAcceptScheduled={(email) => runScheduledReviewAction(email, 'accept')}
           scheduledActionState={scheduledActionState}
+          showSkeletonRows={showTabSkeletonRows}
           scrollContainerRef={scrollContainerRef}
         />
       </div>
