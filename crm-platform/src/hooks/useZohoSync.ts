@@ -4,9 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSyncStore } from '@/store/syncStore';
 import { supabase } from '@/lib/supabase';
 
-const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {
-    'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
-};
+const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {};
 
 async function getOwnerScope(user: { id?: string; email?: string | null }) {
     const primary = String(user.email || '').toLowerCase().trim();
