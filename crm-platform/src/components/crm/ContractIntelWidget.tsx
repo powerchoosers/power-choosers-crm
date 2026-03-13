@@ -255,7 +255,7 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="h-6 w-6 rounded-md nodal-module-glass nodal-monolith-edge text-zinc-400 hover:text-zinc-200 hover:bg-white/5 flex items-center justify-center transition-colors"
+              className="h-6 w-6 rounded-md nodal-module-glass nodal-monolith-edge text-zinc-400 hover:text-zinc-200 hover:bg-white/5 flex items-center justify-center transition-colors focus:outline-none"
               onClick={(e) => e.stopPropagation()}
               aria-label="Contract actions"
             >
