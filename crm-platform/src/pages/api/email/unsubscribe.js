@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
+import { ZohoMailService } from './zoho-service.js';
 
 // preference type → suppression reason label
 const REASON_MAP = {
@@ -8,6 +9,47 @@ const REASON_MAP = {
   pause_90:  'paused_90_days',
   spike_only: 'spike_only',
 };
+
+const ALERT_AUTH_EMAIL = 'l.patterson@nodalpoint.io';
+const ALERT_FROM_EMAIL = 'signal@nodalpoint.io';
+const ALERT_TO_EMAIL = 'l.patterson@nodalpoint.io';
+
+async function sendUnsubscribeAlert({ email, preferenceType, pauseUntil, updatedContactsCount, pausedSequences, now }) {
+  try {
+    const zohoService = new ZohoMailService();
+    const initialized = await zohoService.initialize(ALERT_AUTH_EMAIL);
+    if (!initialized) {
+      logger.warn('[Unsubscribe] Alert email skipped: Zoho init failed');
+      return;
+    }
+
+    const subject = `Unsubscribe preference: ${preferenceType} (${email})`;
+    const html = `
+      <div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5;color:#111827;">
+        <p><strong>Unsubscribe preference submitted</strong></p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Preference:</strong> ${preferenceType}</p>
+        ${pauseUntil ? `<p><strong>Pause Until:</strong> ${pauseUntil}</p>` : ''}
+        <p><strong>Contacts Updated:</strong> ${updatedContactsCount}</p>
+        <p><strong>Sequence Members Updated:</strong> ${pausedSequences}</p>
+        <p><strong>Timestamp (UTC):</strong> ${now}</p>
+      </div>
+    `;
+
+    await zohoService.sendEmail({
+      to: ALERT_TO_EMAIL,
+      subject,
+      html,
+      userEmail: ALERT_AUTH_EMAIL,
+      from: ALERT_FROM_EMAIL,
+      fromName: 'Nodal Point Signal'
+    });
+
+    logger.log(`[Unsubscribe] Alert email sent for ${email}`);
+  } catch (error) {
+    logger.error('[Unsubscribe] Failed to send alert email:', error);
+  }
+}
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -134,6 +176,15 @@ export default async function handler(req, res) {
     } catch (seqErr) {
       logger.error('[Unsubscribe] Error during sequence pausing:', seqErr);
     }
+
+    await sendUnsubscribeAlert({
+      email,
+      preferenceType,
+      pauseUntil,
+      updatedContactsCount,
+      pausedSequences,
+      now
+    });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
