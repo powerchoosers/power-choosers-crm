@@ -102,6 +102,7 @@ Deno.serve(async (req: Request) => {
           SET status = 'failed', error_message = ${err.message}, updated_at = NOW()
           WHERE id = ${job.execution_id}
         `.catch(() => { });
+                await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${job.jobId}::bigint)`.catch(() => { });
                 results.push({ jobId: job.jobId, status: 'failed', error: err.message });
             }
         }
