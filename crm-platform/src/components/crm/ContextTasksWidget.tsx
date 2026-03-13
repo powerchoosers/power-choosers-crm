@@ -4,7 +4,7 @@ import { useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ListTodo, Circle, CheckCircle2, ChevronDown, ChevronUp } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useTasks, type Task } from '@/hooks/useTasks'
+import { useAllPendingTasks, useTasks, type Task } from '@/hooks/useTasks'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
 import { cn } from '@/lib/utils'
 import { buildTaskVariableMap, resolveTaskTemplateText } from '@/lib/task-variables'
@@ -35,17 +35,18 @@ export default function ContextTasksWidget({
   accountContext
 }: ContextTasksWidgetProps) {
   const router = useRouter()
-  const { data: tasksData, updateTask } = useTasks()
+  const { data: allPendingData } = useAllPendingTasks()
+  const { updateTask } = useTasks()
   const [exitingTask, setExitingTask] = useState<{ task: Task; index: number } | null>(null)
   const exitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [expandedTaskIds, setExpandedTaskIds] = useState<Set<string>>(new Set())
   const tasks = useMemo(() => {
     if (!entityId) return []
-    const allTasks = tasksData?.pages.flatMap(page => page.tasks) || []
+    const allTasks = allPendingData?.allPendingTasks ?? []
     return allTasks
       .filter((task) => taskMatchesEntityScope(task, { entityName, contactId, accountId, includeContactIds }))
       .sort(compareTasksByDueDate)
-  }, [tasksData, entityId, entityName, contactId, accountId, includeContactIds])
+  }, [allPendingData?.allPendingTasks, entityId, entityName, contactId, accountId, includeContactIds])
 
   const pendingTasks = useMemo(
     () => tasks.filter(isPendingTask),
