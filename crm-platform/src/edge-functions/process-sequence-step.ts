@@ -163,10 +163,17 @@ async function handleGeneration(execution, job) {
            a.state as account_state,
            a.electricity_supplier as account_supplier,
            a.current_rate as account_current_rate,
-           a.contract_end_date as account_contract_end_date
+           a.contract_end_date as account_contract_end_date,
+           COALESCE(
+             s.bgvector->'settings'->>'senderEmail',
+             s.metadata->>'sender_email',
+             u.email
+           ) as sequence_sender_email
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
     LEFT JOIN accounts a ON c."accountId" = a.id
+    LEFT JOIN sequences s ON s.id = m."sequenceId"
+    LEFT JOIN users u ON (u.id = s."ownerId" OR u.email = s."ownerId")
     WHERE m.id = ${execution.member_id}
   `
 
@@ -190,6 +197,10 @@ async function handleGeneration(execution, job) {
             : 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
     const contractEndYear = member.account_contract_end_date
         ? new Date(member.account_contract_end_date).getUTCFullYear()
+        : null;
+    const senderEmail = String(member.sequence_sender_email || '').trim() || null;
+    const senderDomain = senderEmail && senderEmail.includes('@')
+        ? senderEmail.split('@')[1]
         : null;
 
     const response = await fetch(`${API_BASE_URL}/api/ai/optimize`, {
@@ -219,7 +230,9 @@ async function handleGeneration(execution, job) {
                 website,
                 has_linkedin: !!linkedInUrl,
                 has_website: !!website,
-                source_label: sourceLabel
+                source_label: sourceLabel,
+                sender_email: senderEmail,
+                sender_domain: senderDomain
             }
         })
     })
@@ -234,9 +247,13 @@ async function handleGeneration(execution, job) {
         throw new Error('AI generation returned empty body');
     }
 
+    const metadataPatch = senderEmail
+        ? { body, subject, from: senderEmail, senderEmail, senderDomain }
+        : { body, subject };
+
     await sql`
     UPDATE sequence_executions 
-    SET metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({ body, subject })}::jsonb, status = 'pending_send'
+    SET metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify(metadataPatch)}::jsonb, status = 'pending_send'
     WHERE id = ${execution.id}
   `
 }
@@ -246,7 +263,12 @@ async function handleSend(execution, job) {
 
     const [member] = await sql`
     SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName", 
-           s."ownerId" as owner_uuid, u.email as primary_owner_email
+           s."ownerId" as owner_uuid, u.email as primary_owner_email,
+           COALESCE(
+             s.bgvector->'settings'->>'senderEmail',
+             s.metadata->>'sender_email',
+             u.email
+           ) as sequence_sender_email
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
     JOIN sequences s ON m."sequenceId" = s.id
@@ -255,8 +277,30 @@ async function handleSend(execution, job) {
     LIMIT 1
   `
 
-    const connections = await sql`SELECT email FROM zoho_connections WHERE user_id = ${member.owner_uuid} AND email LIKE '%@getnodalpoint.com' LIMIT 1`
-    const fromEmail = connections[0]?.email || member.primary_owner_email;
+    const preferredSender = String(metadata?.senderEmail || metadata?.from || member.sequence_sender_email || '').trim();
+    let fromEmail = preferredSender || member.primary_owner_email;
+    if (preferredSender) {
+        const preferredConnection = await sql`
+      SELECT email
+      FROM zoho_connections
+      WHERE user_id = ${member.owner_uuid}
+        AND LOWER(email) = LOWER(${preferredSender})
+      LIMIT 1
+    `;
+        if (preferredConnection[0]?.email) {
+            fromEmail = preferredConnection[0].email;
+        }
+    }
+    if (!fromEmail) {
+        const fallbackConnection = await sql`
+      SELECT email
+      FROM zoho_connections
+      WHERE user_id = ${member.owner_uuid}
+      ORDER BY CASE WHEN email LIKE '%@getnodalpoint.com' THEN 0 ELSE 1 END, email
+      LIMIT 1
+    `;
+        fromEmail = fallbackConnection[0]?.email || member.primary_owner_email;
+    }
 
     const emailRecordId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
 

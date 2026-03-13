@@ -114,11 +114,21 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
   `
 }
 
-export function generateForensicSignature(profile: UserProfile): string {
+export function generateForensicSignature(
+  profile: UserProfile,
+  options?: { senderEmail?: string | null; websiteDomain?: string | null }
+): string {
   if (!profile) return '';
 
   const initials = `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`;
   const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Nodal Point Architect';
+  const senderEmail = (options?.senderEmail || profile.email || 'contact@nodalpoint.io').trim();
+  const rawDomain = (options?.websiteDomain || senderEmail.split('@')[1] || 'nodalpoint.io')
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .trim();
+  const websiteDomain = rawDomain || 'nodalpoint.io';
+  const websiteUrl = `https://${websiteDomain}`;
   const NODAL_BLUE = '#002FA7';
   const ZINC_500 = '#71717a';
   const ZINC_950 = '#09090b';
@@ -148,8 +158,11 @@ export function generateForensicSignature(profile: UserProfile): string {
         <p style="margin: 2px 0; font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: ${ZINC_500}; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2;">
           ${profile.jobTitle || 'Market Architect'} // [VECTOR_OPS]
         </p>
-        <a href="https://nodalpoint.io" style="font-size: 12px; color: ${NODAL_BLUE}; text-decoration: none; font-weight: 500;">
-          nodalpoint.io
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: ${ZINC_500}; line-height: 1.3;">
+          ${senderEmail}
+        </p>
+        <a href="${websiteUrl}" style="font-size: 12px; color: ${NODAL_BLUE}; text-decoration: none; font-weight: 500;">
+          ${websiteDomain}
         </a>
       </td>
     </tr>

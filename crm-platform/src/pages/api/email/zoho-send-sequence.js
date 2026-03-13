@@ -102,20 +102,31 @@ export default async function handler(req, res) {
                     .eq('email', lookupEmail)
                     .maybeSingle();
 
-                if (userData && !userError) {
-                    const profile = {
+                const profile = userData && !userError
+                    ? {
                         firstName: userData.first_name,
                         lastName: userData.last_name,
                         jobTitle: userData.job_title,
                         hostedPhotoUrl: userData.hosted_photo_url
+                    }
+                    : {
+                        firstName: 'Lewis',
+                        lastName: 'Patterson',
+                        jobTitle: 'Market Architect'
                     };
-                    const forensicSig = generateForensicSignature(profile);
 
-                    // Simple append for sequence emails
-                    htmlContent = `<div style="font-family: sans-serif; font-size: 14px; color: #09090b;">${htmlContent}</div>${forensicSig}`;
+                const senderDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : null;
+                const forensicSig = generateForensicSignature(profile, {
+                    senderEmail: fromEmail,
+                    websiteDomain: senderDomain
+                });
+
+                // Simple append for sequence emails
+                htmlContent = `<div style="font-family: sans-serif; font-size: 14px; color: #09090b;">${htmlContent}</div>${forensicSig}`;
+                if (userData && !userError) {
                     logger.info(`[Zoho Sequence] Injected Forensic Signature for ${fromEmail} (via ${lookupEmail})`, 'zoho-send-sequence');
                 } else {
-                    logger.warn(`[Zoho Sequence] No profile found for ${lookupEmail}. Signature injection skipped.`, 'zoho-send-sequence');
+                    logger.warn(`[Zoho Sequence] No profile found for ${lookupEmail}. Injected fallback signature for ${fromEmail}.`, 'zoho-send-sequence');
                 }
             } catch (sigError) {
                 logger.error('[Zoho Sequence] Failed to inject signature:', sigError);

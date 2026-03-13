@@ -176,21 +176,25 @@ export default async function handler(req, res) {
             - First touch should ask for interest with a concrete offer, not a meeting request.
             - Offer: if they send Lewis their latest electricity statement, he will reply with a 2–3 bullet forensic snapshot of what stands out.
             - End with a low-friction yes/no question referencing that offer.
-          13. SOURCE TRUTH IS HARD RULE:
+          13. VOICE RULE:
+            - Use first-person peer language from Lewis ("I", "I can", "I review"), not corporate team language.
+            - Avoid openers like "our firm", "we help businesses", or "at Nodal Point, we...".
+            - You may mention Nodal Point once for identity, but keep the voice consultative and person-to-person.
+          14. SOURCE TRUTH IS HARD RULE:
             - If source_label=linkedin (or has_linkedin=true), you may reference LinkedIn once.
             - If source_label=website (or has_linkedin=false and has_website=true), do NOT mention LinkedIn. Reference website/public company info instead.
             - If source_label=public_company_info (or has_linkedin=false and has_website=false), do NOT mention LinkedIn or website. Say you were reviewing companies in their industry/area.
             - Never claim a source that is not supported by SOURCE_TRUTH.
-          14. COMPANY NAME RULE:
+          15. COMPANY NAME RULE:
             - Use COMPANY_OUTREACH_NAME in copy, not the full legal entity name.
             - Strip legal suffixes like Inc, LLC, Ltd, Corp and ignore DBA phrasing unless the STRATEGY explicitly requires the legal name.
             - No normal human writes "Eduardo E. Lozano & Co., Inc. dba eelco" in a cold email opener. Do not do that.
-          15. FIELD USAGE QUALITY RULE:
+          16. FIELD USAGE QUALITY RULE:
             - If ROLE is known, tailor one phrase to that role's business priorities.
             - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
             - If LOCATION is known, anchor the observation to that place naturally.
             - If any field is Unknown, do not invent it and do not force awkward placeholders.
-          16. ENERGY INTEL RULES:
+          17. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
             - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
