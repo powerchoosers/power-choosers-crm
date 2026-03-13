@@ -21,7 +21,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [isSuccess, setIsSuccess] = useState(false)
     const [activeSignature, setActiveSignature] = useState<string | null>(null)
-    const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('draw')
+    const [signatureMode, setSignatureMode] = useState<'draw' | 'type'>('type')
     const [typedSignature, setTypedSignature] = useState('')
     const [textValues, setTextValues] = useState<Record<string, string>>({})
     const [numPages, setNumPages] = useState<number>(0)
@@ -534,13 +534,13 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
                             <div className="flex bg-zinc-900/50 border border-white/5 p-0.5 rounded-md">
                                 <button
-                                    onClick={() => setSignatureMode('draw')}
-                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'draw' ? 'bg-[#002FA7] text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
-                                >Draw Ink</button>
-                                <button
                                     onClick={() => setSignatureMode('type')}
                                     className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'type' ? 'bg-[#002FA7] text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
                                 >Type Font</button>
+                                <button
+                                    onClick={() => setSignatureMode('draw')}
+                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'draw' ? 'bg-[#002FA7] text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                >Draw Ink</button>
                             </div>
 
                             <div
