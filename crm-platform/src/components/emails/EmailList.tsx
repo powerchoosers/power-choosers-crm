@@ -352,250 +352,251 @@ export function EmailList({
             skeletonRows
           ) : (
             paginatedEmails.map((email, index) => {
-            const isOutbound = email.type === 'sent' || email.type === 'scheduled'
-            const executionId = String(email?.metadata?.sequenceExecutionId || '')
-            const hasGeneratedContent = Boolean(String(email.html || '').trim())
-            const isAccepted = Boolean(email?.metadata?.reviewAccepted)
-            const actionState = scheduledActionState[email.id] || ''
-            const isGenerating = actionState === 'generate' || actionState === 'regenerate'
-            const isAccepting = actionState === 'accept'
-            const showRegenerateLabel = hasGeneratedContent || Boolean(email?.metadata?.previewGeneratedAt)
-            const openCount = email.openCount || 0
-            const clickCount = email.clickCount || 0
-            const hasClicks = clickCount > 0
-            const rowIndex = (currentPage - 1) * itemsPerPage + index + 1
-            const isSelected = selectedIds.has(email.id)
-            const toList = Array.isArray(email.to) ? email.to : [email.to]
-            const primaryEmail = isOutbound
-              ? extractEmailAddress(String(toList[0] || ''))
-              : extractEmailAddress(String(email.from || ''))
-            const primaryContact = (email.contactId ? contactById[email.contactId] : undefined) || contactByEmail[primaryEmail]
-            const recipientLabels = toList.map((raw) => {
-              const addr = extractEmailAddress(String(raw || ''))
-              const matched = contactByEmail[addr]
-              return matched?.displayName || String(raw || '')
-            })
-            const participantLabel = isOutbound
-              ? `To: ${recipientLabels.join(', ')}`
-              : (primaryContact?.displayName || email.from)
-            const fallbackDomain = primaryEmail.includes('@') ? primaryEmail.split('@')[1] : undefined
+              const isOutbound = email.type === 'sent' || email.type === 'scheduled'
+              const executionId = String(email?.metadata?.sequenceExecutionId || '')
+              const hasGeneratedContent = Boolean(String(email.html || '').trim())
+              const isAccepted = Boolean(email?.metadata?.reviewAccepted)
+              const actionState = scheduledActionState[email.id] || ''
+              const isGenerating = actionState === 'generate' || actionState === 'regenerate'
+              const isAccepting = actionState === 'accept'
+              const showRegenerateLabel = hasGeneratedContent || Boolean(email?.metadata?.previewGeneratedAt)
+              const openCount = email.openCount || 0
+              const clickCount = email.clickCount || 0
+              const hasClicks = clickCount > 0
+              const rowIndex = (currentPage - 1) * itemsPerPage + index + 1
+              const isSelected = selectedIds.has(email.id)
+              const toList = Array.isArray(email.to) ? email.to : [email.to]
+              const primaryEmail = isOutbound
+                ? extractEmailAddress(String(toList[0] || ''))
+                : extractEmailAddress(String(email.from || ''))
+              const primaryContact = (email.contactId ? contactById[email.contactId] : undefined) || contactByEmail[primaryEmail]
+              const recipientLabels = toList.map((raw) => {
+                const addr = extractEmailAddress(String(raw || ''))
+                const matched = contactByEmail[addr]
+                return matched?.displayName || String(raw || '')
+              })
+              const participantLabel = isOutbound
+                ? `To: ${recipientLabels.join(', ')}`
+                : (primaryContact?.displayName || email.from)
+              const fallbackDomain = primaryEmail.includes('@') ? primaryEmail.split('@')[1] : undefined
 
-            return (
-              <div
-                key={email.id}
-                onClick={() => onSelectEmail(email)}
-                className={cn(
-                  "group grid grid-cols-12 gap-4 p-3 cursor-pointer transition-all items-center border-l-2",
-                  hasClicks ? "border-[#002FA7]" : selectedEmailId === email.id ? "border-[#002FA7]" : "border-transparent",
-                  email.unread ? "bg-[#002FA7]/5" : "",
-                  isSelected ? "selected-container border-[#cfd5ff]/30 shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
-                  !isSelected && "hover:bg-white/5"
-                )}
-              >
-                {/* Select / Row number */}
-                <div className="col-span-1 flex items-center justify-center relative group/select">
-                  {onSelectionChange ? (
-                    <>
-                      <span className={cn(
-                        "font-mono text-[10px] text-zinc-700 transition-opacity",
-                        isSelected ? "opacity-0" : "group-hover/select:opacity-0"
-                      )}>
-                        {rowIndex.toString().padStart(2, '0')}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); toggleRow(email); }}
-                        className={cn(
-                          "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
-                          isSelected
-                            ? "bg-[#002FA7] border-[#002FA7] opacity-100"
-                            : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
-                        )}
-                      >
-                        {isSelected && <Check className="w-3 h-3 text-white" />}
-                      </button>
-                    </>
-                  ) : (
-                    <span className="font-mono text-[10px] text-zinc-700">{rowIndex.toString().padStart(2, '0')}</span>
+              return (
+                <div
+                  key={email.id}
+                  onClick={() => onSelectEmail(email)}
+                  className={cn(
+                    "group grid grid-cols-12 gap-4 p-3 cursor-pointer transition-all items-center border-l-2",
+                    hasClicks ? "border-[#002FA7]" : selectedEmailId === email.id ? "border-[#002FA7]" : "border-transparent",
+                    email.unread ? "bg-[#002FA7]/5" : "",
+                    isSelected ? "selected-container border-[#cfd5ff]/30 shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
+                    !isSelected && "hover:bg-white/5"
                   )}
-                </div>
-                {/* Avatar Icon */}
-                <div className="col-span-1 flex justify-center relative -ml-4">
-                  {email.unread && (
-                    <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
-                  )}
-                  {primaryContact ? (
-                    <ContactAvatar
-                      name={primaryContact.displayName}
-                      photoUrl={primaryContact.avatarUrl}
-                      size={36}
-                      className="rounded-[10px]"
-                      textClassName="text-[10px]"
-                    />
-                  ) : (
-                    <CompanyIcon
-                      name={primaryEmail || 'Unknown'}
-                      domain={fallbackDomain}
-                      size={36}
-                      roundedClassName="rounded-[10px]"
-                    />
-                  )}
-                </div>
-
-                {/* Participant */}
-                <div className="col-span-3 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {primaryContact && onOpenContact ? (
-                      <button
-                        type="button"
-                        onClick={(e) => { e.stopPropagation(); onOpenContact(primaryContact.id) }}
-                        className={cn(
-                          "text-sm truncate font-mono tracking-tight transition-all origin-left hover:scale-[1.03] hover:text-white underline-offset-4 hover:underline cursor-pointer",
-                          email.unread ? "font-semibold text-white" : "text-zinc-300"
-                        )}
-                        title={`Open ${primaryContact.displayName} dossier`}
-                      >
-                        {participantLabel}
-                      </button>
-                    ) : (
-                      <span className={cn(
-                        "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]",
-                        email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
-                      )}>
-                        {participantLabel}
-                      </span>
-                    )}
-                    {isOutbound ? (
-                      <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
-                    ) : (
-                      <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
-                    )}
-                  </div>
-                </div>
-
-                {/* Message Preview */}
-                <div className={cn("min-w-0 space-y-1", filter === 'sent' || filter === 'scheduled' ? "col-span-3" : "col-span-5")}>
-                  <div className="flex items-center gap-2">
-                    <h4 className={cn(
-                      "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1",
-                      email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
-                    )}>
-                      {email.subject}
-                    </h4>
-                    {email.attachments && email.attachments.length > 0 && (
-                      <div className="flex items-center gap-1 text-zinc-500 flex-shrink-0" title={`${email.attachments.length} attachment${email.attachments.length > 1 ? 's' : ''}`}>
-                        <Paperclip className="w-3 h-3" />
-                        {email.attachments.length > 1 && (
-                          <span className="text-[10px] font-mono tabular-nums">{email.attachments.length}</span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-xs text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
-                    {email.snippet || email.text || 'No preview available'}
-                  </p>
-                </div>
-
-                {/* Telemetry Column - Only show for sent emails filter */}
-                {filter === 'sent' && (
-                  <div className="col-span-2 flex items-center">
-                    <div className="flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2.5 py-1 w-fit">
-                      {/* Opens */}
-                      <div className="flex items-center gap-1">
-                        <Eye
-                          size={12}
-                          className={cn(
-                            openCount > 0 ? "text-emerald-400" : "text-zinc-600"
-                          )}
-                        />
+                >
+                  {/* Select / Row number */}
+                  <div className="col-span-1 flex items-center justify-center relative group/select">
+                    {onSelectionChange ? (
+                      <>
                         <span className={cn(
-                          "text-[10px] font-mono tabular-nums",
-                          openCount > 2 ? "text-white" : openCount > 0 ? "text-emerald-400" : "text-zinc-600"
+                          "font-mono text-[10px] text-zinc-700 transition-opacity",
+                          isSelected ? "opacity-0" : "group-hover/select:opacity-0"
                         )}>
-                          {openCount}
+                          {rowIndex.toString().padStart(2, '0')}
                         </span>
-                      </div>
-                      {/* Clicks */}
-                      <div className="flex items-center gap-1">
-                        <MousePointer2
-                          size={12}
-                          className={cn(
-                            clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
-                          )}
-                        />
-                        <span className={cn(
-                          "text-[10px] font-mono tabular-nums",
-                          clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
-                        )}>
-                          {clickCount}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {filter === 'scheduled' && (
-                  <div className="col-span-2 flex items-center">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          if (!executionId || isGenerating) return
-                          if (showRegenerateLabel) {
-                            if (!onRegenerateScheduled) return
-                            onRegenerateScheduled(email)
-                          } else {
-                            if (!onGenerateScheduled) return
-                            onGenerateScheduled(email)
-                          }
-                        }}
-                        disabled={
-                          !executionId ||
-                          isGenerating ||
-                          (showRegenerateLabel ? !onRegenerateScheduled : !onGenerateScheduled)
-                        }
-                        className={cn(
-                          "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40",
-                          showRegenerateLabel
-                            ? "text-violet-300 border-violet-500/40"
-                            : "text-emerald-400 border-emerald-500/40"
-                        )}
-                        title={
-                          executionId
-                            ? `${showRegenerateLabel ? 'Regenerate' : 'Generate'} draft now`
-                            : 'Missing execution link'
-                        }
-                      >
-                        {isGenerating ? 'Generating...' : showRegenerateLabel ? 'Regenerate' : 'Generate'}
-                      </button>
-                      {hasGeneratedContent && (
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            if (!executionId || !onAcceptScheduled || isAccepting) return
-                            onAcceptScheduled(email)
-                          }}
-                          disabled={!executionId || !onAcceptScheduled || isAccepting}
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); toggleRow(email); }}
                           className={cn(
-                            "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40 text-emerald-400 border-emerald-500/40",
-                            isAccepted && "text-emerald-300"
+                            "absolute inset-0 m-auto w-4 h-4 rounded border transition-all flex items-center justify-center",
+                            isSelected
+                              ? "bg-[#002FA7] border-[#002FA7] opacity-100"
+                              : "bg-white/5 border-white/10 opacity-0 group-hover/select:opacity-100"
                           )}
-                          title={executionId ? 'Accept this draft' : 'Missing execution link'}
                         >
-                          {isAccepting ? 'Saving...' : isAccepted ? 'Accepted' : 'Accept'}
+                          {isSelected && <Check className="w-3 h-3 text-white" />}
                         </button>
+                      </>
+                    ) : (
+                      <span className="font-mono text-[10px] text-zinc-700">{rowIndex.toString().padStart(2, '0')}</span>
+                    )}
+                  </div>
+                  {/* Avatar Icon */}
+                  <div className="col-span-1 flex justify-center relative -ml-4">
+                    {email.unread && (
+                      <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
+                    )}
+                    {primaryContact ? (
+                      <ContactAvatar
+                        name={primaryContact.displayName}
+                        photoUrl={primaryContact.avatarUrl}
+                        size={36}
+                        className="rounded-[10px]"
+                        textClassName="text-[10px]"
+                      />
+                    ) : (
+                      <CompanyIcon
+                        name={primaryEmail || 'Unknown'}
+                        domain={fallbackDomain}
+                        size={36}
+                        roundedClassName="rounded-[10px]"
+                      />
+                    )}
+                  </div>
+
+                  {/* Participant */}
+                  <div className="col-span-3 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {primaryContact && onOpenContact ? (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onOpenContact(primaryContact.id) }}
+                          className={cn(
+                            "text-sm truncate font-mono tracking-tight transition-all origin-left hover:scale-[1.03] hover:text-white underline-offset-4 hover:underline cursor-pointer",
+                            email.unread ? "font-semibold text-white" : "text-zinc-300"
+                          )}
+                          title={`Open ${primaryContact.displayName} dossier`}
+                        >
+                          {participantLabel}
+                        </button>
+                      ) : (
+                        <span className={cn(
+                          "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]",
+                          email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
+                        )}>
+                          {participantLabel}
+                        </span>
+                      )}
+                      {isOutbound ? (
+                        <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
+                      ) : (
+                        <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
                       )}
                     </div>
                   </div>
-                )}
 
-                {/* Date */}
-                <div className="col-span-2 flex justify-end">
-                  {formatDate(email.date)}
+                  {/* Message Preview */}
+                  <div className={cn("min-w-0 space-y-1", filter === 'sent' || filter === 'scheduled' ? "col-span-3" : "col-span-5")}>
+                    <div className="flex items-center gap-2">
+                      <h4 className={cn(
+                        "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1",
+                        email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
+                      )}>
+                        {email.subject}
+                      </h4>
+                      {email.attachments && email.attachments.length > 0 && (
+                        <div className="flex items-center gap-1 text-zinc-500 flex-shrink-0" title={`${email.attachments.length} attachment${email.attachments.length > 1 ? 's' : ''}`}>
+                          <Paperclip className="w-3 h-3" />
+                          {email.attachments.length > 1 && (
+                            <span className="text-[10px] font-mono tabular-nums">{email.attachments.length}</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
+                      {email.snippet || email.text || 'No preview available'}
+                    </p>
+                  </div>
+
+                  {/* Telemetry Column - Only show for sent emails filter */}
+                  {filter === 'sent' && (
+                    <div className="col-span-2 flex items-center">
+                      <div className="flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2.5 py-1 w-fit">
+                        {/* Opens */}
+                        <div className="flex items-center gap-1">
+                          <Eye
+                            size={12}
+                            className={cn(
+                              openCount > 0 ? "text-emerald-400" : "text-zinc-600"
+                            )}
+                          />
+                          <span className={cn(
+                            "text-[10px] font-mono tabular-nums",
+                            openCount > 2 ? "text-white" : openCount > 0 ? "text-emerald-400" : "text-zinc-600"
+                          )}>
+                            {openCount}
+                          </span>
+                        </div>
+                        {/* Clicks */}
+                        <div className="flex items-center gap-1">
+                          <MousePointer2
+                            size={12}
+                            className={cn(
+                              clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
+                            )}
+                          />
+                          <span className={cn(
+                            "text-[10px] font-mono tabular-nums",
+                            clickCount > 0 ? "text-[#002FA7]" : "text-zinc-600"
+                          )}>
+                            {clickCount}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {filter === 'scheduled' && (
+                    <div className="col-span-2 flex items-center">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!executionId || isGenerating) return
+                            if (showRegenerateLabel) {
+                              if (!onRegenerateScheduled) return
+                              onRegenerateScheduled(email)
+                            } else {
+                              if (!onGenerateScheduled) return
+                              onGenerateScheduled(email)
+                            }
+                          }}
+                          disabled={
+                            !executionId ||
+                            isGenerating ||
+                            (showRegenerateLabel ? !onRegenerateScheduled : !onGenerateScheduled)
+                          }
+                          className={cn(
+                            "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40",
+                            showRegenerateLabel
+                              ? "text-violet-300 border-violet-500/40"
+                              : "text-emerald-400 border-emerald-500/40"
+                          )}
+                          title={
+                            executionId
+                              ? `${showRegenerateLabel ? 'Regenerate' : 'Generate'} draft now`
+                              : 'Missing execution link'
+                          }
+                        >
+                          {isGenerating ? 'Generating...' : showRegenerateLabel ? 'Regenerate' : 'Generate'}
+                        </button>
+                        {hasGeneratedContent && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (!executionId || !onAcceptScheduled || isAccepting) return
+                              onAcceptScheduled(email)
+                            }}
+                            disabled={!executionId || !onAcceptScheduled || isAccepting}
+                            className={cn(
+                              "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40 text-emerald-400 border-emerald-500/40",
+                              isAccepted && "text-emerald-300"
+                            )}
+                            title={executionId ? 'Accept this draft' : 'Missing execution link'}
+                          >
+                            {isAccepting ? 'Saving...' : isAccepted ? 'Accepted' : 'Accept'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Date */}
+                  <div className="col-span-2 flex justify-end">
+                    {formatDate(email.date)}
+                  </div>
                 </div>
-              </div>
-            )
-          })}
+              )
+            })
+          )}
         </div>
       </div>
 
