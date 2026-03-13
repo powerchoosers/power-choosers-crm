@@ -32,6 +32,7 @@ export default function EmailsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
   const [emailFilter, setEmailFilter] = useState<EmailListFilter>('received')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [scheduledActionState, setScheduledActionState] = useState<Record<string, string>>({})
   const hasRunAutoSync = useRef(false)
 
   // Debounce search query
@@ -87,6 +88,53 @@ export default function EmailsPage() {
     queryClient.invalidateQueries({ queryKey: ['emails-count'] })
     queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
     queryClient.refetchQueries({ queryKey: ['emails'], type: 'active' })
+  }
+
+  const runScheduledReviewAction = async (email: Email, action: 'generate' | 'regenerate' | 'accept') => {
+    const executionId = String(email?.metadata?.sequenceExecutionId || '')
+    if (!executionId) {
+      toast.error('Missing sequence execution link for this scheduled email')
+      return
+    }
+
+    setScheduledActionState(prev => ({ ...prev, [email.id]: action }))
+    try {
+      const response = await fetch('/api/email/sequence-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          executionId,
+          emailId: email.id,
+          action
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.error || `Failed to ${action} scheduled email`)
+      }
+
+      if (action === 'accept') {
+        toast.success('Scheduled draft accepted')
+      } else if (action === 'regenerate') {
+        toast.success('Scheduled draft regenerated')
+      } else {
+        toast.success('Scheduled draft generated')
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+      queryClient.invalidateQueries({ queryKey: ['email', email.id] })
+    } catch (error: any) {
+      toast.error(error?.message || `Failed to ${action} scheduled email`)
+    } finally {
+      setScheduledActionState(prev => {
+        const next = { ...prev }
+        delete next[email.id]
+        return next
+      })
+    }
   }
 
   const handleSelectionChange = (ids: Set<string>) => setSelectedIds(ids)
@@ -219,6 +267,10 @@ export default function EmailsPage() {
           onSelectionChange={handleSelectionChange}
           totalAvailable={effectiveTotal}
           onSelectCount={handleSelectCount}
+          onGenerateScheduled={(email) => runScheduledReviewAction(email, 'generate')}
+          onRegenerateScheduled={(email) => runScheduledReviewAction(email, 'regenerate')}
+          onAcceptScheduled={(email) => runScheduledReviewAction(email, 'accept')}
+          scheduledActionState={scheduledActionState}
         />
       </div>
 

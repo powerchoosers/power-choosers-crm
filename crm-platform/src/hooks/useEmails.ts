@@ -35,6 +35,8 @@ export interface Email {
   openCount?: number
   clickCount?: number
   attachments?: EmailAttachment[]
+  metadata?: Record<string, any>
+  scheduledSendTime?: string | null
 }
 
 const PAGE_SIZE = 50
@@ -230,7 +232,9 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
             ownerId: item.metadata?.ownerId || user.email,
             openCount: item.openCount,
             clickCount: item.clickCount,
-            attachments: item.attachments || item.metadata?.attachments
+            attachments: item.attachments || item.metadata?.attachments,
+            metadata: item.metadata || {},
+            scheduledSendTime: item.scheduledSendTime || null
           }
         }) as Email[]
 
