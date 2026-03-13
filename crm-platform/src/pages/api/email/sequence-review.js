@@ -20,6 +20,24 @@ function senderDomainFromEmail(email) {
   return domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '') || 'nodalpoint.io';
 }
 
+function appendPreviewUnsubscribeFooter(html, email) {
+  const content = String(html || '');
+  const recipient = String(email || '').trim();
+  if (!content || !recipient) return content;
+  if (content.includes('data-nodal-unsubscribe-footer="1"') || content.includes('Unsubscribe or manage preferences')) {
+    return content;
+  }
+  const baseUrl = (process.env.PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app').replace(/\/+$/, '');
+  const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(recipient)}`;
+  const footer =
+    `<div data-nodal-unsubscribe-footer="1" style="margin-top:32px;padding-top:16px;border-top:1px solid #3f3f46;font-family:sans-serif;font-size:11px;color:#71717a;text-align:center;line-height:1.6;">` +
+    `<p style="margin:0 0 4px 0;">Nodal Point &middot; Energy Intelligence &middot; Fort Worth, TX</p>` +
+    `<p style="margin:0;">You received this because we identified a potential opportunity for your energy portfolio. ` +
+    `<a href="${unsubscribeUrl}" style="color:#71717a;text-decoration:underline;">Unsubscribe or manage preferences</a></p>` +
+    `</div>`;
+  return `${content}${footer}`;
+}
+
 export default async function handler(req, res) {
   if (cors(req, res)) return;
   if (req.method !== 'POST') {
@@ -257,6 +275,8 @@ export default async function handler(req, res) {
       const signature = generateForensicSignature(profile, { senderEmail: fromEmail, websiteDomain: senderDomain });
       finalBody = `${finalBody}${signature}`;
     }
+
+    finalBody = appendPreviewUnsubscribeFooter(finalBody, contact.email);
 
     const nowIso = new Date().toISOString();
 
