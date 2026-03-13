@@ -18,6 +18,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
+import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { useComposeStore } from '@/store/composeStore'
@@ -27,10 +28,11 @@ const AUTO_SYNC_DELAY_MS = 5 * 1000 // 5 seconds after load
 export default function EmailsPage() {
   const { user } = useAuth()
   const { pageIndex, setPage, searchQuery, setSearch } = useTableState({ pageSize: 15 })
+  const searchParams = useSearchParams()
 
   const [searchTerm, setSearchTerm] = useState(searchQuery)
   const [debouncedSearch, setDebouncedSearch] = useState(searchQuery)
-  const [emailFilter, setEmailFilter] = useState<EmailListFilter>('received')
+  const emailFilter = (searchParams?.get('tab') as EmailListFilter) || 'received'
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [scheduledActionState, setScheduledActionState] = useState<Record<string, string>>({})
   const hasRunAutoSync = useRef(false)
@@ -50,6 +52,12 @@ export default function EmailsPage() {
   const { performSync, isSyncing } = useZohoSync()
   const queryClient = useQueryClient()
   const router = useRouter()
+
+  const { scrollContainerRef, saveScroll } = useTableScrollRestore(
+    `emails:${emailFilter}:${pageIndex}`,
+    pageIndex,
+    !isLoadingEmails
+  )
 
   // No manual sync trigger needed here as GlobalSync handles it, 
   // but we keep the manual button for forced refresh.
@@ -126,6 +134,7 @@ export default function EmailsPage() {
       queryClient.invalidateQueries({ queryKey: ['emails-count'] })
       queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
       queryClient.invalidateQueries({ queryKey: ['email', email.id] })
+      queryClient.invalidateQueries({ queryKey: ['email-thread', email.id] })
     } catch (error: any) {
       toast.error(error?.message || `Failed to ${action} scheduled email`)
     } finally {
@@ -242,15 +251,17 @@ export default function EmailsPage() {
         <EmailList
           filter={emailFilter}
           onFilterChange={(next) => {
-            setEmailFilter(next)
-            setPage(0)
+            const params = new URLSearchParams(searchParams?.toString() || '')
+            params.set('tab', next)
+            params.set('page', '1')
+            router.replace(`?${params.toString()}`, { scroll: false })
             setSelectedIds(new Set())
           }}
           emails={emails}
           isLoading={isLoadingEmails}
           onRefresh={handleSync}
           isSyncing={isSyncing}
-          onSelectEmail={(email) => router.push(`/network/emails/${email.id}`)}
+          onSelectEmail={(email) => { saveScroll(); router.push(`/network/emails/${email.id}`) }}
           onOpenContact={(contactId) => router.push(`/network/contacts/${contactId}`)}
           contactByEmail={contactByEmail}
           contactById={contactById}
@@ -271,6 +282,7 @@ export default function EmailsPage() {
           onRegenerateScheduled={(email) => runScheduledReviewAction(email, 'regenerate')}
           onAcceptScheduled={(email) => runScheduledReviewAction(email, 'accept')}
           scheduledActionState={scheduledActionState}
+          scrollContainerRef={scrollContainerRef}
         />
       </div>
 
