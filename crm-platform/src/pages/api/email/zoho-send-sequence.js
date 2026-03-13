@@ -93,7 +93,7 @@ export default async function handler(req, res) {
         const toEmail = typeof to === 'object' ? to.email : to;
         // const toName = typeof to === 'object' ? (to.name || '') : '';
         const fromEmail = typeof from === 'object' ? from.email : from;
-        const fromName = typeof from === 'object' ? (from.name || 'Nodal Point') : 'Nodal Point';
+        let fromName = typeof from === 'object' ? (from.name || 'Nodal Point') : 'Nodal Point';
 
         logger.info(`[Zoho Sequence] Sending email: to=${toEmail}, from=${fromEmail}, subject=${subject}`, 'zoho-send-sequence');
 
@@ -141,6 +141,10 @@ export default async function handler(req, res) {
                         lastName: 'Patterson',
                         jobTitle: 'Market Architect'
                     };
+
+                // Always derive fromName from the actual user profile so it matches
+                // the ComposeModal format: "FirstName • Nodal Point"
+                fromName = profile.firstName ? `${profile.firstName} \u2022 Nodal Point` : fromName;
 
                 const senderDomain = fromEmail.includes('@') ? fromEmail.split('@')[1] : null;
                 const forensicSig = generateForensicSignature(profile, {
