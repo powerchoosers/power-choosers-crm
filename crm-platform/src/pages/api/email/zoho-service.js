@@ -266,17 +266,19 @@ export class ZohoMailService {
         try {
             const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
-            // Resolve folder ID if needed
+            // Resolve folder ID if possible. Some legacy tokens are missing folders scope.
+            // In that case, fallback to listing without folderId so sync can still proceed.
             const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
-            if (!resolvedFolderId) {
-                throw new Error(`Zoho inbox folder could not be resolved for ${userEmail}. Check the mailbox folders returned by Zoho for this account.`);
-            }
 
             // Build query params
             const params = new URLSearchParams({
                 limit: limit.toString()
             });
-            params.append('folderId', resolvedFolderId);
+            if (resolvedFolderId) {
+                params.append('folderId', resolvedFolderId);
+            } else {
+                logger.warn(`[Zoho Mail] Proceeding without folderId for ${userEmail}; folder scope may be missing`, 'zoho-service');
+            }
 
             logger.info(`[Zoho Mail] Fetching messages for ${userEmail} (folder: ${resolvedFolderId})...`, 'zoho-service');
 
@@ -309,20 +311,31 @@ export class ZohoMailService {
             const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
 
             const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
-            if (!resolvedFolderId) {
-                throw new Error(`Zoho folder could not be resolved for message ${messageId}`);
-            }
 
             logger.debug(`[Zoho Mail] Fetching content for message ${messageId}...`, 'zoho-service');
 
-            const response = await fetch(`${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/content`, {
-                headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
-            });
+            const candidates = resolvedFolderId
+                ? [
+                    `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/content`,
+                    `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/content`,
+                ]
+                : [
+                    `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/content`,
+                ];
 
-            if (!response.ok) throw new Error(`Zoho Content API error: ${response.status}`);
+            let lastStatus = 0;
+            for (const url of candidates) {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    return result.data; // Full content object
+                }
+                lastStatus = response.status;
+            }
 
-            const result = await response.json();
-            return result.data; // Full content object
+            throw new Error(`Zoho Content API error: ${lastStatus}`);
         } catch (error) {
             logger.error(`[Zoho Mail] Content error for ${messageId}:`, error, 'zoho-service');
             throw error;
@@ -335,9 +348,6 @@ export class ZohoMailService {
     async downloadAttachment(userEmail, messageId, attachmentId, folderId = 'inbox', attachmentPath = '') {
         const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
         const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
-        if (!resolvedFolderId) {
-            throw new Error(`Zoho folder could not be resolved for attachment download on message ${messageId}`);
-        }
 
         const tokenCandidates = Array.from(new Set(
             [attachmentId, attachmentPath]
@@ -346,11 +356,16 @@ export class ZohoMailService {
                 .flatMap((v) => [v, encodeURIComponent(v)])
         ));
 
-        const candidates = tokenCandidates.flatMap((token) => ([
-            `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachments/${token}`,
-            `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments/${token}`,
-            `${this.baseUrl}/accounts/${accountId}/messages/attachments/${token}`,
-        ]));
+        const candidates = tokenCandidates.flatMap((token) => {
+            const urls = [
+                `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments/${token}`,
+                `${this.baseUrl}/accounts/${accountId}/messages/attachments/${token}`,
+            ];
+            if (resolvedFolderId) {
+                urls.unshift(`${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachments/${token}`);
+            }
+            return urls;
+        });
 
         let lastStatus = 0;
         let lastText = '';

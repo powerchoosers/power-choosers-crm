@@ -26,7 +26,8 @@ export default async function handler(req, res) {
     const redirectUri = isLocal
         ? 'http://localhost:3000/api/auth/callback/zoho-secondary'
         : 'https://www.nodalpoint.io/api/auth/callback/zoho-secondary';
-    const scope = 'ZohoMail.messages.ALL,ZohoMail.accounts.READ';
+    // Include folder-read scope because sync resolves inbox folder IDs before listing content.
+    const scope = 'ZohoMail.messages.ALL,ZohoMail.accounts.READ,ZohoMail.folders.READ';
     const accessType = 'offline';
     const prompt = 'consent';
 

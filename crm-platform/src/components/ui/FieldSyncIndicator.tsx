@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatePresence, motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 
 export type FieldSyncSeverity = 'identity' | 'secondary'
@@ -15,8 +16,6 @@ export function FieldSyncIndicator({
   isSaving,
   severity = 'identity'
 }: FieldSyncIndicatorProps) {
-  if (!active) return null
-
   const base = 'flex-none rounded-full transition-all duration-200'
   const sizeClass = severity === 'identity' ? 'w-2.5 h-2.5' : 'w-2 h-2'
   const identityClasses = isSaving
@@ -28,5 +27,18 @@ export function FieldSyncIndicator({
 
   const stateClass = severity === 'identity' ? identityClasses : secondaryClasses
 
-  return <span aria-hidden className={cn(base, sizeClass, stateClass)} />
+  return (
+    <AnimatePresence>
+      {active && (
+        <motion.span
+          aria-hidden
+          className={cn(base, sizeClass, stateClass)}
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.6 }}
+          transition={{ duration: 0.2 }}
+        />
+      )}
+    </AnimatePresence>
+  )
 }
