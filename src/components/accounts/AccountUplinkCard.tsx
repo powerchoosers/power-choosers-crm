@@ -6,6 +6,7 @@ import { Account } from '@/hooks/useAccounts'
 import { useCallStore } from '@/store/callStore'
 import { cn } from '@/lib/utils'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
+import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { mapLocationToZone, LOAD_ZONE_COLOR_MAP, type ErcotZone, ERCOT_ZONES } from '@/lib/market-mapping'
@@ -17,9 +18,18 @@ interface AccountUplinkCardProps {
   isEditing?: boolean
   onEnter?: () => void
   onUpdate?: (updates: Partial<Account>) => void
+  isSaving?: boolean
+  recentlyUpdatedFields?: Set<string>
 }
 
-export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, isEditing, onEnter, onUpdate }) => {
+export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
+  account,
+  isEditing,
+  onEnter,
+  onUpdate,
+  isSaving = false,
+  recentlyUpdatedFields
+}) => {
   const initiateCall = useCallStore((state) => state.initiateCall)
   const [isSearching, setIsSearching] = useState(false)
   const [justUpdated, setJustUpdated] = useState(false)
@@ -154,7 +164,14 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                 <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
               </div>
               <div className="flex flex-col items-start min-w-0 flex-1">
-                <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">Corporate Phone (Primary)</span>
+                  <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
+                    <span className="flex items-center gap-2">
+                      Corporate Phone (Primary)
+                      {!isEditing && recentlyUpdatedFields?.has('companyPhone') && (
+                        <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
+                      )}
+                    </span>
+                  </span>
                 <ForensicDataPoint
                   value={account.companyPhone || 'No phone'}
                   copyValue={account.companyPhone || undefined}
@@ -217,7 +234,14 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
               <div className="flex items-center gap-3 min-w-0 flex-1">
                 <Globe className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                 <div className="flex flex-col items-start min-w-0 flex-1">
-                  <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Digital Domain</span>
+                  <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">
+                    <span className="flex items-center gap-2">
+                      Digital Domain
+                      {!isEditing && recentlyUpdatedFields?.has('domain') && (
+                        <FieldSyncIndicator active isSaving={isSaving} severity="identity" />
+                      )}
+                    </span>
+                  </span>
                   <ForensicDataPoint
                     value={account.domain || 'No domain'}
                     copyValue={account.domain || undefined}
@@ -260,7 +284,14 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({ account, i
                   )} />
                 )}
                 <div className="flex flex-col items-start min-w-0 flex-1">
-                  <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Asset Recon (Location)</span>
+                <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">
+                  <span className="flex items-center gap-2">
+                    Asset Recon (Location)
+                    {!isEditing && recentlyUpdatedFields?.has('address') && (
+                      <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
+                    )}
+                  </span>
+                </span>
                   <ForensicDataPoint
                     value={isSearching ? 'Scanning satellite...' : account.address || 'Search location'}
                     copyValue={account.address || undefined}

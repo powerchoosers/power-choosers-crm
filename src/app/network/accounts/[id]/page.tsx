@@ -46,6 +46,7 @@ export default function AccountDossierPage() {
           isEditing={state.isEditing}
           toggleEditing={state.toggleEditing}
           showSynced={state.showSynced}
+          isSaving={state.isSaving}
           recentlyUpdatedFields={state.recentlyUpdatedFields}
           editAccountName={state.editAccountName}
           setEditAccountName={state.setEditAccountName}
@@ -77,6 +78,7 @@ export default function AccountDossierPage() {
             <AccountPhysicsPanel
               account={state.account}
               isEditing={state.isEditing}
+              isSaving={state.isSaving}
               isRecalibrating={state.isRecalibrating}
               recentlyUpdatedFields={state.recentlyUpdatedFields}
               glowingFields={state.glowingFields}

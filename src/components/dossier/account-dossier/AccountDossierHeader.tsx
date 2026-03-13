@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
+import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import { cn } from '@/lib/utils'
 import { domainToClickableUrl } from '@/lib/url'
@@ -36,6 +37,7 @@ interface AccountDossierHeaderProps {
     isEditing: boolean
     toggleEditing: () => void
     showSynced: boolean
+    isSaving: boolean
     recentlyUpdatedFields: Set<string>
 
     editAccountName: string
@@ -70,6 +72,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
     isEditing,
     toggleEditing,
     showSynced,
+    isSaving,
     recentlyUpdatedFields,
     editAccountName,
     setEditAccountName,
@@ -172,30 +175,39 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
 
                         <div className="flex-1 min-w-0 flex flex-col">
                             <div className="flex items-center gap-3 mb-1">
-                                <h1 className="text-2xl font-semibold tracking-tighter text-white">
-                                    {!isEditing ? (
-                                        <ForensicDataPoint
-                                            value={account.name ?? ''}
-                                            copyValue={account.name ?? undefined}
-                                            valueClassName="text-2xl font-semibold tracking-tighter text-white"
-                                            inline
-                                            compact
-                                        />
-                                    ) : (
-                                        <input
-                                            type="text"
-                                            value={editAccountName}
-                                            onChange={(e) => setEditAccountName(e.target.value)}
-                                            onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                            className="bg-transparent border-b border-white/10 text-white text-2xl font-semibold tracking-tighter w-full focus:outline-none focus:border-[#002FA7] transition-colors"
-                                            placeholder="ACCOUNT NAME"
-                                            autoFocus
-                                        />
-                                    )}
-                                </h1>
+                        <div className="flex-1 flex items-center gap-2 min-w-0">
+                            <h1 className="text-2xl font-semibold tracking-tighter text-white">
+                                {!isEditing ? (
+                                    <ForensicDataPoint
+                                        value={account.name ?? ''}
+                                        copyValue={account.name ?? undefined}
+                                        valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                                        inline
+                                        compact
+                                    />
+                                ) : (
+                                    <input
+                                        type="text"
+                                        value={editAccountName}
+                                        onChange={(e) => setEditAccountName(e.target.value)}
+                                        onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
+                                        className="bg-transparent border-b border-white/10 text-white text-2xl font-semibold tracking-tighter w-full focus:outline-none focus:border-[#002FA7] transition-colors"
+                                        placeholder="ACCOUNT NAME"
+                                        autoFocus
+                                    />
+                                )}
+                            </h1>
+                            {!isEditing && (
+                                <FieldSyncIndicator
+                                    active={recentlyUpdatedFields.has('name')}
+                                    isSaving={isSaving}
+                                    severity="identity"
+                                />
+                            )}
+                        </div>
 
                                 <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
-                                    <div className="flex items-center">
+                                    <div className="flex items-center gap-1">
                                         <button
                                             onClick={() => {
                                                 if (isEditing) {
@@ -215,6 +227,13 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                         >
                                             <Globe className="w-3.5 h-3.5" />
                                         </button>
+                                        {!isEditing && (
+                                            <FieldSyncIndicator
+                                                active={recentlyUpdatedFields.has('domain')}
+                                                isSaving={isSaving}
+                                                severity="identity"
+                                            />
+                                        )}
 
                                         <AnimatePresence>
                                             {isEditing && activeEditField === 'domain' && (
@@ -241,7 +260,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
 
                                     <div className="w-px h-3 bg-white/10" />
 
-                                    <div className="flex items-center">
+                                    <div className="flex items-center gap-1">
                                         <button
                                             onClick={() => {
                                                 if (isEditing) {
@@ -261,6 +280,13 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                         >
                                             <Linkedin className="w-3.5 h-3.5" />
                                         </button>
+                                        {!isEditing && (
+                                            <FieldSyncIndicator
+                                                active={recentlyUpdatedFields.has('linkedin')}
+                                                isSaving={isSaving}
+                                                severity="identity"
+                                            />
+                                        )}
 
                                         <AnimatePresence>
                                             {isEditing && activeEditField === 'linkedin' && (

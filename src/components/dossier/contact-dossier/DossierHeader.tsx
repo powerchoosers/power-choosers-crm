@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
+import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import { cn } from '@/lib/utils'
 
@@ -19,6 +20,7 @@ interface DossierHeaderProps {
     toggleEditing: () => void
     recentlyUpdatedFields: Set<string>
     showSynced: boolean
+    isSaving: boolean
 
     // Field States & Setters
     editName: string
@@ -60,6 +62,7 @@ export const DossierHeader = memo(function DossierHeader({
     toggleEditing,
     recentlyUpdatedFields,
     showSynced,
+    isSaving,
     editName,
     editFirstName,
     setEditFirstName,
@@ -223,6 +226,13 @@ export const DossierHeader = memo(function DossierHeader({
                                         )}
                                     </AnimatePresence>
                                 )}
+                                {!isEditing && (
+                                    <FieldSyncIndicator
+                                        active={recentlyUpdatedFields.has('name')}
+                                        isSaving={isSaving}
+                                        severity="identity"
+                                    />
+                                )}
 
                                 {/* THE SIGNAL ARRAY */}
                                 <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
@@ -246,6 +256,13 @@ export const DossierHeader = memo(function DossierHeader({
                                         >
                                             <Globe className="w-3.5 h-3.5" />
                                         </button>
+                                        {!isEditing && (
+                                            <FieldSyncIndicator
+                                                active={recentlyUpdatedFields.has('website')}
+                                                isSaving={isSaving}
+                                                severity="identity"
+                                            />
+                                        )}
 
                                         <AnimatePresence>
                                             {isEditing && activeEditField === 'website' && (
@@ -298,6 +315,13 @@ export const DossierHeader = memo(function DossierHeader({
                                         >
                                             <Linkedin className="w-3.5 h-3.5" />
                                         </button>
+                                        {!isEditing && (
+                                            <FieldSyncIndicator
+                                                active={recentlyUpdatedFields.has('linkedin')}
+                                                isSaving={isSaving}
+                                                severity="identity"
+                                            />
+                                        )}
 
                                         <AnimatePresence>
                                             {isEditing && activeEditField === 'linkedin' && (
