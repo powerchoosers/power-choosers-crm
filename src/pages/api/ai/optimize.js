@@ -40,6 +40,24 @@ function normalizeSubject(input) {
   return value.replace(/\s+/g, ' ').slice(0, 140);
 }
 
+function cleanCompanyName(input) {
+  const raw = String(input || '').trim();
+  if (!raw) return 'Unknown';
+
+  let cleaned = raw;
+
+  // Outreach should use the operating name, not the full legal entity string.
+  cleaned = cleaned.replace(/\s+d\/b\/a\s+.+$/i, '');
+  cleaned = cleaned.replace(/\s+dba\s+.+$/i, '');
+  cleaned = cleaned.replace(/\s+a\/k\/a\s+.+$/i, '');
+  cleaned = cleaned.replace(/\s+aka\s+.+$/i, '');
+  cleaned = cleaned.replace(/,\s*(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '');
+  cleaned = cleaned.replace(/\s+(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '');
+  cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
+
+  return cleaned || raw;
+}
+
 function softenFirstTouchEnergyJargon(input, strategy) {
   const text = String(input || '');
   const strategyText = String(strategy || '');
@@ -94,13 +112,16 @@ export default async function handler(req, res) {
         : (typeof contact?.city === 'string' && contact.city.trim()
           ? `${contact.city.trim()}${contact?.state ? `, ${String(contact.state).trim()}` : ''}`
           : 'Unknown');
+      const companyName = cleanCompanyName(contact?.company);
       const supplier = (contact?.electricity_supplier || contact?.supplier || contact?.metadata?.energy?.supplier || 'Unknown');
       const currentRate = (contact?.current_rate ?? contact?.metadata?.energy?.current_rate ?? 'Unknown');
       const contractEndRaw = (contact?.contract_end_date || contact?.contractEndDate || null);
       const contractEndYear = contact?.contract_end_year || (contractEndRaw ? new Date(contractEndRaw).getUTCFullYear() : null);
 
       const dataVectors = [
-        `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${contact?.company || 'Unknown'}`,
+        `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${companyName}`,
+        `- COMPANY_OUTREACH_NAME: ${companyName}`,
+        contact?.company && companyName !== contact.company ? `- COMPANY_LEGAL_NAME: ${contact.company}` : null,
         `- ROLE: ${contactTitle}`,
         `- LOCATION: ${contactLocation}`,
         `- VECTOR_STATE: energy_enabled=${hasEnergyVector}`,
@@ -141,24 +162,35 @@ export default async function handler(req, res) {
           6. If you use bullets, this email fails. Use paragraphs only.
           7. NO CITATIONS OR LINKS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
           8. TEXAS DEREGULATED MARKET (ERCOT): Keep context Texas/ERCOT and forbid UK references (like "Citizens Advice").
-          9. JARGON TRANSLATION RULE:
+          9. HOOK RULE:
+            - Sentence one must mention the account city (or the outreach-friendly company name if no city exists) and tie that place to one concrete operational reality—renewal timing, demand spikes, longer run hours, billing cycle hits, etc.
+            - Avoid vague openers like "energy costs are tough" or "utility charges are complex" without grounding them in that specific location and what is shifting now.
+          10. SUBJECT RULE:
+            - Subject line must be 2–4 words and include the account city or outreach-friendly company name.
+            - Keep it curious but specific (e.g., "Fort Worth bill check" or "eelco energy questions").
+          11. JARGON TRANSLATION RULE:
             - Never use unexplained acronyms like 4CP, TDU, ESI ID, pass-through, nodal adder, or load zone shorthand in first-touch copy.
             - Use plain business language first: "energy rate per kWh" and "demand/delivery charges".
             - If a technical term is necessary, define it in the same sentence in plain English.
-          10. CTA RULE:
+          12. CTA RULE:
             - First touch should ask for interest with a concrete offer, not a meeting request.
-            - Use one low-friction yes/no question only.
-          11. SOURCE TRUTH IS HARD RULE:
+            - Offer: if they send Lewis their latest electricity statement, he will reply with a 2–3 bullet forensic snapshot of what stands out.
+            - End with a low-friction yes/no question referencing that offer.
+          13. SOURCE TRUTH IS HARD RULE:
             - If source_label=linkedin (or has_linkedin=true), you may reference LinkedIn once.
             - If source_label=website (or has_linkedin=false and has_website=true), do NOT mention LinkedIn. Reference website/public company info instead.
             - If source_label=public_company_info (or has_linkedin=false and has_website=false), do NOT mention LinkedIn or website. Say you were reviewing companies in their industry/area.
             - Never claim a source that is not supported by SOURCE_TRUTH.
-          12. FIELD USAGE QUALITY RULE:
+          14. COMPANY NAME RULE:
+            - Use COMPANY_OUTREACH_NAME in copy, not the full legal entity name.
+            - Strip legal suffixes like Inc, LLC, Ltd, Corp and ignore DBA phrasing unless the STRATEGY explicitly requires the legal name.
+            - No normal human writes "Eduardo E. Lozano & Co., Inc. dba eelco" in a cold email opener. Do not do that.
+          15. FIELD USAGE QUALITY RULE:
             - If ROLE is known, tailor one phrase to that role's business priorities.
             - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
             - If LOCATION is known, anchor the observation to that place naturally.
             - If any field is Unknown, do not invent it and do not force awkward placeholders.
-          13. ENERGY INTEL RULES:
+          16. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
             - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
@@ -169,7 +201,7 @@ export default async function handler(req, res) {
           - You possess the target's full identity in NEURAL_CONTEXT. Use it proactively to make the email feel manual and researched.
           - ALIAS_MAPPING: 
             - If STRATEGY says "the prospect" or "them" -> Use ${contact?.name || 'the contact'}.
-            - If STRATEGY says "their company" or "the business" -> Use ${contact?.company || 'the business'}.
+            - If STRATEGY says "their company" or "the business" -> Use ${companyName || 'the business'}.
             - If STRATEGY says "their industry" -> Use ${contact?.industry || 'their industry'}.
             - If STRATEGY says "their location" -> Use ${contact?.location || contact?.city || 'their area'}.
           - WEAVE DATA NATURALLY: A high-agency analyst doesn't use placeholders; they use facts. If you know they are in 'Manufacturing', don't just say 'your industry'. Say 'the manufacturing sector' or 'your production facility'.
@@ -214,7 +246,7 @@ export default async function handler(req, res) {
           - RESOLVE PLACEHOLDERS: If the draft or strategy contains variables like {{company}}, {{industry}}, {{city}}, {{asset_type}}, etc., you MUST resolve them using the provided context.
           
           HIGH_AGENCY_IDENTITY_RESOLUTION:
-          - DO NOT wait for bracketed variables. If the draft is generic (e.g. "your company", "your industry"), you MUST replace those with specific data from NEURAL_CONTEXT (e.g. "${contact?.company || 'your business'}", "${contact?.industry || 'your industry'}").
+          - DO NOT wait for bracketed variables. If the draft is generic (e.g. "your company", "your industry"), you MUST replace those with specific data from NEURAL_CONTEXT (e.g. "${companyName || 'your business'}", "${contact?.industry || 'your industry'}").
           - When optimizing, make the text feel manual and researched. A high-agency analyst doesn't use placeholders; they use facts.
 
           NEURAL_CONTEXT:

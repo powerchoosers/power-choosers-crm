@@ -159,6 +159,8 @@ async function handleGeneration(execution, job) {
            a.name as company_name,
            a.domain as account_domain,
            a.industry as account_industry,
+           a.city as account_city,
+           a.state as account_state,
            a.electricity_supplier as account_supplier,
            a.current_rate as account_current_rate,
            a.contract_end_date as account_contract_end_date
@@ -172,9 +174,15 @@ async function handleGeneration(execution, job) {
     const accountDomain = member.account_domain || null;
     const website = accountDomain ? `https://${accountDomain}` : null;
     const sourceLabel = linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info');
-    const location = member.contact_city
-        ? `${member.contact_city}${member.contact_state ? `, ${member.contact_state}` : ''}`
-        : null;
+    const accountCity = member.account_city ? member.account_city.trim() : null;
+    const accountState = member.account_state ? member.account_state.trim() : null;
+    const contactCity = member.contact_city ? member.contact_city.trim() : null;
+    const contactState = member.contact_state ? member.contact_state.trim() : null;
+    const location = accountCity
+        ? `${accountCity}${accountState ? `, ${accountState}` : ''}`
+        : contactCity
+            ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
+            : null;
     const sourceTruthLine = linkedInUrl
         ? 'SOURCE_TRUTH: LinkedIn available. You may reference LinkedIn once if natural.'
         : website
@@ -203,8 +211,8 @@ async function handleGeneration(execution, job) {
                 current_rate: member.account_current_rate || null,
                 contract_end_date: member.account_contract_end_date || null,
                 contract_end_year: Number.isFinite(contractEndYear) ? contractEndYear : null,
-                city: member.contact_city || null,
-                state: member.contact_state || null,
+                city: accountCity || contactCity || null,
+                state: accountState || contactState || null,
                 location,
                 linkedin_url: linkedInUrl,
                 domain: accountDomain,
