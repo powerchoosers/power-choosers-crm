@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Propuesta de Renovación de Energía — Carrel Forwarding</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=DM+Mono:wght@400;500&display=swap"
+    rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --blue: #002FA7;
+      --text: #1a1a2e;
+      --muted: #5a6a80;
+      --border: #dde3ee;
+      --bg: #f4f6fb;
+      --white: #ffffff;
+      --green: #0d9e6e;
+      --red: #c0392b;
+    }
+
+    html,
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 9.5pt;
+      line-height: 1.45;
+    }
+
+    .page {
+      width: 210mm;
+      margin: 0 auto;
+      background: var(--white);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    .header {
+      background: #0a0a0a;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-logo {
+      height: 32px;
+      width: auto;
+      border-radius: 5px;
+      background: white;
+      padding: 2px;
+    }
+
+    .header-brand-name {
+      font-size: 13pt;
+      font-weight: 800;
+      color: #fff;
+      letter-spacing: -0.02em;
+      line-height: 1.1;
+    }
+
+    .header-brand-sub {
+      font-size: 6.5pt;
+      color: rgba(255, 255, 255, 0.55);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-top: 1px;
+    }
+
+    .header-right {
+      text-align: right;
+    }
+
+    .header-date {
+      font-size: 6.5pt;
+      color: rgba(255, 255, 255, 0.5);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .header-prepared {
+      font-size: 7.5pt;
+      color: rgba(255, 255, 255, 0.8);
+      font-weight: 500;
+      margin-top: 1px;
+    }
+
+    .header-accent {
+      height: 3px;
+      background: var(--blue);
+    }
+
+    /* HERO */
+    .hero {
+      background: #0a1628;
+      padding: 16px 24px 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: none;
+      pointer-events: none;
+    }
+
+    .hero-label {
+      font-size: 6pt;
+      color: rgba(255, 255, 255, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-bottom: 2px;
+    }
+
+    .hero-headline {
+      font-size: 24pt;
+      font-weight: 900;
+      color: #000;
+      line-height: 1.1;
+      letter-spacing: -0.01em;
+      white-space: nowrap;
+    }
+
+    .hero-headline em {
+      font-style: normal;
+      color: var(--blue);
+    }
+
+    .hero-subline {
+      font-size: 9pt;
+      color: rgba(255, 255, 255, 0.7);
+      margin-top: 5px;
+      max-width: 600px;
+      line-height: 1.4;
+    }
+
+    .hero-line {
+      width: 40px;
+      height: 3px;
+      background: var(--blue);
+      margin-top: 10px;
+      border-radius: 2px;
+    }
+
+    /* KPI BAND */
+    .kpi-band {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1.5px solid var(--border);
+    }
+
+    .kpi-cell {
+      padding: 10px 14px;
+      border-right: 1px solid var(--border);
+    }
+
+    .kpi-cell:last-child {
+      border-right: none;
+    }
+
+    .kpi-label {
+      font-size: 6pt;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .kpi-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 13pt;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.1;
+    }
+
+    .kpi-value.blue {
+      color: var(--blue);
+    }
+
+    .kpi-value.amber {
+      color: #d97706;
+    }
+
+    .kpi-value.red {
+      color: var(--red);
+    }
+
+    .kpi-sub {
+      font-size: 6.5pt;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    /* BODY */
+    .body {
+      padding: 14px 24px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* COO ALERT */
+    .coo-alert {
+      border-left: 3px solid var(--red);
+      background: #fff5f5;
+      padding: 9px 13px;
+      border-radius: 0 5px 5px 0;
+    }
+
+    .coo-alert-title {
+      font-size: 6.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--red);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .coo-alert-body {
+      font-size: 7.5pt;
+      color: #4a2020;
+      line-height: 1.5;
+    }
+
+    .coo-alert-body strong {
+      color: var(--red);
+    }
+
+    /* SECTION HEADING */
+    .section-heading {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 7px;
+    }
+
+    .section-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 7pt;
+      font-weight: 500;
+      color: var(--blue);
+      background: rgba(0, 47, 167, 0.08);
+      padding: 1px 6px;
+      border-radius: 3px;
+    }
+
+    .section-title {
+      font-size: 9pt;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .section-desc {
+      font-size: 6.5pt;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    /* RATES TABLE */
+    .rates-table {
+      width: 100%;
+      border-collapse: collapse;
+      border-radius: 6px;
+      overflow: hidden;
+      border: 1.5px solid var(--border);
+      font-size: 8.5pt;
+    }
+
+    .rates-table thead tr {
+      background: var(--blue);
+    }
+
+    .rates-table thead th {
+      color: #fff;
+      font-weight: 600;
+      font-size: 7pt;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 7px 12px;
+      text-align: left;
+    }
+
+    .rates-table thead th:not(:first-child) {
+      text-align: center;
+    }
+
+    .rates-table tbody tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    .rates-table tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    .rates-table tbody tr:nth-child(even) {
+      background: #f8faff;
+    }
+
+    .rates-table tbody tr.highlight {
+      background: #eef5ff;
+    }
+
+    .rates-table tbody td {
+      padding: 8px 12px;
+      vertical-align: middle;
+    }
+
+    .rates-table tbody td:not(:first-child) {
+      text-align: center;
+    }
+
+    .supplier-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .supplier-logo {
+      height: 18px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .supplier-name {
+      font-weight: 600;
+      font-size: 8.5pt;
+      color: var(--text);
+    }
+
+    .supplier-name .tag {
+      font-size: 6pt;
+      background: rgba(0, 47, 167, 0.1);
+      color: var(--blue);
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-weight: 600;
+      margin-left: 4px;
+      text-transform: uppercase;
+    }
+
+    .rate-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 10pt;
+      font-weight: 500;
+    }
+
+    .rate-value.winner {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .rate-value.normal {
+      color: var(--muted);
+    }
+
+    .annual-cost {
+      font-size: 6.5pt;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .annual-cost.savings-green {
+      color: var(--green);
+      font-weight: 600;
+    }
+
+    .badge-best {
+      display: inline-block;
+      background: var(--green);
+      color: #fff;
+      font-size: 5.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      border-radius: 3px;
+      padding: 1px 4px;
+      margin-left: 3px;
+      vertical-align: middle;
+    }
+
+    .rates-note {
+      font-size: 6.5pt;
+      color: var(--muted);
+      font-style: italic;
+      margin-top: 5px;
+    }
+
+    /* GRID LAYOUT */
+    .grid-3col {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
+    }
+
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    /* INFO CARD */
+    .info-card {
+      border: 1.5px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .info-card-header {
+      background: #f0f4ff;
+      border-bottom: 1px solid var(--border);
+      padding: 6px 12px;
+      font-size: 6.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--blue);
+    }
+
+    .info-card-body {
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 6px;
+      padding-bottom: 5px;
+      border-bottom: 1px solid #f0f0f0;
+    }
+
+    .info-row:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .info-key {
+      font-size: 6.5pt;
+      color: var(--muted);
+      font-weight: 500;
+      flex-shrink: 0;
+      max-width: 45%;
+    }
+
+    .info-val {
+      font-size: 7pt;
+      font-weight: 600;
+      color: var(--text);
+      text-align: right;
+      font-family: 'DM Mono', monospace;
+    }
+
+    .info-val.normal {
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* PROTECTION CARDS */
+    .protection-card {
+      border: 1.5px solid #90b8ff;
+      border-radius: 6px;
+      padding: 9px 11px;
+      background: #f5f9ff;
+    }
+
+    .protection-icon-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 4px;
+    }
+
+    .protection-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(0, 47, 167, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .protection-icon svg {
+      width: 11px;
+      height: 11px;
+      stroke: var(--blue);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .protection-title {
+      font-size: 8pt;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .protection-desc {
+      font-size: 7pt;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    .protection-desc strong {
+      color: var(--text);
+    }
+
+    /* NRG SECTION */
+    .nrg-section {
+      border: 1.5px solid #c8deff;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .nrg-header {
+      background: #eef5ff;
+      border-bottom: 1px solid #c8deff;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nrg-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nrg-logo {
+      height: 20px;
+      width: auto;
+    }
+
+    .nrg-header-title {
+      font-size: 8pt;
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    .nrg-header-sub {
+      font-size: 6.5pt;
+      color: var(--muted);
+    }
+
+    .nrg-tag {
+      font-size: 6pt;
+      font-weight: 700;
+      background: var(--blue);
+      color: white;
+      padding: 2px 7px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .nrg-body {
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+
+    .nrg-fact {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+    }
+
+    .nrg-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0, 47, 167, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .nrg-icon svg {
+      width: 10px;
+      height: 10px;
+      stroke: var(--blue);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .nrg-fact-title {
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .nrg-fact-desc {
+      font-size: 6.5pt;
+      color: var(--muted);
+      line-height: 1.35;
+      margin-top: 1px;
+    }
+
+    /* MAJOR SECTION (04) */
+    .engie-section {
+      border: 1.5px solid #c8deff;
+      border-radius: 6px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .engie-header {
+      background: #eef5ff;
+      border-bottom: 1px solid #c8deff;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .engie-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .engie-logo {
+      height: 20px;
+      width: auto;
+    }
+
+    .engie-header-title {
+      font-size: 8pt;
+      font-weight: 700;
+      color: var(--blue);
+    }
+
+    .engie-header-sub {
+      font-size: 6.5pt;
+      color: var(--muted);
+    }
+
+    .engie-tag {
+      font-size: 6pt;
+      font-weight: 700;
+      background: var(--blue);
+      color: white;
+      padding: 2px 7px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .engie-body {
+      padding: 10px 14px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 16px;
+    }
+
+    .engie-fact {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+    }
+
+    .engie-icon {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: rgba(0, 47, 167, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .engie-icon svg {
+      width: 10px;
+      height: 10px;
+      stroke: var(--blue);
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .engie-fact-title {
+      font-size: 7.5pt;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .engie-fact-desc {
+      font-size: 6.5pt;
+      color: var(--muted);
+      line-height: 1.35;
+      margin-top: 1px;
+    }
+
+    /* URGENCY */
+    .urgency-banner {
+      background: #0a1628;
+      border-radius: 6px;
+      padding: 10px 15px;
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .urgency-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #ff4444;
+      flex-shrink: 0;
+    }
+
+    .urgency-text {
+      font-size: 7.5pt;
+      color: rgba(255, 255, 255, 0.8);
+      line-height: 1.4;
+    }
+
+    .urgency-text strong {
+      color: #ffffff;
+    }
+
+    /* FOOTER */
+    .footer {
+      border-top: 1.5px solid var(--border);
+      padding: 8px 24px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      background: #f8faff;
+    }
+
+    .footer-contact {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+    }
+
+    .footer-contact-logo {
+      height: 26px;
+      width: auto;
+      border-radius: 4px;
+      background: white;
+      padding: 2px;
+      border: 1px solid var(--border);
+    }
+
+    .footer-contact-name {
+      font-size: 8pt;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .footer-contact-title {
+      font-size: 6.5pt;
+      color: var(--muted);
+    }
+
+    .footer-contact-detail {
+      font-size: 6.5pt;
+      color: var(--blue);
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    .footer-right {
+      text-align: right;
+    }
+
+    .footer-disclaimer {
+      font-size: 6pt;
+      color: var(--muted);
+      line-height: 1.4;
+      max-width: 340px;
+    }
+
+    .footer-confid {
+      font-size: 6pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    /* DOWNLOAD BAR */
+    .download-bar {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      padding: 16px;
+      background: #fff;
+    }
+
+    .btn-download {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--blue);
+      color: white;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 7px;
+      font-size: 9.5pt;
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-download:hover {
+      background: #1a4fd6;
+    }
+
+    .btn-download svg {
+      width: 15px;
+      height: 15px;
+      stroke: white;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .download-hint {
+      font-size: 8pt;
+      color: var(--muted);
+    }
+
+    @media print {
+
+      html,
+      body {
+        background: white;
+      }
+
+      .page {
+        width: 100%;
+        box-shadow: none;
+        margin: 0;
+      }
+
+      .download-bar {
+        display: none !important;
+      }
+
+      @page {
+        size: A4;
+        margin: 0;
+      }
+    }
+
+    @media screen {
+      body {
+        padding: 20px;
+      }
+
+      .page {
+        box-shadow: 0 4px 40px rgba(0, 0, 0, 0.12);
+        border-radius: 4px;
+        margin-bottom: 16px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="download-bar">
+    <button class="btn-download" onclick="generatePDF()">
+      <svg viewBox="0 0 24 24">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+        <polyline points="7 10 12 15 17 10" />
+        <line x1="12" y1="15" x2="12" y2="3" />
+      </svg>
+      Descargar PDF
+    </button>
+    <span class="download-hint">Descarga la propuesta automáticamente como un PDF de 1 página.</span>
+  </div>
+
+  <div class="page">
+
+    <div class="header">
+      <div class="header-left">
+        <img
+          src="../images/nodalpoint.png"
+          alt="Nodal Point" class="header-logo" />
+        <div>
+          <div class="header-brand-name">Nodal Point</div>
+          <div class="header-brand-sub">Asesoría y Ciencias Forenses en Energía Comercial</div>
+        </div>
+      </div>
+      <div class="header-right">
+        <div class="header-date">Propuesta de Renovación de Energía &middot; 12 de marzo de 2026</div>
+        <div class="header-prepared">Preparado para: Carrel Forwarding, Inc.</div>
+      </div>
+    </div>
+    <div class="header-accent"></div>
+
+    <div class="hero">
+      <div class="hero-label">Propuesta de Energía &middot; Carrel Forwarding &middot; Confidencial</div>
+      <div class="hero-headline" style="color:#ffffff; font-size: 22pt;">El contrato de energía vence en <em style="color:#002FA7;">Julio de 2026</em></div>
+      <div class="hero-subline"><strong>Asegure tarifa hoy.</strong> Esta propuesta está lista para aprobación inmediata:
+        Major Energy a 36 meses, antes del ajuste de precios de verano.
+      </div>
+      <div class="hero-line"></div>
+    </div>
+
+    <div class="kpi-band">
+      <div class="kpi-cell">
+        <div class="kpi-label">Consumo Anual</div>
+        <div class="kpi-value blue">241,277</div>
+        <div class="kpi-sub">kWh / año (12 meses)</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Vencimiento del Contrato</div>
+        <div class="kpi-value amber">Julio de 2026</div>
+        <div class="kpi-sub">~4 meses restantes</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Proveedor Actual</div>
+        <div class="kpi-value" style="font-size:11pt;">Freepoint Energy</div>
+        <div class="kpi-sub">Relación actual</div>
+      </div>
+      <div class="kpi-cell">
+        <div class="kpi-label">Cotizaciones Válidas</div>
+        <div class="kpi-value red">Solo Hoy</div>
+        <div class="kpi-sub">Vencen a las 4PM CST, 12/03/2026</div>
+      </div>
+    </div>
+
+    <div class="body">
+
+      <div class="coo-alert">
+        <div class="coo-alert-title">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          Para Alberto (Gerente) &mdash; Por qué es importante actuar ahora
+        </div>
+        <div class="coo-alert-body">Asegure su tarifa ahora. Las tarifas están en su punto más bajo antes del verano. Esta propuesta presenta una sola recomendación: <strong>Major Energy a 36 meses</strong>, para que Alberto pueda aprobar hoy con total visibilidad.</div>
+      </div>
+
+      <div>
+        <div class="section-heading">
+          <span class="section-num">01</span>
+          <span class="section-title">Opciones de Tarifas Cotizadas &mdash; Plazo de 36 Meses</span>
+          <span class="section-desc">Comparación de opciones seleccionadas para el cliente</span>
+        </div>
+        <div style="display:flex; gap: 16px; margin-bottom: 24px; align-items:flex-start; flex-wrap:wrap;">
+          <!-- 36 Month Major Energy Card -->
+          <div class="protection-card" style="flex: 1; display: flex; flex-direction: column; padding: 0;">
+            <div class="nrg-section">
+              <div class="nrg-header">
+                <div class="nrg-header-left">
+                  <img src="../images/MajorEnergy-LOGO.png" alt="Major Energy" class="nrg-logo" />
+                  <div>
+                    <div class="nrg-header-title">Major Energy</div>
+                    <div class="nrg-header-sub">Electricidad fija para cuentas residenciales y comerciales</div>
+                  </div>
+                </div>
+                <div class="nrg-tag">Proveedor Recomendado</div>
+              </div>
+              <div class="nrg-body">
+                <div class="nrg-fact">
+                  <div class="nrg-icon"><svg viewBox="0 0 24 24">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                      <path d="M2 17l10 5 10-5" />
+                      <path d="M2 12l10 5 10-5" />
+                    </svg></div>
+                  <div>
+                    <div class="nrg-fact-title">Tarifa Fija y Cambio Administrado</div>
+                    <div class="nrg-fact-desc">Major Energy ofrece suministro de electricidad con tarifa fija, lo que ayuda a proteger el presupuesto frente a la volatilidad estacional en el mercado.</div>
+                  </div>
+                </div>
+                <div class="nrg-fact">
+                  <div class="nrg-icon"><svg viewBox="0 0 24 24">
+                      <circle cx="12" cy="12" r="10" />
+                      <polyline points="12 6 12 12 16 14" />
+                    </svg></div>
+                  <div>
+                    <div class="nrg-fact-title">Atención para Residencial y Comercial</div>
+                    <div class="nrg-fact-desc">Sus contratos están estructurados para clientes residenciales y comerciales pequeños en mercados desregulados, útil para administrar cuentas mixtas.</div>
+                  </div>
+                </div>
+                <div class="nrg-fact">
+                  <div class="nrg-icon"><svg viewBox="0 0 24 24">
+                      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                    </svg></div>
+                  <div>
+                    <div class="nrg-fact-title">Estructura de Planes Flexible</div>
+                    <div class="nrg-fact-desc">Permite fijar precio por plazo definido para reducir exposición al riesgo de mercado y facilitar planeación financiera mensual.</div>
+                  </div>
+                </div>
+                <div class="nrg-fact">
+                  <div class="nrg-icon"><svg viewBox="0 0 24 24">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                    </svg></div>
+                  <div>
+                    <div class="nrg-fact-title">Ejecución en Múltiples Ubicaciones</div>
+                    <div class="nrg-fact-desc">El modelo de onboarding y soporte está diseñado para múltiples medidores/servicios, útil para operar acuerdos residenciales y comerciales al mismo tiempo.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="padding: 16px;">
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px; align-items: flex-start;">
+                <div style="display:flex; flex-direction: column;">
+                  <span class="info-key" style="font-size: 9pt; white-space: nowrap;">Tarifa de Energía</span>
+                  <span
+                    style="font-family: 'DM Mono', monospace; font-size: 16pt; color: #0d9e6e; font-weight: bold;">$0.07043</span>
+                </div>
+              </div>
+              <div
+                style="display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 12px;">
+                <span class="info-key" style="font-size: 9pt;">Costo Anual Estimado</span>
+                <span class="info-val" style="font-size: 11pt; color: #0d9e6e; font-weight: 500;">~$16,993/yr</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="rates-note" style="flex-basis:100%; margin-top: 2px;">* Precios válidos el 12/03/2026 &middot; Las tarifas vencen a las 4PM CST (5PM EST)
+          &middot; Los costos anuales estimados se basan en un consumo de 241,277 kWh</div>
+      </div>
+
+      <div class="two-col">
+        <div>
+          <div class="section-heading">
+            <span class="section-num">02</span>
+            <span class="section-title">Detalles de la Cuenta</span>
+          </div>
+          <div class="info-card">
+            <div class="info-card-header">Carrel Forwarding, Inc.</div>
+            <div class="info-card-body">
+              <div class="info-row" style="align-items:flex-start;"><span class="info-key">Direcciones<br />de
+                  Servicio</span><span class="info-val normal"
+                  style="text-align:right; font-size: 8pt; line-height: 1.4;">2421 Bermuda Dr, Laredo, TX 78045<br />512
+                  Manor Rd, Laredo, TX 78041<br />835 Hallmark Dr, Laredo, TX 78045<br />835 Hallmark Dr Unit B, Laredo, TX 78045<br />2717 Jones Dr, Laredo, TX 78045</span></div>
+              <div class="info-row"><span class="info-key">Industria</span><span class="info-val normal">Logística y
+                  Almacenamiento</span></div>
+              <div class="info-row"><span class="info-key">Consumo Anual</span><span class="info-val">241,277 kWh</span>
+              </div>
+              <div class="info-row"><span class="info-key">Tarifa Actual</span><span class="info-val">$0.04331 /
+                  kWh</span></div>
+              <div class="info-row"><span class="info-key">Fin del Contrato</span><span class="info-val"
+                  style="color:#d97706;">1 de julio de 2026</span></div>
+              <div class="info-row"><span class="info-key">Proveedor Actual</span><span
+                  class="info-val normal">Freepoint Energy</span></div>
+              <div class="info-row"><span class="info-key">Servicio Público (TDSP)</span><span
+                  class="info-val normal">AEP Texas</span></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="section-heading">
+            <span class="section-num">03</span>
+            <span class="section-title">Protecciones del Contrato - Major Energy</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:8px;">
+            <div class="protection-card">
+              <div class="protection-icon-row">
+                <div class="protection-icon"><svg viewBox="0 0 24 24">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg></div>
+                <div class="protection-title">Tarifa de Cancelación de $0</div>
+              </div>
+              <div class="protection-desc">Si Carrel Forwarding necesita vender una instalación, cerrar una ubicación o
+                mudarse &mdash; <strong>no hay penalización por cancelación anticipada. Cero.</strong> Una disposición
+                muy favorable para la empresa incluida en el acuerdo de Major Energy.</div>
+            </div>
+            <div class="protection-card">
+              <div class="protection-icon-row">
+                <div class="protection-icon"><svg viewBox="0 0 24 24">
+                    <polyline points="17 1 21 5 17 9" />
+                    <path d="M3 11V9a4 4 0 0 1 4-4h14" />
+                    <polyline points="7 23 3 19 7 15" />
+                    <path d="M21 13v2a4 4 0 0 1-4 4H3" />
+                  </svg></div>
+                <div class="protection-title">Mezclar y Extender</div>
+              </div>
+              <div class="protection-desc">Si las tarifas del mercado bajan después de firmar, Carrel Forwarding puede
+                <strong>renegociar una tarifa más baja</strong> a cambio de una ampliación de 1 año en el plazo. No se
+                quedará atrapado y en desventaja si el mercado mejora.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="section-heading">
+          <span class="section-num">04</span>
+          <span class="section-title">Por qué Major Energy &mdash; Proveedor Recomendado</span>
+        </div>
+        <div class="engie-section">
+          <div class="engie-header">
+            <div class="engie-header-left">
+              <img
+                src="../images/MajorEnergy-LOGO.png" alt="Major Energy" class="engie-logo" />
+              <div>
+                <div class="engie-header-title">Major Energy</div>
+                <div class="engie-header-sub">Proveedor de precio fijo &middot; soporte para portafolios mixtos</div>
+              </div>
+            </div>
+            <div class="engie-tag">Proveedor Recomendado</div>
+          </div>
+          <div class="engie-body">
+            <div class="engie-fact">
+              <div class="engie-icon"><svg viewBox="0 0 24 24">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                  <path d="M2 17l10 5 10-5" />
+                  <path d="M2 12l10 5 10-5" />
+                </svg></div>
+              <div>
+                <div class="engie-fact-title">Precio Fijo con Presupuesto Estable</div>
+                <div class="engie-fact-desc">Major Energy participa como proveedor minorista de electricidad en mercados desregulados, con opciones de precio fijo para mayor control presupuestal.</div>
+              </div>
+            </div>
+            <div class="engie-fact">
+              <div class="engie-icon"><svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg></div>
+              <div>
+                <div class="engie-fact-title">Portafolio Residencial + Comercial</div>
+                <div class="engie-fact-desc">La documentación comercial de Major contempla clientes residenciales y small commercial, alineado con el perfil mixto de las 5 ubicaciones de Carrel Forwarding.</div>
+              </div>
+            </div>
+            <div class="engie-fact">
+              <div class="engie-icon"><svg viewBox="0 0 24 24">
+                  <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+                </svg></div>
+              <div>
+                <div class="engie-fact-title">Proceso de Cambio Gestionado</div>
+                <div class="engie-fact-desc">El proceso de alta y cambio de proveedor se coordina por cuenta, reduciendo fricción operativa cuando hay varias direcciones de servicio activas.</div>
+              </div>
+            </div>
+            <div class="engie-fact">
+              <div class="engie-icon"><svg viewBox="0 0 24 24">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg></div>
+              <div>
+                <div class="engie-fact-title">Estrategia de Valor a 36 Meses</div>
+                <div class="engie-fact-desc">Con tarifa de 36 meses a $0.07043/kWh, la estrategia prioriza estabilidad de costo y ejecución centralizada para sus acuerdos residenciales y comerciales.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="urgency-banner">
+        <div class="urgency-dot"></div>
+        <div class="urgency-text">
+          <strong>Estas cotizaciones vencen hoy a las 4PM CST.</strong> Si no se aprueba hoy, la tarifa puede cambiar.
+          Aprobar ahora asegura el precio de Major Energy por 36 meses y protege el presupuesto de Carrel Forwarding
+          hasta 2029.
+        </div>
+      </div>
+
+    </div>
+
+    <div class="footer">
+      <div class="footer-contact">
+        <img
+          src="../images/nodalpoint.png"
+          alt="Nodal Point" class="footer-contact-logo" />
+        <div>
+          <div class="footer-contact-name">Asesoría en Energía Nodal Point</div>
+          <div class="footer-contact-title">Ciencias Forenses en Energía Comercial &middot; nodalpoint.io</div>
+          <div class="footer-contact-detail">Alberto &mdash; ¿Preguntas? Llame o envíe un mensaje en cualquier momento.
+          </div>
+        </div>
+      </div>
+      <div class="footer-right">
+        <div class="footer-confid">Confidencial</div>
+        <div class="footer-disclaimer">Prepared exclusively for Carrel Forwarding, Inc. and Alberto (Gerente). Rates
+          quoted by licensed ERCOT REPs. Nodal Point acts as an independent broker and does not markup supplier rates.
+          Est. costs based on 241,277 kWh/yr.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script>
+    async function generatePDF() {
+      const btn = document.querySelector('.btn-download');
+      const originalText = btn.textContent;
+      btn.textContent = 'Generando...';
+      btn.disabled = true;
+
+      try {
+        const source = document.querySelector('.page');
+        const clone = source.cloneNode(true);
+        clone.style.position = 'fixed';
+        clone.style.left = '-10000px';
+        clone.style.top = '0';
+        clone.style.width = source.offsetWidth + 'px';
+        clone.style.zIndex = '-1';
+
+        // Most taint issues come from image loading policies in browser privacy mode.
+        // Remove images in the export clone so PDF generation is reliable.
+        clone.querySelectorAll('img').forEach((img) => img.remove());
+
+        document.body.appendChild(clone);
+
+        const canvas = await html2canvas(clone, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: false,
+          logging: false,
+          scrollX: 0,
+          scrollY: 0,
+          backgroundColor: '#ffffff'
+        });
+
+        clone.remove();
+
+        const imgData = canvas.toDataURL('image/jpeg', 1.0);
+        const { jsPDF } = window.jspdf;
+        const mmWidth = 210;
+        const mmHeight = (canvas.height / canvas.width) * mmWidth;
+        const pdf = new jsPDF({ unit: 'mm', format: [mmWidth, mmHeight], orientation: 'portrait' });
+        pdf.addImage(imgData, 'JPEG', 0, 0, mmWidth, mmHeight);
+        pdf.save('Carrel-Forwarding-Proposal.pdf');
+      } catch (err) {
+        console.error(err);
+        // Fallback that always works in-browser: Print -> Save as PDF.
+        window.print();
+      } finally {
+        btn.textContent = originalText || 'Descargar PDF';
+        btn.disabled = false;
+      }
+    }
+  </script>
+</body>
+
+</html>
+
+
