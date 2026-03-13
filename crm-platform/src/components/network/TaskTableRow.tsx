@@ -12,12 +12,14 @@ interface TaskTableRowProps {
     row: Row<Task>
     index: number
     router: AppRouterInstance
+    saveScroll?: () => void
 }
 
 export const TaskTableRow = memo(function TaskTableRow({
     row,
     index,
-    router
+    router,
+    saveScroll
 }: TaskTableRowProps) {
     const task = row.original
     return (
@@ -32,6 +34,7 @@ export const TaskTableRow = memo(function TaskTableRow({
             }}
             data-state={row.getIsSelected() ? "selected" : undefined}
             onClick={() => {
+                saveScroll?.()
                 if (task.contactId) {
                     router.push(`/network/contacts/${task.contactId}`)
                 } else if (task.accountId) {

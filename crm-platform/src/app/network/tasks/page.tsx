@@ -11,7 +11,6 @@ import {
   ColumnDef,
   SortingState,
   ColumnFiltersState,
-  PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
 import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Plus, Filter, MoreHorizontal, Search, Check } from 'lucide-react'
@@ -41,18 +40,21 @@ import {
 import { cn } from '@/lib/utils'
 import { PriorityBadge, priorityColorClasses } from '@/components/ui/PriorityBadge'
 import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
 import { TaskTableRow } from '@/components/network/TaskTableRow'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import { toast } from 'sonner'
 import { buildTaskVariableMap, resolveTaskTemplateText } from '@/lib/task-variables'
+import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 
 const PAGE_SIZE = 50
 
 export default function TasksPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
@@ -76,6 +78,7 @@ export default function TasksPage() {
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
   const [isAddingTask, setIsAddingTask] = useState(false)
   const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'Medium' as 'Low' | 'Medium' | 'High', dueDate: '' })
+  const scrollKey = (pathname ?? '/network/tasks') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
 
   useEffect(() => {
     setIsMounted(true)
@@ -83,6 +86,7 @@ export default function TasksPage() {
 
   const tasks = useMemo(() => data?.pages.flatMap(page => page.tasks) || [], [data])
   const isLoading = queryLoading || !isMounted
+  const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
 
   const effectiveTotalRecords = totalTasks ?? tasks.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
@@ -327,15 +331,16 @@ export default function TasksPage() {
     getSortedRowModel: getSortedRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onPaginationChange: (updaterOrValue) => {
+      const next = typeof updaterOrValue === 'function' ? updaterOrValue(pagination) : updaterOrValue
+      setPage(next.pageIndex)
+    },
     onRowSelectionChange: setRowSelection,
     autoResetPageIndex: false,
     state: {
       sorting,
       columnFilters,
-      pagination: {
-        pageIndex,
-        pageSize: PAGE_SIZE,
-      },
+      pagination,
       rowSelection,
     },
   })
@@ -362,7 +367,7 @@ export default function TasksPage() {
       />
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        <div className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+        <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
             <TableHeader className="sticky top-0 z-20 border-b border-white/5">
               {table.getHeaderGroups().map((headerGroup) => (
@@ -399,6 +404,7 @@ export default function TasksPage() {
                       row={row}
                       index={index}
                       router={router}
+                      saveScroll={saveScroll}
                     />
                   ))}
                 </AnimatePresence>
@@ -445,7 +451,7 @@ export default function TasksPage() {
 
                 setPage(nextPageIndex)
               }}
-              disabled={pageIndex + 1 >= displayTotalPages || (!hasNextPage && tasks.length < (pageIndex + 2) * PAGE_SIZE)}
+              disabled={pageIndex + 1 >= displayTotalPages}
               className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
               aria-label="Next page"
             >
