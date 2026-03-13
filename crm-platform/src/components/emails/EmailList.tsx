@@ -506,48 +506,50 @@ export function EmailList({
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          if (!executionId || !onGenerateScheduled || isGenerating) return
-                          onGenerateScheduled(email)
+                          if (!executionId || isGenerating) return
+                          if (showRegenerateLabel) {
+                            if (!onRegenerateScheduled) return
+                            onRegenerateScheduled(email)
+                          } else {
+                            if (!onGenerateScheduled) return
+                            onGenerateScheduled(email)
+                          }
                         }}
-                        disabled={!executionId || !onGenerateScheduled || isGenerating}
+                        disabled={
+                          !executionId ||
+                          isGenerating ||
+                          (showRegenerateLabel ? !onRegenerateScheduled : !onGenerateScheduled)
+                        }
                         className={cn(
                           "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40",
-                          showRegenerateLabel ? "text-emerald-400 border-emerald-500/40" : ""
+                          showRegenerateLabel
+                            ? "text-violet-300 border-violet-500/40"
+                            : "text-emerald-400 border-emerald-500/40"
                         )}
-                        title={executionId ? `${showRegenerateLabel ? 'Regenerate' : 'Generate'} draft now` : 'Missing execution link'}
+                        title={
+                          executionId
+                            ? `${showRegenerateLabel ? 'Regenerate' : 'Generate'} draft now`
+                            : 'Missing execution link'
+                        }
                       >
                         {isGenerating ? 'Generating...' : showRegenerateLabel ? 'Regenerate' : 'Generate'}
                       </button>
                       {hasGeneratedContent && (
-                        <>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (!executionId || !onRegenerateScheduled || isGenerating) return
-                              onRegenerateScheduled(email)
-                            }}
-                            disabled={!executionId || !onRegenerateScheduled || isGenerating}
-                            className="icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40 text-emerald-400 border-emerald-500/40"
-                            title={executionId ? 'Regenerate this draft' : 'Missing execution link'}
-                          >
-                            {isGenerating ? 'Generating...' : 'Regenerate'}
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (!executionId || !onAcceptScheduled || isAccepting) return
-                              onAcceptScheduled(email)
-                            }}
-                            disabled={!executionId || !onAcceptScheduled || isAccepting}
-                            className={cn(
-                              "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40",
-                              isAccepted && "border-emerald-500/40 text-emerald-300"
-                            )}
-                            title={executionId ? 'Accept this draft' : 'Missing execution link'}
-                          >
-                            {isAccepting ? 'Saving...' : isAccepted ? 'Accepted' : 'Accept'}
-                          </button>
-                        </>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (!executionId || !onAcceptScheduled || isAccepting) return
+                            onAcceptScheduled(email)
+                          }}
+                          disabled={!executionId || !onAcceptScheduled || isAccepting}
+                          className={cn(
+                            "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40 text-emerald-400 border-emerald-500/40",
+                            isAccepted && "text-emerald-300"
+                          )}
+                          title={executionId ? 'Accept this draft' : 'Missing execution link'}
+                        >
+                          {isAccepting ? 'Saving...' : isAccepted ? 'Accepted' : 'Accept'}
+                        </button>
                       )}
                     </div>
                   </div>
