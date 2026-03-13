@@ -440,33 +440,66 @@ export default async function handler(req, res) {
             // 2. Check for duplicates in Supabase using the primary 'id' column
             const { data: existing } = await supabaseAdmin
                 .from('emails')
-                .select('id, metadata, contactId, accountId, threadId, subject')
+                .select('id, from, metadata, contactId, accountId, threadId, subject')
                 .eq('id', messageId)
                 .maybeSingle();
 
             if (existing) {
-                // Backfill attachments for previously-synced rows that were saved without attachment metadata.
+                // Backfill attachments and sender email for previously-synced rows.
                 const existingAttachments = Array.isArray(existing?.metadata?.attachments) ? existing.metadata.attachments : [];
                 const hasExistingAttachments = existingAttachments.length > 0;
-                if (!hasExistingAttachments) {
+
+                // Check if from field is missing an email address (just a display name)
+                const existingFrom = existing?.from || '';
+                const existingFromEmail = extractEmailAddress(existingFrom);
+                const summaryEmail = extractEmailAddress(msgSummary?.senderAddress || '');
+                const needsFromBackfill = !isLikelyEmail(existingFromEmail) && isLikelyEmail(summaryEmail);
+
+                if (!hasExistingAttachments || needsFromBackfill) {
                     try {
-                        const fullContent = await zohoService.getMessageContent(userEmail, messageId);
-                        const attachmentMeta = extractZohoAttachments(msgSummary, fullContent, messageId);
-                        if (attachmentMeta.length > 0) {
+                        const backfillUpdate = { ...(existing?.metadata || {}) };
+
+                        // Fix from field with actual email if available from summary
+                        if (needsFromBackfill && summaryEmail) {
+                            const displayName = msgSummary?.sender || '';
+                            const fixedFrom = displayName ? `${displayName} <${summaryEmail}>` : summaryEmail;
+                            backfillUpdate.fromAddress = summaryEmail;
                             await supabaseAdmin
                                 .from('emails')
-                                .update({
-                                    updatedAt: new Date().toISOString(),
-                                    metadata: {
-                                        ...(existing?.metadata || {}),
-                                        hasAttachments: true,
-                                        attachments: attachmentMeta
-                                    }
-                                })
+                                .update({ from: fixedFrom, metadata: { ...backfillUpdate }, updatedAt: new Date().toISOString() })
                                 .eq('id', messageId);
                         }
+
+                        // Fetch real attachment metadata via dedicated API call
+                        if (!hasExistingAttachments) {
+                            const attList = await zohoService.getMessageAttachments(
+                                userEmail, messageId, msgSummary?.folderId || msgSummary?.folderName || 'inbox'
+                            );
+                            if (attList.length > 0) {
+                                const normalizedAttachments = attList.map((att, idx) => ({
+                                    filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
+                                    mimeType: att.contentType || att.mimeType || 'application/octet-stream',
+                                    size: typeof att.size === 'number' ? att.size : Number(att.size || 0),
+                                    attachmentId: att.attachmentId || att.storeName || null,
+                                    messageId: String(messageId),
+                                    provider: 'zoho',
+                                    downloadUnavailable: false,
+                                }));
+                                await supabaseAdmin
+                                    .from('emails')
+                                    .update({
+                                        updatedAt: new Date().toISOString(),
+                                        metadata: {
+                                            ...(existing?.metadata || {}),
+                                            hasAttachments: true,
+                                            attachments: normalizedAttachments
+                                        }
+                                    })
+                                    .eq('id', messageId);
+                            }
+                        }
                     } catch (backfillError) {
-                        logger.warn(`[Zoho Sync] Attachment backfill failed for existing message ${messageId}: ${backfillError?.message || backfillError}`, 'zoho-sync');
+                        logger.warn(`[Zoho Sync] Backfill failed for existing message ${messageId}: ${backfillError?.message || backfillError}`, 'zoho-sync');
                     }
                 }
 
@@ -496,10 +529,33 @@ export default async function handler(req, res) {
             // 3. Fetch full content
             const fullContent = await zohoService.getMessageContent(userEmail, messageId);
 
-            // 4. Parse 
+            // 4. Parse
             const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
 
-            const senderRaw = fullContent?.fromAddress || msgSummary?.senderAddress || msgSummary?.sender || '';
+            // 4b. Fetch actual attachment metadata if needed (Zoho doesn't include it in content/summary)
+            if (emailDoc.metadata.hasAttachments && emailDoc.metadata.attachments.length === 0) {
+                try {
+                    const attList = await zohoService.getMessageAttachments(
+                        userEmail, messageId, msgSummary?.folderId || msgSummary?.folderName || 'inbox'
+                    );
+                    if (attList.length > 0) {
+                        emailDoc.metadata.attachments = attList.map((att, idx) => ({
+                            filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
+                            mimeType: att.contentType || att.mimeType || 'application/octet-stream',
+                            size: typeof att.size === 'number' ? att.size : Number(att.size || 0),
+                            attachmentId: att.attachmentId || att.storeName || null,
+                            messageId: String(messageId),
+                            provider: 'zoho',
+                            downloadUnavailable: false,
+                        }));
+                    }
+                } catch (attErr) {
+                    logger.warn(`[Zoho Sync] Attachment fetch failed for ${messageId}: ${attErr?.message || attErr}`, 'zoho-sync');
+                }
+            }
+
+            // Use the email from the already-resolved emailDoc.from (which has the proper "Name <email>" format)
+            const senderRaw = emailDoc.from || fullContent?.fromAddress || msgSummary?.senderAddress || msgSummary?.sender || '';
             const senderEmail = extractEmailAddress(senderRaw);
             const byEmail = isLikelyEmail(senderEmail) ? await resolveContactAndAccount(userEmail, senderEmail) : { contactId: null, accountId: null };
             if (byEmail.contactId) {
@@ -555,7 +611,19 @@ function parseZohoMessage(summary, content, ownerEmail) {
     const rawText = content.summary || content.textContent || content.plainText || '';
     const plainText = rawText || stripHtml(rawHtml);
 
-    const fromAddress = content?.fromAddress || summary?.senderAddress || summary?.sender || '';
+    // Build a proper "Display Name <email@domain.com>" from string.
+    // Zoho sometimes returns only a display name in content.fromAddress, so we check
+    // summary.senderAddress (which reliably has the email) and combine both.
+    const senderDisplayName = summary?.sender || '';
+    const emailFromContent = extractEmailAddress(content?.fromAddress || '');
+    const emailFromSummary = extractEmailAddress(summary?.senderAddress || '');
+    const actualSenderEmail = (isLikelyEmail(emailFromContent) ? emailFromContent : null)
+        || (isLikelyEmail(emailFromSummary) ? emailFromSummary : null)
+        || '';
+    const fromAddress = actualSenderEmail
+        ? (senderDisplayName ? `${senderDisplayName} <${actualSenderEmail}>` : actualSenderEmail)
+        : (content?.fromAddress || summary?.senderAddress || summary?.sender || '');
+
     const replyToAddress = content?.replyToAddress || content?.replyTo || summary?.replyToAddress || summary?.replyTo || null;
     const hasAttachments = hasAttachmentsInPayload(summary, content, attachmentMeta);
 
@@ -587,7 +655,7 @@ function parseZohoMessage(summary, content, ownerEmail) {
             zohoFolder: summary.folderName || 'inbox',
             sentTime: summary.sentTime,
             hasAttachments,
-            fromAddress,
+            fromAddress: actualSenderEmail || fromAddress,
             replyToAddress,
             attachments: attachmentMeta,
             emailType: 'received'
