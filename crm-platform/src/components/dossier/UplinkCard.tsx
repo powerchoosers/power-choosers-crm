@@ -7,6 +7,7 @@ import { ContactDetail } from '@/hooks/useContacts'
 import { useCallStore } from '@/store/callStore'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
+import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 
 interface UplinkCardProps {
   contact: ContactDetail
@@ -14,6 +15,8 @@ interface UplinkCardProps {
   onEmailClick?: () => void
   onEnter?: () => void
   onUpdate: (updates: Partial<ContactDetail>) => void
+  isSaving?: boolean
+  recentlyUpdatedFields?: Set<string>
 }
 
 type PhoneType = 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
@@ -26,7 +29,15 @@ interface PhoneEntry {
   icon: typeof Smartphone
 }
 
-export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEmailClick, onEnter, onUpdate }) => {
+export const UplinkCard: React.FC<UplinkCardProps> = ({
+  contact,
+  isEditing,
+  onEmailClick,
+  onEnter,
+  onUpdate,
+  isSaving = false,
+  recentlyUpdatedFields
+}) => {
   const initiateCall = useCallStore((state) => state.initiateCall)
   // Local state for editing phones
   const [phones, setPhones] = useState<PhoneEntry[]>([])
@@ -305,8 +316,13 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({ contact, isEditing, onEm
                     <heroPhone.icon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
                     <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
                   </div>
-                  <div className="flex flex-col items-start min-w-0 flex-1">
-                    <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label} (Primary)</span>
+              <div className="flex flex-col items-start min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label} (Primary)</span>
+                      {!isEditing && recentlyUpdatedFields?.has('phone') && (
+                        <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
+                      )}
+                    </div>
                     <ForensicDataPoint
                       value={heroPhone.value || 'No phone'}
                       copyValue={heroPhone.value || undefined}

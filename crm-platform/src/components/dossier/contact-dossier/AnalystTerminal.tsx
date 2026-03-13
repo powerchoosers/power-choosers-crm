@@ -5,6 +5,7 @@ import { Sparkles, Clock, Copy, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
+import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 
 interface AnalystTerminalProps {
     id: string
@@ -14,6 +15,8 @@ interface AnalystTerminalProps {
     onNoteSubmit: (note: string) => Promise<void>
     onWipe?: () => Promise<void>
     maturityInfo?: string
+    recentlyUpdatedFields?: Set<string>
+    isSaving?: boolean
 }
 
 export function AnalystTerminal({
@@ -23,7 +26,9 @@ export function AnalystTerminal({
     setEditNotes,
     onNoteSubmit,
     onWipe,
-    maturityInfo
+    maturityInfo,
+    recentlyUpdatedFields,
+    isSaving = false
 }: AnalystTerminalProps) {
     const [isTyping, setIsTyping] = useState(false)
     const [terminalInput, setTerminalInput] = useState('')
@@ -77,6 +82,9 @@ export function AnalystTerminal({
                     <h3 className="text-xs font-mono uppercase tracking-[0.3em] text-zinc-400">
                         {isEditing ? 'SYS_CONFIG_OVERRIDE' : 'FORENSIC_LOG_STREAM'}
                     </h3>
+                    {!isEditing && recentlyUpdatedFields?.has('notes') && (
+                        <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
+                    )}
                 </div>
                 <div className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest flex items-center gap-4">
                     <span>SECURE_NODE: {id.slice(0, 8).toUpperCase()}</span>

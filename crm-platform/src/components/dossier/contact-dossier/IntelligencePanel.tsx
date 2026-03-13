@@ -15,6 +15,7 @@ interface IntelligencePanelProps {
     isRecalibrating: boolean
     glowingFields: Set<string>
     recentlyUpdatedFields: Set<string>
+    isSaving: boolean
 
     // Field States & Setters
     editEmail: string
@@ -54,6 +55,7 @@ export function IntelligencePanel({
     isRecalibrating,
     glowingFields,
     recentlyUpdatedFields,
+    isSaving,
     editEmail,
     setEditEmail,
     editPhone,
@@ -115,11 +117,11 @@ export function IntelligencePanel({
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-left-4 duration-700">
             {contact && (
-                <UplinkCard
-                    contact={{
-                        ...contact,
-                        email: editEmail,
-                        phone: editPhone,
+                    <UplinkCard
+                        contact={{
+                            ...contact,
+                            email: editEmail,
+                            phone: editPhone,
                         mobile: editMobile,
                         workDirectPhone: editWorkDirect,
                         otherPhone: editOther,
@@ -151,6 +153,8 @@ export function IntelligencePanel({
                         }
                     }}
                     onEnter={toggleEditing}
+                    recentlyUpdatedFields={recentlyUpdatedFields}
+                    isSaving={isSaving}
                 />
             )}
 

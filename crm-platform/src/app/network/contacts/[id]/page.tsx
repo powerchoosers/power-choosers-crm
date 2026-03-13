@@ -232,6 +232,7 @@ export default function ContactDossierPage() {
           toggleEditing={s.toggleEditing}
           recentlyUpdatedFields={s.recentlyUpdatedFields}
           showSynced={s.showSynced}
+          isSaving={s.isSaving}
           editName={s.editName}
           editFirstName={s.editFirstName}
           setEditFirstName={s.setEditFirstName}
@@ -266,12 +267,13 @@ export default function ContactDossierPage() {
           <div className="grid grid-cols-12 w-full h-full">
             {/* Left Panel */}
             <div className="col-span-12 lg:col-span-4 h-full overflow-y-auto p-6 md:p-8 border-r border-white/5 scrollbar-thin">
-              <IntelligencePanel
+            <IntelligencePanel
                 contact={s.contact}
                 isEditing={s.isEditing}
                 isRecalibrating={isRecalibrating}
                 glowingFields={glowingFields}
                 recentlyUpdatedFields={s.recentlyUpdatedFields}
+                isSaving={s.isSaving}
                 editEmail={s.editEmail}
                 setEditEmail={s.setEditEmail}
                 editPhone={s.editPhone}
@@ -313,6 +315,8 @@ export default function ContactDossierPage() {
                   onNoteSubmit={handleTerminalSubmit}
                   onWipe={handleTerminalWipe}
                   maturityInfo={s.editContractEnd ? `Position Maturity: ${s.editContractEnd}` : undefined}
+                  recentlyUpdatedFields={s.recentlyUpdatedFields}
+                  isSaving={s.isSaving}
                 />
 
                 <EngagementLog
