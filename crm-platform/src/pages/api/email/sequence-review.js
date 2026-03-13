@@ -150,12 +150,27 @@ export default async function handler(req, res) {
     const linkedInUrl = contact.linkedinUrl || null;
     const accountDomain = account?.domain || null;
     const website = accountDomain ? `https://${accountDomain}` : null;
-    const location = account?.city
-      ? `${account.city}${account?.state ? `, ${account.state}` : ''}`
-      : contact.city
-      ? `${contact.city}${contact.state ? `, ${contact.state}` : ''}`
+    // Prefer account city over contact city (mirrors edge function logic)
+    const accountCity = account?.city ? account.city.trim() : null;
+    const accountState = account?.state ? account.state.trim() : null;
+    const contactCity = contact.city ? contact.city.trim() : null;
+    const contactState = contact.state ? contact.state.trim() : null;
+    const location = accountCity
+      ? `${accountCity}${accountState ? `, ${accountState}` : ''}`
+      : contactCity
+      ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
       : null;
     const sourceTruthLine = buildSourceTruthLine(linkedInUrl, website);
+
+    // Resolve sender email and domain before the AI call so they can be passed as contact context
+    const preferredFrom = String(sequenceSender || '').trim();
+    const fromEmail = preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io';
+    const senderDomain = senderDomainFromEmail(fromEmail);
+
+    // Calculate contract end year (mirrors edge function logic)
+    const contractEndYear = account?.contract_end_date
+      ? new Date(account.contract_end_date).getUTCFullYear()
+      : null;
 
     const protocol = req.headers['x-forwarded-proto'] || (req.headers.host?.includes('localhost') ? 'http' : 'https');
     const host = req.headers.host;
@@ -179,8 +194,9 @@ export default async function handler(req, res) {
           electricity_supplier: account?.electricity_supplier || null,
           current_rate: account?.current_rate || null,
           contract_end_date: account?.contract_end_date || null,
-          city: contact.city || null,
-          state: contact.state || null,
+          contract_end_year: Number.isFinite(contractEndYear) ? contractEndYear : null,
+          city: accountCity || contactCity || null,
+          state: accountState || contactState || null,
           location,
           linkedin_url: linkedInUrl,
           domain: accountDomain,
@@ -188,6 +204,8 @@ export default async function handler(req, res) {
           has_linkedin: !!linkedInUrl,
           has_website: !!website,
           source_label: linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info'),
+          sender_email: fromEmail,
+          sender_domain: senderDomain,
           sender_first_name: senderFirstName
         }
       })
@@ -210,9 +228,6 @@ export default async function handler(req, res) {
       throw new Error('AI generation returned empty body');
     }
 
-    const preferredFrom = String(sequenceSender || '').trim();
-    const fromEmail = preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io';
-    const senderDomain = senderDomainFromEmail(fromEmail);
     let finalBody = generatedBody;
 
     if (!finalBody.includes('NODAL_FORENSIC_SIGNATURE') && !finalBody.includes('nodal-signature')) {
