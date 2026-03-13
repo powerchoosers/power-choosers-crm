@@ -44,6 +44,7 @@ interface EmailListProps {
   onAcceptScheduled?: (email: Email) => void
   scheduledActionState?: Record<string, string>
   scrollContainerRef?: RefObject<HTMLDivElement | null>
+  showSkeletonRows?: boolean
 }
 
 export function EmailList({
@@ -76,6 +77,7 @@ export function EmailList({
   onAcceptScheduled,
   scheduledActionState = {},
   scrollContainerRef,
+  showSkeletonRows = false,
 }: EmailListProps) {
   const [internalPage, setInternalPage] = useState(1)
 
@@ -109,6 +111,35 @@ export function EmailList({
   // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(filteredEmails.length / itemsPerPage))
   const paginatedEmails = filteredEmails.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const skeletonRowCount = Math.min(itemsPerPage, 6)
+  const skeletonRows = Array.from({ length: skeletonRowCount }).map((_, idx) => (
+    <div
+      key={`skeleton-${idx}`}
+      className="grid grid-cols-12 gap-4 p-3 border-l-2 border-white/5 bg-zinc-950/30 animate-pulse"
+    >
+      <div className="col-span-1 flex items-center justify-center">
+        <span className="h-4 w-4 rounded bg-white/10" />
+      </div>
+      <div className="col-span-1 flex justify-center">
+        <span className="h-8 w-8 rounded-[10px] bg-white/5" />
+      </div>
+      <div className="col-span-3 space-y-2">
+        <span className="block h-3 w-3/4 rounded bg-white/10" />
+        <span className="block h-2 w-1/2 rounded bg-white/5" />
+      </div>
+      <div className="col-span-3 space-y-2">
+        <span className="block h-3 w-full rounded bg-white/10" />
+        <span className="block h-2 w-2/3 rounded bg-white/5" />
+      </div>
+      <div className="col-span-2 space-y-2">
+        <span className="block h-3 w-3/4 rounded bg-white/10" />
+        <span className="block h-2 w-1/2 rounded bg-white/5" />
+      </div>
+      <div className="col-span-2 flex justify-end">
+        <span className="h-4 w-12 rounded bg-white/10" />
+      </div>
+    </div>
+  ))
 
   const selectableTotal = totalAvailable ?? filteredEmails.length
   const allOnPageSelected = paginatedEmails.length > 0 && paginatedEmails.every(e => selectedIds.has(e.id))
@@ -152,7 +183,7 @@ export function EmailList({
     )
   }
 
-  if (emails.length === 0) {
+  if (!showSkeletonRows && emails.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4 animate-in fade-in duration-700">
         <div className="w-16 h-16 rounded-2xl nodal-glass flex items-center justify-center border border-white/5 shadow-2xl">
@@ -317,7 +348,10 @@ export function EmailList({
       {/* Scrollable List */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll">
         <div className="divide-y divide-white/5">
-          {paginatedEmails.map((email, index) => {
+          {showSkeletonRows ? (
+            skeletonRows
+          ) : (
+            paginatedEmails.map((email, index) => {
             const isOutbound = email.type === 'sent' || email.type === 'scheduled'
             const executionId = String(email?.metadata?.sequenceExecutionId || '')
             const hasGeneratedContent = Boolean(String(email.html || '').trim())
