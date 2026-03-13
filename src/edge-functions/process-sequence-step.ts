@@ -132,6 +132,9 @@ async function processJob(job) {
         } else {
             await handleSend(execution, job)
         }
+    } else if (effectiveType === 'linkedin') {
+        // LinkedIn is a manual gate: create/attach task and wait for user completion.
+        await handleLinkedInTask(execution, job)
     } else {
         // Delay node or other passive node
         console.log('[DEBUG] Processing passive node:', effectiveType);
@@ -274,6 +277,104 @@ async function handleSend(execution, job) {
     } else {
         throw new Error(`Email API failed (${response.status})`)
     }
+}
+
+async function handleLinkedInTask(execution, job) {
+    const metadata = normalizeMetadata(execution.metadata);
+
+    const [member] = await sql`
+    SELECT m.id,
+           c.id as contact_id,
+           c."accountId" as account_id,
+           c."firstName",
+           c."lastName",
+           s."ownerId" as owner_id,
+           u.email as owner_email
+    FROM sequence_members m
+    JOIN contacts c ON m."targetId" = c.id
+    LEFT JOIN sequences s ON s.id = m."sequenceId"
+    LEFT JOIN users u ON (u.id = s."ownerId" OR u.email = s."ownerId")
+    WHERE m.id = ${execution.member_id}
+    LIMIT 1
+  `;
+
+    if (!member?.contact_id) {
+        throw new Error(`LinkedIn task requires a valid contact for member ${execution.member_id}`);
+    }
+
+    const existingTasks = await sql`
+    SELECT id, status
+    FROM tasks
+    WHERE metadata->>'sequenceExecutionId' = ${execution.id}
+       OR metadata->>'execution_id' = ${execution.id}
+    ORDER BY "createdAt" DESC
+    LIMIT 1
+  `;
+
+    let taskId = existingTasks?.[0]?.id || null;
+
+    if (!taskId) {
+        const firstName = (member.firstName || '').trim();
+        const lastName = (member.lastName || '').trim();
+        const contactName = `${firstName} ${lastName}`.trim() || 'Contact';
+        const label = (metadata?.label || 'LinkedIn Step').trim();
+        const prompt = (metadata?.prompt || metadata?.aiBody || 'Complete LinkedIn outreach step for this contact.').trim();
+        const ownerEmail = member.owner_email || (String(member.owner_id || '').includes('@') ? member.owner_id : null);
+
+        const inserted = await sql`
+      INSERT INTO tasks (
+        id,
+        title,
+        description,
+        status,
+        priority,
+        "dueDate",
+        "contactId",
+        "accountId",
+        "ownerId",
+        "createdAt",
+        "updatedAt",
+        metadata
+      ) VALUES (
+        gen_random_uuid()::text,
+        ${`LinkedIn - ${label} (${contactName})`},
+        ${prompt},
+        'Pending',
+        'Protocol',
+        NOW(),
+        ${member.contact_id},
+        ${member.account_id},
+        ${ownerEmail},
+        NOW(),
+        NOW(),
+        jsonb_build_object(
+          'taskType', 'LinkedIn',
+          'source', 'sequence',
+          'sequenceExecutionId', ${execution.id},
+          'sequenceId', ${execution.sequence_id},
+          'memberId', ${execution.member_id},
+          'stepType', COALESCE(${execution.step_type}, 'protocolNode'),
+          'execution_id', ${execution.id},
+          'member_id', ${execution.member_id}
+        )
+      )
+      RETURNING id
+    `;
+
+        taskId = inserted?.[0]?.id || null;
+    }
+
+    const executionPatch: Record<string, any> = { manualGate: true };
+    if (taskId) executionPatch.taskId = taskId;
+
+    await sql`
+    UPDATE sequence_executions
+    SET status = 'waiting',
+        wait_until = NULL,
+        metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify(executionPatch)}::jsonb,
+        updated_at = NOW()
+    WHERE id = ${execution.id}
+  `;
 }
 
 async function skipNode(execution, job) {
