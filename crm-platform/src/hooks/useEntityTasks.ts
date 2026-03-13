@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo } from 'react'
-import { useTasks, type Task } from './useTasks'
+import { useAllPendingTasks, type Task } from './useTasks'
 import { isPendingTask } from '@/lib/task-date'
 
 interface EntityTaskScope {
@@ -38,11 +38,11 @@ export function taskMatchesEntityScope(task: Task, scope: EntityTaskScope): bool
  * Same filtering as ContextTasksWidget: by entityId, entityName, or relatedTo.
  */
 export function useEntityTasks(entityId: string | undefined, entityName?: string, options?: Omit<EntityTaskScope, 'entityName'>) {
-  const { data: tasksData } = useTasks()
+  const { data: allPendingData } = useAllPendingTasks()
 
   const pendingTasks = useMemo(() => {
     if (!entityId) return []
-    const allTasks = tasksData?.pages.flatMap((p) => p.tasks) ?? []
+    const allTasks = allPendingData?.allPendingTasks ?? []
     const forEntity = allTasks.filter((t: Task) =>
       taskMatchesEntityScope(t, {
         entityName,
@@ -52,7 +52,7 @@ export function useEntityTasks(entityId: string | undefined, entityName?: string
       })
     )
     return forEntity.filter(isPendingTask)
-  }, [tasksData, entityId, entityName, options?.contactId, options?.accountId, options?.includeContactIds])
+  }, [allPendingData?.allPendingTasks, entityId, entityName, options?.contactId, options?.accountId, options?.includeContactIds])
 
   return { pendingTasks, totalCount: pendingTasks.length }
 }
