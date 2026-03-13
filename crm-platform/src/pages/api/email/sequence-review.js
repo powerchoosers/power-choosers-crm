@@ -137,6 +137,15 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     const sequenceSender = sequence?.bgvector?.settings?.senderEmail || sequence?.metadata?.sender_email || null;
+    let senderFirstName = null;
+    if (sequence?.ownerId) {
+      const { data: ownerUser } = await supabase
+        .from('users')
+        .select('first_name')
+        .or(`id.eq.${sequence.ownerId},email.eq.${sequence.ownerId}`)
+        .maybeSingle();
+      senderFirstName = ownerUser?.first_name || null;
+    }
 
     const linkedInUrl = contact.linkedinUrl || null;
     const accountDomain = account?.domain || null;
@@ -178,7 +187,8 @@ export default async function handler(req, res) {
           website,
           has_linkedin: !!linkedInUrl,
           has_website: !!website,
-          source_label: linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info')
+          source_label: linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info'),
+          sender_first_name: senderFirstName
         }
       })
     });
