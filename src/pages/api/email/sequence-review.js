@@ -139,6 +139,9 @@ export default async function handler(req, res) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: `${executionMeta?.prompt || 'Draft a personalized follow-up'}\n\n${sourceTruthLine}`,
+        provider: 'openrouter',
+        type: 'email',
+        vectors: Array.isArray(executionMeta?.vectors) ? executionMeta.vectors : [],
         mode: 'generate_email',
         contact: {
           name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
@@ -168,8 +171,16 @@ export default async function handler(req, res) {
     }
 
     const optimizeData = await optimizeRes.json();
-    const generatedBody = String(optimizeData.optimizedContent || optimizeData.content || '').trim();
-    const generatedSubject = String(optimizeData.subject || executionMeta.subject || 'Message from Nodal Point').trim();
+    const generatedBody = String(
+      optimizeData.optimized || optimizeData.optimizedContent || optimizeData.content || ''
+    ).trim();
+    const generatedSubject = String(
+      optimizeData.subject || executionMeta.subject || executionMeta.aiSubject || 'Message from Nodal Point'
+    ).trim();
+
+    if (!generatedBody) {
+      throw new Error('AI generation returned empty body');
+    }
     const nowIso = new Date().toISOString();
 
     const nextExecutionMeta = {
