@@ -175,36 +175,36 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
 
                         <div className="flex-1 min-w-0 flex flex-col">
                             <div className="flex items-center gap-3 mb-1">
-                        <div className="flex-1 flex items-center gap-2 min-w-0">
-                            <h1 className="text-2xl font-semibold tracking-tighter text-white">
-                                {!isEditing ? (
-                                    <ForensicDataPoint
-                                        value={account.name ?? ''}
-                                        copyValue={account.name ?? undefined}
-                                        valueClassName="text-2xl font-semibold tracking-tighter text-white"
-                                        inline
-                                        compact
-                                    />
+                                {isEditing ? (
+                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                        <input
+                                            type="text"
+                                            value={editAccountName}
+                                            onChange={(e) => setEditAccountName(e.target.value)}
+                                            onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
+                                            className="bg-transparent border-b border-white/10 text-white text-2xl font-semibold tracking-tighter w-full focus:outline-none focus:border-[#002FA7] transition-colors"
+                                            placeholder="ACCOUNT NAME"
+                                            autoFocus
+                                        />
+                                    </div>
                                 ) : (
-                                    <input
-                                        type="text"
-                                        value={editAccountName}
-                                        onChange={(e) => setEditAccountName(e.target.value)}
-                                        onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                        className="bg-transparent border-b border-white/10 text-white text-2xl font-semibold tracking-tighter w-full focus:outline-none focus:border-[#002FA7] transition-colors"
-                                        placeholder="ACCOUNT NAME"
-                                        autoFocus
+                                    <h1 className="text-2xl font-semibold tracking-tighter text-white">
+                                        <ForensicDataPoint
+                                            value={account.name ?? ''}
+                                            copyValue={account.name ?? undefined}
+                                            valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                                            inline
+                                            compact
+                                        />
+                                    </h1>
+                                )}
+                                {!isEditing && (
+                                    <FieldSyncIndicator
+                                        active={recentlyUpdatedFields.has('name')}
+                                        isSaving={isSaving}
+                                        severity="identity"
                                     />
                                 )}
-                            </h1>
-                            {!isEditing && (
-                                <FieldSyncIndicator
-                                    active={recentlyUpdatedFields.has('name')}
-                                    isSaving={isSaving}
-                                    severity="identity"
-                                />
-                            )}
-                        </div>
 
                                 <div className="flex items-center gap-1 bg-white/[0.02] rounded-full p-1 border border-white/5 relative group/links">
                                     <div className="flex items-center gap-1">
@@ -312,7 +312,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2">
+                                <motion.div layout className="flex items-center gap-2 overflow-visible">
                                     {(() => {
                                         const hasContract = !!account.contractEnd
                                         const contractEnd = parseContractEndDate(account.contractEnd)
@@ -322,7 +322,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
 
                                         const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active Load' : isExpired ? 'Expired' : 'No Contract'
                                         return (
-                                            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full nodal-module-glass border border-white/5">
+                                            <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full nodal-module-glass border border-white/5 shrink-0">
                                                 <div className={cn(
                                                     "w-1.5 h-1.5 rounded-full",
                                                     isCustomer ? "bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" :
@@ -331,7 +331,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                                                 "bg-zinc-600"
                                                 )} />
                                                 <span className={cn(
-                                                    "text-[10px] font-mono uppercase tracking-widest font-medium",
+                                                    "text-[10px] font-mono uppercase tracking-widest font-medium whitespace-nowrap",
                                                     isCustomer ? "text-emerald-500" :
                                                         isActiveLoad ? "text-[#002FA7]" :
                                                             isExpired ? "text-red-500/80" :
@@ -344,9 +344,9 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                     })()}
 
                                     {account.updated && (
-                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full nodal-module-glass border border-white/5">
+                                        <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full nodal-module-glass border border-white/5 shrink-0">
                                             <Clock className="w-2.5 h-2.5 text-zinc-600" />
-                                            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                                            <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest whitespace-nowrap">
                                                 Last_Sync: {(() => {
                                                     try {
                                                         return formatDistanceToNow(new Date(account.updated), { addSuffix: true }).toUpperCase()
@@ -357,22 +357,22 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                             </span>
                                         </div>
                                     )}
+                                </motion.div>
 
-                                    <AnimatePresence>
-                                        {showSynced && (
-                                            <motion.div
-                                                key="synced-indicator"
-                                                initial={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
-                                                animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-                                                exit={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
-                                                className="flex items-center gap-1 text-[10px] font-mono text-green-500 ml-2"
-                                            >
-                                                <Check className="w-3 h-3" />
-                                                <span className="uppercase tracking-widest">Synced</span>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
+                                <AnimatePresence>
+                                    {showSynced && (
+                                        <motion.div
+                                            key="synced-indicator"
+                                            initial={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
+                                            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                                            exit={{ opacity: 0, scale: 0.9, filter: "blur(4px)" }}
+                                            className="flex items-center gap-1 text-[10px] font-mono text-green-500"
+                                        >
+                                            <Check className="w-3 h-3" />
+                                            <span className="uppercase tracking-widest">Synced</span>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </div>
 
                             <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mb-2 w-full">
