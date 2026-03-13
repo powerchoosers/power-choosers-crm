@@ -386,6 +386,39 @@ export class ZohoMailService {
         throw new Error(`Zoho Attachment API error: ${lastStatus} - ${lastText}`);
     }
 
+    /**
+     * List attachments for a Zoho message.
+     * Zoho does not include attachment metadata in the content/summary responses,
+     * so this requires a separate API call to get filenames, IDs, sizes, etc.
+     */
+    async getMessageAttachments(userEmail, messageId, folderId = 'inbox') {
+        try {
+            const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail);
+            const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
+
+            const candidates = resolvedFolderId ? [
+                `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachments`,
+                `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments`,
+            ] : [
+                `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments`,
+            ];
+
+            for (const url of candidates) {
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+                });
+                if (response.ok) {
+                    const result = await response.json();
+                    return Array.isArray(result.data) ? result.data : [];
+                }
+            }
+            return [];
+        } catch (error) {
+            logger.warn(`[Zoho Mail] Attachment list error for ${messageId}:`, error, 'zoho-service');
+            return [];
+        }
+    }
+
     async initialize(userEmail) {
         // Now actually useful for pre-checking tokens
         try {
