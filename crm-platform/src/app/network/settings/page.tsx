@@ -838,30 +838,27 @@ export default function SettingsPage() {
                 size="sm" 
                 onClick={runDiagnostics}
                 disabled={isCheckingHealth}
-                className="nodal-glass border-white/5 text-zinc-400 hover:text-[#002FA7] hover:border-[#002FA7]/50 transition-all font-mono text-[10px]"
+                className="nodal-glass border-white/5 text-zinc-400 hover:text-white hover:border-white/20 transition-all font-mono text-[10px]"
               >
                 <RefreshCw className={cn("w-3 h-3 mr-2", isCheckingHealth && "animate-spin")} />
                 {isCheckingHealth ? 'RUNNING DIAGNOSTIC...' : 'INITIATE MATRIX SCAN'}
               </Button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
               {/* CORE ENGINE */}
-              <Card className="nodal-glass border-white/5 overflow-hidden">
-                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
-                      <Database className="w-3.5 h-3.5" /> Core Systems
-                    </CardTitle>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Operational</span>
-                    </div>
+              <Card className="nodal-glass border-white/5 overflow-hidden !p-0 !gap-0">
+                <CardHeader className="h-11 px-5 border-b border-white/5 bg-white/[0.03] flex items-center justify-between !p-0 !gap-0 !px-5">
+                  <CardTitle className="text-[10px] font-mono tracking-[0.2em] text-zinc-100 flex items-center gap-2.5 uppercase leading-none">
+                    <Database className="w-3.5 h-3.5 text-zinc-400" /> Core Systems
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-tight">Operational</span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-white/5">
-                    <div className="p-4 flex items-center justify-between">
+                <div className="divide-y divide-white/5">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Network className="w-4 h-4 text-zinc-400" />
@@ -874,7 +871,7 @@ export default function SettingsPage() {
                       <Badge variant="outline" className="border-white/10 text-[9px] font-mono text-emerald-500 uppercase bg-emerald-500/5">Primary</Badge>
                     </div>
 
-                    <div className="p-4 flex items-center justify-between">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Globe className="w-4 h-4 text-zinc-400" />
@@ -887,25 +884,21 @@ export default function SettingsPage() {
                       <Badge variant="outline" className="border-white/10 text-[9px] font-mono text-zinc-500 uppercase">Edge</Badge>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </Card>
 
               {/* COMMUNICATIONS */}
-              <Card className="nodal-glass border-white/5 overflow-hidden">
-                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
-                      <Radio className="w-3.5 h-3.5" /> Uplink Protocols
-                    </CardTitle>
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-blue-500 animate-pulse" : "bg-emerald-500")} />
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase">{isSyncing ? 'Transmitting' : 'Idle'}</span>
-                    </div>
+              <Card className="nodal-glass border-white/5 overflow-hidden !p-0 !gap-0">
+                <CardHeader className="h-11 px-5 border-b border-white/5 bg-white/[0.03] flex items-center justify-between !p-0 !gap-0 !px-5">
+                  <CardTitle className="text-[10px] font-mono tracking-[0.2em] text-zinc-100 flex items-center gap-2.5 uppercase leading-none">
+                    <Radio className="w-3.5 h-3.5 text-zinc-400" /> Uplink Protocols
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.4)] animate-pulse" : "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]")} />
+                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-tight">{isSyncing ? 'Transmitting' : 'Idle'}</span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-white/5">
-                    <div className="p-4 flex items-center justify-between">
+                <div className="divide-y divide-white/5">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Mail className="w-4 h-4 text-zinc-400" />
@@ -928,7 +921,7 @@ export default function SettingsPage() {
                       </Button>
                     </div>
 
-                    <div className="p-4 flex items-center justify-between">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Phone className="w-4 h-4 text-zinc-400" />
@@ -941,25 +934,21 @@ export default function SettingsPage() {
                       <div className="text-[9px] font-mono text-emerald-500 px-2 py-0.5 border border-emerald-500/20 bg-emerald-500/5 rounded">LIVE</div>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </Card>
 
               {/* INTELLIGENCE TIER */}
-              <Card className="nodal-glass border-white/5 overflow-hidden">
-                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
-                      <Brain className="w-3.5 h-3.5" /> Cognitive Engine
-                    </CardTitle>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Neural Ready</span>
-                    </div>
+              <Card className="nodal-glass border-white/5 overflow-hidden !p-0 !gap-0">
+                <CardHeader className="h-11 px-5 border-b border-white/5 bg-white/[0.03] flex items-center justify-between !p-0 !gap-0 !px-5">
+                  <CardTitle className="text-[10px] font-mono tracking-[0.2em] text-zinc-100 flex items-center gap-2.5 uppercase leading-none">
+                    <Brain className="w-3.5 h-3.5 text-zinc-400" /> Cognitive Engine
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-tight">Neural Ready</span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-white/5">
-                    <div className="p-4 flex items-center justify-between">
+                <div className="divide-y divide-white/5">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Fingerprint className="w-4 h-4 text-zinc-400" />
@@ -972,7 +961,7 @@ export default function SettingsPage() {
                       <Cpu className="w-3.5 h-3.5 text-zinc-700" />
                     </div>
 
-                    <div className="p-4 flex items-center justify-between">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Activity className="w-4 h-4 text-zinc-400" />
@@ -985,25 +974,21 @@ export default function SettingsPage() {
                       <Activity className="w-3.5 h-3.5 text-zinc-700" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </Card>
 
               {/* MARKET INFRASTRUCTURE */}
-              <Card className="nodal-glass border-white/5 overflow-hidden">
-                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
-                      <Zap className="w-3.5 h-3.5" /> Market Telemetry
-                    </CardTitle>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Grid Sync Active</span>
-                    </div>
+              <Card className="nodal-glass border-white/5 overflow-hidden !p-0 !gap-0">
+                <CardHeader className="h-11 px-5 border-b border-white/5 bg-white/[0.03] flex items-center justify-between !p-0 !gap-0 !px-5">
+                  <CardTitle className="text-[10px] font-mono tracking-[0.2em] text-zinc-100 flex items-center gap-2.5 uppercase leading-none">
+                    <Zap className="w-3.5 h-3.5 text-zinc-400" /> Market Telemetry
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                    <span className="text-[9px] font-mono text-zinc-400 uppercase tracking-tight">Grid Sync Active</span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y divide-white/5">
-                    <div className="p-4 flex items-center justify-between">
+                <div className="divide-y divide-white/5">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Network className="w-4 h-4 text-zinc-400" />
@@ -1018,7 +1003,7 @@ export default function SettingsPage() {
                       </Button>
                     </div>
 
-                    <div className="p-4 flex items-center justify-between">
+                    <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
                       <div className="flex items-center gap-3">
                         <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
                           <Globe className="w-4 h-4 text-zinc-400" />
@@ -1031,16 +1016,15 @@ export default function SettingsPage() {
                       <CheckCircle className="w-3.5 h-3.5 text-emerald-500/50" />
                     </div>
                   </div>
-                </CardContent>
-              </Card>
+                </Card>
             </div>
 
             {/* Diagnostics Console (Advanced) */}
-            <Card className="nodal-glass border-white/5">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-mono tracking-widest text-zinc-400 uppercase">Diagnostics Log</CardTitle>
+            <Card className="nodal-glass border-white/5 !p-0 !gap-0 overflow-hidden">
+              <CardHeader className="h-9 px-4 border-b border-white/5 bg-white/[0.03] flex items-center !p-0 !gap-0 !px-4">
+                <CardTitle className="text-[10px] font-mono tracking-widest text-zinc-400 uppercase leading-none">Diagnostics Log</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="py-4 px-4">
                 <div className="p-4 bg-black/40 rounded border border-white/5 font-mono text-[10px] min-h-[100px] text-zinc-500 space-y-1">
                   {diagData ? (
                     <>
