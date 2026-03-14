@@ -251,6 +251,9 @@ export default async function handler(req, res) {
                 .update({
                     status: 'sent',
                     type: 'sent',
+                    subject,
+                    html: htmlContent || '',
+                    text: textContent || '',
                     timestamp: new Date().toISOString(),
                     metadata: {
                         ...body.metadata,
