@@ -64,7 +64,7 @@ export default async function handler(req, res) {
         const tokenData = await tokenResponse.json();
 
         // Fetch Zoho Identity
-        const profileResponse = await fetch('https://mail.zoho.com/api/accounts', {
+        const profileResponse = await fetch('https://mail.zoho.com/api/v1/accounts', {
             headers: { 'Authorization': `Zoho-oauthtoken ${tokenData.access_token}` }
         });
 
