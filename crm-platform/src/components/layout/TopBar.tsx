@@ -20,6 +20,8 @@ import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
 import { useAccount } from '@/hooks/useAccounts'
 import { useQueryClient } from '@tanstack/react-query'
+import { playClick } from '@/lib/audio'
+import { forensicNotify } from '@/lib/notifications'
 
 function getDaysUntilJune() {
   const now = new Date();
@@ -299,14 +301,12 @@ export function TopBar() {
 
   const handleCall = useCallback(async () => {
     if (phoneNumber.length < 10) {
-      toast.error("Invalid Phone Number")
+      forensicNotify.warn("Invalid Phone Number")
       return
     }
 
     if (!selectedNumber) {
-      toast.error("No Caller ID selected", {
-        description: "Please select a phone number in Settings."
-      })
+      forensicNotify.warn("No Caller ID selected", "Please select a phone number in Settings.")
       return
     }
 
@@ -364,11 +364,7 @@ export function TopBar() {
 
   useEffect(() => {
     // Show toast on mount as a replacement for the "System Ready" indicator
-    toast.success("System Ready", {
-      description: "Connected to Nodal Point Network",
-      className: "bg-zinc-900 border-white/10 text-white",
-      duration: 4000,
-    })
+    forensicNotify.signal("System Ready", "Connected to Nodal Point Network")
   }, [])
 
   // Focus input when dialer opens
@@ -392,9 +388,10 @@ export function TopBar() {
   }, [isDialpadOpen])
 
   const handleRefresh = () => {
-    toast.info("Refreshing Data...")
+    playClick()
+    forensicNotify.update("Refreshing Data...")
     queryClient.invalidateQueries()
-    setTimeout(() => toast.success("Data Synced"), 600)
+    setTimeout(() => forensicNotify.signal("Data Synced"), 600)
   }
 
   const formatPhoneNumber = (value: string) => {
@@ -501,6 +498,11 @@ export function TopBar() {
     }
   }, [callHealth])
 
+  const handleDialClick = (digit: string) => {
+    playClick()
+    sendDigits(digit)
+  }
+
   return (
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
     <header className={cn(
@@ -555,7 +557,10 @@ export function TopBar() {
                 </div>
                 {isActive && (
                   <button
-                    onClick={() => setIsShowingCallBar(true)}
+                    onClick={() => {
+                      playClick()
+                      setIsShowingCallBar(true)
+                    }}
                   className="h-[50px] px-4 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all duration-300 shrink-0"
                     aria-label="Return to Call"
                   >
@@ -694,7 +699,10 @@ export function TopBar() {
                   {/* Right Sector: Intervention Triggers */}
                   <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-2">
                     <button
-                      onClick={() => setSentiment(sentiment === 'connect' ? null : 'connect')}
+                      onClick={() => {
+                        playClick()
+                        setSentiment(sentiment === 'connect' ? null : 'connect')
+                      }}
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'connect'
@@ -706,7 +714,10 @@ export function TopBar() {
                       <span>Connect</span>
                     </button>
                     <button
-                      onClick={() => setSentiment(sentiment === 'interest' ? null : 'interest')}
+                      onClick={() => {
+                        playClick()
+                        setSentiment(sentiment === 'interest' ? null : 'interest')
+                      }}
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'interest'
@@ -718,7 +729,10 @@ export function TopBar() {
                       <span>Interest</span>
                     </button>
                     <button
-                      onClick={() => setSentiment(sentiment === 'lock' ? null : 'lock')}
+                      onClick={() => {
+                        playClick()
+                        setSentiment(sentiment === 'lock' ? null : 'lock')
+                      }}
                       className={cn(
                         "flex items-center gap-1.5 px-3 py-1 h-8 rounded-lg text-[10px] font-mono tracking-widest uppercase transition-all border",
                         sentiment === 'lock'
@@ -735,7 +749,10 @@ export function TopBar() {
                     <div className="relative" ref={dialpadContainerRef}>
                       <button
                         type="button"
-                        onClick={() => setIsDialpadOpen(!isDialpadOpen)}
+                        onClick={() => {
+                          playClick()
+                          setIsDialpadOpen(!isDialpadOpen)
+                        }}
                         className={cn(
                           "icon-button-forensic p-1.5 rounded-[12px] focus:outline-none focus-visible:ring-0",
                           isDialpadOpen && "text-white [&_svg]:scale-[1.15]"
@@ -774,9 +791,7 @@ export function TopBar() {
                                 <button
                                   key={item.digit}
                                   type="button"
-                                  onClick={() => {
-                                    sendDigits(item.digit);
-                                  }}
+                                  onClick={() => handleDialClick(item.digit)}
                                 className="h-12 rounded-xl bg-zinc-950/40 border border-white/10 hover:bg-zinc-950/60 hover:border-white/20 text-zinc-200 font-mono text-base transition-colors active:scale-95 flex flex-col items-center justify-center gap-0.5"
                                 >
                                   <span className="leading-none">{item.digit}</span>

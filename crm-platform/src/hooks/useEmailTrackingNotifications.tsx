@@ -4,6 +4,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { Eye, MousePointer2 } from 'lucide-react'
+import { playPing } from '@/lib/audio'
+import { useUIStore } from '@/store/uiStore'
 
 /**
  * Listens for real-time email tracking updates (opens/clicks) via Supabase Realtime.
@@ -96,12 +98,15 @@ export function useEmailTrackingNotifications() {
             );
           });
 
+          const soundEnabled = useUIStore.getState().soundEnabled
+
           // Format recipient info
           const recipient = Array.isArray(email.to) ? email.to[0] : 'recipient'
           const subject = email.subject?.slice(0, 35) || 'your email'
           const subjectTruncated = email.subject && email.subject.length > 35 ? '...' : ''
 
           if (clicked) {
+            if (soundEnabled) playPing()
             toast.success(
               <div className="flex items-center gap-2">
                 <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
@@ -113,6 +118,7 @@ export function useEmailTrackingNotifications() {
               { duration: 5000 }
             )
           } else if (opened) {
+            if (soundEnabled) playPing()
             toast.success(
               <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-emerald-400" />
