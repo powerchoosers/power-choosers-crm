@@ -397,9 +397,12 @@ export class ZohoMailService {
             const resolvedFolderId = await this.resolveFolderId(userEmail, accessToken, accountId, folderId);
 
             const candidates = resolvedFolderId ? [
+                `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachmentinfo`,
                 `${this.baseUrl}/accounts/${accountId}/folders/${resolvedFolderId}/messages/${messageId}/attachments`,
+                `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachmentinfo`,
                 `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments`,
             ] : [
+                `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachmentinfo`,
                 `${this.baseUrl}/accounts/${accountId}/messages/${messageId}/attachments`,
             ];
 
@@ -409,6 +412,10 @@ export class ZohoMailService {
                 });
                 if (response.ok) {
                     const result = await response.json();
+                    // Handle both /attachments (usually direct array) and /attachmentinfo (nested in .data.attachments)
+                    if (result.data?.attachments) {
+                        return result.data.attachments;
+                    }
                     return Array.isArray(result.data) ? result.data : [];
                 }
             }

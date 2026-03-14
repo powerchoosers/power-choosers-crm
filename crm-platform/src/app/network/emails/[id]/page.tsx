@@ -9,6 +9,7 @@ import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, S
 import { format } from 'date-fns'
 import { playClick } from '@/lib/audio'
 import { EmailContent } from '@/components/emails/EmailContent'
+import { generateNodalSignature } from '@/lib/signature'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -302,13 +303,26 @@ export default function EmailDetailPage() {
     .flatMap((message: Email) => {
       const fromCandidate = extractValidAddress(message.from)
       const toCandidates = (Array.isArray(message.to) ? message.to : [message.to]).map((addr) => extractValidAddress(String(addr || '')))
-      return [fromCandidate, ...toCandidates]
+      const replyToCandidate = extractValidAddress((message as any)?.metadata?.['reply-to'] || (message as any)?.metadata?.replyTo)
+      
+      // NEW: Look up contact email if raw sender address is missing or is just a name
+      const contactCandidate = message.contactId ? extractValidAddress(contactById[message.contactId]?.email) : ''
+      
+      return [replyToCandidate, fromCandidate, contactCandidate, ...toCandidates]
     })
-    .find((address: string) => Boolean(address) && address !== currentUserEmail) || ''
+    .find((address: string) => Boolean(address) && address.toLowerCase() !== currentUserEmail) || ''
+
   const resolveReplyDefaults = (mode: ComposerMode, message: Email) => {
-    const parsedFrom = parseMailbox(message.from || '')
-    const fromAddress = extractValidAddress(parsedFrom.address || message.from)
+    const rawReplyTo = (message as any)?.metadata?.['reply-to'] || (message as any)?.metadata?.replyTo
+    
+    // Primary resolution: metadata reply-to -> from string -> contact database -> metadata fromAddress
+    const fromAddress = extractValidAddress(rawReplyTo || message.from)
+      || (message.contactId ? extractValidAddress(contactById[message.contactId]?.email) : '')
       || extractValidAddress((message as any)?.metadata?.fromAddress)
+    
+    // Safety check: if fromAddress is us (the user), we need to look at who we sent it to
+    const isFromUs = fromAddress && fromAddress.toLowerCase() === currentUserEmail
+    
     const toListForMessage = normalizeRecipients(message.to)
     const ccListForMessage = messageCcValues(message)
     const nonSelf = (address: string) => address && address.toLowerCase() !== currentUserEmail
@@ -324,7 +338,7 @@ export default function EmailDetailPage() {
 
     if (mode === 'reply_all') {
       const participantPool = dedupe([fromAddress, ...toListForMessage, ...ccListForMessage].filter(Boolean) as string[])
-      const primaryTo = message.type === 'received'
+      const primaryTo = message.type === 'received' && !isFromUs
         ? (fromAddress && nonSelf(fromAddress) ? fromAddress : participantPool[0] || '')
         : (toListForMessage.find(nonSelf) || participantPool[0] || inferredCounterparty || '')
       const ccPool = dedupe([
@@ -338,9 +352,10 @@ export default function EmailDetailPage() {
       }
     }
 
-    const singleReplyTo = message.type === 'received'
+    const singleReplyTo = (message.type === 'received' && !isFromUs)
       ? (fromAddress || inferredCounterparty || resolvedReplyAddress || '')
       : (toListForMessage.find(nonSelf) || inferredCounterparty || resolvedReplyAddress || '')
+
     return {
       to: singleReplyTo,
       cc: '',
@@ -454,8 +469,16 @@ export default function EmailDetailPage() {
     return `${detailLines.join('')}<div style="margin-top: 12px;">${getMessageBodyHtml(message)}</div>`
   }
 
-  const openComposerForMessage = (mode: ComposerMode, message?: Email) => {
-    const target = message || threadEmails.find((threadEmail: Email) => threadEmail.id === expandedThreadId) || email
+   const openComposerForMessage = (mode: ComposerMode, message?: Email) => {
+    // 1. Target the passed message (from individual button, if any remain)
+    // 2. Target the currently expanded message in the thread
+    // 3. Fallback to the absolute latest message in the thread (threadEmails[0] is sorted desc)
+    // 4. Final fallback to the root email object
+    const target = message 
+      || threadEmails.find((t) => t.id === expandedThreadId) 
+      || threadEmails[0] 
+      || email
+
     if (!target) return
     const defaults = resolveReplyDefaults(mode, target)
     setComposerMode(mode)
@@ -464,7 +487,9 @@ export default function EmailDetailPage() {
     setDraftCc(defaults.cc)
     setShowCc(Boolean(defaults.cc))
     setDraftSubject(defaults.subject)
-    setReplyHtml('')
+
+    // Clear content but DON'T inject signature here anymore (we show it below)
+    setReplyHtml('<p></p>') 
     setReplyAttachments([])
     setIsReplyOpen(true)
   }
@@ -514,10 +539,12 @@ export default function EmailDetailPage() {
     try {
       const firstName = profile?.firstName || profile?.name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Nodal Point'
       const fromName = `${firstName} • Nodal Point`
-      const finalHtml = composerMode === 'forward'
-        ? `${replyHtml}${buildForwardedMessage(targetMessage)}`
-        : `${replyHtml}${buildQuotedThread(targetMessage)}`
       const quoteText = stripHtml(targetMessage.text || targetMessage.snippet || '')
+
+      const outgoingSignature = profile ? generateNodalSignature(profile, user, false) : ''
+      const finalHtml = composerMode === 'forward'
+        ? `${replyHtml}<div style="margin-top: 24px;">${outgoingSignature}</div>${buildForwardedMessage(targetMessage)}`
+        : `${replyHtml}<div style="margin-top: 24px;">${outgoingSignature}</div>${buildQuotedThread(targetMessage)}`
 
       const encodedAttachments = await Promise.all(
         replyAttachments.map(async (file) => {
@@ -609,12 +636,12 @@ export default function EmailDetailPage() {
       {/* Email Content */}
       <div className="flex-1 bg-zinc-950 border border-white/10 rounded-2xl overflow-hidden flex flex-col relative shadow-2xl">
         <div className="flex-none p-8 border-b border-white/5 space-y-6 nodal-module-glass">
-          <div className="space-y-1">
+          <div className="flex items-start justify-between gap-6">
             <h1 className="text-3xl font-semibold text-white tracking-tighter leading-tight">{email.subject}</h1>
-            <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-md bg-black/40 px-2 py-1 text-xs font-medium text-zinc-400 ring-1 ring-inset ring-white/10">
-                    {isOutboundEmail ? 'Sent' : 'Inbox'}
-                </span>
+            <div className="flex-shrink-0 pt-1">
+              <span className="inline-flex items-center rounded-md bg-zinc-950 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.2em] font-semibold text-zinc-500 ring-1 ring-inset ring-white/10 shadow-sm">
+                {isOutboundEmail ? 'Sent' : 'Inbox'}
+              </span>
             </div>
           </div>
 
@@ -844,6 +871,16 @@ export default function EmailDetailPage() {
                       className="min-h-[140px]"
                       autoFocus
                     />
+
+                    {/* Forensic Signature Reveal */}
+                    {profile && composerMode !== 'forward' && (
+                      <div className="mt-8 pt-6 border-t border-white/5 opacity-80 pointer-events-none select-none overflow-hidden">
+                        <div 
+                          className="scale-90 origin-left"
+                          dangerouslySetInnerHTML={{ __html: generateNodalSignature(profile, user, true) }} 
+                        />
+                      </div>
+                    )}
                     {replyAttachments.length > 0 ? (
                       <div className="mt-3 space-y-2">
                         {replyAttachments.map((file, idx) => (
@@ -870,7 +907,7 @@ export default function EmailDetailPage() {
                     <Button variant="ghost" onClick={() => setIsReplyOpen(false)} className="text-zinc-400 hover:text-white hover:bg-white/5">
                       Cancel
                     </Button>
-                    <Button onClick={handleSend} disabled={isSendingReply} className="bg-white text-zinc-950 hover:bg-zinc-200 min-w-[130px]">
+                    <Button onClick={handleSend} disabled={isSendingReply} className="bg-[#002FA7] text-white hover:bg-[#002FA7]/90 min-w-[130px] shadow-[0_0_15px_-5px_#002FA7]">
                       {isSendingReply ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
                       {composerMode === 'forward' ? 'Send Forward' : 'Send Reply'}
                     </Button>
@@ -1026,32 +1063,7 @@ export default function EmailDetailPage() {
                               className="overflow-hidden border-t border-white/5"
                             >
                               <div className="bg-zinc-900/80 p-4 space-y-4">
-                                <div className="flex items-center justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => openComposerForMessage('reply', threadEmail)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 transition-colors"
-                                  >
-                                    <Reply className="w-3.5 h-3.5" />
-                                    Reply
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openComposerForMessage('reply_all', threadEmail)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 transition-colors"
-                                  >
-                                    <ReplyAll className="w-3.5 h-3.5" />
-                                    Reply all
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => openComposerForMessage('forward', threadEmail)}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-300 transition-colors"
-                                  >
-                                    <Forward className="w-3.5 h-3.5" />
-                                    Forward
-                                  </button>
-                                </div>
+
                                 <EmailContent
                                   html={threadEmail.html}
                                   text={threadEmail.text}
@@ -1121,24 +1133,21 @@ export default function EmailDetailPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => openComposerForMessage('reply')}
-              className="inline-flex items-center justify-center gap-2.5 bg-white text-zinc-950 hover:bg-zinc-200 font-medium h-11 px-5 rounded-xl transition-all shadow-[0_0_30px_-5px_rgba(255,255,255,0.1)] hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.4)]"
-              title="Reply to latest message"
+              className="inline-flex items-center justify-center gap-2.5 bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-medium h-11 px-6 rounded-xl transition-all shadow-[0_0_20px_-5px_#002FA7] hover:shadow-[0_0_30px_-2px_#002FA7]/50 active:scale-[0.98]"
             >
               <Reply className="w-4 h-4" />
               Reply
             </button>
             <button
               onClick={() => openComposerForMessage('reply_all')}
-              className="inline-flex items-center justify-center gap-2 bg-black/30 border border-white/10 hover:bg-black/40 text-zinc-200 font-medium h-11 px-4 rounded-xl transition-all"
-              title="Reply all to latest message"
+              className="inline-flex items-center justify-center gap-2 nodal-glass hover:bg-white/5 text-zinc-200 font-medium h-11 px-5 rounded-xl transition-all active:scale-[0.98]"
             >
               <ReplyAll className="w-4 h-4" />
               Reply all
             </button>
             <button
               onClick={() => openComposerForMessage('forward')}
-              className="inline-flex items-center justify-center gap-2 bg-black/30 border border-white/10 hover:bg-black/40 text-zinc-200 font-medium h-11 px-4 rounded-xl transition-all"
-              title="Forward latest message"
+              className="inline-flex items-center justify-center gap-2 nodal-glass hover:bg-white/5 text-zinc-200 font-medium h-11 px-5 rounded-xl transition-all active:scale-[0.98]"
             >
               <Forward className="w-4 h-4" />
               Forward
