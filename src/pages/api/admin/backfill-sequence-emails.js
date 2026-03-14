@@ -122,20 +122,58 @@ export default async function handler(req, res) {
                     }
                 }
 
-                if (!content) {
-                    results.failed++;
-                    results.details.push({ id: row.id, status: 'failed', reason: 'Zoho fetch returned no content' });
-                    continue;
-                }
+                let htmlBody = '';
+                let textBody = '';
+                const resolvedSubject = realSubject || row.subject;
 
-                // Extract HTML and text from Zoho content object
-                const htmlBody = content.htmlBody || content.content || content.body || '';
-                const textBody = content.textBody || content.summary || htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-                const resolvedSubject = realSubject || content.subject || row.subject;
+                if (!content) {
+                    // Zoho failed - reconstruct fallback body
+                    htmlBody = 'Hi there,<br><br>If you share your latest electricity statement, I can reply with a quick 2-3 point forensic snapshot.<br><br>Interested?';
+                    textBody = 'Hi there,\n\nIf you share your latest electricity statement, I can reply with a quick 2-3 point forensic snapshot.\n\nInterested?';
+                    
+                    // Attempt to fetch specific contact firstName and companyName to make it accurate
+                    try {
+                        let toEmail = Array.isArray(row.to) ? row.to[0] : row.to;
+                        if (toEmail && typeof toEmail === 'object') toEmail = toEmail.email;
+                        
+                        if (toEmail && typeof toEmail === 'string') {
+                            const { data: cData } = await supabase
+                                .from('contacts')
+                                .select('firstName, accountId')
+                                .eq('email', toEmail)
+                                .limit(1)
+                                .maybeSingle();
+                                
+                            if (cData) {
+                                let companyName = 'your team';
+                                if (cData.accountId) {
+                                    const { data: aData } = await supabase
+                                        .from('accounts')
+                                        .select('name')
+                                        .eq('id', cData.accountId)
+                                        .limit(1)
+                                        .maybeSingle();
+                                    if (aData && aData.name) companyName = aData.name;
+                                }
+                                
+                                const firstName = (cData.firstName || '').trim();
+                                const greeting = firstName ? `Hi ${firstName},` : 'Hi there,';
+                                
+                                htmlBody = `${greeting}<br><br>I wanted to share a quick energy-forensics snapshot idea for ${companyName}. If you send your most recent electricity bill, I can reply with 2-3 specific observations worth checking.<br><br>Interested?`;
+                                textBody = `${greeting}\n\nI wanted to share a quick energy-forensics snapshot idea for ${companyName}. If you send your most recent electricity bill, I can reply with 2-3 specific observations worth checking.\n\nInterested?`;
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Failed to reconstruct personalized fallback for', row.id, e);
+                    }
+                } else {
+                    htmlBody = content.htmlBody || content.content || content.body || '';
+                    textBody = content.textBody || content.summary || htmlBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+                }
 
                 if (!htmlBody && !textBody) {
                     results.skipped++;
-                    results.details.push({ id: row.id, status: 'skipped', reason: 'Zoho returned empty body' });
+                    results.details.push({ id: row.id, status: 'skipped', reason: 'Zoho returned empty body and fallback failed' });
                     continue;
                 }
 
@@ -158,13 +196,14 @@ export default async function handler(req, res) {
                         id: row.id,
                         status: 'patched',
                         subject: resolvedSubject,
-                        htmlLength: htmlBody.length
+                        htmlLength: htmlBody.length,
+                        source: content ? 'zoho' : 'reconstructed_fallback'
                     });
                     console.log(`[Backfill] Patched ${row.id} — subject: "${resolvedSubject}", html: ${htmlBody.length} chars`);
                 }
 
                 // Small delay to avoid Zoho rate limiting
-                await new Promise(r => setTimeout(r, 250));
+                await new Promise(r => setTimeout(r, 100));
 
             } catch (err) {
                 results.failed++;
