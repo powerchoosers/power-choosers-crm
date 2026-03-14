@@ -9,12 +9,16 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw } from 'lucide-react'
+import { Badge } from "@/components/ui/badge"
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu } from 'lucide-react'
+import { useSyncStore } from '@/store/syncStore'
+import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useUIStore } from '@/store/uiStore'
 
 export default function SettingsPage() {
   const { user, profile, role, refreshProfile } = useAuth()
@@ -38,6 +42,42 @@ export default function SettingsPage() {
   const [newNumber, setNewNumber] = useState('')
   const [newNumberName, setNewNumberName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+
+  // UI Store Sound Settings
+  const { 
+    soundEnabled, setSoundEnabled,
+    soundIncomingEnabled, setSoundIncomingEnabled,
+    soundActionEnabled, setSoundActionEnabled,
+    soundNavigationEnabled, setSoundNavigationEnabled,
+    soundCriticalEnabled, setSoundCriticalEnabled
+  } = useUIStore()
+
+  // Sync Store & Hook
+  const { lastSyncTime, syncCount, isSyncing: storeSyncing } = useSyncStore()
+  const { performSync, isSyncing: hookSyncing } = useZohoSync()
+  const isSyncing = storeSyncing || hookSyncing
+
+  // Diagnostics State
+  const [diagData, setDiagData] = useState<any>(null)
+  const [isCheckingHealth, setIsCheckingHealth] = useState(false)
+
+  const runDiagnostics = async () => {
+    setIsCheckingHealth(true)
+    try {
+      const res = await fetch('/api/debug/health')
+      const data = await res.json()
+      setDiagData(data)
+      toast.success('Matrix Diagnostic Complete')
+    } catch (err) {
+      toast.error('Diagnostic Fault Detected')
+    } finally {
+      setIsCheckingHealth(false)
+    }
+  }
+
+  useEffect(() => {
+    if (diagData === null) runDiagnostics()
+  }, [])
 
   // Email Connections
   const [connections, setConnections] = useState<any[]>([])
@@ -684,57 +724,344 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="integrations" className="space-y-6 mt-0">
-            <Card className="nodal-glass">
+          <TabsContent value="display" className="space-y-6 mt-0">
+            <Card className="nodal-glass border-white/5">
               <CardHeader>
-                <CardTitle className="text-zinc-100">API Integrations</CardTitle>
-                <CardDescription className="text-zinc-500">Manage your connected services.</CardDescription>
+                <CardTitle className="text-zinc-100 flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-[#002FA7]" />
+                  Interface & Audio
+                </CardTitle>
+                <CardDescription className="text-zinc-500">Customize the sensory experience of the Nodal Point network.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
-                      <Database className="w-5 h-5" />
+              <CardContent className="space-y-8">
+                {/* Audio Engine Settings */}
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <h4 className="text-sm font-medium text-zinc-200">Forensic Audio Engine</h4>
+                      <p className="text-xs text-zinc-500">Master toggle for synthesized audio feedback.</p>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Supabase</p>
-                      <p className="text-xs text-zinc-500">Connected (Active)</p>
+                    <Switch 
+                      checked={soundEnabled} 
+                      onCheckedChange={setSoundEnabled}
+                      className="data-[state=checked]:bg-[#002FA7]" 
+                    />
+                  </div>
+                  
+                  <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-4 transition-all duration-500", !soundEnabled && "opacity-30 grayscale pointer-events-none")}>
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Tactical Pings</Label>
+                        <Switch 
+                          checked={soundIncomingEnabled} 
+                          onCheckedChange={setSoundIncomingEnabled}
+                          className="data-[state=checked]:bg-[#002FA7]" 
+                        />
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed italic">Emails, contract opens, and real-time tracking signals.</p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Action Clicks</Label>
+                        <Switch 
+                          checked={soundActionEnabled} 
+                          onCheckedChange={setSoundActionEnabled}
+                          className="data-[state=checked]:bg-[#002FA7]" 
+                        />
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed italic">High-intent transmissions and forensic data generation.</p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Navigation Pulses</Label>
+                        <Switch 
+                          checked={soundNavigationEnabled} 
+                          onCheckedChange={setSoundNavigationEnabled}
+                          className="data-[state=checked]:bg-[#002FA7]" 
+                        />
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed italic">Subtle sine-based feedback for menu transitions.</p>
+                    </div>
+
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-mono uppercase tracking-widest text-zinc-400">Critical Alerts</Label>
+                        <Switch 
+                          checked={soundCriticalEnabled} 
+                          onCheckedChange={setSoundCriticalEnabled}
+                          className="data-[state=checked]:bg-[#002FA7]" 
+                        />
+                      </div>
+                      <p className="text-[10px] text-zinc-500 leading-relaxed italic">Liability warnings and system-critical klaxons.</p>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">DB Stats</Button>
                 </div>
 
-                <div className="flex items-center justify-between p-4 rounded-lg nodal-glass nodal-glass-hover">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-red-500/20 flex items-center justify-center text-red-500">
-                      <Phone className="w-5 h-5" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Twilio</p>
-                      <p className="text-xs text-zinc-500 font-mono tabular-nums">{twilioNumbers.length > 0 ? 'Connected' : 'Not Configured'}</p>
-                    </div>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => document.querySelector('[value="profile"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))}
-                    className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5"
-                  >
-                    Manage Numbers
-                  </Button>
-                </div>
+                <Separator className="bg-white/5" />
 
-                <div className="flex items-center justify-between p-4 rounded-lg bg-transparent border border-white/5">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-10 h-10 rounded-2xl bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
-                      <Database className="w-5 h-5" />
+                {/* Aesthetic Themes */}
+                <div className="space-y-4 opacity-70">
+                  <div className="space-y-0.5">
+                    <h4 className="text-sm font-medium text-zinc-200">Aesthetic Protocols</h4>
+                    <p className="text-xs text-zinc-500">Visual system overrides (Experimental).</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="aspect-square rounded-lg border border-[#002FA7] bg-[#002FA7]/5 p-2 flex flex-col justify-end transition-all">
+                       <span className="text-[9px] font-mono text-white">OBSIDIAN</span>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-200">Stripe</p>
-                      <p className="text-xs text-zinc-500">Not Connected</p>
+                    <div className="aspect-square rounded-lg border border-white/5 bg-white/[0.01] p-2 flex flex-col justify-end grayscale cursor-not-allowed hover:bg-white/[0.02] transition-colors">
+                       <span className="text-[9px] font-mono text-zinc-600">MONOCHROME</span>
+                    </div>
+                    <div className="aspect-square rounded-lg border border-white/5 bg-white/[0.01] p-2 flex flex-col justify-end grayscale cursor-not-allowed hover:bg-white/[0.02] transition-colors">
+                       <span className="text-[9px] font-mono text-zinc-600">HIGH CONTRAST</span>
                     </div>
                   </div>
-                  <Button variant="outline" size="sm" className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5">Connect</Button>
+                  <p className="text-[10px] text-zinc-600 font-mono italic flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> System locked to Obsidian Void [v1.0]
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="integrations" className="space-y-6 mt-0">
+            <div className="flex items-center justify-between mb-2">
+              <div className="space-y-0.5">
+                <h3 className="text-lg font-medium text-zinc-100 font-sans tracking-tight">Integration Matrix</h3>
+                <p className="text-xs text-zinc-500 font-mono uppercase tracking-wider">Connected Infrastructure & API Endpoints</p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={runDiagnostics}
+                disabled={isCheckingHealth}
+                className="nodal-glass border-white/5 text-zinc-400 hover:text-[#002FA7] hover:border-[#002FA7]/50 transition-all font-mono text-[10px]"
+              >
+                <RefreshCw className={cn("w-3 h-3 mr-2", isCheckingHealth && "animate-spin")} />
+                {isCheckingHealth ? 'RUNNING DIAGNOSTIC...' : 'INITIATE MATRIX SCAN'}
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* CORE ENGINE */}
+              <Card className="nodal-glass border-white/5 overflow-hidden">
+                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
+                      <Database className="w-3.5 h-3.5" /> Core Systems
+                    </CardTitle>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Operational</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/5">
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Network className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">Supabase DB</p>
+                          <p className="text-[10px] text-zinc-500 font-mono tracking-tighter">gfitvnkaevozbcyostez.supabase.co</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="border-white/10 text-[9px] font-mono text-emerald-500 uppercase bg-emerald-500/5">Primary</Badge>
+                    </div>
+
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Globe className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">Vercel Deployment</p>
+                          <p className="text-[10px] text-zinc-500 font-mono tracking-tighter">{diagData?.vercelUrl || 'nodalpoint.io'}</p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="border-white/10 text-[9px] font-mono text-zinc-500 uppercase">Edge</Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* COMMUNICATIONS */}
+              <Card className="nodal-glass border-white/5 overflow-hidden">
+                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
+                      <Radio className="w-3.5 h-3.5" /> Uplink Protocols
+                    </CardTitle>
+                    <div className="flex items-center gap-1.5">
+                      <div className={cn("w-1.5 h-1.5 rounded-full", isSyncing ? "bg-blue-500 animate-pulse" : "bg-emerald-500")} />
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase">{isSyncing ? 'Transmitting' : 'Idle'}</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/5">
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Mail className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">Zoho Mail API</p>
+                          <p className="text-[10px] text-zinc-500 font-mono">
+                            {lastSyncTime ? `Last Check: ${new Date(lastSyncTime).toLocaleTimeString()}` : 'No recent sync'}
+                          </p>
+                        </div>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => performSync()}
+                        disabled={isSyncing}
+                        className="h-7 w-7 text-zinc-500 hover:text-white hover:bg-white/5"
+                      >
+                        <RefreshCw className={cn("w-3.5 h-3.5", isSyncing && "animate-spin")} />
+                      </Button>
+                    </div>
+
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Phone className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">Twilio Voice</p>
+                          <p className="text-[10px] text-zinc-500 font-mono">Forensic Call Engine Active</p>
+                        </div>
+                      </div>
+                      <div className="text-[9px] font-mono text-emerald-500 px-2 py-0.5 border border-emerald-500/20 bg-emerald-500/5 rounded">LIVE</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* INTELLIGENCE TIER */}
+              <Card className="nodal-glass border-white/5 overflow-hidden">
+                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
+                      <Brain className="w-3.5 h-3.5" /> Cognitive Engine
+                    </CardTitle>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Neural Ready</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/5">
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Fingerprint className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">Gemini Neural Network</p>
+                          <p className="text-[10px] text-zinc-500 font-mono">1.5 Pro Flash System active</p>
+                        </div>
+                      </div>
+                      <Cpu className="w-3.5 h-3.5 text-zinc-700" />
+                    </div>
+
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Activity className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">AssemblyAI Transcription</p>
+                          <p className="text-[10px] text-zinc-500 font-mono">Real-time Call Intelligence</p>
+                        </div>
+                      </div>
+                      <Activity className="w-3.5 h-3.5 text-zinc-700" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* MARKET INFRASTRUCTURE */}
+              <Card className="nodal-glass border-white/5 overflow-hidden">
+                <CardHeader className="pb-3 border-b border-white/5 bg-white/[0.01]">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-[11px] font-mono tracking-widest text-[#002FA7] flex items-center gap-2 uppercase">
+                      <Zap className="w-3.5 h-3.5" /> Market Telemetry
+                    </CardTitle>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase">Grid Sync Active</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-white/5">
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Network className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">ERCOT ISO Feed</p>
+                          <p className="text-[10px] text-zinc-500 font-mono">SCED Pricing & Scarcity Signals</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => router.push('/network/telemetry')} className="h-7 w-7 text-zinc-500 hover:text-white">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+
+                    <div className="p-4 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                          <Globe className="w-4 h-4 text-zinc-400" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-zinc-200">EIA Retail API</p>
+                          <p className="text-[10px] text-zinc-500 font-mono">Open Data Governance Connected</p>
+                        </div>
+                      </div>
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-500/50" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Diagnostics Console (Advanced) */}
+            <Card className="nodal-glass border-white/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-xs font-mono tracking-widest text-zinc-400 uppercase">Diagnostics Log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 bg-black/40 rounded border border-white/5 font-mono text-[10px] min-h-[100px] text-zinc-500 space-y-1">
+                  {diagData ? (
+                    <>
+                      <div className="flex justify-between">
+                        <span className="text-zinc-600">[{diagData.serverTime}]</span>
+                        <span className="text-emerald-500">INIT_SUCCESS</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-1 mt-2">
+                        {Object.entries(diagData.envFlags || {}).map(([key, value]) => (
+                          <div key={key} className="flex justify-between border-b border-white/[0.02] pb-1">
+                            <span className="text-zinc-500 capitalize">{key.replace(/_/g, ' ').toLowerCase()}</span>
+                            <span className={cn(value ? "text-emerald-500/80" : "text-red-500/50")}>
+                              {value ? 'READY' : 'MISSING'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="animate-pulse">Waiting for manual matrix scan...</div>
+                  )}
                 </div>
               </CardContent>
             </Card>

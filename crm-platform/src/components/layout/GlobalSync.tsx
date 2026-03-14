@@ -196,6 +196,8 @@ export function GlobalSync() {
               attachments?: Array<unknown>
               hasAttachments?: boolean
             }
+            contactId?: string | null
+            accountId?: string | null
           }
 
           if (!email?.id) return
@@ -205,9 +207,11 @@ export function GlobalSync() {
 
           // Check against full owner scope (primary + shared inboxes like signal@nodalpoint.io)
           const ownerId = String(email.metadata?.ownerId || email.ownerId || '').toLowerCase()
+          const userEmail = String(user.email || '').toLowerCase()
           const scope = ownerScopeRef.current.length > 0
             ? ownerScopeRef.current
-            : [String(user.email || '').toLowerCase()]
+            : [userEmail]
+          
           if (ownerId && !scope.includes(ownerId)) return
 
           // Always refresh inbox queries on new inbound rows for this owner.
@@ -227,16 +231,31 @@ export function GlobalSync() {
           if (!senderEmail) return
 
           const selectColumns = 'id, email, name, firstName, lastName, metadata, accounts(name)'
-          const { data: ownedContact } = await supabase
-            .from('contacts')
-            .select(selectColumns)
-            .eq('ownerId', user.id)
-            .ilike('email', senderEmail)
-            .limit(1)
-            .maybeSingle()
+          let contact = null
 
-          let contact = ownedContact
+          // 1. Try resolving using contactId from the payload (set by sync record)
+          if (email.contactId) {
+            const { data: directContact } = await supabase
+              .from('contacts')
+              .select(selectColumns)
+              .eq('id', email.contactId)
+              .maybeSingle()
+            contact = directContact
+          }
 
+          // 2. Fallback to owner-specific lookup by email (Corrected: ownerId = email)
+          if (!contact) {
+            const { data: ownedContact } = await supabase
+              .from('contacts')
+              .select(selectColumns)
+              .eq('ownerId', userEmail)
+              .ilike('email', senderEmail)
+              .limit(1)
+              .maybeSingle()
+            contact = ownedContact
+          }
+
+          // 3. Fallback to shared contacts
           if (!contact) {
             const { data: sharedContact } = await supabase
               .from('contacts')
@@ -265,7 +284,7 @@ export function GlobalSync() {
             (Array.isArray(email.attachments) && email.attachments.length > 0)
           const photoUrl = resolveContactPhotoUrl(contact)
 
-          if (soundEnabled) playPing();
+          playPing();
           toast(
             <div className="flex items-start gap-3">
               <ContactAvatar name={name} photoUrl={photoUrl || undefined} size={32} />

@@ -4,6 +4,8 @@
  * Zero dependencies, no MP3 files to load, zero network latency.
  */
 
+import { useUIStore } from '@/store/uiStore';
+
 // Synthesizer utility
 const playSynth = (
   type: OscillatorType,
@@ -13,6 +15,9 @@ const playSynth = (
   vol: number = 0.5
 ) => {
   if (typeof window === 'undefined' || !window.AudioContext) return;
+  
+  // Check global master toggle
+  if (!useUIStore.getState().soundEnabled) return;
 
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -44,7 +49,9 @@ const playSynth = (
  * Used for receiving a new signal/message.
  */
 export const playPing = () => {
-  playSynth('sine', 880, 440, 0.4, 0.2);
+  if (useUIStore.getState().soundIncomingEnabled) {
+    playSynth('sine', 880, 440, 0.4, 0.2);
+  }
 };
 
 /**
@@ -52,7 +59,9 @@ export const playPing = () => {
  * A softer, sine-based sound for menu selections.
  */
 export const playNavigation = () => {
-  playSynth('sine', 440, 220, 0.08, 0.15);
+  if (useUIStore.getState().soundNavigationEnabled) {
+    playSynth('sine', 440, 220, 0.08, 0.15);
+  }
 };
 
 /**
@@ -60,7 +69,9 @@ export const playNavigation = () => {
  * Used for UI interactions like clicking buttons or toggles.
  */
 export const playClick = () => {
-  playSynth('square', 300, 50, 0.05, 0.1);
+  if (useUIStore.getState().soundActionEnabled) {
+    playSynth('square', 300, 50, 0.05, 0.1);
+  }
 };
 
 /**
@@ -68,9 +79,11 @@ export const playClick = () => {
  * Used for high-priority alerts (e.g. Demand ratchet exposure spike).
  */
 export const playAlert = () => {
-  playSynth('sawtooth', 200, 200, 0.8, 0.3);
-  // Double pulse
-  setTimeout(() => playSynth('sawtooth', 200, 200, 0.8, 0.3), 1000);
+  if (useUIStore.getState().soundCriticalEnabled) {
+    playSynth('sawtooth', 200, 200, 0.8, 0.3);
+    // Double pulse
+    setTimeout(() => playSynth('sawtooth', 200, 200, 0.8, 0.3), 1000);
+  }
 };
 
 /**
@@ -78,5 +91,7 @@ export const playAlert = () => {
  * Standard low-frequency background telemetry thud.
  */
 export const playThud = () => {
-  playSynth('sine', 150, 40, 0.2, 0.3);
+  if (useUIStore.getState().soundIncomingEnabled) {
+    playSynth('sine', 150, 40, 0.2, 0.3);
+  }
 };
