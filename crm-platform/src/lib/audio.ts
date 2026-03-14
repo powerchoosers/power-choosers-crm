@@ -48,6 +48,14 @@ export const playPing = () => {
 };
 
 /**
+ * Navigation Transition
+ * A softer, sine-based sound for menu selections.
+ */
+export const playNavigation = () => {
+  playSynth('sine', 440, 220, 0.08, 0.15);
+};
+
+/**
  * Forensic Click
  * Used for UI interactions like clicking buttons or toggles.
  */

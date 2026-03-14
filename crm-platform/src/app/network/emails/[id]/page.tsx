@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, Eye, MousePointer2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { playClick } from '@/lib/audio'
 import { EmailContent } from '@/components/emails/EmailContent'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { useState, useEffect, useRef } from 'react'
@@ -508,6 +509,7 @@ export default function EmailDetailPage() {
       return
     }
 
+    playClick()
     setIsSendingReply(true)
     try {
       const firstName = profile?.firstName || profile?.name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Nodal Point'

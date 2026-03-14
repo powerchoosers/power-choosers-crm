@@ -10,6 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useEmails } from '@/hooks/useEmails'
 import { useAuth } from '@/context/AuthContext'
 import { generateNodalSignature } from '@/lib/signature'
+import { playClick, playPing, playAlert, playThud } from '@/lib/audio'
 import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap, Type, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, Palette } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -25,6 +26,7 @@ import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { RichTextEditor } from './RichTextEditor'
 import type { Editor } from '@tiptap/react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { format } from 'date-fns'
 
 const EMAIL_AI_MODELS = [
   { value: 'google/gemini-2.5-flash', label: 'GEMINI-2.5-FLASH' },
@@ -891,7 +893,7 @@ function SearchResultsDropdown({
                     </>
                   )}
                 </div>
-              </div>
+              </div >
             </button>
           ))}
         </div>
@@ -1306,7 +1308,7 @@ Rules:
 - Use sentence case, not title case.
 - Avoid cliches/templates: "following up", "quick follow-up", "checking in", "touching base".
 - Do not start with: "follow-up", "following up", "quick follow-up", "next step".
-- Must include at least one concrete topic from BODY (e.g. rates, agreement, proposal, locations).
+- Must include at least one concrete topic from BODY (e.g. rates, agreement, proposal, next step).
 - No quotes, no markdown, no explanation.
 - Output one plain text subject line only.`,
               },
@@ -1433,6 +1435,7 @@ Return exactly one subject line.`,
     if (!selectedFoundryId) return
 
     const loadTemplate = async () => {
+      playClick()
       setIsLoadingTemplate(true)
       try {
         const idToken = await (async () => {
@@ -1701,6 +1704,7 @@ Return exactly one subject line.`,
       })
     )
 
+    playClick()
     sendEmail(
       {
         to,
