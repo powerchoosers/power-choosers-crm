@@ -74,7 +74,7 @@ function extractZohoAttachments(summary, content, messageId) {
         return {
             filename: att?.attachmentName || att?.fileName || att?.name || `Attachment-${idx + 1}`,
             mimeType: att?.contentType || att?.mimeType || att?.type || 'application/octet-stream',
-            size: typeof att?.size === 'number' ? att.size : Number(att?.size || 0),
+            size: typeof att?.size === 'number' ? att.size : Number(att?.size || att?.attachmentSize || 0),
             attachmentId,
             messageId: String(messageId),
             provider: 'zoho',
@@ -96,11 +96,13 @@ function hasAttachmentsInPayload(summary, content, attachmentMeta) {
     if (Array.isArray(attachmentMeta) && attachmentMeta.length > 0) return true;
     const summaryCount = Number(summary?.attachmentCount || summary?.attachmentsCount || 0);
     const contentCount = Number(content?.attachmentCount || content?.attachmentsCount || content?.data?.attachmentCount || 0);
-    return Boolean(
-        summary?.hasAttachments ||
-        summary?.hasAttachment ||
-        content?.hasAttachments ||
-        content?.hasAttachment ||
+    return (
+        summary?.hasAttachments === true ||
+        summary?.hasAttachment === "1" ||
+        summary?.hasAttachment === true ||
+        content?.hasAttachments === true ||
+        content?.hasAttachment === "1" ||
+        content?.hasAttachment === true ||
         summaryCount > 0 ||
         contentCount > 0
     );
@@ -479,7 +481,7 @@ export default async function handler(req, res) {
                                 const normalizedAttachments = attList.map((att, idx) => ({
                                     filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
                                     mimeType: att.contentType || att.mimeType || 'application/octet-stream',
-                                    size: typeof att.size === 'number' ? att.size : Number(att.size || 0),
+                                    size: typeof att.size === 'number' ? att.size : Number(att.size || att.attachmentSize || 0),
                                     attachmentId: att.attachmentId || att.storeName || null,
                                     messageId: String(messageId),
                                     provider: 'zoho',
@@ -542,7 +544,7 @@ export default async function handler(req, res) {
                         emailDoc.metadata.attachments = attList.map((att, idx) => ({
                             filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
                             mimeType: att.contentType || att.mimeType || 'application/octet-stream',
-                            size: typeof att.size === 'number' ? att.size : Number(att.size || 0),
+                            size: typeof att.size === 'number' ? att.size : Number(att.size || att.attachmentSize || 0),
                             attachmentId: att.attachmentId || att.storeName || null,
                             messageId: String(messageId),
                             provider: 'zoho',
