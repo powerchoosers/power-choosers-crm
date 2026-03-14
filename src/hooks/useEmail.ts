@@ -8,7 +8,7 @@ function normalizeAttachments(raw: any, provider?: string) {
     .map((att: any) => ({
       filename: att.filename || att.attachmentName || att.name || 'Attachment',
       mimeType: att.mimeType || att.type || att.contentType || undefined,
-      size: typeof att.size === 'number' ? att.size : undefined,
+      size: typeof att.size === 'number' ? att.size : (typeof att.attachmentSize === 'number' ? att.attachmentSize : (att.attachmentSize ? Number(att.attachmentSize) : undefined)),
       messageId: att.messageId || att.zohoMessageId || undefined,
       attachmentId: att.attachmentId || att.storeName || att.attachmentPath || undefined,
       attachmentPath: att.attachmentPath || undefined,
