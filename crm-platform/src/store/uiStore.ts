@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { type DealStage } from '@/types/deals'
 
 export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'SEND_PORTAL_ACCESS';
@@ -90,37 +91,65 @@ interface UIState {
   /** Set when Org Intelligence enriches/acquires a contact – dossier uses this to trigger blur-in */
   lastEnrichedContactId: string | null
   setLastEnrichedContactId: (id: string | null) => void
+  
   /** Global audio toggle */
   soundEnabled: boolean
   setSoundEnabled: (enabled: boolean) => void
   toggleSound: () => void
+
+  /** Granular sound settings */
+  soundIncomingEnabled: boolean
+  setSoundIncomingEnabled: (enabled: boolean) => void
+  soundActionEnabled: boolean
+  setSoundActionEnabled: (enabled: boolean) => void
+  soundNavigationEnabled: boolean
+  setSoundNavigationEnabled: (enabled: boolean) => void
+  soundCriticalEnabled: boolean
+  setSoundCriticalEnabled: (enabled: boolean) => void
 }
 
-export const useUIStore = create<UIState>((set) => ({
-  isEditing: false,
-  setIsEditing: (isEditing) => set({ isEditing }),
-  toggleEditing: () => set((state) => ({ isEditing: !state.isEditing })),
-  rightPanelMode: 'DEFAULT',
-  setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
-  ingestionContext: null,
-  setIngestionContext: (ctx) => set({ ingestionContext: ctx }),
-  taskContext: null,
-  setTaskContext: (ctx) => set({ taskContext: ctx }),
-  dealContext: null,
-  setDealContext: (ctx) => set({ dealContext: ctx }),
-  signatureRequestContext: null,
-  setSignatureRequestContext: (ctx) => set({ signatureRequestContext: ctx }),
-  portalAccessContext: null,
-  setPortalAccessContext: (ctx) => set({ portalAccessContext: ctx }),
-  ingestionIdentifier: null,
-  setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
-  ingestionSignal: null,
-  setIngestionSignal: (signal) => set({ ingestionSignal: signal }),
-  lastEnrichedAccountId: null,
-  setLastEnrichedAccountId: (id) => set({ lastEnrichedAccountId: id }),
-  lastEnrichedContactId: null,
-  setLastEnrichedContactId: (id) => set({ lastEnrichedContactId: id }),
-  soundEnabled: true,
-  setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
-  toggleSound: () => set((state) => ({ soundEnabled: !state.soundEnabled })),
-}))
+export const useUIStore = create<UIState>()(
+  persist(
+    (set) => ({
+      isEditing: false,
+      setIsEditing: (isEditing) => set({ isEditing }),
+      toggleEditing: () => set((state) => ({ isEditing: !state.isEditing })),
+      rightPanelMode: 'DEFAULT',
+      setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
+      ingestionContext: null,
+      setIngestionContext: (ctx) => set({ ingestionContext: ctx }),
+      taskContext: null,
+      setTaskContext: (ctx) => set({ taskContext: ctx }),
+      dealContext: null,
+      setDealContext: (ctx) => set({ dealContext: ctx }),
+      signatureRequestContext: null,
+      setSignatureRequestContext: (ctx) => set({ signatureRequestContext: ctx }),
+      portalAccessContext: null,
+      setPortalAccessContext: (ctx) => set({ portalAccessContext: ctx }),
+      ingestionIdentifier: null,
+      setIngestionIdentifier: (id) => set({ ingestionIdentifier: id }),
+      ingestionSignal: null,
+      setIngestionSignal: (signal) => set({ ingestionSignal: signal }),
+      lastEnrichedAccountId: null,
+      setLastEnrichedAccountId: (id) => set({ lastEnrichedAccountId: id }),
+      lastEnrichedContactId: null,
+      setLastEnrichedContactId: (id) => set({ lastEnrichedContactId: id }),
+      
+      soundEnabled: true,
+      setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
+      toggleSound: () => set((state) => ({ soundEnabled: !state.soundEnabled })),
+
+      soundIncomingEnabled: true,
+      setSoundIncomingEnabled: (enabled) => set({ soundIncomingEnabled: enabled }),
+      soundActionEnabled: true,
+      setSoundActionEnabled: (enabled) => set({ soundActionEnabled: enabled }),
+      soundNavigationEnabled: true,
+      setSoundNavigationEnabled: (enabled) => set({ soundNavigationEnabled: enabled }),
+      soundCriticalEnabled: true,
+      setSoundCriticalEnabled: (enabled) => set({ soundCriticalEnabled: enabled }),
+    }),
+    {
+      name: 'nodal-ui-storage',
+    }
+  )
+)
