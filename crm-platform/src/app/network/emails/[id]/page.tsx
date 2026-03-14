@@ -5,7 +5,7 @@ import { useEmail, useMarkEmailAsRead } from '@/hooks/useEmail'
 import { useEmailThread } from '@/hooks/useEmailThread'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, Eye, MousePointer2 } from 'lucide-react'
+import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, Eye, MousePointer2, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react'
 import { format } from 'date-fns'
 import { playClick } from '@/lib/audio'
 import { EmailContent } from '@/components/emails/EmailContent'
@@ -472,7 +472,7 @@ export default function EmailDetailPage() {
     // 3. Fallback to the absolute latest message in the thread (threadEmails[0] is sorted desc)
     // 4. Final fallback to the root email object
     const target = message 
-      || threadEmails.find((t: Email) => t.id === expandedThreadId) 
+      || (expandedThreadId ? threadEmails.find((t: Email) => t.id === expandedThreadId) : null)
       || threadEmails[0] 
       || email
 
@@ -485,8 +485,9 @@ export default function EmailDetailPage() {
     setShowCc(Boolean(defaults.cc))
     setDraftSubject(defaults.subject)
 
-    // Clear content but DON'T inject signature here anymore (we show it below)
-    setReplyHtml('<p></p>') 
+    // Clear content and provide signature in the actual input section
+    const signature = (profile && mode !== 'forward') ? generateNodalSignature(profile, user, true) : ''
+    setReplyHtml(`<p></p><br/><br/>${signature}`) 
     setReplyAttachments([])
     setIsReplyOpen(true)
   }
@@ -538,10 +539,31 @@ export default function EmailDetailPage() {
       const fromName = `${firstName} • Nodal Point`
       const quoteText = stripHtml(targetMessage.text || targetMessage.snippet || '')
 
+      // Handle signature transformation (Dark editor version -> Light outbound version)
       const outgoingSignature = profile ? generateNodalSignature(profile, user, false) : ''
+      const signatureMarker = '<!-- NODAL_COMPOSE_SIGNATURE -->'
+      
+      let finalBodyHtml = replyHtml
+      
+      // If the signature is present in the editor content, swap it for the light version
+      if (replyHtml.includes(signatureMarker)) {
+        // Find the signature block and replace it
+        // generateNodalSignature generates a table or div. We can use the marker to find it.
+        // Actually, we can just find the first occurrence of the marker and replace from there.
+        const parts = replyHtml.split(signatureMarker)
+        // parts[0] is content before signature, parts[1] is content after (which should be empty or just closing tags if user didn't type after)
+        // We'll replace the signature part with the light version.
+        // Note: this is a simple string replace. If the user edited the signature, they might lose those edits 
+        // if we replace the whole block, but it's better than sending dark colors to a light-mode client.
+        finalBodyHtml = parts[0] + signatureMarker + outgoingSignature
+      } else if (profile && composerMode !== 'forward') {
+        // Fallback: if signature was deleted but we still want one
+        finalBodyHtml = `${replyHtml}<div style="margin-top: 24px;">${outgoingSignature}</div>`
+      }
+
       const finalHtml = composerMode === 'forward'
-        ? `${replyHtml}<div style="margin-top: 24px;">${outgoingSignature}</div>${buildForwardedMessage(targetMessage)}`
-        : `${replyHtml}<div style="margin-top: 24px;">${outgoingSignature}</div>${buildQuotedThread(targetMessage)}`
+        ? `${finalBodyHtml}${buildForwardedMessage(targetMessage)}`
+        : `${finalBodyHtml}${buildQuotedThread(targetMessage)}`
 
       const encodedAttachments = await Promise.all(
         replyAttachments.map(async (file: File) => {
@@ -620,13 +642,42 @@ export default function EmailDetailPage() {
             <Star className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={handlePrint} className="icon-button-forensic w-9 h-9">
-            <Printer className="w-4 h-4" />
-          </button>
-          <button className="icon-button-forensic w-9 h-9">
-            <MoreHorizontal className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {email.type === 'sent' && (
+              <span className="inline-flex items-center gap-1.5 rounded-sm bg-[#002FA7]/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-[#8ba6ff] border border-[#002FA7]/30 shadow-sm">
+                <ArrowUpRight className="w-3 h-3" />
+                Uplink_Out
+              </span>
+            )}
+            {email.type === 'received' && (
+              <span className="inline-flex items-center gap-1.5 rounded-sm bg-emerald-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-emerald-400 border border-emerald-500/30 shadow-sm">
+                <ArrowDownLeft className="w-3 h-3" />
+                Uplink_In
+              </span>
+            )}
+            {email.type === 'scheduled' && (
+              <span className="inline-flex items-center gap-1.5 rounded-sm bg-amber-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-amber-500 border border-amber-500/30 shadow-sm">
+                <Clock className="w-3 h-3" />
+                Scheduled
+              </span>
+            )}
+            {email.type === 'draft' && (
+              <span className="inline-flex items-center gap-1.5 rounded-sm bg-zinc-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-zinc-400 border border-zinc-500/30 shadow-sm">
+                <Paperclip className="w-3 h-3" />
+                Draft
+              </span>
+            )}
+          </div>
+          <div className="h-4 w-px bg-white/10" />
+          <div className="flex items-center gap-2">
+            <button onClick={handlePrint} className="icon-button-forensic w-9 h-9">
+              <Printer className="w-4 h-4" />
+            </button>
+            <button className="icon-button-forensic w-9 h-9">
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -635,11 +686,6 @@ export default function EmailDetailPage() {
         <div className="flex-none p-8 border-b border-white/5 space-y-6 nodal-module-glass">
           <div className="flex items-start justify-between gap-6">
             <h1 className="text-3xl font-semibold text-white tracking-tighter leading-tight">{email.subject}</h1>
-            <div className="flex-shrink-0 pt-1">
-              <span className="inline-flex items-center rounded-md bg-zinc-950 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.2em] font-semibold text-zinc-500 ring-1 ring-inset ring-white/10 shadow-sm">
-                {isOutboundEmail ? 'Sent' : 'Inbox'}
-              </span>
-            </div>
           </div>
 
           <div className="flex items-start justify-between">
@@ -869,15 +915,7 @@ export default function EmailDetailPage() {
                       autoFocus
                     />
 
-                    {/* Forensic Signature Reveal */}
-                    {profile && composerMode !== 'forward' && (
-                      <div className="mt-8 pt-6 border-t border-white/5 opacity-80 pointer-events-none select-none overflow-hidden">
-                        <div 
-                          className="scale-90 origin-left"
-                          dangerouslySetInnerHTML={{ __html: generateNodalSignature(profile, user, true) }} 
-                        />
-                      </div>
-                    )}
+
                     {replyAttachments.length > 0 ? (
                       <div className="mt-3 space-y-2">
                         {replyAttachments.map((file, idx) => (
@@ -1031,7 +1069,7 @@ export default function EmailDetailPage() {
                             </div>
                             <div className="flex items-center justify-between gap-2">
                               <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-zinc-500">
-                                {threadIsOutbound ? 'Outbound' : 'Inbox'}
+                                {threadIsOutbound ? 'Uplink_Out' : 'Uplink_In'}
                               </span>
                               <span className="text-xs text-zinc-400 truncate">{displaySegment}</span>
                             </div>
