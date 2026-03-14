@@ -149,61 +149,58 @@ export default function EmailDetailPage() {
     }
   }
 
-  const openAttachmentPreview = async (attachment: EmailAttachment) => {
+  const openAttachmentPreview = async (attachment: EmailAttachment, message?: Email) => {
     if (!attachment.attachmentId || !attachment.messageId) {
-      toast.info('This attachment cannot be previewed yet')
-      return
+      toast.info('This attachment cannot be previewed yet');
+      return;
     }
     if (!user?.email) {
-      toast.error('You must be logged in')
-      return
+      toast.error('You must be logged in');
+      return;
     }
 
-    setIframeLoaded(false)
-    setOpeningAttachment(attachment.attachmentId)
+    setIframeLoaded(false);
+    setOpeningAttachment(attachment.attachmentId);
+    
     try {
-      const response = await fetch('/api/email/attachment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userEmail: user.email,
-          messageId: attachment.messageId,
-          attachmentId: attachment.attachmentId,
-          attachmentPath: attachment.attachmentPath
-        })
-      })
+      const folderId = (message as any)?.metadata?.folderId || 
+                       (message as any)?.metadata?.zohoFolder || 
+                       (email as any)?.metadata?.folderId || 
+                       '6109936000000008014';
+      
+      const params = new URLSearchParams({
+        userEmail: user.email,
+        messageId: attachment.messageId,
+        attachmentId: attachment.attachmentId || '',
+        attachmentPath: attachment.attachmentPath || '',
+        folderId: String(folderId)
+      });
+      
+      const fileUrl = `/api/email/attachment?${params.toString()}`;
 
-      if (!response.ok) {
-        throw new Error('Failed to open attachment')
-      }
-
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
-
-      setPreviewAttachment((prev) => {
-        if (prev?.url) URL.revokeObjectURL(prev.url)
-        return {
-          attachment,
-          filename: attachment.filename || 'attachment',
-          url: objectUrl,
-          mimeType: attachment.mimeType || blob.type || 'application/octet-stream'
-        }
-      })
+      setPreviewAttachment({
+        attachment,
+        filename: attachment.filename || 'attachment',
+        url: fileUrl,
+        mimeType: attachment.mimeType || 'application/octet-stream'
+      });
     } catch (error) {
-      console.error('Error opening attachment:', error)
-      toast.error('Failed to open attachment')
+      console.error('Error opening attachment:', error);
+      toast.error('Failed to open attachment');
     } finally {
-      setOpeningAttachment(null)
+      setOpeningAttachment(null);
     }
-  }
+  };
 
   const closeAttachmentPreview = () => {
-    setPreviewAttachment((prev) => {
-      if (prev?.url) URL.revokeObjectURL(prev.url)
-      return null
-    })
-    setIframeLoaded(false)
-  }
+    setPreviewAttachment((prev: any) => {
+      if (prev?.url && prev.url.startsWith('blob:')) {
+        URL.revokeObjectURL(prev.url);
+      }
+      return null;
+    });
+    setIframeLoaded(false);
+  };
 
   // Mark as read when the email is loaded
   useEffect(() => {
@@ -258,14 +255,14 @@ export default function EmailDetailPage() {
   const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
   const threadContactIds = Array.from(new Set(
     [email?.contactId, ...threadEmails.map((threadEmail: Email) => threadEmail.contactId)]
-      .map((contactId) => String(contactId || '').trim())
+      .map((contactId: string | null | undefined) => String(contactId || '').trim())
       .filter(Boolean)
   ))
   const { data: contactById = {} } = useContactIdentityMapByIds(threadContactIds)
   const fromAddressKey = extractValidAddress(fromValue)
   const fromContact = (email?.contactId ? contactById[email.contactId] : undefined) || contactByEmail[fromAddressKey]
   const isOutboundEmail = email?.type === 'sent' || email?.type === 'scheduled'
-  const toResolved = toList.map((raw) => {
+  const toResolved = toList.map((raw: string | null | undefined) => {
     const key = extractEmailAddress(String(raw || ''))
     return {
       raw: String(raw || ''),
@@ -281,8 +278,8 @@ export default function EmailDetailPage() {
     const values = Array.isArray(value) ? value : [value]
     return Array.from(new Set(
       values
-        .flatMap((entry) => String(entry || '').split(','))
-        .map((entry) => extractValidAddress(entry))
+        .flatMap((entry: any) => String(entry || '').split(','))
+        .map((entry: string) => extractValidAddress(entry))
         .filter(Boolean)
     ))
   }
@@ -302,7 +299,7 @@ export default function EmailDetailPage() {
   const inferredCounterparty = threadEmails
     .flatMap((message: Email) => {
       const fromCandidate = extractValidAddress(message.from)
-      const toCandidates = (Array.isArray(message.to) ? message.to : [message.to]).map((addr) => extractValidAddress(String(addr || '')))
+      const toCandidates = (Array.isArray(message.to) ? message.to : [message.to]).map((addr: string | null | undefined) => extractValidAddress(String(addr || '')))
       const replyToCandidate = extractValidAddress((message as any)?.metadata?.['reply-to'] || (message as any)?.metadata?.replyTo)
       
       // NEW: Look up contact email if raw sender address is missing or is just a name
@@ -475,7 +472,7 @@ export default function EmailDetailPage() {
     // 3. Fallback to the absolute latest message in the thread (threadEmails[0] is sorted desc)
     // 4. Final fallback to the root email object
     const target = message 
-      || threadEmails.find((t) => t.id === expandedThreadId) 
+      || threadEmails.find((t: Email) => t.id === expandedThreadId) 
       || threadEmails[0] 
       || email
 
@@ -547,7 +544,7 @@ export default function EmailDetailPage() {
         : `${replyHtml}<div style="margin-top: 24px;">${outgoingSignature}</div>${buildQuotedThread(targetMessage)}`
 
       const encodedAttachments = await Promise.all(
-        replyAttachments.map(async (file) => {
+        replyAttachments.map(async (file: File) => {
           const buffer = await file.arrayBuffer()
           const bytes = new Uint8Array(buffer)
           let binary = ''
@@ -1082,7 +1079,7 @@ export default function EmailDetailPage() {
                                         <div
                                           key={`${attachment.filename}-${idx}`}
                                           className="flex items-center justify-between gap-3 p-3 rounded-lg border border-white/10 bg-black/20 hover:bg-black/30 transition-colors group cursor-pointer"
-                                          onClick={() => openAttachmentPreview(attachment)}
+                                          onClick={() => openAttachmentPreview(attachment, threadEmail)}
                                         >
                                           <div className="flex items-center gap-3 min-w-0 flex-1">
                                             <div className="w-10 h-10 rounded-xl nodal-glass flex items-center justify-center border border-white/10 flex-shrink-0">
@@ -1224,24 +1221,38 @@ export default function EmailDetailPage() {
                       </div>
                     )}
 
-                    {previewAttachment?.mimeType?.startsWith('image/') ? (
-                      <div className="w-full h-full flex items-center justify-center p-4">
-                        <img
-                          src={previewAttachment.url}
-                          alt={previewAttachment.filename}
-                          className="max-w-full max-h-full object-contain"
-                          onLoad={() => setIframeLoaded(true)}
+                    {(() => {
+                      const isImage = previewAttachment?.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(previewAttachment?.filename || '');
+                      
+                      if (isImage) {
+                        return (
+                          <div className="w-full h-full flex items-center justify-center p-4">
+                            <img
+                              src={previewAttachment.url}
+                              alt={previewAttachment.filename}
+                              className="max-w-full max-h-full object-contain"
+                              onLoad={() => setIframeLoaded(true)}
+                            />
+                          </div>
+                        );
+                      }
+                      
+                      const isOffice = /\.(xlsx|xls|docx|doc|pptx|ppt)$/i.test(previewAttachment?.filename || '');
+                      const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${previewAttachment?.url}` : '';
+                      const iframeSrc = isOffice && fullUrl
+                        ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrl)}`
+                        : `${previewAttachment?.url}#view=FitH`;
+
+                      return (
+                        <iframe
+                          src={iframeSrc}
+                          title={previewAttachment?.filename || 'Attachment Preview'}
+                          className="w-full h-full border-0 absolute inset-0"
+                          style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
+                          onLoad={() => setTimeout(() => setIframeLoaded(true), 900)}
                         />
-                      </div>
-                    ) : (
-                      <iframe
-                        src={`${previewAttachment?.url}#view=FitH`}
-                        title={previewAttachment?.filename || 'Attachment Preview'}
-                        className="w-full h-full border-0 absolute inset-0"
-                        style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
-                        onLoad={() => setTimeout(() => setIframeLoaded(true), 900)}
-                      />
-                    )}
+                      );
+                    })()}
                   </div>
                 </div>
               </motion.div>
