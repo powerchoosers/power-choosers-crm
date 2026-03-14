@@ -90,6 +90,10 @@ interface UIState {
   /** Set when Org Intelligence enriches/acquires a contact – dossier uses this to trigger blur-in */
   lastEnrichedContactId: string | null
   setLastEnrichedContactId: (id: string | null) => void
+  /** Global audio toggle */
+  soundEnabled: boolean
+  setSoundEnabled: (enabled: boolean) => void
+  toggleSound: () => void
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -116,4 +120,7 @@ export const useUIStore = create<UIState>((set) => ({
   setLastEnrichedAccountId: (id) => set({ lastEnrichedAccountId: id }),
   lastEnrichedContactId: null,
   setLastEnrichedContactId: (id) => set({ lastEnrichedContactId: id }),
+  soundEnabled: true,
+  setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
+  toggleSound: () => set((state) => ({ soundEnabled: !state.soundEnabled })),
 }))

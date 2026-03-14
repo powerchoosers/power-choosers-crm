@@ -5,6 +5,8 @@ import { useEffect, useRef } from 'react'
 import { useAuth } from '@/context/AuthContext'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useEmailTrackingNotifications } from '@/hooks/useEmailTrackingNotifications'
+import { playPing, playAlert } from '@/lib/audio'
+import { useUIStore } from '@/store/uiStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
@@ -77,6 +79,7 @@ export function GlobalSync() {
   const { performSync } = useZohoSync()
   const queryClient = useQueryClient()
   const ownerScopeRef = useRef<string[]>([])
+  const soundEnabled = useUIStore(s => s.soundEnabled)
 
   // Real-time email tracking notifications (opens/clicks)
   useEmailTrackingNotifications()
@@ -131,6 +134,7 @@ export function GlobalSync() {
 
           if (oldRecord.status !== 'completed' && newRecord.status === 'completed') {
             if (isOwner) {
+              if (soundEnabled) playPing();
               toast('Contract Secured', {
                 icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
               })
@@ -142,6 +146,7 @@ export function GlobalSync() {
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           } else if (oldRecord.status !== 'opened' && newRecord.status === 'opened') {
             if (isOwner) {
+              if (soundEnabled) playPing();
               toast('Signature Email Opened', {
                 icon: <Eye className="w-4 h-4 text-[#002FA7]" />
               })
@@ -151,6 +156,7 @@ export function GlobalSync() {
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
           } else if (oldRecord.status !== 'viewed' && newRecord.status === 'viewed') {
             if (isOwner) {
+              if (soundEnabled) playPing();
               toast('Contract Viewed by Signatory', {
                 icon: <Eye className="w-4 h-4 text-[#002FA7]" />
               })
@@ -259,6 +265,7 @@ export function GlobalSync() {
             (Array.isArray(email.attachments) && email.attachments.length > 0)
           const photoUrl = resolveContactPhotoUrl(contact)
 
+          if (soundEnabled) playPing();
           toast(
             <div className="flex items-start gap-3">
               <ContactAvatar name={name} photoUrl={photoUrl || undefined} size={32} />

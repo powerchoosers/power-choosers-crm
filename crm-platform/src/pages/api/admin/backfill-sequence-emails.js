@@ -69,6 +69,8 @@ export default async function handler(req, res) {
         
         // Cache tokens and folders for ALL known connections of this user
         const senderCache = {};
+        const allSentMessages = []; // List of all sent messages from all accounts
+
         const { data: allConnRows } = await supabase.from('zoho_connections').select('email');
         if (allConnRows) {
             for (const c of allConnRows) {
@@ -83,17 +85,35 @@ export default async function handler(req, res) {
                         }))
                         .find(f => f.folderType === 'sent' || f.folderName === 'sent');
                     
-                    senderCache[c.email.trim().toLowerCase()] = {
-                        accessToken,
-                        accountId,
-                        sentFolderId: sentFolder?.folderId ? String(sentFolder.folderId) : null
-                    };
-                    console.log(`[Backfill] Pre-loaded sender: ${c.email}`);
+                    const sentFolderId = sentFolder?.folderId ? String(sentFolder.folderId) : null;
+                    
+                    senderCache[c.email.trim().toLowerCase()] = { accessToken, accountId, sentFolderId };
+                    
+                    if (sentFolderId) {
+                        console.log(`[Backfill] Fetching sent messages for ${c.email} (Folder: ${sentFolderId})`);
+                        // Fetch 2 pages of sent messages (400 messages total)
+                        for (let start = 1; start <= 201; start += 200) {
+                            const params = new URLSearchParams({ start: String(start), limit: '200', folderId: sentFolderId });
+                            const res = await fetch(`${zohoService.baseUrl}/accounts/${accountId}/messages/view?${params.toString()}`, {
+                                headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+                            });
+                            if (res.ok) {
+                                const data = await res.json();
+                                const msgs = data.data || [];
+                                if (msgs.length === 0) break;
+                                allSentMessages.push(...msgs.map(m => ({ ...m, senderAccount: c.email, accountId, accessToken })));
+                            } else {
+                                break;
+                            }
+                        }
+                    }
                 } catch (e) {
                     console.warn(`[Backfill] Skip pre-load for ${c.email}: ${e.message}`);
                 }
             }
         }
+
+        console.log(`[Backfill] Total sent messages loaded from Zoho: ${allSentMessages.length}`);
 
         for (const row of rows) {
             const zohoMessageId = row.metadata?.zohoMessageId;
@@ -101,96 +121,49 @@ export default async function handler(req, res) {
             const realSubject = subjectByTrackingId[trackingId] || null;
             const rowFromEmail = (row.from || row.metadata?.senderEmail || row.metadata?.from || 'l.patterson@nodalpoint.io').trim();
 
-            if (!zohoMessageId) {
-                results.skipped++;
-                results.details.push({ id: row.id, status: 'skipped', reason: 'no zohoMessageId' });
-                continue;
-            }
-
             try {
-                const connInfo = senderCache[rowFromEmail.toLowerCase()] || Object.values(senderCache)[0];
-                if (!connInfo) {
-                    results.skipped++;
-                    results.details.push({ id: row.id, status: 'skipped', reason: 'no zoho connection found' });
-                    continue;
-                }
+                let content = null;
+                let usedMatch = null;
 
-                const allConnectionsByPriority = [
-                    senderCache[rowFromEmail.toLowerCase()],
-                    ...Object.values(senderCache).filter(c => c !== senderCache[rowFromEmail.toLowerCase()])
-                ].filter(Boolean);
-
-                // 1. Try primary messageId lookup across all accounts
-                for (const conn of allConnectionsByPriority) {
-                    const { accessToken, accountId, sentFolderId } = conn;
-                    const urlCandidates = sentFolderId
-                        ? [
-                            `${zohoService.baseUrl}/accounts/${accountId}/folders/${sentFolderId}/messages/${zohoMessageId}/content`,
-                            `${zohoService.baseUrl}/accounts/${accountId}/messages/${zohoMessageId}/content`,
-                        ]
-                        : [
-                            `${zohoService.baseUrl}/accounts/${accountId}/messages/${zohoMessageId}/content`,
-                        ];
-
-                    for (const url of urlCandidates) {
-                        const resp = await fetch(url, {
-                            headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
-                        });
-                        if (resp.ok) {
-                            const json = await resp.json();
-                            if (json.data) {
-                                content = json.data;
-                                break;
-                            }
-                        }
-                    }
-                    if (content) break;
-                }
+                // 1. Try to find the specific messageId in our loaded list
+                let match = allSentMessages.find(m => m.messageId === zohoMessageId);
                 
-                // 2. If messageId lookup failed, try search across all accounts
-                if (!content) {
+                // 2. If not found by ID, try to find by recipient address
+                if (!match) {
                     let toEmail = Array.isArray(row.to) ? row.to[0] : row.to;
                     if (toEmail && typeof toEmail === 'object') toEmail = toEmail.email;
-                    
-                    if (toEmail && typeof toEmail === 'string') {
-                        toEmail = toEmail.trim();
-                        console.log(`[Backfill] MessageId fetch failed. Searching for ${toEmail} across all Zoho accounts...`);
-                        
-                        for (const conn of allConnectionsByPriority) {
-                            const { accessToken, accountId, sentFolderId } = conn;
-                            const searchRes = await fetch(`${zohoService.baseUrl}/accounts/${accountId}/messages/search?searchReq={toAddress:${toEmail}}`, {
-                                headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
-                            });
-                            
-                            if (searchRes.ok) {
-                                const searchData = await searchRes.json();
-                                const msgs = searchData.data || [];
-                                // Filter by sent folder if possible, otherwise take first
-                                const match = sentFolderId ? msgs.find(m => m.folderId === sentFolderId) || msgs[0] : msgs[0];
-                                
-                                if (match) {
-                                    console.log(`[Backfill] Found match in search for ${toEmail} (Account: ${accountId})`);
-                                    const folderPathSegment = match.folderId ? `/folders/${match.folderId}` : '';
-                                    const contentRes = await fetch(`${zohoService.baseUrl}/accounts/${accountId}${folderPathSegment}/messages/${match.messageId}/content`, {
-                                        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
-                                    });
-                                    if (contentRes.ok) {
-                                        const cData = await contentRes.json();
-                                        content = cData.data;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                    if (toEmail) {
+                        const target = toEmail.toLowerCase().trim();
+                        match = allSentMessages.find(m => m.toAddress && m.toAddress.toLowerCase().includes(target));
+                    }
+                }
+
+                if (match) {
+                    const { accountId, accessToken, messageId, folderId } = match;
+                    const folderPathSegment = folderId ? `/folders/${folderId}` : '';
+                    const contentRes = await fetch(`${zohoService.baseUrl}/accounts/${accountId}${folderPathSegment}/messages/${messageId}/content`, {
+                        headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+                    });
+                    if (contentRes.ok) {
+                        const cData = await contentRes.json();
+                        content = cData.data;
+                        usedMatch = match;
                     }
                 }
 
                 let htmlBody = '';
                 let textBody = '';
-                const resolvedSubject = realSubject || row.subject;
+                const resolvedSubject = realSubject || (usedMatch ? usedMatch.subject : row.subject);
 
                 if (!content) {
-                    // Zoho failed - reconstruct fallback body
+                    // Zoho failed - reconstruct fallback body (keep existing if already personalized)
+                    const isGeneric = !row.html || row.html.includes('Hi there,') || row.html.length < 100;
+                    if (!isGeneric) {
+                        results.skipped++;
+                        results.details.push({ id: row.id, status: 'skipped', reason: 'Zoho fetch failed but existing body looks personalized' });
+                        continue;
+                    }
+
                     htmlBody = 'Hi there,<br><br>If you share your latest electricity statement, I can reply with a quick 2-3 point forensic snapshot.<br><br>Interested?';
                     textBody = 'Hi there,\n\nIf you share your latest electricity statement, I can reply with a quick 2-3 point forensic snapshot.\n\nInterested?';
                     
@@ -261,13 +234,13 @@ export default async function handler(req, res) {
                         subject: resolvedSubject,
                         htmlLength: htmlBody.length,
                         source: content ? 'zoho' : 'reconstructed_fallback',
-                        searched: !!content && !urlCandidates.find(u => u.includes(zohoMessageId)) // mark if we found via search
+                        sender: usedMatch ? usedMatch.senderAccount : 'unknown'
                     });
                     console.log(`[Backfill] Patched ${row.id} — subject: "${resolvedSubject}", html: ${htmlBody.length} chars (source: ${content ? 'zoho msg' : 'fallback'})`);
                 }
 
-                // Small delay to avoid Zoho rate limiting
-                await new Promise(r => setTimeout(r, 100));
+                // Small delay
+                await new Promise(r => setTimeout(r, 50));
 
             } catch (err) {
                 results.failed++;

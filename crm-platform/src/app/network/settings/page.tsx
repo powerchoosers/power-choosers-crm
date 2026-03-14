@@ -94,19 +94,41 @@ export default function SettingsPage() {
             throw new Error(err.error || 'Failed to connect')
           }
 
-          toast.success('Account connected successfully', { id: toastId })
+          const result = await res.json()
+          toast.success(`Account ${result.email} connected`, { id: toastId })
 
-          // Clear URL immediately to prevent double-processing
+          // Clear URL immediately
           const newParams = new URLSearchParams(window.location.search)
           newParams.delete('action')
           newParams.delete('code')
           newParams.delete('status')
           router.replace(`${window.location.pathname}${newParams.toString() ? '?' + newParams.toString() : ''}`)
 
-          // Re-fetch connections to update UI with animation
+          // Proactive: Trigger a sync for the newly connected email
+          if (result.email) {
+            toast.promise(
+              fetch('/api/email/zoho-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userEmail: result.email }),
+              }),
+              {
+                loading: 'Syncing emails from new account...',
+                success: 'Inbox synchronized',
+                error: 'Initial sync failed (will retry in background)'
+              }
+            )
+          }
+
+          // Re-fetch connections to update UI
           await fetchConnections()
         } catch (e: any) {
-          toast.error(e.message || 'Failed to connect account', { id: toastId })
+          // If the error is just a cancellation or we already have the connection, suppress the "failed" toast
+          if (e.message?.includes('already connected')) {
+             toast.success('Account already connected', { id: toastId })
+          } else {
+             toast.error(e.message || 'Failed to connect account', { id: toastId })
+          }
         } finally {
           setIsConnecting(false)
         }

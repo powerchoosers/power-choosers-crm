@@ -28,6 +28,8 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
+import { playClick } from '@/lib/audio'
+import { forensicNotify } from '@/lib/notifications'
 
 const navigationStructure = [
   // ZONE 1: COMMAND (The Overview)
@@ -101,13 +103,14 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     try {
+      playClick()
       await supabase.auth.signOut()
       document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
-      toast.success('Logged out successfully')
+      forensicNotify.signal('Logged out successfully')
       router.push('/network') // Will be caught by middleware/listener and redirect to /login
     } catch (error) {
       console.error('Logout error:', error)
-      toast.error('Failed to logout')
+      forensicNotify.warn('Failed to logout')
     }
   }
 
@@ -124,7 +127,10 @@ export function Sidebar() {
         width: isHovered ? 280 : 70,
         boxShadow: isHovered ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "0 0 0 0 rgba(0, 0, 0, 0)"
       }}
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => {
+        setIsHovered(true)
+        playClick() // Subtle feedback on expansion
+      }}
       onMouseLeave={() => setIsHovered(false)}
       transition={{
         type: "spring",
@@ -304,7 +310,10 @@ export function Sidebar() {
                 return (
                   <motion.div layout key={item.name}>
                     <button
-                      onClick={() => setRightPanelMode(item.action)}
+                      onClick={() => {
+                        playClick()
+                        setRightPanelMode(item.action)
+                      }}
                       className={buttonClasses}
                     >
                       {content}
@@ -319,6 +328,7 @@ export function Sidebar() {
                     href={item.href}
                     prefetch={false}
                     className={buttonClasses}
+                    onClick={() => playClick()}
                   >
                     {content}
                   </Link>
