@@ -1,3 +1,0 @@
-src/components/crm/ContractIntelWidget.tsx(427,9): error TS17002: Expected corresponding JSX closing tag for 'div'.
-src/components/crm/ContractIntelWidget.tsx(428,5): error TS1005: ')' expected.
-src/components/crm/ContractIntelWidget.tsx(429,3): error TS1109: Expression expected.
