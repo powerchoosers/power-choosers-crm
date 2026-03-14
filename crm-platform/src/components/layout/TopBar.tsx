@@ -20,7 +20,7 @@ import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
 import { useAccount } from '@/hooks/useAccounts'
 import { useQueryClient } from '@tanstack/react-query'
-import { playClick } from '@/lib/audio'
+import { playClick, playNavigation } from '@/lib/audio'
 import { forensicNotify } from '@/lib/notifications'
 
 function getDaysUntilJune() {
@@ -362,10 +362,7 @@ export function TopBar() {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  useEffect(() => {
-    // Show toast on mount as a replacement for the "System Ready" indicator
-    forensicNotify.signal("System Ready", "Connected to Nodal Point Network")
-  }, [])
+  // Removed automatic "System Ready" signal to prevent jarring audio on mount
 
   // Focus input when dialer opens
   useEffect(() => {
@@ -388,7 +385,7 @@ export function TopBar() {
   }, [isDialpadOpen])
 
   const handleRefresh = () => {
-    playClick()
+    playNavigation()
     forensicNotify.update("Refreshing Data...")
     queryClient.invalidateQueries()
     setTimeout(() => forensicNotify.signal("Data Synced"), 600)
@@ -558,7 +555,7 @@ export function TopBar() {
                 {isActive && (
                   <button
                     onClick={() => {
-                      playClick()
+                      playNavigation()
                       setIsShowingCallBar(true)
                     }}
                   className="h-[50px] px-4 flex items-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500/30 transition-all duration-300 shrink-0"
@@ -700,7 +697,7 @@ export function TopBar() {
                   <div className="flex items-center justify-end gap-1 flex-shrink-0 ml-2">
                     <button
                       onClick={() => {
-                        playClick()
+                        playNavigation()
                         setSentiment(sentiment === 'connect' ? null : 'connect')
                       }}
                       className={cn(
@@ -715,7 +712,7 @@ export function TopBar() {
                     </button>
                     <button
                       onClick={() => {
-                        playClick()
+                        playNavigation()
                         setSentiment(sentiment === 'interest' ? null : 'interest')
                       }}
                       className={cn(
@@ -730,7 +727,7 @@ export function TopBar() {
                     </button>
                     <button
                       onClick={() => {
-                        playClick()
+                        playNavigation()
                         setSentiment(sentiment === 'lock' ? null : 'lock')
                       }}
                       className={cn(
@@ -750,7 +747,7 @@ export function TopBar() {
                       <button
                         type="button"
                         onClick={() => {
-                          playClick()
+                          playNavigation()
                           setIsDialpadOpen(!isDialpadOpen)
                         }}
                         className={cn(
