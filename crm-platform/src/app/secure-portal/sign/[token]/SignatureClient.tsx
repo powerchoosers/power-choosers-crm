@@ -535,11 +535,11 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             <div className="flex bg-zinc-900/50 border border-white/5 p-0.5 rounded-md">
                                 <button
                                     onClick={() => setSignatureMode('type')}
-                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'type' ? 'bg-[#002FA7] text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'type' ? 'text-white nodal-toggle-pill-highlight shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
                                 >Type Font</button>
                                 <button
                                     onClick={() => setSignatureMode('draw')}
-                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'draw' ? 'bg-[#002FA7] text-white shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
+                                    className={`flex-1 text-[9px] uppercase font-mono py-1.5 rounded transition-all ${signatureMode === 'draw' ? 'text-white nodal-toggle-pill-highlight shadow-lg' : 'text-zinc-600 hover:text-zinc-400'}`}
                                 >Draw Ink</button>
                             </div>
 
