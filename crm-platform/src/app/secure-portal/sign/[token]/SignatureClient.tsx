@@ -267,39 +267,37 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
     // ── Main Interface ────────────────────────────────────────────────────────
     return (
-        <div className="h-screen w-full flex flex-col bg-zinc-950 overflow-hidden font-sans">
+        <div className="min-h-screen md:h-screen w-full flex flex-col bg-zinc-950 overflow-auto md:overflow-hidden font-sans">
 
             {/* Header: Forensic Navigation */}
-            <header className="h-16 border-b border-white/5 bg-zinc-950 px-6 flex items-center justify-between z-50 shrink-0">
-                <div className="flex items-center gap-4">
-                    <div className="flex flex-col">
-                        <h1 className="text-xs font-mono uppercase tracking-[0.2em] text-[#002FA7] font-bold">
-                            Forensic Document Review
-                        </h1>
-                        <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
-                            ID: {request.id.substring(0, 12)} · {request.document?.name}
-                        </p>
-                    </div>
+            <header className="border-b border-white/5 bg-zinc-950 px-4 md:px-6 py-3 md:py-0 md:h-16 flex items-center justify-between z-50 shrink-0 gap-3">
+                <div className="flex flex-col min-w-0 flex-1">
+                    <h1 className="text-xs font-mono uppercase tracking-[0.2em] text-[#002FA7] font-bold">
+                        Forensic Document Review
+                    </h1>
+                    <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5 truncate">
+                        ID: {request.id.substring(0, 12)} · {request.document?.name}
+                    </p>
                 </div>
 
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-3 px-3 py-1.5 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-500/70 font-mono text-[9px] uppercase tracking-widest">
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>256-Bit Encrypted Session</span>
+                <div className="flex items-center shrink-0">
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-500/70 font-mono text-[9px] uppercase tracking-widest">
+                        <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                        <span className="hidden sm:inline">256-Bit Encrypted Session</span>
                     </div>
                 </div>
             </header>
 
             {/* Main Body: Two Column Forensic Layout */}
-            <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">
 
                 {/* Left: Document Viewport */}
-                <main className="flex-1 flex flex-col bg-zinc-900/30 overflow-hidden relative min-h-[55vh] md:min-h-0">
+                <main className="flex flex-col bg-zinc-900/30 md:flex-1 md:overflow-hidden relative">
 
                     {/* View Controls */}
-                    <div className="h-10 shrink-0 border-b border-white/5 bg-zinc-950/50 flex items-center px-4 relative">
-                        {/* Centered pagination pill */}
-                        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1 px-1 py-1 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5">
+                    <div className="h-10 shrink-0 border-b border-white/5 bg-zinc-950/50 flex items-center px-4 gap-3">
+                        {/* Pagination pill — left aligned */}
+                        <div className="flex items-center gap-1 px-1 py-1 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5">
                             <button
                                 onClick={() => setPageNumber(p => Math.max(1, p - 1))}
                                 disabled={pageNumber <= 1}
@@ -316,7 +314,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                         </div>
 
                         {/* Download button pinned right */}
-                        <div className="ml-auto flex items-center gap-3">
+                        <div className="ml-auto flex items-center gap-3 shrink-0">
                             <button
                                 onClick={handleDownload}
                                 className="flex items-center gap-2 px-3 py-1 text-[10px] font-mono uppercase bg-[#002FA7] hover:bg-[#002FA7]/80 text-white rounded transition-all border border-[#002FA7]"
@@ -429,7 +427,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                 </main>
 
                 {/* Right: Forensic Console (The Action Panel) */}
-                <aside className="w-full md:w-[384px] shrink-0 border-t md:border-t-0 md:border-l border-white/5 bg-zinc-950 flex flex-col z-40 shadow-2xl overflow-y-auto md:overflow-hidden">
+                <aside className="w-full md:w-[384px] shrink-0 border-t md:border-t-0 md:border-l border-white/5 bg-zinc-950 flex flex-col z-40 shadow-2xl md:overflow-y-auto">
                     <div className="p-6 flex-1 overflow-y-auto np-scroll space-y-8">
 
                         {/* Signatory Profile */}
