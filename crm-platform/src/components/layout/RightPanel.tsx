@@ -352,8 +352,7 @@ export function RightPanel() {
             </AnimatePresence>
 
             <div className="flex-1 flex flex-col overflow-hidden relative">
-              <motion.div
-                key="content-wrapper"
+              <div
                 ref={scrollContainerRef}
                 onScroll={(e) => {
                   const target = e.currentTarget;
@@ -532,7 +531,7 @@ export function RightPanel() {
                     </motion.div>
                   )}
                 </AnimatePresence>
-              </motion.div>
+              </div>
             </div>
           </motion.div>
         )}
