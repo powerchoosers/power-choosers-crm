@@ -267,6 +267,8 @@
     /* IE and Edge */
     contain: paint;
     /* Improves scroll performance by containing repaints */
+    overflow-x: hidden;
+    /* Lock horizontal drift on touchpad/trackpad two-finger swipe */
   }
 
   .np-scroll::-webkit-scrollbar {
