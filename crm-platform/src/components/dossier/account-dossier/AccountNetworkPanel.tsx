@@ -33,7 +33,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
     }
 
     return (
-        <div className="col-span-3 h-full overflow-y-auto p-6 np-scroll">
+        <div className="col-span-3 h-full overflow-y-auto px-6 pt-6 pb-12 np-scroll">
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
                 <div className="flex items-center justify-between mb-4">
                     <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">03 // Network</span>
