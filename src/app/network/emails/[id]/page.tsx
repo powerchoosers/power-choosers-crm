@@ -77,7 +77,7 @@ export default function EmailDetailPage() {
   // The outgoing (light) version is appended in handleSend.
   const signatureForPreview = profile
     ? (isGetnodalAccount
-        ? generateForensicSignature(profile, { senderEmail: replyFromAccount })
+        ? generateForensicSignature(profile, { senderEmail: replyFromAccount }, true)
         : generateNodalSignature(profile, user, true))
     : ''
   const threadKey = email?.threadId || email?.id
@@ -1038,20 +1038,13 @@ export default function EmailDetailPage() {
 
                     {/* Signature preview — rendered outside the editor to preserve full inline styling,
                         same pattern as ComposeModal. The light outbound version is appended in handleSend.
-                        Forensic sig (getnodalpoint.com) uses dark text on a light bg by design for email
-                        client compatibility — wrap it in a white surface so it reads correctly in dark UI. */}
+                        Both signatures use isDarkMode=true for this preview so colors stay on-theme. */}
                     {composerMode !== 'forward' && signatureForPreview && (
                       <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
-                        {isGetnodalAccount ? (
-                          <div className="rounded-lg overflow-hidden bg-white p-3">
-                            <div dangerouslySetInnerHTML={{ __html: signatureForPreview }} />
-                          </div>
-                        ) : (
-                          <div
-                            className="rounded-lg overflow-hidden"
-                            dangerouslySetInnerHTML={{ __html: signatureForPreview }}
-                          />
-                        )}
+                        <div
+                          className="rounded-lg overflow-hidden"
+                          dangerouslySetInnerHTML={{ __html: signatureForPreview }}
+                        />
                       </div>
                     )}
 
