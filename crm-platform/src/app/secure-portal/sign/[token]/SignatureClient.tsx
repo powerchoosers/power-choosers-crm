@@ -272,7 +272,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             {/* Header: Forensic Navigation */}
             <header className="border-b border-white/5 bg-zinc-950 px-4 md:px-6 py-3 md:py-0 md:h-16 flex items-center justify-between z-50 shrink-0 gap-3">
                 <div className="flex flex-col min-w-0 flex-1">
-                    <h1 className="text-xs font-mono uppercase tracking-[0.2em] text-[#002FA7] font-bold">
+                    <h1 className="text-xs font-mono uppercase tracking-[0.2em] text-white font-bold">
                         Forensic Document Review
                     </h1>
                     <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5 truncate">
@@ -330,7 +330,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     <div
                         ref={pdfScrollContainerRef}
                         className="flex-1 md:overflow-auto np-scroll pt-6 px-6 pb-2 flex flex-col items-center bg-[url('/grid.svg')] bg-[size:40px_40px] bg-fixed"
-                        style={{ touchAction: 'pan-y pinch-zoom' }}
+                        style={{ touchAction: 'pan-x pan-y pinch-zoom' }}
                     >
                         {documentUrl ? (
                             <motion.div
