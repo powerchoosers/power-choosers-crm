@@ -755,7 +755,7 @@ export default function ContractDetailPage() {
   const totalValue = totalValueFromAnnual ?? deal?.amount ?? null
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col h-[calc(100vh-4rem)] -mb-20 lg:h-[calc(100vh-6rem)] lg:-mb-8 space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
 
       {/* Header */}
       <CollapsiblePageHeader
