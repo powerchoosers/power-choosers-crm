@@ -329,7 +329,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     {/* PDF Scroller */}
                     <div
                         ref={pdfScrollContainerRef}
-                        className="flex-1 md:overflow-auto np-scroll p-6 flex flex-col items-center bg-[url('/grid.svg')] bg-[size:40px_40px] bg-fixed"
+                        className="flex-1 md:overflow-auto np-scroll pt-6 px-6 pb-2 flex flex-col items-center bg-[url('/grid.svg')] bg-[size:40px_40px] bg-fixed"
                         style={{ touchAction: 'pan-y pinch-zoom' }}
                     >
                         {documentUrl ? (
