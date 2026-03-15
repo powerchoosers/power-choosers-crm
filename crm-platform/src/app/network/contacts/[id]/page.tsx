@@ -266,7 +266,7 @@ export default function ContactDossierPage() {
         <div className="flex-1 flex overflow-hidden relative z-10 group/dossier">
           <div className="grid grid-cols-12 w-full h-full">
             {/* Left Panel */}
-            <div className="col-span-12 lg:col-span-4 h-full overflow-y-auto p-6 md:p-8 border-r border-white/5 scrollbar-thin">
+            <div className="col-span-12 lg:col-span-4 h-full overflow-y-auto p-6 md:p-8 border-r border-white/5 scrollbar-thin np-scroll">
             <IntelligencePanel
                 contact={s.contact}
                 isEditing={s.isEditing}
