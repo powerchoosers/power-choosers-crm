@@ -455,7 +455,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                     </div>
                                     <button
                                         onClick={skipToNextField}
-                                        className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest hover:text-blue-400 transition-colors"
+                                        className="text-[9px] font-mono text-white uppercase tracking-widest hover:text-zinc-300 transition-colors"
                                     >Next Field</button>
                                 </div>
                                 <div className="space-y-1.5">
