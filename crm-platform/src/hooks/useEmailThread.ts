@@ -47,6 +47,14 @@ function applyCommonEmailExclusions(query: any) {
     .not('from', 'ilike', '%warmup%')
 }
 
+function normalizeSubject(subject: string) {
+  return String(subject || '')
+    .replace(/^\s*(re|fw|fwd)\s*:\s*/i, '')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim()
+    .toLowerCase()
+}
+
 export function useEmailThread(threadKey?: string) {
   const { user, role, loading } = useAuth()
   const ownerEmail = user?.email?.toLowerCase() ?? 'guest'
@@ -64,7 +72,7 @@ export function useEmailThread(threadKey?: string) {
           .select('*')
 
         if (role !== 'admin' && user?.email) {
-          query = query.eq('metadata->>ownerId', ownerEmail)
+          query = query.or(`metadata->>ownerId.eq.${ownerEmail},ownerId.eq.${ownerEmail}`)
         }
 
         query = applyCommonEmailExclusions(query)
@@ -88,7 +96,54 @@ export function useEmailThread(threadKey?: string) {
           throw error
         }
 
-        return (data || []).map((item: any) => {
+        const primaryData: any[] = data || []
+
+        // Secondary lookup: if the thread has NO sent emails, the outbound messages were
+        // likely sent via sequences/protocols and stored with threadId: null. Find them
+        // by matching normalized subject against the user's sent emails.
+        const hasSent = primaryData.some((item: any) => {
+          const t = String(item.type || '').toLowerCase()
+          return t === 'sent' || t === 'uplink_out'
+        })
+
+        let secondaryData: any[] = []
+        if (!hasSent && primaryData.length > 0) {
+          const sampleSubject = primaryData[0]?.subject || ''
+          const baseSubject = normalizeSubject(sampleSubject)
+          if (baseSubject.length > 4) {
+            let sentQuery: any = supabase
+              .from('emails')
+              .select('*')
+              .in('type', ['sent', 'uplink_out'])
+              .ilike('subject', `%${baseSubject}%`)
+
+            if (role !== 'admin' && user?.email) {
+              sentQuery = sentQuery.eq('ownerId', ownerEmail)
+            }
+
+            sentQuery = applyCommonEmailExclusions(sentQuery)
+
+            const { data: sentData } = await sentQuery
+              .order('timestamp', { ascending: false, nullsFirst: false })
+              .order('createdAt', { ascending: false, nullsFirst: false })
+              .limit(10)
+
+            const primaryIds = new Set(primaryData.map((item: any) => item.id))
+            secondaryData = (sentData || []).filter((item: any) => !primaryIds.has(item.id))
+          }
+        }
+
+        const allData = [...primaryData, ...secondaryData]
+
+        // Re-sort the merged array so secondary (subject-matched) entries interleave
+        // correctly with primary thread messages instead of always appending at the end.
+        allData.sort((a: any, b: any) => {
+          const ta = new Date(a.timestamp || a.createdAt || a.created_at || 0).getTime()
+          const tb = new Date(b.timestamp || b.createdAt || b.created_at || 0).getTime()
+          return tb - ta // descending — newest first
+        })
+
+        return allData.map((item: any) => {
           let type: Email['type'] = 'received'
           const rawType = String(item.type || '').toLowerCase()
 

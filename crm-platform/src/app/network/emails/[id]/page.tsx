@@ -9,7 +9,7 @@ import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, S
 import { format } from 'date-fns'
 import { playClick } from '@/lib/audio'
 import { EmailContent } from '@/components/emails/EmailContent'
-import { generateNodalSignature } from '@/lib/signature'
+import { generateNodalSignature, generateForensicSignature } from '@/lib/signature'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -57,7 +57,29 @@ export default function EmailDetailPage() {
   const [resolvedReplyAddress, setResolvedReplyAddress] = useState('')
   const [pendingFocusMessageId, setPendingFocusMessageId] = useState<string | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
+  const markedAsReadRef = useRef<string | null>(null)
   const ownerEmail = user?.email?.toLowerCase() ?? 'guest'
+  const senderPhotoUrl = profile?.hostedPhotoUrl || (user?.user_metadata?.avatar_url as string | undefined) || null
+  // Which Zoho account should replies go out from?
+  // For outbound emails, prefer email.from (the actual sending address, e.g. getnodalpoint.com)
+  // over email.ownerId which is intentionally remapped to nodalpoint.io by the sequence sender.
+  // For inbound emails, derive from ownerId (the inbox that received the message).
+  // Falls back to the current auth user email.
+  const isOutboundType = email?.type === 'sent' || email?.type === 'scheduled'
+  const replyFromAccount = (
+    isOutboundType
+      ? (extractEmailAddress(email?.from || '') || email?.ownerId || user?.email || '')
+      : (email?.ownerId || user?.email || '')
+  ).toLowerCase()
+  const isGetnodalAccount = replyFromAccount.includes('@getnodalpoint.com')
+  // Signature rendered as a separate preview element (dark UI version) below the editor,
+  // identical to how ComposeModal handles it — keeps inline styles intact.
+  // The outgoing (light) version is appended in handleSend.
+  const signatureForPreview = profile
+    ? (isGetnodalAccount
+        ? generateForensicSignature(profile, { senderEmail: replyFromAccount })
+        : generateNodalSignature(profile, user, true))
+    : ''
   const threadKey = email?.threadId || email?.id
   const threadQueryKey = ['email-thread', threadKey ?? '', ownerEmail, role]
   const { data: threadEmails = [], isLoading: isThreadLoading } = useEmailThread(threadKey)
@@ -84,6 +106,23 @@ export default function EmailDetailPage() {
     setExpandedThreadId(sentReply.id)
     setPendingFocusMessageId(null)
   }, [pendingFocusMessageId, threadEmails])
+
+  // #8: Keep compose target in sync when the user expands a different thread message
+  // while the reply composer is already open. Updates addressing headers to match the
+  // newly focused message but deliberately preserves whatever the user has already typed.
+  useEffect(() => {
+    if (!isReplyOpen || !expandedThreadId) return
+    if (expandedThreadId === composeTargetId) return
+    const expandedMessage = threadEmails.find((t: Email) => t.id === expandedThreadId)
+    if (!expandedMessage) return
+    const defaults = resolveReplyDefaults(composerMode, expandedMessage)
+    setComposeTargetId(expandedMessage.id)
+    setDraftTo(defaults.to)
+    setDraftCc(defaults.cc)
+    setShowCc(Boolean(defaults.cc))
+    setDraftSubject(defaults.subject)
+    // replyHtml intentionally NOT reset — user's typed content is preserved
+  }, [expandedThreadId, isReplyOpen]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     setIsMounted(true)
@@ -202,9 +241,11 @@ export default function EmailDetailPage() {
     setIframeLoaded(false);
   };
 
-  // Mark as read when the email is loaded
+  // Mark as read when the email is loaded — guarded by a ref so it fires at most once
+  // per email ID even in React Strict Mode (which mounts effects twice in dev).
   useEffect(() => {
-    if (email && email.unread) {
+    if (email && email.unread && markedAsReadRef.current !== id) {
+      markedAsReadRef.current = id
       markAsRead(id)
     }
   }, [email, id, markAsRead])
@@ -260,8 +301,12 @@ export default function EmailDetailPage() {
   ))
   const { data: contactById = {} } = useContactIdentityMapByIds(threadContactIds)
   const fromAddressKey = extractValidAddress(fromValue)
-  const fromContact = (email?.contactId ? contactById[email.contactId] : undefined) || contactByEmail[fromAddressKey]
   const isOutboundEmail = email?.type === 'sent' || email?.type === 'scheduled'
+  // For outbound emails contactId is the RECIPIENT's contact, not the sender's.
+  // Using it for fromContact would label the recipient as the sender in the header.
+  const fromContact = isOutboundEmail
+    ? contactByEmail[fromAddressKey]
+    : ((email?.contactId ? contactById[email.contactId] : undefined) || contactByEmail[fromAddressKey])
   const toResolved = toList.map((raw: string | null | undefined) => {
     const key = extractEmailAddress(String(raw || ''))
     return {
@@ -271,9 +316,29 @@ export default function EmailDetailPage() {
     }
   })
 
-  const displayFromName = fromContact?.displayName || (isOutboundEmail ? (email.fromName || null) : fromMailbox.name) || fromValue
-  const displayFromAddress = extractValidAddress(isOutboundEmail ? fromValue : fromMailbox.address || fromValue) || null
+  const agentName = profile?.firstName
+    ? `${profile.firstName}${profile.lastName ? ' ' + profile.lastName : ''}`.trim()
+    : null
+  const displayFromName = fromContact?.displayName
+    || (isOutboundEmail
+      ? (agentName || email.fromName || null)
+      : fromMailbox.name)
+    || fromValue
+  const displayFromAddress =
+    extractValidAddress(isOutboundEmail ? fromValue : fromMailbox.address || fromValue)
+    // Outbound: fall back to the owning inbox address when from-field is a display name only
+    || (isOutboundEmail ? extractValidAddress(email?.ownerId || '') || null : null)
+    // Inbound: fall back to the linked contact's stored email when from-field has no address
+    || extractValidAddress(fromContact?.email || '')
+    || null
   const currentUserEmail = (user?.email || '').toLowerCase().trim()
+  // All email addresses that belong to this user across both connected accounts
+  const ownedEmailAddresses = new Set([
+    currentUserEmail,
+    'l.patterson@getnodalpoint.com',
+    'l.patterson@nodalpoint.io',
+    ...(profile?.email ? [profile.email.toLowerCase()] : [])
+  ].filter(Boolean))
   const normalizeRecipients = (value: string | string[] | null | undefined): string[] => {
     const values = Array.isArray(value) ? value : [value]
     return Array.from(new Set(
@@ -307,7 +372,7 @@ export default function EmailDetailPage() {
       
       return [replyToCandidate, fromCandidate, contactCandidate, ...toCandidates]
     })
-    .find((address: string) => Boolean(address) && address.toLowerCase() !== currentUserEmail) || ''
+    .find((address: string) => Boolean(address) && !ownedEmailAddresses.has(address.toLowerCase())) || ''
 
   const resolveReplyDefaults = (mode: ComposerMode, message: Email) => {
     const rawReplyTo = (message as any)?.metadata?.['reply-to'] || (message as any)?.metadata?.replyTo
@@ -317,12 +382,12 @@ export default function EmailDetailPage() {
       || (message.contactId ? extractValidAddress(contactById[message.contactId]?.email) : '')
       || extractValidAddress((message as any)?.metadata?.fromAddress)
     
-    // Safety check: if fromAddress is us (the user), we need to look at who we sent it to
-    const isFromUs = fromAddress && fromAddress.toLowerCase() === currentUserEmail
-    
+    // Safety check: if fromAddress is us (either account), we need to look at who we sent it to
+    const isFromUs = fromAddress && ownedEmailAddresses.has(fromAddress.toLowerCase())
+
     const toListForMessage = normalizeRecipients(message.to)
     const ccListForMessage = messageCcValues(message)
-    const nonSelf = (address: string) => address && address.toLowerCase() !== currentUserEmail
+    const nonSelf = (address: string) => address && !ownedEmailAddresses.has(address.toLowerCase())
     const dedupe = (list: string[]) => Array.from(new Set(list.filter(nonSelf)))
 
     if (mode === 'forward') {
@@ -361,7 +426,10 @@ export default function EmailDetailPage() {
   }
 
   useEffect(() => {
-    let cancelled = false
+    // AbortController cancels the in-flight Supabase fetch itself, not just the state write.
+    // This prevents stale results from a previous email winning a race against the current one
+    // when the user navigates between emails quickly.
+    const controller = new AbortController()
 
     const resolveReplyAddressFromContact = async () => {
       setResolvedReplyAddress('')
@@ -379,37 +447,59 @@ export default function EmailDetailPage() {
       if (!fromName) return
 
       const escapeLike = (value: string) => value.replace(/[%_]/g, (match) => `\\${match}`)
-      const nameLike = `%${escapeLike(fromName)}%`
 
-      const getCandidate = async (owned: boolean) => {
-        let query = supabase
-          .from('contacts')
-          .select('email')
-          .ilike('name', nameLike)
-          .limit(1)
+      // Build name variants to try: full name, then name without middle initials
+      // e.g. "Juan B. Carranza" → also try "Juan Carranza"
+      const nameWithoutMiddle = fromName.replace(/\s+[A-Z]\.?\s+/g, ' ').trim()
+      const namesToTry = Array.from(new Set([fromName, nameWithoutMiddle].filter(Boolean)))
 
-        if (owned && ownerScope) {
-          query = query.eq('ownerId', ownerScope)
-        } else if (!owned) {
-          query = query.is('ownerId', null)
+      const getCandidate = async (owned: boolean, name: string): Promise<string> => {
+        if (controller.signal.aborted) return ''
+        try {
+          let query = supabase
+            .from('contacts')
+            .select('email')
+            .ilike('name', `%${escapeLike(name)}%`)
+            .limit(1)
+            .abortSignal(controller.signal)
+
+          if (owned && ownerScope) {
+            query = query.eq('ownerId', ownerScope)
+          } else if (!owned) {
+            query = query.is('ownerId', null)
+          }
+
+          const { data } = await query.maybeSingle()
+          return extractValidAddress(data?.email)
+        } catch (err: any) {
+          if (err?.name === 'AbortError' || controller.signal.aborted) return ''
+          throw err
         }
-
-        const { data } = await query.maybeSingle()
-        return extractValidAddress(data?.email)
       }
 
-      const ownedCandidate = await getCandidate(true)
-      const sharedCandidate = ownedCandidate ? '' : await getCandidate(false)
-      const fallback = ownedCandidate || sharedCandidate
+      let fallback = ''
+      for (const name of namesToTry) {
+        if (controller.signal.aborted) break
+        const owned = await getCandidate(true, name)
+        if (owned) { fallback = owned; break }
+        if (controller.signal.aborted) break
+        const shared = await getCandidate(false, name)
+        if (shared) { fallback = shared; break }
+      }
 
-      if (!cancelled && fallback) {
+      if (!controller.signal.aborted && fallback) {
         setResolvedReplyAddress(fallback)
       }
     }
 
-    resolveReplyAddressFromContact()
+    resolveReplyAddressFromContact().catch((err: any) => {
+      if (err?.name !== 'AbortError' && !controller.signal.aborted) {
+        console.error('[resolveReplyAddress]', err)
+      }
+    })
+
     return () => {
-      cancelled = true
+      controller.abort()
     }
   }, [
     email,
@@ -420,6 +510,13 @@ export default function EmailDetailPage() {
     fromContact?.email,
     inferredCounterparty
   ])
+
+  // Backfill draftTo if the composer opened before async address lookups resolved
+  useEffect(() => {
+    if (!isReplyOpen || composerMode === 'forward' || draftTo) return
+    const candidate = resolvedReplyAddress || inferredCounterparty
+    if (candidate) setDraftTo(candidate)
+  }, [resolvedReplyAddress, inferredCounterparty, isReplyOpen, composerMode, draftTo])
 
   const stripHtml = (value: string) => value
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -485,9 +582,8 @@ export default function EmailDetailPage() {
     setShowCc(Boolean(defaults.cc))
     setDraftSubject(defaults.subject)
 
-    // Clear content and provide signature in the actual input section
-    const signature = (profile && mode !== 'forward') ? generateNodalSignature(profile, user, true) : ''
-    setReplyHtml(`<p></p><br/><br/>${signature}`) 
+    // Body starts empty — signature is rendered separately below the editor (see signatureForPreview)
+    setReplyHtml('<p></p>')
     setReplyAttachments([])
     setIsReplyOpen(true)
   }
@@ -540,7 +636,13 @@ export default function EmailDetailPage() {
       const quoteText = stripHtml(targetMessage.text || targetMessage.snippet || '')
 
       // Handle signature transformation (Dark editor version -> Light outbound version)
-      const outgoingSignature = profile ? generateNodalSignature(profile, user, false) : ''
+      // getnodalpoint.com uses the compact forensic signature (cold-outreach / sequence style)
+      // nodalpoint.io uses the full Nodal branded signature
+      const outgoingSignature = profile
+        ? (isGetnodalAccount
+            ? generateForensicSignature(profile, { senderEmail: replyFromAccount })
+            : generateNodalSignature(profile, user, false))
+        : ''
       const signatureMarker = '<!-- NODAL_COMPOSE_SIGNATURE -->'
       
       let finalBodyHtml = replyHtml
@@ -565,20 +667,27 @@ export default function EmailDetailPage() {
         ? `${finalBodyHtml}${buildForwardedMessage(targetMessage)}`
         : `${finalBodyHtml}${buildQuotedThread(targetMessage)}`
 
-      const encodedAttachments = await Promise.all(
-        replyAttachments.map(async (file: File) => {
-          const buffer = await file.arrayBuffer()
-          const bytes = new Uint8Array(buffer)
-          let binary = ''
-          bytes.forEach((b) => { binary += String.fromCharCode(b) })
-          return {
-            filename: file.name,
-            type: file.type || 'application/octet-stream',
-            size: file.size,
-            content: btoa(binary),
-          }
-        })
-      )
+      const encodedAttachments = (
+        await Promise.allSettled(
+          replyAttachments.map(async (file: File) => {
+            const buffer = await file.arrayBuffer()
+            const bytes = new Uint8Array(buffer)
+            let binary = ''
+            bytes.forEach((b) => { binary += String.fromCharCode(b) })
+            return {
+              filename: file.name,
+              type: file.type || 'application/octet-stream',
+              size: file.size,
+              content: btoa(binary),
+            }
+          })
+        )
+      ).flatMap((result, idx) => {
+        if (result.status === 'fulfilled') return [result.value]
+        console.error(`Failed to encode attachment "${replyAttachments[idx]?.name}":`, result.reason)
+        toast.warning(`Skipped attachment "${replyAttachments[idx]?.name}" — could not read file`)
+        return []
+      })
 
       const response = await fetch('/api/email/zoho-send', {
         method: 'POST',
@@ -590,11 +699,14 @@ export default function EmailDetailPage() {
           content: finalHtml,
           plainTextContent: stripHtml(`${noteText}\n\n${quoteText}`),
           isHtmlEmail: true,
-          userEmail: user.email,
-          from: user.email,
+          userEmail: replyFromAccount || user.email,
+          from: replyFromAccount || user.email,
           fromName,
           threadId: composerMode === 'forward' ? undefined : threadKey,
-          attachments: encodedAttachments
+          attachments: encodedAttachments,
+          // Signal to the backend that this page has already embedded the correct signature.
+          // Prevents zoho-send.js from injecting a second one via its fallback path.
+          hasSignature: true
         })
       })
 
@@ -690,7 +802,19 @@ export default function EmailDetailPage() {
 
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-4">
-              {fromContact ? (
+              {isOutboundEmail ? (
+                senderPhotoUrl ? (
+                  <img
+                    src={senderPhotoUrl}
+                    alt={agentName || 'You'}
+                    className="w-12 h-12 rounded-[14px] object-cover block border border-white/10 flex-shrink-0"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-[14px] bg-[#002FA7]/20 border border-[#002FA7]/30 flex items-center justify-center text-[#8ba6ff] text-base font-bold flex-shrink-0">
+                    {profile?.firstName?.[0] || ''}{profile?.lastName?.[0] || ''}
+                  </div>
+                )
+              ) : fromContact ? (
                 <ContactAvatar
                   name={fromContact.displayName}
                   photoUrl={fromContact.avatarUrl}
@@ -707,7 +831,7 @@ export default function EmailDetailPage() {
               )}
               <div>
                 <div className="flex items-baseline gap-2">
-                    {fromContact ? (
+                    {!isOutboundEmail && fromContact ? (
                       <button
                         type="button"
                         onClick={() => router.push(`/network/contacts/${fromContact.id}`)}
@@ -915,6 +1039,17 @@ export default function EmailDetailPage() {
                       autoFocus
                     />
 
+                    {/* Signature preview — rendered outside the editor to preserve full inline styling,
+                        same pattern as ComposeModal. The light outbound version is appended in handleSend. */}
+                    {composerMode !== 'forward' && signatureForPreview && (
+                      <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
+                        <div
+                          className="rounded-lg overflow-hidden"
+                          dangerouslySetInnerHTML={{ __html: signatureForPreview }}
+                        />
+                      </div>
+                    )}
+
 
                     {replyAttachments.length > 0 ? (
                       <div className="mt-3 space-y-2">
@@ -981,14 +1116,26 @@ export default function EmailDetailPage() {
                     const openCount = threadEmail.openCount || 0
                     const clickCount = threadEmail.clickCount || 0
                     const fromKey = extractEmailAddress(threadEmail.from || '')
-                    const fromContactEntry = (threadEmail.contactId ? contactById[threadEmail.contactId] : undefined) || (fromKey ? contactByEmail[fromKey] : undefined)
+                    // For outbound messages contactId is the RECIPIENT — don't use it to
+                    // resolve the sender's identity or the recipient ends up labeled as sender.
+                    const fromContactEntry = threadIsOutbound
+                      ? (fromKey ? contactByEmail[fromKey] : undefined)
+                      : ((threadEmail.contactId ? contactById[threadEmail.contactId] : undefined) || (fromKey ? contactByEmail[fromKey] : undefined))
                     const parsedFrom = parseMailbox(threadEmail.from || '')
-                    const displayName = fromContactEntry?.displayName || (threadIsOutbound
-                      ? (profile?.firstName ? `${profile.firstName} • You` : 'You')
-                      : threadEmail.fromName || parsedFrom.name || threadEmail.from || 'Unknown')
-                    const displaySegment = threadIsOutbound
-                      ? `To ${Array.isArray(threadEmail.to) ? threadEmail.to.join(', ') : threadEmail.to}`
-                      : `From ${parsedFrom.address || threadEmail.from}`
+                    const displayName = threadIsOutbound
+                      ? (agentName || 'You')
+                      : (fromContactEntry?.displayName || threadEmail.fromName || parsedFrom.name || threadEmail.from || 'Unknown')
+                    // Resolve recipient display for outbound cards (shown inline next to name)
+                    const toRawList = Array.isArray(threadEmail.to)
+                      ? threadEmail.to
+                      : String(threadEmail.to || '').split(',').map((s: string) => s.trim()).filter(Boolean)
+                    const firstToAddr = extractEmailAddress(toRawList[0] || '')
+                    const firstToContact = firstToAddr ? contactByEmail[firstToAddr] : undefined
+                    const recipientLabel = firstToContact?.displayName || firstToAddr || toRawList[0] || ''
+                    const recipientSuffix = toRawList.length > 1 ? ` +${toRawList.length - 1}` : ''
+                    const inlineRecipient = recipientLabel ? `${recipientLabel}${recipientSuffix}` : ''
+                    // For inbound keep the sender-address row (useful to see exact email)
+                    const inboundSegment = threadIsOutbound ? '' : `From ${parsedFrom.address || threadEmail.from || ''}`
                     const snippet = threadEmail.snippet || (threadEmail.text || '').slice(0, 140)
                     const isLatest = index === 0
 
@@ -1010,7 +1157,19 @@ export default function EmailDetailPage() {
                           className="w-full text-left p-4 flex items-start gap-3 focus:outline-none"
                         >
                           <div className="flex-shrink-0">
-                            {fromContactEntry ? (
+                            {threadIsOutbound ? (
+                              senderPhotoUrl ? (
+                                <img
+                                  src={senderPhotoUrl}
+                                  alt={profile?.name || 'You'}
+                                  className="w-10 h-10 rounded-[14px] object-cover block border border-white/10"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-[14px] bg-[#002FA7]/20 border border-[#002FA7]/30 flex items-center justify-center text-[#8ba6ff] text-sm font-bold">
+                                  {profile?.firstName?.[0] || ''}{profile?.lastName?.[0] || ''}
+                                </div>
+                              )
+                            ) : fromContactEntry ? (
                               <ContactAvatar name={fromContactEntry.displayName} size={40} className="rounded-[14px]" />
                             ) : (
                               <CompanyIcon
@@ -1028,8 +1187,13 @@ export default function EmailDetailPage() {
                                   {displayName}
                                 </span>
                                 {isLatest && (
-                                  <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-400">
+                                  <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-emerald-400 flex-shrink-0">
                                     Latest
+                                  </span>
+                                )}
+                                {threadIsOutbound && inlineRecipient && (
+                                  <span className="text-[10px] font-mono text-zinc-400 truncate flex-shrink-0">
+                                    → {inlineRecipient}
                                   </span>
                                 )}
                               </div>
@@ -1071,7 +1235,9 @@ export default function EmailDetailPage() {
                               <span className="text-[10px] font-mono uppercase tracking-[0.4em] text-zinc-500">
                                 {threadIsOutbound ? 'Uplink_Out' : 'Uplink_In'}
                               </span>
-                              <span className="text-xs text-zinc-400 truncate">{displaySegment}</span>
+                              {inboundSegment && (
+                                <span className="text-xs text-zinc-400 truncate">{inboundSegment}</span>
+                              )}
                             </div>
                             {!isExpanded && snippet && (
                               <p className="text-sm text-zinc-400 line-clamp-3">
@@ -1165,7 +1331,7 @@ export default function EmailDetailPage() {
         </motion.div>
 
         <div className="p-4 border-t border-white/5 nodal-recessed">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => openComposerForMessage('reply')}
               className="inline-flex items-center justify-center gap-2.5 bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-medium h-11 px-6 rounded-xl transition-all shadow-[0_0_20px_-5px_#002FA7] hover:shadow-[0_0_30px_-2px_#002FA7]/50 active:scale-[0.98]"
