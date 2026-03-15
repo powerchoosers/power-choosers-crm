@@ -215,8 +215,15 @@
     @apply border-border;
   }
 
+  html {
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
+  }
+
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    overscroll-behavior-x: none;
   }
 
   [data-sonner-toast][data-styled='true'] {
@@ -259,7 +266,8 @@
 
   /* Optimized scroll containers: paint containment + touch scrolling + hidden scrollbar */
   .np-scroll {
-    overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
+    overscroll-behavior-x: none;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     /* Firefox */
@@ -268,7 +276,7 @@
     contain: paint;
     /* Improves scroll performance by containing repaints */
     overflow-x: hidden;
-    /* Lock horizontal drift on touchpad/trackpad two-finger swipe */
+    /* Hard-lock horizontal axis — no drift, no rubber-band */
   }
 
   .np-scroll::-webkit-scrollbar {
