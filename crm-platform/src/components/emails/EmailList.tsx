@@ -442,7 +442,13 @@ export function EmailList({
                       <CompanyIcon
                         name={primaryEmail || 'Unknown'}
                         domain={fallbackDomain}
-                        logoUrl={primaryEmail.toLowerCase().endsWith('@nodalpoint.io') ? '/images/nodalpoint-webicon.png' : undefined}
+                        logoUrl={
+                          primaryEmail.toLowerCase().endsWith('@nodalpoint.io') ||
+                          String(email.from || '').toLowerCase().includes('@nodalpoint.io') ||
+                          String(email.from || '').toLowerCase().includes('nodal point')
+                            ? '/images/nodalpoint-webicon.png'
+                            : undefined
+                        }
                         size={36}
                         roundedClassName="rounded-[10px]"
                       />
