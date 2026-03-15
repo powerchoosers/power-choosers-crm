@@ -210,13 +210,13 @@ export default function EmailDetailPage() {
 
     setIframeLoaded(false);
     setOpeningAttachment(attachment.attachmentId);
-    
+
     try {
-      const folderId = (message as any)?.metadata?.folderId || 
-                       (message as any)?.metadata?.zohoFolder || 
-                       (email as any)?.metadata?.folderId || 
+      const folderId = (message as any)?.metadata?.folderId ||
+                       (message as any)?.metadata?.zohoFolder ||
+                       (email as any)?.metadata?.folderId ||
                        '6109936000000008014';
-      
+
       const params = new URLSearchParams({
         userEmail: user.email,
         messageId: attachment.messageId,
@@ -225,14 +225,22 @@ export default function EmailDetailPage() {
         folderId: String(folderId),
         filename: attachment.filename || ''
       });
-      
-      const fileUrl = `/api/email/attachment?${params.toString()}`;
+
+      // Fetch bytes client-side and convert to a blob URL so the iframe can
+      // render the PDF without Next.js proxy security headers blocking it.
+      // This mirrors how DataIngestionCard uses Supabase signed URLs directly.
+      const response = await fetch(`/api/email/attachment?${params.toString()}`);
+      if (!response.ok) throw new Error(`Failed to fetch attachment (${response.status})`);
+
+      const contentType = response.headers.get('Content-Type') || attachment.mimeType || 'application/octet-stream';
+      const arrayBuffer = await response.arrayBuffer();
+      const blobUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: contentType }));
 
       setPreviewAttachment({
         attachment,
         filename: attachment.filename || 'attachment',
-        url: fileUrl,
-        mimeType: attachment.mimeType || 'application/octet-stream'
+        url: blobUrl,
+        mimeType: contentType
       });
     } catch (error) {
       console.error('Error opening attachment:', error);
