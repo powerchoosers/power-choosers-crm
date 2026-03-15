@@ -614,16 +614,26 @@ function parseZohoMessage(summary, content, ownerEmail) {
     const plainText = rawText || stripHtml(rawHtml);
 
     // Build a proper "Display Name <email@domain.com>" from string.
-    // Zoho sometimes returns only a display name in content.fromAddress, so we check
-    // summary.senderAddress (which reliably has the email) and combine both.
+    // Zoho sometimes returns only a display name in content.fromAddress for alias-sent emails,
+    // so we check summary.senderAddress (which reliably has the email) and combine both.
     const senderDisplayName = summary?.sender || '';
     const emailFromContent = extractEmailAddress(content?.fromAddress || '');
     const emailFromSummary = extractEmailAddress(summary?.senderAddress || '');
+    // Also check raw senderAddress in case extractEmailAddress misses a bare email
+    const rawSenderAddress = summary?.senderAddress || '';
     const actualSenderEmail = (isLikelyEmail(emailFromContent) ? emailFromContent : null)
         || (isLikelyEmail(emailFromSummary) ? emailFromSummary : null)
+        || (isLikelyEmail(rawSenderAddress) ? rawSenderAddress : null)
         || '';
-    const fromAddress = actualSenderEmail
-        ? (senderDisplayName ? `${senderDisplayName} <${actualSenderEmail}>` : actualSenderEmail)
+    // Fallback: if display name matches a known Nodal Point sender, use the known alias address
+    const knownNodalSender = !actualSenderEmail && (
+        senderDisplayName === 'Nodal Point Compliance' ||
+        senderDisplayName === 'Nodal Point' ||
+        senderDisplayName === 'Nodal Point Secure Vault'
+    ) ? 'signal@nodalpoint.io' : '';
+    const resolvedSenderEmail = actualSenderEmail || knownNodalSender;
+    const fromAddress = resolvedSenderEmail
+        ? (senderDisplayName ? `${senderDisplayName} <${resolvedSenderEmail}>` : resolvedSenderEmail)
         : (content?.fromAddress || summary?.senderAddress || summary?.sender || '');
 
     const replyToAddress = content?.replyToAddress || content?.replyTo || summary?.replyToAddress || summary?.replyTo || null;
