@@ -754,42 +754,13 @@ export default function EmailDetailPage() {
             <Star className="w-4 h-4" />
           </button>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            {email.type === 'sent' && (
-              <span className="inline-flex items-center gap-1.5 rounded-sm bg-[#002FA7]/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-[#8ba6ff] border border-[#002FA7]/30 shadow-sm">
-                <ArrowUpRight className="w-3 h-3" />
-                Uplink_Out
-              </span>
-            )}
-            {email.type === 'received' && (
-              <span className="inline-flex items-center gap-1.5 rounded-sm bg-emerald-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-emerald-400 border border-emerald-500/30 shadow-sm">
-                <ArrowDownLeft className="w-3 h-3" />
-                Uplink_In
-              </span>
-            )}
-            {email.type === 'scheduled' && (
-              <span className="inline-flex items-center gap-1.5 rounded-sm bg-amber-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-amber-500 border border-amber-500/30 shadow-sm">
-                <Clock className="w-3 h-3" />
-                Scheduled
-              </span>
-            )}
-            {email.type === 'draft' && (
-              <span className="inline-flex items-center gap-1.5 rounded-sm bg-zinc-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-zinc-400 border border-zinc-500/30 shadow-sm">
-                <Paperclip className="w-3 h-3" />
-                Draft
-              </span>
-            )}
-          </div>
-          <div className="h-4 w-px bg-white/10" />
-          <div className="flex items-center gap-2">
-            <button onClick={handlePrint} className="icon-button-forensic w-9 h-9">
-              <Printer className="w-4 h-4" />
-            </button>
-            <button className="icon-button-forensic w-9 h-9">
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="flex items-center gap-2">
+          <button onClick={handlePrint} className="icon-button-forensic w-9 h-9">
+            <Printer className="w-4 h-4" />
+          </button>
+          <button className="icon-button-forensic w-9 h-9">
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -798,6 +769,32 @@ export default function EmailDetailPage() {
         <div className="flex-none p-8 border-b border-white/5 space-y-6 nodal-module-glass">
           <div className="flex items-start justify-between gap-6">
             <h1 className="text-3xl font-semibold text-white tracking-tighter leading-tight">{email.subject}</h1>
+            <div className="flex-shrink-0 pt-1">
+              {email.type === 'sent' && (
+                <span className="inline-flex items-center gap-1.5 rounded-sm bg-[#002FA7]/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-[#8ba6ff] border border-[#002FA7]/30 shadow-sm">
+                  <ArrowUpRight className="w-3 h-3" />
+                  Uplink_Out
+                </span>
+              )}
+              {email.type === 'received' && (
+                <span className="inline-flex items-center gap-1.5 rounded-sm bg-emerald-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-emerald-400 border border-emerald-500/30 shadow-sm">
+                  <ArrowDownLeft className="w-3 h-3" />
+                  Uplink_In
+                </span>
+              )}
+              {email.type === 'scheduled' && (
+                <span className="inline-flex items-center gap-1.5 rounded-sm bg-amber-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-amber-500 border border-amber-500/30 shadow-sm">
+                  <Clock className="w-3 h-3" />
+                  Scheduled
+                </span>
+              )}
+              {email.type === 'draft' && (
+                <span className="inline-flex items-center gap-1.5 rounded-sm bg-zinc-500/10 px-2 py-0.5 text-[9px] font-mono uppercase tracking-widest font-semibold text-zinc-400 border border-zinc-500/30 shadow-sm">
+                  <Paperclip className="w-3 h-3" />
+                  Draft
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex items-start justify-between">
@@ -1040,13 +1037,21 @@ export default function EmailDetailPage() {
                     />
 
                     {/* Signature preview — rendered outside the editor to preserve full inline styling,
-                        same pattern as ComposeModal. The light outbound version is appended in handleSend. */}
+                        same pattern as ComposeModal. The light outbound version is appended in handleSend.
+                        Forensic sig (getnodalpoint.com) uses dark text on a light bg by design for email
+                        client compatibility — wrap it in a white surface so it reads correctly in dark UI. */}
                     {composerMode !== 'forward' && signatureForPreview && (
                       <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
-                        <div
-                          className="rounded-lg overflow-hidden"
-                          dangerouslySetInnerHTML={{ __html: signatureForPreview }}
-                        />
+                        {isGetnodalAccount ? (
+                          <div className="rounded-lg overflow-hidden bg-white p-3">
+                            <div dangerouslySetInnerHTML={{ __html: signatureForPreview }} />
+                          </div>
+                        ) : (
+                          <div
+                            className="rounded-lg overflow-hidden"
+                            dangerouslySetInnerHTML={{ __html: signatureForPreview }}
+                          />
+                        )}
                       </div>
                     )}
 
