@@ -91,7 +91,7 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
     }
 
     return (
-        <div className="col-span-6 h-full overflow-y-auto px-6 pt-6 pb-12 border-r border-white/5 np-scroll">
+        <div className="col-span-6 h-full overflow-y-auto p-6 border-r border-white/5 np-scroll">
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">02 // Infrastructure</div>
 
