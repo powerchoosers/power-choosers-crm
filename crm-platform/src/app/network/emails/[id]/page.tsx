@@ -5,7 +5,7 @@ import { useEmail, useMarkEmailAsRead } from '@/hooks/useEmail'
 import { useEmailThread } from '@/hooks/useEmailThread'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, Eye, MousePointer2, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react'
+import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, ChevronLeft, ChevronRight, Eye, MousePointer2, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react'
 import { format } from 'date-fns'
 import { playClick } from '@/lib/audio'
 import { EmailContent } from '@/components/emails/EmailContent'
@@ -1484,15 +1484,13 @@ export default function EmailDetailPage() {
 
                       if (isPdf && previewAttachment?.url) {
                         return (
-                          <div className="w-full h-full overflow-y-auto flex flex-col items-center bg-zinc-900 py-4 gap-2">
+                          <div className="w-full h-full overflow-y-auto flex flex-col items-center bg-zinc-900 pt-6 pb-4 gap-2">
                             {/* Page navigation */}
                             {previewNumPages > 1 && (
-                              <div className="flex items-center gap-3 sticky top-2 z-10 px-4 py-1.5 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5 text-[10px] font-mono text-zinc-400">
-                                <button disabled={previewPageNumber <= 1} onClick={() => setPreviewPageNumber(p => p - 1)} className="disabled:opacity-30 hover:text-white transition-colors">Prev</button>
-                                <span className="text-zinc-300">{previewPageNumber}</span>
-                                <span className="text-zinc-600">/</span>
-                                <span>{previewNumPages}</span>
-                                <button disabled={previewPageNumber >= previewNumPages} onClick={() => setPreviewPageNumber(p => p + 1)} className="disabled:opacity-30 hover:text-white transition-colors">Next</button>
+                              <div className="flex items-center gap-1 sticky top-4 z-10 px-1 py-1 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5 text-[10px] font-mono text-zinc-400 mb-2">
+                                <button disabled={previewPageNumber <= 1} onClick={() => setPreviewPageNumber(p => p - 1)} className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full disabled:opacity-20 transition-all text-zinc-400 hover:text-white"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                                <div className="px-3 border-x border-white/5 text-zinc-500">Page <span className="text-zinc-200">{previewPageNumber}</span> / {previewNumPages}</div>
+                                <button disabled={previewPageNumber >= previewNumPages} onClick={() => setPreviewPageNumber(p => p + 1)} className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full disabled:opacity-20 transition-all text-zinc-400 hover:text-white"><ChevronRight className="w-3.5 h-3.5" /></button>
                               </div>
                             )}
                             <Document
