@@ -245,7 +245,7 @@ export function EmailList({
             {filter === 'received' && (
               <motion.div
                 layoutId="emails-filter-pill"
-                className="absolute inset-0 rounded-md bg-white/10"
+                className="absolute inset-0 rounded-md nodal-toggle-pill-highlight"
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
               />
             )}
@@ -253,8 +253,8 @@ export function EmailList({
               type="button"
               onClick={() => { onFilterChange('received'); setCurrentPage(1); }}
               className={cn(
-                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
-                filter === 'received' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider gap-2 flex items-center shrink-0 transition-all duration-200 transform",
+                filter === 'received' ? "text-white" : "text-zinc-500 hover:text-white hover:scale-105 focus-visible:text-white"
               )}
               title="Uplink In"
             >
@@ -265,7 +265,7 @@ export function EmailList({
             {filter === 'sent' && (
               <motion.div
                 layoutId="emails-filter-pill"
-                className="absolute inset-0 rounded-md bg-white/10"
+                className="absolute inset-0 rounded-md nodal-toggle-pill-highlight"
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
               />
             )}
@@ -273,8 +273,8 @@ export function EmailList({
               type="button"
               onClick={() => { onFilterChange('sent'); setCurrentPage(1); }}
               className={cn(
-                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
-                filter === 'sent' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider gap-2 flex items-center shrink-0 transition-all duration-200 transform",
+                filter === 'sent' ? "text-white" : "text-zinc-500 hover:text-white hover:scale-105 focus-visible:text-white"
               )}
               title="Uplink Out"
             >
@@ -285,7 +285,7 @@ export function EmailList({
             {filter === 'scheduled' && (
               <motion.div
                 layoutId="emails-filter-pill"
-                className="absolute inset-0 rounded-md bg-white/10"
+                className="absolute inset-0 rounded-md nodal-toggle-pill-highlight"
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
               />
             )}
@@ -293,8 +293,8 @@ export function EmailList({
               type="button"
               onClick={() => { onFilterChange('scheduled'); setCurrentPage(1); }}
               className={cn(
-                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
-                filter === 'scheduled' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider gap-2 flex items-center shrink-0 transition-all duration-200 transform",
+                filter === 'scheduled' ? "text-white" : "text-zinc-500 hover:text-white hover:scale-105 focus-visible:text-white"
               )}
               title="Scheduled Outbound"
             >
@@ -305,7 +305,7 @@ export function EmailList({
             {filter === 'all' && (
               <motion.div
                 layoutId="emails-filter-pill"
-                className="absolute inset-0 rounded-md bg-white/10"
+                className="absolute inset-0 rounded-md nodal-toggle-pill-highlight"
                 transition={{ type: 'spring', stiffness: 350, damping: 30 }}
               />
             )}
@@ -313,8 +313,8 @@ export function EmailList({
               type="button"
               onClick={() => { onFilterChange('all'); setCurrentPage(1); }}
               className={cn(
-                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
-                filter === 'all' ? "text-white" : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider gap-2 flex items-center shrink-0 transition-all duration-200 transform",
+                filter === 'all' ? "text-white" : "text-zinc-500 hover:text-white hover:scale-105 focus-visible:text-white"
               )}
               title="All Nodes"
             >
