@@ -216,17 +216,17 @@ export function SpreadsheetViewer({ url, filename, onLoad }: SpreadsheetViewerPr
 
           {/* Sticky header */}
           <div
-            className="sticky top-0 z-20 bg-zinc-950"
+            className="sticky top-0 z-20 bg-zinc-950/95 backdrop-blur-sm"
             style={{ display: 'grid', gridTemplateColumns: gridCols }}
           >
             {/* Row number gutter header */}
-            <div className="px-2 py-2 text-zinc-700 border-b border-r border-white/10 text-right text-[10px] font-mono select-none" />
+            <div className="px-2 py-2 text-zinc-700 border-b border-r border-white/[0.06] text-right text-[10px] font-mono select-none" />
             {headers.map((h, i) => (
               <div
                 key={i}
                 onClick={() => selectColumn(i)}
                 title="Click to select entire column"
-                className="px-3 py-2 text-left text-zinc-400 border-b border-r border-white/10 font-mono font-medium text-[11px] truncate cursor-pointer hover:bg-[#002FA7]/10 hover:text-[#8ba6ff] transition-colors select-none"
+                className="px-3 py-2 text-left text-zinc-400 border-b border-r border-white/[0.06] font-mono font-medium text-[11px] truncate cursor-pointer hover:bg-[#002FA7]/10 hover:text-[#8ba6ff] transition-colors select-none"
               >
                 {String(h || `Col ${i + 1}`)}
               </div>
