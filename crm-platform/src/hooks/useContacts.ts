@@ -363,7 +363,7 @@ export function useSearchContacts(queryTerm: string) {
       try {
         let query = supabase
           .from('contacts')
-          .select('*, accounts(name, domain, logo_url)');
+          .select('*, accounts!contacts_accountId_fkey(name, domain, logo_url)');
 
         // Admin and dev see all contacts; others filtered by ownerId
         if (role !== 'admin' && role !== 'dev' && user?.email) {
@@ -431,7 +431,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         let query = supabase
           .from('contacts')
-          .select('*, accounts(name, domain, logo_url, metadata, industry, city, state)', { count: 'exact' });
+          .select('*, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state)', { count: 'exact' });
 
         if (listId) {
           // Fetch targetIds from list_members first due to lack of FK for inner join
@@ -596,7 +596,7 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       const needsAccountJoin = (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
 
       let query = needsAccountJoin
-        ? supabase.from('contacts').select('id, accounts!inner(industry, city, state)', { count: 'exact', head: true })
+        ? supabase.from('contacts').select('id, accounts!contacts_accountId_fkey!inner(industry, city, state)', { count: 'exact', head: true })
         : supabase.from('contacts').select('id', { count: 'exact', head: true });
 
       if (listId) {
@@ -681,8 +681,8 @@ export function useContact(id: string) {
       const { data, error } = await supabase
         .from('contacts')
         .select(`
-          *, 
-          accounts (
+          *,
+          accounts!contacts_accountId_fkey (
             name, domain, logo_url, metadata, city, state, industry,
             electricity_supplier, annual_usage, current_rate, contract_end_date,
             service_addresses, description, phone
