@@ -590,7 +590,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                     <div className="flex items-center gap-2 shrink-0">
                       <button
                         onClick={executeDownload}
-                        className="flex items-center gap-2 px-4 py-1.5 bg-[#002FA7]/20 border border-[#002FA7]/40 text-white rounded-md text-xs font-mono uppercase tracking-widest hover:bg-[#002FA7]/30 transition-colors shadow-[0_0_15px_-5px_#002FA7]"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#002FA7] hover:bg-[#002FA7]/80 border border-[#002FA7] text-white rounded-md text-[10px] font-mono uppercase tracking-widest transition-all"
                       >
                         <Download className="w-3.5 h-3.5" /> Download
                       </button>
