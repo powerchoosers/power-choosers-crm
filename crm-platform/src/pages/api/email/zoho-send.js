@@ -89,7 +89,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { to, cc, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun, attachments } = req.body;
+        const { to, cc, subject, content, plainTextContent, from, fromName, _deliverability, threadId, inReplyTo, references, isHtmlEmail, userEmail, emailSettings, contactId, contactName, contactCompany, dryRun, attachments, hasSignature } = req.body;
         const toRecipients = normalizeRecipientList(to);
         const ccRecipients = normalizeRecipientList(cc);
         logger.info(`[Zoho] Attempting to send email to: ${toRecipients.join(',') || 'none'}, cc: ${ccRecipients.join(',') || 'none'}, subject: ${subject}, user: ${userEmail}, attachments: ${attachments?.length || 0}`, 'zoho-send');
@@ -147,12 +147,17 @@ export default async function handler(req, res) {
         let trackedContent = content;
         if (isHtmlEmailBoolean && trackedContent) {
             const isFoundry = trackedContent.includes('<!-- FOUNDRY_TEMPLATE -->') || trackedContent.includes('data-foundry');
-            const hasSignature =
+            // hasSignature=true in the request body means the caller already embedded the
+            // correct signature (e.g. the reply composer in the email detail page).
+            // Falling back to substring detection catches older callers (ComposeModal, sequences)
+            // that don't send the flag but do embed a marker comment.
+            const signatureAlreadyPresent =
+                hasSignature === true ||
                 trackedContent.includes('NODAL_FORENSIC_SIGNATURE') ||
                 trackedContent.includes('NODAL_COMPOSE_SIGNATURE') ||
                 trackedContent.includes('nodal-signature');
 
-            if (!isFoundry && !hasSignature) {
+            if (!isFoundry && !signatureAlreadyPresent) {
                 try {
                     let lookupEmail = ownerEmail;
                     if (lookupEmail.endsWith('@getnodalpoint.com')) {

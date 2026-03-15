@@ -8,7 +8,7 @@ import { Color } from '@tiptap/extension-color'
 import Image from '@tiptap/extension-image'
 import HardBreak from '@tiptap/extension-hard-break'
 import { cn } from '@/lib/utils'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 
 export interface RichTextEditorProps {
     content: string
@@ -23,6 +23,7 @@ export interface RichTextEditorProps {
 }
 
 export function RichTextEditor({ content, onChange, placeholder, className, autoFocus, onEditorReady }: RichTextEditorProps) {
+    const hasAutoFocused = useRef(false)
     const editor = useEditor({
         extensions: [
             StarterKit.configure({
@@ -88,10 +89,16 @@ export function RichTextEditor({ content, onChange, placeholder, className, auto
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [editor])
 
-    // Set initial focus
-    if (autoFocus && editor && !editor.isFocused) {
-        setTimeout(() => editor.commands.focus('end'), 0)
-    }
+    // Set initial focus once when the editor first mounts — NOT on every re-render.
+    // Using a ref guard prevents focus from being stolen back to the editor when the
+    // user types in sibling input fields (To / Subject / CC) that trigger a parent re-render.
+    useEffect(() => {
+        if (autoFocus && editor && !hasAutoFocused.current) {
+            hasAutoFocused.current = true
+            setTimeout(() => editor.commands.focus('end'), 0)
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [editor])
 
     // Sync external content changes into TipTap (e.g. when AI content is accepted)
     useEffect(() => {

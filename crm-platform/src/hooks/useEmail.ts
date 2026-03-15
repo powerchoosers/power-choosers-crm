@@ -82,7 +82,7 @@ export function useEmail(id: string) {
           unread: !data.is_read,
           type: normalizedType,
           status: data.status,
-          ownerId: data.metadata?.ownerId,
+          ownerId: data.metadata?.ownerId || data.ownerId || null,
           openCount: data.openCount,
           clickCount: data.clickCount,
           attachments: normalizedAttachments
