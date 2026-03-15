@@ -17,8 +17,11 @@ import {
 import { cn } from '@/lib/utils'
 import { formatMillValue, millDecimal } from '@/lib/mills'
 import { useDeal, useUpdateDeal } from '@/hooks/useDeals'
-import { useAccountBillIntelligence } from '@/hooks/useAccounts'
+import { useAccountBillIntelligence, useAccount, useUpdateAccount } from '@/hooks/useAccounts'
+import { useAccountContacts } from '@/hooks/useContacts'
 import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel'
+import { AccountHolderCard } from '@/components/dossier/account-dossier/AccountHolderCard'
+import DataIngestionCard from '@/components/dossier/DataIngestionCard'
 import { useUIStore } from '@/store/uiStore'
 import { useAuth } from '@/context/AuthContext'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
@@ -578,7 +581,10 @@ export default function ContractDetailPage() {
   const { data: deal, isLoading } = useDeal(id)
   const updateDeal = useUpdateDeal()
   const { data: billIntel } = useAccountBillIntelligence(deal?.accountId)
-  const { setRightPanelMode, setDealContext, setSignatureRequestContext } = useUIStore()
+  const { data: account } = useAccount(deal?.accountId ?? '')
+  const { data: contacts = [] } = useAccountContacts(deal?.accountId ?? '')
+  const { mutate: updateAccount } = useUpdateAccount()
+  const { setRightPanelMode, setDealContext, setSignatureRequestContext, setIngestionContext } = useUIStore()
 
   // Brief state
   const [briefLoading, setBriefLoading] = useState(false)
@@ -918,12 +924,32 @@ export default function ContractDetailPage() {
         {/* RIGHT — Sidebar panels */}
         <div className="col-span-4 flex flex-col gap-4 overflow-y-auto np-scroll">
           <AccountIntelPanel deal={deal} />
+
+          {/* Decision Maker */}
+          {deal?.accountId && (
+            <AccountHolderCard
+              accountId={deal.accountId}
+              accountName={deal.account?.name || ''}
+              contacts={contacts}
+              primaryContactId={account?.primaryContactId}
+              onSetHolder={(contactId) => updateAccount({ id: deal.accountId, primaryContactId: contactId })}
+            />
+          )}
+
           <SignaturePanel deal={deal} onCreateRequest={handleOpenSignatureRequest} />
           <CommissionPanel
             deal={deal}
             commissionPct={metrics?.commissionPct ?? null}
             commissionValue={metrics?.commissionValue ?? null}
           />
+
+          {/* Document Vault */}
+          {deal?.accountId && (
+            <DataIngestionCard
+              accountId={deal.accountId}
+              onIngestionComplete={() => {}}
+            />
+          )}
         </div>
       </div>
     </div>
