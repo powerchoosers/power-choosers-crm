@@ -137,6 +137,14 @@ export default function EmailDetailPage() {
     }
   }, [previewAttachment])
 
+  // Chrome's PDF viewer inside an iframe doesn't reliably fire onLoad.
+  // Force the loading skeleton away after 2.5s as a fallback.
+  useEffect(() => {
+    if (!previewAttachment) return
+    const t = setTimeout(() => setIframeLoaded(true), 2500)
+    return () => clearTimeout(t)
+  }, [previewAttachment])
+
   useEffect(() => {
     if (!isReplyOpen) return
     const container = scrollContainerRef.current
