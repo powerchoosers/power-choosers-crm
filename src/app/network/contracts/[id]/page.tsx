@@ -832,7 +832,7 @@ export default function ContractDetailPage() {
       <div className="flex-1 grid grid-cols-12 gap-4 min-h-0 overflow-hidden">
 
         {/* LEFT — Contract Intelligence + Forensic Brief */}
-        <div className="col-span-8 flex flex-col gap-4 overflow-y-auto pr-1 np-scroll">
+        <div className="col-span-8 flex flex-col gap-4 overflow-y-auto pr-1 pb-8 np-scroll">
 
           {/* Contract Intelligence */}
           <div className="nodal-glass rounded-2xl p-6 space-y-6 flex-none">
@@ -930,7 +930,7 @@ export default function ContractDetailPage() {
         </div>
 
         {/* RIGHT — Sidebar panels */}
-        <div className="col-span-4 flex flex-col gap-4 overflow-y-auto np-scroll">
+        <div className="col-span-4 flex flex-col gap-4 overflow-y-auto pb-8 np-scroll">
           <AccountIntelPanel deal={deal} />
 
           {/* Decision Maker */}
