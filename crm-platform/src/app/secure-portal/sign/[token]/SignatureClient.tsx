@@ -329,7 +329,8 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     {/* PDF Scroller */}
                     <div
                         ref={pdfScrollContainerRef}
-                        className="flex-1 overflow-auto np-scroll p-6 flex flex-col items-center bg-[url('/grid.svg')] bg-[size:40px_40px] bg-fixed"
+                        className="flex-1 md:overflow-auto np-scroll p-6 flex flex-col items-center bg-[url('/grid.svg')] bg-[size:40px_40px] bg-fixed"
+                        style={{ touchAction: 'pan-y pinch-zoom' }}
                     >
                         {documentUrl ? (
                             <motion.div
@@ -428,7 +429,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
                 {/* Right: Forensic Console (The Action Panel) */}
                 <aside className="w-full md:w-[384px] shrink-0 border-t md:border-t-0 md:border-l border-white/5 bg-zinc-950 flex flex-col z-40 shadow-2xl md:overflow-y-auto">
-                    <div className="p-6 flex-1 overflow-y-auto np-scroll space-y-8">
+                    <div className="p-6 flex-1 md:overflow-y-auto np-scroll space-y-8">
 
                         {/* Signatory Profile */}
                         <div className="space-y-4">
