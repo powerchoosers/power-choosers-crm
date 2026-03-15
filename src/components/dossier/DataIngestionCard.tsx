@@ -7,6 +7,7 @@ import { UploadCloud, FileText, X, Loader2, PenTool, AlertTriangle, Download, Ch
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import { SpreadsheetViewer } from '@/components/ui/SpreadsheetViewer'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`
 import { supabase } from '@/lib/supabase';
@@ -620,8 +621,21 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                       </div>
                     )}
                     {previewDoc?.signedUrl ? (() => {
-                      const isOffice = /\.(xlsx|xls|docx|doc|pptx|ppt)$/i.test(previewDoc.doc.name);
+                      const isSpreadsheet = /\.(xlsx|xls|csv)$/i.test(previewDoc.doc.name);
+                      const isOffice = /\.(docx|doc|pptx|ppt)$/i.test(previewDoc.doc.name);
                       const isPdf = /\.pdf$/i.test(previewDoc.doc.name) || previewDoc.doc.type === 'application/pdf';
+
+                      if (isSpreadsheet) {
+                        return (
+                          <div className="absolute inset-0">
+                            <SpreadsheetViewer
+                              url={previewDoc.signedUrl}
+                              filename={previewDoc.doc.name}
+                              onLoad={() => setIframeLoaded(true)}
+                            />
+                          </div>
+                        );
+                      }
 
                       if (isOffice) {
                         return (
