@@ -919,6 +919,14 @@ export default function ContractDetailPage() {
 
           {/* Bill Intelligence */}
           <BillIntelligencePanel intel={billIntel} />
+
+          {/* Document Vault */}
+          {deal?.accountId && (
+            <DataIngestionCard
+              accountId={deal.accountId}
+              onIngestionComplete={() => {}}
+            />
+          )}
         </div>
 
         {/* RIGHT — Sidebar panels */}
@@ -942,14 +950,6 @@ export default function ContractDetailPage() {
             commissionPct={metrics?.commissionPct ?? null}
             commissionValue={metrics?.commissionValue ?? null}
           />
-
-          {/* Document Vault */}
-          {deal?.accountId && (
-            <DataIngestionCard
-              accountId={deal.accountId}
-              onIngestionComplete={() => {}}
-            />
-          )}
         </div>
       </div>
     </div>
