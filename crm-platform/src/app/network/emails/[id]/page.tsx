@@ -1040,7 +1040,7 @@ export default function EmailDetailPage() {
                         same pattern as ComposeModal. The light outbound version is appended in handleSend.
                         Both signatures use isDarkMode=true for this preview so colors stay on-theme. */}
                     {composerMode !== 'forward' && signatureForPreview && (
-                      <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
+                      <div className="mt-4 opacity-90">
                         <div
                           className="rounded-lg overflow-hidden"
                           dangerouslySetInnerHTML={{ __html: signatureForPreview }}
