@@ -116,7 +116,8 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
 
 export function generateForensicSignature(
   profile: UserProfile,
-  options?: { senderEmail?: string | null; websiteDomain?: string | null }
+  options?: { senderEmail?: string | null; websiteDomain?: string | null },
+  isDarkMode: boolean = false
 ): string {
   if (!profile) return '';
 
@@ -129,36 +130,42 @@ export function generateForensicSignature(
     .trim();
   const websiteDomain = rawDomain || 'nodalpoint.io';
   const websiteUrl = `https://${websiteDomain}`;
-  const NODAL_BLUE = '#002FA7';
-  const ZINC_500 = '#71717a';
-  const ZINC_950 = '#09090b';
+
+  // Theme-aware colors — dark mode for UI preview, light mode for outgoing emails
+  const NODAL_BLUE = isDarkMode ? '#6b8eff' : '#002FA7';
+  const nameColor = isDarkMode ? '#f4f4f5' : '#09090b';
+  const metaColor = isDarkMode ? '#a1a1aa' : '#71717a';
+  const diagnosticColor = isDarkMode ? '#71717a' : '#09090b';
+  const borderColor = isDarkMode ? 'rgba(255,255,255,0.1)' : '#f3f4f6';
+  const accentBorder = isDarkMode ? '#6b8eff' : '#002FA7';
+  const avatarBg = isDarkMode ? '#18181b' : '#09090b';
 
   return `
 <!-- NODAL_FORENSIC_SIGNATURE -->
-<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #f3f4f6; max-width: 500px;">
+<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid ${borderColor}; max-width: 500px;">
   <table cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
     <tr>
       <td style="padding-right: 12px; vertical-align: top;">
         ${profile.hostedPhotoUrl ? `
-          <img 
-            src="${profile.hostedPhotoUrl}" 
-            alt="${fullName}" 
+          <img
+            src="${profile.hostedPhotoUrl}"
+            alt="${fullName}"
             style="width: 48px; height: 48px; border-radius: 14px; object-fit: cover; display: block;"
           />
         ` : `
-          <div style="width: 48px; height: 48px; background-color: ${ZINC_950}; border-radius: 14px; color: white; display: block; line-height: 48px; text-align: center; font-weight: bold; font-size: 14px;">
+          <div style="width: 48px; height: 48px; background-color: ${avatarBg}; border-radius: 14px; color: white; display: block; line-height: 48px; text-align: center; font-weight: bold; font-size: 14px;">
             ${initials}
           </div>
         `}
       </td>
-      <td style="border-left: 2px solid ${NODAL_BLUE}; padding-left: 12px; vertical-align: middle;">
-        <p style="margin: 0; font-size: 14px; font-weight: 700; color: #09090b; letter-spacing: -0.02em; line-height: 1.2;">
+      <td style="border-left: 2px solid ${accentBorder}; padding-left: 12px; vertical-align: middle;">
+        <p style="margin: 0; font-size: 14px; font-weight: 700; color: ${nameColor}; letter-spacing: -0.02em; line-height: 1.2;">
           ${fullName}
         </p>
-        <p style="margin: 2px 0; font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: ${ZINC_500}; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2;">
+        <p style="margin: 2px 0; font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: ${metaColor}; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2;">
           ${profile.jobTitle || 'Market Architect'} // [VECTOR_OPS]
         </p>
-        <p style="margin: 4px 0 0 0; font-size: 12px; color: ${ZINC_500}; line-height: 1.3;">
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: ${metaColor}; line-height: 1.3;">
           ${senderEmail}
         </p>
         <a href="${websiteUrl}" style="font-size: 12px; color: ${NODAL_BLUE}; text-decoration: none; font-weight: 500;">
@@ -170,7 +177,7 @@ export function generateForensicSignature(
       <td colspan="2" style="padding-top: 12px;">
         <div style="font-family: ui-monospace, Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.4;">
           <div style="color: #10b981;">// SYSTEM_STATUS: OPERATIONAL</div>
-          <div style="color: ${ZINC_950};">// ACTIVE_DIAGNOSTIC: <span style="color: ${NODAL_BLUE};">[ RUN_FORENSIC_SNAPSHOT ]</span></div>
+          <div style="color: ${diagnosticColor};">// ACTIVE_DIAGNOSTIC: <span style="color: ${NODAL_BLUE};">[ RUN_FORENSIC_SNAPSHOT ]</span></div>
         </div>
       </td>
     </tr>
