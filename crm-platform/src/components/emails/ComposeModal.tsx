@@ -21,9 +21,9 @@ import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@
 import { buildFoundryContext, generateSystemPrompt, FoundryContext } from '@/lib/foundry-prompt'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
-import { useSearchContacts } from '@/hooks/useContacts'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { RichTextEditor } from './RichTextEditor'
+import { EmailChipField } from './EmailChipField'
 import type { Editor } from '@tiptap/react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { format } from 'date-fns'
@@ -913,8 +913,8 @@ function ComposePanel({
   initialContext: ComposeContext | null
   onClose: () => void
 }) {
-  const [to, setTo] = useState(initialTo)
-  const [cc, setCc] = useState('')
+  const [toChips, setToChips] = useState<string[]>(() => initialTo ? [initialTo] : [])
+  const [ccChips, setCcChips] = useState<string[]>([])
   const [showCc, setShowCc] = useState(false)
   const [subject, setSubject] = useState(initialSubject)
   const context = initialContext
@@ -1049,15 +1049,6 @@ function ComposePanel({
     return () => window.removeEventListener('nodal:call-processed', onCallProcessed as EventListener)
   }, [context?.contactId, context?.accountId, refreshFoundryContext])
 
-  // Search suggestions state
-  const [toQuery, setToQuery] = useState(initialTo)
-  const [ccQuery, setCcQuery] = useState('')
-  const [showToSuggestions, setShowToSuggestions] = useState(false)
-  const [showCcSuggestions, setShowCcSuggestions] = useState(false)
-
-  const { data: toResults = [], isLoading: isToSearching } = useSearchContacts(toQuery)
-  const { data: ccResults = [], isLoading: isCcSearching } = useSearchContacts(ccQuery)
-
   const handleFoundrySelect = useCallback((id: string | null) => {
     if (id) {
       // Backup current manual draft before applying template
@@ -1087,7 +1078,7 @@ function ComposePanel({
 
   const buildEmailSystemPrompt = useCallback((activeDirective = '') => {
     const effectiveConfig = subjectSuggestsMeetingRecap(subject) ? (EMAIL_TYPES.find((t) => t.id === 'professional') ?? emailTypeConfig) : emailTypeConfig
-    let base = effectiveConfig.getSystemPrompt({ signerName, to: to || '', subject: subject || '' })
+    let base = effectiveConfig.getSystemPrompt({ signerName, to: toChips[0] || '', subject: subject || '' })
     const directiveMentionsContractTiming = /\b(contract|renewal|renew|expiry|expiration|end date|agreement term)\b/i.test(activeDirective)
     if (context && (context.contactName || context.companyName || context.contactTitle || context.accountName || context.contextForAi || context.industry || context.accountDescription)) {
       const lines: string[] = []
@@ -1218,7 +1209,7 @@ OUTPUT FORMAT:
     }
 
     return base
-  }, [emailTypeConfig, signerName, to, subject, isRefinementMode, context, emailTypeId, sendAsPlainText, foundryContext])
+  }, [emailTypeConfig, signerName, toChips, subject, isRefinementMode, context, emailTypeId, sendAsPlainText, foundryContext])
 
   const combineAiDirective = useCallback((typedPrompt: string, angleOrPresetDirective?: string) => {
     const typed = (typedPrompt || '').trim()
@@ -1338,7 +1329,7 @@ Return exactly one subject line.`,
         // Fall through to deterministic fallback below.
       }
 
-      const fallback = buildFallbackSubject(emailTypeId, context, to || '', foundryContext, bodyTextOrHtml)
+      const fallback = buildFallbackSubject(emailTypeId, context, toChips[0] || '', foundryContext, bodyTextOrHtml)
       return normalizeSubjectOutput(normalizedCandidate) || fallback
     }
     try {
@@ -1405,7 +1396,7 @@ Return exactly one subject line.`,
     } finally {
       setIsAiLoading(false)
     }
-  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId, context, foundryContext, to])
+  }, [buildEmailSystemPrompt, content, isRefinementMode, selectedModel, profile?.firstName, subject, emailTypeId, context, foundryContext, toChips])
 
   // Fetch available foundry templates
   const { data: foundryAssets } = useQuery<any[]>({
@@ -1645,7 +1636,7 @@ Return exactly one subject line.`,
   }
 
   const handleSend = async () => {
-    if (!to || !subject || !content) {
+    if (!toChips.length || !subject || !content) {
       toast.error('Please fill in all fields')
       return
     }
@@ -1707,8 +1698,8 @@ Return exactly one subject line.`,
     playClick()
     sendEmail(
       {
-        to,
-        cc: showCc ? cc : undefined,
+        to: toChips.join(', '),
+        cc: showCc && ccChips.length ? ccChips.join(', ') : undefined,
         subject,
         content: coldPlaintextBody ?? plainTextContent,
         html: fullHtml ?? (coldPlaintextBody ? undefined : content),
@@ -1772,7 +1763,7 @@ Return exactly one subject line.`,
         {/* Fixed Header Section */}
         <div className="flex-none px-6 py-4 border-b border-white/5 bg-zinc-950/50 backdrop-blur-md space-y-2 z-20">
           {/* Deliverability Alert */}
-          {to && user?.email && to.toLowerCase().trim() === user.email.toLowerCase().trim() && (
+          {toChips.length === 1 && user?.email && toChips[0].toLowerCase() === user.email.toLowerCase() && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
@@ -1788,38 +1779,17 @@ Return exactly one subject line.`,
             </motion.div>
           )}
 
-          <div className="flex items-center gap-2 relative">
-            <span className="text-xs font-mono text-zinc-500 w-8">To</span>
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Recipient"
-                value={to}
-                onChange={(e) => {
-                  setTo(e.target.value)
-                  setToQuery(e.target.value)
-                  setShowToSuggestions(true)
-                }}
-                onFocus={() => {
-                  if (to.length >= 2) setShowToSuggestions(true)
-                }}
-                className="bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-signal/50 rounded-none px-0 h-9 text-sm focus-visible:ring-0 transition-all"
-              />
-              {showToSuggestions && toQuery.length >= 2 && (
-                <SearchResultsDropdown
-                  results={toResults}
-                  isLoading={isToSearching}
-                  onSelect={(email) => {
-                    setTo(email)
-                    setShowToSuggestions(false)
-                  }}
-                  onClose={() => setShowToSuggestions(false)}
-                />
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono text-zinc-500 w-8 flex-shrink-0">To</span>
+            <EmailChipField
+              chips={toChips}
+              onChange={setToChips}
+              placeholder="Recipient email..."
+            />
             {!showCc && (
               <button
                 onClick={() => setShowCc(true)}
-                className="text-[10px] font-mono text-zinc-500 hover:text-signal transition-colors px-2 py-1 rounded hover:bg-white/5"
+                className="text-[10px] font-mono text-zinc-500 hover:text-signal transition-colors px-2 py-1 rounded hover:bg-white/5 flex-shrink-0"
               >
                 CC
               </button>
@@ -1833,41 +1803,20 @@ Return exactly one subject line.`,
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={{ duration: 0.2, ease: "easeInOut" }}
-                className="overflow-hidden flex items-center gap-2 relative"
+                className="overflow-hidden flex items-center gap-2"
               >
-                <span className="text-xs font-mono text-zinc-500 w-8">Cc</span>
-                <div className="flex-1 relative">
-                  <Input
-                    placeholder="Carbon copy"
-                    value={cc}
-                    onChange={(e) => {
-                      setCc(e.target.value)
-                      setCcQuery(e.target.value)
-                      setShowCcSuggestions(true)
-                    }}
-                    onFocus={() => {
-                      if (cc.length >= 2) setShowCcSuggestions(true)
-                    }}
-                    className="bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-signal/50 rounded-none px-0 h-9 text-sm focus-visible:ring-0 transition-all"
-                  />
-                  {showCcSuggestions && ccQuery.length >= 2 && (
-                    <SearchResultsDropdown
-                      results={ccResults}
-                      isLoading={isCcSearching}
-                      onSelect={(email) => {
-                        setCc(email)
-                        setShowCcSuggestions(false)
-                      }}
-                      onClose={() => setShowCcSuggestions(false)}
-                    />
-                  )}
-                </div>
+                <span className="text-xs font-mono text-zinc-500 w-8 flex-shrink-0">Cc</span>
+                <EmailChipField
+                  chips={ccChips}
+                  onChange={setCcChips}
+                  placeholder="Carbon copy..."
+                />
                 <button
                   onClick={() => {
                     setShowCc(false)
-                    setCc('')
+                    setCcChips([])
                   }}
-                  className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                  className="text-zinc-500 hover:text-red-400 transition-colors p-1 flex-shrink-0"
                 >
                   <X size={14} />
                 </button>

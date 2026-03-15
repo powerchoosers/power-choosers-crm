@@ -26,6 +26,7 @@ import { useContactIdentityMapByIds } from '@/hooks/useContactIdentityMapByIds'
 import { supabase } from '@/lib/supabase'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { EmailChipField } from '@/components/emails/EmailChipField'
 
 type ComposerMode = 'reply' | 'reply_all' | 'forward'
 
@@ -42,8 +43,8 @@ export default function EmailDetailPage() {
   const [isReplyOpen, setIsReplyOpen] = useState(false)
   const [composerMode, setComposerMode] = useState<ComposerMode>('reply')
   const [composeTargetId, setComposeTargetId] = useState<string | null>(id || null)
-  const [draftTo, setDraftTo] = useState('')
-  const [draftCc, setDraftCc] = useState('')
+  const [toChips, setToChips] = useState<string[]>([])
+  const [ccChips, setCcChips] = useState<string[]>([])
   const [draftSubject, setDraftSubject] = useState('')
   const [showCc, setShowCc] = useState(false)
   const [replyHtml, setReplyHtml] = useState('')
@@ -117,8 +118,8 @@ export default function EmailDetailPage() {
     if (!expandedMessage) return
     const defaults = resolveReplyDefaults(composerMode, expandedMessage)
     setComposeTargetId(expandedMessage.id)
-    setDraftTo(defaults.to)
-    setDraftCc(defaults.cc)
+    setToChips(chipify(defaults.to))
+    setCcChips(chipify(defaults.cc))
     setShowCc(Boolean(defaults.cc))
     setDraftSubject(defaults.subject)
     // replyHtml intentionally NOT reset — user's typed content is preserved
@@ -511,12 +512,19 @@ export default function EmailDetailPage() {
     inferredCounterparty
   ])
 
-  // Backfill draftTo if the composer opened before async address lookups resolved
+  // Backfill To chips if the composer opened before async address lookups resolved
   useEffect(() => {
-    if (!isReplyOpen || composerMode === 'forward' || draftTo) return
+    if (!isReplyOpen || composerMode === 'forward' || toChips.length > 0) return
     const candidate = resolvedReplyAddress || inferredCounterparty
-    if (candidate) setDraftTo(candidate)
-  }, [resolvedReplyAddress, inferredCounterparty, isReplyOpen, composerMode, draftTo])
+    if (candidate) setToChips(chipify(candidate))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resolvedReplyAddress, inferredCounterparty, isReplyOpen, composerMode, toChips.length])
+
+  // Parse a comma-separated address string into chip array
+  const chipify = (val: string | string[]) =>
+    (Array.isArray(val) ? val : val.split(','))
+      .map((e: string) => e.trim().toLowerCase())
+      .filter(Boolean)
 
   const stripHtml = (value: string) => value
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -577,8 +585,8 @@ export default function EmailDetailPage() {
     const defaults = resolveReplyDefaults(mode, target)
     setComposerMode(mode)
     setComposeTargetId(target.id)
-    setDraftTo(defaults.to)
-    setDraftCc(defaults.cc)
+    setToChips(chipify(defaults.to))
+    setCcChips(chipify(defaults.cc))
     setShowCc(Boolean(defaults.cc))
     setDraftSubject(defaults.subject)
 
@@ -616,8 +624,8 @@ export default function EmailDetailPage() {
       return
     }
 
-    const toRecipients = normalizeRecipients(draftTo)
-    const ccRecipients = showCc || draftCc.trim() ? normalizeRecipients(draftCc) : []
+    const toRecipients = toChips
+    const ccRecipients = showCc && ccChips.length ? ccChips : []
     if (toRecipients.length === 0) {
       toast.error('No valid reply address found')
       return
@@ -722,8 +730,8 @@ export default function EmailDetailPage() {
 
       toast.success(composerMode === 'forward' ? 'Forward sent' : 'Reply sent')
       setReplyHtml('')
-      setDraftTo('')
-      setDraftCc('')
+      setToChips([])
+      setCcChips([])
       setDraftSubject('')
       setShowCc(false)
       setReplyAttachments([])
@@ -915,18 +923,17 @@ export default function EmailDetailPage() {
 
                   <div className="px-4 py-3 border-b border-white/10 space-y-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-zinc-500 w-8">To</span>
-                      <Input
-                        value={draftTo}
-                        onChange={(e) => setDraftTo(e.target.value)}
-                        placeholder={composerMode === 'forward' ? 'Recipient emails, comma separated' : 'Recipient email'}
-                        className="h-8 bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-[#002FA7]/60 rounded-none px-0 text-sm focus-visible:ring-0"
+                      <span className="text-xs font-mono text-zinc-500 w-8 flex-shrink-0">To</span>
+                      <EmailChipField
+                        chips={toChips}
+                        onChange={setToChips}
+                        placeholder={composerMode === 'forward' ? 'Recipient emails...' : 'Recipient email...'}
                       />
                       {!showCc && (
                         <button
                           type="button"
                           onClick={() => setShowCc(true)}
-                          className="text-[10px] font-mono text-zinc-500 hover:text-[#002FA7] transition-colors px-2 py-1 rounded hover:bg-white/5"
+                          className="text-[10px] font-mono text-zinc-500 hover:text-[#002FA7] transition-colors px-2 py-1 rounded hover:bg-white/5 flex-shrink-0"
                         >
                           CC
                         </button>
@@ -934,20 +941,19 @@ export default function EmailDetailPage() {
                     </div>
                     {showCc && (
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-mono text-zinc-500 w-8">Cc</span>
-                        <Input
-                          value={draftCc}
-                          onChange={(e) => setDraftCc(e.target.value)}
-                          placeholder="CC emails, comma separated"
-                          className="h-8 bg-transparent border-0 border-b border-transparent hover:border-white/10 focus-visible:border-[#002FA7]/60 rounded-none px-0 text-sm focus-visible:ring-0"
+                        <span className="text-xs font-mono text-zinc-500 w-8 flex-shrink-0">Cc</span>
+                        <EmailChipField
+                          chips={ccChips}
+                          onChange={setCcChips}
+                          placeholder="CC emails..."
                         />
                         <button
                           type="button"
                           onClick={() => {
                             setShowCc(false)
-                            setDraftCc('')
+                            setCcChips([])
                           }}
-                          className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                          className="text-zinc-500 hover:text-red-400 transition-colors p-1 flex-shrink-0"
                           title="Hide CC"
                         >
                           <X className="w-3 h-3" />
