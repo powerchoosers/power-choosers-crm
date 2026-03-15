@@ -442,6 +442,7 @@ export function EmailList({
                       <CompanyIcon
                         name={primaryEmail || 'Unknown'}
                         domain={fallbackDomain}
+                        logoUrl={primaryEmail === 'signal@nodalpoint.io' ? '/images/nodalpoint-webicon.png' : undefined}
                         size={36}
                         roundedClassName="rounded-[10px]"
                       />
