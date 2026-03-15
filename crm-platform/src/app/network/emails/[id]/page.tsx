@@ -27,6 +27,11 @@ import { supabase } from '@/lib/supabase'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { EmailChipField } from '@/components/emails/EmailChipField'
+import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/Page/AnnotationLayer.css'
+import 'react-pdf/dist/Page/TextLayer.css'
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`
 
 type ComposerMode = 'reply' | 'reply_all' | 'forward'
 
@@ -54,6 +59,8 @@ export default function EmailDetailPage() {
   const [previewAttachment, setPreviewAttachment] = useState<{ attachment: EmailAttachment; filename: string; url: string; mimeType?: string } | null>(null)
   const [openingAttachment, setOpeningAttachment] = useState<string | null>(null)
   const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [previewNumPages, setPreviewNumPages] = useState(0)
+  const [previewPageNumber, setPreviewPageNumber] = useState(1)
   const [isMounted, setIsMounted] = useState(false)
   const [resolvedReplyAddress, setResolvedReplyAddress] = useState('')
   const [pendingFocusMessageId, setPendingFocusMessageId] = useState<string | null>(null)
@@ -232,10 +239,21 @@ export default function EmailDetailPage() {
       const response = await fetch(`/api/email/attachment?${params.toString()}`);
       if (!response.ok) throw new Error(`Failed to fetch attachment (${response.status})`);
 
-      const contentType = response.headers.get('Content-Type') || attachment.mimeType || 'application/octet-stream';
+      let contentType = response.headers.get('Content-Type') || attachment.mimeType || 'application/octet-stream';
+      // Infer MIME from filename when server returns generic octet-stream
+      if (contentType === 'application/octet-stream' || contentType.startsWith('application/octet-stream')) {
+        const ext = (attachment.filename || '').split('.').pop()?.toLowerCase();
+        if (ext === 'pdf') contentType = 'application/pdf';
+        else if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
+        else if (ext === 'png') contentType = 'image/png';
+        else if (ext === 'gif') contentType = 'image/gif';
+        else if (ext === 'webp') contentType = 'image/webp';
+      }
       const arrayBuffer = await response.arrayBuffer();
       const blobUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: contentType }));
 
+      setPreviewNumPages(0);
+      setPreviewPageNumber(1);
       setPreviewAttachment({
         attachment,
         filename: attachment.filename || 'attachment',
@@ -1461,26 +1479,58 @@ export default function EmailDetailPage() {
                     )}
 
                     {(() => {
+                      const isPdf = previewAttachment?.mimeType === 'application/pdf' || /\.pdf$/i.test(previewAttachment?.filename || '');
                       const isImage = previewAttachment?.mimeType?.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(previewAttachment?.filename || '');
-                      
+
+                      if (isPdf && previewAttachment?.url) {
+                        return (
+                          <div className="w-full h-full overflow-y-auto flex flex-col items-center bg-zinc-900 py-4 gap-2">
+                            {/* Page navigation */}
+                            {previewNumPages > 1 && (
+                              <div className="flex items-center gap-3 sticky top-2 z-10 px-4 py-1.5 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5 text-[10px] font-mono text-zinc-400">
+                                <button disabled={previewPageNumber <= 1} onClick={() => setPreviewPageNumber(p => p - 1)} className="disabled:opacity-30 hover:text-white transition-colors">Prev</button>
+                                <span className="text-zinc-300">{previewPageNumber}</span>
+                                <span className="text-zinc-600">/</span>
+                                <span>{previewNumPages}</span>
+                                <button disabled={previewPageNumber >= previewNumPages} onClick={() => setPreviewPageNumber(p => p + 1)} className="disabled:opacity-30 hover:text-white transition-colors">Next</button>
+                              </div>
+                            )}
+                            <Document
+                              file={previewAttachment.url}
+                              onLoadSuccess={({ numPages }) => { setPreviewNumPages(numPages); setIframeLoaded(true); }}
+                              loading={null}
+                              className="flex flex-col items-center"
+                            >
+                              <Page
+                                pageNumber={previewPageNumber}
+                                renderTextLayer={false}
+                                renderAnnotationLayer={false}
+                                width={Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.72 : 900, 900)}
+                                className="shadow-2xl"
+                              />
+                            </Document>
+                          </div>
+                        );
+                      }
+
                       if (isImage) {
                         return (
                           <div className="w-full h-full flex items-center justify-center p-4">
                             <img
-                              src={previewAttachment.url}
-                              alt={previewAttachment.filename}
+                              src={previewAttachment!.url}
+                              alt={previewAttachment!.filename}
                               className="max-w-full max-h-full object-contain"
                               onLoad={() => setIframeLoaded(true)}
                             />
                           </div>
                         );
                       }
-                      
+
                       const isOffice = /\.(xlsx|xls|docx|doc|pptx|ppt)$/i.test(previewAttachment?.filename || '');
                       const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${previewAttachment?.url}` : '';
                       const iframeSrc = isOffice && fullUrl
                         ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrl)}`
-                        : `${previewAttachment?.url}#view=FitH`;
+                        : previewAttachment?.url || '';
 
                       return (
                         <iframe
