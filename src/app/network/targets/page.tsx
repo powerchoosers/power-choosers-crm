@@ -265,17 +265,17 @@ export default function TargetOverviewPage() {
                 {activeMode === 'people' && (
                   <motion.div
                     layoutId="targets-toggle-pill"
-                    className="absolute inset-0 rounded-md bg-white/10"
+                    className="absolute inset-0 rounded-md nodal-toggle-pill-highlight"
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
                 )}
                 <button
                   onClick={() => setActiveMode('people')}
                   className={cn(
-                    "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                    "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider gap-2 flex items-center shrink-0 transition-all duration-200 transform",
                     activeMode === 'people'
                       ? "text-white"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                      : "text-zinc-500 hover:text-white hover:scale-105 focus-visible:text-white"
                   )}
                   title="Human Intel Layer"
                 >
@@ -286,17 +286,17 @@ export default function TargetOverviewPage() {
                 {activeMode === 'account' && (
                   <motion.div
                     layoutId="targets-toggle-pill"
-                    className="absolute inset-0 rounded-md bg-white/10"
+                    className="absolute inset-0 rounded-md nodal-toggle-pill-highlight"
                     transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                   />
                 )}
                 <button
                   onClick={() => setActiveMode('account')}
                   className={cn(
-                    "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider transition-colors duration-200 gap-2 flex items-center shrink-0",
+                    "relative z-10 px-4 py-2 rounded-md text-[10px] font-mono uppercase tracking-wider gap-2 flex items-center shrink-0 transition-all duration-200 transform",
                     activeMode === 'account'
                       ? "text-white"
-                      : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5"
+                      : "text-zinc-500 hover:text-white hover:scale-105 focus-visible:text-white"
                   )}
                   title="Asset Intel Layer"
                 >
