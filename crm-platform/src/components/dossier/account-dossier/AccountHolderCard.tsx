@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { UserCheck, Phone, Mail, ArrowUpRight, X, Search, ChevronDown, Smartphone, Landmark } from 'lucide-react'
+import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone } from 'lucide-react'
 import { useCallStore } from '@/store/callStore'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { formatPhoneNumber } from '@/lib/formatPhone'
@@ -15,7 +15,6 @@ interface HolderContact {
   workDirectPhone?: string
   phone?: string
   avatarUrl?: string
-  avatarColor?: string
 }
 
 interface AccountHolderCardProps {
@@ -97,7 +96,6 @@ export function AccountHolderCard({
             <ContactAvatar
               name={holder.name}
               photoUrl={holder.avatarUrl}
-              color={holder.avatarColor}
               size={40}
               className="rounded-xl shrink-0"
             />
@@ -183,7 +181,6 @@ export function AccountHolderCard({
                 <ContactAvatar
                   name={c.name}
                   photoUrl={c.avatarUrl}
-                  color={c.avatarColor}
                   size={32}
                   className="rounded-lg shrink-0"
                 />
