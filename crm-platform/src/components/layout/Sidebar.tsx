@@ -184,7 +184,7 @@ export function Sidebar() {
 
       <motion.nav
         className={cn(
-          "flex-1 py-6 flex flex-col overflow-x-hidden",
+          "flex-1 py-6 flex flex-col overflow-x-hidden np-scroll",
           isHovered ? "overflow-y-auto custom-scrollbar" : "overflow-y-hidden"
         )}
         animate={{
