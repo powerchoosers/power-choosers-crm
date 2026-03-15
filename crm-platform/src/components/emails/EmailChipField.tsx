@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { X, Loader2 } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 
@@ -76,21 +77,28 @@ export function EmailChipField({ chips, onChange, placeholder = 'Add email...', 
         className="flex flex-wrap items-center gap-1 min-h-[32px] border-b border-transparent hover:border-white/10 focus-within:border-[#002FA7]/60 py-1 cursor-text transition-colors"
         onClick={() => inputRef.current?.focus()}
       >
-        {chips.map((chip, idx) => (
-          <span
-            key={`${chip}-${idx}`}
-            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#002FA7]/15 border border-[#002FA7]/40 text-[#8ba6ff] text-[11px] font-mono flex-shrink-0 max-w-[240px]"
-          >
-            <span className="truncate">{chip}</span>
-            <button
-              type="button"
-              onMouseDown={(e) => { e.preventDefault(); removeChip(idx) }}
-              className="hover:text-white transition-colors flex-shrink-0 ml-0.5"
+        <AnimatePresence initial={false}>
+          {chips.map((chip, idx) => (
+            <motion.span
+              key={chip}
+              initial={{ opacity: 0, scale: 0.7, y: -4 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.7, y: -4 }}
+              transition={{ duration: 0.18, ease: [0.19, 1, 0.22, 1] }}
+              style={{ display: 'inline-flex' }}
+              className="items-center gap-1 px-2 py-0.5 rounded-md bg-[#002FA7]/15 border border-[#002FA7]/40 text-[#8ba6ff] text-[11px] font-mono flex-shrink-0 max-w-[240px]"
             >
-              <X className="w-2.5 h-2.5" />
-            </button>
-          </span>
-        ))}
+              <span className="truncate">{chip}</span>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); removeChip(idx) }}
+                className="hover:text-white transition-colors flex-shrink-0 ml-0.5"
+              >
+                <X className="w-2.5 h-2.5" />
+              </button>
+            </motion.span>
+          ))}
+        </AnimatePresence>
 
         <input
           ref={inputRef}
