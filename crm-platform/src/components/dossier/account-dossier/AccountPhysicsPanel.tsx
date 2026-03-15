@@ -80,7 +80,7 @@ export const AccountPhysicsPanel = memo(function AccountPhysicsPanel({
     }
 
     return (
-        <div className="col-span-3 h-full overflow-y-auto p-6 border-r border-white/5 np-scroll bg-black/10">
+        <div className="col-span-3 h-full overflow-y-auto px-6 pt-6 pb-12 border-r border-white/5 np-scroll bg-black/10">
             <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-700">
                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">01 // Physics</div>
 
