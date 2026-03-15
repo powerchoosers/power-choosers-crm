@@ -30,6 +30,7 @@ import { EmailChipField } from '@/components/emails/EmailChipField'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
+import { SpreadsheetViewer } from '@/components/ui/SpreadsheetViewer'
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`
 
@@ -1524,7 +1525,21 @@ export default function EmailDetailPage() {
                         );
                       }
 
-                      const isOffice = /\.(xlsx|xls|docx|doc|pptx|ppt)$/i.test(previewAttachment?.filename || '');
+                      const isSpreadsheet = /\.(xlsx|xls|csv)$/i.test(previewAttachment?.filename || '');
+                      const isOffice = /\.(docx|doc|pptx|ppt)$/i.test(previewAttachment?.filename || '');
+
+                      if (isSpreadsheet && previewAttachment?.url) {
+                        return (
+                          <div className="absolute inset-0">
+                            <SpreadsheetViewer
+                              url={previewAttachment.url}
+                              filename={previewAttachment.filename || ''}
+                              onLoad={() => setIframeLoaded(true)}
+                            />
+                          </div>
+                        );
+                      }
+
                       const fullUrl = typeof window !== 'undefined' ? `${window.location.origin}${previewAttachment?.url}` : '';
                       const iframeSrc = isOffice && fullUrl
                         ? `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(fullUrl)}`
