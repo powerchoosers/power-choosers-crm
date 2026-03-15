@@ -1455,7 +1455,7 @@ export default function EmailDetailPage() {
                       </button>
                       <button
                         onClick={closeAttachmentPreview}
-                        className="p-1.5 rounded-md text-zinc-500 hover:text-white hover:bg-white/10 transition-all border border-transparent hover:border-white/10"
+                        className="text-zinc-500 hover:text-white transition-all hover:scale-110"
                         title="Close"
                       >
                         <X className="w-4 h-4" />
@@ -1463,17 +1463,17 @@ export default function EmailDetailPage() {
                     </div>
                   </div>
 
-                  <div className="flex-1 bg-zinc-900 relative overflow-hidden">
+                  <div className="flex-1 bg-zinc-950 relative overflow-hidden">
                     {!iframeLoaded && (
-                      <div className="absolute inset-0 z-10 flex flex-col bg-zinc-900 gap-3 p-8">
-                        <div className="w-1/2 h-4 bg-zinc-800 rounded animate-pulse mx-auto" />
-                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse mt-4" />
-                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse" />
-                        <div className="w-4/5 h-3 bg-zinc-800/60 rounded animate-pulse" />
-                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse mt-2" />
-                        <div className="w-full h-3 bg-zinc-800/60 rounded animate-pulse" />
-                        <div className="w-3/4 h-3 bg-zinc-800/60 rounded animate-pulse" />
-                        <div className="mt-4 text-[10px] font-mono text-zinc-600 uppercase tracking-widest text-center animate-pulse">
+                      <div className="absolute inset-0 z-10 flex flex-col bg-zinc-950 gap-3 p-8">
+                        <div className="w-1/2 h-4 bg-white/5 rounded animate-pulse mx-auto" />
+                        <div className="w-full h-3 bg-white/[0.03] rounded animate-pulse mt-4" />
+                        <div className="w-full h-3 bg-white/[0.03] rounded animate-pulse" />
+                        <div className="w-4/5 h-3 bg-white/[0.03] rounded animate-pulse" />
+                        <div className="w-full h-3 bg-white/[0.03] rounded animate-pulse mt-2" />
+                        <div className="w-full h-3 bg-white/[0.03] rounded animate-pulse" />
+                        <div className="w-3/4 h-3 bg-white/[0.03] rounded animate-pulse" />
+                        <div className="mt-4 text-[10px] font-mono text-zinc-700 uppercase tracking-widest text-center animate-pulse">
                           Loading document...
                         </div>
                       </div>
