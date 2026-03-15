@@ -659,8 +659,8 @@ export default function EmailDetailPage() {
         // if we replace the whole block, but it's better than sending dark colors to a light-mode client.
         finalBodyHtml = parts[0] + signatureMarker + outgoingSignature
       } else if (profile && composerMode !== 'forward') {
-        // Fallback: if signature was deleted but we still want one
-        finalBodyHtml = `${replyHtml}<div style="margin-top: 24px;">${outgoingSignature}</div>`
+        // Both signatures carry their own margin-top + border-top — append directly
+        finalBodyHtml = `${replyHtml}${outgoingSignature}`
       }
 
       const finalHtml = composerMode === 'forward'
