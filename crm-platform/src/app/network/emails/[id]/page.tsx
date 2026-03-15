@@ -832,7 +832,13 @@ export default function EmailDetailPage() {
                 <CompanyIcon
                   name={displayFromName}
                   domain={displayFromAddress?.includes('@') ? displayFromAddress.split('@')[1] : undefined}
-                  logoUrl={displayFromAddress?.toLowerCase().endsWith('@nodalpoint.io') ? '/images/nodalpoint-webicon.png' : undefined}
+                  logoUrl={
+                    displayFromAddress?.toLowerCase().endsWith('@nodalpoint.io') ||
+                    String(email?.from || '').toLowerCase().includes('@nodalpoint.io') ||
+                    String(email?.from || '').toLowerCase().includes('nodal point')
+                      ? '/images/nodalpoint-webicon.png'
+                      : undefined
+                  }
                   size={48}
                   roundedClassName="rounded-[14px]"
                 />
@@ -1182,7 +1188,12 @@ export default function EmailDetailPage() {
                               <CompanyIcon
                                 name={displayName}
                                 domain={(parsedFrom.address || threadEmail.from || '').includes('@') ? (parsedFrom.address || threadEmail.from || '').split('@')[1] : undefined}
-                                logoUrl={(parsedFrom.address || threadEmail.from || '').toLowerCase().includes('@nodalpoint.io') ? '/images/nodalpoint-webicon.png' : undefined}
+                                logoUrl={
+                                  (parsedFrom.address || threadEmail.from || '').toLowerCase().includes('@nodalpoint.io') ||
+                                  (parsedFrom.address || threadEmail.from || '').toLowerCase().includes('nodal point')
+                                    ? '/images/nodalpoint-webicon.png'
+                                    : undefined
+                                }
                                 size={40}
                                 roundedClassName="rounded-[14px]"
                               />
