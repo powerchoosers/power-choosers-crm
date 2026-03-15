@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import SignatureCanvas from 'react-signature-canvas'
 import { motion } from 'framer-motion'
-import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronRight, Download, FileText } from 'lucide-react'
+import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Document, Page, pdfjs } from 'react-pdf'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -298,20 +298,20 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
                     {/* View Controls */}
                     <div className="h-10 shrink-0 border-b border-white/5 bg-zinc-950/50 flex items-center justify-between px-4">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1 px-1 py-1 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5">
                             <button
                                 onClick={() => setPageNumber(p => Math.max(1, p - 1))}
                                 disabled={pageNumber <= 1}
-                                className="p-1 px-3 text-[10px] font-mono uppercase bg-white/5 hover:bg-white/10 rounded disabled:opacity-20 transition-all text-zinc-400"
-                            >Prev</button>
-                            <div className="px-4 text-[10px] font-mono text-zinc-500 border-x border-white/5">
+                                className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full disabled:opacity-20 transition-all text-zinc-400 hover:text-white"
+                            ><ChevronLeft className="w-3.5 h-3.5" /></button>
+                            <div className="px-3 text-[10px] font-mono text-zinc-500 border-x border-white/5">
                                 Page <span className="text-zinc-200">{pageNumber}</span> / {numPages || '-'}
                             </div>
                             <button
                                 onClick={() => setPageNumber(p => Math.min(numPages, p + 1))}
                                 disabled={pageNumber >= numPages}
-                                className="p-1 px-3 text-[10px] font-mono uppercase bg-white/5 hover:bg-white/10 rounded disabled:opacity-20 transition-all text-zinc-400"
-                            >Next</button>
+                                className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full disabled:opacity-20 transition-all text-zinc-400 hover:text-white"
+                            ><ChevronRight className="w-3.5 h-3.5" /></button>
                         </div>
 
                         <div className="flex items-center gap-3">
