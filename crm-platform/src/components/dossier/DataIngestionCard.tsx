@@ -431,7 +431,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
       </div>
 
       {/* FILE LIST (The Evidence) */}
-      <div className="p-2 space-y-1 flex-1">
+      <div className="p-2 space-y-1 min-h-[120px]">
         {loading && files.length === 0 ? (
           <div className="flex justify-center py-4">
             <Loader2 className="w-4 h-4 animate-spin text-zinc-700" />
