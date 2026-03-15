@@ -367,7 +367,7 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       className={`
-        relative overflow-hidden rounded-2xl transition-all duration-300
+        relative overflow-hidden rounded-2xl transition-all duration-300 shrink-0
         ${isDragging
           ? 'bg-[#002FA7]/10 border-[#002FA7] shadow-[0_0_30px_-10px_rgba(0,47,167,0.5)]'
           : 'nodal-module-glass nodal-monolith-edge border-white/5'}
