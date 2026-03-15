@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone } from 'lucide-react'
 import { useCallStore } from '@/store/callStore'
+import { useComposeStore } from '@/store/composeStore'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 
@@ -33,6 +34,7 @@ export function AccountHolderCard({
   onSetHolder,
 }: AccountHolderCardProps) {
   const initiateCall = useCallStore(s => s.initiateCall)
+  const openCompose = useComposeStore(s => s.openCompose)
   const [picking, setPicking] = useState(false)
   const [query, setQuery] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -61,7 +63,16 @@ export function AccountHolderCard({
 
   const handleEmail = () => {
     if (!holder?.email) return
-    window.open(`mailto:${holder.email}`)
+    openCompose({
+      to: holder.email,
+      context: {
+        contactId: holder.id,
+        contactName: holder.name,
+        contactTitle: holder.title,
+        accountId: accountId,
+        accountName: accountName,
+      },
+    })
   }
 
   const handleSelect = (c: HolderContact) => {
@@ -126,7 +137,7 @@ export function AccountHolderCard({
                   <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
                     {holder.mobile ? 'Mobile' : holder.workDirectPhone ? 'Work Direct' : 'Phone'}
                   </span>
-                  <span className="text-[13px] font-mono tabular-nums text-white tracking-tight">
+                  <span className="text-[13px] font-mono tabular-nums text-white tracking-tight truncate w-full">
                     {formatPhoneNumber(heroPhone)}
                   </span>
                 </div>
@@ -145,7 +156,7 @@ export function AccountHolderCard({
                 <Mail className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                 <div className="flex flex-col items-start min-w-0">
                   <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">Email</span>
-                  <span className="text-xs text-zinc-400 group-hover:text-zinc-200 truncate max-w-[180px]">{holder.email}</span>
+                  <span className="text-xs text-zinc-400 group-hover:text-zinc-200 truncate w-full">{holder.email}</span>
                 </div>
               </div>
               <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
