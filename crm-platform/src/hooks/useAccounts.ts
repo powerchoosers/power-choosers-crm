@@ -44,6 +44,7 @@ export interface Account {
     endDate: string
   }>
   metadata?: any
+  primaryContactId?: string | null
 }
 
 export function useDeleteAccounts() {
@@ -392,7 +393,8 @@ export function useAccount(id: string) {
         mills: data.metadata?.mills || '',
         status: data.status || 'PROSPECT',
         meters,
-        metadata: data.metadata || {}
+        metadata: data.metadata || {},
+        primaryContactId: data.primaryContactId || null,
       } as Account
     },
     enabled: !!id && !loading && !!user,
@@ -734,6 +736,7 @@ export function useUpdateAccount() {
       if (updates.loadFactor !== undefined) { newMetadata.loadFactor = updates.loadFactor; hasMetadataUpdate = true; }
       if (updates.loadZone !== undefined) { newMetadata.loadZone = updates.loadZone; hasMetadataUpdate = true; }
       if (updates.mills !== undefined) { newMetadata.mills = updates.mills; hasMetadataUpdate = true; }
+      if (updates.primaryContactId !== undefined) dbUpdates['primaryContactId'] = updates.primaryContactId ?? null
       if (updates.meters !== undefined) {
         newMetadata.meters = updates.meters;
         hasMetadataUpdate = true;

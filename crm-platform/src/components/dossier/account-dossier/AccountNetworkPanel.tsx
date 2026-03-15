@@ -6,7 +6,9 @@ import { Plus } from 'lucide-react'
 import { StakeholderMap } from '@/components/accounts/StakeholderMap'
 import { CallListItem } from '@/components/calls/CallListItem'
 import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
+import { AccountHolderCard } from './AccountHolderCard'
 import { useUIStore } from '@/store/uiStore'
+import { useUpdateAccount } from '@/hooks/useAccounts'
 
 interface AccountNetworkPanelProps {
     id: string
@@ -24,6 +26,11 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
     isLoadingCalls
 }: AccountNetworkPanelProps) {
     const { setRightPanelMode, setIngestionContext } = useUIStore()
+    const { mutate: updateAccount } = useUpdateAccount()
+
+    const handleSetHolder = (contactId: string | null) => {
+        updateAccount({ id, primaryContactId: contactId })
+    }
 
     return (
         <div className="col-span-3 h-full overflow-y-auto p-6 np-scroll">
@@ -46,6 +53,14 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                         <Plus className="w-4 h-4" />
                     </button>
                 </div>
+
+                <AccountHolderCard
+                    accountId={id}
+                    accountName={account?.name || ''}
+                    contacts={contacts || []}
+                    primaryContactId={account?.primaryContactId}
+                    onSetHolder={handleSetHolder}
+                />
 
                 <StakeholderMap contacts={contacts || []} />
 
