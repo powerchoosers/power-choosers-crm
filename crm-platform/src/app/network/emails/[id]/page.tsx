@@ -164,7 +164,8 @@ export default function EmailDetailPage() {
           userEmail: user.email,
           messageId: attachment.messageId,
           attachmentId: attachment.attachmentId,
-          attachmentPath: attachment.attachmentPath
+          attachmentPath: attachment.attachmentPath,
+          filename: attachment.filename || ''
         })
       })
 
@@ -213,7 +214,8 @@ export default function EmailDetailPage() {
         messageId: attachment.messageId,
         attachmentId: attachment.attachmentId || '',
         attachmentPath: attachment.attachmentPath || '',
-        folderId: String(folderId)
+        folderId: String(folderId),
+        filename: attachment.filename || ''
       });
       
       const fileUrl = `/api/email/attachment?${params.toString()}`;
