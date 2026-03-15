@@ -35,6 +35,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
 
   return `
 <!-- NODAL_COMPOSE_SIGNATURE -->
+<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid ${borderColor}; max-width: 600px;">
 <table cellpadding="0" cellspacing="0" style="font-family: Helvetica, Arial, sans-serif; font-size: 14px; width: 100%; max-width: 600px; border-collapse: collapse;">
   <tr>
     <!-- THE SIGNAL LINE (Vertical Blue Bar) -->
@@ -111,6 +112,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
     </td>
   </tr>
 </table>
+</div>
   `
 }
 
