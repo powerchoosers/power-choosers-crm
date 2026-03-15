@@ -275,6 +275,7 @@
     /* IE and Edge */
     contain: paint;
     /* Improves scroll performance by containing repaints */
+    will-change: scroll-position;
     overflow-x: hidden;
     /* Hard-lock horizontal axis — no drift, no rubber-band */
   }
