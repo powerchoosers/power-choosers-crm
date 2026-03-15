@@ -1488,9 +1488,9 @@ export default function EmailDetailPage() {
                             {/* Page navigation */}
                             {previewNumPages > 1 && (
                               <div className="flex items-center gap-1 sticky top-4 z-10 px-1 py-1 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5 text-[10px] font-mono text-zinc-400 mb-2">
-                                <button disabled={previewPageNumber <= 1} onClick={() => setPreviewPageNumber(p => p - 1)} className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full disabled:opacity-20 transition-all text-zinc-400 hover:text-white"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                                <button disabled={previewPageNumber <= 1} onClick={() => setPreviewPageNumber(p => p - 1)} className="p-1.5 bg-[#002FA7] hover:bg-[#002FA7]/80 rounded-full disabled:opacity-20 transition-all text-white"><ChevronLeft className="w-3.5 h-3.5" /></button>
                                 <div className="px-3 border-x border-white/5 text-zinc-500">Page <span className="text-zinc-200">{previewPageNumber}</span> / {previewNumPages}</div>
-                                <button disabled={previewPageNumber >= previewNumPages} onClick={() => setPreviewPageNumber(p => p + 1)} className="p-1.5 bg-white/5 hover:bg-white/10 rounded-full disabled:opacity-20 transition-all text-zinc-400 hover:text-white"><ChevronRight className="w-3.5 h-3.5" /></button>
+                                <button disabled={previewPageNumber >= previewNumPages} onClick={() => setPreviewPageNumber(p => p + 1)} className="p-1.5 bg-[#002FA7] hover:bg-[#002FA7]/80 rounded-full disabled:opacity-20 transition-all text-white"><ChevronRight className="w-3.5 h-3.5" /></button>
                               </div>
                             )}
                             <Document
