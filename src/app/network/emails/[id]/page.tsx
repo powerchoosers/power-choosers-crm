@@ -1444,7 +1444,7 @@ export default function EmailDetailPage() {
                       <button
                         onClick={() => previewAttachment?.attachment && handleDownloadAttachment(previewAttachment.attachment)}
                         disabled={!previewAttachment?.attachment || downloadingAttachment === previewAttachment?.attachment?.attachmentId}
-                        className="flex items-center gap-2 px-4 py-1.5 bg-[#002FA7]/20 border border-[#002FA7]/40 text-white rounded-md text-xs font-mono uppercase tracking-widest hover:bg-[#002FA7]/30 transition-colors shadow-[0_0_15px_-5px_#002FA7] disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 px-3 py-1.5 bg-[#002FA7] hover:bg-[#002FA7]/80 border border-[#002FA7] text-white rounded-md text-[10px] font-mono uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {downloadingAttachment === previewAttachment?.attachment?.attachmentId ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
