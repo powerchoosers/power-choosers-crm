@@ -37,8 +37,8 @@ function GlobalShortcuts() {
         toggleWarRoom()
       }
 
-      // Sequence Intel: Ctrl+Alt+S OR Ctrl+Shift+S
-      if (isCtrl && (isAlt || isShift) && key === 's' && activeSequenceId) {
+      // Sequence Intel: Ctrl+Alt+I
+      if (isCtrl && isAlt && key === 'i' && activeSequenceId) {
         e.preventDefault()
         toggleSequenceIntel()
       }
