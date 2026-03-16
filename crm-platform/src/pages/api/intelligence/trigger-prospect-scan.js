@@ -66,7 +66,7 @@ function resolveIndustry(org) {
 
 // Enrich a handful of prospects missing employee_count via Apollo org enrichment
 async function enrichMissingHeadcount(prospects, apiKey) {
-  const toEnrich = prospects.filter((p) => !p.employee_count && p.domain).slice(0, 5);
+  const toEnrich = prospects.filter((p) => (!p.employee_count || !p.description) && p.domain).slice(0, 10);
   if (toEnrich.length === 0) return;
   await Promise.all(
     toEnrich.map(async (p) => {
@@ -82,6 +82,7 @@ async function enrichMissingHeadcount(prospects, apiKey) {
         if (!p.employee_count) p.employee_count = org.estimated_num_employees || org.employee_count || null;
         if (!p.industry) p.industry = resolveIndustry(org);
         if (!p.annual_revenue_printed) p.annual_revenue_printed = org.annual_revenue_printed || org.organization_revenue_printed || null;
+        if (!p.description) p.description = org.short_description || org.seo_description || null;
       } catch (_) { /* skip failed enrichments */ }
     })
   );
