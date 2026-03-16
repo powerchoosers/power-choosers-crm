@@ -1,6 +1,6 @@
 'use client';
 
-import { Gauge, Layers, Zap, Activity, X, ChevronRight, Calendar } from 'lucide-react';
+import { Gauge, Layers, Zap, Activity, X, ChevronRight } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
 import { useExpiringAccounts, type ExpiringAccount } from '@/hooks/useExpiringAccounts';
 import { useEffect, useState, useCallback } from 'react';
@@ -40,123 +40,88 @@ function ExpiringPanel({ onClose }: { onClose: () => void }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 1.02 }}
+      initial={{ opacity: 0, y: -4, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -4, scale: 0.98 }}
       transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-      className="absolute inset-0 z-[100] bg-[#050505] flex flex-col overflow-hidden rounded-xl"
+      className="absolute top-0 left-0 w-72 z-[100] bg-[#050505] border border-white/10 flex flex-col rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.6)] overflow-hidden"
     >
-      {/* Panel Header */}
-      <div className="flex items-start justify-between p-5 pb-4 border-b border-white/5 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-[14px] bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
-            <Gauge className="w-4 h-4 text-amber-400" />
-          </div>
-          <div>
-            <h4 className="text-[11px] font-mono uppercase tracking-[0.2em] text-amber-400">
-              OPEN_POSITIONS // 90D_EXPIRY
-            </h4>
-            <p className="text-[10px] font-mono text-zinc-500 mt-0.5">
-              {isLoading ? '—' : `${accounts.length} contract${accounts.length !== 1 ? 's' : ''} expiring`}
-            </p>
-          </div>
+      {/* Compact header */}
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-white/5 flex-shrink-0">
+        <div className="flex items-center gap-2">
+          <Gauge className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-amber-400">
+            90D_EXPIRY
+          </span>
+          <span className="text-[9px] font-mono text-zinc-600 tabular-nums">
+            {isLoading ? '—' : `(${accounts.length})`}
+          </span>
         </div>
         <button
           onClick={(e) => { e.stopPropagation(); onClose(); }}
-          className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/5 bg-white/5 text-zinc-500 hover:text-white hover:bg-white/10 transition-all"
+          className="w-6 h-6 rounded-md flex items-center justify-center text-zinc-500 hover:text-white hover:bg-white/10 transition-all"
         >
-          <X className="w-4 h-4" />
+          <X className="w-3 h-3" />
         </button>
       </div>
 
       {/* Scrollable account list */}
-      <div className="flex-1 overflow-y-auto np-scroll">
+      <div className="overflow-y-auto np-scroll max-h-72">
         {isLoading && (
-          <div className="space-y-2 p-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div
-                key={i}
-                className="flex items-center gap-3 p-3 rounded-xl border border-white/5 animate-pulse"
-              >
-                <div className="w-9 h-9 rounded-[14px] bg-white/5 flex-shrink-0" />
-                <div className="flex-1 space-y-1.5">
-                  <div className="h-3 bg-white/5 rounded w-2/3" />
-                  <div className="h-2 bg-white/[0.03] rounded w-1/2" />
+          <div className="space-y-1 p-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-2.5 px-2 py-2 rounded-lg border border-white/5 animate-pulse">
+                <div className="w-7 h-7 rounded-lg bg-white/5 flex-shrink-0" />
+                <div className="flex-1 space-y-1">
+                  <div className="h-2.5 bg-white/5 rounded w-2/3" />
+                  <div className="h-2 bg-white/[0.03] rounded w-1/3" />
                 </div>
-                <div className="h-2.5 w-12 bg-white/5 rounded" />
+                <div className="h-2.5 w-8 bg-white/5 rounded" />
               </div>
             ))}
           </div>
         )}
 
         {!isLoading && accounts.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full gap-2 p-8 text-center">
-            <Calendar className="w-6 h-6 text-zinc-700" />
-            <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-              No_Contracts_Expiring_In_90D
-            </span>
+          <div className="flex items-center justify-center py-6 px-4">
+            <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">No_Contracts_In_90D</span>
           </div>
         )}
 
         {!isLoading && accounts.length > 0 && (
-          <AnimatePresence>
-            <div className="p-3 space-y-2">
-              {accounts.map((acct: ExpiringAccount, idx: number) => (
-                <motion.div
-                  key={acct.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.04, duration: 0.22 }}
-                  onClick={() => {
-                    router.push(`/network/accounts/${acct.id}`);
-                    onClose();
-                  }}
-                  className={`group flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer hover:border-white/20 hover:bg-white/[0.04] ${urgencyBorder(acct.daysLeft)}`}
-                >
-                  {/* Company icon */}
-                  <CompanyIcon
-                    logoUrl={acct.logo_url ?? undefined}
-                    domain={acct.domain ?? undefined}
-                    name={acct.name}
-                    size={36}
-                    className="w-9 h-9 flex-shrink-0"
-                  />
-
-                  {/* Company info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-zinc-100 truncate">{acct.name}</p>
-                    {acct.industry && (
-                      <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider truncate mt-0.5">
-                        {acct.industry}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Days left */}
-                  <div className="flex flex-col items-end flex-shrink-0 gap-0.5">
-                    <span className={`text-sm font-mono font-semibold tabular-nums ${urgencyColor(acct.daysLeft)}`}>
-                      {acct.daysLeft}D
-                    </span>
-                    <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
-                      remaining
-                    </span>
-                  </div>
-
-                  {/* Hover chevron */}
-                  <ChevronRight className="w-3.5 h-3.5 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 -translate-x-1 group-hover:translate-x-0 transition-transform" />
-                </motion.div>
-              ))}
-            </div>
-          </AnimatePresence>
+          <div className="p-2 space-y-1">
+            {accounts.map((acct: ExpiringAccount, idx: number) => (
+              <motion.div
+                key={acct.id}
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.03, duration: 0.18 }}
+                onClick={() => { router.push(`/network/accounts/${acct.id}`); onClose(); }}
+                className={`group flex items-center gap-2.5 px-2 py-2 rounded-lg border transition-all cursor-pointer hover:border-white/20 hover:bg-white/[0.04] ${urgencyBorder(acct.daysLeft)}`}
+              >
+                <CompanyIcon
+                  logoUrl={acct.logo_url ?? undefined}
+                  domain={acct.domain ?? undefined}
+                  name={acct.name}
+                  size={28}
+                  className="w-7 h-7 flex-shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-zinc-100 truncate">{acct.name}</p>
+                  {acct.industry && (
+                    <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider truncate">
+                      {acct.industry}
+                    </p>
+                  )}
+                </div>
+                <span className={`text-xs font-mono font-semibold tabular-nums flex-shrink-0 ${urgencyColor(acct.daysLeft)}`}>
+                  {acct.daysLeft}D
+                </span>
+                <ChevronRight className="w-3 h-3 text-zinc-700 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+              </motion.div>
+            ))}
+          </div>
         )}
-      </div>
-
-      {/* Footer */}
-      <div className="p-3 border-t border-white/5 flex items-center gap-1.5 flex-shrink-0">
-        <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
-        <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
-          Click any account to open dossier · Esc to close
-        </span>
       </div>
     </motion.div>
   );
