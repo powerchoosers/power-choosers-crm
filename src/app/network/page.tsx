@@ -32,11 +32,11 @@ export default function Home() {
       <KPIGrid />
 
       {/* Zone 2 + 3: Dial Quota Engine | Active Signal Matrix */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-stretch">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 min-h-[380px]">
           <VelocityTrackerV3 />
         </div>
-        <div className="h-full min-h-[420px]">
+        <div className="h-[500px]">
           <SignalMatrix />
         </div>
       </div>
