@@ -86,6 +86,7 @@ export function SignalMatrix() {
   const router = useRouter();
 
   const [isScraping, setIsScraping] = useState(false);
+  const [isScanningProspects, setIsScanningProspects] = useState(false);
   const queryClient = useQueryClient();
 
   // Prospect radar (ASSET_MONITOR tab)
@@ -111,27 +112,46 @@ export function SignalMatrix() {
   const lastUpdated = qData?.last_updated || null;
   const isRefreshing = isFetching && !isLoading;
 
-  // Trigger Edge Function directly
+  // Trigger recon scrape (RECONNAISSANCE tab)
   const triggerScrape = async () => {
     if (isScraping) return;
     setIsScraping(true);
     const toastId = toast.loading('Initiating deep recon scan...');
     try {
-      const res = await fetch('/api/intelligence/trigger-scrape', {
-        method: 'POST'
-      });
-      if (!res.ok) throw new Error(`Scrape trigger failed`);
+      const res = await fetch('/api/intelligence/trigger-scrape', { method: 'POST' });
+      if (!res.ok) throw new Error('Scrape trigger failed');
       const data = await res.json();
-
       toast.success(`Scan complete. ${data.count || 0} new anomalies detected.`, { id: toastId });
-
-      // Pull fresh data & animate refresh
       await refetch();
     } catch (err: any) {
       console.error('[SignalMatrix] manual scrape error:', err);
       toast.error('Scan failed to initialize.', { id: toastId });
     } finally {
       setIsScraping(false);
+    }
+  };
+
+  // Trigger Apollo prospect scan (ASSET_MONITOR tab)
+  const triggerProspectScan = async () => {
+    if (isScanningProspects) return;
+    setIsScanningProspects(true);
+    const toastId = toast.loading('Running Apollo prospect scan...');
+    try {
+      const res = await fetch('/api/intelligence/trigger-prospect-scan', { method: 'POST' });
+      if (!res.ok) throw new Error('Prospect scan failed');
+      const data = await res.json();
+      toast.success(
+        data.count > 0
+          ? `${data.count} net-new prospects discovered.`
+          : 'No new prospects in this rotation — try again later.',
+        { id: toastId }
+      );
+      queryClient.invalidateQueries({ queryKey: ['prospect-radar'] });
+    } catch (err: any) {
+      console.error('[SignalMatrix] prospect scan error:', err);
+      toast.error('Prospect scan failed.', { id: toastId });
+    } finally {
+      setIsScanningProspects(false);
     }
   };
 
@@ -169,18 +189,12 @@ export function SignalMatrix() {
           </h3>
         </div>
         <button
-          onClick={() => {
-            if (activeTab === 'recon') {
-              triggerScrape();
-            } else {
-              queryClient.invalidateQueries({ queryKey: ['prospect-radar'] });
-            }
-          }}
-          disabled={isScraping || isRefreshing}
+          onClick={() => activeTab === 'recon' ? triggerScrape() : triggerProspectScan()}
+          disabled={activeTab === 'recon' ? (isScraping || isRefreshing) : isScanningProspects}
           className="w-7 h-7 rounded-lg flex items-center justify-center border border-white/10 bg-transparent text-zinc-500 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/10 transition-all disabled:opacity-40"
-          title={activeTab === 'recon' ? 'Initiate Deep Scan' : 'Refresh Prospect Radar'}
+          title={activeTab === 'recon' ? 'Initiate Deep Scan' : 'Run Apollo Prospect Scan'}
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${(isScraping || isRefreshing) ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${(isScraping || isRefreshing || isScanningProspects) ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
