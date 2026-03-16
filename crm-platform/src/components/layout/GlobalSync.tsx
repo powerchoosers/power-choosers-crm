@@ -148,7 +148,7 @@ export function GlobalSync() {
             if (isOwner) {
               if (soundEnabled) playPing();
               toast('Signature Email Opened', {
-                icon: <Eye className="w-4 h-4 text-[#002FA7]" />
+                icon: <Eye className="w-4 h-4 text-emerald-400" />
               })
             }
             invalidateDeals()
@@ -158,7 +158,7 @@ export function GlobalSync() {
             if (isOwner) {
               if (soundEnabled) playPing();
               toast('Contract Viewed by Signatory', {
-                icon: <Eye className="w-4 h-4 text-[#002FA7]" />
+                icon: <Eye className="w-4 h-4 text-emerald-400" />
               })
             }
             invalidateDeals()
