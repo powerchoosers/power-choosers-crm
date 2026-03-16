@@ -466,11 +466,7 @@ async function handleLinkedInTask(execution, job) {
     }
 
     const hasLinkedIn = Boolean(String(member.contact_linkedin_url || '').trim());
-    if (!hasLinkedIn) {
-      console.log(`[DEBUG] Skipping LinkedIn task for member ${execution.member_id} because no LinkedIn URL`);
-      await skipNode(execution, job);
-      return;
-    }
+
 
     const existingTasks = await sql`
     SELECT id, status
@@ -488,7 +484,10 @@ async function handleLinkedInTask(execution, job) {
         const lastName = (member.lastName || '').trim();
         const contactName = `${firstName} ${lastName}`.trim() || 'Contact';
         const label = (metadata?.label || 'LinkedIn Step').trim();
-        const prompt = (metadata?.prompt || metadata?.aiBody || 'Complete LinkedIn outreach step for this contact.').trim();
+        let prompt = (metadata?.prompt || metadata?.aiBody || 'Complete LinkedIn outreach step for this contact.').trim();
+        if (!hasLinkedIn) {
+            prompt = `[MANUAL SEARCH REQUIRED] No LinkedIn URL found in dossier. Please search for and connect with this contact.\n\n${prompt}`;
+        }
         const ownerEmail = member.owner_email || (String(member.owner_id || '').includes('@') ? member.owner_id : null);
 
         const inserted = await sql`
