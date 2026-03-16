@@ -57,11 +57,12 @@ export default async function handler(req, res) {
 
     const accountId = existingId || crypto.randomUUID();
 
-    // Build service_addresses
+    // Build service_addresses with full street address from Apollo
+    const fullAddress = prospect.address || '';
     const serviceAddresses = [];
-    if (prospect.city || prospect.state) {
+    if (prospect.city || prospect.state || fullAddress) {
       serviceAddresses.push({
-        address: '',
+        address: fullAddress,
         city: prospect.city || '',
         state: prospect.state || '',
         country: 'United States',
@@ -69,6 +70,15 @@ export default async function handler(req, res) {
         isPrimary: true,
       });
     }
+
+    // Build meters entry with full address (mirrors OrgIntelligence enrichment flow)
+    const meters = fullAddress || prospect.city ? [{
+      id: crypto.randomUUID(),
+      esiId: '',
+      address: fullAddress || [prospect.city, prospect.state, 'United States'].filter(Boolean).join(', '),
+      rate: '',
+      endDate: '',
+    }] : [];
 
     const payload = {
       name: prospect.name,
@@ -81,13 +91,15 @@ export default async function handler(req, res) {
       city: prospect.city || null,
       state: prospect.state || null,
       country: 'United States',
+      address: fullAddress || null,
+      zip: prospect.zip || null,
       logo_url: prospect.logo_url || null,
       phone: prospect.phone || null,
       linkedin_url: prospect.linkedin_url || null,
       ownerId: userId || null,
       status: 'active',
       service_addresses: serviceAddresses,
-      metadata: { meters: [], source: 'prospect_radar', apollo_org_id: prospect.apollo_org_id || null },
+      metadata: { meters, source: 'prospect_radar', apollo_org_id: prospect.apollo_org_id || null },
       updatedAt: now,
     };
 
