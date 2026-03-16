@@ -226,8 +226,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const queryClient = useQueryClient();
   const setLastEnrichedAccountId = useUIStore((s) => s.setLastEnrichedAccountId);
   const setLastEnrichedContactId = useUIStore((s) => s.setLastEnrichedContactId);
-  const pendingAutoScan = useUIStore((s) => s.pendingAutoScan);
-  const setPendingAutoScan = useUIStore((s) => s.setPendingAutoScan);
   const CONTACTS_PER_PAGE = 5;
 
   const patchRevealState = (personId: string, patch: Partial<RevealState>) => {
@@ -392,14 +390,6 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
     loadCache();
   }, [domain, companyName, accountId]);
-
-  // Auto-trigger scan after prospect ingest (pendingAutoScan flag set by useIngestProspect)
-  useEffect(() => {
-    if (scanStatus !== 'idle' || !pendingAutoScan) return;
-    if (!domain && !companyName) return;
-    setPendingAutoScan(false);
-    handleScan(); // eslint-disable-line react-hooks/exhaustive-deps
-  }, [scanStatus, pendingAutoScan]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     return () => {
