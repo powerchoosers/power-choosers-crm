@@ -216,7 +216,7 @@ export function KPIGrid() {
         return (
           <div
             key={m.key}
-            className={`nodal-void-card p-5 transition-colors relative overflow-hidden group ${m.clickable && positionsNum > 0 && !isLoading
+            className={`nodal-void-card p-5 transition-colors relative group ${isPositions && expiryOpen ? 'overflow-visible' : 'overflow-hidden'} ${m.clickable && positionsNum > 0 && !isLoading
                 ? 'hover:border-amber-500/30 cursor-pointer'
                 : 'hover:border-white/10'
               }`}
@@ -281,17 +281,18 @@ export function KPIGrid() {
               )}
             </div>
 
+            {/* Expiry Panel — anchored to the OPEN_POSITIONS card, overflows downward */}
+            {isPositions && (
+              <AnimatePresence>
+                {expiryOpen && (
+                  <ExpiringPanel onClose={() => setExpiryOpen(false)} />
+                )}
+              </AnimatePresence>
+            )}
           </div>
         );
       })}
     </div>
-
-    {/* Expiry Panel — spans the full KPI grid row, not a single card */}
-    <AnimatePresence>
-      {expiryOpen && (
-        <ExpiringPanel onClose={() => setExpiryOpen(false)} />
-      )}
-    </AnimatePresence>
     </div>
   );
 }
