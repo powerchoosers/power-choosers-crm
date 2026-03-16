@@ -23,7 +23,7 @@ export default function AccountDossierPage() {
 
   const handleDelete = () => {
     deleteAccount.mutate(id, {
-      onSuccess: () => router.push('/network/accounts'),
+      onSuccess: () => router.back(),
     })
   }
 

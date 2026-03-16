@@ -34,7 +34,7 @@ export default function ContactDossierPage() {
 
   const handleDelete = () => {
     deleteContact.mutate(id, {
-      onSuccess: () => router.push('/network/contacts'),
+      onSuccess: () => router.back(),
     })
   }
 
