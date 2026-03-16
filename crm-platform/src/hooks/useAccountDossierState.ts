@@ -61,6 +61,7 @@ export function useAccountDossierState(id: string) {
     const [editMills, setEditMills] = useState('')
     const [editIndustry, setEditIndustry] = useState('')
     const [editLocation, setEditLocation] = useState('')
+    const [editEmployees, setEditEmployees] = useState('')
     const [editLogoUrl, setEditLogoUrl] = useState('')
     const [editSupplier, setEditSupplier] = useState('')
     const [editDomain, setEditDomain] = useState('')
@@ -113,6 +114,7 @@ export function useAccountDossierState(id: string) {
             setEditMills(formatMillValue(account.mills ?? account.metadata?.mills))
             setEditIndustry(account.industry || '')
             setEditLocation(account.location || '')
+            setEditEmployees(account.employees?.toString() || '')
             setEditLogoUrl(account.logoUrl || '')
             setEditSupplier(account.electricitySupplier || '')
             setEditDomain(account.domain || '')
@@ -158,6 +160,7 @@ export function useAccountDossierState(id: string) {
                 if ((formatMillValue(account?.mills ?? account?.metadata?.mills) || '') !== (editMills || '')) changedFields.add('mills')
                 if ((account?.industry || '') !== (editIndustry || '')) changedFields.add('industry')
                 if ((account?.location || '') !== (editLocation || '')) changedFields.add('location')
+                if ((account?.employees?.toString() || '') !== (editEmployees || '')) changedFields.add('employees')
                 if ((account?.logoUrl || '') !== (editLogoUrl || '')) changedFields.add('logoUrl')
                 if ((account?.electricitySupplier || '') !== (editSupplier || '')) changedFields.add('currentSupplier')
                 if ((account?.domain || '') !== (editDomain || '')) changedFields.add('domain')
@@ -181,6 +184,7 @@ export function useAccountDossierState(id: string) {
                         mills: editMills,
                         industry: editIndustry,
                         location: editLocation,
+                        employees: editEmployees,
                         logoUrl: editLogoUrl,
                         electricitySupplier: editSupplier,
                         domain: editDomain,
@@ -202,6 +206,7 @@ export function useAccountDossierState(id: string) {
                         mills: editMills,
                         industry: editIndustry,
                         location: editLocation,
+                        employees: editEmployees,
                         logoUrl: editLogoUrl,
                         electricitySupplier: editSupplier,
                         domain: editDomain,
@@ -228,7 +233,7 @@ export function useAccountDossierState(id: string) {
             }
             triggerSave()
         }
-    }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editMills, editIndustry, editLocation, editLogoUrl, editSupplier, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
+    }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editMills, editIndustry, editLocation, editEmployees, editLogoUrl, editSupplier, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
 
     useEffect(() => {
         return () => {
@@ -365,6 +370,7 @@ export function useAccountDossierState(id: string) {
         recentlyUpdatedFields, glowingFields, isRecalibrating,
         editAccountName, setEditAccountName, editNotes, setEditNotes, editAnnualUsage, setEditAnnualUsage,
         editStrikePrice, setEditStrikePrice, editMills, setEditMills, editIndustry, setEditIndustry, editLocation, setEditLocation,
+        editEmployees, setEditEmployees,
         editLogoUrl, setEditLogoUrl, editSupplier, setEditSupplier, editDomain, setEditDomain, editLinkedinUrl, setEditLinkedinUrl,
         editMeters, setEditMeters, editContractEnd, setEditContractEnd, editCompanyPhone, setEditCompanyPhone,
         editAddress, setEditAddress,

@@ -124,6 +124,21 @@ const DEREGULATED_LOCATIONS = [
   { city: 'Lubbock', tdsp: 'LP&L' },
 ];
 
+// Industries excluded from prospect radar — not serviceable for commercial energy brokerage
+const EXCLUDED_INDUSTRIES = [
+  'staffing', 'recruiting', 'recruitment', 'temp agency', 'employment agency',
+  'business services', 'management consulting', 'consulting services',
+  'legal services', 'law firm', 'attorneys', 'legal',
+  'information technology', 'it services', 'software development', 'software products',
+  'data processing', 'computer services', 'saas', 'tech services',
+];
+
+function isExcludedIndustry(industry) {
+  if (!industry) return false;
+  const lower = industry.toLowerCase();
+  return EXCLUDED_INDUSTRIES.some((ex) => lower.includes(ex));
+}
+
 // Rotate industry targets to get variety across manual/daily scans
 const INDUSTRY_ROTATIONS = [
   ['manufacturing', 'industrial'],
@@ -237,6 +252,10 @@ export default async function handler(req, res) {
       if (apolloId && seenIds.has(apolloId)) continue;
       if (!org.name) continue;
 
+      // Skip non-serviceable industries
+      const resolvedIndustry = resolveIndustry(org);
+      if (isExcludedIndustry(resolvedIndustry)) continue;
+
       if (apolloId) seenIds.add(apolloId);
 
       // Determine TDSP zone from city match
@@ -251,7 +270,7 @@ export default async function handler(req, res) {
         domain: domain || null,
         website: org.website_url || (domain ? `https://${domain}` : null),
         logo_url: org.logo_url || null,
-        industry: resolveIndustry(org),
+        industry: resolvedIndustry,
         // accounts return headcount in estimated_num_employees or employee_count
         employee_count: org.estimated_num_employees || org.employee_count || org.num_employees || null,
         // accounts use organization_revenue_printed; orgs use annual_revenue_printed

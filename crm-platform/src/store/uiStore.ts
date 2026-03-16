@@ -91,7 +91,10 @@ interface UIState {
   /** Set when Org Intelligence enriches/acquires a contact – dossier uses this to trigger blur-in */
   lastEnrichedContactId: string | null
   setLastEnrichedContactId: (id: string | null) => void
-  
+  /** Set to true after prospect ingest — OrgIntelligence reads this to auto-trigger scan */
+  pendingAutoScan: boolean
+  setPendingAutoScan: (v: boolean) => void
+
   /** Global audio toggle */
   soundEnabled: boolean
   setSoundEnabled: (enabled: boolean) => void
@@ -134,6 +137,8 @@ export const useUIStore = create<UIState>()(
       setLastEnrichedAccountId: (id) => set({ lastEnrichedAccountId: id }),
       lastEnrichedContactId: null,
       setLastEnrichedContactId: (id) => set({ lastEnrichedContactId: id }),
+      pendingAutoScan: false,
+      setPendingAutoScan: (v) => set({ pendingAutoScan: v }),
       
       soundEnabled: true,
       setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),

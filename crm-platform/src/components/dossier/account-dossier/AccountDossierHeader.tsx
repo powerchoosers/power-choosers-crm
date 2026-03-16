@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow, parseISO, isValid } from 'date-fns'
 import {
-    ArrowLeft, Globe, Linkedin, Lock, Unlock, Clock, Activity, Check, MapPin
+    ArrowLeft, Globe, Linkedin, Lock, Unlock, Clock, Activity, Check, MapPin, Users
 } from 'lucide-react'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
@@ -46,6 +46,8 @@ interface AccountDossierHeaderProps {
     setEditIndustry: (v: string) => void
     editLocation: string
     setEditLocation: (v: string) => void
+    editEmployees: string
+    setEditEmployees: (v: string) => void
     editLogoUrl: string
     setEditLogoUrl: (v: string) => void
     editDomain: string
@@ -80,6 +82,8 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
     setEditIndustry,
     editLocation,
     setEditLocation,
+    editEmployees,
+    setEditEmployees,
     editLogoUrl,
     setEditLogoUrl,
     editDomain,
@@ -377,7 +381,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
 
                             <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mb-2 w-full">
                                 {isEditing ? (
-                                    <div className="flex items-center gap-4 w-full">
+                                    <div className="flex items-center gap-3 w-full">
                                         <div className="flex items-center gap-1.5 flex-1 min-w-0">
                                             <Activity className="w-3.5 h-3.5 text-white shrink-0" />
                                             <input
@@ -401,6 +405,18 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                                 placeholder="CITY, STATE"
                                             />
                                         </div>
+                                        <span className="w-1 h-1 rounded-full bg-black/40 shrink-0" />
+                                        <div className="flex items-center gap-1.5 w-24 min-w-0 shrink-0">
+                                            <Users className="w-3.5 h-3.5 text-white shrink-0" />
+                                            <input
+                                                type="text"
+                                                value={editEmployees}
+                                                onChange={(e) => setEditEmployees(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
+                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                                                placeholder="HEADCOUNT"
+                                            />
+                                        </div>
                                     </div>
                                 ) : (
                                     <>
@@ -413,6 +429,15 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                             <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
                                             <ForensicDataPoint value={account.location || 'Unknown Location'} valueClassName="text-zinc-400" inline compact />
                                         </div>
+                                        {account.employees && (
+                                            <>
+                                                <span className="flex-none w-1 h-1 rounded-full bg-zinc-800" />
+                                                <div className="flex-none flex items-center gap-1.5 text-zinc-400">
+                                                    <Users className="w-3.5 h-3.5 text-white shrink-0" />
+                                                    <ForensicDataPoint value={`${Number(account.employees).toLocaleString()} emp`} valueClassName="text-zinc-400" inline compact />
+                                                </div>
+                                            </>
+                                        )}
                                     </>
                                 )}
                             </div>

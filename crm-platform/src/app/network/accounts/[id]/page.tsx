@@ -54,6 +54,8 @@ export default function AccountDossierPage() {
           setEditIndustry={state.setEditIndustry}
           editLocation={state.editLocation}
           setEditLocation={state.setEditLocation}
+          editEmployees={state.editEmployees}
+          setEditEmployees={state.setEditEmployees}
           editLogoUrl={state.editLogoUrl}
           setEditLogoUrl={state.setEditLogoUrl}
           editDomain={state.editDomain}
