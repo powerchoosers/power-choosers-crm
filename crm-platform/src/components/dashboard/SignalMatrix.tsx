@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
 import { useProspectRadar, useIngestProspect, useDismissProspect } from '@/hooks/useProspectRadar';
+import { supabase } from '@/lib/supabase';
 
 type TabId = 'recon' | 'monitor';
 
@@ -137,7 +138,14 @@ export function SignalMatrix() {
     setIsScanningProspects(true);
     const toastId = toast.loading('Running Apollo prospect scan...');
     try {
-      const res = await fetch('/api/intelligence/trigger-prospect-scan', { method: 'POST' });
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/intelligence/trigger-prospect-scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error('Prospect scan failed');
       const data = await res.json();
       toast.success(
