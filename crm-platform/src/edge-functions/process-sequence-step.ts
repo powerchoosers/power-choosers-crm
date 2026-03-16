@@ -162,8 +162,11 @@ async function processJob(job) {
     } else if (effectiveType === 'linkedin') {
         // LinkedIn is a manual gate: create/attach task and wait for user completion.
         await handleLinkedInTask(execution, job)
+    } else if (effectiveType === 'call') {
+        // Call steps are manual gates: create a task and wait for user to make the call.
+        await handleCallTask(execution, job)
     } else {
-        // Delay node or other passive node
+        // Delay node or other truly passive node (condition, end, input, etc.)
         console.log('[DEBUG] Processing passive node:', effectiveType);
         await skipNode(execution, job)
     }
@@ -517,6 +520,104 @@ async function handleLinkedInTask(execution, job) {
         NOW(),
         jsonb_build_object(
           'taskType', 'LinkedIn',
+          'source', 'sequence',
+          'sequenceExecutionId', ${String(execution.id)}::text,
+          'sequenceId', ${String(execution.sequence_id)}::text,
+          'memberId', ${String(execution.member_id)}::text,
+          'stepType', ${String(execution.step_type || 'protocolNode')}::text,
+          'execution_id', ${String(execution.id)}::text,
+          'member_id', ${String(execution.member_id)}::text
+        )
+      )
+      RETURNING id
+    `;
+
+        taskId = inserted?.[0]?.id || null;
+    }
+
+    const executionPatch: Record<string, any> = { manualGate: true };
+    if (taskId) executionPatch.taskId = taskId;
+
+    await sql`
+    UPDATE sequence_executions
+    SET status = 'waiting',
+        wait_until = NULL,
+        metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify(executionPatch)}::jsonb,
+        updated_at = NOW()
+    WHERE id = ${execution.id}
+  `;
+}
+
+async function handleCallTask(execution, job) {
+    const metadata = normalizeMetadata(execution.metadata);
+
+    const [member] = await sql`
+    SELECT m.id,
+           c.id as contact_id,
+           c."accountId" as account_id,
+           c."firstName",
+           c."lastName",
+           c.phone as contact_phone,
+           s."ownerId" as owner_id,
+           u.email as owner_email
+    FROM sequence_members m
+    JOIN contacts c ON m."targetId" = c.id
+    LEFT JOIN sequences s ON s.id = m."sequenceId"
+    LEFT JOIN users u ON (u.id = s."ownerId" OR u.email = s."ownerId")
+    WHERE m.id = ${execution.member_id}
+    LIMIT 1
+  `;
+
+    if (!member?.contact_id) {
+        throw new Error(`Call task requires a valid contact for member ${execution.member_id}`);
+    }
+
+    const existingTasks = await sql`
+    SELECT id, status
+    FROM tasks
+    WHERE metadata->>'sequenceExecutionId' = ${execution.id}
+       OR metadata->>'execution_id' = ${execution.id}
+    ORDER BY "createdAt" DESC
+    LIMIT 1
+  `;
+
+    let taskId = existingTasks?.[0]?.id || null;
+
+    if (!taskId) {
+        const firstName = (member.firstName || '').trim();
+        const lastName = (member.lastName || '').trim();
+        const contactName = `${firstName} ${lastName}`.trim() || 'Contact';
+        const label = (metadata?.label || 'Call Step').trim();
+        const ownerId = member.owner_id && !String(member.owner_id).includes('@') ? String(member.owner_id) : null;
+
+        const inserted = await sql`
+      INSERT INTO tasks (
+        id,
+        title,
+        description,
+        status,
+        priority,
+        "dueDate",
+        "contactId",
+        "accountId",
+        "ownerId",
+        "createdAt",
+        "updatedAt",
+        metadata
+      ) VALUES (
+        gen_random_uuid()::text,
+        ${`Call - ${label} (${contactName})`},
+        ${'Drop a voicemail for this contact as part of the outreach sequence.'},
+        'Pending',
+        'Protocol',
+        NOW(),
+        ${member.contact_id},
+        ${member.account_id},
+        ${ownerId},
+        NOW(),
+        NOW(),
+        jsonb_build_object(
+          'taskType', 'Call',
           'source', 'sequence',
           'sequenceExecutionId', ${String(execution.id)}::text,
           'sequenceId', ${String(execution.sequence_id)}::text,
