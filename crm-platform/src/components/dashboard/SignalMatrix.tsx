@@ -369,55 +369,65 @@ export function SignalMatrix() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -20 }}
                   transition={{ delay: idx * 0.04, duration: 0.25 }}
-                  className="group flex items-start gap-3 p-3 rounded-xl bg-transparent border border-white/5 hover:bg-zinc-950/90 hover:border-white/10 transition-all"
+                  className="group rounded-xl border border-white/5 hover:border-[#002FA7]/25 hover:bg-[#002FA7]/[0.03] transition-all overflow-hidden"
                 >
-                  {/* Logo / Initials */}
-                  <div className="w-8 h-8 rounded-[14px] border border-[#002FA7]/30 bg-[#002FA7]/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                    {prospect.logo_url ? (
-                      <img src={prospect.logo_url} alt="" className="w-6 h-6 object-contain" />
-                    ) : (
-                      <span className="text-[10px] font-mono font-bold text-[#4D88FF] uppercase">
+                  {/* Main content row */}
+                  <div className="flex items-center gap-3 p-3">
+                    {/* Squircle avatar — matches RECON signal icons */}
+                    <div className="w-9 h-9 rounded-[14px] border border-white/10 bg-zinc-900 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                      {prospect.logo_url ? (
+                        <img
+                          src={prospect.logo_url}
+                          alt=""
+                          className="w-full h-full object-cover rounded-[13px]"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = 'none';
+                            (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty('display', 'flex');
+                          }}
+                        />
+                      ) : null}
+                      <span
+                        className="text-[11px] font-mono font-bold text-zinc-300 uppercase"
+                        style={{ display: prospect.logo_url ? 'none' : 'flex' }}
+                      >
                         {prospect.name.slice(0, 2)}
+                      </span>
+                    </div>
+
+                    {/* Name + meta */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-mono text-zinc-100 leading-tight">{prospect.name}</p>
+                      <div className="flex items-center gap-2 mt-1 min-w-0 flex-wrap">
+                        {prospect.industry && (
+                          <span className="text-[9px] font-mono text-zinc-500 truncate max-w-[120px]">{prospect.industry}</span>
+                        )}
+                        {prospect.employee_count && (
+                          <span className="text-[9px] font-mono text-zinc-600 flex-shrink-0">
+                            · {prospect.employee_count.toLocaleString()} emp
+                          </span>
+                        )}
+                        {prospect.city && (
+                          <span className="text-[9px] font-mono text-zinc-600 flex-shrink-0">
+                            · {prospect.city}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* TDSP badge — right-pinned */}
+                    {prospect.tdsp_zone && prospect.tdsp_zone !== 'Unknown' && (
+                      <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
+                        {prospect.tdsp_zone}
                       </span>
                     )}
                   </div>
 
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-xs font-mono text-zinc-100 truncate">{prospect.name}</p>
-                      {prospect.tdsp_zone && prospect.tdsp_zone !== 'Unknown' && (
-                        <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
-                          {prospect.tdsp_zone}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      {prospect.industry && (
-                        <span className="text-[10px] font-mono text-zinc-500 truncate">{prospect.industry}</span>
-                      )}
-                      {prospect.employee_count && (
-                        <span className="flex items-center gap-1 text-[9px] font-mono text-zinc-600">
-                          <Users className="w-2.5 h-2.5" />
-                          {prospect.employee_count.toLocaleString()}
-                        </span>
-                      )}
-                      {prospect.city && (
-                        <span className="flex items-center gap-1 text-[9px] font-mono text-zinc-600">
-                          <MapPin className="w-2.5 h-2.5" />
-                          {prospect.city}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Actions — visible on hover */}
-                  <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                  {/* Action bar — slides in from bottom on hover */}
+                  <div className="grid grid-cols-2 border-t border-white/5 max-h-0 group-hover:max-h-[32px] overflow-hidden transition-[max-height] duration-200">
                     <button
                       type="button"
                       onClick={() => dismissProspect(prospect.id)}
-                      className="h-6 px-2 rounded-md bg-white/5 border border-white/10 text-[8px] font-mono text-zinc-500 hover:text-white hover:border-white/20 transition-all uppercase tracking-widest"
+                      className="py-1.5 text-[9px] font-mono text-zinc-600 hover:text-zinc-300 hover:bg-white/5 transition-all uppercase tracking-widest border-r border-white/5"
                     >
                       DISMISS
                     </button>
@@ -429,7 +439,7 @@ export function SignalMatrix() {
                         await ingestProspect(prospect.id, prospect.name);
                         setIngestingId(null);
                       }}
-                      className="h-6 px-2 rounded-md bg-[#002FA7] border border-[#002FA7]/50 text-[8px] font-mono text-white hover:bg-[#002FA7]/80 transition-all uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
+                      className="py-1.5 text-[9px] font-mono text-[#4D88FF] hover:text-white hover:bg-[#002FA7]/20 transition-all uppercase tracking-widest flex items-center justify-center gap-1 disabled:opacity-50"
                     >
                       {ingestingId === prospect.id ? (
                         <Loader2 className="w-2.5 h-2.5 animate-spin" />
