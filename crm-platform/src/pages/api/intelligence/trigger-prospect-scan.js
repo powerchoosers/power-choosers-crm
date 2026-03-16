@@ -97,7 +97,6 @@ const DEREGULATED_LOCATIONS = [
   { city: 'Plano', tdsp: 'Oncor' },
   { city: 'Irving', tdsp: 'Oncor' },
   { city: 'McKinney', tdsp: 'Oncor' },
-  { city: 'Frisco', tdsp: 'Oncor' },
   { city: 'Denton', tdsp: 'Oncor' },
   { city: 'Tyler', tdsp: 'Oncor' },
   { city: 'Wichita Falls', tdsp: 'Oncor' },
