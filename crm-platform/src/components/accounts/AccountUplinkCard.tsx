@@ -166,7 +166,7 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
               <div className="flex flex-col items-start min-w-0 flex-1">
                   <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
                     <span className="flex items-center gap-2">
-                      Corporate Phone (Primary)
+                      Corporate Phone
                       {!isEditing && recentlyUpdatedFields?.has('companyPhone') && (
                         <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
                       )}
