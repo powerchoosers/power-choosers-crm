@@ -540,7 +540,7 @@ export const DossierHeader = memo(function DossierHeader({
                                         exit={{ opacity: 0, scale: 0.7, x: 6 }}
                                         transition={{ duration: 0.2, ease: 'easeOut' }}
                                         onClick={() => setDeleteModalOpen(true)}
-                                        className="w-7 h-7 flex items-center justify-center rounded-lg text-red-500/50 hover:text-red-500 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all duration-200"
+                                        className="w-7 h-7 flex items-center justify-center rounded-lg text-white bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 transition-all duration-200"
                                         title="Terminate Record"
                                     >
                                         <Trash2 className="w-4 h-4" />
@@ -553,7 +553,7 @@ export const DossierHeader = memo(function DossierHeader({
                                 onClick={toggleEditing}
                                 className={cn(
                                     "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
-                                    isEditing ? "text-white bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-white"
+                                    isEditing ? "text-white bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-white hover:text-white"
                                 )}
                             >
                                 {isEditing ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
