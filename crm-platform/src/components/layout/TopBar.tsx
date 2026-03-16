@@ -20,7 +20,7 @@ import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
 import { useAccount } from '@/hooks/useAccounts'
 import { useQueryClient } from '@tanstack/react-query'
-import { playClick, playNavigation } from '@/lib/audio'
+import { playNavigation } from '@/lib/audio'
 import { forensicNotify } from '@/lib/notifications'
 
 function getDaysUntilJune() {
@@ -496,7 +496,6 @@ export function TopBar() {
   }, [callHealth])
 
   const handleDialClick = (digit: string) => {
-    playClick()
     sendDigits(digit)
   }
 
