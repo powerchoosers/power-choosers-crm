@@ -444,11 +444,11 @@ export default async function handler(req, res) {
       .select('metadata, service_addresses')
       .eq('id', accountId)
       .single();
-    // Bills and usage data → apply extracted fields immediately
+    // Bills and usage data → apply extracted fields immediately.
+    // Contracts (signed or unsigned) → data is stored in document metadata only;
+    // account fields are applied at actual signing time via /api/signatures/execute.
     const shouldApplyUsageFieldsNow = type === 'BILL' || type === 'USAGE_DATA';
-    // Signed contracts → apply contract fields to account (supplier, rate, end date, volume)
-    const shouldApplyContractFields = type === 'SIGNED_CONTRACT';
-    if (shouldApplyUsageFieldsNow || shouldApplyContractFields) {
+    if (shouldApplyUsageFieldsNow) {
       if (data.contract_end_date) updates.contract_end_date = data.contract_end_date;
       if (data.strike_price) updates.current_rate = String(data.strike_price);
       if (data.supplier) updates.electricity_supplier = data.supplier;
@@ -477,11 +477,8 @@ export default async function handler(req, res) {
       dealStageToSet = 'AUDITING';
     }
 
-    if (type === 'SIGNED_CONTRACT') {
-      // Signed contract = confirmed customer, move deal to secured
-      updates.status = 'CUSTOMER';
-      dealStageToSet = 'SECURED';
-    }
+    // SIGNED_CONTRACT and CONTRACT: status/deal changes are deferred to
+    // /api/signatures/execute, which fires only after the contact actually signs.
 
     if (Object.keys(updates).length > 0) {
       // 1. Update Account Record

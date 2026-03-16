@@ -240,15 +240,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // 7. Send via Zoho
+    // authEmail: the account with stored Zoho OAuth tokens (always l.patterson).
+    // fromEmail: display address shown to recipients.
+    const authEmail = 'l.patterson@nodalpoint.io';
+    const fromEmail = 'signal@nodalpoint.io';
+
     const zohoService = new ZohoMailService();
-    await zohoService.initialize(userEmail);
+    await zohoService.initialize(authEmail);
 
     await zohoService.sendEmail({
       to: [contactEmail],
       subject: emailSubject,
       html: emailHtml,
       text: `Please review and sign the document here: ${signingUrl}`,
-      userEmail: userEmail,
+      userEmail: authEmail,
+      from: fromEmail,
       fromName: 'Nodal Point Secure Vault'
     });
 

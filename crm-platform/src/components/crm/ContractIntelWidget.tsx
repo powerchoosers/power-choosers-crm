@@ -218,14 +218,12 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
                           </div>
                         </div>
 
-                        {derivedStatus !== 'signed' && (
+                        {derivedStatus !== 'signed' && derivedStatus !== 'cancelled' && (
                           <button
                             onClick={async () => {
-                              if (confirm('Cancel this signature request? This will invalidate the link sent to the client.')) {
-                                await cancelSignature.mutateAsync(req.id)
-                                if (deal.signature_requests?.length === 1) {
-                                  setIsSignaturesExpanded(false)
-                                }
+                              await cancelSignature.mutateAsync(req.id)
+                              if (deal.signature_requests?.length === 1) {
+                                setIsSignaturesExpanded(false)
                               }
                             }}
                             disabled={cancelSignature.isPending}
