@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { user } = await requireUser(req);
+  const { user, id: userId } = await requireUser(req);
   if (!user) return;
 
   const { prospectId } = req.body || {};
@@ -73,18 +73,21 @@ export default async function handler(req, res) {
     const payload = {
       name: prospect.name,
       domain: domain,
+      website: prospect.website || (domain ? `https://${domain}` : null),
       industry: prospect.industry || null,
       description: prospect.description || null,
       employees: prospect.employee_count || 0,
+      revenue: prospect.annual_revenue_printed || null,
       city: prospect.city || null,
       state: prospect.state || null,
       country: 'United States',
       logo_url: prospect.logo_url || null,
       phone: prospect.phone || null,
       linkedin_url: prospect.linkedin_url || null,
+      ownerId: userId || null,
       status: 'active',
       service_addresses: serviceAddresses,
-      metadata: { meters: [], source: 'prospect_radar' },
+      metadata: { meters: [], source: 'prospect_radar', apollo_org_id: prospect.apollo_org_id || null },
       updatedAt: now,
     };
 
