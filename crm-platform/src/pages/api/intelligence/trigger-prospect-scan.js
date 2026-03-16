@@ -262,6 +262,8 @@ export default async function handler(req, res) {
         phone: org.phone || org.primary_phone?.number || null,
         linkedin_url: org.linkedin_url || null,
         description: org.short_description || org.seo_description || null,
+        address: org.organization_raw_address || org.raw_address || org.street_address || org.organization_street_address || null,
+        zip: org.organization_postal_code || org.postal_code || null,
         discovered_at: new Date().toISOString(),
       });
     }
