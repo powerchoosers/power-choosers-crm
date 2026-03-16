@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 
 // Modular Components
 import { useAccountDossierState } from '@/hooks/useAccountDossierState'
+import { useDeleteAccount } from '@/hooks/useAccounts'
 import { AccountDossierHeader } from '@/components/dossier/account-dossier/AccountDossierHeader'
 import { AccountPhysicsPanel } from '@/components/dossier/account-dossier/AccountPhysicsPanel'
 import { AccountInfrastructurePanel } from '@/components/dossier/account-dossier/AccountInfrastructurePanel'
@@ -18,6 +19,13 @@ export default function AccountDossierPage() {
   const id = (params?.id as string) || ''
 
   const state = useAccountDossierState(id)
+  const deleteAccount = useDeleteAccount()
+
+  const handleDelete = () => {
+    deleteAccount.mutate(id, {
+      onSuccess: () => router.push('/network/accounts'),
+    })
+  }
 
   if (state.isLoading) {
     return (
@@ -45,6 +53,7 @@ export default function AccountDossierPage() {
           account={state.account}
           isEditing={state.isEditing}
           toggleEditing={state.toggleEditing}
+          onDelete={handleDelete}
           showSynced={state.showSynced}
           isSaving={state.isSaving}
           recentlyUpdatedFields={state.recentlyUpdatedFields}
