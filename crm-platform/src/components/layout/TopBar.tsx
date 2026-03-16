@@ -768,7 +768,7 @@ export function TopBar() {
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 glass-panel rounded-2xl p-4 z-50"
+                            className="absolute top-full mt-3 left-1/2 -translate-x-1/2 w-48 bg-zinc-950/80 backdrop-blur-xl border border-white/5 shadow-[0_20px_50px_rgba(0,0,0,0.5)] rounded-2xl p-4 z-50"
                           >
                             <div className="grid grid-cols-3 gap-2">
                               {[
@@ -848,7 +848,7 @@ export function TopBar() {
         >
           {/* Glass Background Layer - Absolute to prevent nesting filters with children */}
           <div className={cn(
-            "absolute inset-0 rounded-[24px] bg-zinc-950/90 backdrop-blur-md border border-white/5 !shadow-[0_0_20px_rgba(0,0,0,0.5)] z-0 pointer-events-none transition-colors",
+            "absolute inset-0 rounded-[24px] bg-zinc-950/80 backdrop-blur-xl border border-white/5 !shadow-[0_0_20px_rgba(0,0,0,0.5)] z-0 pointer-events-none transition-colors",
             isDialerOpen && "bg-white/5 border-white/10"
           )} />
 
