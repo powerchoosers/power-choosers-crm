@@ -10,7 +10,7 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 
-const RECON_TYPES = ['new_location', 'exec_hire', 'energy_rfp', 'sec_filing', 'expansion'];
+const RECON_TYPES = ['new_location', 'exec_hire', 'energy_rfp', 'sec_filing', 'expansion', 'permit_signal'];
 
 export default async function handler(req, res) {
     if (cors(req, res)) return;
@@ -43,6 +43,7 @@ export default async function handler(req, res) {
         crm_match_score,
         source_url,
         relevance_score,
+        metadata,
         created_at,
         accounts!market_intelligence_crm_account_id_fkey(id, name, domain)
       `)
