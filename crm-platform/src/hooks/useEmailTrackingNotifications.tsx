@@ -43,6 +43,10 @@ export function useEmailTrackingNotifications() {
           // Only CRM-sent emails use tracked IDs (zoho_, sig_, sig_exec_)
           if (!email.id || (!email.id.startsWith('zoho_') && !email.id.startsWith('sig_') && !email.id.startsWith('sig_exec_'))) return
 
+          // Signature/contract emails are handled exclusively by GlobalSync's contract notifications.
+          // Still update React Query caches below for live counter updates, but skip toasts.
+          const isContractEmail = email.id.startsWith('sig_') || email.id.startsWith('sig_exec_')
+
           const oldEmail = payload.old as {
             openCount?: number
             clickCount?: number
@@ -105,30 +109,32 @@ export function useEmailTrackingNotifications() {
           const subject = email.subject?.slice(0, 35) || 'your email'
           const subjectTruncated = email.subject && email.subject.length > 35 ? '...' : ''
 
-          if (clicked) {
-            if (soundEnabled) playPing()
-            toast.success(
-              <div className="flex items-center gap-2">
-                <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
-                <div className="flex flex-col">
-                  <span className="font-medium">Link clicked by {recipient}</span>
-                  <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
-                </div>
-              </div>,
-              { duration: 5000 }
-            )
-          } else if (opened) {
-            if (soundEnabled) playPing()
-            toast.success(
-              <div className="flex items-center gap-2">
-                <Eye className="w-4 h-4 text-emerald-400" />
-                <div className="flex flex-col">
-                  <span className="font-medium">Email opened by {recipient}</span>
-                  <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
-                </div>
-              </div>,
-              { duration: 5000 }
-            )
+          if (!isContractEmail) {
+            if (clicked) {
+              if (soundEnabled) playPing()
+              toast(
+                <div className="flex items-center gap-2">
+                  <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">Link clicked by {recipient}</span>
+                    <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                  </div>
+                </div>,
+                { duration: 5000 }
+              )
+            } else if (opened) {
+              if (soundEnabled) playPing()
+              toast(
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-emerald-400" />
+                  <div className="flex flex-col">
+                    <span className="font-medium">Email opened by {recipient}</span>
+                    <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                  </div>
+                </div>,
+                { duration: 5000 }
+              )
+            }
           }
         }
       )
