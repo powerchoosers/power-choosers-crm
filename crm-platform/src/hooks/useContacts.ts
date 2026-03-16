@@ -22,8 +22,10 @@ export interface Contact {
   avatarUrl?: string
   mobile?: string
   workPhone?: string
+  workDirectPhone?: string
   otherPhone?: string
   companyPhone?: string
+  primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
   metadata?: any
 }
 
@@ -337,6 +339,11 @@ export function useAccountContacts(accountId: string) {
           lastName: lName,
           email: row.email || '',
           phone: row.phone || '',
+          mobile: row.mobile || '',
+          workDirectPhone: row.workPhone || '',
+          otherPhone: row.otherPhone || '',
+          companyPhone: row.companyPhone || '',
+          primaryPhoneField: normalizePrimaryPhoneField(row.primaryPhoneField),
           avatarUrl: resolveContactPhotoUrl(row, metadata),
           title: row.title || '',
           accountId: row.accountId,
@@ -548,7 +555,10 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
             mobile: item.mobile || metadata?.mobile || '',
             workPhone: item.workPhone || metadata?.workDirectPhone || '',
+            workDirectPhone: item.workPhone || metadata?.workDirectPhone || '',
             otherPhone: item.otherPhone || metadata?.otherPhone || '',
+            companyPhone: item.companyPhone || '',
+            primaryPhoneField: normalizePrimaryPhoneField(item.primaryPhoneField),
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.general?.company || '',
             companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
