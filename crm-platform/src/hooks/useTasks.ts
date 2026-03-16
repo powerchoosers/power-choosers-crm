@@ -182,6 +182,12 @@ export function useTasks(searchQuery?: string) {
         .single()
 
       if (error) throw error
+
+      // NOTE: sequence advancement on LinkedIn task completion is handled by the
+      // handle_task_completion_advancement DB trigger (migration 2026031301).
+      // Do NOT call advance_sequence_member here — it would double-fire and corrupt
+      // current_node_id by advancing two steps instead of one.
+
       return data as Task
     },
     onSuccess: () => {
