@@ -108,6 +108,13 @@ interface UIState {
   setSoundNavigationEnabled: (enabled: boolean) => void
   soundCriticalEnabled: boolean
   setSoundCriticalEnabled: (enabled: boolean) => void
+
+  /** Global Sequence Intel Modal */
+  sequenceIntelOpen: boolean
+  setSequenceIntelOpen: (open: boolean) => void
+  activeSequenceId: string | null
+  setActiveSequenceId: (id: string | null) => void
+  toggleSequenceIntel: () => void
 }
 
 export const useUIStore = create<UIState>()(
@@ -151,6 +158,12 @@ export const useUIStore = create<UIState>()(
       setSoundNavigationEnabled: (enabled) => set({ soundNavigationEnabled: enabled }),
       soundCriticalEnabled: true,
       setSoundCriticalEnabled: (enabled) => set({ soundCriticalEnabled: enabled }),
+
+      sequenceIntelOpen: false,
+      setSequenceIntelOpen: (open) => set({ sequenceIntelOpen: open }),
+      activeSequenceId: null,
+      setActiveSequenceId: (id) => set({ activeSequenceId: id }),
+      toggleSequenceIntel: () => set((state) => ({ sequenceIntelOpen: !state.sequenceIntelOpen })),
     }),
     {
       name: 'nodal-ui-storage',
