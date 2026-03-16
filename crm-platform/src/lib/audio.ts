@@ -66,11 +66,45 @@ export const playNavigation = () => {
 
 /**
  * Nav Tick
- * Tiny, crisp micro-click for sidebar nav item selection.
+ * Simulates a physical mouse click — filtered noise burst, 12ms transient.
  */
 export const playNavTick = () => {
-  if (useUIStore.getState().soundNavigationEnabled) {
-    playSynth('sine', 1800, 1200, 0.022, 0.055);
+  if (!useUIStore.getState().soundEnabled) return;
+  if (!useUIStore.getState().soundNavigationEnabled) return;
+  if (typeof window === 'undefined' || !window.AudioContext) return;
+
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const sampleRate = audioCtx.sampleRate;
+    const duration = 0.012; // 12ms
+    const bufferSize = Math.floor(sampleRate * duration);
+
+    const buffer = audioCtx.createBuffer(1, bufferSize, sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      // White noise shaped with a steep exponential decay envelope
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 6);
+    }
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+
+    // Bandpass to shape it like a physical click (cut lows + highs)
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.value = 1800;
+    filter.Q.value = 0.7;
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.07, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+  } catch (e) {
+    console.warn('Audio generation failed or blocked by browser:', e);
   }
 };
 
