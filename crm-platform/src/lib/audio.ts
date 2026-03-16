@@ -65,6 +65,16 @@ export const playNavigation = () => {
 };
 
 /**
+ * Nav Tick
+ * Tiny, crisp micro-click for sidebar nav item selection.
+ */
+export const playNavTick = () => {
+  if (useUIStore.getState().soundNavigationEnabled) {
+    playSynth('sine', 1800, 1200, 0.022, 0.055);
+  }
+};
+
+/**
  * Forensic Click
  * Used for UI interactions like clicking buttons or toggles.
  */

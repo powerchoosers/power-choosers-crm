@@ -28,7 +28,7 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
-import { playClick, playNavigation } from '@/lib/audio'
+import { playClick, playNavTick } from '@/lib/audio'
 import { forensicNotify } from '@/lib/notifications'
 
 const navigationStructure = [
@@ -310,7 +310,7 @@ export function Sidebar() {
                   <motion.div layout key={item.name}>
                     <button
                       onClick={() => {
-                        playNavigation()
+                        playNavTick()
                         setRightPanelMode(item.action)
                       }}
                       className={buttonClasses}
@@ -327,7 +327,7 @@ export function Sidebar() {
                     href={item.href}
                     prefetch={false}
                     className={buttonClasses}
-                    onClick={() => playNavigation()}
+                    onClick={() => playNavTick()}
                   >
                     {content}
                   </Link>
