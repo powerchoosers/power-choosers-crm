@@ -9,6 +9,84 @@ import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import { getApiKey, APOLLO_BASE_URL, fetchWithRetry } from '../apollo/_utils.js';
 
+// SIC/NAICS → human-readable industry (Apollo accounts don't have an `industry` field)
+function resolveIndustry(org) {
+  if (org.industry) return org.industry;
+  if (org.industry_category) return org.industry_category;
+  if ((org.industries || []).length > 0) return org.industries[0];
+  const SIC_MAP = {
+    '2000': 'Food Manufacturing', '2011': 'Meat Packing', '2013': 'Sausages & Prepared Meats',
+    '2020': 'Dairy Products', '2041': 'Flour & Grain Mill', '2050': 'Bakery Products',
+    '2080': 'Beverages', '2086': 'Bottled & Canned Soft Drinks',
+    '2099': 'Food Preparations', '2100': 'Tobacco', '2200': 'Textile Mill Products',
+    '2300': 'Apparel', '2400': 'Lumber & Wood', '2500': 'Furniture',
+    '2600': 'Paper & Allied Products', '2650': 'Paperboard Containers',
+    '2700': 'Printing & Publishing', '2800': 'Chemicals & Allied',
+    '2860': 'Industrial Chemicals', '2869': 'Industrial Chemicals',
+    '2900': 'Petroleum & Coal', '3000': 'Rubber & Plastics',
+    '3100': 'Leather Products', '3200': 'Stone, Clay & Glass',
+    '3300': 'Primary Metal Industries', '3310': 'Steel Works',
+    '3400': 'Fabricated Metal', '3440': 'Fabricated Structural Metal',
+    '3500': 'Industrial Machinery', '3559': 'Industrial Machinery',
+    '3600': 'Electronic Equipment', '3670': 'Electronic Components',
+    '3700': 'Transportation Equipment', '3710': 'Motor Vehicles',
+    '3720': 'Aircraft', '3760': 'Guided Missiles',
+    '3800': 'Instruments', '3900': 'Misc Manufacturing',
+    '4200': 'Trucking & Warehousing', '4210': 'Trucking',
+    '4220': 'Public Warehousing', '4400': 'Water Transportation',
+    '4500': 'Air Transportation', '4600': 'Pipelines',
+    '4800': 'Communications', '4900': 'Electric, Gas & Sanitary',
+    '5000': 'Wholesale Trade', '5100': 'Wholesale Nondurable Goods',
+    '5200': 'Building Materials', '5400': 'Food Stores',
+    '5500': 'Auto Dealers', '5600': 'Apparel Stores',
+    '5700': 'Furniture Stores', '5900': 'Retail Stores',
+    '6000': 'Banking', '6100': 'Credit Agencies',
+    '6200': 'Security Dealers', '6300': 'Insurance',
+    '6500': 'Real Estate', '7000': 'Hotels & Lodging',
+    '7200': 'Personal Services', '7300': 'Business Services',
+    '7370': 'IT Services', '7371': 'Software Development',
+    '7372': 'Software Products', '7374': 'Data Processing',
+    '7500': 'Auto Repair Services', '7600': 'Misc Repair',
+    '7800': 'Motion Picture', '7900': 'Amusement & Recreation',
+    '8000': 'Health Services', '8040': 'Dental Offices',
+    '8060': 'Hospitals', '8100': 'Legal Services',
+    '8200': 'Educational Services', '8700': 'Engineering Services',
+    '8742': 'Management Consulting', '9000': 'Government',
+  };
+  const codes = [...(org.sic_codes || []), ...(org.naics_codes || [])];
+  for (const code of codes) {
+    const str = String(code);
+    // Try exact match first, then 4-digit, then 2-digit prefix
+    if (SIC_MAP[str]) return SIC_MAP[str];
+    if (SIC_MAP[str.slice(0, 4)]) return SIC_MAP[str.slice(0, 4)];
+    if (SIC_MAP[str.slice(0, 2) + '00']) return SIC_MAP[str.slice(0, 2) + '00'];
+  }
+  return null;
+}
+
+// Enrich a handful of prospects missing employee_count via Apollo org enrichment
+async function enrichMissingHeadcount(prospects, apiKey) {
+  const toEnrich = prospects.filter((p) => !p.employee_count && p.domain).slice(0, 5);
+  if (toEnrich.length === 0) return;
+  await Promise.all(
+    toEnrich.map(async (p) => {
+      try {
+        const resp = await fetchWithRetry(
+          `${APOLLO_BASE_URL}/organizations/enrich?domain=${encodeURIComponent(p.domain)}`,
+          { method: 'GET', headers: { 'Cache-Control': 'no-cache', 'Content-Type': 'application/json', 'X-Api-Key': apiKey } }
+        );
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const org = data.organization;
+        if (!org) return;
+        if (!p.employee_count) p.employee_count = org.estimated_num_employees || org.employee_count || null;
+        if (!p.industry) p.industry = resolveIndustry(org);
+        if (!p.annual_revenue_printed) p.annual_revenue_printed = org.annual_revenue_printed || org.organization_revenue_printed || null;
+      } catch (_) { /* skip failed enrichments */ }
+    })
+  );
+}
+
 // ─── Deregulated ERCOT zones only ────────────────────────────────────────────
 const DEREGULATED_LOCATIONS = [
   // Oncor
@@ -170,14 +248,17 @@ export default async function handler(req, res) {
         apollo_org_id: apolloId || null,
         name: org.name,
         domain: domain || null,
+        website: org.website_url || (domain ? `https://${domain}` : null),
         logo_url: org.logo_url || null,
-        industry: org.industry || (org.industries || [])[0] || null,
-        employee_count: org.estimated_num_employees || org.employee_count || null,
-        annual_revenue_printed: org.annual_revenue_printed || null,
+        industry: resolveIndustry(org),
+        // accounts return headcount in estimated_num_employees or employee_count
+        employee_count: org.estimated_num_employees || org.employee_count || org.num_employees || null,
+        // accounts use organization_revenue_printed; orgs use annual_revenue_printed
+        annual_revenue_printed: org.organization_revenue_printed || org.annual_revenue_printed || null,
         city: org.organization_city || org.city || null,
         state: org.organization_state || org.state || 'Texas',
         tdsp_zone: matchedLocation?.tdsp || 'ERCOT',
-        phone: org.phone || (org.primary_phone?.number) || null,
+        phone: org.phone || org.primary_phone?.number || null,
         linkedin_url: org.linkedin_url || null,
         description: org.short_description || org.seo_description || null,
         discovered_at: new Date().toISOString(),
@@ -189,10 +270,15 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ── 4. Upsert into prospect_radar (ignore conflicts on apollo_org_id) ───
+    // ── 4. Enrich up to 5 prospects missing employee_count (Apollo accounts
+    //       don't return headcount in search results — requires org enrichment) ──
+    const APOLLO_API_KEY_FOR_ENRICH = getApiKey();
+    await enrichMissingHeadcount(toInsert, APOLLO_API_KEY_FOR_ENRICH);
+
+    // ── 5. Upsert — ON CONFLICT update so existing null rows get backfilled ──
     const { error: insertError } = await supabaseAdmin
       .from('prospect_radar')
-      .upsert(toInsert, { onConflict: 'apollo_org_id', ignoreDuplicates: true });
+      .upsert(toInsert, { onConflict: 'apollo_org_id', ignoreDuplicates: false });
 
     if (insertError) {
       console.error('[trigger-prospect-scan] Insert error:', insertError);
