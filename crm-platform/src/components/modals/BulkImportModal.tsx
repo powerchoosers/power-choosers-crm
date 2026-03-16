@@ -944,7 +944,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                 initial={{ opacity: 0, x: 20 }} 
                 animate={{ opacity: 1, x: 0 }} 
                 exit={{ opacity: 0, x: -20 }}
-                className="p-6 flex flex-col"
+                className="p-6 flex flex-col flex-1 min-h-0"
               >
                 <h3 className="text-sm font-semibold text-white mb-6 uppercase tracking-widest flex-none">Routing Matrix</h3>
                 
@@ -1069,7 +1069,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   )}
                 </div>
 
-                <div className="mt-8 flex flex-col gap-4 flex-none pt-4 border-t border-white/5">
+                <div className="mt-4 flex flex-col gap-4 flex-none pt-4 border-t border-white/5">
                   {analysis && (
                     <div className="flex items-center justify-between px-4 py-3 bg-[#002FA7]/5 border border-[#002FA7]/20 rounded-xl">
                       <div className="flex items-center gap-3">
@@ -1089,13 +1089,23 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                     </div>
                   )}
                   
-                  <Button 
-                    className="w-full bg-white text-black hover:bg-zinc-200 font-mono text-[10px] font-bold uppercase tracking-[0.2em]"
-                    onClick={handleInitiateIngestion}
-                    disabled={isAnalyzing}
-                  >
-                    {isAnalyzing ? '[ ANALYZING_PAYLOAD... ]' : '[ INITIATE_INGESTION ]'}
-                  </Button>
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      className="flex-none bg-transparent border-white/10 text-zinc-400 hover:text-white hover:border-white/30 font-mono text-[10px] uppercase tracking-[0.2em]"
+                      onClick={() => setStep('CALIBRATION')}
+                      disabled={isAnalyzing}
+                    >
+                      ← BACK
+                    </Button>
+                    <Button
+                      className="flex-1 bg-white text-black hover:bg-zinc-200 font-mono text-[10px] font-bold uppercase tracking-[0.2em]"
+                      onClick={handleInitiateIngestion}
+                      disabled={isAnalyzing}
+                    >
+                      {isAnalyzing ? '[ ANALYZING_PAYLOAD... ]' : '[ INITIATE_INGESTION ]'}
+                    </Button>
+                  </div>
                 </div>
               </motion.div>
             )}
