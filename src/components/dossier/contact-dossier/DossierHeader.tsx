@@ -549,15 +549,17 @@ export const DossierHeader = memo(function DossierHeader({
                             </AnimatePresence>
 
                             {/* Padlock — always visible */}
-                            <button
+                            <motion.button
                                 onClick={toggleEditing}
                                 className={cn(
                                     "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
-                                    isEditing ? "text-white bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-zinc-500"
+                                    isEditing ? "text-white bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-white hover:scale-105 hover:shadow-[0_0_12px_rgba(0,47,167,0.15)]"
                                 )}
+                                animate={!isEditing ? { backgroundColor: "transparent", scale: 1 } : {}}
+                                transition={{ duration: 0.2 }}
                             >
                                 {isEditing ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                            </button>
+                            </motion.button>
                         </div>
                         {!hasTasks && (
                             <div className="flex items-center gap-2">
