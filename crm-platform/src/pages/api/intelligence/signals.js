@@ -64,10 +64,13 @@ export default async function handler(req, res) {
 
         // Cache for 15 minutes
         res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=300');
+        const signals = data || [];
+        // Use the most recent signal's created_at as last_updated (not request time)
+        const last_updated = signals.length > 0 ? signals[0].created_at : null;
         res.status(200).json({
-            signals: data || [],
-            count: (data || []).length,
-            last_updated: new Date().toISOString()
+            signals,
+            count: signals.length,
+            last_updated,
         });
 
     } catch (err) {
