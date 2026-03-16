@@ -2234,9 +2234,13 @@ function ProtocolArchitectInner() {
               <div className="px-6 py-5 border-b border-white/10 bg-black/30 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Sequence Intel</div>
-                  <div className="text-lg font-semibold tracking-tight text-zinc-100 mt-1">
-                    {sequenceIntelName || `Protocol ${id?.toString().slice(0, 8)}...`}
-                  </div>
+                  {sequenceIntelLoading ? (
+                    <div className="h-5 w-48 bg-white/10 rounded animate-pulse mt-1" />
+                  ) : (
+                    <div className="text-lg font-semibold tracking-tight text-zinc-100 mt-1">
+                      {sequenceIntelName || `Protocol ${id?.toString().slice(0, 8)}...`}
+                    </div>
+                  )}
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -2257,47 +2261,51 @@ function ProtocolArchitectInner() {
                 </div>
               </div>
 
-              {sequenceIntelSummary && (
+              {(sequenceIntelLoading || sequenceIntelSummary) && (
                 <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 p-4 border-b border-white/10 bg-black/20">
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
-                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Members</div>
-                    <div className="text-sm font-mono text-zinc-100 tabular-nums">{sequenceIntelSummary.totalMembers}</div>
-                  </div>
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
-                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Active</div>
-                    <div className="text-sm font-mono text-emerald-400 tabular-nums">{sequenceIntelSummary.activeMembers}</div>
-                  </div>
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
-                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Paused</div>
-                    <div className="text-sm font-mono text-amber-400 tabular-nums">{sequenceIntelSummary.pausedMembers}</div>
-                  </div>
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
-                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Completed</div>
-                    <div className="text-sm font-mono text-zinc-100 tabular-nums">{sequenceIntelSummary.completedMembers}</div>
-                  </div>
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
-                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Queued</div>
-                    <div className="text-sm font-mono text-sky-400 tabular-nums">{sequenceIntelSummary.queuedExecutions}</div>
-                  </div>
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
-                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Running</div>
-                    <div className="text-sm font-mono text-[#002FA7] tabular-nums">{sequenceIntelSummary.runningExecutions}</div>
-                  </div>
-                  <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
-                    <div className="text-[9px] font-mono text-zinc-500 uppercase">Failed</div>
-                    <div className="text-sm font-mono text-red-400 tabular-nums">{sequenceIntelSummary.failedExecutions}</div>
-                  </div>
+                  {sequenceIntelLoading ? (
+                    Array.from({ length: 7 }).map((_, i) => (
+                      <div key={i} className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="h-2 w-14 bg-white/10 rounded animate-pulse mb-2" />
+                        <div className="h-3.5 w-8 bg-white/10 rounded animate-pulse" />
+                      </div>
+                    ))
+                  ) : (
+                    <>
+                      <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="text-[9px] font-mono text-zinc-500 uppercase">Members</div>
+                        <div className="text-sm font-mono text-zinc-100 tabular-nums">{sequenceIntelSummary!.totalMembers}</div>
+                      </div>
+                      <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="text-[9px] font-mono text-zinc-500 uppercase">Active</div>
+                        <div className="text-sm font-mono text-emerald-400 tabular-nums">{sequenceIntelSummary!.activeMembers}</div>
+                      </div>
+                      <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="text-[9px] font-mono text-zinc-500 uppercase">Paused</div>
+                        <div className="text-sm font-mono text-amber-400 tabular-nums">{sequenceIntelSummary!.pausedMembers}</div>
+                      </div>
+                      <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="text-[9px] font-mono text-zinc-500 uppercase">Completed</div>
+                        <div className="text-sm font-mono text-zinc-100 tabular-nums">{sequenceIntelSummary!.completedMembers}</div>
+                      </div>
+                      <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="text-[9px] font-mono text-zinc-500 uppercase">Queued</div>
+                        <div className="text-sm font-mono text-sky-400 tabular-nums">{sequenceIntelSummary!.queuedExecutions}</div>
+                      </div>
+                      <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="text-[9px] font-mono text-zinc-500 uppercase">Running</div>
+                        <div className="text-sm font-mono text-[#002FA7] tabular-nums">{sequenceIntelSummary!.runningExecutions}</div>
+                      </div>
+                      <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
+                        <div className="text-[9px] font-mono text-zinc-500 uppercase">Failed</div>
+                        <div className="text-sm font-mono text-red-400 tabular-nums">{sequenceIntelSummary!.failedExecutions}</div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
-              <div className="p-4 max-h-[58vh] overflow-auto">
-                {sequenceIntelLoading && (
-                  <div className="h-40 flex items-center justify-center text-zinc-400 font-mono text-[11px] uppercase tracking-widest">
-                    <RotateCcw className="w-4 h-4 mr-2 animate-spin" />
-                    Loading Sequence Intel...
-                  </div>
-                )}
-
+              <div className="p-4 max-h-[58vh] overflow-auto np-scroll scroll-smooth">
                 {!sequenceIntelLoading && sequenceIntelError && (
                   <div className="h-40 flex items-center justify-center">
                     <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-3">
@@ -2312,7 +2320,7 @@ function ProtocolArchitectInner() {
                   </div>
                 )}
 
-                {!sequenceIntelLoading && !sequenceIntelError && sequenceIntelRows.length > 0 && (
+                {(sequenceIntelLoading || (!sequenceIntelError && sequenceIntelRows.length > 0)) && (
                   <div className="overflow-x-auto rounded-xl border border-white/10">
                     <table className="w-full min-w-[1150px]">
                       <thead className="bg-black/40 border-b border-white/10 sticky top-0 z-10">
@@ -2328,32 +2336,53 @@ function ProtocolArchitectInner() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sequenceIntelRows.map((row) => {
-                          const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || row.email || 'Unknown';
-                          const currentStep = row.currentNodeLabel || row.currentNodeId || '-';
-                          const executionLabel = row.executionLabel || row.executionStepType || '-';
-                          const signals = `${row.totalEmailsSent}E / ${row.totalOpens}O / ${row.totalClicks}C / ${row.totalReplies}R`;
-                          return (
-                            <tr key={row.memberId} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
+                        {sequenceIntelLoading ? (
+                          Array.from({ length: 5 }).map((_, i) => (
+                            <tr key={i} className="border-b border-white/5 last:border-0">
                               <td className="px-3 py-2.5">
-                                <div className="text-sm text-zinc-100">{fullName}</div>
-                                <div className="text-[10px] font-mono text-zinc-500 truncate">{row.title || row.email || '-'}</div>
+                                <div className="h-3.5 w-28 bg-white/10 rounded animate-pulse mb-1.5" />
+                                <div className="h-2.5 w-20 bg-white/5 rounded animate-pulse" />
                               </td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-300">{row.accountName || '-'}</td>
+                              <td className="px-3 py-2.5"><div className="h-3.5 w-24 bg-white/10 rounded animate-pulse" /></td>
+                              <td className="px-3 py-2.5"><div className="h-3.5 w-16 bg-white/10 rounded animate-pulse" /></td>
+                              <td className="px-3 py-2.5"><div className="h-3.5 w-20 bg-white/10 rounded animate-pulse" /></td>
                               <td className="px-3 py-2.5">
-                                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-200">{row.memberStatus || '-'}</span>
+                                <div className="h-3.5 w-20 bg-white/10 rounded animate-pulse mb-1.5" />
+                                <div className="h-2.5 w-12 bg-white/5 rounded animate-pulse" />
                               </td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-200">{currentStep}</td>
-                              <td className="px-3 py-2.5">
-                                <div className="text-sm text-zinc-100">{executionLabel}</div>
-                                <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{row.executionStatus || '-'}</div>
-                              </td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-300">{formatTimestamp(row.executionScheduledAt)}</td>
-                              <td className="px-3 py-2.5 text-[11px] font-mono text-zinc-300 tabular-nums">{signals}</td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-400">{formatTimestamp(row.updatedAt)}</td>
+                              <td className="px-3 py-2.5"><div className="h-3.5 w-24 bg-white/10 rounded animate-pulse" /></td>
+                              <td className="px-3 py-2.5"><div className="h-3.5 w-20 bg-white/10 rounded animate-pulse" /></td>
+                              <td className="px-3 py-2.5"><div className="h-3.5 w-20 bg-white/10 rounded animate-pulse" /></td>
                             </tr>
-                          );
-                        })}
+                          ))
+                        ) : (
+                          sequenceIntelRows.map((row) => {
+                            const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || row.email || 'Unknown';
+                            const currentStep = row.currentNodeLabel || row.currentNodeId || '-';
+                            const executionLabel = row.executionLabel || row.executionStepType || '-';
+                            const signals = `${row.totalEmailsSent}E / ${row.totalOpens}O / ${row.totalClicks}C / ${row.totalReplies}R`;
+                            return (
+                              <tr key={row.memberId} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
+                                <td className="px-3 py-2.5">
+                                  <div className="text-sm text-zinc-100">{fullName}</div>
+                                  <div className="text-[10px] font-mono text-zinc-500 truncate">{row.title || row.email || '-'}</div>
+                                </td>
+                                <td className="px-3 py-2.5 text-sm text-zinc-300">{row.accountName || '-'}</td>
+                                <td className="px-3 py-2.5">
+                                  <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-200">{row.memberStatus || '-'}</span>
+                                </td>
+                                <td className="px-3 py-2.5 text-sm text-zinc-200">{currentStep}</td>
+                                <td className="px-3 py-2.5">
+                                  <div className="text-sm text-zinc-100">{executionLabel}</div>
+                                  <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{row.executionStatus || '-'}</div>
+                                </td>
+                                <td className="px-3 py-2.5 text-sm text-zinc-300">{formatTimestamp(row.executionScheduledAt)}</td>
+                                <td className="px-3 py-2.5 text-[11px] font-mono text-zinc-300 tabular-nums">{signals}</td>
+                                <td className="px-3 py-2.5 text-sm text-zinc-400">{formatTimestamp(row.updatedAt)}</td>
+                              </tr>
+                            );
+                          })
+                        )}
                       </tbody>
                     </table>
                   </div>
