@@ -435,7 +435,7 @@ export const DossierHeader = memo(function DossierHeader({
                                                 value={editLocation}
                                                 onChange={(e) => setEditLocation(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="CITY, STATE"
                                             />
                                         </div>

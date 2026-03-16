@@ -318,7 +318,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                   </div>
               <div className="flex flex-col items-start min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label} (Primary)</span>
+                      <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label}</span>
                       {!isEditing && recentlyUpdatedFields?.has('phone') && (
                         <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
                       )}
