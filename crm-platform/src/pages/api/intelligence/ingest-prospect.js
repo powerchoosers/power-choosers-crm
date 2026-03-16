@@ -86,7 +86,7 @@ export default async function handler(req, res) {
       website: prospect.website || (domain ? `https://${domain}` : null),
       industry: prospect.industry || null,
       description: prospect.description || null,
-      employees: prospect.employee_count || 0,
+      employees: prospect.employee_count || null,
       revenue: prospect.annual_revenue_printed || null,
       city: prospect.city || null,
       state: prospect.state || null,
