@@ -133,6 +133,9 @@ export function NodeIngestion() {
   const [title, setTitle] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [mobile, setMobile] = useState('');
+  const [workDirect, setWorkDirect] = useState('');
+  const [otherPhone, setOtherPhone] = useState('');
   const [revenue, setRevenue] = useState('');
   const [employees, setEmployees] = useState('');
   const [address, setAddress] = useState('');
@@ -348,7 +351,7 @@ export function NodeIngestion() {
         setLastName(data.lastName || '');
         setTitle(data.title || '');
         setEmail(data.email || '');
-        setPhone(data.phone || '');
+        setMobile(data.phone || '');
         setRevenue(data.revenue || '');
         setEmployees(data.employees || '');
         setAddress(data.address || '');
@@ -519,7 +522,7 @@ export function NodeIngestion() {
           industry: scanResult?.industry,
           description: description || scanResult?.description,
           revenue: revenue,
-          employees: parseInt(employees) || 0,
+          employees: parseInt(employees) || null,
           address: address,
           city: city,
           state: state,
@@ -534,7 +537,28 @@ export function NodeIngestion() {
         };
 
         if (existingId) {
-          const { error } = await supabase.from('accounts').update(payload).eq('id', existingId);
+          // Only update fields that are actually set — never overwrite existing data with empty form values
+          const enrichUpdate: Record<string, any> = { status: 'active', updatedAt: now };
+          if (entityName) enrichUpdate.name = entityName;
+          if (domainKey) enrichUpdate.domain = domainKey;
+          if (scanResult?.industry) enrichUpdate.industry = scanResult.industry;
+          const desc = description || scanResult?.description;
+          if (desc) enrichUpdate.description = desc;
+          if (revenue) enrichUpdate.revenue = revenue;
+          const emp = parseInt(employees);
+          if (!isNaN(emp) && emp > 0) enrichUpdate.employees = emp;
+          if (address) enrichUpdate.address = address;
+          if (city) enrichUpdate.city = city;
+          if (state) enrichUpdate.state = state;
+          if (scanResult?.country) enrichUpdate.country = scanResult.country;
+          if (serviceAddresses.length > 0) enrichUpdate.service_addresses = serviceAddresses;
+          const logo = scanResult?.logoUrl || scanResult?.logo;
+          if (logo) enrichUpdate.logo_url = logo;
+          const ph = formatPhoneNumber(phone || scanResult?.phone);
+          if (ph) enrichUpdate.phone = ph;
+          if (scanResult?.linkedin) enrichUpdate.linkedin_url = scanResult.linkedin;
+          if (meters.length > 0) enrichUpdate.metadata = { meters };
+          const { error } = await supabase.from('accounts').update(enrichUpdate).eq('id', existingId);
           if (error) throw error;
         } else {
           const { error } = await supabase.from('accounts').insert({ id, ...payload, createdAt: now });
@@ -572,46 +596,65 @@ export function NodeIngestion() {
           const { data } = await supabase.from('contacts').select('id').eq('email', email).maybeSingle();
           if (data) existingId = data.id;
         }
-        if (!existingId && (firstName || lastName)) {
+        const trimmedFullName = `${firstName.trim()} ${lastName.trim()}`.trim();
+        if (!existingId && trimmedFullName) {
           const { data } = await supabase.from('contacts').select('id')
-            .ilike('name', `${firstName} ${lastName}`.trim())
+            .ilike('name', trimmedFullName)
             .maybeSingle();
           if (data) existingId = data.id;
         }
 
         const id = existingId || crypto.randomUUID();
 
-        // Base enrichment fields (safe to update on existing records)
-        const updatePayload = {
-          firstName: firstName,
-          lastName: lastName,
-          name: entityName || `${firstName} ${lastName}`.trim(),
-          email: email,
-          phone: formatPhoneNumber(phone) || null,
-          title: title,
-          linkedinUrl: identifier.includes('linkedin.com') ? identifier : (scanResult?.linkedin || null),
-          city: city,
-          state: state,
-          status: 'active',
-          updatedAt: now,
-        };
-
-        // Only set accountId on new records — never overwrite an existing contact's account link
-        const insertPayload = {
-          ...updatePayload,
-          accountId: ingestionContext?.accountId || null,
-          createdAt: now,
-        };
+        const fName = firstName.trim();
+        const lName = lastName.trim();
+        const fullName = (entityName || `${fName} ${lName}`).trim();
 
         if (existingId) {
-          const { error } = await supabase.from('contacts').update(updatePayload).eq('id', existingId);
+          // Only update fields that are actually set — never overwrite existing data with empty form values
+          const enrichUpdate: Record<string, any> = { status: 'active', updatedAt: now };
+          if (fName) enrichUpdate.firstName = fName;
+          if (lName) enrichUpdate.lastName = lName;
+          if (fullName) enrichUpdate.name = fullName;
+          if (email) enrichUpdate.email = email;
+          const mob = formatPhoneNumber(mobile);
+          if (mob) enrichUpdate.mobile = mob;
+          const wd = formatPhoneNumber(workDirect);
+          if (wd) enrichUpdate.workPhone = wd;
+          const other = formatPhoneNumber(otherPhone);
+          if (other) enrichUpdate.otherPhone = other;
+          if (title) enrichUpdate.title = title;
+          if (identifier.includes('linkedin.com')) enrichUpdate.linkedinUrl = identifier;
+          else if (scanResult?.linkedin) enrichUpdate.linkedinUrl = scanResult.linkedin;
+          if (city) enrichUpdate.city = city;
+          if (state) enrichUpdate.state = state;
+          const { error } = await supabase.from('contacts').update(enrichUpdate).eq('id', existingId);
           if (error) throw error;
         } else {
-          const { error } = await supabase.from('contacts').insert({ id, ...insertPayload });
+          // For new contacts, include all provided fields + accountId link
+          const insertPayload = {
+            id,
+            firstName: fName,
+            lastName: lName,
+            name: fullName,
+            email,
+            mobile: formatPhoneNumber(mobile) || null,
+            workPhone: formatPhoneNumber(workDirect) || null,
+            otherPhone: formatPhoneNumber(otherPhone) || null,
+            title,
+            linkedinUrl: identifier.includes('linkedin.com') ? identifier : (scanResult?.linkedin || null),
+            city,
+            state,
+            status: 'active',
+            accountId: ingestionContext?.accountId || null,
+            createdAt: now,
+            updatedAt: now,
+          };
+          const { error } = await supabase.from('contacts').insert(insertPayload);
           if (error) throw error;
         }
 
-        const displayName = entityName || `${firstName} ${lastName}`.trim();
+        const displayName = fullName || fName || lName;
         toast.success(existingId ? 'Contact Node Enriched' : 'Contact Node Initialized', {
           description: existingId
             ? `${displayName} already exists — record enriched with latest intelligence.`
@@ -656,6 +699,9 @@ export function NodeIngestion() {
     setTitle('');
     setEmail('');
     setPhone('');
+    setMobile('');
+    setWorkDirect('');
+    setOtherPhone('');
     setRevenue('');
     setEmployees('');
     setAddress('');
@@ -778,10 +824,30 @@ export function NodeIngestion() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Phone</label>
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Mobile</label>
                         <input
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
+                          value={mobile}
+                          onChange={(e) => setMobile(e.target.value)}
+                          className={panelTheme.field}
+                          placeholder="+1 (555) 000-0000"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Work Direct</label>
+                        <input
+                          value={workDirect}
+                          onChange={(e) => setWorkDirect(e.target.value)}
+                          className={panelTheme.field}
+                          placeholder="+1 (555) 000-0000"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Other</label>
+                        <input
+                          value={otherPhone}
+                          onChange={(e) => setOtherPhone(e.target.value)}
                           className={panelTheme.field}
                           placeholder="+1 (555) 000-0000"
                         />
@@ -791,7 +857,7 @@ export function NodeIngestion() {
                   <div className="pt-4 border-t border-white/10">
                     <Button
                       onClick={handleCommit}
-                      disabled={isCommitting || (!firstName && !lastName)}
+                      disabled={isCommitting || (!firstName.trim() && !lastName.trim())}
                       className={panelTheme.cta}
                     >
                       {isCommitting ? (
@@ -1042,10 +1108,30 @@ export function NodeIngestion() {
                         />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Phone</label>
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Mobile</label>
                         <input
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
+                          value={mobile}
+                          onChange={(e) => setMobile(e.target.value)}
+                          className={panelTheme.field}
+                          placeholder="+1 (555) 000-0000"
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Work Direct</label>
+                        <input
+                          value={workDirect}
+                          onChange={(e) => setWorkDirect(e.target.value)}
+                          className={panelTheme.field}
+                          placeholder="+1 (555) 000-0000"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-mono text-zinc-500 uppercase">Other</label>
+                        <input
+                          value={otherPhone}
+                          onChange={(e) => setOtherPhone(e.target.value)}
                           className={panelTheme.field}
                           placeholder="+1 (555) 000-0000"
                         />
@@ -1153,7 +1239,7 @@ export function NodeIngestion() {
               <div className="pt-6 mt-6 border-t border-white/10 space-y-2">
                 <Button
                   onClick={handleCommit}
-                  disabled={isCommitting || (type === 'ACCOUNT' ? !entityName : (!firstName && !lastName))}
+                  disabled={isCommitting || (type === 'ACCOUNT' ? !entityName : (!firstName.trim() && !lastName.trim()))}
                   className={panelTheme.cta}
                 >
                   {isCommitting ? (
