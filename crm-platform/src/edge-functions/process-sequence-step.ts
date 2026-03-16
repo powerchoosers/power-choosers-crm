@@ -333,13 +333,9 @@ async function handleSend(execution, job) {
 
     const targetEmail = String(member?.target_email || '').trim();
     if (!targetEmail) {
-        await sql`
-      UPDATE sequence_executions
-      SET status = 'skipped',
-          error_message = 'Missing target email',
-          updated_at = NOW()
-      WHERE id = ${execution.id}
-    `;
+        // No email on file — skip this step and advance to the next node so the
+        // sequence continues (e.g. to the voicemail drop) rather than stalling here.
+        await skipNode(execution, job);
         return;
     }
 
