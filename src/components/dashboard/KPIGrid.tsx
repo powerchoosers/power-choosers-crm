@@ -62,7 +62,7 @@ function ExpiringPanel({ onClose }: { onClose: () => void }) {
           </div>
         </div>
         <button
-          onClick={onClose}
+          onClick={(e) => { e.stopPropagation(); onClose(); }}
           className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/5 bg-white/5 text-zinc-500 hover:text-white hover:bg-white/10 transition-all"
         >
           <X className="w-4 h-4" />
@@ -241,6 +241,7 @@ export function KPIGrid() {
   ];
 
   return (
+    <div className="relative">
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {METRICS.map((m) => {
         const num = m.gauge ? (typeof volatilityNum === 'number' ? volatilityNum : parseInt(m.value, 10) || 0) : 0;
@@ -255,7 +256,7 @@ export function KPIGrid() {
                 : 'hover:border-white/10'
               }`}
             onClick={() => {
-              if (m.clickable && positionsNum > 0 && !isLoading) {
+              if (m.clickable && positionsNum > 0 && !isLoading && !expiryOpen) {
                 setExpiryOpen(true);
               }
             }}
@@ -315,15 +316,17 @@ export function KPIGrid() {
               )}
             </div>
 
-            {/* Expiry Panel Overlay — lives inside the OPEN_POSITIONS card */}
-            <AnimatePresence>
-              {isPositions && expiryOpen && (
-                <ExpiringPanel onClose={() => setExpiryOpen(false)} />
-              )}
-            </AnimatePresence>
           </div>
         );
       })}
+    </div>
+
+    {/* Expiry Panel — spans the full KPI grid row, not a single card */}
+    <AnimatePresence>
+      {expiryOpen && (
+        <ExpiringPanel onClose={() => setExpiryOpen(false)} />
+      )}
+    </AnimatePresence>
     </div>
   );
 }
