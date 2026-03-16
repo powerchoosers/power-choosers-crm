@@ -110,6 +110,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             meta.accountId = data.contact.accountId || data.account?.id || data.account?.accountId
             meta.city = data.contact.city
             meta.state = data.contact.state
+            meta.industry = data.contact.industry || data.account?.industry
             meta.logoUrl = data.contact.logoUrl || data.account?.logoUrl
             meta.domain = data.contact.domain || data.account?.domain
             meta.isAccountOnly = false
@@ -121,6 +122,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             meta.accountId = data.account.id || data.account.accountId
             meta.city = data.account.city
             meta.state = data.account.state
+            meta.industry = data.account.industry
             meta.isAccountOnly = true
           }
           // Keep a minimal raw payload for defensive UI fallbacks
@@ -403,7 +405,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         const meta = await resolvePhoneMeta(from)
         setMetadata(meta)
 
-        const toastId = toast.info(
+        const toastId = toast(
           <IncomingCallToast meta={meta} from={from} />,
           {
             action: {
@@ -472,6 +474,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
                   }
                 };
                 monitorMediaHealth();
+              }
+            },
+            cancel: {
+              label: 'Decline',
+              onClick: () => {
+                call.reject()
+                toast.dismiss(toastId)
               }
             },
             duration: 30000, // Longer duration for incoming call

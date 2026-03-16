@@ -168,7 +168,7 @@ export default async function handler(req, res) {
           accountId,
           city,
           state,
-          accounts ( name, domain, logo_url, metadata )
+          accounts ( name, domain, logo_url, metadata, industry )
         `)
         .or(orQuery);
 
@@ -196,6 +196,7 @@ export default async function handler(req, res) {
           accountId: data.accountId || '',
           city: data.city || '',
           state: data.state || '',
+          industry: data.accounts?.industry || data.accounts?.metadata?.industry || '',
           avatarUrl: data.metadata?.photoUrl || data.metadata?.photo_url || data.metadata?.avatarUrl || data.metadata?.avatar_url || data.metadata?.original_apollo_data?.photoUrl || '',
           domain: data.accounts?.domain || data.accounts?.metadata?.domain || data.accounts?.metadata?.general?.domain || '',
           logoUrl: data.accounts?.logo_url || data.accounts?.metadata?.logo_url || data.accounts?.metadata?.logoUrl || ''
@@ -225,7 +226,7 @@ export default async function handler(req, res) {
             accountId,
             city,
             state,
-            accounts ( name, domain, logo_url, metadata )
+            accounts ( name, domain, logo_url, metadata, industry )
           `)
           .or('mobile.not.is.null,workPhone.not.is.null,otherPhone.not.is.null,phone.not.is.null')
           .limit(2000);
@@ -254,6 +255,7 @@ export default async function handler(req, res) {
               accountId: matched.accountId || '',
               city: matched.city || '',
               state: matched.state || '',
+              industry: matched.accounts?.industry || matched.accounts?.metadata?.industry || '',
               avatarUrl: matched.metadata?.photoUrl || matched.metadata?.photo_url || matched.metadata?.avatarUrl || matched.metadata?.avatar_url || matched.metadata?.original_apollo_data?.photoUrl || '',
               domain: matched.accounts?.domain || matched.accounts?.metadata?.domain || matched.accounts?.metadata?.general?.domain || '',
               logoUrl: matched.accounts?.logo_url || matched.accounts?.metadata?.logo_url || matched.accounts?.metadata?.logoUrl || ''
@@ -274,7 +276,7 @@ export default async function handler(req, res) {
 
         let accountQuery = supabaseAdmin
           .from('accounts')
-          .select('id, name, phone, city, state, domain, logo_url, metadata')
+          .select('id, name, phone, city, state, industry, domain, logo_url, metadata')
           .or(orQueryAccount);
 
         accountQuery = applyLegacyOwnershipScope(accountQuery, user, isAdmin);
@@ -292,6 +294,7 @@ export default async function handler(req, res) {
             companyPhone: data.phone || '',
             city: data.city || '',
             state: data.state || '',
+            industry: data.industry || data.metadata?.industry || '',
             domain: data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
             logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || ''
           };
@@ -301,7 +304,7 @@ export default async function handler(req, res) {
           logger.log('[Search] Account exact-match miss; running normalized fallback scan...');
           let accountFallbackQuery = supabaseAdmin
             .from('accounts')
-            .select('id, name, phone, city, state, domain, logo_url, metadata')
+            .select('id, name, phone, city, state, industry, domain, logo_url, metadata')
             .or('phone.not.is.null')
             .limit(2000);
 
@@ -321,6 +324,7 @@ export default async function handler(req, res) {
                 companyPhone: matchedAccount.phone || '',
                 city: matchedAccount.city || '',
                 state: matchedAccount.state || '',
+                industry: matchedAccount.industry || matchedAccount.metadata?.industry || '',
                 domain: matchedAccount.domain || matchedAccount.metadata?.domain || matchedAccount.metadata?.general?.domain || '',
                 logoUrl: matchedAccount.logo_url || matchedAccount.metadata?.logo_url || matchedAccount.metadata?.logoUrl || ''
               };
