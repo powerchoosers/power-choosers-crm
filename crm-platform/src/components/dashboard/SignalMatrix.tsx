@@ -5,7 +5,7 @@ import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, Tr
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
 import { useProspectRadar, useIngestProspect, useDismissProspect } from '@/hooks/useProspectRadar';
 
@@ -86,6 +86,7 @@ export function SignalMatrix() {
   const router = useRouter();
 
   const [isScraping, setIsScraping] = useState(false);
+  const queryClient = useQueryClient();
 
   // Prospect radar (ASSET_MONITOR tab)
   const { data: prospects = [], isLoading: isLoadingProspects } = useProspectRadar();
@@ -164,45 +165,47 @@ export function SignalMatrix() {
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
           <h3 className="text-[11px] font-mono text-zinc-400 uppercase tracking-[0.2em]">
-            ACTIVE_TELEMETRY // LIVE_SIGNALS
+            <span className="sm:hidden">ACTIVE_TELEMETRY</span>
+            <span className="hidden sm:inline">ACTIVE_TELEMETRY // LIVE_SIGNALS</span>
           </h3>
         </div>
         <button
-          onClick={triggerScrape}
+          onClick={() => {
+            if (activeTab === 'recon') {
+              triggerScrape();
+            } else {
+              queryClient.invalidateQueries({ queryKey: ['prospect-radar'] });
+            }
+          }}
           disabled={isScraping || isRefreshing}
           className="w-7 h-7 rounded-lg flex items-center justify-center border border-white/10 bg-transparent text-zinc-500 hover:text-white hover:border-[#002FA7]/50 hover:bg-[#002FA7]/10 transition-all disabled:opacity-40"
-          title="Initiate Deep Scan"
+          title={activeTab === 'recon' ? 'Initiate Deep Scan' : 'Refresh Prospect Radar'}
         >
           <RefreshCw className={`w-3.5 h-3.5 ${(isScraping || isRefreshing) ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-white/5 px-4 flex-shrink-0">
-        <button
-          type="button"
-          onClick={() => setActiveTab('recon')}
-          className={`
-            px-4 py-3 text-[10px] font-mono uppercase tracking-widest border-b-2 transition-colors
-            ${activeTab === 'recon'
-              ? 'border-white text-white'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'}
-          `}
-        >
-          RECONNAISSANCE
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('monitor')}
-          className={`
-            px-4 py-3 text-[10px] font-mono uppercase tracking-widest border-b-2 transition-colors
-            ${activeTab === 'monitor'
-              ? 'border-white text-white'
-              : 'border-transparent text-zinc-500 hover:text-zinc-300'}
-          `}
-        >
-          ASSET_MONITOR
-        </button>
+      <div className="flex border-b border-white/5 px-4 flex-shrink-0 relative">
+        {(['recon', 'monitor'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`relative px-4 py-3 text-[10px] font-mono uppercase tracking-widest transition-colors ${
+              activeTab === tab ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            {tab === 'recon' ? 'RECONNAISSANCE' : 'ASSET_MONITOR'}
+            {activeTab === tab && (
+              <motion.div
+                layoutId="tab-underline"
+                className="absolute bottom-0 left-0 right-0 h-px bg-white"
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              />
+            )}
+          </button>
+        ))}
       </div>
 
       {/* Stream content */}
