@@ -15,6 +15,7 @@ import { useComposeStore } from '@/store/composeStore'
 
 // Modular Components
 import { useContactDossierState } from '@/hooks/useContactDossierState'
+import { useDeleteContact } from '@/hooks/useContacts'
 import { DossierHeader } from '@/components/dossier/contact-dossier/DossierHeader'
 import { IntelligencePanel } from '@/components/dossier/contact-dossier/IntelligencePanel'
 import { AnalystTerminal } from '@/components/dossier/contact-dossier/AnalystTerminal'
@@ -29,6 +30,13 @@ export default function ContactDossierPage() {
   // Centralized State Hook
   const s = useContactDossierState(id)
   const openCompose = useComposeStore((state) => state.openCompose)
+  const deleteContact = useDeleteContact()
+
+  const handleDelete = () => {
+    deleteContact.mutate(id, {
+      onSuccess: () => router.push('/network/contacts'),
+    })
+  }
 
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
   const [isRecalibrating, setIsRecalibrating] = useState(false)
@@ -230,6 +238,7 @@ export default function ContactDossierPage() {
           contact={s.contact}
           isEditing={s.isEditing}
           toggleEditing={s.toggleEditing}
+          onDelete={handleDelete}
           recentlyUpdatedFields={s.recentlyUpdatedFields}
           showSynced={s.showSynced}
           isSaving={s.isSaving}

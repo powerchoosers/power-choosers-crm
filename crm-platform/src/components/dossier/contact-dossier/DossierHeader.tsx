@@ -1,23 +1,25 @@
 'use client'
 
-import { memo, useEffect } from 'react'
+import { memo, useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { formatDistanceToNow } from 'date-fns'
 import {
-    ArrowLeft, Globe, Linkedin, Lock, Unlock, Clock, Activity, Check, MapPin
+    ArrowLeft, Globe, Linkedin, Lock, Unlock, Clock, Activity, Check, MapPin, ChevronDown, Trash2
 } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
+import DestructModal from '@/components/network/DestructModal'
 import { cn } from '@/lib/utils'
 
 interface DossierHeaderProps {
     contact: any
     isEditing: boolean
     toggleEditing: () => void
+    onDelete: () => void
     recentlyUpdatedFields: Set<string>
     showSynced: boolean
     isSaving: boolean
@@ -60,6 +62,7 @@ export const DossierHeader = memo(function DossierHeader({
     contact,
     isEditing,
     toggleEditing,
+    onDelete,
     recentlyUpdatedFields,
     showSynced,
     isSaving,
@@ -94,12 +97,31 @@ export const DossierHeader = memo(function DossierHeader({
 }: DossierHeaderProps) {
     const router = useRouter()
     const contactName = contact?.name || 'Unknown Contact'
+    const [menuOpen, setMenuOpen] = useState(false)
+    const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         if (!isEditing && activeEditField !== null) {
             setActiveEditField(null)
         }
     }, [activeEditField, isEditing, setActiveEditField])
+
+    useEffect(() => {
+        if (!menuOpen) return
+        const handleClickOutside = (e: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                setMenuOpen(false)
+            }
+        }
+        const handleEsc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false) }
+        document.addEventListener('mousedown', handleClickOutside)
+        document.addEventListener('keydown', handleEsc)
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside)
+            document.removeEventListener('keydown', handleEsc)
+        }
+    }, [menuOpen])
 
     return (
         <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 nodal-recessed relative z-10">
@@ -176,14 +198,14 @@ export const DossierHeader = memo(function DossierHeader({
                         <div className="flex-1 min-w-0 flex flex-col">
                             <div className="flex items-center gap-3 mb-1">
                                 {isEditing ? (
-                                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
                                         <input
                                             type="text"
                                             value={editFirstName}
                                             onChange={(e) => setEditFirstName(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                            className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 -ml-1 flex-1 min-w-0"
-                                            placeholder="First name"
+                                            className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 -ml-1 w-36"
+                                            placeholder="First"
                                             autoFocus
                                         />
                                         <input
@@ -191,8 +213,8 @@ export const DossierHeader = memo(function DossierHeader({
                                             value={editLastName}
                                             onChange={(e) => setEditLastName(e.target.value)}
                                             onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                            className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 flex-1 min-w-0"
-                                            placeholder="Last name"
+                                            className="text-2xl font-semibold tracking-tighter text-white bg-transparent border-none outline-none focus:ring-1 focus:ring-[#002FA7]/50 rounded px-1 w-40"
+                                            placeholder="Last"
                                         />
                                     </div>
                                 ) : (
@@ -407,35 +429,35 @@ export const DossierHeader = memo(function DossierHeader({
 
                             <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mb-2 w-full">
                                 {isEditing ? (
-                                    <div className="flex items-center gap-4 w-full">
-                                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                    <div className="flex items-center gap-3 w-full">
+                                        <div className="flex items-center gap-1.5">
                                             <input
                                                 type="text"
                                                 value={editTitle}
                                                 onChange={(e) => setEditTitle(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-32 focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="TITLE"
                                             />
-                                            <span className="text-zinc-600 lowercase">at</span>
+                                            <span className="text-zinc-600 lowercase shrink-0">at</span>
                                             <input
                                                 type="text"
                                                 value={editCompany}
                                                 onChange={(e) => setEditCompany(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono uppercase tracking-widest w-36 focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="COMPANY"
                                             />
                                         </div>
                                         <span className="w-1 h-1 rounded-full bg-black/40 shrink-0" />
-                                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                                        <div className="flex items-center gap-1.5">
                                             <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
                                             <input
                                                 type="text"
                                                 value={editLocation}
                                                 onChange={(e) => setEditLocation(e.target.value)}
                                                 onKeyDown={(e) => e.key === 'Enter' && toggleEditing()}
-                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono tracking-widest w-full focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
+                                                className="bg-transparent border-b border-white/10 text-white text-xs font-mono tracking-widest w-28 focus:outline-none focus:border-[#002FA7] transition-colors placeholder:text-zinc-700"
                                                 placeholder="CITY, STATE"
                                             />
                                         </div>
@@ -525,27 +547,142 @@ export const DossierHeader = memo(function DossierHeader({
                                     onCompleteAndAdvance={handleCompleteAndAdvance}
                                 />
                             )}
-                            <button
-                                onClick={toggleEditing}
-                                className={cn(
-                                    "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
-                                    isEditing ? "text-white bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-white"
-                                )}
-                            >
-                                {isEditing ? <Unlock className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
-                            </button>
+
+                            {/* Animated lock dropdown button */}
+                            <div className="relative" ref={menuRef}>
+                                <motion.div
+                                    className="flex items-center rounded-lg overflow-hidden"
+                                    layout
+                                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                                >
+                                    {/* Left: lock/unlock + label */}
+                                    <motion.button
+                                        onClick={toggleEditing}
+                                        className={cn(
+                                            "flex items-center gap-1.5 pl-2.5 pr-2 py-1.5 text-[10px] font-mono uppercase tracking-widest transition-colors duration-300 border-r",
+                                            isEditing
+                                                ? "text-[#002FA7] bg-[#002FA7]/10 border border-[#002FA7]/30 border-r-[#002FA7]/20"
+                                                : "text-zinc-500 hover:text-white bg-white/5 border border-white/10 border-r-white/5"
+                                        )}
+                                        layout
+                                    >
+                                        <AnimatePresence mode="wait">
+                                            {isEditing ? (
+                                                <motion.span
+                                                    key="unlock-icon"
+                                                    initial={{ rotate: -15, opacity: 0, scale: 0.8 }}
+                                                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                                                    exit={{ rotate: 15, opacity: 0, scale: 0.8 }}
+                                                    transition={{ duration: 0.2 }}
+                                                >
+                                                    <Unlock className="w-3.5 h-3.5" />
+                                                </motion.span>
+                                            ) : (
+                                                <motion.span
+                                                    key="lock-icon"
+                                                    initial={{ rotate: 15, opacity: 0, scale: 0.8 }}
+                                                    animate={{ rotate: 0, opacity: 1, scale: 1 }}
+                                                    exit={{ rotate: -15, opacity: 0, scale: 0.8 }}
+                                                    transition={{ duration: 0.2 }}
+                                                >
+                                                    <Lock className="w-3.5 h-3.5" />
+                                                </motion.span>
+                                            )}
+                                        </AnimatePresence>
+                                        <AnimatePresence mode="wait">
+                                            <motion.span
+                                                key={isEditing ? 'editing-label' : 'edit-label'}
+                                                initial={{ opacity: 0, x: -4 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                exit={{ opacity: 0, x: 4 }}
+                                                transition={{ duration: 0.15 }}
+                                            >
+                                                {isEditing ? 'Editing' : 'Edit'}
+                                            </motion.span>
+                                        </AnimatePresence>
+                                    </motion.button>
+
+                                    {/* Right: chevron for dropdown */}
+                                    <motion.button
+                                        onClick={() => setMenuOpen(v => !v)}
+                                        className={cn(
+                                            "flex items-center px-1.5 py-1.5 transition-colors duration-300",
+                                            isEditing
+                                                ? "text-[#002FA7] bg-[#002FA7]/10 border border-[#002FA7]/30 border-l-0"
+                                                : "text-zinc-500 hover:text-white bg-white/5 border border-white/10 border-l-0"
+                                        )}
+                                        layout
+                                    >
+                                        <motion.div
+                                            animate={{ rotate: menuOpen ? 180 : 0 }}
+                                            transition={{ duration: 0.2, ease: 'easeInOut' }}
+                                        >
+                                            <ChevronDown className="w-3 h-3" />
+                                        </motion.div>
+                                    </motion.button>
+                                </motion.div>
+
+                                {/* Dropdown */}
+                                <AnimatePresence>
+                                    {menuOpen && (
+                                        <motion.div
+                                            key="dossier-menu"
+                                            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                                            transition={{ duration: 0.15, ease: 'easeOut' }}
+                                            className="absolute right-0 top-full mt-2 w-44 bg-zinc-950 nodal-monolith-edge border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl"
+                                        >
+                                            <button
+                                                onClick={() => { toggleEditing(); setMenuOpen(false) }}
+                                                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-white/5 transition-colors"
+                                            >
+                                                {isEditing ? <Lock className="w-3.5 h-3.5 shrink-0" /> : <Unlock className="w-3.5 h-3.5 shrink-0" />}
+                                                {isEditing ? 'Lock Record' : 'Edit Record'}
+                                            </button>
+                                            <div className="h-px bg-white/5 mx-3" />
+                                            <button
+                                                onClick={() => { setDeleteModalOpen(true); setMenuOpen(false) }}
+                                                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-[10px] font-mono uppercase tracking-widest text-red-500/60 hover:text-red-500 hover:bg-red-500/5 transition-colors"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                                Terminate Record
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </div>
                         </div>
                         {!hasTasks && (
                             <div className="flex items-center gap-2">
-                                <div className={cn("h-2 w-2 rounded-full animate-pulse", isEditing ? "bg-[#002FA7]" : "bg-green-500")} />
-                                <span className={cn("text-xs font-mono uppercase tracking-widest", isEditing ? "text-[#002FA7]" : "text-green-500")}>
-                                    {isEditing ? "SECURE_FIELD_OVERRIDE" : "ACTIVE_INTELLIGENCE"}
-                                </span>
+                                <motion.div
+                                    className={cn("h-2 w-2 rounded-full animate-pulse", isEditing ? "bg-[#002FA7]" : "bg-green-500")}
+                                    layout
+                                />
+                                <AnimatePresence mode="wait">
+                                    <motion.span
+                                        key={isEditing ? 'override' : 'active'}
+                                        initial={{ opacity: 0, x: 4 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -4 }}
+                                        transition={{ duration: 0.2 }}
+                                        className={cn("text-xs font-mono uppercase tracking-widest", isEditing ? "text-[#002FA7]" : "text-green-500")}
+                                    >
+                                        {isEditing ? "SECURE_FIELD_OVERRIDE" : "ACTIVE_INTELLIGENCE"}
+                                    </motion.span>
+                                </AnimatePresence>
                             </div>
                         )}
                     </div>
                 </div>
             </div>
+
+            <DestructModal
+                isOpen={deleteModalOpen}
+                onClose={() => setDeleteModalOpen(false)}
+                onConfirm={onDelete}
+                count={1}
+            />
         </header>
     )
 })
