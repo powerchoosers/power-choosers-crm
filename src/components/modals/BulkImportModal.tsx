@@ -865,7 +865,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   {/* Neural Line: Visual Indicator of Scrollability */}
                   <div className="absolute top-0 left-0 bottom-0 w-[2px] bg-[#002FA7] z-10 opacity-30" />
 
-                  <div className="h-full overflow-y-auto custom-scrollbar p-4">
+                  <div className="h-full overflow-y-auto custom-scrollbar np-scroll p-4">
                     <div className="space-y-2">
                       {csvHeaders.map((header, idx) => (
                         <div 
@@ -948,7 +948,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
               >
                 <h3 className="text-sm font-semibold text-white mb-6 uppercase tracking-widest flex-none">Routing Matrix</h3>
                 
-                <div className="space-y-6 overflow-y-auto custom-scrollbar pr-2 flex-1">
+                <div className="space-y-6 overflow-y-auto custom-scrollbar np-scroll pr-2 flex-1">
                   {/* ENRICHMENT TOGGLE */}
                   <div className="flex items-center justify-between p-4 rounded nodal-module-glass border border-white/5">
                     <div>
