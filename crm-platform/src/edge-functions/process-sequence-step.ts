@@ -490,7 +490,6 @@ async function handleLinkedInTask(execution, job) {
         const label = (metadata?.label || 'LinkedIn Step').trim();
         const prompt = (metadata?.prompt || metadata?.aiBody || 'Complete LinkedIn outreach step for this contact.').trim();
         const ownerEmail = member.owner_email || (String(member.owner_id || '').includes('@') ? member.owner_id : null);
-        const ownerId = member.owner_id && !String(member.owner_id).includes('@') ? String(member.owner_id) : null;
 
         const inserted = await sql`
       INSERT INTO tasks (
@@ -515,7 +514,7 @@ async function handleLinkedInTask(execution, job) {
         NOW(),
         ${member.contact_id},
         ${member.account_id},
-        ${ownerId},
+        ${ownerEmail},
         NOW(),
         NOW(),
         jsonb_build_object(
@@ -588,7 +587,7 @@ async function handleCallTask(execution, job) {
         const lastName = (member.lastName || '').trim();
         const contactName = `${firstName} ${lastName}`.trim() || 'Contact';
         const label = (metadata?.label || 'Call Step').trim();
-        const ownerId = member.owner_id && !String(member.owner_id).includes('@') ? String(member.owner_id) : null;
+        const ownerEmail = member.owner_email || (String(member.owner_id || '').includes('@') ? member.owner_id : null);
 
         const inserted = await sql`
       INSERT INTO tasks (
@@ -613,7 +612,7 @@ async function handleCallTask(execution, job) {
         NOW(),
         ${member.contact_id},
         ${member.account_id},
-        ${ownerId},
+        ${ownerEmail},
         NOW(),
         NOW(),
         jsonb_build_object(
