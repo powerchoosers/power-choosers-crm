@@ -451,6 +451,7 @@ async function handleLinkedInTask(execution, job) {
            c."accountId" as account_id,
            c."firstName",
            c."lastName",
+           c."linkedinUrl" as contact_linkedin_url,
            s."ownerId" as owner_id,
            u.email as owner_email
     FROM sequence_members m
@@ -463,6 +464,13 @@ async function handleLinkedInTask(execution, job) {
 
     if (!member?.contact_id) {
         throw new Error(`LinkedIn task requires a valid contact for member ${execution.member_id}`);
+    }
+
+    const hasLinkedIn = Boolean(String(member.contact_linkedin_url || '').trim());
+    if (!hasLinkedIn) {
+      console.log(`[DEBUG] Skipping LinkedIn task for member ${execution.member_id} because no LinkedIn URL`);
+      await skipNode(execution, job);
+      return;
     }
 
     const existingTasks = await sql`
