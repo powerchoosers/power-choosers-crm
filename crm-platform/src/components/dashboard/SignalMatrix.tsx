@@ -10,7 +10,6 @@ import { useUIStore } from '@/store/uiStore';
 import { useProspectRadar, useIngestProspect, useDismissProspect } from '@/hooks/useProspectRadar';
 import { supabase } from '@/lib/supabase';
 
-type TabId = 'recon' | 'monitor';
 
 type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion';
 
@@ -81,8 +80,7 @@ function formatRelativeTime(iso: string): string {
 }
 
 export function SignalMatrix() {
-  const { setRightPanelMode, setIngestionIdentifier, setIngestionSignal } = useUIStore();
-  const [activeTab, setActiveTab] = useState<TabId>('recon');
+  const { setRightPanelMode, setIngestionIdentifier, setIngestionSignal, signalMatrixTab: activeTab, setSignalMatrixTab: setActiveTab } = useUIStore();
   const [selectedSignal, setSelectedSignal] = useState<IntelSignal | null>(null);
   const router = useRouter();
 

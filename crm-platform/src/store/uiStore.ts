@@ -91,6 +91,9 @@ interface UIState {
   /** Set when Org Intelligence enriches/acquires a contact – dossier uses this to trigger blur-in */
   lastEnrichedContactId: string | null
   setLastEnrichedContactId: (id: string | null) => void
+  /** Persisted active tab for Signal Matrix (survives navigation + browser restart) */
+  signalMatrixTab: 'recon' | 'monitor'
+  setSignalMatrixTab: (tab: 'recon' | 'monitor') => void
   /** Global audio toggle */
   soundEnabled: boolean
   setSoundEnabled: (enabled: boolean) => void
@@ -133,6 +136,8 @@ export const useUIStore = create<UIState>()(
       setLastEnrichedAccountId: (id) => set({ lastEnrichedAccountId: id }),
       lastEnrichedContactId: null,
       setLastEnrichedContactId: (id) => set({ lastEnrichedContactId: id }),
+      signalMatrixTab: 'recon',
+      setSignalMatrixTab: (tab) => set({ signalMatrixTab: tab }),
       
       soundEnabled: true,
       setSoundEnabled: (enabled) => set({ soundEnabled: enabled }),
