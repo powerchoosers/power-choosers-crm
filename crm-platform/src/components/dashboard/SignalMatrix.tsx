@@ -1,12 +1,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X } from 'lucide-react';
+import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X, Users, DollarSign, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
+import { useProspectRadar, useIngestProspect, useDismissProspect } from '@/hooks/useProspectRadar';
 
 type TabId = 'recon' | 'monitor';
 
@@ -28,20 +29,6 @@ interface IntelSignal {
   accounts?: { id: string; name: string; domain?: string } | null;
 }
 
-interface MonitorSignal {
-  id: string;
-  time: string;
-  label: 'HIGH_VELOCITY_INTEREST' | 'VOLATILITY_EXPOSURE' | 'CHURN_RISK';
-  message: string;
-  type: 'risk' | 'opportunity';
-}
-
-// Monitor tab stays as useful static placeholders (real CRM data wiring is future phase)
-const MONITOR_SIGNALS: MonitorSignal[] = [
-  { id: '1', time: '08:00', label: 'VOLATILITY_EXPOSURE', message: 'Check accounts with contracts expiring in 60 days for 4CP exposure.', type: 'risk' },
-  { id: '2', time: '07:30', label: 'HIGH_VELOCITY_INTEREST', message: 'Review Apollo signals for recently-enriched target accounts.', type: 'opportunity' },
-  { id: '3', time: '07:00', label: 'CHURN_RISK', message: 'Track executive changes at existing accounts — champion departures signal risk.', type: 'risk' },
-];
 
 const SIGNAL_CONFIG: Record<SignalType, { icon: React.ReactNode; label: string; color: string; bg: string; border: string }> = {
   new_location: {
@@ -99,6 +86,12 @@ export function SignalMatrix() {
   const router = useRouter();
 
   const [isScraping, setIsScraping] = useState(false);
+
+  // Prospect radar (ASSET_MONITOR tab)
+  const { data: prospects = [], isLoading: isLoadingProspects } = useProspectRadar();
+  const ingestProspect = useIngestProspect();
+  const dismissProspect = useDismissProspect();
+  const [ingestingId, setIngestingId] = useState<string | null>(null);
 
   // Fetch signals autonomously using TanStack Query
   const { data: qData, isLoading, isFetching, error, refetch } = useQuery({
@@ -318,41 +311,113 @@ export function SignalMatrix() {
           </>
         )}
 
-        {/* ASSET_MONITOR TAB */}
+        {/* ASSET_MONITOR TAB — Apollo Prospect Radar */}
         {activeTab === 'monitor' && (
           <>
-            {MONITOR_SIGNALS.map((s) => (
-              <div
-                key={s.id}
-                className="group flex items-start gap-3 p-3 rounded-xl bg-transparent border border-white/5 hover:bg-zinc-950/90 hover:border-white/10 transition-all"
-              >
-                <div
-                  className={`w-8 h-8 rounded-[14px] border flex items-center justify-center flex-shrink-0 ${s.type === 'risk'
-                    ? 'bg-amber-500/10 border-amber-500/30'
-                    : 'bg-[#002FA7]/10 border-[#002FA7]/30'
-                    }`}
-                >
-                  {s.type === 'risk' ? (
-                    <AlertTriangle className="w-4 h-4 text-amber-400" />
-                  ) : (
-                    <Zap className="w-4 h-4 text-[#002FA7]" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-mono tabular-nums uppercase tracking-wider text-zinc-500">
-                    [{s.time}] {s.label}
-                  </p>
-                  <p className="text-xs text-zinc-200 mt-0.5 font-mono leading-snug">{s.message}</p>
-                </div>
-                <button
-                  type="button"
-                  className="opacity-0 group-hover:opacity-100 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/10 border border-white/10 text-[9px] font-mono text-zinc-300 hover:text-white hover:border-[#002FA7]/50 transition-all uppercase tracking-widest flex-shrink-0"
-                >
-                  <Phone className="w-3 h-3" />
-                  INITIATE_CONTACT
-                </button>
+            {isLoadingProspects && (
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-transparent border border-white/5 animate-pulse">
+                    <div className="w-8 h-8 rounded-[14px] bg-white/5 flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-2.5 bg-white/5 rounded w-32" />
+                      <div className="h-3 bg-white/5 rounded w-full" />
+                      <div className="h-2.5 bg-white/5 rounded w-2/3" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+
+            {!isLoadingProspects && prospects.length === 0 && (
+              <div className="flex flex-col items-center justify-center h-32 gap-2 text-center">
+                <Building2 className="w-6 h-6 text-zinc-700" />
+                <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">No_Prospects_On_Radar</span>
+                <span className="text-[9px] font-mono text-zinc-700">Cron runs daily at 6 AM CDT — first scan pending</span>
+              </div>
+            )}
+
+            <AnimatePresence>
+              {!isLoadingProspects && prospects.map((prospect, idx) => (
+                <motion.div
+                  key={prospect.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ delay: idx * 0.04, duration: 0.25 }}
+                  className="group flex items-start gap-3 p-3 rounded-xl bg-transparent border border-white/5 hover:bg-zinc-950/90 hover:border-white/10 transition-all"
+                >
+                  {/* Logo / Initials */}
+                  <div className="w-8 h-8 rounded-[14px] border border-[#002FA7]/30 bg-[#002FA7]/10 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                    {prospect.logo_url ? (
+                      <img src={prospect.logo_url} alt="" className="w-6 h-6 object-contain" />
+                    ) : (
+                      <span className="text-[10px] font-mono font-bold text-[#4D88FF] uppercase">
+                        {prospect.name.slice(0, 2)}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-xs font-mono text-zinc-100 truncate">{prospect.name}</p>
+                      {prospect.tdsp_zone && prospect.tdsp_zone !== 'Unknown' && (
+                        <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
+                          {prospect.tdsp_zone}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                      {prospect.industry && (
+                        <span className="text-[10px] font-mono text-zinc-500 truncate">{prospect.industry}</span>
+                      )}
+                      {prospect.employee_count && (
+                        <span className="flex items-center gap-1 text-[9px] font-mono text-zinc-600">
+                          <Users className="w-2.5 h-2.5" />
+                          {prospect.employee_count.toLocaleString()}
+                        </span>
+                      )}
+                      {prospect.city && (
+                        <span className="flex items-center gap-1 text-[9px] font-mono text-zinc-600">
+                          <MapPin className="w-2.5 h-2.5" />
+                          {prospect.city}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Actions — visible on hover */}
+                  <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => dismissProspect(prospect.id)}
+                      className="h-6 px-2 rounded-md bg-white/5 border border-white/10 text-[8px] font-mono text-zinc-500 hover:text-white hover:border-white/20 transition-all uppercase tracking-widest"
+                    >
+                      DISMISS
+                    </button>
+                    <button
+                      type="button"
+                      disabled={ingestingId === prospect.id}
+                      onClick={async () => {
+                        setIngestingId(prospect.id);
+                        await ingestProspect(prospect.id, prospect.name);
+                        setIngestingId(null);
+                      }}
+                      className="h-6 px-2 rounded-md bg-[#002FA7] border border-[#002FA7]/50 text-[8px] font-mono text-white hover:bg-[#002FA7]/80 transition-all uppercase tracking-widest flex items-center gap-1 disabled:opacity-50"
+                    >
+                      {ingestingId === prospect.id ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : (
+                        <Plus className="w-2.5 h-2.5" />
+                      )}
+                      INGEST
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
           </>
         )}
       </div>
