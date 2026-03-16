@@ -165,8 +165,7 @@ export function SignalMatrix() {
         <div className="flex items-center gap-2">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_6px_rgba(16,185,129,0.6)]" />
           <h3 className="text-[11px] font-mono text-zinc-400 uppercase tracking-[0.2em]">
-            <span className="sm:hidden">ACTIVE_TELEMETRY</span>
-            <span className="hidden sm:inline">ACTIVE_TELEMETRY // LIVE_SIGNALS</span>
+            ACTIVE_TELEMETRY
           </h3>
         </div>
         <button
