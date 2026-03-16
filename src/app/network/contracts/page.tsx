@@ -608,12 +608,21 @@ export default function ContractsPage() {
         cell: ({ row }) => {
           const deal = row.original
           return (
-            <div className="min-w-0">
-              <div className="font-sans text-sm text-zinc-200 truncate group-hover:text-white transition-colors">
-                {deal.account?.name || deal.accountId}
-              </div>
-              <div className="font-mono text-[10px] text-zinc-600 truncate uppercase tracking-tight">
-                {deal.title}
+            <div className="flex items-center gap-3 min-w-0">
+              <CompanyIcon
+                logoUrl={deal.account?.logoUrl ?? deal.account?.logo_url}
+                domain={deal.account?.domain}
+                name={deal.account?.name || deal.accountId}
+                size={32}
+                className="w-8 h-8 flex-none"
+              />
+              <div className="min-w-0">
+                <div className="font-sans text-sm text-zinc-200 truncate group-hover:text-white transition-colors">
+                  {deal.account?.name || deal.accountId}
+                </div>
+                <div className="font-mono text-[10px] text-zinc-600 truncate uppercase tracking-tight">
+                  {deal.title}
+                </div>
               </div>
             </div>
           )
