@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone } from 'lucide-react'
+import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone, Landmark, Phone, Building2 } from 'lucide-react'
 import { useCallStore } from '@/store/callStore'
 import { useComposeStore } from '@/store/composeStore'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
@@ -14,8 +14,11 @@ interface HolderContact {
   email?: string
   mobile?: string
   workDirectPhone?: string
+  otherPhone?: string
+  companyPhone?: string
   phone?: string
   avatarUrl?: string
+  primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
 }
 
 interface AccountHolderCardProps {
@@ -40,7 +43,44 @@ export function AccountHolderCard({
   const inputRef = useRef<HTMLInputElement>(null)
 
   const holder = primaryContactId ? contacts.find(c => c.id === primaryContactId) : null
-  const heroPhone = holder?.mobile || holder?.workDirectPhone || holder?.phone || ''
+
+  // Determine hero phone and its icon/label based on primaryPhoneField
+  const getHeroPhoneInfo = (contact: HolderContact) => {
+    const primaryField = contact.primaryPhoneField || 'mobile'
+    const phoneLabels: Record<string, string> = {
+      mobile: 'Mobile',
+      workDirectPhone: 'Work Direct',
+      otherPhone: 'Other',
+      companyPhone: 'Company'
+    }
+    const phoneIcons: Record<string, typeof Smartphone> = {
+      mobile: Smartphone,
+      workDirectPhone: Landmark,
+      otherPhone: Phone,
+      companyPhone: Building2
+    }
+
+    let phone = ''
+    if (primaryField === 'mobile') phone = contact.mobile || ''
+    else if (primaryField === 'workDirectPhone') phone = contact.workDirectPhone || ''
+    else if (primaryField === 'otherPhone') phone = contact.otherPhone || ''
+    else if (primaryField === 'companyPhone') phone = contact.companyPhone || ''
+
+    // Fallback to any available phone if primary is empty
+    if (!phone) {
+      if (contact.mobile) { phone = contact.mobile; return { phone, label: 'Mobile', icon: Smartphone } }
+      if (contact.workDirectPhone) { phone = contact.workDirectPhone; return { phone, label: 'Work Direct', icon: Landmark } }
+      if (contact.otherPhone) { phone = contact.otherPhone; return { phone, label: 'Other', icon: Phone } }
+      if (contact.companyPhone) { phone = contact.companyPhone; return { phone, label: 'Company', icon: Building2 } }
+      phone = contact.phone || ''
+    }
+
+    return { phone, label: phoneLabels[primaryField] || 'Phone', icon: phoneIcons[primaryField] || Smartphone }
+  }
+
+  const heroPhoneInfo = holder ? getHeroPhoneInfo(holder) : { phone: '', label: 'Phone', icon: Smartphone }
+  const heroPhone = heroPhoneInfo.phone
+
   const filtered = contacts.filter(c =>
     c.name.toLowerCase().includes(query.toLowerCase()) ||
     (c.title || '').toLowerCase().includes(query.toLowerCase())
@@ -132,10 +172,10 @@ export function AccountHolderCard({
               className="w-full group flex items-center justify-between p-3.5 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_24px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
             >
               <div className="flex items-center gap-3 min-w-0">
-                <Smartphone className="w-4 h-4 text-white/70 group-hover:text-white transition-colors shrink-0" />
+                <heroPhoneInfo.icon className="w-4 h-4 text-white/70 group-hover:text-white transition-colors shrink-0" />
                 <div className="flex flex-col items-start min-w-0">
                   <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
-                    {holder.mobile ? 'Mobile' : holder.workDirectPhone ? 'Work Direct' : 'Phone'}
+                    {heroPhoneInfo.label}
                   </span>
                   <span className="text-[13px] font-mono tabular-nums text-white tracking-tight truncate w-full">
                     {formatPhoneNumber(heroPhone)}
