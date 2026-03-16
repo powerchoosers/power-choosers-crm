@@ -16,20 +16,36 @@ import { CheckCircle, Eye } from 'lucide-react'
 import { GlobalComposeModal } from '@/components/emails/GlobalComposeModal'
 
 
-function WarRoomKeyListener() {
-  const toggle = useWarRoomStore((s) => s.toggle)
+import { useUIStore } from '@/store/uiStore'
+import { SequenceIntelModal } from '@/components/sequences/SequenceIntelModal'
+
+function GlobalShortcuts() {
+  const toggleWarRoom = useWarRoomStore((s) => s.toggle)
+  const toggleSequenceIntel = useUIStore((s) => s.toggleSequenceIntel)
+  const activeSequenceId = useUIStore((s) => s.activeSequenceId)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Ctrl+Shift+W (Cmd+Shift+W on Mac)
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'w') {
+      const isCtrl = e.ctrlKey || e.metaKey;
+      const isAlt = e.altKey;
+      const isShift = e.shiftKey;
+      const key = e.key.toLowerCase();
+
+      // War Room: Ctrl+Alt+W OR Ctrl+Shift+W
+      if (isCtrl && (isAlt || isShift) && key === 'w') {
         e.preventDefault()
-        toggle()
+        toggleWarRoom()
+      }
+
+      // Sequence Intel: Ctrl+Alt+I
+      if (isCtrl && isAlt && key === 'i' && activeSequenceId) {
+        e.preventDefault()
+        toggleSequenceIntel()
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [toggle])
+  }, [toggleWarRoom, toggleSequenceIntel, activeSequenceId])
 
   return null
 }
@@ -46,6 +62,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   }))
 
   const [persister] = useState(() => createIDBPersister('reactQuery-v2'))
+  const { sequenceIntelOpen, setSequenceIntelOpen, activeSequenceId } = useUIStore()
 
   return (
     <PersistQueryClientProvider
@@ -73,9 +90,16 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         <VoiceProvider>
           <ChunkLoadErrorHandler />
-          <WarRoomKeyListener />
+          <GlobalShortcuts />
           <WarRoomOverlay />
           <GlobalComposeModal />
+          {activeSequenceId && (
+            <SequenceIntelModal 
+              isOpen={sequenceIntelOpen} 
+              onClose={() => setSequenceIntelOpen(false)} 
+              sequenceId={activeSequenceId as string} 
+            />
+          )}
           {children}
         </VoiceProvider>
       </AuthProvider>
