@@ -369,26 +369,36 @@ function SignaturePanel({
         )[0]
       : null
 
+  function derivedStatus(req: any) {
+    if (req.status === 'completed' || req.status === 'signed') return 'signed'
+    if (req.status === 'canceled' || req.status === 'cancelled') return 'cancelled'
+    if (req.expires_at && new Date(req.expires_at) < new Date()) return 'expired'
+    return req.status
+  }
+
   const statusColor = (status: string) => {
-    if (status === 'completed' || status === 'signed') return 'text-emerald-400'
-    if (status === 'pending' || status === 'sent') return 'text-amber-400'
+    if (status === 'signed') return 'text-emerald-400'
+    if (status === 'expired') return 'text-rose-400'
+    if (status === 'pending' || status === 'sent' || status === 'opened' || status === 'viewed') return 'text-amber-400'
     return 'text-zinc-500'
   }
+
+  const latestDerived = latest ? derivedStatus(latest) : null
 
   return (
     <div className="nodal-glass rounded-2xl p-5 space-y-3">
       <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
         Signature Status
       </span>
-      {latest ? (
+      {latest && latestDerived ? (
         <div className="space-y-1.5">
           <div
             className={cn(
               'font-mono text-xs uppercase tracking-wider font-medium',
-              statusColor(latest.status)
+              statusColor(latestDerived)
             )}
           >
-            {latest.status}
+            {latestDerived}
           </div>
           <div className="font-mono text-[9px] text-zinc-600">
             Requested {format(new Date(latest.created_at), 'MMM d, yyyy')}
@@ -405,7 +415,7 @@ function SignaturePanel({
         className="w-full flex items-center gap-2 font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors group"
       >
         <FileSignature className="w-3 h-3 flex-none" />
-        <span>{latest ? 'New Signature Request' : 'Request Signature'}</span>
+        <span>{latestDerived && latestDerived !== 'signed' ? 'New Signature Request' : latest ? 'View / Resend' : 'Request Signature'}</span>
         <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-none" />
       </button>
     </div>

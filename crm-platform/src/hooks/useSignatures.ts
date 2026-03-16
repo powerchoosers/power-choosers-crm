@@ -9,7 +9,7 @@ export function useCancelSignatureRequest() {
     mutationFn: async (requestId: string) => {
       const { error } = await supabase
         .from('signature_requests')
-        .delete()
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
         .eq('id', requestId)
 
       if (error) throw error
