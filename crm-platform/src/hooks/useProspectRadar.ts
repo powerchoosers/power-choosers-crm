@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { useUIStore } from '@/store/uiStore';
 
 export interface ProspectRadarEntry {
   id: string;
@@ -47,6 +48,7 @@ export function useProspectRadar() {
 export function useIngestProspect() {
   const queryClient = useQueryClient();
   const router = useRouter();
+  const setPendingAutoScan = useUIStore((s) => s.setPendingAutoScan);
 
   return async (prospectId: string, prospectName: string) => {
     const toastId = toast.loading(`Ingesting ${prospectName}...`);
@@ -74,6 +76,10 @@ export function useIngestProspect() {
 
       queryClient.invalidateQueries({ queryKey: ['prospect-radar'] });
       queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['account', accountId] });
+
+      // Signal OrgIntelligence to auto-trigger scan on the new account
+      setPendingAutoScan(true);
 
       router.push(`/network/accounts/${accountId}`);
     } catch (err: any) {
