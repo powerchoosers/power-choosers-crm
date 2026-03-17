@@ -239,8 +239,9 @@ export default async function handler(req, res) {
 
         const normalizedAttachments = normalizeComposerAttachments(attachments);
 
-        // Create email record in Supabase BEFORE sending (for tracking)
-        if (supabaseAdmin && deliverability.enableTracking) {
+        // Persist the email record before sending so Sent/Scheduled lists always have a row.
+        // Tracking remains optional; it only affects injected pixels/links and tracking metadata.
+        if (supabaseAdmin) {
             try {
                 const emailRecord = {
                     id: trackingId,
@@ -320,8 +321,8 @@ export default async function handler(req, res) {
             userEmail: ownerEmail
         });
 
-        // Update email record with sent status and Zoho message ID
-        if (supabaseAdmin && deliverability.enableTracking) {
+        // Update the persisted row with the final send status and Zoho message ID.
+        if (supabaseAdmin) {
             try {
                 const finalThreadId = requestedThreadId || result.messageId || trackingId;
                 const attachmentsWithMessageId = normalizedAttachments.map((att, idx) => ({
