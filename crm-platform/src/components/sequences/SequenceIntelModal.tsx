@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { XCircle, RotateCcw, AlertTriangle, Cpu } from 'lucide-react'
+import { XCircle, RotateCcw, AlertTriangle, GitMerge } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import {
@@ -201,22 +201,24 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                     value={selectedSequenceId || ''}
                     onValueChange={(val) => setSelectedSequenceId(val)}
                   >
-                    <SelectTrigger className="h-8 bg-black/40 border border-white/10 rounded-lg px-3 text-[10px] font-mono text-zinc-300 hover:text-white transition-colors uppercase tracking-wider focus:ring-1 focus:ring-[#002FA7]/50 w-[240px] gap-2 flex items-center justify-between shadow-sm">
+                    <SelectTrigger className="h-8 bg-black/40 border border-white/10 rounded-lg px-3 text-[10px] font-mono text-zinc-300 hover:text-white transition-all uppercase tracking-wider focus:ring-0 focus:ring-offset-0 focus:outline-none ring-0 outline-none w-[240px] gap-2 flex items-center justify-between shadow-sm">
                       <div className="flex items-center gap-2 truncate">
-                        <Cpu className="w-3 h-3 text-[#002FA7]" />
+                        <GitMerge className="w-3 h-3 text-[#002FA7]" />
                         <SelectValue placeholder="Switch Protocol" />
                       </div>
                     </SelectTrigger>
-                    <SelectContent className="bg-zinc-950 border-white/10 text-white min-w-[240px] shadow-2xl backdrop-blur-xl">
-                      <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">
+                    <SelectContent className="bg-zinc-950 border-white/10 text-white min-w-[240px] shadow-2xl backdrop-blur-xl z-[200]">
+                      <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5 flex items-center gap-2">
+                        <GitMerge className="w-2.5 h-2.5 text-zinc-500" />
                         Available Protocols
                       </div>
                       {availableSequences.map(seq => (
                         <SelectItem 
                           key={seq.id} 
                           value={seq.id}
-                          className="text-[10px] font-mono focus:bg-[#002FA7]/20 cursor-pointer py-2"
+                          className="text-[10px] font-mono focus:bg-[#002FA7]/20 cursor-pointer py-2 flex items-center gap-2"
                         >
+                          <GitMerge className="w-3 h-3 text-white mr-2" />
                           {seq.name}
                         </SelectItem>
                       ))}
