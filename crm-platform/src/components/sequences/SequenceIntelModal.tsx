@@ -322,8 +322,8 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                       <TH>Company</TH>
                       <TH>Status</TH>
                       <TH>Current Step</TH>
-                      <TH>Execution</TH>
-                      <TH>Exec Status</TH>
+                      <TH>Next Action</TH>
+                      <TH>Queue Status</TH>
                       <TH>Scheduled</TH>
                       <TH>Signals</TH>
                       <TH className="pr-5">Updated</TH>
