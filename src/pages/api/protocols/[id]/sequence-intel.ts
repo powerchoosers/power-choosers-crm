@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { requireUser, supabaseAdmin } from '@/lib/supabase';
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar';
 
 type SequenceIntelRow = {
   memberId: string;
@@ -138,7 +139,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: contacts, error: contactsError } = contactIds.length
       ? await supabaseAdmin
           .from('contacts')
-          .select('id, firstName, lastName, email, title, accountId, avatarUrl')
+          .select('id, firstName, lastName, email, title, accountId, metadata')
           .in('id', contactIds)
       : { data: [], error: null };
 
@@ -209,7 +210,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastName: contact?.lastName || null,
         email: contact?.email || null,
         title: contact?.title || null,
-        avatarUrl: contact?.avatarUrl || null,
+        avatarUrl: resolveContactPhotoUrl(contact, contact?.metadata) || null,
         accountName: account?.name || null,
         updatedAt: member.updatedAt || null,
         totalEmailsSent: normalizeNumber(member.total_emails_sent),
