@@ -43,6 +43,7 @@ interface SequenceMemberRow {
   executionStepType: string | null
   executionScheduledAt: string | null
   executionLabel: string | null
+  nextActionLabel: string | null
 }
 
 interface SequenceIntelSummary {
@@ -367,7 +368,7 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                       rows.map((row, i) => {
                         const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || row.email || 'Unknown'
                         const currentStep = row.currentNodeLabel || row.currentNodeId || '-'
-                        const executionLabel = row.executionLabel || row.executionStepType || '-'
+                        const executionLabel = row.nextActionLabel || row.executionLabel || row.executionStepType || '-'
                         return (
                           <motion.tr
                             key={row.memberId}
