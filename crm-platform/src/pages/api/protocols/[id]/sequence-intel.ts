@@ -22,6 +22,7 @@ type SequenceIntelRow = {
   executionStepType: string | null;
   executionScheduledAt: string | null;
   executionLabel: string | null;
+  nextActionLabel: string | null;
   avatarUrl: string | null;
   accountId: string | null;
   accountDomain: string | null;
@@ -76,6 +77,25 @@ function pickExecutionLabel(
   return null;
 }
 
+function pickNextNodeId(
+  currentNodeId: string | null,
+  edges: Array<Record<string, any>>
+): string | null {
+  if (!currentNodeId) return null;
+  const outgoing = edges.filter((edge) => edge?.source === currentNodeId);
+  if (!outgoing.length) return null;
+
+  // Prefer the generic/default path first, then any deterministic first edge.
+  const defaultEdge = outgoing.find((edge) => {
+    const handle = String(edge?.sourceHandle || '').toLowerCase();
+    return !handle || handle.includes('completed') || handle.includes('default');
+  });
+
+  const chosen = defaultEdge || outgoing[0];
+  const target = chosen?.target;
+  return typeof target === 'string' && target.trim() ? target : null;
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -109,6 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const nodes = Array.isArray(sequence?.bgvector?.nodes) ? sequence.bgvector.nodes : [];
+    const edges = Array.isArray(sequence?.bgvector?.edges) ? sequence.bgvector.edges : [];
     const nodeLabelMap = new Map<string, string>();
     for (const node of nodes) {
       if (!node || typeof node !== 'object') continue;
@@ -233,6 +254,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         executionStepType: execution?.step_type || null,
         executionScheduledAt: execution?.scheduled_at || null,
         executionLabel: pickExecutionLabel(execution, nodeLabelMap, stepsArray),
+        nextActionLabel: (() => {
+          const anchorNodeId =
+            currentNodeId ||
+            (typeof execution?.metadata?.nodeId === 'string' ? execution.metadata.nodeId : null) ||
+            (typeof execution?.metadata?.node_id === 'string' ? execution.metadata.node_id : null) ||
+            null;
+          const nextNodeId = pickNextNodeId(anchorNodeId, edges);
+          return nextNodeId ? nodeLabelMap.get(nextNodeId) || null : null;
+        })(),
       };
     });
 
