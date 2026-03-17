@@ -6,17 +6,18 @@ import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import type { EmailIdentity } from './useEmailIdentityMap'
 
 export function useContactIdentityMapByIds(contactIds: Array<string | null | undefined>) {
-  const { user, role, loading } = useAuth()
+  const { user, loading } = useAuth()
 
   const normalizedIds = useMemo(() => {
     return Array.from(new Set((contactIds || []).map((id) => String(id || '').trim()).filter(Boolean))).sort()
   }, [contactIds])
 
   return useQuery({
-    queryKey: ['contact-identity-map-by-id', normalizedIds, user?.id, role],
+    // role excluded from queryKey — RLS enforces row-level access at the DB level
+    queryKey: ['contact-identity-map-by-id', normalizedIds, user?.id],
     queryFn: async () => {
       if (!normalizedIds.length) return {} as Record<string, EmailIdentity>
-      if (!user && role !== 'admin') return {} as Record<string, EmailIdentity>
+      if (!user) return {} as Record<string, EmailIdentity>
 
       const map: Record<string, EmailIdentity> = {}
       const selectClause = 'id, email, name, firstName, lastName, accountId, ownerId, metadata, accounts(name, domain, logo_url)'
@@ -51,7 +52,7 @@ export function useContactIdentityMapByIds(contactIds: Array<string | null | und
 
       return map
     },
-    enabled: !loading && normalizedIds.length > 0 && !!(user || role === 'admin'),
+    enabled: !loading && normalizedIds.length > 0 && !!user,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
     refetchOnMount: false,
