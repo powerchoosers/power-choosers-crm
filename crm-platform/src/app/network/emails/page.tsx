@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEmails, useEmailsCount, useEmailTypeCounts, Email, EmailListFilter } from '@/hooks/useEmails'
 import { extractEmailAddress, useEmailIdentityMap } from '@/hooks/useEmailIdentityMap'
@@ -68,14 +68,17 @@ export default function EmailsPage() {
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const openCompose = useComposeStore((s) => s.openCompose)
 
-  const emails = data?.pages.flatMap(page => page.emails) || []
-  const identityAddresses = emails.flatMap((e) => {
-    const toList = Array.isArray(e.to) ? e.to : [e.to]
-    return [e.from, ...toList].map((addr) => extractEmailAddress(String(addr || ''))).filter(Boolean)
-  })
+  const emails = useMemo(() => data?.pages.flatMap(page => page.emails) || [], [data])
+  const identityAddresses = useMemo(() =>
+    emails.flatMap((e) => {
+      const toList = Array.isArray(e.to) ? e.to : [e.to]
+      return [e.from, ...toList].map((addr) => extractEmailAddress(String(addr || ''))).filter(Boolean)
+    }),
+  [emails])
   const { data: contactByEmail = {} } = useEmailIdentityMap(identityAddresses)
-  const contactIds = emails.map((email) => email.contactId).filter(Boolean) as string[]
-  const { data: contactById = {} } = useContactIdentityMapByIds(contactIds)
+  const contactIds = useMemo(() =>
+    emails.map((email) => email.contactId).filter(Boolean) as string[],
+  [emails])
   const effectiveTotal =
     emailFilter === 'sent'
       ? (emailTypeCounts?.sent ?? emails.length)
