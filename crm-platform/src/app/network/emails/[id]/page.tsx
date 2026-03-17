@@ -868,9 +868,12 @@ export default function EmailDetailPage() {
                   name={displayFromName}
                   domain={displayFromAddress?.includes('@') ? displayFromAddress.split('@')[1] : undefined}
                   logoUrl={
+                    // Show NP logo when the primary address is @nodalpoint.io,
+                    // or receiving a system email from a @nodalpoint.io sender.
+                    // Exclude outbound emails — from is Lewis's personal address.
                     displayFromAddress?.toLowerCase().endsWith('@nodalpoint.io') ||
-                    String(email?.from || '').toLowerCase().includes('@nodalpoint.io') ||
-                    String(email?.from || '').toLowerCase().includes('nodal point')
+                    (!isOutboundType && String(email?.from || '').toLowerCase().includes('@nodalpoint.io')) ||
+                    (!isOutboundType && String(email?.from || '').toLowerCase().includes('nodal point'))
                       ? '/images/nodalpoint-webicon.png'
                       : undefined
                   }
@@ -1224,8 +1227,12 @@ export default function EmailDetailPage() {
                                 name={displayName}
                                 domain={(parsedFrom.address || threadEmail.from || '').includes('@') ? (parsedFrom.address || threadEmail.from || '').split('@')[1] : undefined}
                                 logoUrl={
-                                  (parsedFrom.address || threadEmail.from || '').toLowerCase().includes('@nodalpoint.io') ||
-                                  (parsedFrom.address || threadEmail.from || '').toLowerCase().includes('nodal point')
+                                  // Outbound thread items: from is Lewis's address — never show NP logo
+                                  // Inbound thread items: show NP logo if sender is a @nodalpoint.io system address
+                                  !threadIsOutbound && (
+                                    (parsedFrom.address || threadEmail.from || '').toLowerCase().includes('@nodalpoint.io') ||
+                                    (parsedFrom.address || threadEmail.from || '').toLowerCase().includes('nodal point')
+                                  )
                                     ? '/images/nodalpoint-webicon.png'
                                     : undefined
                                 }
