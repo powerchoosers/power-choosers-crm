@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nodal Point | Proposal for Killam Development</title>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: rgba(255,255,255,0.03);
+      --line-soft: rgba(255,255,255,0.08);
+      --text: #e4e4e7;
+      --muted: #a1a1aa;
+      --signal: #002FA7;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 90% -10%, rgba(0,47,167,0.33), transparent 38%),
+        radial-gradient(circle at 0% 100%, rgba(255,255,255,0.08), transparent 30%),
+        var(--bg);
+      color: var(--text);
+      font-family: "Segoe UI", Arial, sans-serif;
+      line-height: 1.45;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    .page {
+      width: 8.5in;
+      min-height: 11in;
+      margin: 0 auto;
+      padding: 0.5in;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card {
+      border: 1px solid var(--line-soft);
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 12px;
+      background: linear-gradient(160deg, var(--surface), rgba(255,255,255,0.015));
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .top {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+
+    .logos {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo {
+      width: 54px;
+      height: 54px;
+      object-fit: contain;
+      border-radius: 10px;
+      border: 1px solid var(--line-soft);
+      background: #fff;
+      padding: 4px;
+    }
+
+    .eyebrow {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 24px;
+      line-height: 1.2;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 5px;
+    }
+
+    .sender {
+      display: flex;
+      justify-self: end;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .avatar {
+      width: 50px;
+      height: 50px;
+      border-radius: 999px;
+      object-fit: cover;
+      border: 1px solid var(--line-soft);
+    }
+
+    .sender-text {
+      text-align: right;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .sender-text strong {
+      color: var(--text);
+      display: block;
+      font-size: 12px;
+    }
+
+    h2 {
+      margin: 0 0 8px;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: #d4d4d8;
+    }
+
+    p {
+      margin: 0;
+      color: #d4d4d8;
+      font-size: 12px;
+    }
+
+    .hero-img {
+      width: 100%;
+      height: 148px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid var(--line-soft);
+      margin-top: 10px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .tile {
+      border: 1px solid var(--line-soft);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(255,255,255,0.02);
+      font-size: 12px;
+      color: #d4d4d8;
+    }
+
+    .tile strong {
+      display: block;
+      color: #f4f4f5;
+      margin-bottom: 4px;
+      font-size: 12px;
+    }
+
+    .signal {
+      border-left: 4px solid var(--signal);
+      background: rgba(0,47,167,0.17);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 12px;
+      color: #dbeafe;
+    }
+
+    .close {
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .page-fill {
+      flex: 1 1 auto;
+      min-height: 8px;
+    }
+
+    .footer {
+      border-top: 1px solid var(--line-soft);
+      padding-top: 10px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      font-size: 10px;
+      color: var(--muted);
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .footer-right {
+      text-align: right;
+    }
+
+    @page { size: Letter; margin: 0; }
+
+    @media print {
+      .page {
+        padding: 0.38in;
+      }
+
+      .card {
+        padding: 12px;
+        margin-bottom: 8px;
+      }
+
+      h1 {
+        font-size: 21px;
+      }
+
+      p,
+      .tile,
+      .signal {
+        font-size: 11px;
+      }
+
+      .hero-img {
+        height: 126px;
+      }
+
+      .footer {
+        font-size: 9.5px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="card top">
+      <div>
+        <div class="logos">
+          <img class="logo" src="../images/nodalpoint-webicon.png" alt="Nodal Point logo" />
+          <img class="logo" src="https://zenprospect-production.s3.amazonaws.com/uploads/pictures/69868e625718460001cd2f98/picture" alt="Killam Development logo" />
+          <div>
+            <div class="eyebrow">Prepared For Killam Development</div>
+            <h1>Energy Cost Verification Proposal</h1>
+            <div class="subtitle">Attn: Gerardo Fragoso | March 17, 2026</div>
+          </div>
+        </div>
+      </div>
+      <div class="sender">
+        <img class="avatar" src="../images/Photoroom-20251202_113044.png" alt="Lewis Patterson III" />
+        <div class="sender-text">
+          <strong>Lewis Patterson III</strong>
+          Energy Strategist, Nodal Point<br />
+          +1 (817) 809-3367<br />
+          l.patterson@nodalpoint.io
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Gerardo, Why I Reached Out</h2>
+      <p>
+        You mentioned Killam already has broker support, and that makes sense. My goal is not to replace what is working.
+        My goal is to give Killam a fast, independent verification that there are no hidden utility cost leaks across your portfolio.
+      </p>
+      <img class="hero-img" src="../images/KILLAM2.jpg" alt="Killam Development office space" />
+    </section>
+
+    <section class="card">
+      <h2>Why This Matters For Killam Specifically</h2>
+      <div class="grid">
+        <div class="tile">
+          <strong>Large Portfolio Effect</strong>
+          Killam's industrial and commercial footprint means small billing inefficiencies can compound into meaningful annual spend.
+        </div>
+        <div class="tile">
+          <strong>South Texas Load Volatility</strong>
+          In ERCOT territory, peak demand events and pass-through structures can create costs that are easy to miss in standard reviews.
+        </div>
+        <div class="tile">
+          <strong>Industrial Site Complexity</strong>
+          Multi-tenant and distribution-heavy properties often carry demand and delivery structures that require meter-level validation.
+        </div>
+        <div class="tile">
+          <strong>Low Disruption Approach</strong>
+          This can run in parallel with your current legal and broker process, with no immediate contract change needed.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>What Nodal Point Will Deliver</h2>
+      <div class="grid">
+        <div class="tile">
+          <strong>1) Bill Forensic Review</strong>
+          Check for delivery, pass-through, and demand-ratchet charges that may be avoidable.
+        </div>
+        <div class="tile">
+          <strong>2) Contract-to-Load Check</strong>
+          Compare current agreement assumptions to actual usage behavior to identify mismatch risk.
+        </div>
+        <div class="tile">
+          <strong>3) Executive Findings Summary</strong>
+          One-page result with plain-English findings and clear next actions.
+        </div>
+        <div class="tile">
+          <strong>4) 48-Hour Turnaround</strong>
+          After we receive one recent utility invoice from one site.
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Recommended Next Step</h2>
+      <div class="signal">
+        If you share one recent invoice from a single Killam property, I will return a concise findings brief within 48 hours so your team can confirm whether current pricing and fee structure are fully optimized.
+      </div>
+      <p class="close">
+        Respectfully, Lewis Patterson III | Nodal Point
+      </p>
+    </section>
+
+    <div class="page-fill"></div>
+
+    <footer class="footer">
+      <div>
+        Nodal Point | Forensic Energy Intelligence<br />
+        Prepared for Killam Development (Attn: Gerardo Fragoso)
+      </div>
+      <div class="footer-right">
+        Lewis Patterson III | l.patterson@nodalpoint.io | +1 (817) 809-3367<br />
+        Confidential business communication. March 17, 2026.
+      </div>
+    </footer>
+  </main>
+</body>
+</html>

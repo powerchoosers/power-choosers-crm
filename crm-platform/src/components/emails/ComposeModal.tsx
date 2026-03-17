@@ -1704,6 +1704,7 @@ Return exactly one subject line.`,
         subject,
         content: coldPlaintextBody ?? plainTextContent,
         html: fullHtml ?? (coldPlaintextBody ? undefined : content),
+        hasSignature: Boolean(!isColdPlaintext && !selectedFoundryId && outgoingSignatureHtml),
         attachments: attachmentsData.length > 0 ? attachmentsData : undefined,
       },
       {
@@ -1988,7 +1989,7 @@ Return exactly one subject line.`,
 
                   {/* Signature - Scrolls with email body */}
                   {signatureHtml && !selectedFoundryId && (
-                    <div className="mt-6 pt-4 border-t border-white/5 opacity-90">
+                    <div className="mt-4 opacity-90">
                       <div
                         className="rounded-lg overflow-hidden"
                         dangerouslySetInnerHTML={{ __html: signatureHtml }}
