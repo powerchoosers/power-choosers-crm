@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
+import { ForensicClose } from '@/components/ui/ForensicClose';
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme';
 
 // REAL API ENRICHMENT
@@ -730,13 +731,7 @@ export function NodeIngestion() {
             INITIALIZE_{type}_NODE
           </span>
         </div>
-        <button
-          onClick={resetProtocol}
-          className={panelTheme.closeButton}
-          title="Cancel"
-        >
-          [ ESC ]
-        </button>
+        <ForensicClose onClick={resetProtocol} size={16} />
       </div>
 
       <div className={panelTheme.body}>
@@ -1288,12 +1283,7 @@ export function NodeIngestion() {
                   <h3 className="text-sm font-mono text-white uppercase tracking-widest">
                     Verify Match
                   </h3>
-                  <button
-                    onClick={() => setShowVerifyModal(false)}
-                    className="icon-button-forensic w-8 h-8"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                  <ForensicClose onClick={() => setShowVerifyModal(false)} size={16} />
                 </div>
 
                 <p className="text-xs font-mono text-zinc-400">

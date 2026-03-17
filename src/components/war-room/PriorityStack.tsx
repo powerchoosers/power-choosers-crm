@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { useWarRoomStore } from '@/store/warRoomStore'
 import { Phone, Mail, CheckSquare, Zap, X, Loader2, Calendar } from 'lucide-react'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { useRouter } from 'next/navigation'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -300,13 +301,12 @@ export function PriorityStack({ gridSnapshot, activeAccountId, onAccountOpen, on
                         className="nodal-module-glass border-b border-white/10 overflow-hidden shrink-0"
                     >
                         <div className="relative px-5 py-4">
-                            <button
+                            <ForensicClose
                                 onClick={() => { setBrief(null); setBriefError(null) }}
-                                className="absolute top-3 right-4 icon-button-forensic w-5 h-5 flex items-center justify-center"
+                                size={12}
+                                className="absolute top-3 right-4"
                                 title="Dismiss brief"
-                            >
-                                <X className="w-3 h-3" />
-                            </button>
+                            />
                             {briefError ? (
                                 <p className="text-xs font-mono text-rose-400">{briefError}</p>
                             ) : (
