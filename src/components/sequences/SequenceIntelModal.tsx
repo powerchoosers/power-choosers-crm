@@ -3,9 +3,16 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { XCircle, RotateCcw, AlertTriangle } from 'lucide-react'
+import { XCircle, RotateCcw, AlertTriangle, Cpu } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 interface SequenceMemberRow {
   memberId: string
@@ -190,16 +197,31 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-px bg-white/5 mx-2" />
-                  <select
-                    className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7] transition-colors cursor-pointer"
+                  <Select
                     value={selectedSequenceId || ''}
-                    onChange={(e) => setSelectedSequenceId(e.target.value)}
+                    onValueChange={(val) => setSelectedSequenceId(val)}
                   >
-                    <option value="" disabled>Switch Protocol</option>
-                    {availableSequences.map(seq => (
-                      <option key={seq.id} value={seq.id}>{seq.name}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-8 bg-black/40 border border-white/10 rounded-lg px-3 text-[10px] font-mono text-zinc-300 hover:text-white transition-colors uppercase tracking-wider focus:ring-1 focus:ring-[#002FA7]/50 w-[240px] gap-2 flex items-center justify-between shadow-sm">
+                      <div className="flex items-center gap-2 truncate">
+                        <Cpu className="w-3 h-3 text-[#002FA7]" />
+                        <SelectValue placeholder="Switch Protocol" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-950 border-white/10 text-white min-w-[240px] shadow-2xl backdrop-blur-xl">
+                      <div className="px-2 py-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-widest border-b border-white/5 mb-1 bg-white/5">
+                        Available Protocols
+                      </div>
+                      {availableSequences.map(seq => (
+                        <SelectItem 
+                          key={seq.id} 
+                          value={seq.id}
+                          className="text-[10px] font-mono focus:bg-[#002FA7]/20 cursor-pointer py-2"
+                        >
+                          {seq.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
