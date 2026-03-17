@@ -113,14 +113,18 @@ export default async function handler(req, res) {
           });
 
           // TRIGGER SEQUENCE ADVANCEMENT (If part of a sequence)
+          // Skip bots — security scanners auto-click every link and would rapidly
+          // cycle the contact through all sequence nodes if we let them advance.
           const memberId = existingMeta.member_id || existingMeta.memberId;
-          if (memberId) {
+          if (memberId && deviceType !== 'bot') {
             logger.info(`[Email Click] Advancing sequence for member: ${memberId}`, { trackingId });
             const { error: rpcError } = await supabaseAdmin.rpc('advance_sequence_member', {
               p_member_id: memberId,
               p_outcome: 'clicked'
             });
             if (rpcError) logger.error('[Email Click] RPC Error advancing sequence:', rpcError);
+          } else if (memberId && deviceType === 'bot') {
+            logger.info(`[Email Click] Bot click detected — skipping sequence advancement for member: ${memberId}`, { trackingId });
           }
         }
       } else if (isInternalEmailView) {
