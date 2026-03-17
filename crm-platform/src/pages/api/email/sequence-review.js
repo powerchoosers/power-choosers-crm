@@ -321,14 +321,16 @@ export default async function handler(req, res) {
       emailRecordId: targetEmailId,
       status: 'pending_send'
     };
-    const preservedFrom = typeof existingEmail?.from === 'string' ? existingEmail.from : null;
+    // Always use the sequence-configured fromEmail (from bgvector.settings.senderEmail).
+    // Do NOT preserve the existing `from` — the DB trigger writes the owner's primary email
+    // as a placeholder, which is wrong when a burner account (getnodalpoint.com) is configured.
     const preservedOwner = typeof nextEmailMeta.ownerId === 'string' ? nextEmailMeta.ownerId : null;
 
     const baseEmailPayload = {
       id: targetEmailId,
       contactId: contact.id || null,
       accountId: contact.accountId || null,
-      from: preservedFrom || fromEmail,
+      from: fromEmail,
       to: contact.email ? [contact.email] : [],
       subject: generatedSubject,
       html: finalBody,
