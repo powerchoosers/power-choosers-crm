@@ -16,6 +16,8 @@ export interface ProspectRadarEntry {
   annual_revenue_printed: string | null;
   city: string | null;
   state: string | null;
+  address: string | null;
+  zip: string | null;
   tdsp_zone: string | null;
   phone: string | null;
   linkedin_url: string | null;

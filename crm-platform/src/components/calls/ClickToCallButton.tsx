@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 interface ClickToCallButtonProps {
   phoneNumber: string | null | undefined
   name?: string
+  photoUrl?: string
   account?: string
   title?: string
   logoUrl?: string
@@ -24,6 +25,7 @@ interface ClickToCallButtonProps {
 export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
   phoneNumber,
   name,
+  photoUrl,
   account,
   title,
   logoUrl,
@@ -54,6 +56,7 @@ export const ClickToCallButton: React.FC<ClickToCallButtonProps> = ({
         }
       : { 
           name, 
+          photoUrl,
           account,
           title,
           logoUrl,
