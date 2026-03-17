@@ -65,6 +65,7 @@ export function useEmailIdentityMap(addresses: string[]) {
       for (const c of chunks) {
         // Single query — RLS SELECT policy handles row-level visibility.
         // Admin: sees all contacts. Agent: sees own + null-owner contacts.
+        // ilike is used for case-insensitive matching (DB may store mixed-case emails).
         const { data, error } = await supabase
           .from('contacts')
           .select(selectClause)
@@ -98,9 +99,9 @@ export function useEmailIdentityMap(addresses: string[]) {
       return map
     },
     enabled: !loading && normalized.length > 0 && !!user,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
-    refetchOnMount: false,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     retry: 1,
     placeholderData: (previousData) => previousData,
