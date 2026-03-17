@@ -157,7 +157,7 @@ async function resolveRecipientContact(ownerEmail, recipientEmail) {
         })
         .filter(({ score }) => score > 0)
         .sort((a, b) => {
-            const ownerPriority = (row: any) => {
+            const ownerPriority = (row) => {
                 if (ownerUserId && normalizeOwnerKey(row.ownerId) === normalizeOwnerKey(ownerUserId)) return 3;
                 if (normalizeOwnerKey(row.ownerId) === ownerKey) return 2;
                 if (!row.ownerId) return 1;
