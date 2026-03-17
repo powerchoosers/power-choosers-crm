@@ -30,6 +30,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
@@ -302,9 +303,7 @@ export function TaskCreationPanel() {
                         INITIALIZE_TASK_VECTOR
                     </span>
                 </div>
-                <button onClick={handleClose} className={panelTheme.closeButton}>
-                    [ ESC ]
-                </button>
+                <ForensicClose onClick={handleClose} size={16} />
             </div>
 
             <div className={`${panelTheme.body} space-y-8`}>

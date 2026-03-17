@@ -7,9 +7,10 @@ import { useCallStore } from '@/store/callStore'
 import { GridStrip } from '@/components/war-room/GridStrip'
 import { PriorityStack } from '@/components/war-room/PriorityStack'
 import { SignalFeed, SignalEntry } from '@/components/war-room/SignalFeed'
-import { X, Shield, Zap } from 'lucide-react'
+import { Shield, Zap } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { useFourCPForecast } from '@/hooks/useFourCPForecast'
 import { useLiveTranscription } from '@/hooks/useLiveTranscription'
 
@@ -251,13 +252,7 @@ export function WarRoomOverlay() {
                                 )}
                             </AnimatePresence>
 
-                            <button
-                                onClick={close}
-                                className="icon-button-forensic w-8 h-8 flex items-center justify-center rounded hover:bg-white/5"
-                                title="Close (Esc)"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            <ForensicClose onClick={close} size={20} title="Close (Esc)" />
                         </div>
 
                         {/* Station I: Grid Strip */}

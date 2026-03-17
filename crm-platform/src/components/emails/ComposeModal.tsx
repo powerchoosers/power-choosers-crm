@@ -26,6 +26,7 @@ import { RichTextEditor } from './RichTextEditor'
 import { EmailChipField } from './EmailChipField'
 import type { Editor } from '@tiptap/react'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { format } from 'date-fns'
 
 const EMAIL_AI_MODELS = [
@@ -1740,16 +1741,14 @@ Return exactly one subject line.`,
           >
             {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
           </button>
-          <button
-            className="icon-button-forensic h-8 w-8 flex items-center justify-center hover:text-red-400"
+          <ForensicClose 
+            size={18}
             title="Close"
             onClick={(e) => {
               e.stopPropagation()
               onClose()
             }}
-          >
-            <X className="w-4 h-4" />
-          </button>
+          />
         </div>
       </div>
 
@@ -1811,15 +1810,13 @@ Return exactly one subject line.`,
                   onChange={setCcChips}
                   placeholder="Carbon copy..."
                 />
-                <button
+                <ForensicClose 
+                  size={14} 
                   onClick={() => {
                     setShowCc(false)
                     setCcChips([])
                   }}
-                  className="text-zinc-500 hover:text-red-400 transition-colors p-1 flex-shrink-0"
-                >
-                  <X size={14} />
-                </button>
+                />
               </motion.div>
             )}
           </AnimatePresence>
@@ -1910,14 +1907,12 @@ Return exactly one subject line.`,
                     <span className="text-[10px] font-mono text-[#002FA7] uppercase tracking-wider">
                       Foundry Template: {foundryAssets.find((a: any) => a.id === selectedFoundryId)?.name || 'Loading...'}
                     </span>
-                    <button
-                      type="button"
-                      title="Remove Template"
+                    <ForensicClose 
                       onClick={() => handleFoundrySelect(null)}
-                      className="ml-auto text-zinc-400 hover:text-red-400 transition-colors"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                      size={12}
+                      title="Remove Template"
+                      className="ml-auto"
+                    />
                   </motion.div>
                 )}
 
@@ -2034,14 +2029,12 @@ Return exactly one subject line.`,
                           ({(file.size / 1024).toFixed(1)} KB)
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        title="Remove Attachment"
+                      <ForensicClose 
                         onClick={() => removeAttachment(idx)}
-                        className="icon-button-forensic h-6 w-6 flex items-center justify-center hover:text-red-400"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
+                        size={12}
+                        title="Remove Attachment"
+                        className="hover:text-red-400"
+                      />
                     </div>
                   ))}
                 </div>
@@ -2217,14 +2210,12 @@ Return exactly one subject line.`,
                   >
                     {isAiLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Generate'}
                   </Button>
-                  <button
-                    type="button"
-                    title="Close AI Rail"
+                  <ForensicClose 
                     onClick={() => setAiRailOpen(false)}
-                    className="icon-button-forensic h-8 w-8 flex items-center justify-center ml-1"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
+                    size={16}
+                    title="Close AI Rail"
+                    className="ml-1"
+                  />
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {isRefinementMode

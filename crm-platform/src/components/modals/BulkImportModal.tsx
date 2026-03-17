@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { normalizeWebsiteForImport } from '@/lib/url';
+import { ForensicClose } from '@/components/ui/ForensicClose';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -703,9 +704,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
               DATA_INGESTION_PROTOCOL // {step}
             </span>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
-            <X className="w-4 h-4" />
-          </button>
+          <ForensicClose size={18} onClick={onClose} />
         </div>
 
         <motion.div 

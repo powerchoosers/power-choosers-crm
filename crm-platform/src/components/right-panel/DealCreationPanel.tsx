@@ -3,11 +3,6 @@
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-    Plus,
-    Search,
-    ArrowRight,
-    Building2,
-    Trash2,
     Clock,
     Check,
     AlertTriangle,
@@ -16,7 +11,13 @@ import {
     Zap,
     DollarSign,
     FileText,
-    SlidersHorizontal
+    SlidersHorizontal,
+    Search,
+    Building2,
+    Trash2,
+    ArrowRight,
+    TrendingUp,
+    Sparkles
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 import { useAuth } from '@/context/AuthContext'
@@ -31,6 +32,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { cn } from '@/lib/utils'
 import { millOptions, formatMillValue, millDecimal } from '@/lib/mills'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
 
 interface AccountResult {
@@ -65,9 +67,11 @@ export function DealCreationPanel() {
     const [closeDate, setCloseDate] = useState('')
     const [probability, setProbability] = useState('50')
     const [isCommitting, setIsCommitting] = useState(false)
+
     const isEditMode = dealContext?.mode === 'edit' && !!dealContext?.dealId
     const commissionRate = role === 'admin' ? 0.7 : 0.5
     const commissionLabel = role === 'admin' ? 'Admin' : 'Agent'
+    
     const payoutCommissionPreview = useMemo(() => {
         const value = Number(amount)
         if (!Number.isFinite(value) || value <= 0) return ''
@@ -108,7 +112,6 @@ export function DealCreationPanel() {
                 setProbability(dealContext.probability?.toString() || '50')
 
                 // Edit-mode can be opened from several surfaces; some only provide accountId.
-                // Hydrate account name/logo/domain here so the linked-account block never shows "Unlabeled Node".
                 if (!dealContext.accountName || !dealContext.accountLogoUrl || !dealContext.accountDomain) {
                     const hydrateAccountContext = async () => {
                         const { data } = await supabase
@@ -160,7 +163,6 @@ export function DealCreationPanel() {
                 fetchMeta()
             } else if (!title) {
                 setTitle(dealContext.defaultTitle || `${dealContext.accountName} - New Opportunity`)
-                // In case account metadata isn't fully loaded, fetch it anyway to fill out the form
                 const fillForm = async () => {
                     const { data } = await supabase
                         .from('accounts')
@@ -220,6 +222,24 @@ export function DealCreationPanel() {
         setStep('DEAL_DETAILS')
         setTitle(dealContext?.defaultTitle || `${account.name} - New Opportunity`)
     }
+
+    const handleClose = useCallback(() => {
+        setRightPanelMode('DEFAULT')
+        setDealContext(null)
+        setStep('SELECT_ACCOUNT')
+        setSearchQuery('')
+        setTitle('')
+        setStage('IDENTIFIED')
+        setAmount('')
+        setAnnualUsage('')
+        setSellRate('')
+        setMills('')
+        setContractLength('')
+        setCloseDate('')
+        setProbability('50')
+    }, [setDealContext, setRightPanelMode])
+
+    useEscClose(handleClose)
 
     const handleCommit = async () => {
         if (!dealContext?.accountId || !title.trim()) {
@@ -287,25 +307,6 @@ export function DealCreationPanel() {
         }
     }
 
-    const handleClose = useCallback(() => {
-        setRightPanelMode('DEFAULT')
-        setDealContext(null)
-        // Reset internal state
-        setStep('SELECT_ACCOUNT')
-        setSearchQuery('')
-        setTitle('')
-        setStage('IDENTIFIED')
-        setAmount('')
-        setAnnualUsage('')
-        setSellRate('')
-        setMills('')
-        setContractLength('')
-        setCloseDate('')
-        setProbability('50')
-    }, [setDealContext, setRightPanelMode])
-
-    useEscClose(handleClose)
-
     return (
         <motion.div
             initial={{ opacity: 0, x: 20 }}
@@ -322,9 +323,7 @@ export function DealCreationPanel() {
                         INITIALIZE_CONTRACT_VECTOR
                     </span>
                 </div>
-                <button onClick={handleClose} className={panelTheme.closeButton}>
-                    [ ESC ]
-                </button>
+                <ForensicClose onClick={handleClose} size={16} />
             </div>
 
             <div className={`${panelTheme.body} space-y-8`}>
@@ -434,12 +433,12 @@ export function DealCreationPanel() {
 
                                 <div className="space-y-1.5">
                                     <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Contract Title</label>
-                                        <Input
-                                            value={title}
-                                            onChange={(e) => setTitle(e.target.value)}
-                                            placeholder="e.g. Q3 Energy Procurement"
-                                            className={panelTheme.field}
-                                        />
+                                    <Input
+                                        value={title}
+                                        onChange={(e) => setTitle(e.target.value)}
+                                        placeholder="e.g. Q3 Energy Procurement"
+                                        className={panelTheme.field}
+                                    />
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4">
@@ -527,28 +526,28 @@ export function DealCreationPanel() {
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                    <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                                                        <FileText className="w-3 h-3 inline" /> Sell Rate
-                                                    </label>
-                                                <div className="relative">
-                                                    <Input
-                                                        type="text"
-                                                        value={sellRate}
-                                                        onChange={(e) => {
-                                                            const cleaned = e.target.value
-                                                                .replace(/[^0-9.]/g, '')
-                                                                .replace(/(\..*)\./g, '$1')
-                                                            setSellRate(cleaned)
-                                                        }}
-                                                        placeholder="8.70"
-                                                        className={`${panelTheme.field} pr-12`}
-                                                    />
-                                                    <span className="absolute inset-y-0 right-3 flex items-center text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                                                        ¢/kWh
-                                                    </span>
-                                                </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                                                <FileText className="w-3 h-3 inline" /> Sell Rate
+                                            </label>
+                                            <div className="relative">
+                                                <Input
+                                                    type="text"
+                                                    value={sellRate}
+                                                    onChange={(e) => {
+                                                        const cleaned = e.target.value
+                                                            .replace(/[^0-9.]/g, '')
+                                                            .replace(/(\..*)\./g, '$1')
+                                                        setSellRate(cleaned)
+                                                    }}
+                                                    placeholder="8.70"
+                                                    className={`${panelTheme.field} pr-12`}
+                                                />
+                                                <span className="absolute inset-y-0 right-3 flex items-center text-[9px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+                                                    ¢/kWh
+                                                </span>
                                             </div>
+                                        </div>
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                                                 <SlidersHorizontal className="w-3 h-3 inline" /> Margin Mills
@@ -560,23 +559,23 @@ export function DealCreationPanel() {
                                                     recalcAmountFromUsageAndMills(annualUsage, value)
                                                 }}
                                             >
-                                            <SelectTrigger className={panelTheme.selectTrigger}>
+                                                <SelectTrigger className={panelTheme.selectTrigger}>
                                                     <SelectValue placeholder="Select mills" />
                                                 </SelectTrigger>
-                                            <SelectContent position="popper" className="bg-zinc-950 border-white/10 max-h-36">
-                                                {millOptions.map((option) => (
-                                                    <SelectItem
-                                                        key={option}
-                                                        value={option}
-                                                        className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10"
-                                                    >
-                                                        {option}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
+                                                <SelectContent position="popper" className="bg-zinc-950 border-white/10 max-h-36">
+                                                    {millOptions.map((option) => (
+                                                        <SelectItem
+                                                            key={option}
+                                                            value={option}
+                                                            className="text-sm font-mono text-zinc-300 focus:bg-[#002FA7]/10"
+                                                        >
+                                                            {option}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
                                             </Select>
-                                            </div>
                                         </div>
+                                    </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                                             <DollarSign className="w-3 h-3 inline" /> {commissionLabel} Commission ({Math.round(commissionRate * 100)}%)

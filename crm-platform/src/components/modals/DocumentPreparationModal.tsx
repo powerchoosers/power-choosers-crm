@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, LayoutTemplate, ArrowRight } from 'lucide-react'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Rnd } from 'react-rnd'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -100,12 +101,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                                 CLICK ANYWHERE ON PAGE TO ADD BLOCK
                             </span>
-                            <button
-                                onClick={onClose}
-                                className="p-2 text-zinc-500 hover:text-white transition-colors"
-                            >
-                                <X className="w-4 h-4" />
-                            </button>
+                            <ForensicClose onClick={onClose} size={16} />
                         </div>
                     </div>
 
