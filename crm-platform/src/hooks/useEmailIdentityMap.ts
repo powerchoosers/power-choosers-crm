@@ -32,7 +32,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 export function useEmailIdentityMap(addresses: string[]) {
-  const { user, role, loading } = useAuth()
+  const { user, loading } = useAuth()
 
   const normalized = useMemo(() => {
     const dedup = new Set<string>()
@@ -44,10 +44,15 @@ export function useEmailIdentityMap(addresses: string[]) {
   }, [addresses])
 
   return useQuery({
-    queryKey: ['email-identity-map', normalized, user?.id, role],
+    // Note: role intentionally excluded from queryKey — RLS enforces access control
+    // at the DB level, so we don't need role-based client branching. Removing role
+    // from the key eliminates a race condition where the query fires before
+    // AuthContext.fetchProfile() resolves role to 'admin', causing contacts owned
+    // by email-format ownerIds (e.g. l.patterson@nodalpoint.io) to be missed.
+    queryKey: ['email-identity-map', normalized, user?.id],
     queryFn: async () => {
       if (!normalized.length) return {} as Record<string, EmailIdentity>
-      if (!user && role !== 'admin') return {} as Record<string, EmailIdentity>
+      if (!user) return {} as Record<string, EmailIdentity>
 
       const map: Record<string, EmailIdentity> = {}
       const chunks = chunk(normalized, 100)
@@ -55,64 +60,44 @@ export function useEmailIdentityMap(addresses: string[]) {
       const emailOrFilter = (emails: string[]) =>
         emails.map((e) => `email.ilike.${e}`).join(',')
 
+      const selectClause = 'id, email, name, firstName, lastName, accountId, ownerId, metadata, accounts(name, domain, logo_url)'
+
       for (const c of chunks) {
-        const selectClause = 'id, email, name, firstName, lastName, accountId, ownerId, metadata, accounts(name, domain, logo_url)'
+        // Single query — RLS SELECT policy handles row-level visibility.
+        // Admin: sees all contacts. Agent: sees own + null-owner contacts.
+        const { data, error } = await supabase
+          .from('contacts')
+          .select(selectClause)
+          .or(emailOrFilter(c))
 
-        const querySets: any[] = []
-        if (role === 'admin') {
-          querySets.push(
-            supabase
-              .from('contacts')
-              .select(selectClause)
-              .or(emailOrFilter(c))
-          )
-        } else if (user?.id) {
-          querySets.push(
-            supabase
-              .from('contacts')
-              .select(selectClause)
-              .eq('ownerId', user.id)
-              .or(emailOrFilter(c))
-          )
-          querySets.push(
-            supabase
-              .from('contacts')
-              .select(selectClause)
-              .is('ownerId', null)
-              .or(emailOrFilter(c))
-          )
-        }
+        if (error) throw error
 
-        for (const query of querySets) {
-          const { data, error } = await query
-          if (error) throw error
-
-          for (const row of data || []) {
-            const key = extractEmailAddress(row.email)
-            if (!key) continue
-            const displayName =
-              row.name ||
-              [row.firstName, row.lastName].filter(Boolean).join(' ').trim() ||
-              row.email
-            map[key] = {
-              id: row.id,
-              email: row.email,
-              displayName,
-              firstName: row.firstName || undefined,
-              lastName: row.lastName || undefined,
-              accountId: row.accountId || null,
-              accountName: row.accounts?.name || null,
-              accountDomain: row.accounts?.domain || null,
-              accountLogoUrl: row.accounts?.logo_url || null,
-              avatarUrl: resolveContactPhotoUrl(row) || null,
-            }
+        for (const row of data || []) {
+          const key = extractEmailAddress(row.email)
+          if (!key) continue
+          const account = Array.isArray(row.accounts) ? row.accounts[0] : row.accounts
+          const displayName =
+            row.name ||
+            [row.firstName, row.lastName].filter(Boolean).join(' ').trim() ||
+            row.email
+          map[key] = {
+            id: row.id,
+            email: row.email,
+            displayName,
+            firstName: row.firstName || undefined,
+            lastName: row.lastName || undefined,
+            accountId: row.accountId || null,
+            accountName: account?.name || null,
+            accountDomain: account?.domain || null,
+            accountLogoUrl: account?.logo_url || null,
+            avatarUrl: resolveContactPhotoUrl(row) || null,
           }
         }
       }
 
       return map
     },
-    enabled: !loading && normalized.length > 0 && !!(user || role === 'admin'),
+    enabled: !loading && normalized.length > 0 && !!user,
     staleTime: 1000 * 60 * 30,
     gcTime: 1000 * 60 * 60,
     refetchOnMount: false,

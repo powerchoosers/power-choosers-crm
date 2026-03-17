@@ -443,9 +443,13 @@ export function EmailList({
                         name={primaryEmail || 'Unknown'}
                         domain={fallbackDomain}
                         logoUrl={
+                          // Show NP logo when the RECIPIENT is a @nodalpoint.io address,
+                          // or when receiving a system email FROM a @nodalpoint.io sender.
+                          // Never apply email.from check for outbound emails — from is always
+                          // Lewis's personal address and should not override the recipient icon.
                           primaryEmail.toLowerCase().endsWith('@nodalpoint.io') ||
-                          String(email.from || '').toLowerCase().includes('@nodalpoint.io') ||
-                          String(email.from || '').toLowerCase().includes('nodal point')
+                          (!isOutbound && String(email.from || '').toLowerCase().includes('@nodalpoint.io')) ||
+                          (!isOutbound && String(email.from || '').toLowerCase().includes('nodal point'))
                             ? '/images/nodalpoint-webicon.png'
                             : undefined
                         }
