@@ -213,7 +213,14 @@ async function handleGeneration(execution, job) {
            c."linkedinUrl" as contact_linkedin_url,
            a.name as company_name,
            a.domain as account_domain,
+           a.website as account_website,
+           a.linkedin_url as account_linkedin_url,
            a.industry as account_industry,
+           a.description as account_description,
+           a.employees as account_employees,
+           a.revenue as account_revenue,
+           a.annual_usage as account_annual_usage,
+           a.load_factor as account_load_factor,
            a.city as account_city,
            a.state as account_state,
            a.electricity_supplier as account_supplier,
@@ -233,9 +240,9 @@ async function handleGeneration(execution, job) {
     WHERE m.id = ${execution.member_id}
   `
 
-    const linkedInUrl = member.contact_linkedin_url || null;
+    const linkedInUrl = member.contact_linkedin_url || member.account_linkedin_url || null;
     const accountDomain = member.account_domain || null;
-    const website = accountDomain ? `https://${accountDomain}` : null;
+    const website = member.account_website || (accountDomain ? `https://${accountDomain}` : null);
     const sourceLabel = linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info');
     const accountCity = member.account_city ? member.account_city.trim() : null;
     const accountState = member.account_state ? member.account_state.trim() : null;
@@ -251,6 +258,17 @@ async function handleGeneration(execution, job) {
         : website
             ? 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.'
             : 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
+    const researchFacts = [
+        member.account_description ? `Company summary: ${member.account_description}` : null,
+        member.account_industry ? `Industry: ${member.account_industry}` : null,
+        member.account_employees ? `Scale: ${member.account_employees}` : null,
+        member.account_revenue ? `Revenue: ${member.account_revenue}` : null,
+        (accountCity || accountState) ? `HQ: ${[accountCity, accountState].filter(Boolean).join(', ')}` : null,
+        member.account_website || website ? `Website: ${member.account_website || website}` : null,
+        member.account_linkedin_url ? 'LinkedIn: available' : null,
+        member.contact_title ? `Contact title: ${member.contact_title}` : null,
+        member.contact_city || member.contact_state ? `Contact location: ${[member.contact_city, member.contact_state].filter(Boolean).join(', ')}` : null
+    ].filter(Boolean).join('\n');
     const contractEndYear = member.account_contract_end_date
         ? new Date(member.account_contract_end_date).getUTCFullYear()
         : null;
@@ -268,14 +286,22 @@ async function handleGeneration(execution, job) {
             type: 'email',
             vectors: Array.isArray(metadata?.vectors) ? metadata.vectors : [],
             mode: 'generate_email',
-            contact: {
-                name: `${member.firstName} ${member.lastName}`,
-                email: member.contact_email,
-                company: member.company_name,
-                title: member.contact_title || null,
-                industry: member.account_industry || null,
-                electricity_supplier: member.account_supplier || null,
-                current_rate: member.account_current_rate || null,
+                contact: {
+                    name: `${member.firstName} ${member.lastName}`,
+                    email: member.contact_email,
+                    company: member.company_name,
+                    website: member.account_website || website || null,
+                    linkedin_url: member.account_linkedin_url || linkedInUrl || null,
+                    company_description: member.account_description || null,
+                    employees: member.account_employees || null,
+                    revenue: member.account_revenue || null,
+                    annual_usage: member.account_annual_usage || null,
+                    load_factor: member.account_load_factor || null,
+                    research_summary: researchFacts || null,
+                    title: member.contact_title || null,
+                    industry: member.account_industry || null,
+                    electricity_supplier: member.account_supplier || null,
+                    current_rate: member.account_current_rate || null,
                 contract_end_date: member.account_contract_end_date || null,
                 contract_end_year: Number.isFinite(contractEndYear) ? contractEndYear : null,
                 city: accountCity || contactCity || null,

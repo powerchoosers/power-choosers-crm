@@ -74,6 +74,97 @@ function getEmailSnippet(email: { snippet?: string | null, text?: string | null,
   return 'New message received'
 }
 
+function normalizeLookupText(value?: string | null) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+function parseSenderLabel(value?: string | null) {
+  const raw = String(value || '').trim()
+  const angle = raw.match(/<\s*([^>]+)\s*>/)
+  const email = (angle?.[1] || raw).trim().toLowerCase()
+  const display = raw.replace(/<\s*[^>]+\s*>/, '').trim()
+  return {
+    raw,
+    email: extractEmailAddress(email),
+    display: display || raw,
+    normalizedDisplay: normalizeLookupText(display || raw),
+    normalizedEmail: normalizeLookupText(email),
+  }
+}
+
+async function resolveNotificationContact(
+  ownerEmail: string,
+  senderLabel: string,
+) {
+  const sender = parseSenderLabel(senderLabel)
+  if (!sender.display && !sender.email) return null
+
+  const queryParts: string[] = []
+  if (sender.email) {
+    queryParts.push(`email.ilike.%${sender.email}%`)
+    queryParts.push(`email.ilike.%${sender.normalizedEmail}%`)
+  }
+  if (sender.display) {
+    queryParts.push(`name.ilike.%${sender.display}%`)
+    queryParts.push(`firstName.ilike.%${sender.display}%`)
+    queryParts.push(`lastName.ilike.%${sender.display}%`)
+  }
+
+  const searchContacts = async (ownerFilter: 'owned' | 'shared') => {
+    const base = supabase
+      .from('contacts')
+      .select('id, email, name, firstName, lastName, metadata, accounts(name), ownerId')
+
+    const scoped = ownerFilter === 'owned'
+      ? base.eq('ownerId', ownerEmail)
+      : base.is('ownerId', null)
+
+    const { data, error } = await scoped.or(Array.from(new Set(queryParts)).join(',')).limit(10)
+    if (error) return []
+    return Array.isArray(data) ? data : []
+  }
+
+  const rows = [
+    ...(await searchContacts('owned')),
+    ...(await searchContacts('shared')),
+  ]
+
+  if (!rows.length) return null
+
+  const scored = rows
+    .map((row) => {
+      const rowEmail = normalizeLookupText(row.email)
+      const rowName = normalizeLookupText(row.name)
+      const rowFullName = normalizeLookupText([row.firstName, row.lastName].filter(Boolean).join(' '))
+      const rowPriority = String(row.ownerId || '').toLowerCase().trim() === ownerEmail.toLowerCase().trim()
+        ? 2
+        : (row.ownerId ? 1 : 0)
+
+      let score = 0
+      if (sender.normalizedEmail && sender.normalizedEmail === rowEmail) score = 100
+      else if (sender.normalizedDisplay && sender.normalizedDisplay === rowName) score = 90
+      else if (sender.normalizedDisplay && sender.normalizedDisplay === rowFullName) score = 85
+
+      return { row, score, rowPriority }
+    })
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => {
+      if (b.rowPriority !== a.rowPriority) return b.rowPriority - a.rowPriority
+      if (b.score !== a.score) return b.score - a.score
+      return String(a.row.name || '').localeCompare(String(b.row.name || ''))
+    })
+
+  if (!scored.length) return null
+
+  const best = scored[0]
+  const sameRank = scored.filter((entry) => entry.score === best.score && entry.rowPriority === best.rowPriority)
+  if (sameRank.length > 1) return null
+
+  return best.row
+}
+
 export function GlobalSync() {
   const { user, loading } = useAuth()
   const { performSync } = useZohoSync()
@@ -195,6 +286,8 @@ export function GlobalSync() {
               ownerId?: string
               attachments?: Array<unknown>
               hasAttachments?: boolean
+              fromAddress?: string
+              replyToAddress?: string
             }
             contactId?: string | null
             accountId?: string | null
@@ -227,48 +320,28 @@ export function GlobalSync() {
             if (!Number.isNaN(insertedTs) && Date.now() - insertedTs > 10 * 60 * 1000) return
           }
 
-          const senderEmail = extractEmailAddress(email.from)
-          if (!senderEmail) return
-
-          const selectColumns = 'id, email, name, firstName, lastName, metadata, accounts(name)'
+          const senderLabel = email.from || email.metadata?.fromAddress || email.metadata?.replyToAddress || ''
           let contact = null
 
-          // 1. Try resolving using contactId from the payload (set by sync record)
+          // 1. Try resolving using contactId from the payload (set by sync/backfill)
           if (email.contactId) {
             const { data: directContact } = await supabase
               .from('contacts')
-              .select(selectColumns)
+              .select('id, email, name, firstName, lastName, metadata, accounts(name), ownerId')
               .eq('id', email.contactId)
               .maybeSingle()
-            contact = directContact
+            contact = directContact || null
           }
 
-          // 2. Fallback to owner-specific lookup by email (Corrected: ownerId = email)
+          // 2. Fallback to sender-name / sender-email lookup inside the current owner's contact scope
           if (!contact) {
-            const { data: ownedContact } = await supabase
-              .from('contacts')
-              .select(selectColumns)
-              .eq('ownerId', userEmail)
-              .ilike('email', senderEmail)
-              .limit(1)
-              .maybeSingle()
-            contact = ownedContact
-          }
-
-          // 3. Fallback to shared contacts
-          if (!contact) {
-            const { data: sharedContact } = await supabase
-              .from('contacts')
-              .select(selectColumns)
-              .is('ownerId', null)
-              .ilike('email', senderEmail)
-              .limit(1)
-              .maybeSingle()
-            contact = sharedContact
+            contact = await resolveNotificationContact(userEmail, senderLabel)
           }
 
           // Only notify if sender is actually a known CRM contact.
           if (!contact) return
+
+          const senderEmail = extractEmailAddress(senderLabel) || extractEmailAddress(email.from)
 
           const name = (
             contact.name ||

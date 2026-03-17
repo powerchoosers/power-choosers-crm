@@ -225,6 +225,7 @@ interface ApolloCompany {
   country?: string;
   address?: string; // Full street address from Apollo (raw_address or street_address)
   logoUrl?: string;
+  website?: string;
   linkedin?: string;
   companyPhone?: string;
   zip?: string;
@@ -1168,6 +1169,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     if (description) contextPieces.push(description);
     if (companySummary?.industry) contextPieces.push(`Industry: ${companySummary.industry}`);
     if (companySummary?.revenue) contextPieces.push(`Revenue: ${companySummary.revenue}`);
+    if (companySummary?.website) contextPieces.push(`Website: ${companySummary.website}`);
+    if (companySummary?.linkedin) contextPieces.push(`LinkedIn: ${companySummary.linkedin}`);
     const locationParts = [companySummary?.city, companySummary?.state, companySummary?.country].filter(Boolean);
     if (locationParts.length) contextPieces.push(`HQ: ${locationParts.join(', ')}`);
     if (person.title) contextPieces.push(`Contact Title: ${person.title}`);

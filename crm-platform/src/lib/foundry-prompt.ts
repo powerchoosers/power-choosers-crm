@@ -17,6 +17,7 @@ export interface FoundryContext {
         city: string
         state: string
         website: string
+        linkedin: string
     }
     energy: {
         currentRate: string
@@ -119,7 +120,7 @@ export async function buildFoundryContext(
 ): Promise<FoundryContext> {
     const context: FoundryContext = {
         contact: { name: '', firstName: '', lastName: '', title: '', email: '', phone: '' },
-        company: { name: '', domain: '', industry: '', description: '', city: '', state: '', website: '' },
+        company: { name: '', domain: '', industry: '', description: '', city: '', state: '', website: '', linkedin: '' },
         energy: { currentRate: '', contractEnd: '', annualUsage: '', supplier: '', loadZone: '', serviceAddress: '' },
         intelligence: { transcripts: [], summary: '', callHistory: [] }
     }
@@ -131,11 +132,11 @@ export async function buildFoundryContext(
         if (contactId) {
             console.log('[FoundryContext] Fetching contact:', contactId)
             const { data, error } = await supabase
-                .from('contacts')
-                .select(`
+            .from('contacts')
+            .select(`
           *,
           accounts (
-            id, name, domain, industry, description, city, state,
+            id, name, domain, website, linkedin_url, industry, description, city, state,
             current_rate, contract_end_date, annual_usage, electricity_supplier,
             service_addresses, load_factor, latitude, longitude, metadata
           )
@@ -203,7 +204,8 @@ export async function buildFoundryContext(
                 description: accountData.description || '',
                 city: accountData.city || '',
                 state: accountData.state || '',
-                website: accountData.website || accountData.domain || ''
+                website: accountData.website || accountData.domain || '',
+                linkedin: accountData.linkedin_url || ''
             }
             context.energy = {
                 currentRate: accountData.current_rate || '',
@@ -304,6 +306,8 @@ export function generateSystemPrompt(
     - Industry: ${company.industry || 'Unknown'}
     - Company Description: ${(company.description || '').slice(0, 200)}
     - Location: ${locStr}
+    - Website: ${company.website || 'Unknown'}
+    - LinkedIn: ${company.linkedin || 'Unknown'}
     - Energy Profile: ${energyStr}
     - Intelligence Notes: ${intelligence.summary || 'None'}
     ${intelligence.transcripts.length ? `\n    RECENT CALL TRANSCRIPTS:\n    ${intelligence.transcripts.join('\n    ')}` : ''}

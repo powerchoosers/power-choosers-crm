@@ -142,7 +142,7 @@ export default async function handler(req, res) {
     if (contact.accountId) {
       const { data: acc } = await supabase
         .from('accounts')
-        .select('name, domain, industry, city, state, electricity_supplier, current_rate, contract_end_date')
+        .select('name, domain, website, linkedin_url, industry, description, employees, revenue, annual_usage, load_factor, city, state, electricity_supplier, current_rate, contract_end_date')
         .eq('id', contact.accountId)
         .maybeSingle();
       account = acc || null;
@@ -165,9 +165,9 @@ export default async function handler(req, res) {
       senderFirstName = ownerUser?.first_name || null;
     }
 
-    const linkedInUrl = contact.linkedinUrl || null;
+    const linkedInUrl = contact.linkedinUrl || account?.linkedin_url || null;
     const accountDomain = account?.domain || null;
-    const website = accountDomain ? `https://${accountDomain}` : null;
+    const website = account?.website || (accountDomain ? `https://${accountDomain}` : null);
     // Prefer account city over contact city (mirrors edge function logic)
     const accountCity = account?.city ? account.city.trim() : null;
     const accountState = account?.state ? account.state.trim() : null;
@@ -179,6 +179,18 @@ export default async function handler(req, res) {
       ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
       : null;
     const sourceTruthLine = buildSourceTruthLine(linkedInUrl, website);
+    const researchFacts = [
+      account?.description ? `Company summary: ${account.description}` : null,
+      account?.industry ? `Industry: ${account.industry}` : null,
+      account?.employees ? `Scale: ${account.employees} employees` : null,
+      account?.revenue ? `Revenue: ${account.revenue}` : null,
+      (accountCity || accountState) ? `HQ: ${[accountCity, accountState].filter(Boolean).join(', ')}` : null,
+      account?.website || accountDomain ? `Website: ${account.website || accountDomain}` : null,
+      account?.linkedin_url ? 'LinkedIn: available' : null,
+      contact.title ? `Contact title: ${contact.title}` : null,
+      contact.city || contact.state ? `Contact location: ${[contact.city, contact.state].filter(Boolean).join(', ')}` : null,
+      contact.notes ? `Contact notes: ${contact.notes.slice(0, 250)}` : null
+    ].filter(Boolean).join('\n');
 
     // Resolve sender email and domain before the AI call so they can be passed as contact context
     const preferredFrom = String(sequenceSender || '').trim();
@@ -207,6 +219,14 @@ export default async function handler(req, res) {
           name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
           email: contact.email,
           company: account?.name || null,
+          website: account?.website || accountDomain || null,
+          linkedin_url: account?.linkedin_url || linkedInUrl || null,
+          company_description: account?.description || null,
+          employees: account?.employees ?? null,
+          revenue: account?.revenue ?? null,
+          annual_usage: account?.annual_usage ?? null,
+          load_factor: account?.load_factor ?? null,
+          research_summary: researchFacts || null,
           title: contact.title || null,
           industry: account?.industry || null,
           electricity_supplier: account?.electricity_supplier || null,
