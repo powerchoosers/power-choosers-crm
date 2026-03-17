@@ -27,6 +27,7 @@ interface SequenceMemberRow {
   lastName: string | null
   email: string | null
   title: string | null
+  avatarUrl: string | null
   accountName: string | null
   updatedAt: string | null
   totalEmailsSent: number
@@ -370,6 +371,7 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                               <div className="flex items-center gap-2.5">
                                 <ContactAvatar
                                   name={fullName}
+                                  photoUrl={row.avatarUrl ?? undefined}
                                   size={32}
                                   className="shrink-0"
                                 />
