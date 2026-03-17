@@ -38,9 +38,15 @@ function GlobalShortcuts() {
       }
 
       // Sequence Intel: Ctrl+Alt+I
-      if (isCtrl && isAlt && key === 'i' && activeSequenceId) {
+      if (isCtrl && isAlt && key === 'i') {
         e.preventDefault()
+        e.stopPropagation()
+        console.log('>>> ATTEMPTING TO TOGGLE SEQUENCE INTEL')
         toggleSequenceIntel()
+        toast.success('Sequence Intel Toggled', {
+          description: 'Global Intelligence modal should appear.',
+          duration: 2000
+        })
       }
     }
     window.addEventListener('keydown', handler)
@@ -93,13 +99,11 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           <GlobalShortcuts />
           <WarRoomOverlay />
           <GlobalComposeModal />
-          {activeSequenceId && (
-            <SequenceIntelModal 
-              isOpen={sequenceIntelOpen} 
-              onClose={() => setSequenceIntelOpen(false)} 
-              sequenceId={activeSequenceId as string} 
-            />
-          )}
+          <SequenceIntelModal 
+            isOpen={sequenceIntelOpen} 
+            onClose={() => setSequenceIntelOpen(false)} 
+            sequenceId={activeSequenceId || undefined} 
+          />
           {children}
         </VoiceProvider>
       </AuthProvider>
