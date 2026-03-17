@@ -835,10 +835,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       };
       const safeEmail = sanitizeContactText(enriched.email) || sanitizeContactText(person.email) || 'N/A';
 
-      const contactData: Record<string, unknown> = {
+      const contactIdentityPatch: Record<string, unknown> = {
         name: resolvedIdentity.name,
         firstName: resolvedIdentity.firstName,
         lastName: resolvedIdentity.lastName,
+      };
+
+      const contactBaseData: Record<string, unknown> = {
         title: enriched.jobTitle || person.title,
         email: safeEmail,
         accountId: accountId,
@@ -861,12 +864,29 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       };
 
       if (crmId) {
+        const { data: currentContact } = await supabase
+          .from('contacts')
+          .select('name, firstName, lastName')
+          .eq('id', crmId)
+          .maybeSingle();
+
+        const hasExistingName =
+          sanitizeContactText(currentContact?.name) ||
+          sanitizeContactText(currentContact?.firstName) ||
+          sanitizeContactText(currentContact?.lastName);
+
+        const updateData = hasExistingName
+          ? contactBaseData
+          : { ...contactBaseData, ...contactIdentityPatch };
+
         const { error } = await supabase
           .from('contacts')
-          .update(contactData)
+          .update(updateData)
           .eq('id', crmId);
         if (error) throw error;
       } else {
+        const contactData = { ...contactBaseData, ...contactIdentityPatch };
+
         // Try to find existing contact by Apollo person id (from a previous reveal) or by email
         const { data: byApolloId } = await supabase
           .from('contacts')
@@ -874,10 +894,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           .eq('metadata->>apollo_person_id', person.id)
           .maybeSingle();
         if (byApolloId?.id) {
-          crmId = byApolloId.id;
-          const { error } = await supabase
-            .from('contacts')
-            .update(contactData)
+            crmId = byApolloId.id;
+            const { error } = await supabase
+              .from('contacts')
+              .update(contactData)
             .eq('id', crmId);
           if (error) throw error;
         } else if (linkedinUrl) {
