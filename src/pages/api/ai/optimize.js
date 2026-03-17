@@ -93,10 +93,27 @@ function softenFirstTouchEnergyJargon(input, strategy) {
   if (!text || !isFirstTouch) return text;
 
   return text
-    .replace(/\b4CP\b/gi, 'summer peak demand tags')
-    .replace(/\bTDUs\b/g, 'delivery utilities')
-    .replace(/\bTDU\b/g, 'delivery utility')
-    .replace(/\bESI\s*ID\b/gi, 'service meter ID');
+    .replace(/\b4CP\b/gi, 'summer peak periods')
+    .replace(/\bTDUs\b/g, 'local utilities')
+    .replace(/\bTDU\b/g, 'local utility')
+    .replace(/\bESI\s*ID\b/gi, 'service account number');
+}
+
+function deGenericizeFirstTouchCopy(input, strategy) {
+  const text = String(input || '');
+  const strategyText = String(strategy || '');
+  const isFirstTouch = /first[-\s]?touch|day\s*1|forensic opener/i.test(strategyText);
+  if (!text || !isFirstTouch) return text;
+
+  return text
+    .replace(/I noticed on ([^<]+?) website that/gi, 'I was reviewing $1 and saw that')
+    .replace(/Came across your ([^<]+?) role on LinkedIn/gi, 'I saw your $1 role on LinkedIn')
+    .replace(/Reviewing ([^<]+?), I noticed/gi, 'I was reviewing $1 and saw')
+    .replace(/many organizations in your sector see costs shift constantly in the ERCOT market/gi, 'a lot of companies in your space see those costs move with ERCOT')
+    .replace(/I regularly diagnose Texas electricity bills, looking for billing errors or contract issues/gi, 'I review Texas electricity bills for billing issues and contract leaks')
+    .replace(/I offer a quick check on those details/gi, 'I can take a quick look at those details')
+    .replace(/If you sent me your latest electricity statement, I could reply with a 2-3 point snapshot of what stands out/gi, 'If you send me your latest electricity statement, I can reply with a 2-3 point snapshot of what stands out')
+    .replace(/If you sent me your latest bill, I could reply with a few bullet points on what stands out/gi, 'If you send me your latest bill, I can reply with a short readout of what stands out');
 }
 
 export default async function handler(req, res) {
@@ -141,20 +158,43 @@ export default async function handler(req, res) {
           ? `${contact.city.trim()}${contact?.state ? `, ${String(contact.state).trim()}` : ''}`
           : 'Unknown');
       const companyName = cleanCompanyName(contact?.company);
+      const companyDescription = typeof contact?.company_description === 'string' && contact.company_description.trim()
+        ? contact.company_description.trim()
+        : typeof contact?.description === 'string' && contact.description.trim()
+          ? contact.description.trim()
+          : '';
+      const companyResearch = typeof contact?.research_summary === 'string' && contact.research_summary.trim()
+        ? contact.research_summary.trim()
+        : typeof contact?.context_for_ai === 'string' && contact.context_for_ai.trim()
+          ? contact.context_for_ai.trim()
+          : '';
+      const employeeCount = contact?.employees ?? contact?.employee_count ?? contact?.headcount ?? null;
       const supplier = (contact?.electricity_supplier || contact?.supplier || contact?.metadata?.energy?.supplier || 'Unknown');
       const currentRate = (contact?.current_rate ?? contact?.metadata?.energy?.current_rate ?? 'Unknown');
       const contractEndRaw = (contact?.contract_end_date || contact?.contractEndDate || null);
       const contractEndYear = contact?.contract_end_year || (contractEndRaw ? new Date(contractEndRaw).getUTCFullYear() : null);
+      const annualUsage = contact?.annual_usage ?? contact?.metadata?.energy?.annual_usage ?? null;
+      const loadFactor = contact?.load_factor ?? contact?.metadata?.energy?.load_factor ?? null;
+      const recentSignal = typeof contact?.recent_signal === 'string' && contact.recent_signal.trim()
+        ? contact.recent_signal.trim()
+        : typeof contact?.news === 'string' && contact.news.trim()
+          ? contact.news.trim()
+          : typeof contact?.notes === 'string' && contact.notes.trim()
+            ? contact.notes.trim()
+            : '';
 
       const dataVectors = [
         `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${companyName}`,
         `- COMPANY_OUTREACH_NAME: ${companyName}`,
         contact?.company && companyName !== contact.company ? `- COMPANY_LEGAL_NAME: ${contact.company}` : null,
+        companyDescription ? `- COMPANY_DESCRIPTION: ${companyDescription}` : null,
+        companyResearch ? `- COMPANY_RESEARCH: ${companyResearch}` : null,
+        employeeCount ? `- COMPANY_SCALE: ${employeeCount} employees` : null,
         `- ROLE: ${contactTitle}`,
         `- LOCATION: ${contactLocation}`,
         `- VECTOR_STATE: energy_enabled=${hasEnergyVector}`,
         hasEnergyVector
-          ? `- ENERGY_INTEL: Supplier ${supplier}, Current Rate ${currentRate}, Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${contact?.load_factor || 'Unknown'}, Annual Usage ${contact?.annual_usage || 'Unknown'}, Contract End Year ${contractEndYear || 'Unknown'}`
+          ? `- ENERGY_INTEL: Supplier ${supplier}, Current Rate ${currentRate}, Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${loadFactor || 'Unknown'}, Annual Usage ${annualUsage || 'Unknown'}, Contract End Year ${contractEndYear || 'Unknown'}`
           : '- ENERGY_INTEL: disabled_by_vector',
         `- SOURCE_TRUTH: source_label=${sourceLabel}, has_linkedin=${hasLinkedIn}, has_website=${hasWebsite}`,
         contact?.linkedin_url && `- LINKEDIN_URL: ${contact.linkedin_url}`,
@@ -162,6 +202,7 @@ export default async function handler(req, res) {
         contact?.website && `- WEBSITE: ${contact.website}`,
         contact?.domain && `- DOMAIN: ${contact.domain}`,
         vectors.includes('recent_news') && `- SIGNALS: ${contact?.news || 'No news signals.'}`,
+        recentSignal ? `- RECENT_SIGNAL: ${recentSignal}` : null,
         vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${contact?.transcript || 'No previous call transcripts.'}`,
         contact?.metadata && `- EXTENDED_METADATA: ${JSON.stringify(contact.metadata)}`
       ].filter(Boolean).join('\n');
@@ -172,9 +213,10 @@ export default async function handler(req, res) {
 
           RULES:
           1. Keep it under 80 words.
-          2. No mention of bullets.
-          3. State the goal, the target persona, and one key risk signal.
-          4. Output ONLY the optimized prompt text. No explanations.
+          2. Preserve hard facts, names, dates, and constraints.
+          3. Make the outcome explicit: one concrete observation, one pain signal, one low-friction ask.
+          4. Remove filler, marketing fluff, and vague language.
+          5. Output ONLY the optimized prompt text. No explanations.
         `;
         userContent = `Original prompt:\n\n${prompt}`;
       } else if (mode === 'generate_email') {
@@ -193,6 +235,7 @@ export default async function handler(req, res) {
           9. HOOK RULE:
             - Sentence one must mention the account city (or the outreach-friendly company name if no city exists) and tie that place to one concrete operational reality—renewal timing, demand spikes, longer run hours, billing cycle hits, etc.
             - Avoid vague openers like "energy costs are tough" or "utility charges are complex" without grounding them in that specific location and what is shifting now.
+            - Do not start with "I noticed on the website", "Came across your", "Reviewing", or "many organizations in your sector". Those sound templated.
           10. SUBJECT RULE:
             - Subject line must be 4–7 words.
             - Vary the angle: use the account city OR company name as an anchor, OR lead with a cost-specific question, OR reference renewal/contract timing, OR use a "I noticed something" hook.
@@ -225,6 +268,8 @@ export default async function handler(req, res) {
             - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
             - If LOCATION is known, anchor the observation to that place naturally.
             - If any field is Unknown, do not invent it and do not force awkward placeholders.
+            - If company description, employee count, recent signal, or notes are available, use at most one of them naturally. Do not stack all of them into one sentence.
+            - If COMPANY_RESEARCH exists, use one concrete fact from it. Do not say you "looked at LinkedIn" or "noticed on the website" unless that source mention directly adds credibility.
           17. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
@@ -334,7 +379,10 @@ export default async function handler(req, res) {
           const bodyCandidate = parsed.body_html || parsed.body || parsed.content || '';
           finalResult = {
             optimized: ensureThanksSignoff(
-              softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
+              deGenericizeFirstTouchCopy(
+                softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
+                prompt
+              ),
               contact?.sender_first_name
             ),
             subject: normalizeSubject(parsed.subject_line || parsed.subject),
@@ -344,7 +392,10 @@ export default async function handler(req, res) {
           // Fallback if AI didn't return valid JSON despite instructions
           finalResult = {
             optimized: ensureThanksSignoff(
-              softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
+              deGenericizeFirstTouchCopy(
+                softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
+                prompt
+              ),
               contact?.sender_first_name
             ),
             subject: normalizeSubject(null)

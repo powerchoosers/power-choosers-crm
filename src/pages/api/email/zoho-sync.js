@@ -125,6 +125,25 @@ function extractEmailAddress(value) {
     return email.trim().toLowerCase();
 }
 
+function normalizeLookupText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function parseSenderLabel(value) {
+    const raw = String(value || '').trim();
+    const email = extractEmailAddress(raw);
+    const display = raw.replace(/<\s*[^>]+\s*>/, '').trim();
+    return {
+        raw,
+        email: isLikelyEmail(email) ? email : '',
+        display: display || raw,
+        normalizedDisplay: normalizeLookupText(display || raw),
+        normalizedEmail: normalizeLookupText(email),
+    };
+}
+
 function isLikelyEmail(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim());
 }
@@ -239,37 +258,72 @@ async function resolveContactAndAccountFromThread(ownerEmail, threadId) {
 }
 
 async function resolveContactAndAccountBySenderName(ownerEmail, senderLabel) {
-    const name = String(senderLabel || '').trim();
-    if (!name) return { contactId: null, accountId: null };
+    const sender = parseSenderLabel(senderLabel);
+    if (!sender.display && !sender.email) return { contactId: null, accountId: null };
 
-    const ownedQuery = await supabaseAdmin
-        .from('contacts')
-        .select('id, accountId')
-        .eq('ownerId', ownerEmail)
-        .ilike('name', name)
-        .limit(10);
-
-    const ownedMatches = Array.isArray(ownedQuery.data) ? ownedQuery.data : [];
-    if (ownedMatches.length === 1) {
-        return { contactId: ownedMatches[0].id || null, accountId: ownedMatches[0].accountId || null };
+    if (sender.email) {
+        const byEmail = await resolveContactAndAccount(ownerEmail, sender.email);
+        if (byEmail.contactId) return byEmail;
     }
-    if (ownedMatches.length > 1) {
+
+    const queryParts = [];
+    if (sender.email) {
+        queryParts.push(`email.ilike.%${sender.email}%`);
+        queryParts.push(`email.ilike.%${sender.normalizedEmail}%`);
+    }
+    if (sender.display) {
+        queryParts.push(`name.ilike.%${sender.display}%`);
+        queryParts.push(`firstName.ilike.%${sender.display}%`);
+        queryParts.push(`lastName.ilike.%${sender.display}%`);
+    }
+
+    const { data: contacts, error } = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId, ownerId, email, name, firstName, lastName')
+        .or(Array.from(new Set(queryParts)).join(','));
+
+    if (error) {
+        logger.warn('[Zoho Sync] Sender-name contact lookup failed:', error.message || error, 'zoho-sync');
         return { contactId: null, accountId: null };
     }
 
-    const sharedQuery = await supabaseAdmin
-        .from('contacts')
-        .select('id, accountId')
-        .is('ownerId', null)
-        .ilike('name', name)
-        .limit(10);
+    const rows = Array.isArray(contacts) ? contacts : [];
+    if (!rows.length) return { contactId: null, accountId: null };
 
-    const sharedMatches = Array.isArray(sharedQuery.data) ? sharedQuery.data : [];
-    if (sharedMatches.length === 1) {
-        return { contactId: sharedMatches[0].id || null, accountId: sharedMatches[0].accountId || null };
-    }
+    const ownerKey = String(ownerEmail || '').toLowerCase().trim();
+    const scoreRow = (row) => {
+        const rowEmail = normalizeLookupText(row.email);
+        const rowName = normalizeLookupText(row.name);
+        const rowFullName = normalizeLookupText([row.firstName, row.lastName].filter(Boolean).join(' '));
+        const rowPriority = String(row.ownerId || '').toLowerCase().trim() === ownerKey ? 2 : (row.ownerId ? 1 : 0);
 
-    return { contactId: null, accountId: null };
+        let score = 0;
+        if (sender.normalizedEmail && sender.normalizedEmail === rowEmail) score = 100;
+        else if (sender.normalizedDisplay && sender.normalizedDisplay === rowName) score = 90;
+        else if (sender.normalizedDisplay && sender.normalizedDisplay === rowFullName) score = 85;
+
+        return { row, score, rowPriority };
+    };
+
+    const scored = rows
+        .map(scoreRow)
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => {
+            if (b.rowPriority !== a.rowPriority) return b.rowPriority - a.rowPriority;
+            if (b.score !== a.score) return b.score - a.score;
+            return String(a.row.name || '').localeCompare(String(b.row.name || ''));
+        });
+
+    if (!scored.length) return { contactId: null, accountId: null };
+
+    const best = scored[0];
+    const sameRank = scored.filter((entry) => entry.score === best.score && entry.rowPriority === best.rowPriority);
+    if (sameRank.length > 1) return { contactId: null, accountId: null };
+
+    return {
+        contactId: best.row.id || null,
+        accountId: best.row.accountId || null
+    };
 }
 
 async function autoIngestInboundAttachments({
@@ -683,7 +737,11 @@ function parseZohoMessage(summary, content, ownerEmail) {
 function determineThreadId(emailData) {
     // Zoho doesn't provide a clean threadId in summary, we might need to derive it
     // Using subject + participants hash as fallback if no references
-    const normalizeSubject = (s) => (s || '').replace(/^\s*(re|fw|fwd)\s*:\s*/i, '').trim().toLowerCase();
+    const normalizeSubject = (s) => String(s || '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
+        .replace(/^\s*(?:(?:re|fw|fwd)\s*:\s*)+/i, '')
+        .trim()
+        .toLowerCase();
     const subjectNorm = normalizeSubject(emailData.subject);
     const hash = crypto.createHash('sha1').update(subjectNorm + '|' + emailData.ownerId, 'utf8').digest('hex');
     return `thr_${hash}`;
@@ -716,7 +774,11 @@ async function updateThread(emailDoc) {
             })
             .eq('id', threadId);
     } else {
-        const normalizeSubject = (s) => (s || '').replace(/^\s*(re|fw|fwd)\s*:\s*/i, '').trim().toLowerCase();
+        const normalizeSubject = (s) => String(s || '')
+            .replace(/[\u200B-\u200D\uFEFF]/g, '')
+            .replace(/^\s*(?:(?:re|fw|fwd)\s*:\s*)+/i, '')
+            .trim()
+            .toLowerCase();
         const subjectNorm = normalizeSubject(emailDoc.subject);
 
         await supabaseAdmin

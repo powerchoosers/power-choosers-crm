@@ -39,6 +39,7 @@ Your hook: "${opener?.hook || 'Question about your energy strategy'}"
 Guidelines:
 - This is NOT a template - feel free to rephrase naturally
 - But preserve the core message and pain point
+- If you have a real research fact from the company website, LinkedIn, description, size, revenue, or location, use one fact naturally in sentence 1. Do not say you "looked at LinkedIn" or "saw the website"; use the fact itself.
 - Example: Change "Most manufacturers we audit" to "From what I'm seeing with manufacturers"
 - The key is: OBSERVABLE PAIN that they can't dismiss
 
@@ -95,10 +96,11 @@ Recipient: ${firstName} (${role}) at ${company}
 
 Rules:
 1. Lead with OBSERVABLE PAIN (not generic greeting)
-2. Include numbers/proof
-3. Use high-friction CTA (not "want to talk?")
-4. 3-4 short paragraphs max
-5. NO "hope this finds you well", NO "just following up", NO "my name is"
+2. Use one concrete company fact if available from website/LinkedIn/research notes. Do not invent one.
+3. Include numbers/proof
+4. Use high-friction CTA (not "want to talk?")
+5. 3-4 short paragraphs max
+6. NO "hope this finds you well", NO "just following up", NO "my name is"
 
 Generate as JSON: subject, greeting, opening_hook, paragraph2, paragraph3, closing
 `;
