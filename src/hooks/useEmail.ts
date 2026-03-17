@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { Email } from './useEmails'
 
 function normalizeAttachments(raw: any, provider?: string) {
@@ -42,7 +43,7 @@ export function useEmail(id: string) {
       
       const { data, error } = await supabase
         .from('emails')
-        .select('*')
+        .select('*, contact:contacts(id, email, name, firstName, lastName, accountId, metadata)')
         .eq('id', id)
         .single()
       
@@ -85,7 +86,14 @@ export function useEmail(id: string) {
           ownerId: data.metadata?.ownerId || data.ownerId || null,
           openCount: data.openCount,
           clickCount: data.clickCount,
-          attachments: normalizedAttachments
+          attachments: normalizedAttachments,
+          contact: data.contact
+            ? {
+                ...data.contact,
+                displayName: data.contact.name || [data.contact.firstName, data.contact.lastName].filter(Boolean).join(' ').trim() || data.contact.email,
+                avatarUrl: resolveContactPhotoUrl(data.contact) || null,
+              }
+            : null
         } as Email
       }
       return null

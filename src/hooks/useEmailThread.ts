@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { Email } from './useEmails'
 
 function stripHtml(value?: string | null) {
@@ -55,6 +56,29 @@ function normalizeSubject(subject: string) {
     .toLowerCase()
 }
 
+function extractEmailAddress(value: any) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  const angle = raw.match(/<\s*([^>]+)\s*>/)
+  const candidate = (angle?.[1] || raw).trim().toLowerCase()
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate) ? candidate : ''
+}
+
+function extractEmailList(value: any) {
+  if (!value) return []
+  const values = Array.isArray(value)
+    ? value
+    : String(value)
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+
+  return values
+    .map((part) => extractEmailAddress(part))
+    .filter(Boolean)
+}
+
 export function useEmailThread(threadKey?: string) {
   const { user, role, loading } = useAuth()
   const ownerEmail = user?.email?.toLowerCase() ?? 'guest'
@@ -69,7 +93,7 @@ export function useEmailThread(threadKey?: string) {
       try {
         let query: any = supabase
           .from('emails')
-          .select('*')
+          .select('*, contact:contacts(id, email, name, firstName, lastName, accountId, metadata)')
 
         if (role !== 'admin' && user?.email) {
           query = query.or(`metadata->>ownerId.eq.${ownerEmail},ownerId.eq.${ownerEmail}`)
@@ -99,8 +123,9 @@ export function useEmailThread(threadKey?: string) {
         const primaryData: any[] = data || []
 
         // Secondary lookup: if the thread has NO sent emails, the outbound messages were
-        // likely sent via sequences/protocols and stored with threadId: null. Find them
-        // by matching normalized subject against the user's sent emails.
+        // likely sent via sequences/protocols and stored with threadId: null. Pull in only
+        // the most likely match instead of merging every email that happens to share a short
+        // subject like "test".
         const hasSent = primaryData.some((item: any) => {
           const t = String(item.type || '').toLowerCase()
           return t === 'sent' || t === 'uplink_out'
@@ -110,7 +135,7 @@ export function useEmailThread(threadKey?: string) {
         if (!hasSent && primaryData.length > 0) {
           const sampleSubject = primaryData[0]?.subject || ''
           const baseSubject = normalizeSubject(sampleSubject)
-          if (baseSubject.length > 4) {
+          if (baseSubject.length > 6) {
             let sentQuery: any = supabase
               .from('emails')
               .select('*')
@@ -129,7 +154,30 @@ export function useEmailThread(threadKey?: string) {
               .limit(10)
 
             const primaryIds = new Set(primaryData.map((item: any) => item.id))
-            secondaryData = (sentData || []).filter((item: any) => !primaryIds.has(item.id))
+            const primaryParticipants = new Set(
+              primaryData.flatMap((item: any) => ([
+                ...extractEmailList(item.from),
+                ...extractEmailList(item.to),
+                ...extractEmailList(item.cc),
+                ...extractEmailList(item.bcc),
+              ]))
+            )
+
+            secondaryData = (sentData || [])
+              .filter((item: any) => !primaryIds.has(item.id))
+              .filter((item: any) => normalizeSubject(item.subject || '') === baseSubject)
+              .filter((item: any) => {
+                if (primaryParticipants.size === 0) return true
+                const itemRecipients = new Set([
+                  ...extractEmailList(item.to),
+                  ...extractEmailList(item.cc),
+                  ...extractEmailList(item.bcc),
+                ])
+                for (const address of itemRecipients) {
+                  if (primaryParticipants.has(address)) return true
+                }
+                return false
+              })
           }
         }
 
@@ -177,7 +225,14 @@ export function useEmailThread(threadKey?: string) {
             clickCount: item.clickCount,
             attachments: normalizeAttachments(item.metadata?.attachments || item.attachments),
             threadId: item.threadId || item.metadata?.threadId || null,
-            fromName: item.metadata?.fromName || null
+            fromName: item.metadata?.fromName || null,
+            contact: item.contact
+              ? {
+                  ...item.contact,
+                  displayName: item.contact.name || [item.contact.firstName, item.contact.lastName].filter(Boolean).join(' ').trim() || item.contact.email,
+                  avatarUrl: resolveContactPhotoUrl(item.contact) || null,
+                }
+              : null
           } as Email
         })
       } catch (error: any) {
