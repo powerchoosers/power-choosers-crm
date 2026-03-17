@@ -21,6 +21,7 @@ type SequenceIntelRow = {
   executionStepType: string | null;
   executionScheduledAt: string | null;
   executionLabel: string | null;
+  avatarUrl: string | null;
 };
 
 function normalizeNumber(value: unknown): number {
@@ -137,7 +138,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: contacts, error: contactsError } = contactIds.length
       ? await supabaseAdmin
           .from('contacts')
-          .select('id, firstName, lastName, email, title, accountId')
+          .select('id, firstName, lastName, email, title, accountId, avatarUrl')
           .in('id', contactIds)
       : { data: [], error: null };
 
@@ -208,6 +209,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         lastName: contact?.lastName || null,
         email: contact?.email || null,
         title: contact?.title || null,
+        avatarUrl: contact?.avatarUrl || null,
         accountName: account?.name || null,
         updatedAt: member.updatedAt || null,
         totalEmailsSent: normalizeNumber(member.total_emails_sent),
