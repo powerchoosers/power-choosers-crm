@@ -17,12 +17,15 @@ export interface EmailIdentity {
   avatarUrl?: string | null
 }
 
+const EMAIL_REGEX = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i
+
 export function extractEmailAddress(value?: string | null): string {
   const raw = String(value || '').trim()
   if (!raw) return ''
   const angle = raw.match(/<\s*([^>]+)\s*>/)
-  const email = angle?.[1] || raw
-  return email.trim().toLowerCase()
+  const candidate = String(angle?.[1] || raw).trim()
+  const matched = candidate.match(EMAIL_REGEX) || raw.match(EMAIL_REGEX)
+  return matched?.[0]?.trim().toLowerCase() || ''
 }
 
 function chunk<T>(arr: T[], size: number): T[][] {
