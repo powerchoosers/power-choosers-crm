@@ -37,6 +37,7 @@ interface OrgIntelligenceProps {
 
 /** Phone as string (legacy/cache) or { number, type } from Apollo (type: mobile, direct, work, etc.) */
 type PhoneEntry = string | { number: string; type?: string };
+type RevealedPhone = { number: string; type?: string };
 
 function phoneDisplayNumber(entry: PhoneEntry): string {
   return typeof entry === 'string' ? entry : entry.number;
@@ -50,6 +51,76 @@ function phoneTypeLabel(entry: PhoneEntry, index: number): 'MOBILE' | 'WORK DIRE
   if (type.includes('other') || type.includes('home')) return 'OTHER';
   if (typeof entry === 'string') return (['MOBILE', 'WORK DIRECT', 'OTHER'] as const)[index] ?? 'OTHER';
   return 'OTHER';
+}
+
+function normalizeRevealedPhones(entries: PhoneEntry[]): RevealedPhone[] {
+  const out: RevealedPhone[] = [];
+  const seen = new Set<string>();
+
+  entries.forEach((entry, index) => {
+    const rawNumber = phoneDisplayNumber(entry);
+    const formatted = formatPhoneNumber(rawNumber);
+    if (!formatted) return;
+    const label = phoneTypeLabel(entry, index);
+    const type = label === 'MOBILE' ? 'mobile' : label === 'WORK DIRECT' ? 'work_direct' : 'other';
+    const key = `${formatted}|${type}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ number: formatted, type });
+  });
+
+  return out;
+}
+
+function assignRevealedPhonesToContactFields(phones: RevealedPhone[]) {
+  const patch: Record<string, string> = {};
+  const extras: RevealedPhone[] = [];
+  const slotsUsed = {
+    mobile: false,
+    work_direct: false,
+    other: false
+  };
+
+  for (const phone of phones) {
+    const t = (phone.type || '').toLowerCase();
+    if (t.includes('mobile')) {
+      if (!slotsUsed.mobile) {
+        patch.mobile = phone.number;
+        patch.phone = phone.number;
+        slotsUsed.mobile = true;
+      } else {
+        extras.push(phone);
+      }
+      continue;
+    }
+
+    if (t.includes('direct') || t.includes('work')) {
+      if (!slotsUsed.work_direct) {
+        patch.workPhone = phone.number;
+        slotsUsed.work_direct = true;
+      } else {
+        extras.push(phone);
+      }
+      continue;
+    }
+
+    if (!slotsUsed.other) {
+      patch.otherPhone = phone.number;
+      slotsUsed.other = true;
+    } else {
+      extras.push(phone);
+    }
+  }
+
+  if (!patch.mobile && phones[0]?.number) {
+    patch.mobile = phones[0].number;
+  }
+
+  if (!patch.phone) {
+    patch.phone = patch.mobile || phones[0]?.number || patch.workPhone || patch.otherPhone || '';
+  }
+
+  return { patch, extras };
 }
 
 const PHONE_REVEAL_WARNING_MS = 60_000;
@@ -548,6 +619,55 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   };
 
+  const syncContactCachesImmediately = (
+    crmId: string,
+    phonePatch: Record<string, unknown>,
+    metadataPatch?: Record<string, unknown>
+  ) => {
+    const mergedPatch = {
+      ...phonePatch,
+      ...(phonePatch.workPhone !== undefined ? { workDirectPhone: phonePatch.workPhone } : {}),
+      ...(metadataPatch ? { metadata: metadataPatch } : {})
+    } as Record<string, unknown>;
+
+    queryClient.setQueriesData(
+      { predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId },
+      (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          ...mergedPatch
+        };
+      }
+    );
+
+    if (accountId) {
+      queryClient.setQueriesData(
+        { predicate: (q) => q.queryKey[0] === 'account-contacts' && q.queryKey[1] === accountId },
+        (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((c: any) => (c?.id === crmId ? { ...c, ...mergedPatch } : c));
+        }
+      );
+    }
+
+    queryClient.setQueriesData(
+      { predicate: (q) => q.queryKey[0] === 'contacts' },
+      (old: any) => {
+        if (!old?.pages) return old;
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            contacts: Array.isArray(page.contacts)
+              ? page.contacts.map((c: any) => (c?.id === crmId ? { ...c, ...mergedPatch } : c))
+              : page.contacts
+          }))
+        };
+      }
+    );
+  };
+
   const buildExistingContactLookups = async () => {
     const empty = {
       emailToCrmId: new Map<string, string>(),
@@ -690,10 +810,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const contactCity = (enriched as { city?: string }).city ?? person.location?.split(',')[0]?.trim() ?? null;
       const contactState = (enriched as { state?: string }).state ?? (person.location?.includes(',') ? person.location.split(',')[1]?.trim() : null) ?? null;
       const linkedinUrl = (enriched as { linkedin?: string }).linkedin || person.linkedin || null;
-      const immediatePhones = (enriched.phones?.map((ph: { number?: string }) => ph?.number).filter(Boolean) as string[]) || [];
-      const phone0 = immediatePhones[0] ? formatPhoneNumber(immediatePhones[0]) : '';
-      const phone1 = immediatePhones[1] ? formatPhoneNumber(immediatePhones[1]) : '';
-      const phone2 = immediatePhones[2] ? formatPhoneNumber(immediatePhones[2]) : '';
+      const rawImmediatePhones: PhoneEntry[] = (enriched.phones || [])
+        .map((ph: { number?: string; type?: string; type_cd?: string }) => {
+          if (!ph?.number) return null;
+          return { number: ph.number, type: ph.type || ph.type_cd };
+        })
+        .filter(Boolean) as PhoneEntry[];
+      const immediatePhones = normalizeRevealedPhones(rawImmediatePhones);
+      const assignedImmediatePhones = assignRevealedPhonesToContactFields(immediatePhones);
       const enrichedIdentity = buildIdentityName({
         name: enriched.fullName,
         firstName: enriched.firstName,
@@ -723,15 +847,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         ...(linkedinUrl ? { linkedinUrl } : {}),
         ...(contactCity ? { city: contactCity } : {}),
         ...(contactState ? { state: contactState } : {}),
-        ...(phone0 ? { phone: phone0, mobile: phone0 } : {}),
-        ...(phone1 ? { workPhone: phone1 } : {}),
-        ...(phone2 ? { otherPhone: phone2 } : {}),
+        ...assignedImmediatePhones.patch,
         metadata: {
           source: 'Apollo Organizational Intelligence',
           acquired_at: new Date().toISOString(),
           company: companySummary?.name || companyName || domain,
           apollo_person_id: person.id,
           photoUrl: enriched.photoUrl || person.photoUrl || '',
+          apollo_revealed_phones: immediatePhones,
+          apollo_overflow_phones: assignedImmediatePhones.extras,
           original_apollo_data: enriched
         }
       };
@@ -829,6 +953,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const typeLabel = type === 'both' ? 'details' : type === 'email' ? 'email' : 'phone';
       toast.success(`${resolvedIdentity.name} ${typeLabel} revealed & synced`);
 
+      // Immediate local cache hydration so dossier Uplinks updates without waiting for refetch.
+      if (crmId) {
+        syncContactCachesImmediately(
+          crmId,
+          assignedImmediatePhones.patch,
+          contactData.metadata as Record<string, unknown>
+        );
+      }
+
       // Invalidate and refetch so dossier, people, accounts, targets see changes immediately
       await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId });
       await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId });
@@ -919,26 +1052,44 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             if (!res.ok) return;
             const json = await res.json();
             if (json.ready && Array.isArray(json.phones) && json.phones.length > 0) {
-              const incoming: PhoneEntry[] = json.phones
-                .map((p: { sanitized_number?: string; raw_number?: string; type?: string }) => {
+              const incomingRaw: PhoneEntry[] = json.phones
+                .map((p: { sanitized_number?: string; raw_number?: string; type?: string; type_cd?: string }) => {
                   const raw = p.sanitized_number || p.raw_number;
                   if (!raw) return null;
-                  return { number: formatPhoneNumber(raw), type: p.type } as PhoneEntry;
+                  return { number: raw, type: p.type || p.type_cd } as PhoneEntry;
                 })
-                .filter(Boolean);
+                .filter(Boolean) as PhoneEntry[];
+              const incoming = normalizeRevealedPhones(incomingRaw);
               if (incoming.length === 0) return;
-              const phoneUpdate: Record<string, string> = {};
-              const n0 = phoneDisplayNumber(incoming[0]);
-              const n1 = incoming[1] ? phoneDisplayNumber(incoming[1]) : '';
-              const n2 = incoming[2] ? phoneDisplayNumber(incoming[2]) : '';
-              if (n0) {
-                phoneUpdate.phone = n0;
-                phoneUpdate.mobile = n0;
-              }
-              if (n1) phoneUpdate.workPhone = n1;
-              if (n2) phoneUpdate.otherPhone = n2;
-              const { error: updateError } = await supabase.from('contacts').update(phoneUpdate).eq('id', crmId);
+
+              const assignedIncomingPhones = assignRevealedPhonesToContactFields(incoming);
+
+              const { data: existingContact } = await supabase
+                .from('contacts')
+                .select('metadata')
+                .eq('id', crmId)
+                .maybeSingle();
+
+              const existingMetadata = isRecord(existingContact?.metadata) ? existingContact.metadata : {};
+              const metadataPatch = {
+                ...existingMetadata,
+                apollo_revealed_phones: incoming,
+                apollo_overflow_phones: assignedIncomingPhones.extras
+              };
+
+              const { error: updateError } = await supabase
+                .from('contacts')
+                .update({
+                  ...assignedIncomingPhones.patch,
+                  metadata: metadataPatch
+                })
+                .eq('id', crmId);
               if (!updateError) {
+                syncContactCachesImmediately(
+                  crmId,
+                  assignedIncomingPhones.patch,
+                  metadataPatch
+                );
                 setData(prev => {
                   const existing = prev.find(p => p.id === person.id)?.phones || [];
                   const existingNums = new Set(existing.map(phoneDisplayNumber));
@@ -1282,15 +1433,30 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             ? c.photo_url
             : (typeof c.photoUrl === 'string' ? c.photoUrl : undefined);
 
-          const phones: string[] = [];
+          const phones: PhoneEntry[] = [];
           if (Array.isArray(c.phones)) {
             c.phones.forEach((p: unknown) => {
-              if (isRecord(p) && typeof p.sanitized_number === 'string') phones.push(p.sanitized_number);
+              if (!isRecord(p)) return;
+              if (typeof p.number === 'string') {
+                phones.push({
+                  number: p.number,
+                  type: typeof p.type === 'string' ? p.type : undefined
+                });
+                return;
+              }
+              if (typeof p.sanitized_number === 'string') {
+                phones.push({
+                  number: p.sanitized_number,
+                  type: typeof p.type === 'string' ? p.type : undefined
+                });
+              }
             });
           } else if (Array.isArray(c.phone_numbers)) {
-            (c.phone_numbers as Array<{ sanitized_number?: string; number?: string }>).forEach(p => {
+            (c.phone_numbers as Array<{ sanitized_number?: string; number?: string; type?: string; type_cd?: string }>).forEach(p => {
               const num = p?.sanitized_number ?? p?.number;
-              if (typeof num === 'string') phones.push(num);
+              if (typeof num === 'string') {
+                phones.push({ number: num, type: p.type || p.type_cd });
+              }
             });
           }
 
@@ -1967,5 +2133,3 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     </motion.div>
   );
 }
-
-

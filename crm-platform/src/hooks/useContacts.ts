@@ -26,6 +26,7 @@ export interface Contact {
   otherPhone?: string
   companyPhone?: string
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
+  additionalPhones?: Array<{ number: string; type?: string }>
   metadata?: any
 }
 
@@ -60,6 +61,7 @@ export type ContactDetail = Contact & {
   otherPhone?: string
   companyPhone?: string
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone'
+  additionalPhones?: Array<{ number: string; type?: string }>
 }
 
 export function useDeleteContacts() {
@@ -137,6 +139,7 @@ type ContactMetadata = {
   mobile?: string
   otherPhone?: string
   primaryPhoneField?: string
+  apollo_revealed_phones?: Array<{ number?: string; type?: string } | string>
   email?: string
   notes?: string
   avatarUrl?: string
@@ -276,6 +279,34 @@ function normalizeMetadata(value: ContactMetadata | string | null | undefined): 
   return value
 }
 
+function extractAdditionalPhones(metadata: ContactMetadata | null): Array<{ number: string; type?: string }> {
+  if (!metadata || !Array.isArray(metadata.apollo_revealed_phones)) return []
+  const out: Array<{ number: string; type?: string }> = []
+  const seen = new Set<string>()
+
+  metadata.apollo_revealed_phones.forEach((entry) => {
+    if (typeof entry === 'string') {
+      const number = cleanText(entry)
+      if (!number) return
+      const key = `${number}|`
+      if (seen.has(key)) return
+      seen.add(key)
+      out.push({ number })
+      return
+    }
+    if (!entry || typeof entry !== 'object') return
+    const number = cleanText(entry.number)
+    const type = cleanText(entry.type) || undefined
+    if (!number) return
+    const key = `${number}|${type || ''}`
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push({ number, type })
+  })
+
+  return out
+}
+
 function buildContactName(args: {
   firstName?: unknown
   lastName?: unknown
@@ -344,6 +375,7 @@ export function useAccountContacts(accountId: string) {
           otherPhone: row.otherPhone || '',
           companyPhone: row.companyPhone || '',
           primaryPhoneField: normalizePrimaryPhoneField(row.primaryPhoneField),
+          additionalPhones: extractAdditionalPhones(metadata),
           avatarUrl: resolveContactPhotoUrl(row, metadata),
           title: row.title || '',
           accountId: row.accountId,
@@ -559,6 +591,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             otherPhone: item.otherPhone || metadata?.otherPhone || '',
             companyPhone: item.companyPhone || '',
             primaryPhoneField: normalizePrimaryPhoneField(item.primaryPhoneField),
+            additionalPhones: extractAdditionalPhones(metadata),
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.general?.company || '',
             companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
@@ -798,7 +831,9 @@ export function useContact(id: string) {
         workDirectPhone: typedData.workPhone || '',
         otherPhone: typedData.otherPhone || '',
         companyPhone: typedData.companyPhone || account?.phone || '',
-        primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField)
+        primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField),
+        additionalPhones: extractAdditionalPhones(metadata),
+        metadata
       } as ContactDetail
     },
     enabled: !!id && !loading && !!user,
