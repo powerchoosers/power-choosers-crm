@@ -12,6 +12,70 @@ import { supabaseAdmin } from '@/lib/supabase';
 // Store phone data for 30 minutes
 const PHONE_DATA_TTL_MS = 30 * 60 * 1000;
 
+function mapPhonesToContactUpdate(phones) {
+  const normalized = (Array.isArray(phones) ? phones : [])
+    .map((p) => {
+      const raw = p?.sanitized_number || p?.raw_number;
+      const number = formatPhoneForContact(raw);
+      if (!number) return null;
+      const type = String(p?.type || p?.type_cd || '').toLowerCase();
+      return { number, type };
+    })
+    .filter(Boolean);
+
+  const seen = new Set();
+  const unique = [];
+  normalized.forEach((p) => {
+    const key = `${p.number}|${p.type || ''}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    unique.push(p);
+  });
+
+  const update = {};
+  const extras = [];
+  const slots = { mobile: false, work: false, other: false };
+
+  unique.forEach((p) => {
+    if (p.type.includes('mobile')) {
+      if (!slots.mobile) {
+        update.mobile = p.number;
+        update.phone = p.number;
+        slots.mobile = true;
+      } else {
+        extras.push(p);
+      }
+      return;
+    }
+
+    if (p.type.includes('direct') || p.type.includes('work')) {
+      if (!slots.work) {
+        update.workPhone = p.number;
+        slots.work = true;
+      } else {
+        extras.push(p);
+      }
+      return;
+    }
+
+    if (!slots.other) {
+      update.otherPhone = p.number;
+      slots.other = true;
+    } else {
+      extras.push(p);
+    }
+  });
+
+  if (!update.mobile && unique[0]?.number) {
+    update.mobile = unique[0].number;
+  }
+  if (!update.phone) {
+    update.phone = update.mobile || unique[0]?.number || update.workPhone || update.otherPhone || '';
+  }
+
+  return { update, unique, extras };
+}
+
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
@@ -70,24 +134,18 @@ export default async function handler(req, res) {
         // 2. Direct update to contact record
         const { data: contactRow } = await supabaseAdmin
           .from('contacts')
-          .select('id')
+          .select('id, metadata')
           .eq('metadata->>apollo_person_id', personId)
           .maybeSingle();
 
         if (contactRow?.id) {
-          const numbers = phones
-            .map(p => p.sanitized_number || p.raw_number)
-            .filter(Boolean)
-            .map(formatPhoneForContact)
-            .filter(Boolean);
-
-          const update = {};
-          if (numbers[0]) {
-            update.phone = numbers[0];
-            update.mobile = numbers[0];
-          }
-          if (numbers[1]) update.workPhone = numbers[1];
-          if (numbers[2]) update.otherPhone = numbers[2];
+          const { update, unique, extras } = mapPhonesToContactUpdate(phones);
+          const existingMetadata = (contactRow.metadata && typeof contactRow.metadata === 'object') ? contactRow.metadata : {};
+          update.metadata = {
+            ...existingMetadata,
+            apollo_revealed_phones: unique,
+            apollo_overflow_phones: extras
+          };
 
           if (Object.keys(update).length > 0) {
             update.updatedAt = new Date().toISOString();
