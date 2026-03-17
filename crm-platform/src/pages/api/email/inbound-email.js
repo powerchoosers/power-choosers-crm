@@ -249,7 +249,7 @@ export default async function handler(req, res) {
     function normalizeSubject(subj = '') {
       try {
         let s = String(subj || '').replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-        s = s.replace(/^\s*(re|fw|fwd)\s*:\s*/i, '');
+        s = s.replace(/^\s*(?:(?:re|fw|fwd)\s*:\s*)+/i, '').trim();
         return s.toLowerCase();
       } catch (_) { return ''; }
     }
