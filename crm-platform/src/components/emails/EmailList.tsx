@@ -337,7 +337,7 @@ export function EmailList({
       </div>
 
       {/* Column Headers */}
-      <div className="flex-none px-4 py-3 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-4 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+      <div className="flex-none px-2 py-3 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-4 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
         <div className="col-span-1 flex items-center justify-center">
           {onSelectionChange ? (
             <button
@@ -405,7 +405,7 @@ export function EmailList({
                   key={email.id}
                   onClick={() => onSelectEmail(email)}
                 className={cn(
-                  "group grid grid-cols-12 gap-4 p-3 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
+                  "group grid grid-cols-12 gap-4 px-2 py-3 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
                   hasClicks ? "border-l-[#002FA7]" : selectedEmailId === email.id ? "border-l-[#002FA7]" : "border-l-transparent",
                   email.unread ? "bg-[#002FA7]/8" : "",
                   isSelected ? "selected-container shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
@@ -440,7 +440,7 @@ export function EmailList({
                     )}
                   </div>
                   {/* Avatar Icon */}
-                  <div className="col-span-1 flex justify-center relative -ml-4">
+                  <div className="col-span-1 flex justify-center relative">
                     {email.unread && (
                       <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
                     )}
@@ -474,7 +474,7 @@ export function EmailList({
                   </div>
 
                   {/* Participant */}
-                  <div className="col-span-3 min-w-0">
+                  <div className="col-span-3 min-w-0 -ml-1">
                     <div className="flex items-center gap-2">
                       {primaryContact && onOpenContact ? (
                         <button
@@ -505,7 +505,7 @@ export function EmailList({
                   </div>
 
                   {/* Channel Badge */}
-                  <div className="col-span-1 flex items-center">
+                  <div className="col-span-1 flex items-center -ml-1">
                     <span className={cn(
                       "text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border whitespace-nowrap",
                       channel.isMain
@@ -517,7 +517,7 @@ export function EmailList({
                   </div>
 
                   {/* Message Preview */}
-                  <div className={cn("min-w-0 space-y-1", filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4")}>
+                  <div className={cn("min-w-0 space-y-1 -ml-1", filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4")}>
                     <div className="flex items-center gap-2">
                       <h4 className={cn(
                         "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1",
