@@ -317,6 +317,14 @@ async function handleGeneration(execution, job) {
 async function handleSend(execution, job) {
     const metadata = normalizeMetadata(execution.metadata);
 
+    // Fix 3 — Idempotency: re-check DB status right before sending to prevent duplicate
+    // sends when two PGMQ messages for the same execution are processed concurrently.
+    const [freshExecSend] = await sql`SELECT status FROM sequence_executions WHERE id = ${execution.id}`;
+    if (freshExecSend?.status === 'waiting' || freshExecSend?.status === 'completed') {
+        console.log(`[DEBUG] handleSend: execution ${execution.id} already ${freshExecSend.status} — skipping duplicate send`);
+        return;
+    }
+
     const [member] = await sql`
     SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
            s."ownerId" as owner_uuid, u.email as primary_owner_email,
@@ -403,6 +411,39 @@ async function handleSend(execution, job) {
     }
 
     const emailRecordId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
+    const [existingEmailRecord] = await sql`
+      SELECT id, status, metadata, "from"
+      FROM emails
+      WHERE id = ${String(emailRecordId)}
+      LIMIT 1
+    `;
+    const alreadySentForExecution = existingEmailRecord
+        && (
+            String(existingEmailRecord.status || '').toLowerCase() === 'sent'
+            || !!existingEmailRecord?.metadata?.messageId
+            || !!existingEmailRecord?.metadata?.zohoMessageId
+            || !!existingEmailRecord?.metadata?.sentAt
+        );
+    if (alreadySentForExecution) {
+        console.log(`[DEBUG] handleSend: email already sent for execution ${execution.id}; skipping duplicate send`);
+        const delayVal = parseInt(metadata?.delay || metadata?.interval || '3');
+        const delayUnit = metadata?.delayUnit || 'days';
+        await sql`
+          UPDATE sequence_executions
+          SET status = 'waiting',
+              wait_until = COALESCE(wait_until, NOW() + (${delayVal} || ' ' || ${delayUnit})::INTERVAL),
+              metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({
+            messageId: existingEmailRecord?.metadata?.messageId || existingEmailRecord?.metadata?.zohoMessageId || null,
+            sentAt: existingEmailRecord?.metadata?.sentAt || new Date().toISOString(),
+            from: existingEmailRecord?.from || fromEmail
+        })}::jsonb,
+              updated_at = NOW()
+          WHERE id = ${execution.id}
+            AND status NOT IN ('waiting', 'completed')
+        `;
+        return;
+    }
+
     const htmlBody = String(metadata?.body || metadata?.aiBody || '').trim() ||
         'Hi there,\n\nIf you share your latest electricity statement, I can reply with a quick 2-3 point forensic snapshot.\n\nInterested?';
 
@@ -560,6 +601,52 @@ async function handleLinkedInTask(execution, job) {
 
 async function handleCallTask(execution, job) {
     const metadata = normalizeMetadata(execution.metadata);
+
+    // Fix 2 — Idempotency: re-check DB status before creating the call task to prevent
+    // duplicate task creation when two PGMQ messages race for the same execution.
+    const [freshExecCall] = await sql`SELECT status FROM sequence_executions WHERE id = ${execution.id}`;
+    if (freshExecCall?.status === 'waiting' || freshExecCall?.status === 'completed') {
+        console.log(`[DEBUG] handleCallTask: execution ${execution.id} already ${freshExecCall.status} — skipping duplicate task creation`);
+        return;
+    }
+
+    // Fix 2 (strict): if another waiting call execution already exists for this member
+    // at this call node, mark this execution as deduplicated and skip creating any task.
+    const currentNodeId = String(metadata?.nodeId || metadata?.id || '').trim();
+    const siblingWaitingCall = currentNodeId
+        ? (await sql`
+      SELECT id
+      FROM sequence_executions
+      WHERE member_id = ${execution.member_id}
+        AND id <> ${execution.id}
+        AND status = 'waiting'
+        AND lower(coalesce(metadata->>'type', CASE WHEN step_type = 'protocolNode' THEN NULL ELSE step_type END, '')) = 'call'
+        AND coalesce(metadata->>'nodeId', metadata->>'id', '') = ${currentNodeId}
+      LIMIT 1
+    `)?.[0]
+        : (await sql`
+      SELECT id
+      FROM sequence_executions
+      WHERE member_id = ${execution.member_id}
+        AND id <> ${execution.id}
+        AND status = 'waiting'
+        AND lower(coalesce(metadata->>'type', CASE WHEN step_type = 'protocolNode' THEN NULL ELSE step_type END, '')) = 'call'
+      LIMIT 1
+    `)?.[0];
+    if (siblingWaitingCall?.id) {
+        await sql`
+      UPDATE sequence_executions
+      SET status = 'completed',
+          outcome = 'deduplicated',
+          completed_at = NOW(),
+          error_message = ${`Deduplicated: waiting call execution ${siblingWaitingCall.id} already exists for this member/node`},
+          updated_at = NOW()
+      WHERE id = ${execution.id}
+        AND status NOT IN ('waiting', 'completed')
+    `;
+        console.log(`[DEBUG] handleCallTask: deduplicated execution ${execution.id}; waiting execution ${siblingWaitingCall.id} already exists`);
+        return;
+    }
 
     const [member] = await sql`
     SELECT m.id,
