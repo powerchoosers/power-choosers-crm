@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone, Landmark, Phone, Building2 } from 'lucide-react'
 import { useCallStore } from '@/store/callStore'
 import { useComposeStore } from '@/store/composeStore'
@@ -37,6 +38,7 @@ export function AccountHolderCard({
   onSetHolder,
 }: AccountHolderCardProps) {
   const initiateCall = useCallStore(s => s.initiateCall)
+  const router = useRouter()
   const openCompose = useComposeStore(s => s.openCompose)
   const [picking, setPicking] = useState(false)
   const [query, setQuery] = useState('')
@@ -115,6 +117,11 @@ export function AccountHolderCard({
     })
   }
 
+  const openContactDossier = () => {
+    if (!holder) return
+    router.push(`/network/contacts/${holder.id}`)
+  }
+
   const handleSelect = (c: HolderContact) => {
     onSetHolder(c.id)
     setPicking(false)
@@ -143,7 +150,19 @@ export function AccountHolderCard({
       {holder && !picking && (
         <div className="space-y-3">
           {/* Identity row */}
-          <div className="flex items-center gap-3">
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={openContactDossier}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                openContactDossier()
+              }
+            }}
+            className="group flex items-center gap-3 rounded-xl p-2 -mx-2 cursor-pointer hover:bg-white/[0.03] transition-all outline-none focus-visible:ring-1 focus-visible:ring-[#002FA7]/50"
+            title="Open contact dossier"
+          >
             <ContactAvatar
               name={holder.name}
               photoUrl={holder.avatarUrl}
@@ -157,8 +176,11 @@ export function AccountHolderCard({
               )}
             </div>
             <button
-              onClick={() => onSetHolder(null)}
-              className="text-zinc-700 hover:text-zinc-400 hover:scale-110 transition-all shrink-0"
+              onClick={(e) => {
+                e.stopPropagation()
+                onSetHolder(null)
+              }}
+              className="text-zinc-700 hover:text-zinc-400 hover:scale-110 transition-all shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
               title="Clear decision maker"
             >
               <X className="w-3.5 h-3.5" />

@@ -1162,6 +1162,9 @@ export function useUpdateContact() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contact', CONTACTS_QUERY_BUSTER, variables.id] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['account'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
     }
   })
 }
