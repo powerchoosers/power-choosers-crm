@@ -42,10 +42,10 @@ function getDaysUntilJune() {
 
 /**
  * Dedicated icon for the active call bar.
- * - Company call (logoUrl or domain set): shows logo img → Clearbit fallback → Building2
- * - Contact call (no logoUrl, no domain): shows ContactAvatar with the contact's name
+ * - Contact call: shows ContactAvatar when the call is not account-only
+ * - Company call: shows logo img → Clearbit fallback → Building2
  */
-function CallBarIcon({ logoUrl, domain, name, contactName, photoUrl }: { logoUrl?: string; domain?: string; name: string; contactName?: string; photoUrl?: string }) {
+function CallBarIcon({ logoUrl, domain, name, contactName, photoUrl, isAccountOnly }: { logoUrl?: string; domain?: string; name: string; contactName?: string; photoUrl?: string; isAccountOnly?: boolean }) {
   const clearbitUrl = domain ? `https://logo.clearbit.com/${domain.replace(/^https?:\/\//i, '').split('/')[0].toLowerCase()}` : null
   const [src, setSrc] = useState<string | null>(logoUrl || clearbitUrl)
   const [failed, setFailed] = useState(false)
@@ -64,8 +64,10 @@ function CallBarIcon({ logoUrl, domain, name, contactName, photoUrl }: { logoUrl
     }
   }
 
-  // No company branding at all — show contact avatar
-  if (!logoUrl && !domain) {
+  const shouldShowContactAvatar = !isAccountOnly && !!(contactName || photoUrl)
+
+  // Personal/contact call should show contact identity, even when company branding exists.
+  if (shouldShowContactAvatar) {
     return (
       <ContactAvatar
         name={contactName || name}
@@ -585,6 +587,7 @@ export function TopBar() {
                       name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
                       contactName={displayMetadata?.name || undefined}
                       photoUrl={displayMetadata?.photoUrl || undefined}
+                      isAccountOnly={Boolean(displayMetadata?.isAccountOnly)}
                     />
                     <div className="flex flex-col min-w-0">
                       <div className="text-sm font-medium text-white leading-none mb-1 flex items-center gap-2 truncate">
