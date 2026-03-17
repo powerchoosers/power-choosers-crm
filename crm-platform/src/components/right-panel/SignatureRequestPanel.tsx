@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import dynamic from 'next/dynamic'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
 
 const DocumentPreparationModal = dynamic(
@@ -334,9 +335,7 @@ export function SignatureRequestPanel() {
             </div>
           </div>
         </div>
-        <button onClick={handleClose} className={panelTheme.closeButton} title="Cancel">
-          [ ESC ]
-        </button>
+        <ForensicClose onClick={handleClose} size={16} />
       </div>
 
       <div className={panelTheme.body}>

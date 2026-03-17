@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { Search, X, Building2, Users, Plus, Sparkles, Loader2, GitMerge, CheckCircle2, Phone, Mail, Radar } from 'lucide-react'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { useSearchAccounts } from '@/hooks/useAccounts'
 import { useSearchProtocols } from '@/hooks/useProtocols'
@@ -122,12 +123,10 @@ export function GlobalSearch() {
             <Loader2 className="animate-spin text-zinc-200" size={16} />
           )}
           {query && (
-            <button
+            <ForensicClose 
               onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus() }}
-              className="icon-button-forensic"
-            >
-              <X size={16} />
-            </button>
+              size={16}
+            />
           )}
           <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-md border border-white/10 bg-transparent shadow-inner">
             <kbd className="font-mono text-[10px] font-medium text-zinc-500">⌘</kbd>

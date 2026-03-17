@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { XCircle, RotateCcw, AlertTriangle, GitMerge } from 'lucide-react'
+import { RotateCcw, AlertTriangle, GitMerge } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import {
@@ -13,6 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ForensicClose } from '@/components/ui/ForensicClose'
+import { ForensicRefresh } from '@/components/ui/ForensicRefresh'
 
 interface SequenceMemberRow {
   memberId: string
@@ -226,21 +228,12 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
               </div>
 
               <div className="flex items-center gap-2">
-                <button
+                <ForensicRefresh 
                   onClick={() => selectedSequenceId && fetchIntel(selectedSequenceId)}
+                  loading={loading}
                   disabled={loading || !selectedSequenceId}
-                  className="icon-button-forensic h-9 px-3 rounded-xl border border-white/10 bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50 flex items-center text-[10px] font-mono uppercase tracking-wider"
-                >
-                  <RotateCcw className={cn('w-3.5 h-3.5 mr-2', loading && 'animate-spin')} />
-                  Refresh
-                </button>
-                <button
-                  onClick={onClose}
-                  className="icon-button-forensic h-9 w-9 rounded-xl border border-white/10 bg-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all flex items-center justify-center"
-                  title="Close"
-                >
-                  <XCircle className="w-4 h-4" />
-                </button>
+                />
+                <ForensicClose onClick={onClose} size={18} />
               </div>
             </div>
 

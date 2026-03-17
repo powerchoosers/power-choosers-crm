@@ -1,6 +1,7 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Check } from 'lucide-react';
+import { ForensicClose } from '@/components/ui/ForensicClose';
 import { cn } from '@/lib/utils';
 import { INDUSTRY_VECTORS } from '@/lib/industry-mapping';
 import { TITLE_VECTORS } from '@/lib/title-mapping';
@@ -200,9 +201,9 @@ export default function FilterCommandDeck({
           <div className="px-6 pb-6 flex justify-between items-center border-t border-white/5 pt-6">
             <button
               onClick={onClose}
-              className="text-xs text-zinc-500 hover:text-white font-mono flex items-center gap-2 transition-colors"
+              className="text-xs text-zinc-500 hover:text-white font-mono flex items-center gap-2 transition-colors group"
             >
-              <X className="w-3 h-3" /> CLOSE_DECK
+              <ForensicClose size={12} className="p-0 pointer-events-none" /> CLOSE_DECK
             </button>
             <button
               onClick={clearFilters}
