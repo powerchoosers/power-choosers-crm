@@ -432,6 +432,7 @@ export default function TargetDetailPage() {
             <ClickToCallButton
               phoneNumber={contact.phone}
               name={contact.name}
+              photoUrl={contact.avatarUrl}
               account={contact.company}
               logoUrl={contact.logoUrl}
               className="h-8 w-8"
