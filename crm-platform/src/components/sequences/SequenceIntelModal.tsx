@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
-import { RotateCcw, AlertTriangle, GitMerge } from 'lucide-react'
+import { GitMerge } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import {
@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select'
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { ForensicRefresh } from '@/components/ui/ForensicRefresh'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 
 interface SequenceMemberRow {
   memberId: string
@@ -64,28 +65,62 @@ interface SequenceIntelModalProps {
   sequenceId?: string
 }
 
+function MemberStatusBadge({ status }: { status: string | null }) {
+  const s = (status || '').toLowerCase()
+  const config: Record<string, { label: string; color: string }> = {
+    active:    { label: 'Active',     color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' },
+    paused:    { label: 'Paused',     color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+    completed: { label: 'Completed',  color: 'text-zinc-400 bg-white/5 border-white/10' },
+    failed:    { label: 'Failed',     color: 'text-red-400 bg-red-500/10 border-red-500/20' },
+    removed:   { label: 'Removed',    color: 'text-zinc-500 bg-white/5 border-white/10' },
+  }
+  const { label, color } = config[s] ?? { label: status || '-', color: 'text-zinc-400 bg-white/5 border-white/10' }
+  return (
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded border text-[9px] font-mono uppercase tracking-widest whitespace-nowrap', color)}>
+      {label}
+    </span>
+  )
+}
+
+function ExecStatusBadge({ status }: { status: string | null }) {
+  const s = (status || '').toLowerCase()
+  const config: Record<string, { label: string; color: string }> = {
+    queued:    { label: 'Queued',   color: 'text-sky-400 bg-sky-500/10 border-sky-500/20' },
+    running:   { label: 'Running',  color: 'text-[#002FA7] bg-[#002FA7]/10 border-[#002FA7]/20' },
+    waiting:   { label: 'Waiting',  color: 'text-amber-400 bg-amber-500/10 border-amber-500/20' },
+    done:      { label: 'Done',     color: 'text-zinc-400 bg-white/5 border-white/10' },
+    completed: { label: 'Done',     color: 'text-zinc-400 bg-white/5 border-white/10' },
+    failed:    { label: 'Failed',   color: 'text-red-400 bg-red-500/10 border-red-500/20' },
+  }
+  const { label, color } = config[s] ?? { label: status || '-', color: 'text-zinc-500 bg-white/5 border-white/10' }
+  return (
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded border text-[9px] font-mono uppercase tracking-widest whitespace-nowrap', color)}>
+      {label}
+    </span>
+  )
+}
+
+const TH = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+  <th className={cn('px-4 py-2.5 text-[9px] font-mono text-zinc-500 uppercase tracking-[0.15em] text-left whitespace-nowrap', className)}>
+    {children}
+  </th>
+)
+
 export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceIntelModalProps) {
-  console.log('--- SEQUENCE INTEL MODAL RENDER ---', { isOpen, sequenceId })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<SequenceMemberRow[]>([])
   const [name, setName] = useState('')
   const [summary, setSummary] = useState<SequenceIntelSummary | null>(null)
   const [isClient, setIsClient] = useState(false)
-  
-  // Selection state for when no sequenceId is provided
-  const [availableSequences, setAvailableSequences] = useState<{id: string, name: string}[]>([])
+
+  const [availableSequences, setAvailableSequences] = useState<{ id: string; name: string }[]>([])
   const [selectedSequenceId, setSelectedSequenceId] = useState<string | null>(null)
 
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
+  useEffect(() => { setIsClient(true) }, [])
 
-  // Sync internal selected ID with prop
   useEffect(() => {
-    if (sequenceId) {
-      setSelectedSequenceId(sequenceId)
-    }
+    if (sequenceId) setSelectedSequenceId(sequenceId)
   }, [sequenceId])
 
   const fetchProtocols = useCallback(async () => {
@@ -94,7 +129,6 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
         .from('sequences')
         .select('id, name')
         .order('name', { ascending: true })
-
       if (error) throw error
       setAvailableSequences(data || [])
     } catch (err) {
@@ -104,17 +138,12 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
   const fetchIntel = useCallback(async (targetId: string) => {
     if (!targetId) return
-
     setLoading(true)
     setError(null)
-
     try {
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData?.session?.access_token
-
-      if (!token) {
-        throw new Error('Please log in again. Session token is missing.')
-      }
+      if (!token) throw new Error('Please log in again. Session token is missing.')
 
       const response = await fetch(`/api/protocols/${targetId}/sequence-intel`, {
         headers: {
@@ -122,12 +151,8 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
           'Content-Type': 'application/json',
         },
       })
-
       const data = await response.json() as SequenceIntelResponse
-
-      if (!response.ok) {
-        throw new Error(data?.error || 'Failed to load sequence intel')
-      }
+      if (!response.ok) throw new Error(data?.error || 'Failed to load sequence intel')
 
       setRows(Array.isArray(data.rows) ? data.rows : [])
       setSummary(data.summary || null)
@@ -144,11 +169,8 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
   useEffect(() => {
     if (isOpen) {
-      if (selectedSequenceId) {
-        fetchIntel(selectedSequenceId)
-      } else {
-        fetchProtocols()
-      }
+      if (selectedSequenceId) fetchIntel(selectedSequenceId)
+      else fetchProtocols()
     }
   }, [isOpen, selectedSequenceId, fetchIntel, fetchProtocols])
 
@@ -156,12 +178,7 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
     if (!value) return '-'
     const dt = new Date(value)
     if (Number.isNaN(dt.getTime())) return '-'
-    return dt.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    })
+    return dt.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
   }
 
   if (!isClient) return null
@@ -181,10 +198,11 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.98 }}
             transition={{ duration: 0.2 }}
-            className="w-full max-w-[1240px] max-h-[88vh] nodal-monolith-edge bg-zinc-950/95 border border-white/10 rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.65)]"
+            className="w-full max-w-[1240px] max-h-[88vh] nodal-monolith-edge bg-zinc-950/95 border border-white/10 rounded-2xl overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.65)] flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-6 py-5 border-b border-white/10 bg-black/30 flex items-center justify-between">
+            {/* ── Header ── */}
+            <div className="px-6 py-5 border-b border-white/10 bg-black/30 flex items-center justify-between flex-none">
               <div className="flex-1 flex items-center gap-6">
                 <div>
                   <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Sequence Intel</div>
@@ -199,10 +217,7 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
                 <div className="flex items-center gap-2">
                   <div className="h-8 w-px bg-white/5 mx-2" />
-                  <Select
-                    value={selectedSequenceId || ''}
-                    onValueChange={(val) => setSelectedSequenceId(val)}
-                  >
+                  <Select value={selectedSequenceId || ''} onValueChange={(val) => setSelectedSequenceId(val)}>
                     <SelectTrigger className="h-8 bg-black/40 border border-white/10 rounded-lg px-3 text-[10px] font-mono text-zinc-300 hover:text-white transition-all uppercase tracking-wider focus:ring-0 focus:ring-offset-0 focus:outline-none ring-0 outline-none w-[240px] gap-2 flex items-center justify-between shadow-sm">
                       <div className="flex items-center gap-2 truncate">
                         <GitMerge className="w-3 h-3 text-white" />
@@ -214,10 +229,10 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                         Available Protocols
                       </div>
                       {availableSequences.map(seq => (
-                        <SelectItem 
-                          key={seq.id} 
+                        <SelectItem
+                          key={seq.id}
                           value={seq.id}
-                          className="text-[10px] font-mono focus:bg-[#002FA7]/20 cursor-pointer py-2 flex items-center gap-2"
+                          className="text-[10px] font-mono focus:bg-[#002FA7]/20 cursor-pointer py-2"
                         >
                           {seq.name}
                         </SelectItem>
@@ -228,7 +243,7 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
               </div>
 
               <div className="flex items-center gap-2">
-                <ForensicRefresh 
+                <ForensicRefresh
                   onClick={() => selectedSequenceId && fetchIntel(selectedSequenceId)}
                   loading={loading}
                   disabled={loading || !selectedSequenceId}
@@ -237,8 +252,9 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
               </div>
             </div>
 
+            {/* ── Summary Stats ── */}
             {(loading || summary) && (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 p-4 border-b border-white/10 bg-black/20">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 p-4 border-b border-white/10 bg-black/20 flex-none">
                 {loading ? (
                   Array.from({ length: 7 }).map((_, i) => (
                     <div key={i} className="bg-black/40 border border-white/5 rounded-lg p-2.5">
@@ -281,9 +297,10 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
               </div>
             )}
 
-            <div className="p-4 max-h-[58vh] overflow-auto np-scroll scroll-smooth">
+            {/* ── Table ── */}
+            <div className="flex-1 min-h-0 overflow-auto np-scroll scroll-smooth">
               {!loading && error && (
-                <div className="h-40 flex items-center justify-center">
+                <div className="h-40 flex items-center justify-center p-6">
                   <div className="bg-red-500/10 border border-red-500/30 text-red-300 text-sm rounded-xl px-4 py-3">
                     {error}
                   </div>
@@ -297,71 +314,133 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
               )}
 
               {(loading || (!error && rows.length > 0)) && (
-                <div className="overflow-x-auto rounded-xl border border-white/10">
-                  <table className="w-full min-w-[1150px]">
-                    <thead className="bg-black/40 border-b border-white/10 sticky top-0 z-10">
-                      <tr className="text-left">
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Contact</th>
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Company</th>
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Member Status</th>
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Current Step</th>
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Execution</th>
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Scheduled</th>
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Signals</th>
-                        <th className="px-3 py-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Updated</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {loading ? (
-                        Array.from({ length: 5 }).map((_, i) => (
-                          <tr key={i} className="border-b border-white/5 last:border-0">
-                            <td className="px-3 py-2.5">
-                              <div className="h-3.5 w-28 bg-white/10 rounded animate-pulse mb-1.5" />
-                              <div className="h-2.5 w-20 bg-white/5 rounded animate-pulse" />
+                <table className="w-full min-w-[1080px]">
+                  <thead className="sticky top-0 z-10 bg-zinc-950/95 backdrop-blur-sm border-b border-white/5">
+                    <tr>
+                      <TH className="pl-5">Contact</TH>
+                      <TH>Company</TH>
+                      <TH>Status</TH>
+                      <TH>Current Step</TH>
+                      <TH>Execution</TH>
+                      <TH>Exec Status</TH>
+                      <TH>Scheduled</TH>
+                      <TH>Signals</TH>
+                      <TH className="pr-5">Updated</TH>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      Array.from({ length: 6 }).map((_, i) => (
+                        <tr key={i} className="border-b border-white/5 last:border-0">
+                          {/* Contact skeleton with avatar */}
+                          <td className="px-4 py-3 pl-5">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-[10px] bg-white/10 animate-pulse shrink-0" />
+                              <div>
+                                <div className="h-3 w-28 bg-white/10 rounded animate-pulse mb-1.5" />
+                                <div className="h-2.5 w-20 bg-white/5 rounded animate-pulse" />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3"><div className="h-3 w-24 bg-white/10 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3"><div className="h-4 w-16 bg-white/10 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3"><div className="h-3 w-20 bg-white/10 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3"><div className="h-3 w-20 bg-white/10 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3"><div className="h-4 w-14 bg-white/10 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3"><div className="h-3 w-20 bg-white/10 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3"><div className="h-3 w-24 bg-white/5 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3 pr-5"><div className="h-3 w-16 bg-white/5 rounded animate-pulse" /></td>
+                        </tr>
+                      ))
+                    ) : (
+                      rows.map((row, i) => {
+                        const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || row.email || 'Unknown'
+                        const currentStep = row.currentNodeLabel || row.currentNodeId || '-'
+                        const executionLabel = row.executionLabel || row.executionStepType || '-'
+                        return (
+                          <motion.tr
+                            key={row.memberId}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.25, delay: Math.min(i * 0.02, 0.3) }}
+                            className="border-b border-white/5 last:border-0 hover:bg-white/[0.02] transition-colors group"
+                          >
+                            {/* Contact */}
+                            <td className="px-4 py-3 pl-5">
+                              <div className="flex items-center gap-2.5">
+                                <ContactAvatar
+                                  name={fullName}
+                                  size={32}
+                                  className="shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors whitespace-nowrap truncate max-w-[160px]">
+                                    {fullName}
+                                  </div>
+                                  <div className="text-[10px] font-mono text-zinc-500 truncate max-w-[160px]">
+                                    {row.title || row.email || '-'}
+                                  </div>
+                                </div>
+                              </div>
                             </td>
-                            <td className="px-3 py-2.5"><div className="h-3.5 w-24 bg-white/10 rounded animate-pulse" /></td>
-                            <td className="px-3 py-2.5"><div className="h-3.5 w-16 bg-white/10 rounded animate-pulse" /></td>
-                            <td className="px-3 py-2.5"><div className="h-3.5 w-20 bg-white/10 rounded animate-pulse" /></td>
-                            <td className="px-3 py-2.5">
-                              <div className="h-3.5 w-20 bg-white/10 rounded animate-pulse mb-1.5" />
-                              <div className="h-2.5 w-12 bg-white/5 rounded animate-pulse" />
+
+                            {/* Company */}
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-zinc-300 whitespace-nowrap">
+                                {row.accountName || '-'}
+                              </span>
                             </td>
-                            <td className="px-3 py-2.5"><div className="h-3.5 w-24 bg-white/10 rounded animate-pulse" /></td>
-                            <td className="px-3 py-2.5"><div className="h-3.5 w-20 bg-white/10 rounded animate-pulse" /></td>
-                            <td className="px-3 py-2.5"><div className="h-3.5 w-20 bg-white/10 rounded animate-pulse" /></td>
-                          </tr>
-                        ))
-                      ) : (
-                        rows.map((row) => {
-                          const fullName = `${row.firstName || ''} ${row.lastName || ''}`.trim() || row.email || 'Unknown';
-                          const currentStep = row.currentNodeLabel || row.currentNodeId || '-';
-                          const executionLabel = row.executionLabel || row.executionStepType || '-';
-                          const signals = `${row.totalEmailsSent}E / ${row.totalOpens}O / ${row.totalClicks}C / ${row.totalReplies}R`;
-                          return (
-                            <tr key={row.memberId} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
-                              <td className="px-3 py-2.5">
-                                <div className="text-sm text-zinc-100">{fullName}</div>
-                                <div className="text-[10px] font-mono text-zinc-500 truncate">{row.title || row.email || '-'}</div>
-                              </td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-300">{row.accountName || '-'}</td>
-                              <td className="px-3 py-2.5">
-                                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-200">{row.memberStatus || '-'}</span>
-                              </td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-200">{currentStep}</td>
-                              <td className="px-3 py-2.5">
-                                <div className="text-sm text-zinc-100">{executionLabel}</div>
-                                <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">{row.executionStatus || '-'}</div>
-                              </td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-300">{formatTimestamp(row.executionScheduledAt)}</td>
-                              <td className="px-3 py-2.5 text-[11px] font-mono text-zinc-300 tabular-nums">{signals}</td>
-                              <td className="px-3 py-2.5 text-sm text-zinc-400">{formatTimestamp(row.updatedAt)}</td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+
+                            {/* Member Status */}
+                            <td className="px-4 py-3">
+                              <MemberStatusBadge status={row.memberStatus} />
+                            </td>
+
+                            {/* Current Step */}
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-zinc-300 whitespace-nowrap truncate max-w-[180px] block">
+                                {currentStep}
+                              </span>
+                            </td>
+
+                            {/* Execution Label */}
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-zinc-300 whitespace-nowrap truncate max-w-[160px] block">
+                                {executionLabel}
+                              </span>
+                            </td>
+
+                            {/* Exec Status */}
+                            <td className="px-4 py-3">
+                              <ExecStatusBadge status={row.executionStatus} />
+                            </td>
+
+                            {/* Scheduled */}
+                            <td className="px-4 py-3">
+                              <span className="text-sm text-zinc-400 whitespace-nowrap font-mono tabular-nums">
+                                {formatTimestamp(row.executionScheduledAt)}
+                              </span>
+                            </td>
+
+                            {/* Signals */}
+                            <td className="px-4 py-3">
+                              <span className="text-[11px] font-mono text-zinc-400 tabular-nums whitespace-nowrap">
+                                {row.totalEmailsSent}E&nbsp;&nbsp;{row.totalOpens}O&nbsp;&nbsp;{row.totalClicks}C&nbsp;&nbsp;{row.totalReplies}R
+                              </span>
+                            </td>
+
+                            {/* Updated */}
+                            <td className="px-4 py-3 pr-5">
+                              <span className="text-sm text-zinc-500 whitespace-nowrap">
+                                {formatTimestamp(row.updatedAt)}
+                              </span>
+                            </td>
+                          </motion.tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
               )}
             </div>
           </motion.div>
