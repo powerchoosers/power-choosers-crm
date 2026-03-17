@@ -29,6 +29,13 @@ interface PhoneEntry {
   icon: typeof Smartphone
 }
 
+interface AdditionalPhoneEntry {
+  id: string
+  label: string
+  value: string
+  icon: typeof Smartphone
+}
+
 export const UplinkCard: React.FC<UplinkCardProps> = ({
   contact,
   isEditing,
@@ -41,6 +48,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
   const initiateCall = useCallStore((state) => state.initiateCall)
   // Local state for editing phones
   const [phones, setPhones] = useState<PhoneEntry[]>([])
+  const [additionalPhones, setAdditionalPhones] = useState<AdditionalPhoneEntry[]>([])
   const [primaryField, setPrimaryField] = useState<PrimaryPhoneType>(contact.primaryPhoneField || 'mobile')
   const [email, setEmail] = useState(contact.email || '')
   const [localTime, setLocalTime] = useState('')
@@ -127,9 +135,25 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
     const firstNonCompany = phoneEntries.find((p) => p.id !== 'companyPhone')
     const nextPrimary = (contact.primaryPhoneField || (firstNonCompany?.id ?? 'mobile')) as PrimaryPhoneType
     const nextEmail = contact.email || ''
+    const canonicalValues = new Set(phoneEntries.map((p) => p.value))
+    const extras = (Array.isArray(contact.additionalPhones) ? contact.additionalPhones : [])
+      .filter((p) => p && typeof p.number === 'string' && p.number.trim())
+      .filter((p) => !canonicalValues.has(p.number))
+      .map((p, idx) => {
+        const rawType = String(p.type || '').toLowerCase()
+        const isMobile = rawType.includes('mobile')
+        const isWork = rawType.includes('work') || rawType.includes('direct')
+        return {
+          id: `extra-${idx}-${p.number}`,
+          label: isMobile ? `Mobile ${idx + 2}` : isWork ? `Work Direct ${idx + 2}` : `Other ${idx + 2}`,
+          value: p.number,
+          icon: isMobile ? Smartphone : isWork ? Landmark : Phone
+        } as AdditionalPhoneEntry
+      })
 
     Promise.resolve().then(() => {
       setPhones((prev) => (JSON.stringify(prev) !== JSON.stringify(phoneEntries) ? phoneEntries : prev))
+      setAdditionalPhones((prev) => (JSON.stringify(prev) !== JSON.stringify(extras) ? extras : prev))
       setPrimaryField((prev) => (prev !== nextPrimary ? nextPrimary : prev))
       setEmail((prev) => (prev !== nextEmail ? nextEmail : prev))
     })
@@ -343,7 +367,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
           )}
 
           {/* Backup Numbers */}
-          {phones.filter(p => p.id !== primaryField).length > 0 && (
+          {(phones.filter(p => p.id !== primaryField).length > 0 || additionalPhones.length > 0) && (
             <div className="space-y-2 pt-2">
               <div className="px-1 mb-2">
                 <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em]">Infrastructure / Backup</span>
@@ -355,6 +379,28 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                     type="button"
                     className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
                     onClick={() => handleCallClick(phone)}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
+                      <div className="flex flex-col items-start min-w-0 flex-1">
+                        <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
+                        <ForensicDataPoint
+                          value={phone.value}
+                          copyValue={phone.value}
+                          valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                          inline
+                        />
+                      </div>
+                    </div>
+                    <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
+                  </button>
+                ))}
+                {additionalPhones.map((phone) => (
+                  <button
+                    key={phone.id}
+                    type="button"
+                    className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
+                    onClick={() => handleCallClick({ ...phone, id: 'otherPhone' as PhoneType })}
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
