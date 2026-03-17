@@ -52,23 +52,49 @@ interface SequenceIntelResponse {
 interface SequenceIntelModalProps {
   isOpen: boolean
   onClose: () => void
-  sequenceId: string
+  sequenceId?: string
 }
 
 export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceIntelModalProps) {
+  console.log('--- SEQUENCE INTEL MODAL RENDER ---', { isOpen, sequenceId })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [rows, setRows] = useState<SequenceMemberRow[]>([])
   const [name, setName] = useState('')
   const [summary, setSummary] = useState<SequenceIntelSummary | null>(null)
   const [isClient, setIsClient] = useState(false)
+  
+  // Selection state for when no sequenceId is provided
+  const [availableSequences, setAvailableSequences] = useState<{id: string, name: string}[]>([])
+  const [selectedSequenceId, setSelectedSequenceId] = useState<string | null>(null)
 
   useEffect(() => {
     setIsClient(true)
   }, [])
 
-  const fetchIntel = useCallback(async () => {
-    if (!sequenceId) return
+  // Sync internal selected ID with prop
+  useEffect(() => {
+    if (sequenceId) {
+      setSelectedSequenceId(sequenceId)
+    }
+  }, [sequenceId])
+
+  const fetchProtocols = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('sequences')
+        .select('id, name')
+        .order('name', { ascending: true })
+
+      if (error) throw error
+      setAvailableSequences(data || [])
+    } catch (err) {
+      console.error('Error fetching sequences:', err)
+    }
+  }, [])
+
+  const fetchIntel = useCallback(async (targetId: string) => {
+    if (!targetId) return
 
     setLoading(true)
     setError(null)
@@ -81,7 +107,7 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
         throw new Error('Please log in again. Session token is missing.')
       }
 
-      const response = await fetch(`/api/protocols/${sequenceId}/sequence-intel`, {
+      const response = await fetch(`/api/protocols/${targetId}/sequence-intel`, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -105,13 +131,17 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
     } finally {
       setLoading(false)
     }
-  }, [sequenceId])
+  }, [])
 
   useEffect(() => {
     if (isOpen) {
-      fetchIntel()
+      if (selectedSequenceId) {
+        fetchIntel(selectedSequenceId)
+      } else {
+        fetchProtocols()
+      }
     }
-  }, [isOpen, fetchIntel])
+  }, [isOpen, selectedSequenceId, fetchIntel, fetchProtocols])
 
   const formatTimestamp = (value?: string | null) => {
     if (!value) return '-'
@@ -146,20 +176,37 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-5 border-b border-white/10 bg-black/30 flex items-center justify-between">
-              <div>
-                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Sequence Intel</div>
-                {loading ? (
-                  <div className="h-5 w-48 bg-white/10 rounded animate-pulse mt-1" />
-                ) : (
-                  <div className="text-lg font-semibold tracking-tight text-zinc-100 mt-1">
-                    {name || `Protocol ${sequenceId?.toString().slice(0, 8)}...`}
-                  </div>
-                )}
+              <div className="flex-1 flex items-center gap-6">
+                <div>
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Sequence Intel</div>
+                  {loading ? (
+                    <div className="h-5 w-48 bg-white/10 rounded animate-pulse mt-1" />
+                  ) : (
+                    <div className="text-lg font-semibold tracking-tight text-zinc-100 mt-1">
+                      {name || 'Select Protocol'}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="h-8 w-px bg-white/5 mx-2" />
+                  <select
+                    className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs font-mono text-zinc-300 focus:outline-none focus:border-[#002FA7] transition-colors cursor-pointer"
+                    value={selectedSequenceId || ''}
+                    onChange={(e) => setSelectedSequenceId(e.target.value)}
+                  >
+                    <option value="" disabled>Switch Protocol</option>
+                    {availableSequences.map(seq => (
+                      <option key={seq.id} value={seq.id}>{seq.name}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
+
               <div className="flex items-center gap-2">
                 <button
-                  onClick={fetchIntel}
-                  disabled={loading}
+                  onClick={() => selectedSequenceId && fetchIntel(selectedSequenceId)}
+                  disabled={loading || !selectedSequenceId}
                   className="icon-button-forensic h-9 px-3 rounded-xl border border-white/10 bg-white/5 text-zinc-300 hover:text-white hover:bg-white/10 transition-all disabled:opacity-50 flex items-center text-[10px] font-mono uppercase tracking-wider"
                 >
                   <RotateCcw className={cn('w-3.5 h-3.5 mr-2', loading && 'animate-spin')} />
@@ -188,31 +235,31 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                   <>
                     <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
                       <div className="text-[9px] font-mono text-zinc-500 uppercase">Members</div>
-                      <div className="text-sm font-mono text-zinc-100 tabular-nums">{summary!.totalMembers}</div>
+                      <div className="text-sm font-mono text-zinc-100 tabular-nums">{summary?.totalMembers ?? 0}</div>
                     </div>
                     <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
                       <div className="text-[9px] font-mono text-zinc-500 uppercase">Active</div>
-                      <div className="text-sm font-mono text-emerald-400 tabular-nums">{summary!.activeMembers}</div>
+                      <div className="text-sm font-mono text-emerald-400 tabular-nums">{summary?.activeMembers ?? 0}</div>
                     </div>
                     <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
                       <div className="text-[9px] font-mono text-zinc-500 uppercase">Paused</div>
-                      <div className="text-sm font-mono text-amber-400 tabular-nums">{summary!.pausedMembers}</div>
+                      <div className="text-sm font-mono text-amber-400 tabular-nums">{summary?.pausedMembers ?? 0}</div>
                     </div>
                     <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
                       <div className="text-[9px] font-mono text-zinc-500 uppercase">Completed</div>
-                      <div className="text-sm font-mono text-zinc-100 tabular-nums">{summary!.completedMembers}</div>
+                      <div className="text-sm font-mono text-zinc-100 tabular-nums">{summary?.completedMembers ?? 0}</div>
                     </div>
                     <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
                       <div className="text-[9px] font-mono text-zinc-500 uppercase">Queued</div>
-                      <div className="text-sm font-mono text-sky-400 tabular-nums">{summary!.queuedExecutions}</div>
+                      <div className="text-sm font-mono text-sky-400 tabular-nums">{summary?.queuedExecutions ?? 0}</div>
                     </div>
                     <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
                       <div className="text-[9px] font-mono text-zinc-500 uppercase">Running</div>
-                      <div className="text-sm font-mono text-[#002FA7] tabular-nums">{summary!.runningExecutions}</div>
+                      <div className="text-sm font-mono text-[#002FA7] tabular-nums">{summary?.runningExecutions ?? 0}</div>
                     </div>
                     <div className="bg-black/40 border border-white/5 rounded-lg p-2.5">
                       <div className="text-[9px] font-mono text-zinc-500 uppercase">Failed</div>
-                      <div className="text-sm font-mono text-red-400 tabular-nums">{summary!.failedExecutions}</div>
+                      <div className="text-sm font-mono text-red-400 tabular-nums">{summary?.failedExecutions ?? 0}</div>
                     </div>
                   </>
                 )}
