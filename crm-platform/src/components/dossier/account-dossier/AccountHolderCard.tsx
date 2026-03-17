@@ -160,7 +160,7 @@ export function AccountHolderCard({
                 openContactDossier()
               }
             }}
-            className="group flex items-center gap-3 rounded-xl p-2 -mx-2 cursor-pointer hover:bg-white/[0.03] transition-all outline-none focus-visible:ring-1 focus-visible:ring-[#002FA7]/50"
+            className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-[#002FA7]/50"
             title="Open contact dossier"
           >
             <ContactAvatar
