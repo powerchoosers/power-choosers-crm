@@ -116,12 +116,12 @@ export function EmailList({
   const skeletonRows = Array.from({ length: skeletonRowCount }).map((_, idx) => (
     <div
       key={`skeleton-${idx}`}
-      className="grid grid-cols-12 gap-3 px-2 py-2.5 border-l-2 border-l-transparent border-b border-white/5 bg-zinc-950/30 animate-pulse"
+      className="grid grid-cols-12 gap-1.5 px-1.5 py-2.5 border-l-2 border-l-transparent border-b border-white/5 bg-zinc-950/30 animate-pulse"
     >
       <div className="col-span-1 flex items-center justify-center">
         <span className="h-3.5 w-3.5 rounded bg-white/10" />
       </div>
-      <div className="col-span-1 flex justify-center">
+      <div className="col-span-1 flex justify-start pl-1">
         <span className="h-7 w-7 rounded-[10px] bg-white/5" />
       </div>
       <div className="col-span-3 space-y-1.5">
@@ -337,7 +337,7 @@ export function EmailList({
       </div>
 
       {/* Column Headers */}
-      <div className="flex-none px-2 py-2.5 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-3 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+      <div className="flex-none px-1.5 py-2.5 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-1.5 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
         <div className="col-span-1 flex items-center justify-center">
           {onSelectionChange ? (
             <button
@@ -386,7 +386,7 @@ export function EmailList({
                 ? extractEmailAddress(String(toList[0] || ''))
                 : extractEmailAddress(String(email.from || ''))
               const channel = resolveEmailChannel(email)
-              const primaryContact = (email.contactId ? contactById[email.contactId] : undefined) || contactByEmail[primaryEmail]
+              const primaryContact = (email.contact || (email.contactId ? contactById[email.contactId] : undefined)) || contactByEmail[primaryEmail]
               const recipientLabels = toList
                 .map((raw, idx) => {
                   const addr = extractEmailAddress(String(raw || ''))
@@ -405,7 +405,7 @@ export function EmailList({
                   key={email.id}
                   onClick={() => onSelectEmail(email)}
                 className={cn(
-                  "group grid grid-cols-12 gap-3 px-2 py-2.5 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
+                  "group grid grid-cols-12 gap-1.5 px-1.5 py-2.5 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
                   hasClicks ? "border-l-[#002FA7]" : selectedEmailId === email.id ? "border-l-[#002FA7]" : "border-l-transparent",
                   email.unread ? "bg-[#002FA7]/8" : "",
                   isSelected ? "selected-container shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
@@ -440,7 +440,7 @@ export function EmailList({
                     )}
                   </div>
                   {/* Avatar Icon */}
-                  <div className="col-span-1 flex justify-center relative">
+                  <div className="col-span-1 flex justify-start pl-1 relative">
                     {email.unread && (
                       <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
                     )}
@@ -474,7 +474,7 @@ export function EmailList({
                   </div>
 
                   {/* Participant */}
-                  <div className="col-span-3 min-w-0 -ml-1">
+                  <div className="col-span-3 min-w-0">
                     <div className="flex items-center gap-1.5">
                       {primaryContact && onOpenContact ? (
                         <button
