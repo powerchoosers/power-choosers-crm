@@ -39,7 +39,8 @@ function normalizeNumber(value: unknown): number {
 
 function pickExecutionLabel(
   execution: Record<string, any> | undefined,
-  nodeMap: Map<string, string>
+  nodeMap: Map<string, string>,
+  stepsArray: Array<{ label?: string }>
 ): string | null {
   if (!execution) return null;
 
@@ -66,8 +67,10 @@ function pickExecutionLabel(
     return nodeMap.get(nodeId) || null;
   }
 
-  if (typeof execution.step_type === 'string' && execution.step_type.trim()) {
-    return execution.step_type;
+  // Fall back to steps[step_index].label if available
+  const stepIndex = execution.step_index;
+  if (typeof stepIndex === 'number' && stepsArray[stepIndex]?.label) {
+    return stepsArray[stepIndex].label as string;
   }
 
   return null;
@@ -96,7 +99,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { data: sequence, error: sequenceError } = await supabaseAdmin
       .from('sequences')
-      .select('id, name, bgvector')
+      .select('id, name, bgvector, steps')
       .eq('id', sequenceId)
       .single();
 
@@ -113,6 +116,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const label = typeof node?.data?.label === 'string' ? node.data.label : null;
       if (nodeId && label) nodeLabelMap.set(nodeId, label);
     }
+
+    // Build index-based label lookup from the steps array
+    const stepsArray: Array<{ label?: string }> = Array.isArray((sequence as any)?.steps) ? (sequence as any).steps : [];
 
     const { data: members, error: membersError } = await supabaseAdmin
       .from('sequence_members')
@@ -169,7 +175,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: executions, error: executionsError } = memberIds.length
       ? await supabaseAdmin
           .from('sequence_executions')
-          .select('id, member_id, step_type, status, scheduled_at, created_at, metadata')
+          .select('id, member_id, step_type, step_index, status, scheduled_at, created_at, metadata')
           .eq('sequence_id', sequenceId)
           .in('member_id', memberIds)
           .order('created_at', { ascending: false })
@@ -226,7 +232,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         executionStatus: execution?.status || null,
         executionStepType: execution?.step_type || null,
         executionScheduledAt: execution?.scheduled_at || null,
-        executionLabel: pickExecutionLabel(execution, nodeLabelMap),
+        executionLabel: pickExecutionLabel(execution, nodeLabelMap, stepsArray),
       };
     });
 
