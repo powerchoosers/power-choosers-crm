@@ -109,48 +109,40 @@ export function useRemoveContactFromProtocol() {
 
   return useMutation({
     mutationFn: async ({ contactId, membershipId }: { contactId: string; membershipId: string }) => {
-      // Read sequence linkage before delete so we can clean orphaned protocol tasks.
-      const { data: memberRow } = await supabase
-        .from('sequence_members')
-        .select('id, sequenceId, targetId')
-        .eq('id', membershipId)
-        .single()
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData?.session?.access_token
+      if (!token) throw new Error('Please log in again. Session token is missing.')
 
-      const { error } = await supabase
-        .from('sequence_members')
-        .delete()
-        .eq('id', membershipId)
+      const response = await fetch('/api/protocols/remove-contact', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ contactId, membershipId }),
+      })
 
-      if (error) throw error
-
-      // Immediate client-side cleanup so stale protocol tasks disappear without waiting on background sync.
-      await supabase
-        .from('tasks')
-        .delete()
-        .eq('contactId', contactId)
-        .eq('priority', 'Protocol')
-        .eq('metadata->>source', 'sequence')
-        .filter('metadata->>memberId', 'eq', membershipId)
-
-      if (memberRow?.sequenceId) {
-        await supabase
-          .from('tasks')
-          .delete()
-          .eq('contactId', contactId)
-          .eq('priority', 'Protocol')
-          .eq('metadata->>source', 'sequence')
-          .filter('metadata->>sequenceId', 'eq', memberRow.sequenceId)
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to remove contact from protocol')
       }
+
+      return payload
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['contact-protocol-memberships', variables.contactId] })
       queryClient.invalidateQueries({ queryKey: ['protocols'] })
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === variables.contactId })
       queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-count'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-metrics'] })
+      queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] })
+      queryClient.invalidateQueries({ queryKey: ['forensic-tasks'] })
+      toast.success('Contact removed from protocol and sequence tasks cleaned up')
     },
     onError: (error: Error) => {
       console.error('Error removing contact from protocol:', error)
-      toast.error('Failed to remove contact from protocol')
+      toast.error(error.message || 'Failed to remove contact from protocol')
     }
   })
 }
