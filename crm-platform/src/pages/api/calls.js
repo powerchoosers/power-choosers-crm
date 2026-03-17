@@ -292,24 +292,56 @@ export async function upsertCallInSupabase(payload) {
   // CRM context passthrough
   let finalContactId = payload.contactId != null ? payload.contactId : current.contactId;
   let finalContactName = payload.contactName != null ? payload.contactName : current.contactName;
+  let finalAccountId = payload.accountId != null ? payload.accountId : current.accountId;
 
-  // AUTO-LINKING: If no contact is linked, try to find one by phone number
-  if (!finalContactId && (payload.to || payload.from)) {
-    const phoneCandidates = [payload.to, payload.from].filter(p => p && p.length > 5);
-    for (const phone of phoneCandidates) {
-      const { data: match } = await supabaseAdmin
-        .from('contacts')
-        .select('id, name')
-        .or(`mobile.eq.${phone},workPhone.eq.${phone},phone.eq.${phone},otherPhone.eq.${phone}`)
-        .limit(1)
-        .maybeSingle();
+  // AUTO-LINKING: If no contact/account is linked, try to find records by normalized phone digits.
+  // This handles format mismatches like "+1 (956)-477-6081" vs "+19564776081".
+  if (!finalContactId || !finalAccountId) {
+    const candidates = [
+      payload.targetPhone,
+      payload.to,
+      payload.from,
+      current.targetPhone,
+      current.to,
+      current.from
+    ]
+      .map(norm10)
+      .filter(Boolean);
 
-      if (match) {
-        finalContactId = match.id;
-        finalContactName = match.name;
-        logger.log(`[Calls API] Auto-linked call ${primaryId} to contact ${match.name} (${match.id}) via phone ${phone}`);
-        break;
+    const phoneCandidates = [...new Set(candidates)];
+
+    for (const digits of phoneCandidates) {
+      if (!finalContactId) {
+        const { data: contactMatch } = await supabaseAdmin
+          .from('contacts')
+          .select('id, name, accountId')
+          .or(`mobile.ilike.%${digits},workPhone.ilike.%${digits},phone.ilike.%${digits},otherPhone.ilike.%${digits},companyPhone.ilike.%${digits}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (contactMatch) {
+          finalContactId = contactMatch.id;
+          finalContactName = contactMatch.name;
+          if (!finalAccountId && contactMatch.accountId) finalAccountId = contactMatch.accountId;
+          logger.log(`[Calls API] Auto-linked call ${primaryId} to contact ${contactMatch.name} (${contactMatch.id}) via phone ${digits}`);
+        }
       }
+
+      if (!finalAccountId) {
+        const { data: accountMatch } = await supabaseAdmin
+          .from('accounts')
+          .select('id, name')
+          .or(`phone.ilike.%${digits}`)
+          .limit(1)
+          .maybeSingle();
+
+        if (accountMatch) {
+          finalAccountId = accountMatch.id;
+          logger.log(`[Calls API] Auto-linked call ${primaryId} to account ${accountMatch.name || accountMatch.id} via phone ${digits}`);
+        }
+      }
+
+      if (finalContactId && finalAccountId) break;
     }
   }
 
@@ -337,7 +369,7 @@ export async function upsertCallInSupabase(payload) {
     conversationalIntelligence: (payload.conversationalIntelligence != null ? payload.conversationalIntelligence : (payload.aiInsights && payload.aiInsights.conversationalIntelligence)) != null ? (payload.conversationalIntelligence || (payload.aiInsights && payload.aiInsights.conversationalIntelligence)) : current.conversationalIntelligence,
 
     // CRM context passthrough
-    accountId: payload.accountId != null ? payload.accountId : current.accountId,
+    accountId: finalAccountId,
     accountName: payload.accountName != null ? payload.accountName : current.accountName,
     contactId: finalContactId,
     contactName: finalContactName,
