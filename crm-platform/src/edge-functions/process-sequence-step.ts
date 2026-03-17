@@ -358,6 +358,10 @@ async function handleSend(execution, job) {
             updated_at = NOW()
         WHERE id = ${execution.id}
       `
+            // Advance past this email node so the member doesn't get permanently
+            // stuck at current_node_id with no pending execution. The next step
+            // (Day 2 call) is a human gate — the rep can decide what to do.
+            await skipNode(execution, job);
             return;
         }
     }
