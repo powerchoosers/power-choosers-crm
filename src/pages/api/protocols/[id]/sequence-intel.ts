@@ -23,6 +23,9 @@ type SequenceIntelRow = {
   executionScheduledAt: string | null;
   executionLabel: string | null;
   avatarUrl: string | null;
+  accountId: string | null;
+  accountDomain: string | null;
+  accountLogoUrl: string | null;
 };
 
 function normalizeNumber(value: unknown): number {
@@ -155,7 +158,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: accounts, error: accountsError } = accountIds.length
       ? await supabaseAdmin
           .from('accounts')
-          .select('id, name')
+          .select('id, name, domain, logo_url')
           .in('id', accountIds)
       : { data: [], error: null };
 
@@ -211,7 +214,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         email: contact?.email || null,
         title: contact?.title || null,
         avatarUrl: resolveContactPhotoUrl(contact, contact?.metadata) || null,
-        accountName: account?.name || null,
+        accountId: contact?.accountId || null,
+        accountName: (account as any)?.name || null,
+        accountDomain: (account as any)?.domain || null,
+        accountLogoUrl: (account as any)?.logo_url || null,
         updatedAt: member.updatedAt || null,
         totalEmailsSent: normalizeNumber(member.total_emails_sent),
         totalOpens: normalizeNumber(member.total_opens),
