@@ -347,9 +347,10 @@ export default function EmailDetailPage() {
     : ((email?.contactId ? contactById[email.contactId] : undefined) || contactByEmail[fromAddressKey])
   const toResolved = toList.map((raw: string | null | undefined) => {
     const key = extractEmailAddress(String(raw || ''))
+    const contactFromId = isOutboundEmail && email?.contactId ? contactById[email.contactId] : undefined
     return {
       raw: String(raw || ''),
-      contact: contactByEmail[key],
+      contact: contactFromId || contactByEmail[key],
       key,
     }
   })
@@ -1181,7 +1182,9 @@ export default function EmailDetailPage() {
                       ? threadEmail.to
                       : String(threadEmail.to || '').split(',').map((s: string) => s.trim()).filter(Boolean)
                     const firstToAddr = extractEmailAddress(toRawList[0] || '')
-                    const firstToContact = firstToAddr ? contactByEmail[firstToAddr] : undefined
+                    const firstToContact = threadIsOutbound && threadEmail.contactId
+                      ? contactById[threadEmail.contactId]
+                      : (firstToAddr ? contactByEmail[firstToAddr] : undefined)
                     const recipientLabel = firstToContact?.displayName || firstToAddr || toRawList[0] || ''
                     const recipientSuffix = toRawList.length > 1 ? ` +${toRawList.length - 1}` : ''
                     const inlineRecipient = recipientLabel ? `${recipientLabel}${recipientSuffix}` : ''
@@ -1304,6 +1307,21 @@ export default function EmailDetailPage() {
                               <p className="text-sm text-zinc-400 line-clamp-3">
                                 {snippet}
                               </p>
+                            )}
+                            {threadIsOutbound && firstToContact?.displayName && (
+                              <div className="text-[10px] font-mono text-zinc-500">
+                                Recipient: <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/network/contacts/${firstToContact.id}`)
+                                  }}
+                                  className="text-zinc-300 hover:text-white underline-offset-4 hover:underline"
+                                  title={`Open ${firstToContact.displayName} dossier`}
+                                >
+                                  {firstToContact.displayName}
+                                </button>
+                              </div>
                             )}
                           </div>
                           <motion.span
