@@ -308,7 +308,7 @@ export default function TargetOverviewPage() {
         </div>
 
         {/* Scrollable Content Area */}
-        <div className="flex-1 min-h-0 overflow-y-auto p-6 scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll relative z-0">
+        <div className="flex-1 min-h-0 overflow-auto p-6 scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll relative z-0">
           {isLoading ? (
             <TargetSkeleton />
           ) : (
