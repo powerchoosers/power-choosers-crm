@@ -387,13 +387,16 @@ export function EmailList({
                 : extractEmailAddress(String(email.from || ''))
               const channel = resolveEmailChannel(email)
               const primaryContact = (email.contactId ? contactById[email.contactId] : undefined) || contactByEmail[primaryEmail]
-              const recipientLabels = toList.map((raw) => {
-                const addr = extractEmailAddress(String(raw || ''))
-                const matched = contactByEmail[addr]
-                return matched?.displayName || String(raw || '')
-              })
+              const recipientLabels = toList
+                .map((raw, idx) => {
+                  const addr = extractEmailAddress(String(raw || ''))
+                  if (idx === 0 && primaryContact?.displayName) return primaryContact.displayName
+                  const matched = contactByEmail[addr]
+                  return matched?.displayName || addr || String(raw || '')
+                })
+                .filter(Boolean)
               const participantLabel = isOutbound
-                ? `To: ${recipientLabels.join(', ')}`
+                ? `To: ${(recipientLabels.length ? recipientLabels : [primaryContact?.displayName || primaryEmail || 'Unknown recipient']).join(', ')}`
                 : (primaryContact?.displayName || email.from)
               const fallbackDomain = primaryEmail.includes('@') ? primaryEmail.split('@')[1] : undefined
 
