@@ -425,15 +425,23 @@ async function handleSend(execution, job) {
 
         // Update to 'waiting' state
         await sql`
-       UPDATE sequence_executions 
-       SET status = 'waiting', 
+       UPDATE sequence_executions
+       SET status = 'waiting',
            wait_until = NOW() + (${delayVal} || ' ' || ${delayUnit})::INTERVAL,
            metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({
             messageId: result.messageId,
             sentAt: new Date().toISOString(),
             from: fromEmail
-        })}::jsonb 
+        })}::jsonb
        WHERE id = ${execution.id}
+    `
+
+        // Increment total_emails_sent on the sequence member now that the send succeeded
+        await sql`
+       UPDATE sequence_members
+       SET total_emails_sent = COALESCE(total_emails_sent, 0) + 1,
+           "updatedAt" = NOW()
+       WHERE id = ${execution.member_id}
     `
     } else {
         const errorText = await response.text().catch(() => '');
