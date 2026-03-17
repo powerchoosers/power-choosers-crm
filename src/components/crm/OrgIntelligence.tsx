@@ -978,7 +978,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         syncContactCachesImmediately(
           crmId,
           assignedImmediatePhones.patch,
-          contactData.metadata as Record<string, unknown>
+          contactBaseData.metadata as Record<string, unknown>
         );
       }
 
