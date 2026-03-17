@@ -212,6 +212,15 @@ export function EmailList({
     )
   }
 
+  const resolveEmailChannel = (em: Email): { label: string; isMain: boolean } => {
+    const isOutboundEmail = em.type === 'sent' || em.type === 'scheduled'
+    const channelAddr = isOutboundEmail
+      ? String(em.from || '').toLowerCase()
+      : String(em.ownerId || '').toLowerCase()
+    if (channelAddr.includes('getnodalpoint')) return { label: 'GNP', isMain: false }
+    return { label: 'NP', isMain: true }
+  }
+
   const formatDate = (dateString: string | number | undefined) => {
     if (!dateString) return null;
     try {
@@ -345,7 +354,8 @@ export function EmailList({
         </div>
         <div className="col-span-1" />
         <div className="col-span-3">Entity</div>
-        <div className={filter === 'sent' || filter === 'scheduled' ? "col-span-3" : "col-span-5"}>Transmission</div>
+        <div className="col-span-1">Channel</div>
+        <div className={filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4"}>Transmission</div>
         {filter === 'sent' && <div className="col-span-2">Telemetry</div>}
         {filter === 'scheduled' && <div className="col-span-2">Review</div>}
         <div className="col-span-2 text-right">Timestamp</div>
@@ -375,6 +385,7 @@ export function EmailList({
               const primaryEmail = isOutbound
                 ? extractEmailAddress(String(toList[0] || ''))
                 : extractEmailAddress(String(email.from || ''))
+              const channel = resolveEmailChannel(email)
               const primaryContact = (email.contactId ? contactById[email.contactId] : undefined) || contactByEmail[primaryEmail]
               const recipientLabels = toList.map((raw) => {
                 const addr = extractEmailAddress(String(raw || ''))
@@ -490,8 +501,20 @@ export function EmailList({
                     </div>
                   </div>
 
+                  {/* Channel Badge */}
+                  <div className="col-span-1 flex items-center">
+                    <span className={cn(
+                      "text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border whitespace-nowrap",
+                      channel.isMain
+                        ? "text-zinc-500 border-zinc-700/60 bg-transparent"
+                        : "text-sky-400 border-sky-700/40 bg-sky-950/20"
+                    )}>
+                      {channel.label}
+                    </span>
+                  </div>
+
                   {/* Message Preview */}
-                  <div className={cn("min-w-0 space-y-1", filter === 'sent' || filter === 'scheduled' ? "col-span-3" : "col-span-5")}>
+                  <div className={cn("min-w-0 space-y-1", filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4")}>
                     <div className="flex items-center gap-2">
                       <h4 className={cn(
                         "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1",
