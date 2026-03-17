@@ -79,6 +79,7 @@ export default function EmailsPage() {
   const contactIds = useMemo(() =>
     emails.map((email) => email.contactId).filter(Boolean) as string[],
   [emails])
+  const { data: contactById = {} } = useContactIdentityMapByIds(contactIds)
   const effectiveTotal =
     emailFilter === 'sent'
       ? (emailTypeCounts?.sent ?? emails.length)
