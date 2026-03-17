@@ -53,9 +53,9 @@ export function useContactIdentityMapByIds(contactIds: Array<string | null | und
       return map
     },
     enabled: !loading && normalizedIds.length > 0 && !!user,
-    staleTime: 1000 * 60 * 30,
-    gcTime: 1000 * 60 * 60,
-    refetchOnMount: false,
+    staleTime: 1000 * 60 * 5,
+    gcTime: 1000 * 60 * 30,
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
     retry: 1,
     placeholderData: (previousData) => previousData,
