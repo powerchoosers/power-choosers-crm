@@ -276,8 +276,9 @@
     contain: paint;
     /* Improves scroll performance by containing repaints */
     will-change: scroll-position;
-    overflow-x: hidden;
-    /* Hard-lock horizontal axis — no drift, no rubber-band */
+    /* overflow-x is intentionally NOT locked here — use overflow-x-hidden Tailwind class
+       on containers that should never scroll horizontally (sidebar, panels). Table pages
+       need overflow-auto so their wide tables can scroll left/right. */
   }
 
   .np-scroll::-webkit-scrollbar {

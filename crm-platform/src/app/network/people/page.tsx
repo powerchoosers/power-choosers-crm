@@ -656,7 +656,7 @@ export default function PeoplePage() {
       />
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
           <Table>
             <DndContext
               sensors={sensors}
