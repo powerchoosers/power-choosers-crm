@@ -131,11 +131,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const nodes = Array.isArray(sequence?.bgvector?.nodes) ? sequence.bgvector.nodes : [];
     const edges = Array.isArray(sequence?.bgvector?.edges) ? sequence.bgvector.edges : [];
     const nodeLabelMap = new Map<string, string>();
+    const nodeIdByLabelMap = new Map<string, string>();
     for (const node of nodes) {
       if (!node || typeof node !== 'object') continue;
       const nodeId = typeof node.id === 'string' ? node.id : null;
       const label = typeof node?.data?.label === 'string' ? node.data.label : null;
       if (nodeId && label) nodeLabelMap.set(nodeId, label);
+      if (nodeId && label && !nodeIdByLabelMap.has(label)) nodeIdByLabelMap.set(label, nodeId);
     }
 
     // Build index-based label lookup from the steps array
@@ -229,12 +231,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const account = contact?.accountId ? accountById.get(contact.accountId) : null;
       const execution = latestExecutionByMember.get(member.id);
       const currentNodeId = typeof member.current_node_id === 'string' ? member.current_node_id : null;
+      const executionLabel = pickExecutionLabel(execution, nodeLabelMap, stepsArray);
+      const currentNodeLabel = currentNodeId
+        ? nodeLabelMap.get(currentNodeId) || null
+        : executionLabel || null;
 
       return {
         memberId: member.id,
         memberStatus: member.status || null,
         currentNodeId,
-        currentNodeLabel: currentNodeId ? nodeLabelMap.get(currentNodeId) || null : null,
+        currentNodeLabel,
         contactId: member.targetId || null,
         firstName: contact?.firstName || null,
         lastName: contact?.lastName || null,
@@ -253,12 +259,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         executionStatus: execution?.status || null,
         executionStepType: execution?.step_type || null,
         executionScheduledAt: execution?.scheduled_at || null,
-        executionLabel: pickExecutionLabel(execution, nodeLabelMap, stepsArray),
+        executionLabel,
         nextActionLabel: (() => {
           const anchorNodeId =
             currentNodeId ||
             (typeof execution?.metadata?.nodeId === 'string' ? execution.metadata.nodeId : null) ||
             (typeof execution?.metadata?.node_id === 'string' ? execution.metadata.node_id : null) ||
+            (executionLabel ? nodeIdByLabelMap.get(executionLabel) || null : null) ||
             null;
           const nextNodeId = pickNextNodeId(anchorNodeId, edges);
           return nextNodeId ? nodeLabelMap.get(nextNodeId) || null : null;
