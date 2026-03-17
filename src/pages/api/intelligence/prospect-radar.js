@@ -32,7 +32,7 @@ export default async function handler(req, res) {
 
     const { data: rawData, error } = await supabaseAdmin
       .from('prospect_radar')
-      .select('id, apollo_org_id, name, domain, logo_url, industry, employee_count, annual_revenue_printed, city, state, tdsp_zone, phone, linkedin_url, description, website, discovered_at')
+      .select('id, apollo_org_id, name, domain, logo_url, industry, employee_count, annual_revenue_printed, city, state, address, zip, tdsp_zone, phone, linkedin_url, description, website, discovered_at')
       .is('dismissed_at', null)
       .is('ingested_at', null)
       .order('discovered_at', { ascending: false })

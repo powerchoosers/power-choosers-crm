@@ -4,7 +4,9 @@
  * marks the prospect as ingested, and returns the new account ID.
  */
 import { supabaseAdmin, requireUser } from '@/lib/supabase';
+import { buildProspectServiceAddresses, enrichApolloOrganizationByDomain, formatProspectLocationLabel, normalizeOrganizationName } from '@/lib/apollo-prospect';
 import { cors } from '../_cors.js';
+import { getApiKey } from '../apollo/_utils.js';
 
 export default async function handler(req, res) {
   if (cors(req, res)) return;
@@ -43,6 +45,8 @@ export default async function handler(req, res) {
 
     const now = new Date().toISOString();
     const domain = (prospect.domain || '').toLowerCase().trim() || null;
+    const apiKey = getApiKey();
+    const enrichedOrg = domain ? await enrichApolloOrganizationByDomain({ domain }, apiKey) : null;
 
     // Duplicate check: domain first, then name
     let existingId = null;
@@ -51,51 +55,63 @@ export default async function handler(req, res) {
       if (data) existingId = data.id;
     }
     if (!existingId && prospect.name) {
-      const { data } = await supabaseAdmin.from('accounts').select('id').ilike('name', prospect.name).maybeSingle();
+      const { data } = await supabaseAdmin.from('accounts').select('id').ilike('name', normalizeOrganizationName(prospect.name) || prospect.name).maybeSingle();
       if (data) existingId = data.id;
     }
 
     const accountId = existingId || crypto.randomUUID();
 
-    // Build service_addresses with full street address from Apollo
-    const fullAddress = prospect.address || '';
-    const serviceAddresses = [];
-    if (prospect.city || prospect.state || fullAddress) {
-      serviceAddresses.push({
-        address: fullAddress,
-        city: prospect.city || '',
-        state: prospect.state || '',
-        country: 'United States',
-        type: 'headquarters',
-        isPrimary: true,
-      });
-    }
+    const accountName = normalizeOrganizationName(enrichedOrg?.name || prospect.name || '') || prospect.name;
+    const accountIndustry = enrichedOrg?.industry || enrichedOrg?.industry_category || (enrichedOrg?.industries || [])[0] || prospect.industry || null;
+    const accountCity = enrichedOrg?.city || enrichedOrg?.organization_city || prospect.city || null;
+    const accountState = enrichedOrg?.state || enrichedOrg?.organization_state || prospect.state || null;
+    const accountAddress = enrichedOrg?.formatted_address || enrichedOrg?.raw_address || enrichedOrg?.street_address || enrichedOrg?.organization_raw_address || enrichedOrg?.organization_street_address || prospect.address || null;
+    const accountZip = enrichedOrg?.postal_code || enrichedOrg?.organization_postal_code || prospect.zip || null;
+    const accountWebsite = enrichedOrg?.website_url || prospect.website || (domain ? `https://${domain}` : null);
+    const accountPhone = enrichedOrg?.phone || enrichedOrg?.sanitized_phone || enrichedOrg?.primary_phone?.number || prospect.phone || null;
+    const accountLinkedIn = enrichedOrg?.linkedin_url || prospect.linkedin_url || null;
+    const accountLogo = enrichedOrg?.logo_url || prospect.logo_url || null;
+    const accountDescription = enrichedOrg?.short_description || enrichedOrg?.seo_description || prospect.description || null;
+    const accountEmployees = enrichedOrg?.estimated_num_employees || enrichedOrg?.employee_count || prospect.employee_count || null;
+    const accountRevenue = enrichedOrg?.annual_revenue_printed || enrichedOrg?.organization_revenue_printed || prospect.annual_revenue_printed || null;
+    const serviceAddresses = buildProspectServiceAddresses({
+      address: accountAddress,
+      city: accountCity,
+      state: accountState,
+      country: enrichedOrg?.country || null,
+    });
 
     // Build meters entry with full address (mirrors OrgIntelligence enrichment flow)
-    const meters = fullAddress || prospect.city ? [{
+    const fullAddress = formatProspectLocationLabel({
+      address: accountAddress,
+      city: accountCity,
+      state: accountState,
+      zip: accountZip,
+    });
+    const meters = fullAddress && fullAddress !== 'Unknown Location' ? [{
       id: crypto.randomUUID(),
       esiId: '',
-      address: fullAddress || [prospect.city, prospect.state, 'United States'].filter(Boolean).join(', '),
+      address: fullAddress,
       rate: '',
       endDate: '',
     }] : [];
 
     const payload = {
-      name: prospect.name,
+      name: accountName,
       domain: domain,
-      website: prospect.website || (domain ? `https://${domain}` : null),
-      industry: prospect.industry || null,
-      description: prospect.description || null,
-      employees: prospect.employee_count || null,
-      revenue: prospect.annual_revenue_printed || null,
-      city: prospect.city || null,
-      state: prospect.state || null,
-      country: 'United States',
-      address: fullAddress || null,
-      zip: prospect.zip || null,
-      logo_url: prospect.logo_url || null,
-      phone: prospect.phone || null,
-      linkedin_url: prospect.linkedin_url || null,
+      website: accountWebsite,
+      industry: accountIndustry,
+      description: accountDescription,
+      employees: accountEmployees,
+      revenue: accountRevenue,
+      city: accountCity,
+      state: accountState,
+      country: enrichedOrg?.country || null,
+      address: accountAddress || null,
+      zip: accountZip,
+      logo_url: accountLogo,
+      phone: accountPhone,
+      linkedin_url: accountLinkedIn,
       ownerId: userId || null,
       status: 'active',
       service_addresses: serviceAddresses,
