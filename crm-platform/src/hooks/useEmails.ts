@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 
 export interface EmailAttachment {
   filename: string
@@ -12,6 +13,18 @@ export interface EmailAttachment {
   messageId?: string
   provider?: string
   downloadUnavailable?: boolean
+}
+
+export interface EmailContact {
+  id: string
+  email: string
+  displayName: string
+  name?: string | null
+  firstName?: string | null
+  lastName?: string | null
+  accountId?: string | null
+  metadata?: Record<string, any> | null
+  avatarUrl?: string | null
 }
 
 export interface Email {
@@ -37,6 +50,7 @@ export interface Email {
   attachments?: EmailAttachment[]
   metadata?: Record<string, any>
   scheduledSendTime?: string | null
+  contact?: EmailContact | null
 }
 
 const PAGE_SIZE = 50
@@ -154,7 +168,7 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
       try {
         let query: any = supabase
           .from('emails')
-          .select('*', { count: 'exact' })
+          .select('*, contact:contacts(id, email, name, firstName, lastName, accountId, metadata)', { count: 'exact' })
 
         if (role === 'admin') {
           // Admin sees all emails across all connected inboxes (nodalpoint.io, getnodalpoint.com, signal@)
@@ -235,7 +249,14 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
             clickCount: item.clickCount,
             attachments: item.attachments || item.metadata?.attachments,
             metadata: item.metadata || {},
-            scheduledSendTime: item.scheduledSendTime || null
+            scheduledSendTime: item.scheduledSendTime || null,
+            contact: item.contact
+              ? {
+                  ...item.contact,
+                  displayName: item.contact.name || [item.contact.firstName, item.contact.lastName].filter(Boolean).join(' ').trim() || item.contact.email,
+                  avatarUrl: resolveContactPhotoUrl(item.contact) || null,
+                }
+              : null
           }
         }) as Email[]
 

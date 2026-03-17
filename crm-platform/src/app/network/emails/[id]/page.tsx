@@ -344,10 +344,12 @@ export default function EmailDetailPage() {
   // Using it for fromContact would label the recipient as the sender in the header.
   const fromContact = isOutboundEmail
     ? contactByEmail[fromAddressKey]
-    : ((email?.contactId ? contactById[email.contactId] : undefined) || contactByEmail[fromAddressKey])
+    : ((email?.contact || (email?.contactId ? contactById[email.contactId] : undefined)) || contactByEmail[fromAddressKey])
   const toResolved = toList.map((raw: string | null | undefined) => {
     const key = extractEmailAddress(String(raw || ''))
-    const contactFromId = isOutboundEmail && email?.contactId ? contactById[email.contactId] : undefined
+    const contactFromId = isOutboundEmail
+      ? (email?.contact || (email?.contactId ? contactById[email.contactId] : undefined))
+      : undefined
     return {
       raw: String(raw || ''),
       contact: contactFromId || contactByEmail[key],
@@ -1172,7 +1174,7 @@ export default function EmailDetailPage() {
                     // resolve the sender's identity or the recipient ends up labeled as sender.
                     const fromContactEntry = threadIsOutbound
                       ? (fromKey ? contactByEmail[fromKey] : undefined)
-                      : ((threadEmail.contactId ? contactById[threadEmail.contactId] : undefined) || (fromKey ? contactByEmail[fromKey] : undefined))
+                      : ((threadEmail.contact || (threadEmail.contactId ? contactById[threadEmail.contactId] : undefined)) || (fromKey ? contactByEmail[fromKey] : undefined))
                     const parsedFrom = parseMailbox(threadEmail.from || '')
                     const displayName = threadIsOutbound
                       ? (agentName || 'You')
@@ -1183,7 +1185,7 @@ export default function EmailDetailPage() {
                       : String(threadEmail.to || '').split(',').map((s: string) => s.trim()).filter(Boolean)
                     const firstToAddr = extractEmailAddress(toRawList[0] || '')
                     const firstToContact = threadIsOutbound && threadEmail.contactId
-                      ? contactById[threadEmail.contactId]
+                      ? (threadEmail.contact || contactById[threadEmail.contactId])
                       : (firstToAddr ? contactByEmail[firstToAddr] : undefined)
                     const recipientLabel = firstToContact?.displayName || firstToAddr || toRawList[0] || ''
                     const recipientSuffix = toRawList.length > 1 ? ` +${toRawList.length - 1}` : ''
