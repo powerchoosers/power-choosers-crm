@@ -23,6 +23,36 @@ function extractValidEmail(value) {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(candidate) ? candidate : '';
 }
 
+function normalizeLookupText(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '');
+}
+
+function parseRecipientIdentity(value) {
+    const raw = String(value || '').trim();
+    const email = extractValidEmail(raw);
+    const display = email
+        ? raw.replace(/<\s*[^>]+\s*>/, '').trim()
+        : raw;
+    const normalizedDisplay = normalizeLookupText(display);
+    const normalizedEmail = normalizeLookupText(email);
+    const emailParts = email ? email.split('@') : ['', ''];
+    const localPart = emailParts[0] || '';
+    const domainPart = emailParts[1] || '';
+
+    return {
+        raw,
+        email,
+        display,
+        normalizedDisplay,
+        normalizedEmail,
+        localPart,
+        domainPart,
+        localCompact: normalizeLookupText(localPart),
+    };
+}
+
 function normalizeRecipientList(raw) {
     const values = Array.isArray(raw) ? raw : [raw];
     const normalized = values
@@ -46,18 +76,20 @@ function buildContactName(contact) {
 
 function buildContactCompany(contact) {
     const metadata = contact?.metadata && typeof contact.metadata === 'object' ? contact.metadata : {};
+    const account = Array.isArray(contact?.accounts) ? contact.accounts[0] : contact?.accounts;
     return (
         metadata?.company
         || metadata?.companyName
         || metadata?.general?.company
         || metadata?.general?.companyName
+        || account?.name
         || null
     );
 }
 
 async function resolveRecipientContact(ownerEmail, recipientEmail) {
-    const normalizedRecipient = extractValidEmail(recipientEmail);
-    if (!ownerEmail || !normalizedRecipient) {
+    const recipient = parseRecipientIdentity(recipientEmail);
+    if (!ownerEmail || (!recipient.email && !recipient.display)) {
         return { contactId: null, accountId: null, contactName: null, contactCompany: null };
     }
 
@@ -74,10 +106,26 @@ async function resolveRecipientContact(ownerEmail, recipientEmail) {
         // Best effort only.
     }
 
-    const { data: contacts, error } = await supabaseAdmin
+    const queryParts = [];
+    if (recipient.email) {
+        queryParts.push(`email.ilike.%${recipient.email}%`);
+        queryParts.push(`email.ilike.%${recipient.localPart}%`);
+        if (recipient.domainPart) {
+            queryParts.push(`email.ilike.%@${recipient.domainPart}%`);
+        }
+    }
+    if (recipient.display && recipient.display !== recipient.email) {
+        queryParts.push(`name.ilike.%${recipient.display}%`);
+        queryParts.push(`firstName.ilike.%${recipient.display}%`);
+        queryParts.push(`lastName.ilike.%${recipient.display}%`);
+    }
+
+    const contactQuery = supabaseAdmin
         .from('contacts')
-        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata')
-        .ilike('email', normalizedRecipient);
+        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts(name)')
+        .or(Array.from(new Set(queryParts)).join(','));
+
+    const { data: contacts, error } = await contactQuery;
 
     if (error) {
         logger.warn('[Zoho] Contact resolution failed:', error.message || error, 'zoho-send');
@@ -90,8 +138,41 @@ async function resolveRecipientContact(ownerEmail, recipientEmail) {
     }
 
     const ownerKey = normalizeOwnerKey(ownerEmail);
+    const scored = rows
+        .map((row) => {
+            const rowEmail = normalizeLookupText(row.email);
+            const rowName = normalizeLookupText(row.name);
+            const rowFullName = normalizeLookupText([row.firstName, row.lastName].filter(Boolean).join(' '));
+            const rowLocalPart = normalizeLookupText(String(row.email || '').split('@')[0] || '');
+            const rowDomainPart = String(row.email || '').split('@')[1] || '';
+
+            let score = 0;
+            if (recipient.normalizedEmail && recipient.normalizedEmail === rowEmail) score = 100;
+            else if (recipient.normalizedDisplay && recipient.normalizedDisplay === rowName) score = 95;
+            else if (recipient.normalizedDisplay && recipient.normalizedDisplay === rowFullName) score = 90;
+            else if (recipient.domainPart && recipient.domainPart === rowDomainPart && recipient.localCompact === rowLocalPart) score = 80;
+            else if (recipient.domainPart && recipient.domainPart === rowDomainPart && recipient.localCompact.length > 1 && recipient.localCompact.slice(1) === rowLocalPart) score = 70;
+
+            return { row, score };
+        })
+        .filter(({ score }) => score > 0)
+        .sort((a, b) => {
+            const ownerPriority = (row: any) => {
+                if (ownerUserId && normalizeOwnerKey(row.ownerId) === normalizeOwnerKey(ownerUserId)) return 3;
+                if (normalizeOwnerKey(row.ownerId) === ownerKey) return 2;
+                if (!row.ownerId) return 1;
+                return 0;
+            };
+
+            const ownerDiff = ownerPriority(b.row) - ownerPriority(a.row);
+            if (ownerDiff !== 0) return ownerDiff;
+            if (b.score !== a.score) return b.score - a.score;
+            return String(a.row.name || '').localeCompare(String(b.row.name || ''));
+        });
+
     const chosen =
-        (ownerUserId ? rows.find((row) => normalizeOwnerKey(row.ownerId) === normalizeOwnerKey(ownerUserId)) : null)
+        scored[0]?.row
+        || (ownerUserId ? rows.find((row) => normalizeOwnerKey(row.ownerId) === normalizeOwnerKey(ownerUserId)) : null)
         || rows.find((row) => normalizeOwnerKey(row.ownerId) === ownerKey)
         || rows.find((row) => !row.ownerId)
         || (rows.length === 1 ? rows[0] : null);
