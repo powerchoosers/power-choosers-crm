@@ -116,28 +116,28 @@ export function EmailList({
   const skeletonRows = Array.from({ length: skeletonRowCount }).map((_, idx) => (
     <div
       key={`skeleton-${idx}`}
-      className="grid grid-cols-12 gap-4 p-3 border-l-2 border-l-transparent border-b border-white/5 bg-zinc-950/30 animate-pulse"
+      className="grid grid-cols-12 gap-3 px-2 py-2.5 border-l-2 border-l-transparent border-b border-white/5 bg-zinc-950/30 animate-pulse"
     >
       <div className="col-span-1 flex items-center justify-center">
-        <span className="h-4 w-4 rounded bg-white/10" />
+        <span className="h-3.5 w-3.5 rounded bg-white/10" />
       </div>
       <div className="col-span-1 flex justify-center">
-        <span className="h-8 w-8 rounded-[10px] bg-white/5" />
+        <span className="h-7 w-7 rounded-[10px] bg-white/5" />
       </div>
-      <div className="col-span-3 space-y-2">
-        <span className="block h-3 w-3/4 rounded bg-white/10" />
-        <span className="block h-2 w-1/2 rounded bg-white/5" />
+      <div className="col-span-3 space-y-1.5">
+        <span className="block h-2.5 w-3/4 rounded bg-white/10" />
+        <span className="block h-1.5 w-1/2 rounded bg-white/5" />
       </div>
-      <div className="col-span-3 space-y-2">
-        <span className="block h-3 w-full rounded bg-white/10" />
-        <span className="block h-2 w-2/3 rounded bg-white/5" />
+      <div className="col-span-3 space-y-1.5">
+        <span className="block h-2.5 w-full rounded bg-white/10" />
+        <span className="block h-1.5 w-2/3 rounded bg-white/5" />
       </div>
-      <div className="col-span-2 space-y-2">
-        <span className="block h-3 w-3/4 rounded bg-white/10" />
-        <span className="block h-2 w-1/2 rounded bg-white/5" />
+      <div className="col-span-2 space-y-1.5">
+        <span className="block h-2.5 w-3/4 rounded bg-white/10" />
+        <span className="block h-1.5 w-1/2 rounded bg-white/5" />
       </div>
       <div className="col-span-2 flex justify-end">
-        <span className="h-4 w-12 rounded bg-white/10" />
+        <span className="h-3.5 w-10 rounded bg-white/10" />
       </div>
     </div>
   ))
@@ -337,7 +337,7 @@ export function EmailList({
       </div>
 
       {/* Column Headers */}
-      <div className="flex-none px-2 py-3 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-4 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+      <div className="flex-none px-2 py-2.5 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-3 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
         <div className="col-span-1 flex items-center justify-center">
           {onSelectionChange ? (
             <button
@@ -405,7 +405,7 @@ export function EmailList({
                   key={email.id}
                   onClick={() => onSelectEmail(email)}
                 className={cn(
-                  "group grid grid-cols-12 gap-4 px-2 py-3 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
+                  "group grid grid-cols-12 gap-3 px-2 py-2.5 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
                   hasClicks ? "border-l-[#002FA7]" : selectedEmailId === email.id ? "border-l-[#002FA7]" : "border-l-transparent",
                   email.unread ? "bg-[#002FA7]/8" : "",
                   isSelected ? "selected-container shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
@@ -448,7 +448,7 @@ export function EmailList({
                       <ContactAvatar
                         name={primaryContact.displayName}
                         photoUrl={primaryContact.avatarUrl}
-                        size={36}
+                        size={32}
                         className="rounded-[10px]"
                         textClassName="text-[10px]"
                       />
@@ -467,7 +467,7 @@ export function EmailList({
                             ? '/images/nodalpoint-webicon.png'
                             : undefined
                         }
-                        size={36}
+                        size={32}
                         roundedClassName="rounded-[10px]"
                       />
                     )}
@@ -475,13 +475,13 @@ export function EmailList({
 
                   {/* Participant */}
                   <div className="col-span-3 min-w-0 -ml-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                       {primaryContact && onOpenContact ? (
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); onOpenContact(primaryContact.id) }}
                           className={cn(
-                            "text-sm truncate font-mono tracking-tight transition-all origin-left hover:scale-[1.03] hover:text-white underline-offset-4 hover:underline cursor-pointer",
+                            "text-[13px] truncate font-mono tracking-tight transition-all origin-left hover:scale-[1.02] hover:text-white underline-offset-4 hover:underline cursor-pointer",
                             email.unread ? "font-semibold text-white" : "text-zinc-300"
                           )}
                           title={`Open ${primaryContact.displayName} dossier`}
@@ -490,7 +490,7 @@ export function EmailList({
                         </button>
                       ) : (
                         <span className={cn(
-                          "text-sm truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.02]",
+                          "text-[13px] truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.01]",
                           email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
                         )}>
                           {participantLabel}
@@ -517,10 +517,10 @@ export function EmailList({
                   </div>
 
                   {/* Message Preview */}
-                  <div className={cn("min-w-0 space-y-1 -ml-1", filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4")}>
-                    <div className="flex items-center gap-2">
+                  <div className={cn("min-w-0 space-y-0.5 -ml-1", filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4")}>
+                    <div className="flex items-center gap-1.5">
                       <h4 className={cn(
-                        "text-sm truncate tracking-tight transition-all origin-left group-hover:scale-[1.02] flex-1",
+                        "text-[13px] truncate tracking-tight transition-all origin-left group-hover:scale-[1.01] flex-1",
                         email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
                       )}>
                         {email.subject}
@@ -534,7 +534,7 @@ export function EmailList({
                         </div>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
+                    <p className="text-[11px] text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
                       {email.snippet || email.text || 'No preview available'}
                     </p>
                   </div>
@@ -542,7 +542,7 @@ export function EmailList({
                   {/* Telemetry Column - Only show for sent emails filter */}
                   {filter === 'sent' && (
                     <div className="col-span-2 flex items-center">
-                      <div className="flex items-center gap-3 rounded-md border border-white/10 bg-zinc-950/40 px-2.5 py-1 w-fit">
+                      <div className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-2 py-0.5 w-fit">
                         {/* Opens */}
                         <div className="flex items-center gap-1">
                           <Eye
