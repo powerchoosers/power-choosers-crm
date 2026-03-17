@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
 import { useProspectRadar, useIngestProspect, useDismissProspect } from '@/hooks/useProspectRadar';
 import { supabase } from '@/lib/supabase';
+import { formatProspectLocationLabel, normalizeOrganizationName } from '@/lib/apollo-prospect';
 
 
 type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion';
@@ -77,6 +78,10 @@ function formatRelativeTime(iso: string): string {
   if (mins < 60) return `${mins}m ago`;
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
+}
+
+function displayProspectName(name: string): string {
+  return normalizeOrganizationName(name) || name;
 }
 
 export function SignalMatrix() {
@@ -360,95 +365,106 @@ export function SignalMatrix() {
             )}
 
             <AnimatePresence>
-              {!isLoadingProspects && prospects.map((prospect, idx) => (
-                <motion.div
-                  key={prospect.id}
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ delay: idx * 0.04, duration: 0.25 }}
-                  className="group rounded-xl border border-white/5 hover:border-[#002FA7]/25 hover:bg-[#002FA7]/[0.03] transition-all overflow-hidden"
-                >
-                  {/* Main content row */}
-                  <div className="flex items-center gap-3 p-3">
-                    {/* Squircle avatar — matches RECON signal icons */}
-                    <div className="w-9 h-9 rounded-[14px] border border-white/10 bg-zinc-900 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                      {prospect.logo_url ? (
-                        <img
-                          src={prospect.logo_url}
-                          alt=""
-                          className="w-full h-full object-cover rounded-[13px]"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).style.display = 'none';
-                            (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty('display', 'flex');
-                          }}
-                        />
-                      ) : null}
-                      <span
-                        className="text-[11px] font-mono font-bold text-zinc-300 uppercase"
-                        style={{ display: prospect.logo_url ? 'none' : 'flex' }}
-                      >
-                        {prospect.name.slice(0, 2)}
-                      </span>
-                    </div>
+              {!isLoadingProspects && prospects.map((prospect, idx) => {
+                const displayName = displayProspectName(prospect.name);
+                const locationLabel = formatProspectLocationLabel({
+                  address: prospect.address,
+                  city: prospect.city,
+                  state: prospect.state,
+                  zip: prospect.zip,
+                });
 
-                    {/* Name + meta */}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-mono text-zinc-100 leading-tight">{prospect.name}</p>
-                      <div className="flex items-center gap-2 mt-1 min-w-0 flex-wrap">
-                        {prospect.industry && (
-                          <span className="text-[9px] font-mono text-zinc-500 truncate max-w-[120px]">{prospect.industry}</span>
-                        )}
-                        {prospect.employee_count && (
-                          <span className="text-[9px] font-mono text-zinc-600 flex-shrink-0">
-                            · {prospect.employee_count.toLocaleString()} emp
-                          </span>
-                        )}
-                        {prospect.city && (
-                          <span className="text-[9px] font-mono text-zinc-600 flex-shrink-0">
-                            · {prospect.city}
-                          </span>
-                        )}
+                return (
+                  <motion.div
+                    key={prospect.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ delay: idx * 0.04, duration: 0.25 }}
+                    className="group rounded-xl border border-white/5 hover:border-[#002FA7]/25 hover:bg-[#002FA7]/[0.03] transition-all overflow-hidden"
+                  >
+                    {/* Main content row */}
+                    <div className="flex items-center gap-3 p-3">
+                      {/* Squircle avatar — matches RECON signal icons */}
+                      <div className="w-9 h-9 rounded-[14px] border border-white/10 bg-zinc-900 flex items-center justify-center flex-shrink-0 overflow-hidden">
+                        {prospect.logo_url ? (
+                          <img
+                            src={prospect.logo_url}
+                            alt=""
+                            className="w-full h-full object-cover rounded-[13px]"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = 'none';
+                              (e.currentTarget.nextElementSibling as HTMLElement | null)?.style.setProperty('display', 'flex');
+                            }}
+                          />
+                        ) : null}
+                        <span
+                          className="text-[11px] font-mono font-bold text-zinc-300 uppercase"
+                          style={{ display: prospect.logo_url ? 'none' : 'flex' }}
+                        >
+                          {displayName.slice(0, 2)}
+                        </span>
                       </div>
+
+                      {/* Name + meta */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-mono text-zinc-100 leading-tight">{displayName}</p>
+                        <div className="flex items-center gap-2 mt-1 min-w-0 flex-wrap">
+                          {prospect.industry && (
+                            <span className="text-[9px] font-mono text-zinc-500 truncate max-w-[120px]">{prospect.industry}</span>
+                          )}
+                          {prospect.employee_count && (
+                            <span className="text-[9px] font-mono text-zinc-600 flex-shrink-0">
+                              · {prospect.employee_count.toLocaleString()} emp
+                            </span>
+                          )}
+                          <span
+                            className="text-[9px] font-mono text-zinc-600 flex-shrink-0 truncate max-w-[180px]"
+                            title={locationLabel}
+                          >
+                            · {locationLabel}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* TDSP badge — right-pinned */}
+                      {prospect.tdsp_zone && prospect.tdsp_zone !== 'Unknown' && (
+                        <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
+                          {prospect.tdsp_zone}
+                        </span>
+                      )}
                     </div>
 
-                    {/* TDSP badge — right-pinned */}
-                    {prospect.tdsp_zone && prospect.tdsp_zone !== 'Unknown' && (
-                      <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex-shrink-0">
-                        {prospect.tdsp_zone}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Action bar — slides in from bottom on hover */}
-                  <div className="grid grid-cols-2 border-t border-white/5 max-h-0 group-hover:max-h-[32px] overflow-hidden transition-[max-height] duration-200">
-                    <button
-                      type="button"
-                      onClick={() => dismissProspect(prospect.id)}
-                      className="py-1.5 text-[9px] font-mono text-zinc-600 hover:text-zinc-300 hover:bg-white/5 transition-all uppercase tracking-widest border-r border-white/5"
-                    >
-                      DISMISS
-                    </button>
-                    <button
-                      type="button"
-                      disabled={ingestingId === prospect.id}
-                      onClick={async () => {
-                        setIngestingId(prospect.id);
-                        await ingestProspect(prospect.id, prospect.name);
-                        setIngestingId(null);
-                      }}
-                      className="py-1.5 text-[9px] font-mono text-[#4D88FF] hover:text-white hover:bg-[#002FA7]/20 transition-all uppercase tracking-widest flex items-center justify-center gap-1 disabled:opacity-50"
-                    >
-                      {ingestingId === prospect.id ? (
-                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                      ) : (
-                        <Plus className="w-2.5 h-2.5" />
-                      )}
-                      INGEST
-                    </button>
-                  </div>
-                </motion.div>
-              ))}
+                    {/* Action bar — slides in from bottom on hover */}
+                    <div className="grid grid-cols-2 border-t border-white/5 max-h-0 group-hover:max-h-[32px] overflow-hidden transition-[max-height] duration-200">
+                      <button
+                        type="button"
+                        onClick={() => dismissProspect(prospect.id)}
+                        className="py-1.5 text-[9px] font-mono text-zinc-600 hover:text-zinc-300 hover:bg-white/5 transition-all uppercase tracking-widest border-r border-white/5"
+                      >
+                        DISMISS
+                      </button>
+                      <button
+                        type="button"
+                        disabled={ingestingId === prospect.id}
+                        onClick={async () => {
+                          setIngestingId(prospect.id);
+                          await ingestProspect(prospect.id, prospect.name);
+                          setIngestingId(null);
+                        }}
+                        className="py-1.5 text-[9px] font-mono text-[#4D88FF] hover:text-white hover:bg-[#002FA7]/20 transition-all uppercase tracking-widest flex items-center justify-center gap-1 disabled:opacity-50"
+                      >
+                        {ingestingId === prospect.id ? (
+                          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                        ) : (
+                          <Plus className="w-2.5 h-2.5" />
+                        )}
+                        INGEST
+                      </button>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </AnimatePresence>
           </>
         )}

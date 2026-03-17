@@ -586,7 +586,13 @@ export function TopBar() {
                       domain={callbarDomain || undefined}
                       name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
                       contactName={displayMetadata?.name || undefined}
-                      photoUrl={displayMetadata?.photoUrl || undefined}
+                      photoUrl={
+                        displayMetadata?.photoUrl ||
+                        displayMetadata?.avatarUrl ||
+                        displayMetadata?.metadata?.photoUrl ||
+                        displayMetadata?.metadata?.avatarUrl ||
+                        undefined
+                      }
                       isAccountOnly={Boolean(displayMetadata?.isAccountOnly)}
                     />
                     <div className="flex flex-col min-w-0">

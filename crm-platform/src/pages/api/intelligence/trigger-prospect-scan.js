@@ -6,6 +6,7 @@
  * and stores them in prospect_radar.
  */
 import { supabaseAdmin, requireUser } from '@/lib/supabase';
+import { enrichApolloOrganizationByDomain, normalizeOrganizationName } from '@/lib/apollo-prospect';
 import { cors } from '../_cors.js';
 import { getApiKey, APOLLO_BASE_URL, fetchWithRetry } from '../apollo/_utils.js';
 
@@ -64,25 +65,32 @@ function resolveIndustry(org) {
   return null;
 }
 
-// Enrich a handful of prospects missing employee_count via Apollo org enrichment
-async function enrichMissingHeadcount(prospects, apiKey) {
-  const toEnrich = prospects.filter((p) => (!p.employee_count || !p.description) && p.domain).slice(0, 10);
+// Enrich prospects with Apollo org enrichment so the radar card gets real
+// industry, address, and company metadata instead of search-result noise.
+async function enrichProspectProfiles(prospects, apiKey) {
+  const toEnrich = prospects.filter((p) => p.domain).slice(0, 25);
   if (toEnrich.length === 0) return;
   await Promise.all(
     toEnrich.map(async (p) => {
       try {
-        const resp = await fetchWithRetry(
-          `${APOLLO_BASE_URL}/organizations/enrich?domain=${encodeURIComponent(p.domain)}`,
-          { method: 'GET', headers: { 'Cache-Control': 'no-cache', 'Content-Type': 'application/json', 'X-Api-Key': apiKey } }
-        );
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const org = data.organization;
+        const org = await enrichApolloOrganizationByDomain(p, apiKey);
         if (!org) return;
-        if (!p.employee_count) p.employee_count = org.estimated_num_employees || org.employee_count || null;
-        if (!p.industry) p.industry = resolveIndustry(org);
-        if (!p.annual_revenue_printed) p.annual_revenue_printed = org.annual_revenue_printed || org.organization_revenue_printed || null;
-        if (!p.description) p.description = org.short_description || org.seo_description || null;
+
+        const enrichedName = normalizeOrganizationName(org.name);
+        if (enrichedName) p.name = enrichedName;
+
+        p.industry = org.industry || org.industry_category || (org.industries || [])[0] || p.industry || null;
+        p.employee_count = org.estimated_num_employees || org.employee_count || p.employee_count || null;
+        p.annual_revenue_printed = org.annual_revenue_printed || org.organization_revenue_printed || p.annual_revenue_printed || null;
+        p.description = org.short_description || org.seo_description || p.description || null;
+        p.city = org.city || org.organization_city || p.city || null;
+        p.state = org.state || org.organization_state || p.state || null;
+        p.address = org.formatted_address || org.raw_address || org.street_address || org.organization_raw_address || org.organization_street_address || p.address || null;
+        p.website = org.website_url || p.website || null;
+        p.logo_url = org.logo_url || p.logo_url || null;
+        p.phone = org.phone || org.sanitized_phone || org.primary_phone?.number || p.phone || null;
+        p.linkedin_url = org.linkedin_url || p.linkedin_url || null;
+        p.zip = org.postal_code || org.organization_postal_code || p.zip || null;
       } catch (_) { /* skip failed enrichments */ }
     })
   );
@@ -265,7 +273,7 @@ export default async function handler(req, res) {
 
       toInsert.push({
         apollo_org_id: apolloId || null,
-        name: org.name,
+        name: normalizeOrganizationName(org.name) || org.name,
         domain: domain || null,
         website: org.website_url || (domain ? `https://${domain}` : null),
         logo_url: org.logo_url || null,
@@ -275,8 +283,8 @@ export default async function handler(req, res) {
         // accounts use organization_revenue_printed; orgs use annual_revenue_printed
         annual_revenue_printed: org.organization_revenue_printed || org.annual_revenue_printed || null,
         city: org.organization_city || org.city || null,
-        state: org.organization_state || org.state || 'Texas',
-        tdsp_zone: matchedLocation?.tdsp || 'ERCOT',
+        state: org.organization_state || org.state || null,
+        tdsp_zone: matchedLocation?.tdsp || 'Unknown',
         phone: org.phone || org.primary_phone?.number || null,
         linkedin_url: org.linkedin_url || null,
         description: org.short_description || org.seo_description || null,
@@ -291,15 +299,27 @@ export default async function handler(req, res) {
       return;
     }
 
-    // ── 4. Enrich up to 5 prospects missing employee_count (Apollo accounts
-    //       don't return headcount in search results — requires org enrichment) ──
+    // ── 4. Enrich prospect rows with Apollo org enrichment so the radar
+    //       card gets a real industry, address, and headcount when available ──
     const APOLLO_API_KEY_FOR_ENRICH = getApiKey();
-    await enrichMissingHeadcount(toInsert, APOLLO_API_KEY_FOR_ENRICH);
+    await enrichProspectProfiles(toInsert, APOLLO_API_KEY_FOR_ENRICH);
+
+    // Recompute territory after enrichment. This keeps out-of-market records
+    // from being mislabelled as ERCOT when Apollo gives us a better location.
+    for (const prospect of toInsert) {
+      const city = (prospect.city || '').toString().trim().toLowerCase();
+      const matchedLocation = city
+        ? DEREGULATED_LOCATIONS.find((l) => l.city.toLowerCase() === city)
+        : null;
+      prospect.tdsp_zone = matchedLocation?.tdsp || 'Unknown';
+    }
+
+    const normalizedInsert = toInsert.filter((prospect) => !isExcludedIndustry(prospect.industry));
 
     // ── 5. Upsert — ON CONFLICT update so existing null rows get backfilled ──
     const { error: insertError } = await supabaseAdmin
       .from('prospect_radar')
-      .upsert(toInsert, { onConflict: 'apollo_org_id', ignoreDuplicates: false });
+      .upsert(normalizedInsert, { onConflict: 'apollo_org_id', ignoreDuplicates: false });
 
     if (insertError) {
       console.error('[trigger-prospect-scan] Insert error:', insertError);
@@ -307,8 +327,8 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log(`[trigger-prospect-scan] Inserted ${toInsert.length} net-new prospects`);
-    res.status(200).json({ count: toInsert.length, industries, locations: locationStrings });
+    console.log(`[trigger-prospect-scan] Inserted ${normalizedInsert.length} net-new prospects`);
+    res.status(200).json({ count: normalizedInsert.length, industries, locations: locationStrings });
 
   } catch (err) {
     console.error('[trigger-prospect-scan] Error:', err);

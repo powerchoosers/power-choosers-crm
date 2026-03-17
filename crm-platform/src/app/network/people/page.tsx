@@ -490,6 +490,7 @@ export default function PeoplePage() {
               <ClickToCallButton
                 phoneNumber={contact.phone}
                 name={contact.name}
+                photoUrl={contact.avatarUrl}
                 account={contact.company}
                 logoUrl={contact.logoUrl}
                 className="h-8 w-8 icon-button-forensic"

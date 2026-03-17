@@ -32,6 +32,82 @@ function normalizeRecipientList(raw) {
     return Array.from(new Set(normalized));
 }
 
+function normalizeOwnerKey(value) {
+    return String(value || '').trim().toLowerCase();
+}
+
+function buildContactName(contact) {
+    return (
+        contact?.name
+        || [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim()
+        || null
+    );
+}
+
+function buildContactCompany(contact) {
+    const metadata = contact?.metadata && typeof contact.metadata === 'object' ? contact.metadata : {};
+    return (
+        metadata?.company
+        || metadata?.companyName
+        || metadata?.general?.company
+        || metadata?.general?.companyName
+        || null
+    );
+}
+
+async function resolveRecipientContact(ownerEmail, recipientEmail) {
+    const normalizedRecipient = extractValidEmail(recipientEmail);
+    if (!ownerEmail || !normalizedRecipient) {
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    let ownerUserId = null;
+    try {
+        const { data: ownerUser } = await supabaseAdmin
+            .from('users')
+            .select('id')
+            .eq('email', ownerEmail)
+            .maybeSingle();
+
+        ownerUserId = ownerUser?.id || null;
+    } catch {
+        // Best effort only.
+    }
+
+    const { data: contacts, error } = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata')
+        .ilike('email', normalizedRecipient);
+
+    if (error) {
+        logger.warn('[Zoho] Contact resolution failed:', error.message || error, 'zoho-send');
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    const rows = Array.isArray(contacts) ? contacts : [];
+    if (!rows.length) {
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    const ownerKey = normalizeOwnerKey(ownerEmail);
+    const chosen =
+        (ownerUserId ? rows.find((row) => normalizeOwnerKey(row.ownerId) === normalizeOwnerKey(ownerUserId)) : null)
+        || rows.find((row) => normalizeOwnerKey(row.ownerId) === ownerKey)
+        || rows.find((row) => !row.ownerId)
+        || (rows.length === 1 ? rows[0] : null);
+
+    if (!chosen) {
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    return {
+        contactId: chosen.id || null,
+        accountId: chosen.accountId || null,
+        contactName: buildContactName(chosen),
+        contactCompany: buildContactCompany(chosen)
+    };
+}
+
 function normalizeComposerAttachments(attachments, uploadedAttachments = []) {
     if (!Array.isArray(attachments) || attachments.length === 0) return [];
 
@@ -238,6 +314,9 @@ export default async function handler(req, res) {
         }
 
         const normalizedAttachments = normalizeComposerAttachments(attachments);
+        const resolvedRecipient = supabaseAdmin
+            ? await resolveRecipientContact(ownerEmail, toRecipients[0])
+            : { contactId: null, accountId: null, contactName: null, contactCompany: null };
 
         // Persist the email record before sending so Sent/Scheduled lists always have a row.
         // Tracking remains optional; it only affects injected pixels/links and tracking metadata.
@@ -253,7 +332,8 @@ export default async function handler(req, res) {
                     from: from || ownerEmail || 'noreply@nodalpoint.io',
                     type: 'sent',
                     status: 'sending',
-                    contactId: contactId || null,
+                    contactId: contactId || resolvedRecipient.contactId || null,
+                    accountId: resolvedRecipient.accountId || null,
                     opens: [],
                     clicks: [],
                     openCount: 0,
@@ -267,8 +347,10 @@ export default async function handler(req, res) {
                         emailType: 'sent',
                         isSentEmail: true,
                         provider: 'zoho',
-                        contactName: contactName || null,
-                        contactCompany: contactCompany || null,
+                        contactName: contactName || resolvedRecipient.contactName || null,
+                        contactCompany: contactCompany || resolvedRecipient.contactCompany || null,
+                        contactId: contactId || resolvedRecipient.contactId || null,
+                        accountId: resolvedRecipient.accountId || null,
                         ownerId: ownerEmail,
                         assignedTo: ownerEmail,
                         createdBy: ownerEmail,
