@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { GitMerge } from 'lucide-react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import {
@@ -368,7 +369,11 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                           >
                             {/* Contact */}
                             <td className="px-4 py-3 pl-5">
-                              <div className="flex items-center gap-2.5">
+                              <Link
+                                href={`/network/contacts/${row.contactId}`}
+                                className="flex items-center gap-2.5 group/contact"
+                                onClick={onClose}
+                              >
                                 <ContactAvatar
                                   name={fullName}
                                   photoUrl={row.avatarUrl ?? undefined}
@@ -376,14 +381,14 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                                   className="shrink-0"
                                 />
                                 <div className="min-w-0">
-                                  <div className="text-sm font-medium text-zinc-200 group-hover:text-white transition-colors whitespace-nowrap truncate max-w-[160px]">
+                                  <div className="text-sm font-medium text-zinc-200 group-hover/contact:text-white group-hover/contact:scale-[1.02] transition-all origin-left whitespace-nowrap truncate max-w-[160px]">
                                     {fullName}
                                   </div>
                                   <div className="text-[10px] font-mono text-zinc-500 truncate max-w-[160px]">
                                     {row.title || row.email || '-'}
                                   </div>
                                 </div>
-                              </div>
+                              </Link>
                             </td>
 
                             {/* Company */}
