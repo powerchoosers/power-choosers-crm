@@ -17,6 +17,7 @@ import {
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { ForensicRefresh } from '@/components/ui/ForensicRefresh'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
 interface SequenceMemberRow {
   memberId: string
@@ -29,7 +30,10 @@ interface SequenceMemberRow {
   email: string | null
   title: string | null
   avatarUrl: string | null
+  accountId: string | null
   accountName: string | null
+  accountDomain: string | null
+  accountLogoUrl: string | null
   updatedAt: string | null
   totalEmailsSent: number
   totalOpens: number
@@ -344,7 +348,12 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3"><div className="h-3 w-24 bg-white/10 rounded animate-pulse" /></td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-[8px] bg-white/10 animate-pulse shrink-0" />
+                              <div className="h-3 w-24 bg-white/10 rounded animate-pulse" />
+                            </div>
+                          </td>
                           <td className="px-4 py-3"><div className="h-4 w-16 bg-white/10 rounded animate-pulse" /></td>
                           <td className="px-4 py-3"><div className="h-3 w-20 bg-white/10 rounded animate-pulse" /></td>
                           <td className="px-4 py-3"><div className="h-3 w-20 bg-white/10 rounded animate-pulse" /></td>
@@ -393,9 +402,33 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
                             {/* Company */}
                             <td className="px-4 py-3">
-                              <span className="text-sm text-zinc-300 whitespace-nowrap">
-                                {row.accountName || '-'}
-                              </span>
+                              {row.accountId ? (
+                                <Link
+                                  href={`/network/accounts/${row.accountId}`}
+                                  className="flex items-center gap-2.5 group/company"
+                                  onClick={onClose}
+                                >
+                                  <CompanyIcon
+                                    name={row.accountName || ''}
+                                    logoUrl={row.accountLogoUrl ?? undefined}
+                                    domain={row.accountDomain ?? undefined}
+                                    size={28}
+                                    className="shrink-0"
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="text-sm font-medium text-zinc-300 group-hover/company:text-white group-hover/company:scale-[1.02] transition-all origin-left whitespace-nowrap truncate max-w-[140px]">
+                                      {row.accountName || '-'}
+                                    </div>
+                                    {row.accountDomain && (
+                                      <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider truncate max-w-[140px]">
+                                        {row.accountDomain}
+                                      </div>
+                                    )}
+                                  </div>
+                                </Link>
+                              ) : (
+                                <span className="text-sm text-zinc-500">-</span>
+                              )}
                             </td>
 
                             {/* Member Status */}
