@@ -1,45 +1,42 @@
-import { toast } from 'sonner';
-import { playPing } from './audio';
-import { useUIStore } from '@/store/uiStore';
+import React from 'react'
+import { toast } from 'sonner'
+import { playPing } from './audio'
+import { useUIStore } from '@/store/uiStore'
+import { InboxEmailToast } from '@/components/emails/InboxEmailToast'
 
 export type InboxEmailToastInput = {
-  name: string;
-  company?: string;
-  subject?: string;
-  snippet?: string;
-  hasAttachments?: boolean;
-  sourceLabel?: string;
-  photoUrl?: string | null;
-  duration?: number;
-};
+  name: string
+  company?: string
+  subject?: string
+  snippet?: string
+  hasAttachments?: boolean
+  sourceLabel?: string
+  photoUrl?: string | null
+  duration?: number
+}
 
 export function showInboxEmailToast({
   name,
-  company = 'Unknown company',
-  subject = 'New email from CRM contact',
-  snippet = 'New message received',
+  company,
+  subject,
+  snippet,
   hasAttachments = false,
   sourceLabel,
   photoUrl = null,
   duration = 6500,
 }: InboxEmailToastInput) {
-  const soundEnabled = useUIStore.getState().soundEnabled;
-  if (soundEnabled) playPing();
-
-  const fallbackName = name || 'CRM contact';
-  const fallbackSnippet = snippet || 'New message received';
-  const fallbackCompany = company || 'Unknown company';
-  const headingParts = [fallbackName, fallbackCompany, sourceLabel].filter(Boolean);
-  const heading = headingParts.join(' • ');
-  const descriptionParts = [subject, fallbackSnippet].filter(Boolean);
-  const description = descriptionParts.join(' — ');
-  const attachmentSuffix = hasAttachments ? ' • Attachment included' : '';
+  const soundEnabled = useUIStore.getState().soundEnabled
+  if (soundEnabled) playPing()
 
   toast(
-    heading ? `${heading}${attachmentSuffix}` : fallbackName,
-    {
-      description,
-      duration,
-    }
-  );
+    <InboxEmailToast
+      name={name}
+      company={company}
+      subject={subject || snippet}
+      photoUrl={photoUrl}
+      hasAttachments={hasAttachments}
+      sourceLabel={sourceLabel}
+    />,
+    { duration }
+  )
 }
