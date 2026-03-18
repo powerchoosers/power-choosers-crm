@@ -10,9 +10,8 @@ import { useUIStore } from '@/store/uiStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { CheckCircle, Eye, Paperclip } from 'lucide-react'
-import { ContactAvatar } from '@/components/ui/ContactAvatar'
-import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
+import { CheckCircle, Eye } from 'lucide-react'
+import { showInboxEmailToast } from '@/lib/inbox-email-toast'
 
 const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -43,35 +42,6 @@ function extractEmailAddress(value?: string | null) {
   const email = angle?.[1] || raw
   const normalized = email.trim().toLowerCase()
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) ? normalized : ''
-}
-
-function stripHtml(value?: string | null) {
-  if (!value) return ''
-  return String(value)
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function getEmailSnippet(email: { snippet?: string | null, text?: string | null, html?: string | null }) {
-  const plainSnippet = stripHtml(email.snippet)
-  if (plainSnippet) return plainSnippet.slice(0, 120)
-
-  const plainText = stripHtml(email.text)
-  if (plainText) return plainText.slice(0, 120)
-
-  const plainHtml = stripHtml(email.html)
-  if (plainHtml) return plainHtml.slice(0, 120)
-
-  return 'New message received'
 }
 
 function normalizeLookupText(value?: string | null) {
@@ -170,6 +140,7 @@ export function GlobalSync() {
   const { performSync } = useZohoSync()
   const queryClient = useQueryClient()
   const ownerScopeRef = useRef<string[]>([])
+  const seenInboxSignalIdsRef = useRef<Set<string>>(new Set())
   const soundEnabled = useUIStore(s => s.soundEnabled)
 
   // Real-time email tracking notifications (opens/clicks)
@@ -342,40 +313,34 @@ export function GlobalSync() {
           // Only notify if sender is actually a known CRM contact.
           if (!contact) return
 
-          const senderEmail = extractEmailAddress(senderLabel) || extractEmailAddress(email.from)
+          const signalId = String(email.id || '').trim()
+          if (signalId && seenInboxSignalIdsRef.current.has(signalId)) return
+          if (signalId) seenInboxSignalIdsRef.current.add(signalId)
 
+          const senderEmail = extractEmailAddress(senderLabel) || extractEmailAddress(email.from)
           const name = (
             contact.name ||
             [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() ||
-            senderEmail
+            senderEmail ||
+            'CRM contact'
           )
           const relatedAccount = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts
           const company = relatedAccount?.name || 'Unknown company'
-          const snippet = getEmailSnippet(email)
+          const snippet =
+            String(email.snippet || email.text || email.html || 'New message received')
+              .replace(/\s+/g, ' ')
+              .slice(0, 140)
           const hasAttachments =
             !!email.metadata?.hasAttachments ||
             (Array.isArray(email.metadata?.attachments) && email.metadata.attachments.length > 0) ||
             (Array.isArray(email.attachments) && email.attachments.length > 0)
-          const photoUrl = resolveContactPhotoUrl(contact)
-
-          playPing();
-          toast(
-            <div className="flex items-start gap-3">
-              <ContactAvatar name={name} photoUrl={photoUrl || undefined} size={32} />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-white truncate">{name}</span>
-                  {hasAttachments && <Paperclip className="w-3.5 h-3.5 text-zinc-400" />}
-                </div>
-                <div className="text-[11px] text-zinc-400 truncate">{company}</div>
-                <div className="text-xs text-zinc-300 mt-1 line-clamp-2">{snippet}</div>
-              </div>
-            </div>,
-            {
-              description: email.subject || 'New email from CRM contact',
-              duration: 6500,
-            }
-          )
+          showInboxEmailToast({
+            name,
+            company,
+            subject: email.subject || 'New email from CRM contact',
+            snippet,
+            hasAttachments,
+          })
         }
       )
       .subscribe((status) => {
@@ -390,6 +355,61 @@ export function GlobalSync() {
       supabase.removeChannel(emailChannel)
     }
   }, [loading, user, performSync, queryClient])
+
+  useEffect(() => {
+    if (loading || !user?.email) return
+
+    let cancelled = false
+
+    const pollNotifications = async () => {
+      const scope = ownerScopeRef.current.length > 0
+        ? ownerScopeRef.current
+        : [String(user.email || '').toLowerCase()]
+
+      const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('id, ownerId, title, message, type, read, link, data, metadata, createdAt')
+        .in('ownerId', scope)
+        .eq('read', false)
+        .gte('createdAt', cutoff)
+        .order('createdAt', { ascending: true })
+        .limit(20)
+
+      if (error || cancelled || !Array.isArray(data)) return
+
+      for (const row of data) {
+        const payload = (row.data && typeof row.data === 'object') ? row.data as Record<string, any> : {}
+        const signalId = String(payload.emailId || row.id || '').trim()
+        if (!signalId || seenInboxSignalIdsRef.current.has(signalId)) continue
+
+        seenInboxSignalIdsRef.current.add(signalId)
+
+        showInboxEmailToast({
+          name: String(payload.contactName || row.title?.replace(/^New email from\s+/i, '') || 'CRM contact'),
+          company: String(payload.company || 'Unknown company'),
+          subject: String(payload.subject || row.message || 'New email from CRM contact'),
+          snippet: String(payload.snippet || row.message || 'New message received'),
+          hasAttachments: Boolean(payload.hasAttachments),
+        })
+
+        await supabase
+          .from('notifications')
+          .update({ read: true })
+          .eq('id', row.id)
+      }
+    }
+
+    void pollNotifications()
+    const interval = setInterval(() => {
+      void pollNotifications()
+    }, 15000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [loading, user?.email])
 
   return null
 }
