@@ -490,7 +490,25 @@ async function autoIngestInboundAttachments({
     return { saved, skipped };
 }
 
-async function createInboxNotification({ emailDoc, ownerEmail, messageId }) {
+function normalizeSyncSource(value) {
+    const source = String(value || '').toLowerCase().trim();
+    if (source === 'webhook') return 'webhook';
+    if (source === 'manual') return 'manual';
+    if (source === 'background') return 'background';
+    if (source === 'cron') return 'cron';
+    return 'manual';
+}
+
+function formatSourceLabel(value) {
+    const source = normalizeSyncSource(value);
+    if (source === 'webhook') return 'Webhook';
+    if (source === 'manual') return 'Manual sync';
+    if (source === 'background') return 'Background sync';
+    if (source === 'cron') return 'Cron sync';
+    return '';
+}
+
+async function createInboxNotification({ emailDoc, ownerEmail, messageId, source = 'manual' }) {
     if (!emailDoc?.contactId || !ownerEmail || !messageId) return null;
 
     const { data: contactRow } = await supabaseAdmin
@@ -499,7 +517,16 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId }) {
         .eq('id', emailDoc.contactId)
         .maybeSingle();
 
+    let accountName = null;
     const relatedAccount = Array.isArray(contactRow?.accounts) ? contactRow.accounts[0] : contactRow?.accounts;
+    if (!relatedAccount?.name && (contactRow?.accountId || emailDoc.accountId)) {
+        const { data: accountRow } = await supabaseAdmin
+            .from('accounts')
+            .select('id, name')
+            .eq('id', contactRow?.accountId || emailDoc.accountId)
+            .maybeSingle();
+        accountName = accountRow?.name || null;
+    }
     const contactName = (
         contactRow?.name ||
         [contactRow?.firstName, contactRow?.lastName].filter(Boolean).join(' ').trim() ||
@@ -507,8 +534,10 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId }) {
         extractEmailAddress(emailDoc.from) ||
         'New contact'
     );
-    const companyName = relatedAccount?.name || 'Unknown company';
+    const companyName = relatedAccount?.name || accountName || 'Unknown company';
     const snippet = emailDoc.text?.slice(0, 140) || 'New message received';
+    const syncSource = normalizeSyncSource(source);
+    const sourceLabel = formatSourceLabel(syncSource);
 
     const notification = {
         id: `email-notif-${messageId}`,
@@ -529,12 +558,16 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId }) {
             snippet,
             from: emailDoc.from || '',
             hasAttachments: !!emailDoc.metadata?.hasAttachments,
+            source: syncSource,
+            sourceLabel,
         },
         metadata: {
             ownerId: ownerEmail,
             emailId: messageId,
             contactId: emailDoc.contactId,
             accountId: emailDoc.accountId || contactRow?.accountId || null,
+            source: syncSource,
+            sourceLabel,
         },
     };
 
@@ -580,6 +613,7 @@ export default async function handler(req, res) {
     }
 
     const { userEmail } = req.body;
+    const syncSource = normalizeSyncSource(req.body?.source || 'manual');
 
     if (!userEmail) {
         res.status(400).json({ error: 'Missing userEmail' });
@@ -775,6 +809,7 @@ export default async function handler(req, res) {
                         emailDoc,
                         ownerEmail: userEmail,
                         messageId,
+                        source: syncSource,
                     });
                     if (notification) {
                         notifications.push(notification);

@@ -189,7 +189,7 @@ async function getConnectedZohoEmails() {
   };
 }
 
-async function triggerZohoSync(userEmail) {
+async function triggerZohoSync(userEmail, source = 'webhook') {
   const syncUrl = `${APP_URL}/api/email/zoho-sync`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
@@ -198,7 +198,7 @@ async function triggerZohoSync(userEmail) {
     const response = await fetch(syncUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userEmail }),
+      body: JSON.stringify({ userEmail, source }),
       signal: controller.signal,
     });
 
@@ -295,6 +295,13 @@ export default async function handler(req, res) {
       });
     }
 
+    logger.info('[ZohoWebhook] Webhook received', {
+      eventType: eventType || null,
+      bodyKeys: Object.keys(body || {}),
+      candidateEmails: extracted.candidateEmails,
+      candidateAccountIds: extracted.candidateAccountIds,
+    });
+
     let syncTargets = targetEmails;
     let syncMode = 'resolved';
 
@@ -320,7 +327,7 @@ export default async function handler(req, res) {
     const results = [];
     for (const userEmail of syncTargets) {
       try {
-        const syncResult = await triggerZohoSync(userEmail);
+        const syncResult = await triggerZohoSync(userEmail, 'webhook');
         results.push({
           userEmail,
           ok: syncResult.ok,
