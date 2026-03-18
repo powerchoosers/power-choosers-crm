@@ -87,6 +87,23 @@ function buildContactCompany(contact) {
     );
 }
 
+async function resolveProvidedContact(contactId) {
+    const normalizedId = String(contactId || '').trim();
+    if (!normalizedId) return null;
+
+    const { data, error } = await supabaseAdmin
+        .from('contacts')
+        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts(name)')
+        .eq('id', normalizedId)
+        .maybeSingle();
+
+    if (error || !data) {
+        return null;
+    }
+
+    return data;
+}
+
 async function resolveRecipientContact(ownerEmail, recipientEmail) {
     const recipient = parseRecipientIdentity(recipientEmail);
     if (!ownerEmail || (!recipient.email && !recipient.display)) {
@@ -398,50 +415,70 @@ export default async function handler(req, res) {
         const resolvedRecipient = supabaseAdmin
             ? await resolveRecipientContact(ownerEmail, toRecipients[0])
             : { contactId: null, accountId: null, contactName: null, contactCompany: null };
+        const providedContact = (supabaseAdmin && contactId)
+            ? await resolveProvidedContact(contactId)
+            : null;
+
+        if (contactId && !providedContact) {
+            logger.warn(`[Zoho] Provided contactId '${contactId}' was not found. Falling back to recipient resolution.`, 'zoho-send');
+        }
+
+        const persistedContactId = providedContact?.id || resolvedRecipient.contactId || null;
+        const persistedAccountId = providedContact?.accountId || resolvedRecipient.accountId || null;
+        const persistedContactName =
+            buildContactName(providedContact)
+            || resolvedRecipient.contactName
+            || contactName
+            || null;
+        const persistedContactCompany =
+            buildContactCompany(providedContact)
+            || resolvedRecipient.contactCompany
+            || contactCompany
+            || null;
 
         // Persist the email record before sending so Sent/Scheduled lists always have a row.
         // Tracking remains optional; it only affects injected pixels/links and tracking metadata.
         if (supabaseAdmin) {
-            try {
-                const emailRecord = {
-                    id: trackingId,
-                    to: toRecipients,
-                    subject,
-                    threadId: requestedThreadId || trackingId,
-                    html: trackedContent,
-                    text: textContent,
-                    from: from || ownerEmail || 'noreply@nodalpoint.io',
-                    type: 'sent',
-                    status: 'sending',
-                    contactId: contactId || resolvedRecipient.contactId || null,
-                    accountId: resolvedRecipient.accountId || null,
-                    opens: [],
-                    clicks: [],
-                    openCount: 0,
-                    clickCount: 0,
-                    timestamp: new Date().toISOString(),
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
+            const emailRecord = {
+                id: trackingId,
+                to: toRecipients,
+                subject,
+                threadId: requestedThreadId || trackingId,
+                html: trackedContent,
+                text: textContent,
+                from: from || ownerEmail || 'noreply@nodalpoint.io',
+                type: 'sent',
+                status: 'sending',
+                contactId: persistedContactId,
+                accountId: persistedAccountId,
+                opens: [],
+                clicks: [],
+                openCount: 0,
+                clickCount: 0,
+                timestamp: new Date().toISOString(),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                ownerId: ownerEmail,
+                metadata: {
+                    fromName: fromName || null,
+                    emailType: 'sent',
+                    isSentEmail: true,
+                    provider: 'zoho',
+                    contactName: persistedContactName,
+                    contactCompany: persistedContactCompany,
+                    contactId: persistedContactId,
+                    accountId: persistedAccountId,
                     ownerId: ownerEmail,
-                    metadata: {
-                        fromName: fromName || null,
-                        emailType: 'sent',
-                        isSentEmail: true,
-                        provider: 'zoho',
-                        contactName: contactName || resolvedRecipient.contactName || null,
-                        contactCompany: contactCompany || resolvedRecipient.contactCompany || null,
-                        contactId: contactId || resolvedRecipient.contactId || null,
-                        accountId: resolvedRecipient.accountId || null,
-                        ownerId: ownerEmail,
-                        assignedTo: ownerEmail,
-                        createdBy: ownerEmail,
-                        zohoFolder: 'sent',
-                        threadId: requestedThreadId || trackingId,
-                        attachments: normalizedAttachments,
-                        replies: []
-                    }
-                };
+                    assignedTo: ownerEmail,
+                    createdBy: ownerEmail,
+                    zohoFolder: 'sent',
+                    threadId: requestedThreadId || trackingId,
+                    attachments: normalizedAttachments,
+                    replies: []
+                }
+            };
 
+            try {
                 const { error } = await supabaseAdmin
                     .from('emails')
                     .insert(emailRecord);
@@ -449,7 +486,26 @@ export default async function handler(req, res) {
                 if (error) throw error;
                 logger.debug('[Zoho] Created email record for tracking in Supabase:', { trackingId });
             } catch (dbError) {
-                logger.warn('[Zoho] Failed to create email record in Supabase (tracking may not work):', dbError.message);
+                logger.warn('[Zoho] Failed to create pre-send email record. Retrying with null contact linkage:', dbError.message);
+                try {
+                    const fallbackRecord = {
+                        ...emailRecord,
+                        contactId: null,
+                        accountId: null,
+                        metadata: {
+                            ...emailRecord.metadata,
+                            contactId: null,
+                            accountId: null
+                        }
+                    };
+                    const { error: fallbackError } = await supabaseAdmin
+                        .from('emails')
+                        .upsert(fallbackRecord, { onConflict: 'id' });
+                    if (fallbackError) throw fallbackError;
+                    logger.warn('[Zoho] Pre-send fallback insert succeeded without contact/account linkage.', 'zoho-send');
+                } catch (fallbackErr) {
+                    logger.error('[Zoho] Pre-send fallback insert failed:', fallbackErr?.message || fallbackErr, 'zoho-send');
+                }
             }
         }
 
@@ -484,7 +540,8 @@ export default async function handler(req, res) {
             userEmail: ownerEmail
         });
 
-        // Update the persisted row with the final send status and Zoho message ID.
+        // Update the persisted row with final send status and Zoho message ID.
+        // If the pre-send insert failed, create the row here so sent email is never swallowed.
         if (supabaseAdmin) {
             try {
                 const finalThreadId = requestedThreadId || result.messageId || trackingId;
@@ -496,27 +553,74 @@ export default async function handler(req, res) {
                     downloadUnavailable: !((att.attachmentId || uploadedAttachments[idx]?.attachmentPath || uploadedAttachments[idx]?.storeName) && result.messageId)
                 }));
 
-                const { error } = await supabaseAdmin
+                const { data: existingRow, error: existingRowError } = await supabaseAdmin
                     .from('emails')
-                    .update({
-                        status: 'sent',
-                        threadId: finalThreadId,
-                        updatedAt: new Date().toISOString(),
-                        metadata: {
-                            // Get existing metadata and merge
-                            ...(await supabaseAdmin.from('emails').select('metadata').eq('id', trackingId).single().then(res => res.data?.metadata || {})),
-                            sentAt: new Date().toISOString(),
-                            zohoMessageId: result.messageId,
-                            messageId: result.messageId,
-                            zohoFolder: 'sent',
-                            threadId: finalThreadId,
-                            attachments: attachmentsWithMessageId
-                        }
-                    })
-                    .eq('id', trackingId);
+                    .select('id, metadata')
+                    .eq('id', trackingId)
+                    .maybeSingle();
 
-                if (error) throw error;
-                logger.debug('[Zoho] Updated email record with sent status in Supabase:', { trackingId, messageId: result.messageId });
+                if (existingRowError) {
+                    logger.warn('[Zoho] Failed to fetch existing sent row before update:', existingRowError.message, 'zoho-send');
+                }
+
+                const mergedMetadata = {
+                    ...(existingRow?.metadata && typeof existingRow.metadata === 'object' ? existingRow.metadata : {}),
+                    sentAt: new Date().toISOString(),
+                    zohoMessageId: result.messageId,
+                    messageId: result.messageId,
+                    zohoFolder: 'sent',
+                    threadId: finalThreadId,
+                    contactName: persistedContactName,
+                    contactCompany: persistedContactCompany,
+                    contactId: persistedContactId,
+                    accountId: persistedAccountId,
+                    attachments: attachmentsWithMessageId
+                };
+
+                if (existingRow?.id) {
+                    const { error } = await supabaseAdmin
+                        .from('emails')
+                        .update({
+                            status: 'sent',
+                            threadId: finalThreadId,
+                            contactId: persistedContactId,
+                            accountId: persistedAccountId,
+                            updatedAt: new Date().toISOString(),
+                            metadata: mergedMetadata
+                        })
+                        .eq('id', trackingId);
+                    if (error) throw error;
+                    logger.debug('[Zoho] Updated email record with sent status in Supabase:', { trackingId, messageId: result.messageId });
+                } else {
+                    const sentRecord = {
+                        id: trackingId,
+                        to: toRecipients,
+                        subject,
+                        threadId: finalThreadId,
+                        html: trackedContent,
+                        text: textContent,
+                        from: from || ownerEmail || 'noreply@nodalpoint.io',
+                        type: 'sent',
+                        status: 'sent',
+                        contactId: persistedContactId,
+                        accountId: persistedAccountId,
+                        opens: [],
+                        clicks: [],
+                        openCount: 0,
+                        clickCount: 0,
+                        timestamp: new Date().toISOString(),
+                        createdAt: new Date().toISOString(),
+                        updatedAt: new Date().toISOString(),
+                        ownerId: ownerEmail,
+                        metadata: mergedMetadata
+                    };
+
+                    const { error: insertAfterSendError } = await supabaseAdmin
+                        .from('emails')
+                        .insert(sentRecord);
+                    if (insertAfterSendError) throw insertAfterSendError;
+                    logger.warn('[Zoho] Created sent email row after send because pre-send row was missing.', 'zoho-send');
+                }
             } catch (dbError) {
                 logger.warn('[Zoho] Failed to update email record in Supabase:', dbError.message);
             }
