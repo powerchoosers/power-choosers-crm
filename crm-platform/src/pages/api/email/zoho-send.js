@@ -206,6 +206,74 @@ async function resolveRecipientContact(ownerEmail, recipientEmail) {
     };
 }
 
+async function resolveContactFromThread(ownerEmail, threadId, recipientEmail) {
+    const normalizedThreadId = String(threadId || '').trim();
+    const recipientKey = extractValidEmail(recipientEmail);
+    if (!normalizedThreadId) {
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    const { data: rows, error } = await supabaseAdmin
+        .from('emails')
+        .select('contactId, accountId, from, to, ownerId, metadata, timestamp, createdAt')
+        .or(`threadId.eq.${normalizedThreadId},metadata->>threadId.eq.${normalizedThreadId}`)
+        .not('contactId', 'is', null)
+        .order('timestamp', { ascending: false, nullsFirst: false })
+        .order('createdAt', { ascending: false, nullsFirst: false })
+        .limit(50);
+
+    if (error) {
+        logger.warn('[Zoho] Thread contact fallback query failed:', error.message || error, 'zoho-send');
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    const allRows = Array.isArray(rows) ? rows : [];
+    if (!allRows.length) {
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    const ownerKey = normalizeOwnerKey(ownerEmail);
+    const scopedRows = allRows.filter((row) => {
+        const rowOwnerKey = normalizeOwnerKey(row?.ownerId || row?.metadata?.ownerId);
+        return !ownerKey || !rowOwnerKey || rowOwnerKey === ownerKey;
+    });
+
+    const scored = (scopedRows.length ? scopedRows : allRows)
+        .map((row) => {
+            const rowFrom = extractValidEmail(row?.from || '');
+            const rowTo = normalizeRecipientList(row?.to || []);
+            const participantMatch = recipientKey
+                ? (rowFrom === recipientKey || rowTo.includes(recipientKey))
+                : true;
+            return { row, score: participantMatch ? 2 : 0 };
+        })
+        .sort((a, b) => b.score - a.score);
+
+    const chosen = scored[0]?.row;
+    if (!chosen?.contactId) {
+        return { contactId: null, accountId: null, contactName: null, contactCompany: null };
+    }
+
+    let chosenContact = null;
+    try {
+        const { data } = await supabaseAdmin
+            .from('contacts')
+            .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts(name)')
+            .eq('id', String(chosen.contactId))
+            .maybeSingle();
+        chosenContact = data || null;
+    } catch (contactError) {
+        logger.warn('[Zoho] Thread fallback contact lookup failed:', contactError?.message || contactError, 'zoho-send');
+    }
+
+    return {
+        contactId: chosen.contactId || null,
+        accountId: chosen.accountId || chosenContact?.accountId || null,
+        contactName: buildContactName(chosenContact),
+        contactCompany: buildContactCompany(chosenContact)
+    };
+}
+
 function normalizeComposerAttachments(attachments, uploadedAttachments = []) {
     if (!Array.isArray(attachments) || attachments.length === 0) return [];
 
@@ -418,21 +486,37 @@ export default async function handler(req, res) {
         const providedContact = (supabaseAdmin && contactId)
             ? await resolveProvidedContact(contactId)
             : null;
+        const threadResolvedRecipient = (supabaseAdmin && requestedThreadId)
+            ? await resolveContactFromThread(ownerEmail, requestedThreadId, toRecipients[0])
+            : { contactId: null, accountId: null, contactName: null, contactCompany: null };
 
         if (contactId && !providedContact) {
             logger.warn(`[Zoho] Provided contactId '${contactId}' was not found. Falling back to recipient resolution.`, 'zoho-send');
         }
+        if (!providedContact?.id && !resolvedRecipient.contactId && threadResolvedRecipient.contactId) {
+            logger.info(`[Zoho] Recovered contact linkage from thread fallback: ${threadResolvedRecipient.contactId}`, 'zoho-send');
+        }
 
-        const persistedContactId = providedContact?.id || resolvedRecipient.contactId || null;
-        const persistedAccountId = providedContact?.accountId || resolvedRecipient.accountId || null;
+        const persistedContactId =
+            providedContact?.id
+            || resolvedRecipient.contactId
+            || threadResolvedRecipient.contactId
+            || null;
+        const persistedAccountId =
+            providedContact?.accountId
+            || resolvedRecipient.accountId
+            || threadResolvedRecipient.accountId
+            || null;
         const persistedContactName =
             buildContactName(providedContact)
             || resolvedRecipient.contactName
+            || threadResolvedRecipient.contactName
             || contactName
             || null;
         const persistedContactCompany =
             buildContactCompany(providedContact)
             || resolvedRecipient.contactCompany
+            || threadResolvedRecipient.contactCompany
             || contactCompany
             || null;
 
