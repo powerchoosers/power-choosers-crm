@@ -16,6 +16,12 @@ function stripHtml(html: string | undefined | null) {
     return text.replace(/\s+/g, ' ').trim()
 }
 
+function chunk<T>(arr: T[], size: number): T[][] {
+    const out: T[][] = []
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+    return out
+}
+
 export function useEntityEmails(emailAddresses: string[]) {
     const { user, role, loading } = useAuth()
 
@@ -49,29 +55,40 @@ export function useEntityEmails(emailAddresses: string[]) {
                     .not('from', 'ilike', '%lemwarm%')
                     .not('from', 'ilike', '%warmup%')
 
-                // Build OR condition for all provided email addresses
-                // Using ilike.%email% for substring match in `to` and `from`
-                // Supabase `or` structure requires a comma-separated list of conditions
-                // Note: `to` is a JSONB array, so we must use `.cs.` (contains) instead of `.ilike.`
-                const orConditions = validEmails.map(email =>
-                    `from.ilike.%${email}%,to.cs.["${email}"]`
-                ).join(',')
+                const batches = chunk(validEmails, 25)
+                const emailMap = new Map<string, any>()
 
-                query = query.or(orConditions)
+                for (const batch of batches) {
+                    const orConditions = batch.map(email =>
+                        `from.ilike.%${email}%,to.cs.["${email}"]`
+                    ).join(',')
 
-                const { data, error } = await query
-                    .order('timestamp', { ascending: false, nullsFirst: false })
-                    .order('createdAt', { ascending: false, nullsFirst: false })
-                    .limit(50)
+                    const { data, error } = await query
+                        .or(orConditions)
+                        .order('timestamp', { ascending: false, nullsFirst: false })
+                        .order('createdAt', { ascending: false, nullsFirst: false })
+                        .limit(50)
 
-                if (error) {
-                    if (error.message === 'FetchUserError: Request was aborted' || error.message?.includes('abort')) {
-                        return []
+                    if (error) {
+                        if (error.message === 'FetchUserError: Request was aborted' || error.message?.includes('abort')) {
+                            return []
+                        }
+                        throw error
                     }
-                    throw error
+
+                    for (const item of data || []) {
+                        emailMap.set(item.id, item)
+                    }
                 }
 
-                const emails = data.map(item => {
+                const emails = Array.from(emailMap.values())
+                    .sort((a, b) => {
+                        const ta = new Date(a.timestamp || a.createdAt || a.created_at || 0).getTime()
+                        const tb = new Date(b.timestamp || b.createdAt || b.created_at || 0).getTime()
+                        return tb - ta
+                    })
+                    .slice(0, 50)
+                    .map(item => {
                     let type: Email['type'] = 'received'
                     const rawType = String(item.type || '').toLowerCase()
 
