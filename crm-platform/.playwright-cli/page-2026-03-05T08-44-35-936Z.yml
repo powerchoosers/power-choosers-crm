@@ -1,5 +1,0 @@
-- generic [active] [ref=e1]:
-  - generic [ref=e8]: Initialising Terminal...
-  - region "Notifications alt+T"
-  - button "Open Next.js Dev Tools" [ref=e14] [cursor=pointer]:
-    - img [ref=e15]
