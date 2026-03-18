@@ -281,7 +281,7 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
   })
 
   const sendEmailMutation = useMutation({
-    mutationFn: async (emailData: { to: string, cc?: string, subject: string, content: string, html?: string, hasSignature?: boolean, attachments?: Array<{ filename: string, content: string, type: string, size: number }> }) => {
+    mutationFn: async (emailData: { to: string, cc?: string, subject: string, content: string, html?: string, hasSignature?: boolean, contactId?: string | null, contactName?: string | null, contactCompany?: string | null, attachments?: Array<{ filename: string, content: string, type: string, size: number }> }) => {
       if (!user?.email) {
         throw new Error('You must be logged in to send email')
       }
@@ -308,6 +308,9 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
           userEmail: user.email,
           from: user.email,
           fromName,
+          contactId: emailData.contactId || undefined,
+          contactName: emailData.contactName || undefined,
+          contactCompany: emailData.contactCompany || undefined,
           attachments: emailData.attachments,
         }),
       });
