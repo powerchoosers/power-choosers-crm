@@ -14,6 +14,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { CheckCircle, Eye } from 'lucide-react'
 import { GlobalComposeModal } from '@/components/emails/GlobalComposeModal'
+import { GlobalSync } from '@/components/layout/GlobalSync'
 
 
 import { useUIStore } from '@/store/uiStore'
@@ -97,6 +98,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <VoiceProvider>
           <ChunkLoadErrorHandler />
           <GlobalShortcuts />
+          <GlobalSync />
           <WarRoomOverlay />
           <GlobalComposeModal />
           <SequenceIntelModal 

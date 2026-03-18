@@ -9,7 +9,6 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { LoadingOrb } from "@/components/ui/LoadingOrb";
-import { GlobalSync } from "@/components/layout/GlobalSync"
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
@@ -80,7 +79,6 @@ export function NetworkLayoutClient({
         "font-sans bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-[100dvh] w-screen relative"
       )}
     >
-      <GlobalSync />
       <TopBar />
       <Sidebar />
       <RightPanel />
