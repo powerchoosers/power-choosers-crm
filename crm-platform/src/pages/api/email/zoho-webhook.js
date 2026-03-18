@@ -14,16 +14,41 @@ const EMAIL_KEYS = new Set([
   'emailaddress',
   'mailbox',
   'mailboxemail',
+  'mailboxaddress',
   'owneremail',
   'recipient',
   'recipientemail',
+  'recipientaddress',
   'sender',
   'senderemail',
+  'senderaddress',
   'to',
+  'toaddress',
   'from',
+  'fromaddress',
+  'cc',
+  'ccaddress',
+  'bcc',
+  'bccaddress',
   'useremail',
   'accountemail',
   'replyto',
+  'replytoaddress',
+]);
+
+const ZOHO_MAIL_SIGNAL_KEYS = new Set([
+  'messageid',
+  'sentdateingmt',
+  'receivedtime',
+  'subject',
+  'summary',
+  'html',
+  'fromaddress',
+  'toaddress',
+  'ccaddress',
+  'bccaddress',
+  'folderid',
+  'integidlist',
 ]);
 
 const ACCOUNT_KEYS = new Set([
@@ -109,6 +134,37 @@ function collectCandidates(node, acc, depth = 0) {
       collectCandidates(value, acc, depth + 1);
     }
   }
+}
+
+function hasZohoMailSignal(node, depth = 0) {
+  if (depth > 4 || node == null) return false;
+
+  if (Array.isArray(node)) {
+    return node.some((item) => hasZohoMailSignal(item, depth + 1));
+  }
+
+  if (typeof node !== 'object') return false;
+
+  for (const [key, value] of Object.entries(node)) {
+    const normalizedKey = normalizeKey(key);
+    if (ZOHO_MAIL_SIGNAL_KEYS.has(normalizedKey)) {
+      const text = typeof value === 'string' ? value.trim() : value;
+      if (text !== '' && text != null) return true;
+    }
+
+    if (
+      normalizedKey === 'data' ||
+      normalizedKey === 'payload' ||
+      normalizedKey === 'body' ||
+      normalizedKey === 'event' ||
+      normalizedKey === 'record' ||
+      normalizedKey === 'records'
+    ) {
+      if (hasZohoMailSignal(value, depth + 1)) return true;
+    }
+  }
+
+  return false;
 }
 
 function unique(values) {
@@ -280,11 +336,13 @@ export default async function handler(req, res) {
     const eventType = normalizeText(body?.event || body?.eventType || body?.type || body?.category || body?.action || '');
     const extracted = collectTargetsFromPayload(body, allEmailSet, emailToAccount, accountToEmails);
     const targetEmails = unique(extracted.explicitEmail);
+    const hasZohoMailPayload = hasZohoMailSignal(body);
     const hasWebhookSignal = Boolean(
       eventType ||
       targetEmails.length > 0 ||
       extracted.candidateEmails.length > 0 ||
-      extracted.candidateAccountIds.length > 0
+      extracted.candidateAccountIds.length > 0 ||
+      hasZohoMailPayload
     );
 
     if (!hasWebhookSignal) {
@@ -297,9 +355,14 @@ export default async function handler(req, res) {
 
     logger.info('[ZohoWebhook] Webhook received', {
       eventType: eventType || null,
+      hasZohoMailPayload,
       bodyKeys: Object.keys(body || {}),
       candidateEmails: extracted.candidateEmails,
       candidateAccountIds: extracted.candidateAccountIds,
+      fromAddress: body?.fromAddress || body?.from || null,
+      toAddress: body?.toAddress || body?.to || null,
+      messageId: body?.messageId || null,
+      subject: body?.subject || null,
     });
 
     let syncTargets = targetEmails;
