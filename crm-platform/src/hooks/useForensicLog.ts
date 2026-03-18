@@ -23,6 +23,12 @@ export interface LogEntry {
     detail: string;
 }
 
+function chunk<T>(arr: T[], size: number): T[][] {
+    const out: T[][] = []
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+    return out
+}
+
 export function useForensicLog() {
     const { user, role } = useAuth();
     const { data: marketPulse } = useMarketPulse();
@@ -91,31 +97,32 @@ export function useForensicLog() {
 
             if (validAddresses.length === 0) return []
 
-            // 2. Fetch recent emails specifically for these contacts
-            const conditions: string[] = []
-            validAddresses.forEach(e => {
-                conditions.push(`from.ilike.*${e}*`)
-                conditions.push(`to.cs.["${e}"]`)
-            })
-
+            // 2. Fetch recent emails and filter them locally against the CRM contact set.
+            // This avoids a giant `or=` URL that can blow up when the contact list is large.
             const { data: recentEmails } = await supabase
                 .from('emails')
                 .select('id, subject, from, to, type, timestamp, createdAt, openCount')
-                .or(conditions.join(','))
+                .not('is_deleted', 'eq', true)
                 .order('timestamp', { ascending: false })
+                .order('createdAt', { ascending: false })
                 .limit(60);
 
             if (!recentEmails || recentEmails.length === 0) return [];
 
             // Map contact names for display
-            const { data: contacts } = await supabase
-                .from('contacts')
-                .select('email, name')
-                .in('email', validAddresses);
+            const contacts: any[] = []
+            for (const batch of chunk(validAddresses, 100)) {
+                const { data } = await supabase
+                    .from('contacts')
+                    .select('email, name')
+                    .in('email', batch)
+                if (Array.isArray(data)) contacts.push(...data)
+            }
 
             const validContactEmails = new Map((contacts || []).map(c => [c.email.toLowerCase().trim(), c.name]));
 
-            return recentEmails.map(e => {
+            return recentEmails
+                .map(e => {
                 const fromMatch = e.from?.match(/<([^>]+)>/);
                 const fromAddr = (fromMatch ? fromMatch[1] : e.from)?.toLowerCase().trim();
 
@@ -128,9 +135,21 @@ export function useForensicLog() {
                     }
                 }
 
-                (e as any)._contactName = validContactEmails.get(fromAddr) || validContactEmails.get(toAddr) || 'Contact';
-                return e;
-            });
+                    (e as any)._contactName = validContactEmails.get(fromAddr) || validContactEmails.get(toAddr) || 'Contact';
+                    return e;
+                })
+                .filter((e: any) => {
+                    const fromMatch = e.from?.match(/<([^>]+)>/);
+                    const fromAddr = (fromMatch ? fromMatch[1] : e.from)?.toLowerCase().trim();
+                    const toList = Array.isArray(e.to) ? e.to : [e.to]
+                    const toAddrs = toList
+                        .map((entry: any) => {
+                            const toMatch = String(entry || '').match(/<([^>]+)>/)
+                            return (toMatch ? toMatch[1] : entry)?.toLowerCase().trim()
+                        })
+                        .filter(Boolean)
+                    return validContactEmails.has(fromAddr) || toAddrs.some((addr: string) => validContactEmails.has(addr))
+                });
         },
         enabled: !!user?.email,
         refetchInterval: 15000,
