@@ -11,6 +11,7 @@ export type InboxEmailToastInput = {
   subject?: string;
   snippet?: string;
   hasAttachments?: boolean;
+  sourceLabel?: string;
   photoUrl?: string | null;
   duration?: number;
 };
@@ -21,6 +22,7 @@ export function showInboxEmailToast({
   subject = 'New email from CRM contact',
   snippet = 'New message received',
   hasAttachments = false,
+  sourceLabel,
   photoUrl = null,
   duration = 6500,
 }: InboxEmailToastInput) {
@@ -41,7 +43,14 @@ export function showInboxEmailToast({
           <span className="text-sm font-medium text-white truncate">{fallbackName}</span>
           {hasAttachments && <Paperclip className="w-3.5 h-3.5 text-zinc-400" />}
         </div>
-        <div className="text-[11px] text-zinc-400 truncate">{fallbackCompany}</div>
+        <div className="flex items-center gap-2 text-[11px] text-zinc-400 truncate">
+          <span className="truncate">{fallbackCompany}</span>
+          {sourceLabel ? (
+            <span className="shrink-0 rounded-full border border-white/10 bg-white/5 px-1.5 py-0.5 text-[9px] uppercase tracking-[0.16em] text-zinc-500">
+              {sourceLabel}
+            </span>
+          ) : null}
+        </div>
         <div className="text-xs text-zinc-300 mt-1 line-clamp-2">{fallbackSnippet}</div>
       </div>
     </div>,
