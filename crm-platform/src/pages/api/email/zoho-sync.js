@@ -511,28 +511,44 @@ function formatSourceLabel(value) {
 async function createInboxNotification({ emailDoc, ownerEmail, messageId, source = 'manual' }) {
     if (!emailDoc?.contactId || !ownerEmail || !messageId) return null;
 
-    const { data: contactRow } = await supabaseAdmin
+    const { data: contactRow, error: contactError } = await supabaseAdmin
         .from('contacts')
-        .select('id, email, name, firstName, lastName, accountId, accounts(name)')
+        .select('id, email, name, firstName, lastName, accountId, metadata')
         .eq('id', emailDoc.contactId)
         .maybeSingle();
 
-    let accountName = null;
-    const relatedAccount = Array.isArray(contactRow?.accounts) ? contactRow.accounts[0] : contactRow?.accounts;
-    if (!relatedAccount?.name && (contactRow?.accountId || emailDoc.accountId)) {
-        const { data: accountRow } = await supabaseAdmin
-            .from('accounts')
-            .select('id, name')
-            .eq('id', contactRow?.accountId || emailDoc.accountId)
-            .maybeSingle();
-        accountName = accountRow?.name || null;
+    if (contactError) {
+        logger.warn(`[Zoho Sync] Contact lookup failed for ${emailDoc.contactId}: ${contactError.message}`, 'zoho-sync');
     }
+
     const resolvedContactName = (
         contactRow?.name ||
         [contactRow?.firstName, contactRow?.lastName].filter(Boolean).join(' ').trim() ||
         'New contact'
     );
-    const companyName = relatedAccount?.name || accountName || 'Unknown company';
+
+    const contactMeta = (contactRow?.metadata && typeof contactRow.metadata === 'object') ? contactRow.metadata : {};
+    const photoUrl = (
+        contactMeta.photoUrl ||
+        contactMeta.photo_url ||
+        contactMeta.avatarUrl ||
+        contactMeta.original_apollo_data?.photoUrl ||
+        null
+    );
+
+    let companyName = 'Unknown company';
+    const accountId = contactRow?.accountId || emailDoc.accountId;
+    if (accountId) {
+        const { data: accountRow, error: accountError } = await supabaseAdmin
+            .from('accounts')
+            .select('id, name')
+            .eq('id', accountId)
+            .maybeSingle();
+        if (accountError) {
+            logger.warn(`[Zoho Sync] Account lookup failed for ${accountId}: ${accountError.message}`, 'zoho-sync');
+        }
+        companyName = accountRow?.name || 'Unknown company';
+    }
     const snippet = emailDoc.text?.slice(0, 140) || 'New message received';
     const syncSource = normalizeSyncSource(source);
     const sourceLabel = formatSourceLabel(syncSource);
@@ -552,6 +568,7 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId, source
             accountId: emailDoc.accountId || contactRow?.accountId || null,
             contactName: resolvedContactName,
             company: companyName,
+            photoUrl: photoUrl || null,
             subject: emailDoc.subject || '',
             snippet,
             from: emailDoc.from || '',

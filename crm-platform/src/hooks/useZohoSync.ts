@@ -55,6 +55,7 @@ export function useZohoSync() {
                 subject: String(payload.subject || notification?.message || 'New email from CRM contact'),
                 snippet: String(payload.snippet || notification?.message || 'New message received'),
                 hasAttachments: Boolean(payload.hasAttachments),
+                photoUrl: (payload.photoUrl as string | null) ?? null,
                 sourceLabel: sourceLabel || undefined,
             });
 

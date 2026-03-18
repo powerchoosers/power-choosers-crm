@@ -262,6 +262,7 @@ export function GlobalSync() {
             subject,
             snippet,
             hasAttachments,
+            photoUrl: (notification.data?.photoUrl as string | null) ?? null,
             sourceLabel: sourceLabel || undefined,
           })
 
@@ -321,6 +322,7 @@ export function GlobalSync() {
           subject: String(payload.subject || row.message || 'New email from CRM contact'),
           snippet: String(payload.snippet || row.message || 'New message received'),
           hasAttachments: Boolean(payload.hasAttachments),
+          photoUrl: (payload.photoUrl as string | null) ?? null,
           sourceLabel: formatSourceLabel(payload.source || row.metadata?.source),
         })
 
