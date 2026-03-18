@@ -279,6 +279,20 @@ export default async function handler(req, res) {
     const eventType = normalizeText(body?.event || body?.eventType || body?.type || body?.category || body?.action || '');
     const extracted = collectTargetsFromPayload(body, allEmailSet, emailToAccount, accountToEmails);
     const targetEmails = unique(extracted.explicitEmail);
+    const hasWebhookSignal = Boolean(
+      eventType ||
+      targetEmails.length > 0 ||
+      extracted.candidateEmails.length > 0 ||
+      extracted.candidateAccountIds.length > 0
+    );
+
+    if (!hasWebhookSignal) {
+      logger.info('[ZohoWebhook] Handshake received, acknowledging without sync');
+      return res.status(200).json({
+        success: true,
+        message: 'Webhook handshake acknowledged',
+      });
+    }
 
     let syncTargets = targetEmails;
     let syncMode = 'resolved';
