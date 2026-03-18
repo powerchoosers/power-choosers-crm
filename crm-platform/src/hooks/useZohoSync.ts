@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useSyncStore } from '@/store/syncStore';
 import { supabase } from '@/lib/supabase';
 import { showInboxEmailToast } from '@/lib/inbox-email-toast';
+import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe';
 
 const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {};
 
@@ -43,6 +44,7 @@ export function useZohoSync() {
             const payload = notification?.data || {};
             const notificationId = String(payload.emailId || notification?.id || '').trim();
             if (!notificationId || deliveredNotificationIdsRef.current.has(notificationId)) return;
+            if (!consumeInboxToastId(notificationId)) return;
             deliveredNotificationIdsRef.current.add(notificationId);
 
             showInboxEmailToast({
