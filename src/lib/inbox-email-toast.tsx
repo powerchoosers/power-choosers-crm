@@ -21,7 +21,6 @@ export function showInboxEmailToast({
   subject,
   snippet,
   hasAttachments = false,
-  sourceLabel,
   photoUrl = null,
   duration = 6500,
 }: InboxEmailToastInput) {
@@ -32,10 +31,10 @@ export function showInboxEmailToast({
     <InboxEmailToast
       name={name}
       company={company}
-      subject={subject || snippet}
+      subject={subject}
+      snippet={snippet}
       photoUrl={photoUrl}
       hasAttachments={hasAttachments}
-      sourceLabel={sourceLabel}
     />,
     { duration }
   )
