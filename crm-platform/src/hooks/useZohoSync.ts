@@ -47,12 +47,15 @@ export function useZohoSync() {
             if (!consumeInboxToastId(notificationId)) return;
             deliveredNotificationIdsRef.current.add(notificationId);
 
+            const sourceLabel = String(payload.sourceLabel || notification?.metadata?.sourceLabel || '').trim();
+
             showInboxEmailToast({
                 name: String(payload.contactName || notification?.title?.replace(/^New email from\s+/i, '') || 'CRM contact'),
                 company: String(payload.company || 'Unknown company'),
                 subject: String(payload.subject || notification?.message || 'New email from CRM contact'),
                 snippet: String(payload.snippet || notification?.message || 'New message received'),
                 hasAttachments: Boolean(payload.hasAttachments),
+                sourceLabel: sourceLabel || undefined,
             });
 
             void supabase
@@ -64,6 +67,7 @@ export function useZohoSync() {
 
     const performSync = useCallback(async (isSilent = false) => {
         if (!user?.email || syncInProgress.current) return;
+        const syncSource = isSilent ? 'background' : 'manual';
 
         try {
             syncInProgress.current = true;
@@ -78,7 +82,7 @@ export function useZohoSync() {
                 const response = await fetch('/api/email/zoho-sync', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userEmail: inboxEmail }),
+                    body: JSON.stringify({ userEmail: inboxEmail, source: syncSource }),
                 });
 
                 const data = await response.json();
