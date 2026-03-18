@@ -116,16 +116,17 @@ function unique(values) {
 }
 
 function readWebhookSecret(req) {
+  const headers = req?.headers || {};
   const headerSecret = [
-    req.headers['x-zoho-webhook-secret'],
-    req.headers['x-webhook-secret'],
-    req.headers['x-zoho-mail-webhook-secret'],
-    req.headers.authorization,
+    headers['x-zoho-webhook-secret'],
+    headers['x-webhook-secret'],
+    headers['x-zoho-mail-webhook-secret'],
+    headers.authorization,
   ]
     .find((value) => typeof value === 'string' && value.trim()) || '';
 
-  const querySecret = typeof req.query?.secret === 'string' ? req.query.secret : '';
-  const bodySecret = typeof req.body?.secret === 'string' ? req.body.secret : '';
+  const querySecret = typeof req?.query?.secret === 'string' ? req.query.secret : '';
+  const bodySecret = typeof req?.body?.secret === 'string' ? req.body.secret : '';
 
   const candidate = String(headerSecret || querySecret || bodySecret || '').trim();
   if (candidate.toLowerCase().startsWith('bearer ')) {
