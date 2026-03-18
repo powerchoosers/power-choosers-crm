@@ -737,13 +737,38 @@ export default function EmailDetailPage() {
         return []
       })
 
-      // Resolve contact identity from the thread so zoho-send persists the correct
-      // contactId / contactName on the new email row (avoids fallback resolution).
+      // Resolve contact identity from the exact reply target first, then the thread.
+      // This prevents replies from falling back to raw email strings in the list.
       const recipientAddr = extractEmailAddress(toRecipients[0] || '')
-      const resolvedContact =
+      const messageMatchesRecipient = (message: Email) => {
+        if (!recipientAddr) return false
+        const fromAddr = extractEmailAddress(message.from || '')
+        const toAddrList = (Array.isArray(message.to) ? message.to : String(message.to || '').split(','))
+          .map((addr: string) => extractEmailAddress(String(addr || '')))
+          .filter(Boolean)
+        return fromAddr === recipientAddr || toAddrList.includes(recipientAddr)
+      }
+      const targetMessageContact =
+        (targetMessage?.contactId ? (targetMessage.contact || contactById[targetMessage.contactId]) : undefined)
+      const threadContactSource = threadEmails.find((threadEmail: Email) =>
+        Boolean(threadEmail?.contactId) && messageMatchesRecipient(threadEmail)
+      )
+      const threadMatchedContact =
+        (threadContactSource?.contactId ? (threadContactSource.contact || contactById[threadContactSource.contactId]) : undefined)
+      const rootMessageContact =
         (email?.contactId ? (email?.contact || contactById[email.contactId]) : undefined)
-        || contactByEmail[recipientAddr]
-      const resolvedContactId = resolvedContact?.id || email?.contactId || null
+
+      const resolvedContact =
+        (recipientAddr ? contactByEmail[recipientAddr] : undefined)
+        || targetMessageContact
+        || threadMatchedContact
+        || rootMessageContact
+      const resolvedContactId =
+        resolvedContact?.id
+        || targetMessage?.contactId
+        || threadContactSource?.contactId
+        || email?.contactId
+        || null
       const resolvedContactName = resolvedContact?.displayName
         || [resolvedContact?.firstName, resolvedContact?.lastName].filter(Boolean).join(' ').trim()
         || null
