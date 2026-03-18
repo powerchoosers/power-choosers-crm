@@ -527,11 +527,9 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId, source
             .maybeSingle();
         accountName = accountRow?.name || null;
     }
-    const contactName = (
+    const resolvedContactName = (
         contactRow?.name ||
         [contactRow?.firstName, contactRow?.lastName].filter(Boolean).join(' ').trim() ||
-        extractDisplayName(emailDoc.from) ||
-        extractEmailAddress(emailDoc.from) ||
         'New contact'
     );
     const companyName = relatedAccount?.name || accountName || 'Unknown company';
@@ -543,7 +541,7 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId, source
         id: `email-notif-${messageId}`,
         ownerId: ownerEmail,
         userId: null,
-        title: `New email from ${contactName}`,
+        title: `New email from ${resolvedContactName}`,
         message: emailDoc.subject || snippet,
         type: 'email',
         read: false,
@@ -552,7 +550,7 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId, source
             emailId: messageId,
             contactId: emailDoc.contactId,
             accountId: emailDoc.accountId || contactRow?.accountId || null,
-            contactName,
+            contactName: resolvedContactName,
             company: companyName,
             subject: emailDoc.subject || '',
             snippet,
