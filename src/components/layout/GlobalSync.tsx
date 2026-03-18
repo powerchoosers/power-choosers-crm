@@ -51,6 +51,15 @@ function normalizeLookupText(value?: string | null) {
     .replace(/[^a-z0-9]+/g, '')
 }
 
+function formatSourceLabel(value?: string | null) {
+  const source = String(value || '').toLowerCase().trim()
+  if (source === 'webhook') return 'Webhook'
+  if (source === 'manual') return 'Manual sync'
+  if (source === 'background') return 'Background sync'
+  if (source === 'cron') return 'Cron sync'
+  return ''
+}
+
 export function GlobalSync() {
   const { user, loading } = useAuth()
   const { performSync } = useZohoSync()
@@ -245,6 +254,7 @@ export function GlobalSync() {
           const subject = String(notification.data?.subject || notification.message || 'New email from CRM contact')
           const snippet = String(notification.data?.snippet || notification.message || 'New message received')
           const hasAttachments = Boolean(notification.data?.hasAttachments)
+          const sourceLabel = formatSourceLabel(notification.data?.source || notification.metadata?.source)
 
           showInboxEmailToast({
             name,
@@ -252,6 +262,7 @@ export function GlobalSync() {
             subject,
             snippet,
             hasAttachments,
+            sourceLabel: sourceLabel || undefined,
           })
 
           await supabase
@@ -310,6 +321,7 @@ export function GlobalSync() {
           subject: String(payload.subject || row.message || 'New email from CRM contact'),
           snippet: String(payload.snippet || row.message || 'New message received'),
           hasAttachments: Boolean(payload.hasAttachments),
+          sourceLabel: formatSourceLabel(payload.source || row.metadata?.source),
         })
 
         await supabase
