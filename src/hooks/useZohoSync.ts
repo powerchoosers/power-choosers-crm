@@ -3,6 +3,7 @@ import { useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useSyncStore } from '@/store/syncStore';
 import { supabase } from '@/lib/supabase';
+import { showInboxEmailToast } from '@/lib/inbox-email-toast';
 
 const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {};
 
@@ -35,6 +36,24 @@ export function useZohoSync() {
     const { user } = useAuth();
     const { isSyncing, setIsSyncing, setLastSyncTime, syncCount, setSyncCount } = useSyncStore();
     const syncInProgress = useRef(false);
+    const deliveredNotificationIdsRef = useRef(new Set<string>());
+
+    const showSyncNotifications = useCallback((notifications: any[] = []) => {
+        notifications.forEach((notification) => {
+            const payload = notification?.data || {};
+            const notificationId = String(payload.emailId || notification?.id || '').trim();
+            if (!notificationId || deliveredNotificationIdsRef.current.has(notificationId)) return;
+            deliveredNotificationIdsRef.current.add(notificationId);
+
+            showInboxEmailToast({
+                name: String(payload.contactName || notification?.title?.replace(/^New email from\s+/i, '') || 'CRM contact'),
+                company: String(payload.company || 'Unknown company'),
+                subject: String(payload.subject || notification?.message || 'New email from CRM contact'),
+                snippet: String(payload.snippet || notification?.message || 'New message received'),
+                hasAttachments: Boolean(payload.hasAttachments),
+            });
+        });
+    }, []);
 
     const performSync = useCallback(async (isSilent = false) => {
         if (!user?.email || syncInProgress.current) return;
@@ -60,6 +79,9 @@ export function useZohoSync() {
                 if (data.success) {
                     totalSynced += Number(data.count || 0);
                     console.log(`[Zoho Sync] ${inboxEmail}: synced ${data.count || 0} emails.`, data.debug || '');
+                    if (!isSilent && Array.isArray(data.notifications) && data.notifications.length > 0) {
+                        showSyncNotifications(data.notifications);
+                    }
                 } else {
                     console.error(`[Zoho Sync] ${inboxEmail}: sync failed`, data.error);
                 }
@@ -75,7 +97,7 @@ export function useZohoSync() {
             syncInProgress.current = false;
             setIsSyncing(false);
         }
-    }, [user, setIsSyncing, setLastSyncTime, setSyncCount, syncCount]);
+    }, [user, setIsSyncing, setLastSyncTime, setSyncCount, syncCount, showSyncNotifications]);
 
     useEffect(() => {
         if (!user) return;
