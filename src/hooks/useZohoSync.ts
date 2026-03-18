@@ -52,6 +52,11 @@ export function useZohoSync() {
                 snippet: String(payload.snippet || notification?.message || 'New message received'),
                 hasAttachments: Boolean(payload.hasAttachments),
             });
+
+            void supabase
+                .from('notifications')
+                .update({ read: true })
+                .eq('id', notification?.id || notificationId);
         });
     }, []);
 
@@ -79,7 +84,7 @@ export function useZohoSync() {
                 if (data.success) {
                     totalSynced += Number(data.count || 0);
                     console.log(`[Zoho Sync] ${inboxEmail}: synced ${data.count || 0} emails.`, data.debug || '');
-                    if (!isSilent && Array.isArray(data.notifications) && data.notifications.length > 0) {
+                    if (Array.isArray(data.notifications) && data.notifications.length > 0) {
                         showSyncNotifications(data.notifications);
                     }
                 } else {
