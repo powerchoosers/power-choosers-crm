@@ -490,6 +490,66 @@ async function autoIngestInboundAttachments({
     return { saved, skipped };
 }
 
+async function createInboxNotification({ emailDoc, ownerEmail, messageId }) {
+    if (!emailDoc?.contactId || !ownerEmail || !messageId) return null;
+
+    const { data: contactRow } = await supabaseAdmin
+        .from('contacts')
+        .select('id, email, name, firstName, lastName, accountId, accounts(name)')
+        .eq('id', emailDoc.contactId)
+        .maybeSingle();
+
+    const relatedAccount = Array.isArray(contactRow?.accounts) ? contactRow.accounts[0] : contactRow?.accounts;
+    const contactName = (
+        contactRow?.name ||
+        [contactRow?.firstName, contactRow?.lastName].filter(Boolean).join(' ').trim() ||
+        extractDisplayName(emailDoc.from) ||
+        extractEmailAddress(emailDoc.from) ||
+        'New contact'
+    );
+    const companyName = relatedAccount?.name || 'Unknown company';
+    const snippet = emailDoc.text?.slice(0, 140) || 'New message received';
+
+    const notification = {
+        id: `email-notif-${messageId}`,
+        ownerId: ownerEmail,
+        userId: null,
+        title: `New email from ${contactName}`,
+        message: emailDoc.subject || snippet,
+        type: 'email',
+        read: false,
+        link: `/network/emails/${messageId}`,
+        data: {
+            emailId: messageId,
+            contactId: emailDoc.contactId,
+            accountId: emailDoc.accountId || contactRow?.accountId || null,
+            contactName,
+            company: companyName,
+            subject: emailDoc.subject || '',
+            snippet,
+            from: emailDoc.from || '',
+            hasAttachments: !!emailDoc.metadata?.hasAttachments,
+        },
+        metadata: {
+            ownerId: ownerEmail,
+            emailId: messageId,
+            contactId: emailDoc.contactId,
+            accountId: emailDoc.accountId || contactRow?.accountId || null,
+        },
+    };
+
+    const { error } = await supabaseAdmin
+        .from('notifications')
+        .upsert(notification, { onConflict: 'id' });
+
+    if (error) {
+        logger.warn(`[Zoho Sync] Notification insert failed for ${messageId}: ${error.message}`, 'zoho-sync');
+        return null;
+    }
+
+    return notification;
+}
+
 async function triggerDocumentAnalysis(accountId, filePath, fileName) {
     if (!accountId || !filePath) return false;
     try {
@@ -561,6 +621,7 @@ export default async function handler(req, res) {
         let syncedCount = 0;
         let skippedCount = 0;
         let ingestedAttachmentCount = 0;
+        const notifications = [];
 
         for (const msgSummary of messages) {
             // Zoho messageId is a 19-digit number as a string
@@ -709,6 +770,16 @@ export default async function handler(req, res) {
                 logger.error(`[Zoho Sync] Failed to save message ${messageId}:`, insertError, 'zoho-sync');
             } else {
                 syncedCount++;
+                if (emailDoc.type === 'received' && emailDoc.contactId) {
+                    const notification = await createInboxNotification({
+                        emailDoc,
+                        ownerEmail: userEmail,
+                        messageId,
+                    });
+                    if (notification) {
+                        notifications.push(notification);
+                    }
+                }
                 if (emailDoc.type === 'received' && emailDoc.accountId && Array.isArray(emailDoc.metadata?.attachments) && emailDoc.metadata.attachments.length > 0) {
                     const ingest = await autoIngestInboundAttachments({
                         zohoService,
@@ -724,7 +795,7 @@ export default async function handler(req, res) {
         }
 
         logger.info(`[Zoho Sync] Sync complete for ${userEmail}: ${syncedCount} new, ${skippedCount} skipped, ${ingestedAttachmentCount} attachments ingested`, 'zoho-sync');
-        res.status(200).json({ success: true, count: syncedCount, ingestedAttachments: ingestedAttachmentCount });
+        res.status(200).json({ success: true, count: syncedCount, ingestedAttachments: ingestedAttachmentCount, notifications });
 
     } catch (error) {
         logger.error(`[Zoho Sync] Global error for ${userEmail}:`, error, 'zoho-sync');
