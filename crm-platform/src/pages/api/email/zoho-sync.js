@@ -125,6 +125,79 @@ function extractEmailAddress(value) {
     return email.trim().toLowerCase();
 }
 
+function extractEmailFromUnknown(value, depth = 0) {
+    if (depth > 4 || value == null) return '';
+
+    if (typeof value === 'string') {
+        const raw = value.trim();
+        if (!raw) return '';
+        const direct = extractEmailAddress(raw);
+        if (isLikelyEmail(direct)) return direct;
+        const inline = raw.match(/[^\s<>,;]+@[^\s<>,;]+\.[^\s<>,;]+/i)?.[0] || '';
+        return isLikelyEmail(inline) ? inline.toLowerCase() : '';
+    }
+
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const found = extractEmailFromUnknown(item, depth + 1);
+            if (found) return found;
+        }
+        return '';
+    }
+
+    if (typeof value === 'object') {
+        const keys = [
+            'email',
+            'emailAddress',
+            'address',
+            'mailAddress',
+            'fromAddress',
+            'senderAddress',
+            'replyTo',
+            'replyToAddress',
+            'from',
+            'sender',
+            'value',
+        ];
+        for (const key of keys) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+                const found = extractEmailFromUnknown(value[key], depth + 1);
+                if (found) return found;
+            }
+        }
+        for (const nested of Object.values(value)) {
+            const found = extractEmailFromUnknown(nested, depth + 1);
+            if (found) return found;
+        }
+    }
+
+    return '';
+}
+
+function extractDisplayName(value) {
+    if (value == null) return '';
+    if (typeof value === 'string') {
+        return value.replace(/<\s*[^>]+\s*>/g, '').trim();
+    }
+    if (Array.isArray(value)) {
+        for (const item of value) {
+            const found = extractDisplayName(item);
+            if (found) return found;
+        }
+        return '';
+    }
+    if (typeof value === 'object') {
+        const keys = ['name', 'displayName', 'fullName', 'personal', 'label', 'fromName', 'sender'];
+        for (const key of keys) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+                const found = extractDisplayName(value[key]);
+                if (found) return found;
+            }
+        }
+    }
+    return '';
+}
+
 function normalizeLookupText(value) {
     return String(value || '')
         .toLowerCase()
@@ -670,14 +743,18 @@ function parseZohoMessage(summary, content, ownerEmail) {
     // Build a proper "Display Name <email@domain.com>" from string.
     // Zoho sometimes returns only a display name in content.fromAddress for alias-sent emails,
     // so we check summary.senderAddress (which reliably has the email) and combine both.
-    const senderDisplayName = summary?.sender || '';
-    const emailFromContent = extractEmailAddress(content?.fromAddress || '');
-    const emailFromSummary = extractEmailAddress(summary?.senderAddress || '');
+    const senderDisplayName =
+        extractDisplayName(summary?.sender)
+        || extractDisplayName(content?.fromAddress)
+        || extractDisplayName(summary?.senderAddress)
+        || '';
+    const emailFromContent = extractEmailFromUnknown(content?.fromAddress || content?.from || content?.sender || null);
+    const emailFromSummary = extractEmailFromUnknown(summary?.senderAddress || summary?.fromAddress || summary?.from || null);
     // Also check raw senderAddress in case extractEmailAddress misses a bare email
-    const rawSenderAddress = summary?.senderAddress || '';
+    const rawSenderAddress = summary?.senderAddress || summary?.fromAddress || '';
     const actualSenderEmail = (isLikelyEmail(emailFromContent) ? emailFromContent : null)
         || (isLikelyEmail(emailFromSummary) ? emailFromSummary : null)
-        || (isLikelyEmail(rawSenderAddress) ? rawSenderAddress : null)
+        || (isLikelyEmail(extractEmailAddress(rawSenderAddress)) ? extractEmailAddress(rawSenderAddress) : null)
         || '';
     // Fallback: if display name matches a known Nodal Point sender, use the known alias address
     const knownNodalSender = !actualSenderEmail && (
@@ -688,9 +765,17 @@ function parseZohoMessage(summary, content, ownerEmail) {
     const resolvedSenderEmail = actualSenderEmail || knownNodalSender;
     const fromAddress = resolvedSenderEmail
         ? (senderDisplayName ? `${senderDisplayName} <${resolvedSenderEmail}>` : resolvedSenderEmail)
-        : (content?.fromAddress || summary?.senderAddress || summary?.sender || '');
+        : (
+            extractDisplayName(content?.fromAddress)
+            || extractDisplayName(summary?.senderAddress)
+            || extractDisplayName(summary?.sender)
+            || content?.fromAddress
+            || summary?.senderAddress
+            || summary?.sender
+            || ''
+        );
 
-    const replyToAddress = content?.replyToAddress || content?.replyTo || summary?.replyToAddress || summary?.replyTo || null;
+    const replyToAddress = extractEmailFromUnknown(content?.replyToAddress || content?.replyTo || summary?.replyToAddress || summary?.replyTo || null) || null;
     const hasAttachments = hasAttachmentsInPayload(summary, content, attachmentMeta);
 
     // Prefer concrete email addresses from message content when available.

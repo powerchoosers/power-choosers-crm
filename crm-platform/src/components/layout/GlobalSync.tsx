@@ -279,6 +279,7 @@ export function GlobalSync() {
             snippet?: string
             type?: string
             timestamp?: string
+            createdAt?: string
             created_at?: string
             ownerId?: string
             attachments?: Array<unknown>
@@ -314,7 +315,7 @@ export function GlobalSync() {
           queryClient.invalidateQueries({ queryKey: ['emails-count'] })
 
           // Avoid spam on first sync/load by only notifying for fresh inserts.
-          const insertedAt = email.timestamp || email.created_at
+          const insertedAt = email.createdAt || email.created_at || email.timestamp
           if (insertedAt) {
             const insertedTs = new Date(insertedAt).getTime()
             if (!Number.isNaN(insertedTs) && Date.now() - insertedTs > 10 * 60 * 1000) return
