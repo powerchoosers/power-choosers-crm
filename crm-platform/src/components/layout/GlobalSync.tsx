@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { CheckCircle, Eye } from 'lucide-react'
 import { showInboxEmailToast } from '@/lib/inbox-email-toast'
+import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe'
 
 const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -315,6 +316,7 @@ export function GlobalSync() {
 
           const signalId = String(email.id || '').trim()
           if (signalId && seenInboxSignalIdsRef.current.has(signalId)) return
+          if (signalId && !consumeInboxToastId(signalId)) return
           if (signalId) seenInboxSignalIdsRef.current.add(signalId)
 
           const senderEmail = extractEmailAddress(senderLabel) || extractEmailAddress(email.from)
@@ -382,6 +384,7 @@ export function GlobalSync() {
         const payload = (row.data && typeof row.data === 'object') ? row.data as Record<string, any> : {}
         const signalId = String(payload.emailId || row.id || '').trim()
         if (!signalId || seenInboxSignalIdsRef.current.has(signalId)) continue
+        if (!consumeInboxToastId(signalId)) continue
 
         seenInboxSignalIdsRef.current.add(signalId)
 
