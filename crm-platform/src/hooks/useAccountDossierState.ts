@@ -147,6 +147,7 @@ export function useAccountDossierState(id: string) {
         if (wasEditing && !isEditing) {
             if (skipSaveOnNextLockRef.current) {
                 skipSaveOnNextLockRef.current = false
+                suppressHydrationRef.current = false
                 return
             }
             const triggerSave = async () => {
@@ -235,10 +236,18 @@ export function useAccountDossierState(id: string) {
         }
     }, [isEditing, id, editAccountName, editNotes, editAnnualUsage, editStrikePrice, editMills, editIndustry, editLocation, editEmployees, editLogoUrl, editSupplier, editDomain, editLinkedinUrl, editMeters, editContractEnd, editCompanyPhone, editAddress, updateAccount])
 
+    const lockWithoutSaving = () => {
+        if (!isEditing) return
+        skipSaveOnNextLockRef.current = true
+        suppressHydrationRef.current = false
+        setIsEditing(false)
+    }
+
     useEffect(() => {
         return () => {
             if (!prevIsEditing.current) return
             skipSaveOnNextLockRef.current = true
+            suppressHydrationRef.current = false
             setIsEditing(false)
         }
     }, [setIsEditing])
@@ -366,7 +375,7 @@ export function useAccountDossierState(id: string) {
     return {
         id, account, contacts, calls, isLoading: isLoading || (!!id && account == null && !isFetched),
         isLoadingContacts, isLoadingCalls, isFetched,
-        isEditing, toggleEditing, isSaving, showSynced, setActiveEditField, activeEditField,
+        isEditing, lockWithoutSaving, toggleEditing, isSaving, showSynced, setActiveEditField, activeEditField,
         recentlyUpdatedFields, glowingFields, isRecalibrating,
         editAccountName, setEditAccountName, editNotes, setEditNotes, editAnnualUsage, setEditAnnualUsage,
         editStrikePrice, setEditStrikePrice, editMills, setEditMills, editIndustry, setEditIndustry, editLocation, setEditLocation,

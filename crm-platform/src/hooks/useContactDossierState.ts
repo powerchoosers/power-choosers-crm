@@ -187,6 +187,7 @@ export function useContactDossierState(id: string) {
         if (wasEditing && !isEditing) {
             if (skipSaveOnNextLockRef.current) {
                 skipSaveOnNextLockRef.current = false
+                suppressHydrationRef.current = false
                 return
             }
             const triggerSave = async () => {
@@ -323,10 +324,18 @@ export function useContactDossierState(id: string) {
         }
     }, [isEditing, id, editFirstName, editLastName, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editMills, editAnnualUsage, editLocation, editLogoUrl, editWebsite, editLinkedinUrl, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editContractEnd, updateContact, updateAccount, contact])
 
+    const lockWithoutSaving = () => {
+        if (!isEditing) return
+        skipSaveOnNextLockRef.current = true
+        suppressHydrationRef.current = false
+        setIsEditing(false)
+    }
+
     useEffect(() => {
         return () => {
             if (!prevIsEditing.current) return
             skipSaveOnNextLockRef.current = true
+            suppressHydrationRef.current = false
             setIsEditing(false)
         }
     }, [setIsEditing])
@@ -342,6 +351,7 @@ export function useContactDossierState(id: string) {
 
         // UI State
         isEditing,
+        lockWithoutSaving,
         toggleEditing,
         isSaving,
         showSynced,

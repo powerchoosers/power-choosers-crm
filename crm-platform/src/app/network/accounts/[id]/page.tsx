@@ -22,6 +22,7 @@ export default function AccountDossierPage() {
   const deleteAccount = useDeleteAccount()
 
   const handleDelete = () => {
+    state.lockWithoutSaving()
     deleteAccount.mutate(id, {
       onSuccess: () => router.back(),
     })

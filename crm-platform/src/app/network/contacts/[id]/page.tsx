@@ -33,6 +33,7 @@ export default function ContactDossierPage() {
   const deleteContact = useDeleteContact()
 
   const handleDelete = () => {
+    s.lockWithoutSaving()
     deleteContact.mutate(id, {
       onSuccess: () => router.back(),
     })
