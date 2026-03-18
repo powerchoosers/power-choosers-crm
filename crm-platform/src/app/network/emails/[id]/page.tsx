@@ -737,6 +737,18 @@ export default function EmailDetailPage() {
         return []
       })
 
+      // Resolve contact identity from the thread so zoho-send persists the correct
+      // contactId / contactName on the new email row (avoids fallback resolution).
+      const recipientAddr = extractEmailAddress(toRecipients[0] || '')
+      const resolvedContact =
+        (email?.contactId ? (email?.contact || contactById[email.contactId]) : undefined)
+        || contactByEmail[recipientAddr]
+      const resolvedContactId = resolvedContact?.id || email?.contactId || null
+      const resolvedContactName = resolvedContact?.displayName
+        || [resolvedContact?.firstName, resolvedContact?.lastName].filter(Boolean).join(' ').trim()
+        || null
+      const resolvedContactCompany = ('accountName' in (resolvedContact || {}) ? (resolvedContact as any)?.accountName : null) || null
+
       const response = await fetch('/api/email/zoho-send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -752,6 +764,9 @@ export default function EmailDetailPage() {
           fromName,
           threadId: composerMode === 'forward' ? undefined : threadKey,
           attachments: encodedAttachments,
+          contactId: resolvedContactId,
+          contactName: resolvedContactName,
+          contactCompany: resolvedContactCompany,
           // Signal to the backend that this page has already embedded the correct signature.
           // Prevents zoho-send.js from injecting a second one via its fallback path.
           hasSignature: true
@@ -777,8 +792,16 @@ export default function EmailDetailPage() {
       setReplyAttachments([])
       setIsReplyOpen(false)
       queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
       queryClient.invalidateQueries({ queryKey: ['email', id] })
       queryClient.invalidateQueries({ queryKey: threadQueryKey })
+      // Force refetch after a short delay so the email list picks up the new row
+      // even if the list page component isn't mounted yet (matches ComposeModal pattern).
+      setTimeout(() => {
+        queryClient.refetchQueries({ queryKey: ['emails'] })
+        queryClient.refetchQueries({ queryKey: threadQueryKey })
+      }, 500)
     } catch (error: any) {
       toast.error(error?.message || `Failed to send ${composerMode === 'forward' ? 'forward' : 'reply'}`)
     } finally {
