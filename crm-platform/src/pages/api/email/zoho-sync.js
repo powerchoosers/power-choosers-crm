@@ -508,6 +508,65 @@ function formatSourceLabel(value) {
     return '';
 }
 
+function normalizeWebhookHint(value) {
+    if (!value || typeof value !== 'object') return null;
+    const messageId = String(value.messageId || '').trim();
+    if (!messageId) return null;
+
+    return {
+        messageId,
+        fromAddress: String(value.fromAddress || '').trim() || null,
+        toAddress: String(value.toAddress || '').trim() || null,
+        subject: String(value.subject || '').trim() || null,
+        receivedTime: String(value.receivedTime || '').trim() || null,
+        folderId: String(value.folderId || '').trim() || null,
+        folderName: String(value.folderName || '').trim() || null,
+    };
+}
+
+function buildWebhookSeedSummary(userEmail, hint) {
+    if (!hint?.messageId) return null;
+
+    const now = Date.now();
+    const receivedMs = Number(hint.receivedTime || now);
+    const receivedTime = Number.isFinite(receivedMs) && receivedMs > 0 ? String(receivedMs) : String(now);
+
+    return {
+        messageId: hint.messageId,
+        receivedTime,
+        sentTime: receivedTime,
+        subject: hint.subject || '',
+        sender: hint.fromAddress || '',
+        senderAddress: hint.fromAddress || '',
+        fromAddress: hint.fromAddress || '',
+        toAddress: hint.toAddress || userEmail,
+        folderId: hint.folderId || null,
+        folderName: hint.folderName || 'inbox',
+        isRead: false,
+        isStarred: false,
+    };
+}
+
+function mergeMessagesWithSeed(seedSummary, messages) {
+    const combined = [];
+    if (seedSummary?.messageId) combined.push(seedSummary);
+    if (Array.isArray(messages)) combined.push(...messages);
+
+    const seen = new Set();
+    const deduped = [];
+    for (const item of combined) {
+        const messageId = String(item?.messageId || item?.message_id || '').trim();
+        if (!messageId || seen.has(messageId)) continue;
+        seen.add(messageId);
+        deduped.push(item);
+    }
+    return deduped;
+}
+
+function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function createInboxNotification({ emailDoc, ownerEmail, messageId, source = 'manual' }) {
     if (!emailDoc?.contactId || !ownerEmail || !messageId) return null;
 
@@ -629,6 +688,7 @@ export default async function handler(req, res) {
 
     const { userEmail } = req.body;
     const syncSource = normalizeSyncSource(req.body?.source || 'manual');
+    const webhookHint = normalizeWebhookHint(req.body?.webhookHint);
 
     if (!userEmail) {
         res.status(400).json({ error: 'Missing userEmail' });
@@ -643,7 +703,11 @@ export default async function handler(req, res) {
         const { accessToken, accountId } = await getValidAccessTokenForUser(userEmail).catch(e => ({ error: e.message }));
 
         // 1. Fetch recent messages from Zoho inbox
-        const messages = await zohoService.listMessages(userEmail, { limit: 20 });
+        const listedMessages = await zohoService.listMessages(userEmail, { limit: 20 });
+        const webhookSeedSummary = (syncSource === 'webhook' && webhookHint?.messageId)
+            ? buildWebhookSeedSummary(userEmail, webhookHint)
+            : null;
+        const messages = mergeMessagesWithSeed(webhookSeedSummary, listedMessages);
 
         if (!messages || messages.length === 0) {
             logger.info(`[Zoho Sync] No messages found for ${userEmail}`, 'zoho-sync');
@@ -660,6 +724,7 @@ export default async function handler(req, res) {
                     user: userEmail,
                     accountId: accountId,
                     hasToken: !!accessToken,
+                    webhookHint: webhookHint || null,
                     folderCount: folders.length,
                     inboxFolder: inbox ? { id: inbox.folderId, name: inbox.folderName, path: inbox.path, type: inbox.folderType } : "Not Found"
                 }
@@ -674,173 +739,194 @@ export default async function handler(req, res) {
 
         for (const msgSummary of messages) {
             // Zoho messageId is a 19-digit number as a string
-            const messageId = String(msgSummary.messageId || msgSummary.message_id);
-
-            // 2. Check for duplicates in Supabase using the primary 'id' column
-            const { data: existing } = await supabaseAdmin
-                .from('emails')
-                .select('id, from, metadata, contactId, accountId, threadId, subject')
-                .eq('id', messageId)
-                .maybeSingle();
-
-            if (existing) {
-                // Backfill attachments and sender email for previously-synced rows.
-                const existingAttachments = Array.isArray(existing?.metadata?.attachments) ? existing.metadata.attachments : [];
-                const hasExistingAttachments = existingAttachments.length > 0;
-
-                // Check if from field is missing an email address (just a display name)
-                const existingFrom = existing?.from || '';
-                const existingFromEmail = extractEmailAddress(existingFrom);
-                const summaryEmail = extractEmailAddress(msgSummary?.senderAddress || '');
-                const needsFromBackfill = !isLikelyEmail(existingFromEmail) && isLikelyEmail(summaryEmail);
-
-                if (!hasExistingAttachments || needsFromBackfill) {
-                    try {
-                        const backfillUpdate = { ...(existing?.metadata || {}) };
-
-                        // Fix from field with actual email if available from summary
-                        if (needsFromBackfill && summaryEmail) {
-                            const displayName = msgSummary?.sender || '';
-                            const fixedFrom = displayName ? `${displayName} <${summaryEmail}>` : summaryEmail;
-                            backfillUpdate.fromAddress = summaryEmail;
-                            await supabaseAdmin
-                                .from('emails')
-                                .update({ from: fixedFrom, metadata: { ...backfillUpdate }, updatedAt: new Date().toISOString() })
-                                .eq('id', messageId);
-                        }
-
-                        // Fetch real attachment metadata via dedicated API call
-                        if (!hasExistingAttachments) {
-                            const attList = await zohoService.getMessageAttachments(
-                                userEmail, messageId, msgSummary?.folderId || msgSummary?.folderName || 'inbox'
-                            );
-                            if (attList.length > 0) {
-                                const normalizedAttachments = attList.map((att, idx) => ({
-                                    filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
-                                    mimeType: att.contentType || att.mimeType || 'application/octet-stream',
-                                    size: typeof att.size === 'number' ? att.size : Number(att.size || att.attachmentSize || 0),
-                                    attachmentId: att.attachmentId || att.storeName || null,
-                                    messageId: String(messageId),
-                                    provider: 'zoho',
-                                    downloadUnavailable: false,
-                                }));
-                                await supabaseAdmin
-                                    .from('emails')
-                                    .update({
-                                        updatedAt: new Date().toISOString(),
-                                        metadata: {
-                                            ...(existing?.metadata || {}),
-                                            hasAttachments: true,
-                                            attachments: normalizedAttachments
-                                        }
-                                    })
-                                    .eq('id', messageId);
-                            }
-                        }
-                    } catch (backfillError) {
-                        logger.warn(`[Zoho Sync] Backfill failed for existing message ${messageId}: ${backfillError?.message || backfillError}`, 'zoho-sync');
-                    }
-                }
-
-                if (!existing?.contactId) {
-                    try {
-                        const fallbackThreadId = existing?.threadId || determineThreadId({ subject: msgSummary?.subject || existing?.subject || '', ownerId: userEmail });
-                        const byName = await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || existing?.metadata?.fromAddress || '');
-                        const fallbackIdentity = byName?.contactId ? byName : await resolveContactAndAccountFromThread(userEmail, fallbackThreadId);
-                        if (fallbackIdentity?.contactId) {
-                            await supabaseAdmin
-                                .from('emails')
-                                .update({
-                                    contactId: fallbackIdentity.contactId,
-                                    accountId: fallbackIdentity.accountId,
-                                    updatedAt: new Date().toISOString()
-                                })
-                                .eq('id', messageId);
-                        }
-                    } catch (identityBackfillError) {
-                        logger.warn(`[Zoho Sync] Contact backfill failed for existing message ${messageId}: ${identityBackfillError?.message || identityBackfillError}`, 'zoho-sync');
-                    }
-                }
+            const messageId = String(msgSummary?.messageId || msgSummary?.message_id || '').trim();
+            if (!messageId) {
                 skippedCount++;
                 continue;
             }
 
-            // 3. Fetch full content
-            const fullContent = await zohoService.getMessageContent(userEmail, messageId);
+            try {
+                // 2. Check for duplicates in Supabase using the primary 'id' column
+                const { data: existing } = await supabaseAdmin
+                    .from('emails')
+                    .select('id, from, metadata, contactId, accountId, threadId, subject')
+                    .eq('id', messageId)
+                    .maybeSingle();
 
-            // 4. Parse
-            const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
+                if (existing) {
+                    // Backfill attachments and sender email for previously-synced rows.
+                    const existingAttachments = Array.isArray(existing?.metadata?.attachments) ? existing.metadata.attachments : [];
+                    const hasExistingAttachments = existingAttachments.length > 0;
 
-            // 4b. Fetch actual attachment metadata if needed (Zoho doesn't include it in content/summary)
-            if (emailDoc.metadata.hasAttachments && emailDoc.metadata.attachments.length === 0) {
+                    // Check if from field is missing an email address (just a display name)
+                    const existingFrom = existing?.from || '';
+                    const existingFromEmail = extractEmailAddress(existingFrom);
+                    const summaryEmail = extractEmailAddress(msgSummary?.senderAddress || '');
+                    const needsFromBackfill = !isLikelyEmail(existingFromEmail) && isLikelyEmail(summaryEmail);
+
+                    if (!hasExistingAttachments || needsFromBackfill) {
+                        try {
+                            const backfillUpdate = { ...(existing?.metadata || {}) };
+
+                            // Fix from field with actual email if available from summary
+                            if (needsFromBackfill && summaryEmail) {
+                                const displayName = msgSummary?.sender || '';
+                                const fixedFrom = displayName ? `${displayName} <${summaryEmail}>` : summaryEmail;
+                                backfillUpdate.fromAddress = summaryEmail;
+                                await supabaseAdmin
+                                    .from('emails')
+                                    .update({ from: fixedFrom, metadata: { ...backfillUpdate }, updatedAt: new Date().toISOString() })
+                                    .eq('id', messageId);
+                            }
+
+                            // Fetch real attachment metadata via dedicated API call
+                            if (!hasExistingAttachments) {
+                                const attList = await zohoService.getMessageAttachments(
+                                    userEmail, messageId, msgSummary?.folderId || msgSummary?.folderName || 'inbox'
+                                );
+                                if (attList.length > 0) {
+                                    const normalizedAttachments = attList.map((att, idx) => ({
+                                        filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
+                                        mimeType: att.contentType || att.mimeType || 'application/octet-stream',
+                                        size: typeof att.size === 'number' ? att.size : Number(att.size || att.attachmentSize || 0),
+                                        attachmentId: att.attachmentId || att.storeName || null,
+                                        messageId: String(messageId),
+                                        provider: 'zoho',
+                                        downloadUnavailable: false,
+                                    }));
+                                    await supabaseAdmin
+                                        .from('emails')
+                                        .update({
+                                            updatedAt: new Date().toISOString(),
+                                            metadata: {
+                                                ...(existing?.metadata || {}),
+                                                hasAttachments: true,
+                                                attachments: normalizedAttachments
+                                            }
+                                        })
+                                        .eq('id', messageId);
+                                }
+                            }
+                        } catch (backfillError) {
+                            logger.warn(`[Zoho Sync] Backfill failed for existing message ${messageId}: ${backfillError?.message || backfillError}`, 'zoho-sync');
+                        }
+                    }
+
+                    if (!existing?.contactId) {
+                        try {
+                            const fallbackThreadId = existing?.threadId || determineThreadId({ subject: msgSummary?.subject || existing?.subject || '', ownerId: userEmail });
+                            const byName = await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || existing?.metadata?.fromAddress || '');
+                            const fallbackIdentity = byName?.contactId ? byName : await resolveContactAndAccountFromThread(userEmail, fallbackThreadId);
+                            if (fallbackIdentity?.contactId) {
+                                await supabaseAdmin
+                                    .from('emails')
+                                    .update({
+                                        contactId: fallbackIdentity.contactId,
+                                        accountId: fallbackIdentity.accountId,
+                                        updatedAt: new Date().toISOString()
+                                    })
+                                    .eq('id', messageId);
+                            }
+                        } catch (identityBackfillError) {
+                            logger.warn(`[Zoho Sync] Contact backfill failed for existing message ${messageId}: ${identityBackfillError?.message || identityBackfillError}`, 'zoho-sync');
+                        }
+                    }
+                    skippedCount++;
+                    continue;
+                }
+
+                // 3. Fetch full content. For webhook-triggered sync, retry once because Zoho
+                // can briefly emit webhook before content endpoints become readable.
+                let fullContent;
                 try {
-                    const attList = await zohoService.getMessageAttachments(
-                        userEmail, messageId, msgSummary?.folderId || msgSummary?.folderName || 'inbox'
-                    );
-                    if (attList.length > 0) {
-                        emailDoc.metadata.attachments = attList.map((att, idx) => ({
-                            filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
-                            mimeType: att.contentType || att.mimeType || 'application/octet-stream',
-                            size: typeof att.size === 'number' ? att.size : Number(att.size || att.attachmentSize || 0),
-                            attachmentId: att.attachmentId || att.storeName || null,
-                            messageId: String(messageId),
-                            provider: 'zoho',
-                            downloadUnavailable: false,
-                        }));
-                    }
-                } catch (attErr) {
-                    logger.warn(`[Zoho Sync] Attachment fetch failed for ${messageId}: ${attErr?.message || attErr}`, 'zoho-sync');
-                }
-            }
-
-            // Use the email from the already-resolved emailDoc.from (which has the proper "Name <email>" format)
-            const senderRaw = emailDoc.from || fullContent?.fromAddress || msgSummary?.senderAddress || msgSummary?.sender || '';
-            const senderEmail = extractEmailAddress(senderRaw);
-            const byEmail = isLikelyEmail(senderEmail) ? await resolveContactAndAccount(userEmail, senderEmail) : { contactId: null, accountId: null };
-            if (byEmail.contactId) {
-                emailDoc.contactId = byEmail.contactId;
-                emailDoc.accountId = byEmail.accountId;
-            } else {
-                const byName = await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || senderRaw);
-                const fallbackIdentity = byName?.contactId ? byName : await resolveContactAndAccountFromThread(userEmail, emailDoc.threadId);
-                emailDoc.contactId = fallbackIdentity.contactId;
-                emailDoc.accountId = fallbackIdentity.accountId;
-            }
-
-            // 5. Ensure thread exists (Must be before email insert due to FK constraint)
-            await updateThread(emailDoc);
-
-            // 6. Save email
-            const { error: insertError } = await supabaseAdmin
-                .from('emails')
-                .insert(emailDoc);
-
-            if (insertError) {
-                logger.error(`[Zoho Sync] Failed to save message ${messageId}:`, insertError, 'zoho-sync');
-            } else {
-                syncedCount++;
-                if (emailDoc.type === 'received' && emailDoc.contactId) {
-                    const notification = await createInboxNotification({
-                        emailDoc,
-                        ownerEmail: userEmail,
-                        messageId,
-                        source: syncSource,
-                    });
-                    if (notification) {
-                        notifications.push(notification);
+                    fullContent = await zohoService.getMessageContent(userEmail, messageId);
+                } catch (contentError) {
+                    if (syncSource === 'webhook') {
+                        await sleep(1200);
+                        fullContent = await zohoService.getMessageContent(userEmail, messageId);
+                    } else {
+                        throw contentError;
                     }
                 }
-                if (emailDoc.type === 'received' && emailDoc.accountId && Array.isArray(emailDoc.metadata?.attachments) && emailDoc.metadata.attachments.length > 0) {
-                    const ingest = await autoIngestInboundAttachments({
-                        zohoService,
-                        ownerEmail: userEmail,
-                        messageId,
-                        accountId: emailDoc.accountId,
-                        attachments: emailDoc.metadata.attachments,
-                        folderId: msgSummary?.folderId || msgSummary?.folderName || 'inbox',
-                    });
-                    ingestedAttachmentCount += ingest.saved;
+
+                // 4. Parse
+                const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
+
+                // 4b. Fetch actual attachment metadata if needed (Zoho doesn't include it in content/summary)
+                if (emailDoc.metadata.hasAttachments && emailDoc.metadata.attachments.length === 0) {
+                    try {
+                        const attList = await zohoService.getMessageAttachments(
+                            userEmail, messageId, msgSummary?.folderId || msgSummary?.folderName || 'inbox'
+                        );
+                        if (attList.length > 0) {
+                            emailDoc.metadata.attachments = attList.map((att, idx) => ({
+                                filename: att.attachmentName || att.fileName || att.name || `Attachment-${idx + 1}`,
+                                mimeType: att.contentType || att.mimeType || 'application/octet-stream',
+                                size: typeof att.size === 'number' ? att.size : Number(att.size || att.attachmentSize || 0),
+                                attachmentId: att.attachmentId || att.storeName || null,
+                                messageId: String(messageId),
+                                provider: 'zoho',
+                                downloadUnavailable: false,
+                            }));
+                        }
+                    } catch (attErr) {
+                        logger.warn(`[Zoho Sync] Attachment fetch failed for ${messageId}: ${attErr?.message || attErr}`, 'zoho-sync');
+                    }
                 }
+
+                // Use the email from the already-resolved emailDoc.from (which has the proper "Name <email>" format)
+                const senderRaw = emailDoc.from || fullContent?.fromAddress || msgSummary?.senderAddress || msgSummary?.sender || '';
+                const senderEmail = extractEmailAddress(senderRaw);
+                const byEmail = isLikelyEmail(senderEmail) ? await resolveContactAndAccount(userEmail, senderEmail) : { contactId: null, accountId: null };
+                if (byEmail.contactId) {
+                    emailDoc.contactId = byEmail.contactId;
+                    emailDoc.accountId = byEmail.accountId;
+                } else {
+                    const byName = await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || senderRaw);
+                    const fallbackIdentity = byName?.contactId ? byName : await resolveContactAndAccountFromThread(userEmail, emailDoc.threadId);
+                    emailDoc.contactId = fallbackIdentity.contactId;
+                    emailDoc.accountId = fallbackIdentity.accountId;
+                }
+
+                // 5. Ensure thread exists (Must be before email insert due to FK constraint)
+                await updateThread(emailDoc);
+
+                // 6. Save email
+                const { error: insertError } = await supabaseAdmin
+                    .from('emails')
+                    .insert(emailDoc);
+
+                if (insertError) {
+                    logger.error(`[Zoho Sync] Failed to save message ${messageId}:`, insertError, 'zoho-sync');
+                } else {
+                    syncedCount++;
+                    if (emailDoc.type === 'received' && emailDoc.contactId) {
+                        const notification = await createInboxNotification({
+                            emailDoc,
+                            ownerEmail: userEmail,
+                            messageId,
+                            source: syncSource,
+                        });
+                        if (notification) {
+                            notifications.push(notification);
+                        }
+                    }
+                    if (emailDoc.type === 'received' && emailDoc.accountId && Array.isArray(emailDoc.metadata?.attachments) && emailDoc.metadata.attachments.length > 0) {
+                        const ingest = await autoIngestInboundAttachments({
+                            zohoService,
+                            ownerEmail: userEmail,
+                            messageId,
+                            accountId: emailDoc.accountId,
+                            attachments: emailDoc.metadata.attachments,
+                            folderId: msgSummary?.folderId || msgSummary?.folderName || 'inbox',
+                        });
+                        ingestedAttachmentCount += ingest.saved;
+                    }
+                }
+            } catch (messageError) {
+                logger.warn(`[Zoho Sync] Failed to process message ${messageId}: ${messageError?.message || messageError}`, 'zoho-sync');
+                skippedCount++;
+                continue;
             }
         }
 

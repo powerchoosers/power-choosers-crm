@@ -171,6 +171,65 @@ function unique(values) {
   return Array.from(new Set((Array.isArray(values) ? values : [values]).filter(Boolean)));
 }
 
+function findFirstValueByKeys(node, keys, depth = 0) {
+  if (depth > 5 || node == null) return '';
+
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = findFirstValueByKeys(item, keys, depth + 1);
+      if (found) return found;
+    }
+    return '';
+  }
+
+  if (typeof node !== 'object') {
+    return node == null ? '' : String(node);
+  }
+
+  for (const [key, value] of Object.entries(node)) {
+    const normalizedKey = normalizeKey(key);
+    if (keys.has(normalizedKey)) {
+      if (value == null) continue;
+      if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (trimmed) return trimmed;
+      } else if (typeof value === 'number') {
+        return String(value);
+      } else {
+        const nested = findFirstValueByKeys(value, keys, depth + 1);
+        if (nested) return nested;
+      }
+    }
+  }
+
+  for (const value of Object.values(node)) {
+    const nested = findFirstValueByKeys(value, keys, depth + 1);
+    if (nested) return nested;
+  }
+
+  return '';
+}
+
+function extractWebhookHint(payload) {
+  const messageId = normalizeText(findFirstValueByKeys(payload, new Set(['messageid', 'msgid', 'mailid'])));
+  const fromAddress = normalizeText(findFirstValueByKeys(payload, new Set(['fromaddress', 'senderaddress', 'from', 'sender'])));
+  const toAddress = normalizeText(findFirstValueByKeys(payload, new Set(['toaddress', 'recipientaddress', 'to', 'recipient'])));
+  const subject = normalizeText(findFirstValueByKeys(payload, new Set(['subject'])));
+  const receivedTime = normalizeText(findFirstValueByKeys(payload, new Set(['receivedtime', 'sentdateingmt', 'time', 'timestamp'])));
+  const folderId = normalizeText(findFirstValueByKeys(payload, new Set(['folderid'])));
+  const folderName = normalizeText(findFirstValueByKeys(payload, new Set(['foldername'])));
+
+  return {
+    messageId: messageId || null,
+    fromAddress: fromAddress || null,
+    toAddress: toAddress || null,
+    subject: subject || null,
+    receivedTime: receivedTime || null,
+    folderId: folderId || null,
+    folderName: folderName || null,
+  };
+}
+
 function readWebhookSecret(req) {
   const headers = req?.headers || {};
   const headerSecret = [
@@ -245,7 +304,7 @@ async function getConnectedZohoEmails() {
   };
 }
 
-async function triggerZohoSync(userEmail, source = 'webhook') {
+async function triggerZohoSync(userEmail, source = 'webhook', webhookHint = null) {
   const syncUrl = `${APP_URL}/api/email/zoho-sync`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SYNC_TIMEOUT_MS);
@@ -254,7 +313,7 @@ async function triggerZohoSync(userEmail, source = 'webhook') {
     const response = await fetch(syncUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userEmail, source }),
+      body: JSON.stringify({ userEmail, source, webhookHint: webhookHint || undefined }),
       signal: controller.signal,
     });
 
@@ -335,6 +394,7 @@ export default async function handler(req, res) {
     const allEmailSet = new Set(allEmails.map((email) => String(email || '').toLowerCase().trim()).filter(Boolean));
     const eventType = normalizeText(body?.event || body?.eventType || body?.type || body?.category || body?.action || '');
     const extracted = collectTargetsFromPayload(body, allEmailSet, emailToAccount, accountToEmails);
+    const webhookHint = extractWebhookHint(body);
     const targetEmails = unique(extracted.explicitEmail);
     const hasZohoMailPayload = hasZohoMailSignal(body);
     const hasWebhookSignal = Boolean(
@@ -359,10 +419,11 @@ export default async function handler(req, res) {
       bodyKeys: Object.keys(body || {}),
       candidateEmails: extracted.candidateEmails,
       candidateAccountIds: extracted.candidateAccountIds,
-      fromAddress: body?.fromAddress || body?.from || null,
-      toAddress: body?.toAddress || body?.to || null,
-      messageId: body?.messageId || null,
-      subject: body?.subject || null,
+      fromAddress: webhookHint.fromAddress,
+      toAddress: webhookHint.toAddress,
+      messageId: webhookHint.messageId,
+      subject: webhookHint.subject,
+      folderId: webhookHint.folderId,
     });
 
     let syncTargets = targetEmails;
@@ -390,7 +451,7 @@ export default async function handler(req, res) {
     const results = [];
     for (const userEmail of syncTargets) {
       try {
-        const syncResult = await triggerZohoSync(userEmail, 'webhook');
+        const syncResult = await triggerZohoSync(userEmail, 'webhook', webhookHint);
         results.push({
           userEmail,
           ok: syncResult.ok,
