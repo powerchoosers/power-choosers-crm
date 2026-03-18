@@ -51,91 +51,6 @@ function normalizeLookupText(value?: string | null) {
     .replace(/[^a-z0-9]+/g, '')
 }
 
-function parseSenderLabel(value?: string | null) {
-  const raw = String(value || '').trim()
-  const angle = raw.match(/<\s*([^>]+)\s*>/)
-  const email = (angle?.[1] || raw).trim().toLowerCase()
-  const display = raw.replace(/<\s*[^>]+\s*>/, '').trim()
-  return {
-    raw,
-    email: extractEmailAddress(email),
-    display: display || raw,
-    normalizedDisplay: normalizeLookupText(display || raw),
-    normalizedEmail: normalizeLookupText(email),
-  }
-}
-
-async function resolveNotificationContact(
-  ownerEmail: string,
-  senderLabel: string,
-) {
-  const sender = parseSenderLabel(senderLabel)
-  if (!sender.display && !sender.email) return null
-
-  const queryParts: string[] = []
-  if (sender.email) {
-    queryParts.push(`email.ilike.%${sender.email}%`)
-    queryParts.push(`email.ilike.%${sender.normalizedEmail}%`)
-  }
-  if (sender.display) {
-    queryParts.push(`name.ilike.%${sender.display}%`)
-    queryParts.push(`firstName.ilike.%${sender.display}%`)
-    queryParts.push(`lastName.ilike.%${sender.display}%`)
-  }
-
-  const searchContacts = async (ownerFilter: 'owned' | 'shared') => {
-    const base = supabase
-      .from('contacts')
-      .select('id, email, name, firstName, lastName, metadata, accounts(name), ownerId')
-
-    const scoped = ownerFilter === 'owned'
-      ? base.eq('ownerId', ownerEmail)
-      : base.is('ownerId', null)
-
-    const { data, error } = await scoped.or(Array.from(new Set(queryParts)).join(',')).limit(10)
-    if (error) return []
-    return Array.isArray(data) ? data : []
-  }
-
-  const rows = [
-    ...(await searchContacts('owned')),
-    ...(await searchContacts('shared')),
-  ]
-
-  if (!rows.length) return null
-
-  const scored = rows
-    .map((row) => {
-      const rowEmail = normalizeLookupText(row.email)
-      const rowName = normalizeLookupText(row.name)
-      const rowFullName = normalizeLookupText([row.firstName, row.lastName].filter(Boolean).join(' '))
-      const rowPriority = String(row.ownerId || '').toLowerCase().trim() === ownerEmail.toLowerCase().trim()
-        ? 2
-        : (row.ownerId ? 1 : 0)
-
-      let score = 0
-      if (sender.normalizedEmail && sender.normalizedEmail === rowEmail) score = 100
-      else if (sender.normalizedDisplay && sender.normalizedDisplay === rowName) score = 90
-      else if (sender.normalizedDisplay && sender.normalizedDisplay === rowFullName) score = 85
-
-      return { row, score, rowPriority }
-    })
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => {
-      if (b.rowPriority !== a.rowPriority) return b.rowPriority - a.rowPriority
-      if (b.score !== a.score) return b.score - a.score
-      return String(a.row.name || '').localeCompare(String(b.row.name || ''))
-    })
-
-  if (!scored.length) return null
-
-  const best = scored[0]
-  const sameRank = scored.filter((entry) => entry.score === best.score && entry.rowPriority === best.rowPriority)
-  if (sameRank.length > 1) return null
-
-  return best.row
-}
-
 export function GlobalSync() {
   const { user, loading } = useAuth()
   const { performSync } = useZohoSync()
@@ -285,64 +200,6 @@ export function GlobalSync() {
           queryClient.invalidateQueries({ queryKey: ['emails'] })
           queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
           queryClient.invalidateQueries({ queryKey: ['emails-count'] })
-
-          // Avoid spam on first sync/load by only notifying for fresh inserts.
-          const insertedAt = email.createdAt || email.created_at || email.timestamp
-          if (insertedAt) {
-            const insertedTs = new Date(insertedAt).getTime()
-            if (!Number.isNaN(insertedTs) && Date.now() - insertedTs > 10 * 60 * 1000) return
-          }
-
-          const senderLabel = email.from || email.metadata?.fromAddress || email.metadata?.replyToAddress || ''
-          let contact = null
-
-          // 1. Try resolving using contactId from the payload (set by sync/backfill)
-          if (email.contactId) {
-            const { data: directContact } = await supabase
-              .from('contacts')
-              .select('id, email, name, firstName, lastName, metadata, accounts(name), ownerId')
-              .eq('id', email.contactId)
-              .maybeSingle()
-            contact = directContact || null
-          }
-
-          // 2. Fallback to sender-name / sender-email lookup inside the current owner's contact scope
-          if (!contact) {
-            contact = await resolveNotificationContact(userEmail, senderLabel)
-          }
-
-          // Only notify if sender is actually a known CRM contact.
-          if (!contact) return
-
-          const signalId = String(email.id || '').trim()
-          if (signalId && seenInboxSignalIdsRef.current.has(signalId)) return
-          if (signalId && !consumeInboxToastId(signalId)) return
-          if (signalId) seenInboxSignalIdsRef.current.add(signalId)
-
-          const senderEmail = extractEmailAddress(senderLabel) || extractEmailAddress(email.from)
-          const name = (
-            contact.name ||
-            [contact.firstName, contact.lastName].filter(Boolean).join(' ').trim() ||
-            senderEmail ||
-            'CRM contact'
-          )
-          const relatedAccount = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts
-          const company = relatedAccount?.name || 'Unknown company'
-          const snippet =
-            String(email.snippet || email.text || email.html || 'New message received')
-              .replace(/\s+/g, ' ')
-              .slice(0, 140)
-          const hasAttachments =
-            !!email.metadata?.hasAttachments ||
-            (Array.isArray(email.metadata?.attachments) && email.metadata.attachments.length > 0) ||
-            (Array.isArray(email.attachments) && email.attachments.length > 0)
-          showInboxEmailToast({
-            name,
-            company,
-            subject: email.subject || 'New email from CRM contact',
-            snippet,
-            hasAttachments,
-          })
         }
       )
       .subscribe((status) => {
@@ -351,10 +208,69 @@ export function GlobalSync() {
         }
       })
 
+    const notificationChannel = supabase.channel('email-notification-inserts')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications' },
+        async (payload) => {
+          const notification = payload.new as {
+            id?: string
+            ownerId?: string
+            type?: string
+            read?: boolean
+            data?: Record<string, any> | null
+            metadata?: Record<string, any> | null
+            title?: string | null
+            message?: string | null
+          }
+
+          if (!notification?.id) return
+          if (notification.type && String(notification.type).toLowerCase() !== 'email') return
+          if (notification.read) return
+
+          const ownerId = String(notification.ownerId || '').toLowerCase()
+          const userEmail = String(user.email || '').toLowerCase()
+          const scope = ownerScopeRef.current.length > 0
+            ? ownerScopeRef.current
+            : [userEmail]
+          if (ownerId && !scope.includes(ownerId)) return
+
+          const signalId = String(notification.data?.emailId || notification.id).trim()
+          if (signalId && seenInboxSignalIdsRef.current.has(signalId)) return
+          if (signalId && !consumeInboxToastId(signalId)) return
+          if (signalId) seenInboxSignalIdsRef.current.add(signalId)
+
+          const name = String(notification.data?.contactName || notification.title?.replace(/^New email from\s+/i, '') || 'CRM contact')
+          const company = String(notification.data?.company || 'Unknown company')
+          const subject = String(notification.data?.subject || notification.message || 'New email from CRM contact')
+          const snippet = String(notification.data?.snippet || notification.message || 'New message received')
+          const hasAttachments = Boolean(notification.data?.hasAttachments)
+
+          showInboxEmailToast({
+            name,
+            company,
+            subject,
+            snippet,
+            hasAttachments,
+          })
+
+          await supabase
+            .from('notifications')
+            .update({ read: true })
+            .eq('id', notification.id)
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.info('[Realtime] notifications channel connected')
+        }
+      })
+
     return () => {
       clearTimeout(timer)
       supabase.removeChannel(sigChannel)
       supabase.removeChannel(emailChannel)
+      supabase.removeChannel(notificationChannel)
     }
   }, [loading, user, performSync, queryClient])
 
