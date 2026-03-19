@@ -985,6 +985,23 @@ function parseZohoMessage(summary, content, ownerEmail) {
     const replyToAddress = extractEmailFromUnknown(content?.replyToAddress || content?.replyTo || summary?.replyToAddress || summary?.replyTo || null) || null;
     const hasAttachments = hasAttachmentsInPayload(summary, content, attachmentMeta);
 
+    // Detect self-sends: email FROM the owner's own Zoho account that arrived in their
+    // inbox (e.g. sending to yourself for testing). The from address will match the
+    // ownerEmail or another nodalpoint.io / getnodalpoint.com address.  These should
+    // be classified as 'sent', not 'received', because the zoho-send API already
+    // creates a zoho_* tracking record.  Storing it again as received causes the email
+    // to appear in UPLINK_IN looking like an inbound message from yourself.
+    const senderEmail = extractEmailAddress(fromAddress || '');
+    const ownerDomain = (ownerEmail || '').split('@')[1] || '';
+    const isOwnDomain = ownerDomain === 'nodalpoint.io' || ownerDomain === 'getnodalpoint.com';
+    const isSelfSend =
+        senderEmail && ownerEmail &&
+        (senderEmail.toLowerCase() === ownerEmail.toLowerCase() ||
+         (isOwnDomain && (
+             senderEmail.toLowerCase().endsWith('@nodalpoint.io') ||
+             senderEmail.toLowerCase().endsWith('@getnodalpoint.com')
+         )));
+
     // Prefer concrete email addresses from message content when available.
     const emailData = {
         id: zohoId, // Use Zoho Message ID as primary key
@@ -992,7 +1009,7 @@ function parseZohoMessage(summary, content, ownerEmail) {
         to: [ownerEmail], // Store as array to match DB jsonb 'to' column
         subject: summary.subject,
         text: plainText,
-        html: rawHtml, // Zoho content API might return HTML directly
+        html: rawHtml, // Zoho content API might arrive HTML directly
         timestamp: (() => {
             // Zoho's receivedTime is a Unix epoch in ms, but some senders' mail servers
             // embed a non-UTC timezone in the Date header (e.g. +07:00). parseInt() strips
@@ -1003,10 +1020,10 @@ function parseZohoMessage(summary, content, ownerEmail) {
             const ts = Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
             return new Date(Math.min(ts, Date.now() + 60_000)).toISOString();
         })(),
-        type: 'received',
+        type: isSelfSend ? 'sent' : 'received',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        status: 'received',
+        status: isSelfSend ? 'sent' : 'received',
         is_read: !!summary.isRead,
         is_starred: !!summary.isStarred,
         contactId: null,
