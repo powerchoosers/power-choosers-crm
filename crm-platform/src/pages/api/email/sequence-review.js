@@ -2,6 +2,8 @@ import { cors } from '../_cors.js';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
 import logger from '../_logger.js';
 import { generateForensicSignature } from '@/lib/signature';
+import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes';
+import { buildUsableCallContextEntries, buildUsableCallContextBlock } from '@/lib/call-context';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -130,7 +132,7 @@ export default async function handler(req, res) {
 
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('id, email, "firstName", "lastName", title, city, state, "linkedinUrl", "accountId"')
+      .select('id, email, notes, "firstName", "lastName", title, city, state, "linkedinUrl", "accountId"')
       .eq('id', memberData.targetId)
       .maybeSingle();
 
@@ -147,6 +149,29 @@ export default async function handler(req, res) {
         .maybeSingle();
       account = acc || null;
     }
+
+    const { data: rawCalls } = await supabase
+      .from('calls')
+      .select('id, transcript, summary, aiInsights, timestamp, direction, status, duration, "contactId", "accountId"')
+      .or(contact.accountId
+        ? `contactId.eq.${contact.id},accountId.eq.${contact.accountId}`
+        : `contactId.eq.${contact.id}`)
+      .order('timestamp', { ascending: false })
+      .limit(6);
+    const usableCalls = buildUsableCallContextEntries(rawCalls || [], 4);
+    const usableCallContext = buildUsableCallContextBlock(rawCalls || [], 4);
+
+    const noteEntries = buildForensicNoteEntries([
+      {
+        label: `CONTACT NOTE • ${[contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email || 'UNKNOWN CONTACT'}`,
+        notes: contact.notes || null,
+      },
+      {
+        label: `ACCOUNT NOTE • ${account?.name || 'UNKNOWN ACCOUNT'}`,
+        notes: account?.description || null,
+      },
+    ]);
+    const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
 
     const { data: sequence } = await supabase
       .from('sequences')
@@ -189,6 +214,8 @@ export default async function handler(req, res) {
       account?.linkedin_url ? 'LinkedIn: available' : null,
       contact.title ? `Contact title: ${contact.title}` : null,
       contact.city || contact.state ? `Contact location: ${[contact.city, contact.state].filter(Boolean).join(', ')}` : null,
+      noteContext ? `Dossier notes:\n${noteContext}` : null,
+      usableCallContext ? `Transmission log:\n${usableCallContext}` : null,
       contact.notes ? `Contact notes: ${contact.notes.slice(0, 250)}` : null
     ].filter(Boolean).join('\n');
 
@@ -244,7 +271,10 @@ export default async function handler(req, res) {
           source_label: linkedInUrl ? 'linkedin' : (website ? 'website' : 'public_company_info'),
           sender_email: fromEmail,
           sender_domain: senderDomain,
-          sender_first_name: senderFirstName
+          sender_first_name: senderFirstName,
+          call_context: usableCallContext || null,
+          transcript: usableCalls[0]?.transcriptSnippet || null,
+          notes: noteContext || null
         }
       })
     });

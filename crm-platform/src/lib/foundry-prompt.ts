@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
+import { buildUsableCallContextEntries } from './call-context'
 
 export interface FoundryContext {
     contact: {
@@ -237,30 +238,7 @@ export async function buildFoundryContext(
 
             const { data: calls } = await query
             if (calls) {
-                const withContext = (calls as any[])
-                    .filter((c) => c && (c.transcript || c.summary || c.aiInsights))
-                    .map((c) => {
-                        const ts = c.timestamp ? new Date(c.timestamp) : null
-                        const validTs = ts && !Number.isNaN(ts.getTime()) ? ts : null
-                        const localTime = validTs ? formatLocalCallTime(validTs) : 'Unknown time'
-                        const relativeTimeHint = validTs ? getRelativeTimeHint(validTs) : 'recently'
-                        const summary = (c.summary || '').toString().trim()
-                        const transcriptSnippet = (c.transcript || '').toString().slice(0, 500).trim()
-                        const insightsSummary = parseInsightsSummary(c.aiInsights)
-
-                        return {
-                            id: String(c.id || ''),
-                            timestamp: (c.timestamp || '').toString(),
-                            localTime,
-                            relativeTimeHint,
-                            direction: (c.direction || '').toString(),
-                            status: (c.status || '').toString(),
-                            durationSeconds: typeof c.duration === 'number' ? c.duration : 0,
-                            summary,
-                            transcriptSnippet,
-                            insightsSummary
-                        }
-                    })
+                const withContext = buildUsableCallContextEntries(calls as any[], 5)
 
                 context.intelligence.callHistory = withContext
                 context.intelligence.transcripts = withContext.map((entry) => {

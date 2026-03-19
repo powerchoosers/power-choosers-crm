@@ -7,6 +7,8 @@ import logger from '../_logger.js';
 import { ZohoMailService } from '../email/zoho-service.js';
 import { APOLLO_BASE_URL, fetchWithRetry, getApiKey } from '../apollo/_utils.js';
 import { getErcotMarketData } from '../market/ercot.js';
+import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes';
+import { buildUsableCallContextBlock, buildUsableCallContextEntries } from '@/lib/call-context';
 
 // Define the tools (functions) Gemini can call
 const tools = [
@@ -1537,15 +1539,18 @@ Output rules:
           callsQuery,
         ]);
         const contact = contactRes?.data;
+        const linkedAccount = Array.isArray(contact?.accounts) ? contact.accounts[0] : contact?.accounts;
         const calls = callsRes?.data || [];
+        const usableCalls = buildUsableCallContextEntries(calls, 4);
+        const usableCallBlock = buildUsableCallContextBlock(calls, 4);
         const lines = [];
 
         // Calculate Momentum
-        const lastCall = calls[0];
+        const lastCall = usableCalls[0];
         let momentumStatus = 'COLD - No contact records';
         if (lastCall?.timestamp) {
           const days = Math.floor((new Date() - new Date(lastCall.timestamp)) / (1000 * 60 * 60 * 24));
-          const hasTranscript = !!lastCall.transcript;
+          const hasTranscript = !!lastCall.transcriptSnippet;
           if (days < 7 && hasTranscript) momentumStatus = 'WARM';
           else if (days < 21) momentumStatus = 'STAGNANT';
           else momentumStatus = 'COLD';
@@ -1558,21 +1563,25 @@ Output rules:
           lines.push(`CURRENT CONTACT (Log_Stream / dossier): ${name}`);
           const title = contact.title ?? contact.jobTitle;
           if (title) lines.push(`Title: ${title}`);
-          const company = contact.companyName ?? contact.company ?? contact.company_name ?? contact.accounts?.name;
+          const company = contact.companyName ?? contact.company ?? contact.company_name ?? linkedAccount?.name;
           if (company) lines.push(`Company: ${company}`);
-          const notes = String(contact.notes ?? contact.metadata?.notes ?? '').trim();
-          if (notes) lines.push(`Notes (Log_Stream): ${notes.slice(0, 800)}${notes.length > 800 ? '…' : ''}`);
+          const noteEntries = buildForensicNoteEntries([
+            { label: `CONTACT NOTE • ${name}`, notes: contact.notes ?? contact.metadata?.notes ?? '' },
+            { label: `ACCOUNT NOTE • ${linkedAccount?.name || company || 'UNKNOWN ACCOUNT'}`, notes: linkedAccount?.description || linkedAccount?.notes || '' },
+          ]);
+          const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
+          if (noteContext) lines.push(`Notes (usable dossier stream): ${noteContext.slice(0, 800)}${noteContext.length > 800 ? '…' : ''}`);
         }
-        if (calls.length) {
-          lines.push('RECENT CALLS (transmission log):');
-          calls.forEach((c, i) => {
+        if (usableCalls.length) {
+          lines.push('RECENT CALLS (usable transmission log):');
+          usableCalls.forEach((c, i) => {
             const date = c.timestamp ? new Date(c.timestamp).toISOString().split('T')[0] : '';
-            const type = c.direction || c.type || 'call';
-            const sum = String(c.ai_summary ?? c.summary ?? '').trim();
-            const trans = String(c.transcript ?? '').trim();
-            lines.push(`  ${type.toUpperCase()} ${i + 1} (${date}): ${sum || 'No summary available.'}`);
-            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 400)}${trans.length > 400 ? '…' : ''}`);
+            const type = c.direction || 'call';
+            lines.push(`  ${type.toUpperCase()} ${i + 1} (${date}): ${c.summary || c.insightsSummary || 'No summary available.'}`);
+            if (c.transcriptSnippet) lines.push(`  Transcript excerpt: ${c.transcriptSnippet.slice(0, 400)}${c.transcriptSnippet.length > 400 ? '…' : ''}`);
           });
+        } else if (usableCallBlock) {
+          lines.push(usableCallBlock);
         }
         // Pull linked account context (contract end, supplier, etc.) and domain for Apollo news
         let contactDomain = null;
@@ -1584,7 +1593,10 @@ Output rules:
             if (acc.industry) lines.push(`Account industry: ${acc.industry}`);
             if (acc.contract_end_date) lines.push(`Contract end: ${acc.contract_end_date}`);
             if (acc.electricity_supplier) lines.push(`Supplier: ${acc.electricity_supplier}`);
-            const accNotes = String(acc.notes ?? acc.description ?? '').trim();
+            const accNoteEntries = buildForensicNoteEntries([
+              { label: `ACCOUNT NOTE • ${acc.name || 'UNKNOWN ACCOUNT'}`, notes: acc.notes ?? acc.description ?? '' },
+            ]);
+            const accNotes = accNoteEntries.length > 0 ? formatForensicNoteClipboard(accNoteEntries) : String(acc.notes ?? acc.description ?? '').trim();
             if (accNotes) lines.push(`Account notes: ${accNotes.slice(0, 600)}${accNotes.length > 600 ? '…' : ''}`);
             contactDomain = acc?.domain?.trim() || null;
           }
@@ -1638,19 +1650,22 @@ Output rules:
           if (account.industry) lines.push(`Industry: ${account.industry}`);
           if (account.contract_end_date) lines.push(`Contract end: ${account.contract_end_date}`);
           if (account.electricity_supplier) lines.push(`Supplier: ${account.electricity_supplier}`);
-          const notes = String(account.notes ?? account.description ?? '').trim();
+          const noteEntries = buildForensicNoteEntries([
+            { label: `ACCOUNT NOTE • ${account.name || 'UNKNOWN ACCOUNT'}`, notes: account.notes ?? account.description ?? '' },
+          ]);
+          const notes = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : String(account.notes ?? account.description ?? '').trim();
           if (notes) lines.push(`Notes: ${notes.slice(0, 600)}${notes.length > 600 ? '…' : ''}`);
         }
-        if (calls.length) {
-          lines.push('RECENT CALLS (this account):');
-          calls.forEach((c, i) => {
+        if (usableCalls.length) {
+          lines.push('RECENT CALLS (usable transmission log for this account):');
+          usableCalls.forEach((c, i) => {
             const date = c.timestamp ? new Date(c.timestamp).toISOString().split('T')[0] : '';
-            const type = c.direction || c.type || 'call';
-            const sum = String(c.ai_summary ?? c.summary ?? '').trim();
-            const trans = String(c.transcript ?? '').trim();
-            lines.push(`  ${type.toUpperCase()} ${i + 1} (${date}): ${sum || 'No summary available.'}`);
-            if (trans) lines.push(`  Transcript excerpt: ${trans.slice(0, 400)}${trans.length > 400 ? '…' : ''}`);
+            const type = c.direction || 'call';
+            lines.push(`  ${type.toUpperCase()} ${i + 1} (${date}): ${c.summary || c.insightsSummary || 'No summary available.'}`);
+            if (c.transcriptSnippet) lines.push(`  Transcript excerpt: ${c.transcriptSnippet.slice(0, 400)}${c.transcriptSnippet.length > 400 ? '…' : ''}`);
           });
+        } else if (usableCallBlock) {
+          lines.push(usableCallBlock);
         }
         const accountDomain = account.domain?.trim();
         if (accountDomain) {

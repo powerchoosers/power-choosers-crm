@@ -9,6 +9,8 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { z } from 'npm:zod'
 import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js'
+import { buildForensicNoteEntries, formatForensicNoteClipboard } from '../lib/forensic-notes.ts'
+import { buildUsableCallContextEntries, buildUsableCallContextBlock } from '../lib/call-context.ts'
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!)
 
@@ -204,6 +206,7 @@ async function handleGeneration(execution, job) {
 
     const [member] = await sql`
     SELECT m.id,
+           c.id as contact_id,
            c.email as contact_email,
            c."firstName",
            c."lastName",
@@ -211,6 +214,8 @@ async function handleGeneration(execution, job) {
            c.city as contact_city,
            c.state as contact_state,
            c."linkedinUrl" as contact_linkedin_url,
+           c.notes as contact_notes,
+           a.id as account_id,
            a.name as company_name,
            a.domain as account_domain,
            a.website as account_website,
@@ -269,6 +274,37 @@ async function handleGeneration(execution, job) {
         member.contact_title ? `Contact title: ${member.contact_title}` : null,
         member.contact_city || member.contact_state ? `Contact location: ${[member.contact_city, member.contact_state].filter(Boolean).join(', ')}` : null
     ].filter(Boolean).join('\n');
+
+    const callRows = member.contact_id
+        ? await sql`
+            SELECT id, "contactId" as contact_id, "accountId" as account_id, timestamp, direction, status, duration, transcript, summary, "aiInsights"
+            FROM calls
+            WHERE "contactId" = ${member.contact_id}
+            ORDER BY timestamp DESC
+            LIMIT 6
+        `
+        : member.account_id
+            ? await sql`
+            SELECT id, "contactId" as contact_id, "accountId" as account_id, timestamp, direction, status, duration, transcript, summary, "aiInsights"
+            FROM calls
+            WHERE "accountId" = ${member.account_id}
+            ORDER BY timestamp DESC
+            LIMIT 6
+        `
+            : [];
+    const usableCalls = buildUsableCallContextEntries(callRows as any[], 4);
+    const callContext = buildUsableCallContextBlock(callRows as any[], 4);
+    const noteEntries = buildForensicNoteEntries([
+        {
+            label: `CONTACT NOTE • ${[member.firstName, member.lastName].filter(Boolean).join(' ') || member.contact_email || 'UNKNOWN CONTACT'}`,
+            notes: member.contact_notes || null,
+        },
+        {
+            label: `ACCOUNT NOTE • ${member.company_name || 'UNKNOWN ACCOUNT'}`,
+            notes: member.account_description || null,
+        },
+    ]);
+    const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
     const contractEndYear = member.account_contract_end_date
         ? new Date(member.account_contract_end_date).getUTCFullYear()
         : null;
@@ -286,10 +322,10 @@ async function handleGeneration(execution, job) {
             type: 'email',
             vectors: Array.isArray(metadata?.vectors) ? metadata.vectors : [],
             mode: 'generate_email',
-                contact: {
-                    name: `${member.firstName} ${member.lastName}`,
-                    email: member.contact_email,
-                    company: member.company_name,
+            contact: {
+                name: `${member.firstName} ${member.lastName}`,
+                email: member.contact_email,
+                company: member.company_name,
                     website: member.account_website || website || null,
                     linkedin_url: member.account_linkedin_url || linkedInUrl || null,
                     company_description: member.account_description || null,
@@ -315,7 +351,10 @@ async function handleGeneration(execution, job) {
                 source_label: sourceLabel,
                 sender_email: senderEmail,
                 sender_domain: senderDomain,
-                sender_first_name: member.owner_first_name || null
+                sender_first_name: member.owner_first_name || null,
+                call_context: callContext || null,
+                transcript: usableCalls[0]?.transcriptSnippet || null,
+                notes: noteContext || null
             }
         })
     })
