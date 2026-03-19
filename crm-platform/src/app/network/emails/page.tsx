@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useEmails, useEmailsCount, useEmailTypeCounts, Email, EmailListFilter } from '@/hooks/useEmails'
 import { extractEmailAddress, useEmailIdentityMap } from '@/hooks/useEmailIdentityMap'
@@ -10,20 +10,14 @@ import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Search, Plus, RefreshCw, Mail, Filter } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
-import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { useComposeStore } from '@/store/composeStore'
-
-const AUTO_SYNC_DELAY_MS = 5 * 1000 // 5 seconds after load
 
 export default function EmailsPage() {
   const { user } = useAuth()
@@ -35,7 +29,6 @@ export default function EmailsPage() {
   const emailFilter = (searchParams?.get('tab') as EmailListFilter) || 'received'
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [scheduledActionState, setScheduledActionState] = useState<Record<string, string>>({})
-  const hasRunAutoSync = useRef(false)
   const [showTabSkeletonRows, setShowTabSkeletonRows] = useState(false)
   const [tabSkeletonFetchStarted, setTabSkeletonFetchStarted] = useState(false)
   const previousFilterRef = useRef(emailFilter)
@@ -125,14 +118,14 @@ export default function EmailsPage() {
     return () => clearTimeout(timer)
   }, [showTabSkeletonRows, isFetching, tabSkeletonFetchStarted])
 
-  const handleSync = async () => {
+  const handleSync = useCallback(async () => {
     if (!user) return
     await performSync(false)
     queryClient.invalidateQueries({ queryKey: ['emails'] })
     queryClient.invalidateQueries({ queryKey: ['emails-count'] })
     queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
     queryClient.refetchQueries({ queryKey: ['emails'], type: 'active' })
-  }
+  }, [performSync, queryClient, user])
 
   const runScheduledReviewAction = async (email: Email, action: 'generate' | 'regenerate' | 'accept') => {
     const executionId = String(email?.metadata?.sequenceExecutionId || '')
@@ -259,27 +252,13 @@ export default function EmailsPage() {
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CollapsiblePageHeader
         title="Emails"
-        description="Manage your communications and sync with Zoho Mail."
+        description="Manage your communications. Pull down inside the list to refresh Zoho Mail."
         globalFilter={searchTerm}
         onSearchChange={setSearchTerm}
         primaryAction={{
           label: "Compose",
           onClick: () => openCompose({ to: '', subject: '', context: null }),
           icon: <Plus size={18} className="mr-2" />
-        }}
-        secondaryAction={{
-          label: isSyncing ? 'Syncing...' : 'Net_Sync',
-          onClick: handleSync,
-          disabled: isSyncing,
-          icon: (
-            <div className="flex items-center gap-2">
-              <div className={cn(
-                "w-1.5 h-1.5 rounded-full",
-                isSyncing ? "bg-signal animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.5)]" : "bg-zinc-600"
-              )} />
-              {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            </div>
-          )
         }}
       />
 
