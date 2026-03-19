@@ -719,6 +719,9 @@ STRUCTURE: Short call reference (1 sentence, natural) → Key takeaway or releva
 
 PERSONALIZATION: If CALL INTELLIGENCE or NOTES are provided in the context, reference something specific from the conversation. One specific detail beats three generic lines. Make it feel like you were listening.
 CALL TIMING: Use call timing cues from context. Never say "today" unless the call happened today. If it was older, use wording like "earlier this week", "a few days ago", or "last week" based on the provided timestamp.
+CALL QUALITY: If the transcript is mostly a gatekeeper, receptionist, or routing handoff, do not pretend you had a full substantive conversation. Use wording like "thanks for the direction" or "thanks for pointing me to the right place." Only use "good talking with you" when the transcript shows a real back-and-forth about the actual topic.
+NEXT STEP: If the transcript includes a direct instruction or handoff, follow that exact next step. Do not invent a different CTA.
+NO FUTURE EMAILS: Do not write phrases like "I'll send over a brief email" or "I'll follow up with more info" unless the user explicitly asked for a later email. The body you write is the email that gets sent now, so include the information directly.
 
 SENDER: ${signerName}
 RECIPIENT: ${to || '(not specified)'}
@@ -733,7 +736,7 @@ ${DELIVERABILITY_RULES}
     getRefinementInstruction: () =>
       'REFINEMENT: Make this post-call email warmer and more specific. Reference the conversation naturally. One clear next step. Output only the revised body.',
     generationChips: [
-      { label: 'Thank you + recap', directive: 'Write a warm post-call thank-you that briefly references the key topic we discussed and proposes one concrete next step. 80–100 words.' },
+      { label: 'Thank you + recap', directive: 'Write a warm post-call thank-you that briefly references the real call outcome and one concrete next step. If the transcript was mainly a routing handoff or front-desk transfer, thank them for the direction instead of implying a deep conversation. Use one specific detail from the transcript and keep the ask tied to the exact next step. Do not say you will send another email later; include the relevant information in this email now. 80–100 words.' },
       { label: 'Send the math', directive: 'Write a short post-call follow-up saying I am following up with the numbers I mentioned on the call. Reference what we discussed. Build curiosity. 70–90 words.' },
       { label: 'Schedule next step', directive: 'Write a post-call follow-up that thanks them for the conversation and proposes one specific next step (follow-up call, sending an audit, or a proposal). 80–100 words.' },
       { label: 'Drip materials', directive: 'Write a post-call follow-up mentioning I am attaching or linking the materials I referenced on the call. Make it feel like a natural continuation. 70–90 words.' },
