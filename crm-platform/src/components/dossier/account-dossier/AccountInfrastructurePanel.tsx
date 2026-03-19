@@ -162,15 +162,17 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
                                 )}
                                 <div className="space-y-4">
                                     {noteEntries.length > 0 ? noteEntries.map((entry, idx) => (
-                                        <div key={`${entry.sourceLabel}-${entry.timestamp || 'na'}-${idx}`} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300 pb-4 border-b border-white/[0.03] last:border-none">
+                                        <div key={`${entry.sourceLabel}-${entry.timestamp || 'na'}-${idx}`} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300 pb-4">
                                             <div className="flex flex-col items-center self-stretch flex-none">
                                                 <div className="w-1 h-1 rounded-full bg-[#002FA7]/40 mt-2.5 flex-none" />
                                                 <div className="w-px bg-[#002FA7]/20 flex-1" />
                                             </div>
                                             <div className="flex-1 min-w-0 pb-2">
-                                                <div className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-1.5">
-                                                    {entry.sourceLabel}
-                                                </div>
+                                                {entry.showSourceLabel && (
+                                                    <div className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-1.5">
+                                                        {entry.sourceLabel}
+                                                    </div>
+                                                )}
                                                 {entry.timestamp && (
                                                     <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2">
                                                         <Clock className="w-3 h-3 shrink-0" />
