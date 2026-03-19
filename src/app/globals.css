@@ -536,6 +536,24 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
+  .network-cursor-enabled :is(
+      a[href],
+      button,
+      summary,
+      label[for],
+      select,
+      option,
+      input[type="button"],
+      input[type="submit"],
+      input[type="reset"],
+      [role="button"],
+      [role="link"],
+      [data-cursor="action"],
+      [data-clickable="true"]
+    ) {
+    cursor: pointer !important;
+  }
+
   .network-cursor-enabled input:not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
   .network-cursor-enabled textarea,
   .network-cursor-enabled [contenteditable="true"] {
