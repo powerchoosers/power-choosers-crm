@@ -536,11 +536,6 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .network-cursor-enabled,
-  .network-cursor-enabled * {
-    cursor: none !important;
-  }
-
   .network-cursor-enabled input:not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
   .network-cursor-enabled textarea,
   .network-cursor-enabled [contenteditable="true"] {
@@ -553,42 +548,16 @@
     top: 0;
     z-index: 9999;
     pointer-events: none;
-    width: 14px;
-    height: 14px;
-    border-radius: 999px;
-    border: 1.5px solid rgba(255, 255, 255, 0.92);
-    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.24), 0 0 16px rgba(94, 148, 255, 0.45);
     transform: translate3d(-50%, -50%, 0);
     opacity: 0;
-    transition:
-      width 0.18s cubic-bezier(0.23, 1, 0.32, 1),
-      height 0.18s cubic-bezier(0.23, 1, 0.32, 1),
-      border-color 0.18s cubic-bezier(0.23, 1, 0.32, 1),
-      background-color 0.18s cubic-bezier(0.23, 1, 0.32, 1),
-      border-radius 0.18s cubic-bezier(0.23, 1, 0.32, 1),
-      box-shadow 0.18s cubic-bezier(0.23, 1, 0.32, 1),
-      opacity 0.16s ease;
-    will-change: left, top, width, height;
+    transition: opacity 0.08s linear;
+    will-change: left, top;
     contain: layout paint style;
     backface-visibility: hidden;
   }
 
   .network-cursor.is-visible {
     opacity: 1;
-  }
-
-  .network-cursor.tone-interactive {
-    width: 22px;
-    height: 22px;
-    border-color: rgba(255, 255, 255, 0.98);
-    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.3), 0 0 24px rgba(94, 148, 255, 0.55);
-  }
-
-  .network-cursor.tone-active {
-    width: 16px;
-    height: 16px;
-    border-color: rgba(255, 255, 255, 0.94);
-    box-shadow: 0 0 0 2px rgba(0, 47, 167, 0.34), 0 0 16px rgba(0, 47, 167, 0.5);
   }
 
   .network-cursor.tone-text {
@@ -600,18 +569,22 @@
     box-shadow: 0 0 12px rgba(94, 148, 255, 0.72);
   }
 
-  .satellite-uplink-open .network-cursor {
-    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.12);
-    transition-duration: 0.05s;
-  }
-
-  .satellite-uplink-open .network-cursor.tone-interactive,
-  .satellite-uplink-open .network-cursor.tone-active {
-    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.16);
-  }
-
   .satellite-uplink-open .network-cursor.tone-text {
     box-shadow: 0 0 8px rgba(94, 148, 255, 0.42);
+  }
+
+  .network-cursor-enabled :is(a, button, [role="button"], [role="link"], label[for], summary, select, [tabindex]:not([tabindex="-1"])) {
+    transition:
+      box-shadow 0.14s ease,
+      border-color 0.14s ease,
+      background-color 0.14s ease,
+      transform 0.14s ease;
+  }
+
+  .network-cursor-enabled :is(a, button, [role="button"], [role="link"], label[for], summary, select, [tabindex]:not([tabindex="-1"])):hover,
+  .network-cursor-enabled :is(a, button, [role="button"], [role="link"], label[for], summary, select, [tabindex]:not([tabindex="-1"])):focus-visible {
+    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.18), 0 0 14px rgba(94, 148, 255, 0.12);
+    transform: translateY(-1px);
   }
 }
 
