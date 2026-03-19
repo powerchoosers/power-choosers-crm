@@ -168,6 +168,11 @@ export default async function handler(req, res) {
         : typeof contact?.context_for_ai === 'string' && contact.context_for_ai.trim()
           ? contact.context_for_ai.trim()
           : '';
+      const callContext = typeof contact?.call_context === 'string' && contact.call_context.trim()
+        ? contact.call_context.trim()
+        : typeof contact?.transcript === 'string' && contact.transcript.trim()
+          ? contact.transcript.trim()
+          : '';
       const employeeCount = contact?.employees ?? contact?.employee_count ?? contact?.headcount ?? null;
       const supplier = (contact?.electricity_supplier || contact?.supplier || contact?.metadata?.energy?.supplier || 'Unknown');
       const currentRate = (contact?.current_rate ?? contact?.metadata?.energy?.current_rate ?? 'Unknown');
@@ -189,6 +194,7 @@ export default async function handler(req, res) {
         contact?.company && companyName !== contact.company ? `- COMPANY_LEGAL_NAME: ${contact.company}` : null,
         companyDescription ? `- COMPANY_DESCRIPTION: ${companyDescription}` : null,
         companyResearch ? `- COMPANY_RESEARCH: ${companyResearch}` : null,
+        callContext ? `- CALL_CONTEXT: ${callContext}` : null,
         employeeCount ? `- COMPANY_SCALE: ${employeeCount} employees` : null,
         `- ROLE: ${contactTitle}`,
         `- LOCATION: ${contactLocation}`,
@@ -203,7 +209,7 @@ export default async function handler(req, res) {
         contact?.domain && `- DOMAIN: ${contact.domain}`,
         vectors.includes('recent_news') && `- SIGNALS: ${contact?.news || 'No news signals.'}`,
         recentSignal ? `- RECENT_SIGNAL: ${recentSignal}` : null,
-        vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${contact?.transcript || 'No previous call transcripts.'}`,
+        vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${callContext || 'No usable call transcripts.'}`,
         contact?.metadata && `- EXTENDED_METADATA: ${JSON.stringify(contact.metadata)}`
       ].filter(Boolean).join('\n');
 
@@ -269,6 +275,7 @@ export default async function handler(req, res) {
             - If LOCATION is known, anchor the observation to that place naturally.
             - If any field is Unknown, do not invent it and do not force awkward placeholders.
             - If company description, employee count, recent signal, or notes are available, use at most one of them naturally. Do not stack all of them into one sentence.
+            - If CALL_CONTEXT is present, use only human conversation or substantive call notes. Ignore no-answer calls, voicemail menus, extension trees, and IVR noise.
             - If COMPANY_RESEARCH exists, use one concrete fact from it. Do not say you "looked at LinkedIn" or "noticed on the website" unless that source mention directly adds credibility.
           17. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, or contract timing details.
@@ -324,6 +331,7 @@ export default async function handler(req, res) {
           INTELLIGENT_CONTEXT_MAPPING:
           - Use the NEURAL_CONTEXT and EXTENDED_METADATA to personalize the draft proactively.
           - RESOLVE PLACEHOLDERS: If the draft or strategy contains variables like {{company}}, {{industry}}, {{city}}, {{asset_type}}, etc., you MUST resolve them using the provided context.
+          - If CALL_CONTEXT is present, use only human conversation or substantive call notes. Ignore no-answer calls, voicemail menus, extension trees, and IVR noise.
           
           HIGH_AGENCY_IDENTITY_RESOLUTION:
           - DO NOT wait for bracketed variables. If the draft is generic (e.g. "your company", "your industry"), you MUST replace those with specific data from NEURAL_CONTEXT (e.g. "${companyName || 'your business'}", "${contact?.industry || 'your industry'}").

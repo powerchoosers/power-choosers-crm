@@ -12,6 +12,8 @@ import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useComposeStore } from '@/store/composeStore'
+import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
+import { buildUsableCallContextBlock } from '@/lib/call-context'
 
 // Modular Components
 import { useContactDossierState } from '@/hooks/useContactDossierState'
@@ -135,69 +137,35 @@ export default function ContactDossierPage() {
   const composeContext = useMemo((): ComposeContext | null => {
     if (!s.contact) return null
 
-    let contextForAi = s.editNotes || ''
+    const noteEntries = buildForensicNoteEntries([
+      {
+        label: `CONTACT NOTE • ${s.contact.name || 'UNKNOWN CONTACT'}`,
+        notes: s.editNotes || null,
+      },
+      {
+        label: `ACCOUNT NOTE • ${s.account?.name || 'UNKNOWN ACCOUNT'}`,
+        notes: s.account?.description || null,
+      },
+    ])
 
-    const describeRelativeCallTime = (callDate: Date): string => {
-      const now = new Date()
-      const msPerDay = 24 * 60 * 60 * 1000
-      const dayDiff = Math.floor((now.getTime() - callDate.getTime()) / msPerDay)
-      if (dayDiff <= 0) {
-        const hour = callDate.getHours()
-        if (hour < 12) return 'earlier this morning'
-        if (hour < 17) return 'earlier this afternoon'
-        return 'earlier today'
-      }
-      if (dayDiff === 1) return 'yesterday'
-      if (dayDiff <= 3) return `${dayDiff} days ago`
-      if (dayDiff <= 7) return 'earlier this week'
-      if (dayDiff <= 14) return 'about a week ago'
-      return 'earlier this month'
-    }
-
-    const readInsightsSummary = (value: unknown): string => {
-      if (!value) return ''
-      try {
-        const parsed = typeof value === 'string' ? JSON.parse(value) : value
-        if (parsed && typeof parsed === 'object' && typeof (parsed as { summary?: unknown }).summary === 'string') {
-          return String((parsed as { summary: string }).summary).trim()
-        }
-      } catch {
-        return ''
-      }
-      return ''
-    }
+    let contextForAi = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : ''
 
     // Add recent call transcripts to Context
-    if (s.recentCalls && s.recentCalls.length > 0) {
-      const callsWithText = s.recentCalls.filter(c => c.transcript || c.note || c.aiInsights)
-      if (callsWithText.length > 0) {
-        contextForAi += '\\n\\nRECENT CALL HISTORY:\\n'
-        contextForAi += callsWithText.slice(0, 4).map(c => {
-          const callDate = c.date ? new Date(c.date) : null
-          const validDate = callDate && !Number.isNaN(callDate.getTime()) ? callDate : null
-          const localTime = validDate
-            ? validDate.toLocaleString('en-US', {
-              timeZone: 'America/Chicago',
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              year: 'numeric',
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-              timeZoneName: 'short'
-            })
-            : 'Unknown'
-          const timingCue = validDate ? describeRelativeCallTime(validDate) : 'recently'
-          const insightsSummary = readInsightsSummary(c.aiInsights)
-
-          let text = `[Call Time: ${localTime}] [Timing Cue: ${timingCue}] (${c.type} - ${c.status})\\n`
-          if (c.note) text += `Summary: ${c.note}\\n`
-          if (insightsSummary) text += `AI Insight: ${insightsSummary}\\n`
-          if (c.transcript) text += `Transcript Snippet:\\n${String(c.transcript).slice(0, 1200)}\\n`
-          return text
-        }).join('\\n---\\n')
-      }
+    const recentCallContext = buildUsableCallContextBlock(
+      (s.recentCalls || []).map((c) => ({
+        id: c.id,
+        timestamp: c.date || c.timestamp || null,
+        direction: c.type || c.direction || null,
+        status: c.status || null,
+        duration: typeof c.duration === 'number' ? c.duration : null,
+        transcript: c.transcript || null,
+        summary: c.note || c.summary || null,
+        aiInsights: c.aiInsights || null,
+      })),
+      4
+    )
+    if (recentCallContext) {
+      contextForAi += contextForAi ? '\\n\\n' + recentCallContext : recentCallContext
     }
 
     return {
