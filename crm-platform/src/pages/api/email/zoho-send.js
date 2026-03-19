@@ -93,7 +93,7 @@ async function resolveProvidedContact(contactId) {
 
     const { data, error } = await supabaseAdmin
         .from('contacts')
-        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts(name)')
+        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts!contacts_accountId_fkey(name)')
         .eq('id', normalizedId)
         .maybeSingle();
 
@@ -139,7 +139,7 @@ async function resolveRecipientContact(ownerEmail, recipientEmail) {
 
     const contactQuery = supabaseAdmin
         .from('contacts')
-        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts(name)')
+        .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts!contacts_accountId_fkey(name)')
         .or(Array.from(new Set(queryParts)).join(','));
 
     const { data: contacts, error } = await contactQuery;
@@ -258,7 +258,7 @@ async function resolveContactFromThread(ownerEmail, threadId, recipientEmail) {
     try {
         const { data } = await supabaseAdmin
             .from('contacts')
-            .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts(name)')
+            .select('id, accountId, ownerId, email, name, firstName, lastName, metadata, accounts!contacts_accountId_fkey(name)')
             .eq('id', String(chosen.contactId))
             .maybeSingle();
         chosenContact = data || null;
