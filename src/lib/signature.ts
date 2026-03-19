@@ -83,7 +83,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
       <!-- TELEMETRY (Contact Info: email, phone, city/state) -->
       <div style="margin-bottom: 16px; font-size: 12px; line-height: 1.6; color: ${secondaryTextColor};">
         <span style="font-family: 'Courier New', Courier, monospace;">E:</span> ${esc(email)} <br>
-        <span style="font-family: 'Courier New', Courier, monospace;">P:</span> ${esc(phone)}
+        <span style="font-family: 'Courier New', Courier, monospace;">P:</span> ${esc(phone)}<br>
         ${locationLine ? ` <br><span style="font-family: 'Courier New', Courier, monospace;">${esc(locationLine)}</span>` : ''}
       </div>
 
@@ -143,6 +143,8 @@ export function generateForensicSignature(
   const website = normalizeWebsite(options?.websiteDomain || profile.website, senderEmail.split('@')[1] || 'nodalpoint.io');
   const websiteDomain = website.domain;
   const websiteUrl = website.url;
+  const phone = profile.selectedPhoneNumber ||
+    (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : '+1 (817) 809-3367')
 
   // Theme-aware colors — dark mode for UI preview, light mode for outgoing emails
   const NODAL_BLUE = isDarkMode ? '#6b8eff' : '#002FA7';
@@ -180,6 +182,9 @@ export function generateForensicSignature(
         </p>
         <p style="margin: 4px 0 0 0; font-size: 12px; color: ${metaColor}; line-height: 1.3;">
           ${senderEmail}
+        </p>
+        <p style="margin: 3px 0 0 0; font-size: 12px; color: ${metaColor}; line-height: 1.3;">
+          ${phone}
         </p>
         <a href="${websiteUrl}" style="font-size: 12px; color: ${NODAL_BLUE}; text-decoration: none; font-weight: 500;">
           ${websiteDomain}

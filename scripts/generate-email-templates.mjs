@@ -89,7 +89,7 @@ function renderTemplate(t) {
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 4px;
       margin-bottom: 18px;
     }
 
@@ -102,6 +102,7 @@ function renderTemplate(t) {
       padding: 4px;
       object-fit: contain;
       flex: 0 0 auto;
+      margin-right: 0;
     }
 
     .eyebrow {
