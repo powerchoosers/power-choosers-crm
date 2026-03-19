@@ -5,7 +5,7 @@ import { ArrowRightLeft, ChevronLeft, ChevronRight, Mic, Sparkles, History } fro
 import { CallListItem } from '@/components/calls/CallListItem'
 import { Button } from '@/components/ui/button'
 
-const CALLS_PER_PAGE = 8
+const CALLS_PER_PAGE = 4
 
 interface EngagementLogProps {
     recentCalls: any[]
@@ -28,6 +28,11 @@ export function EngagementLog({
     contact,
     account
 }: EngagementLogProps) {
+    const totalPages = Math.max(1, Math.ceil((recentCalls?.length ?? 0) / CALLS_PER_PAGE))
+    const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
+    const pageStart = ((safeCurrentPage - 1) * CALLS_PER_PAGE) + 1
+    const pageEnd = Math.min(safeCurrentPage * CALLS_PER_PAGE, recentCalls?.length ?? 0)
+
     return (
         <div className="nodal-void-card p-6 shadow-xl">
             <div className="flex items-center justify-between mb-4">
@@ -60,7 +65,7 @@ export function EngagementLog({
                     <div className="space-y-2">
                         <AnimatePresence initial={false} mode="popLayout">
                             {recentCalls
-                                .slice((currentPage - 1) * CALLS_PER_PAGE, currentPage * CALLS_PER_PAGE)
+                                .slice((safeCurrentPage - 1) * CALLS_PER_PAGE, safeCurrentPage * CALLS_PER_PAGE)
                                 .map((call) => {
                                     const companyPhone = account?.companyPhone?.replace(/\D/g, '').slice(-10)
                                     const callToPhone = (call.phoneNumber || '').replace(/\D/g, '').slice(-10)
@@ -111,7 +116,7 @@ export function EngagementLog({
                     <div className="flex items-center gap-4">
                         <span className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Sync_Block {((currentPage - 1) * CALLS_PER_PAGE + 1).toString().padStart(2, '0')}–{Math.min(currentPage * CALLS_PER_PAGE, recentCalls.length).toString().padStart(2, '0')}
+                            Sync_Block {String(pageStart).padStart(2, '0')}–{String(pageEnd).padStart(2, '0')}
                         </span>
                         <span className="opacity-40">|</span>
                         <span>Total_Nodes: {recentCalls.length}</span>
@@ -120,20 +125,20 @@ export function EngagementLog({
                         <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                            disabled={currentPage === 1}
+                            onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
+                            disabled={safeCurrentPage === 1}
                             className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white"
                         >
                             <ChevronLeft className="h-3.5 w-3.5" />
                         </Button>
                         <span className="min-w-8 text-center tabular-nums">
-                            {currentPage.toString().padStart(2, '0')}
+                            {safeCurrentPage.toString().padStart(2, '0')}
                         </span>
                         <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => setCurrentPage(currentPage + 1)}
-                            disabled={currentPage >= Math.ceil(recentCalls.length / CALLS_PER_PAGE)}
+                            onClick={() => setCurrentPage(safeCurrentPage + 1)}
+                            disabled={safeCurrentPage >= totalPages}
                             className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white"
                         >
                             <ChevronRight className="h-3.5 w-3.5" />

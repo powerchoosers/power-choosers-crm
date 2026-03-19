@@ -23,6 +23,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useComposeStore } from '@/store/composeStore';
 import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -283,6 +284,7 @@ function buildNameKey(firstName?: unknown, lastName?: unknown): string {
 
 export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId, accountLogoUrl, accountDomain }: OrgIntelligenceProps) {
   const { user } = useAuth();
+  const router = useRouter();
   const [data, setData] = useState<ApolloContactRow[]>([]);
   const [companySummary, setCompanySummary] = useState<ApolloCompany | null>(null);
   const [scanStatus, setScanStatus] = useState<'idle' | 'scanning' | 'complete'>('idle');
@@ -1901,31 +1903,53 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       )}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
-                          <ContactAvatar
-                            name={person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact'}
-                            photoUrl={person.photoUrl}
-                            size={36}
-                            className="w-9 h-9 rounded-[10px]"
-                            textClassName="text-[10px]"
-                          />
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
-                              {person.isMonitored
-                                ? contactFullName
-                                : compactName
-                              }
-                            </span>
-                            {person.isMonitored && (
+                        {person.isMonitored && person.crmId ? (
+                          <button
+                            type="button"
+                            onClick={() => router.push(`/network/contacts/${person.crmId}`)}
+                            aria-label={`Open dossier for ${contactFullName}`}
+                            className="flex items-center gap-2 min-w-0 flex-1 mr-2 text-left rounded-lg transition-colors hover:bg-white/[0.02] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#002FA7]"
+                          >
+                            <ContactAvatar
+                              name={person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact'}
+                              photoUrl={person.photoUrl}
+                              size={36}
+                              className="w-9 h-9 rounded-[10px]"
+                              textClassName="text-[10px]"
+                            />
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
+                                {contactFullName}
+                              </span>
                               <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" aria-label="Synced" />
-                            )}
+                              </div>
+                              <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
+                                {person.title || 'Nodal Analyst'}
+                              </span>
                             </div>
-                            <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
-                              {person.title || 'Nodal Analyst'}
-                            </span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                            <ContactAvatar
+                              name={person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact'}
+                              photoUrl={person.photoUrl}
+                              size={36}
+                              className="w-9 h-9 rounded-[10px]"
+                              textClassName="text-[10px]"
+                            />
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="text-[11px] font-semibold text-zinc-200 truncate group-hover:text-white transition-colors">
+                                {compactName}
+                              </span>
+                              </div>
+                              <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
+                                {person.title || 'Nodal Analyst'}
+                              </span>
+                            </div>
                           </div>
-                        </div>
+                        )}
 
                         <div className="flex items-center gap-1.5">
                           {person.isMonitored ? (
