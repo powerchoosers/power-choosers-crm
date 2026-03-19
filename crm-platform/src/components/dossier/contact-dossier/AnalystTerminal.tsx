@@ -37,8 +37,8 @@ export function AnalystTerminal({
     const [terminalInput, setTerminalInput] = useState('')
     const [descriptionCopied, setDescriptionCopied] = useState(false)
     const noteEntries = useMemo(() => buildForensicNoteEntries([
+        ...noteSources,
         { label: 'CONTACT NOTE', notes: editNotes },
-        ...noteSources
     ]), [editNotes, noteSources])
     const clipboardText = useMemo(() => formatForensicNoteClipboard(noteEntries), [noteEntries])
 
@@ -137,9 +137,11 @@ export function AnalystTerminal({
                                         <div className="w-px bg-[#002FA7]/20 flex-1" />
                                     </div>
                                     <div className="flex-1 min-w-0 pb-2">
-                                        <div className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-1.5">
-                                            {entry.sourceLabel}
-                                        </div>
+                                        {entry.showSourceLabel && (
+                                            <div className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-1.5">
+                                                {entry.sourceLabel}
+                                            </div>
+                                        )}
                                         {entry.timestamp && (
                                             <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2">
                                                 <Clock className="w-3 h-3" />

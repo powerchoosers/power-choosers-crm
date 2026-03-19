@@ -7,13 +7,21 @@ export interface ForensicNoteEntry {
   sourceLabel: string
   timestamp: string | null
   content: string
+  showSourceLabel: boolean
   sourceIndex: number
   entryIndex: number
 }
 
 function splitForensicEntries(notes: string) {
-  return notes
-    .split(/\n\s*\n/)
+  const normalized = notes.trim()
+  if (!normalized) return []
+
+  // Timestamped terminal notes are split into entries. Plain descriptions stay as one block.
+  const hasTimestampedEntries = /\[[0-9]{4}-[0-9]{2}-[0-9]{2}[^\]]*?\]/.test(normalized)
+  if (!hasTimestampedEntries) return [normalized]
+
+  return normalized
+    .split(/\n\s*\n(?=\[[0-9]{4}-[0-9]{2}-[0-9]{2}[^\]]*?\])/)
     .map((entry) => entry.trim())
     .filter(Boolean)
 }
@@ -35,6 +43,7 @@ function parseForensicEntry(entry: string) {
 
 export function buildForensicNoteEntries(sources: ForensicNoteSource[]) {
   const entries: ForensicNoteEntry[] = []
+  const dedupe = new Set<string>()
 
   sources.forEach((source, sourceIndex) => {
     const notes = source.notes?.trim()
@@ -43,11 +52,16 @@ export function buildForensicNoteEntries(sources: ForensicNoteSource[]) {
     splitForensicEntries(notes).forEach((entry, entryIndex) => {
       const parsed = parseForensicEntry(entry)
       if (!parsed.content) return
+      const normalizedContent = parsed.content.replace(/\s+/g, ' ').trim().toLowerCase()
+      const dedupeKey = `${parsed.timestamp || 'no-ts'}::${normalizedContent}`
+      if (dedupe.has(dedupeKey)) return
+      dedupe.add(dedupeKey)
 
       entries.push({
         sourceLabel: source.label,
         timestamp: parsed.timestamp,
         content: parsed.content,
+        showSourceLabel: Boolean(parsed.timestamp),
         sourceIndex,
         entryIndex,
       })
@@ -75,7 +89,7 @@ export function buildForensicNoteEntries(sources: ForensicNoteSource[]) {
 export function formatForensicNoteClipboard(entries: ForensicNoteEntry[]) {
   return entries
     .map((entry) => {
-      const label = entry.sourceLabel
+      const label = entry.showSourceLabel ? entry.sourceLabel : ''
       const timestampLine = entry.timestamp ? `[${entry.timestamp}]` : ''
       return [label, timestampLine, entry.content].filter(Boolean).join('\n')
     })
