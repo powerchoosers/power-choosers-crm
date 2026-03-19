@@ -483,6 +483,39 @@ export default async function handler(req, res) {
         const resolvedRecipient = supabaseAdmin
             ? await resolveRecipientContact(ownerEmail, toRecipients[0])
             : { contactId: null, accountId: null, contactName: null, contactCompany: null };
+        logger.info(`[Zoho] resolveRecipientContact result: contactId=${resolvedRecipient.contactId}, accountId=${resolvedRecipient.accountId}, name=${resolvedRecipient.contactName}`, 'zoho-send');
+
+        // Direct exact-match fallback: if the complex resolution failed, try a simple email lookup
+        let directMatchRecipient = { contactId: null, accountId: null, contactName: null, contactCompany: null };
+        if (supabaseAdmin && !resolvedRecipient.contactId && toRecipients[0]) {
+            try {
+                const { data: exactMatch, error: exactError } = await supabaseAdmin
+                    .from('contacts')
+                    .select('id, accountId, ownerId, email, name, firstName, lastName, metadata')
+                    .ilike('email', toRecipients[0])
+                    .limit(5);
+
+                if (exactError) {
+                    logger.warn(`[Zoho] Direct contact lookup failed: ${exactError.message}`, 'zoho-send');
+                } else if (exactMatch && exactMatch.length > 0) {
+                    // Prefer contact owned by the sender
+                    const owned = exactMatch.find(c => normalizeOwnerKey(c.ownerId) === normalizeOwnerKey(ownerEmail));
+                    const chosen = owned || exactMatch[0];
+                    directMatchRecipient = {
+                        contactId: chosen.id || null,
+                        accountId: chosen.accountId || null,
+                        contactName: buildContactName(chosen),
+                        contactCompany: buildContactCompany(chosen)
+                    };
+                    logger.info(`[Zoho] Direct contact lookup recovered: ${chosen.id} (${chosen.name || chosen.email})`, 'zoho-send');
+                } else {
+                    logger.info(`[Zoho] Direct contact lookup found no match for: ${toRecipients[0]}`, 'zoho-send');
+                }
+            } catch (directErr) {
+                logger.warn(`[Zoho] Direct contact lookup exception: ${directErr?.message || directErr}`, 'zoho-send');
+            }
+        }
+
         const providedContact = (supabaseAdmin && contactId)
             ? await resolveProvidedContact(contactId)
             : null;
@@ -500,22 +533,26 @@ export default async function handler(req, res) {
         const persistedContactId =
             providedContact?.id
             || resolvedRecipient.contactId
+            || directMatchRecipient.contactId
             || threadResolvedRecipient.contactId
             || null;
         const persistedAccountId =
             providedContact?.accountId
             || resolvedRecipient.accountId
+            || directMatchRecipient.accountId
             || threadResolvedRecipient.accountId
             || null;
         const persistedContactName =
             buildContactName(providedContact)
             || resolvedRecipient.contactName
+            || directMatchRecipient.contactName
             || threadResolvedRecipient.contactName
             || contactName
             || null;
         const persistedContactCompany =
             buildContactCompany(providedContact)
             || resolvedRecipient.contactCompany
+            || directMatchRecipient.contactCompany
             || threadResolvedRecipient.contactCompany
             || contactCompany
             || null;
