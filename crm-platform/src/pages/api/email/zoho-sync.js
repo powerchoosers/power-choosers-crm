@@ -857,8 +857,12 @@ export default async function handler(req, res) {
                     }
                 }
 
-                // 4. Parse
+                // 4. Parse (returns null for self-sends that should be skipped)
                 const emailDoc = parseZohoMessage(msgSummary, fullContent, userEmail);
+                if (!emailDoc) {
+                    skippedCount++;
+                    continue;
+                }
 
                 // 4b. Fetch actual attachment metadata if needed (Zoho doesn't include it in content/summary)
                 if (emailDoc.metadata.hasAttachments && emailDoc.metadata.attachments.length === 0) {
@@ -1025,6 +1029,13 @@ function parseZohoMessage(summary, content, ownerEmail) {
 
     const isSelfSend = isSelfSendByEmail || isSelfSendByDisplayName;
 
+    // Self-sends already have a proper zoho_* tracking record from zoho-send.
+    // Skip them entirely to avoid duplicates with wrong `to` field.
+    if (isSelfSend) {
+        logger.info(`[Zoho Sync] Skipping self-send from inbox: ${summary.subject} (from: ${fromAddress})`, 'zoho-sync');
+        return null;
+    }
+
     // Prefer concrete email addresses from message content when available.
     const emailData = {
         id: zohoId, // Use Zoho Message ID as primary key
@@ -1043,10 +1054,10 @@ function parseZohoMessage(summary, content, ownerEmail) {
             const ts = Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
             return new Date(Math.min(ts, Date.now() + 60_000)).toISOString();
         })(),
-        type: isSelfSend ? 'sent' : 'received',
+        type: 'received',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
-        status: isSelfSend ? 'sent' : 'received',
+        status: 'received',
         is_read: !!summary.isRead,
         is_starred: !!summary.isStarred,
         contactId: null,
