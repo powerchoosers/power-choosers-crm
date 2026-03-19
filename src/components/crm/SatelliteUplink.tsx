@@ -92,6 +92,15 @@ export default function SatelliteUplink({
     fetchShadowIntel();
   }, [isActive, coordinates]);
 
+  useEffect(() => {
+    const isHeavyOpen = isActive || isSearchOpen;
+    document.body.classList.toggle('satellite-uplink-open', isHeavyOpen);
+
+    return () => {
+      document.body.classList.remove('satellite-uplink-open');
+    };
+  }, [isActive, isSearchOpen]);
+
   const revealMap = () => {
     // If map is already expanded, align immediately on next frame.
     if (isActive && coordinates) {
