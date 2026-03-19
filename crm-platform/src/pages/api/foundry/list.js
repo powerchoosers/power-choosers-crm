@@ -29,7 +29,7 @@ export default async function handler(req, res) {
         // Fetch all foundry assets
         const { data, error } = await supabaseAdmin
             .from('transmission_assets')
-            .select('id, name, type, updated_at')
+            .select('id, name, type, updated_at, content_json')
             .order('updated_at', { ascending: false });
 
         if (error) {

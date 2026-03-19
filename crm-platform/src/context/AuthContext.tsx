@@ -13,6 +13,7 @@ export type UserProfile = {
   bio: string | null
   jobTitle: string | null
   linkedinUrl: string | null
+  website: string | null
   city: string | null
   state: string | null
   hostedPhotoUrl: string | null
@@ -41,6 +42,7 @@ const AuthContext = createContext<AuthContextType>({
     bio: null,
     jobTitle: null,
     linkedinUrl: null,
+    website: null,
     city: null,
     state: null,
     hostedPhotoUrl: null,
@@ -63,6 +65,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     bio: null,
     jobTitle: null,
     linkedinUrl: null,
+    website: null,
     city: null,
     state: null,
     hostedPhotoUrl: null,
@@ -146,6 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: data.bio || null,
         jobTitle: data.job_title || null,
         linkedinUrl: data.linkedin_url || null,
+        website: settings.website ?? null,
         city: settings.city ?? null,
         state: settings.state ?? null,
         hostedPhotoUrl: data.hosted_photo_url || null,
@@ -202,6 +206,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         bio: 'System Administrator (Bypass)',
         jobTitle: 'Principal Market Architect',
         linkedinUrl: 'https://linkedin.com/in/nodalpoint',
+        website: 'nodalpoint.io',
         city: null,
         state: null,
         hostedPhotoUrl: null,
@@ -224,6 +229,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: null,
           jobTitle: null,
           linkedinUrl: null,
+          website: null,
           city: null,
           state: null,
           hostedPhotoUrl: null,
@@ -262,10 +268,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           name: 'Dev User',
           firstName: 'Dev',
           lastName: 'User',
-          bio: 'System Administrator (Bypass)',
-          jobTitle: 'Principal Market Architect',
-          linkedinUrl: 'https://linkedin.com/in/nodalpoint',
-          city: null,
+        bio: 'System Administrator (Bypass)',
+        jobTitle: 'Principal Market Architect',
+        linkedinUrl: 'https://linkedin.com/in/nodalpoint',
+        website: 'nodalpoint.io',
+        city: null,
           state: null,
           hostedPhotoUrl: null,
           twilioNumbers: [],
@@ -331,6 +338,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 bio: data.bio || null,
                 jobTitle: data.job_title || null,
                 linkedinUrl: data.linkedin_url || null,
+                website: settings.website ?? null,
                 city: settings.city ?? null,
                 state: settings.state ?? null,
                 hostedPhotoUrl: data.hosted_photo_url || null,
@@ -355,7 +363,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   role: isAdmin ? 'admin' : 'employee',
                   twilioNumbers: [],
                   selectedPhoneNumber: null,
-                  bridgeToMobile: false
+                  bridgeToMobile: false,
+                  website: null
                 }
               }
 
@@ -369,6 +378,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 bio: null,
                 jobTitle: null,
                 linkedinUrl: null,
+                website: null,
                 city: null,
                 state: null,
                 hostedPhotoUrl: null,
@@ -415,6 +425,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           bio: null,
           jobTitle: null,
           linkedinUrl: null,
+          website: null,
           city: null,
           state: null,
           hostedPhotoUrl: null,

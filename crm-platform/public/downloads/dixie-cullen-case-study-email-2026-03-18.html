@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nodal Point | Dixie Cullen Case Study Email</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f4f4f5;
+      color: #18181b;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+      -ms-text-size-adjust: 100%;
+    }
+
+    .wrap {
+      width: 100%;
+      padding: 28px 14px;
+      box-sizing: border-box;
+    }
+
+    .shell {
+      max-width: 680px;
+      margin: 0 auto;
+      border: 1px solid #e4e4e7;
+      border-radius: 20px;
+      overflow: hidden;
+      background: #ffffff;
+      box-shadow: 0 18px 50px rgba(24, 24, 27, 0.08);
+    }
+
+    .top {
+      padding: 26px 28px 18px;
+      background:
+        radial-gradient(circle at top right, rgba(0,47,167,0.12), transparent 30%),
+        linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+      border-bottom: 1px solid #e4e4e7;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .logo {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid #e4e4e7;
+      padding: 4px;
+      object-fit: contain;
+      flex: 0 0 auto;
+    }
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: #71717a;
+      margin-bottom: 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 29px;
+      line-height: 1.08;
+      letter-spacing: -0.04em;
+      color: #09090b;
+    }
+
+    .intro {
+      margin: 14px 0 0;
+      font-size: 15px;
+      line-height: 1.65;
+      color: #3f3f46;
+      max-width: 54ch;
+    }
+
+    .body {
+      padding: 24px 28px 28px;
+    }
+
+    .callout {
+      border-left: 4px solid #002FA7;
+      background: #eef2ff;
+      border-radius: 14px;
+      padding: 16px 16px 16px 14px;
+      margin: 18px 0 22px;
+      color: #1e1b4b;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .grid {
+      display: table;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 12px;
+    }
+
+    .row {
+      display: table-row;
+    }
+
+    .cell {
+      display: table-cell;
+      width: 50%;
+      vertical-align: top;
+      padding-right: 12px;
+    }
+
+    .card {
+      border: 1px solid #e4e4e7;
+      border-radius: 16px;
+      padding: 16px;
+      background: #ffffff;
+    }
+
+    .card h2 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      color: #71717a;
+    }
+
+    .card p {
+      margin: 0;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #27272a;
+    }
+
+    .stat {
+      margin: 0 0 10px;
+      padding: 14px 16px;
+      border: 1px solid #e4e4e7;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 22px;
+      line-height: 1;
+      color: #09090b;
+      margin-bottom: 4px;
+      letter-spacing: -0.04em;
+    }
+
+    .stat span {
+      display: block;
+      color: #52525b;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .bullet-list {
+      margin: 12px 0 0;
+      padding: 0 0 0 18px;
+      color: #27272a;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .bullet-list li { margin-bottom: 8px; }
+
+    .cta {
+      margin-top: 18px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, #002FA7 0%, #0040d8 100%);
+      color: #fff;
+      padding: 18px 18px 16px;
+    }
+
+    .cta .label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      opacity: 0.8;
+      margin-bottom: 8px;
+    }
+
+    .cta p {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #fff;
+    }
+
+    .button {
+      display: inline-block;
+      margin-top: 14px;
+      background: #ffffff;
+      color: #002FA7 !important;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 12px 18px;
+      border-radius: 999px;
+    }
+
+    .footer {
+      padding: 18px 28px 24px;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #71717a;
+      border-top: 1px solid #e4e4e7;
+      background: #fafafa;
+    }
+
+    .footer strong {
+      color: #09090b;
+      display: block;
+      margin-bottom: 3px;
+    }
+
+    @media only screen and (max-width: 640px) {
+      .wrap { padding: 14px 8px; }
+      .top, .body, .footer { padding-left: 18px; padding-right: 18px; }
+      h1 { font-size: 24px; }
+      .cell {
+        display: block;
+        width: 100%;
+        padding-right: 0;
+        margin-bottom: 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="shell">
+      <div class="top">
+        <div class="brand">
+          <img class="logo" src="../images/nodalpoint-webicon.png" alt="Nodal Point logo" />
+          <div>
+            <div class="eyebrow">Case Study Follow-Up</div>
+            <h1>How B.I.G. Logistics cut energy cost</h1>
+          </div>
+        </div>
+        <p class="intro">
+          Lorena, thanks again for taking my call. I kept this short on purpose because you said
+          you get this kind of outreach all the time.
+        </p>
+      </div>
+
+      <div class="body">
+        <div class="callout">
+          One example I wanted to share: we helped <strong>B.I.G. Logistics</strong> reduce their energy cost on
+          both the <strong>rate per kWh</strong> and the <strong>demand charges</strong>, which netted them
+          <strong>over $30,000 in annual savings</strong> using cost-efficient solutions.
+        </div>
+
+        <div class="grid">
+          <div class="row">
+            <div class="cell">
+              <div class="card">
+                <h2>What changed</h2>
+                <p>
+                  We looked at the bill like a system, not just a price. That meant checking the electricity
+                  rate, the peak-usage fees, and any parts of the bill that were creating avoidable spend.
+                </p>
+              </div>
+            </div>
+            <div class="cell">
+              <div class="card">
+                <h2>Why it worked</h2>
+                <p>
+                  The savings came from tightening both sides of the bill:
+                  the unit price for power and the charges tied to peak demand.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid">
+          <div class="row">
+            <div class="cell">
+              <div class="stat">
+                <strong>$30,000+</strong>
+                <span>Annual savings for B.I.G. Logistics from a cleaner energy structure.</span>
+              </div>
+            </div>
+            <div class="cell">
+              <div class="stat">
+                <strong>2 levers</strong>
+                <span>Lower price per kWh plus demand charge reduction.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>What I’d do for Dixie Cullen Interests</h2>
+          <ul class="bullet-list">
+            <li>Review one recent bill and see if the rate structure is still competitive.</li>
+            <li>Check the demand charges to see if the peak-usage fee is getting too high.</li>
+            <li>Tell you in plain English whether there is enough there to justify a future conversation.</li>
+          </ul>
+        </div>
+
+        <div class="cta">
+          <div class="label">Next step</div>
+          <p>
+            If you want, send me one recent bill and I’ll take a look. If it is worth a deeper conversation,
+            I’ll show you why. If not, I’ll be straight with you.
+          </p>
+          <a class="button" href="mailto:l.patterson@nodalpoint.io?subject=Dixie%20Cullen%20Interests%20bill%20review">Send a bill</a>
+        </div>
+      </div>
+
+      <div class="footer">
+        <strong>Lewis Patterson | Nodal Point</strong>
+        Director of Energy Architecture | l.patterson@nodalpoint.io<br />
+        Based on the most recent call with Lorena Bacigalupo and the Daniel Johns email thread.
+      </div>
+    </div>
+  </div>
+</body>
+</html>

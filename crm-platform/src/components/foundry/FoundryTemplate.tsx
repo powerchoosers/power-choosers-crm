@@ -24,17 +24,18 @@ interface FoundryTemplateProps {
     blocks: FoundryBlock[]
     options?: {
         skipFooter?: boolean
-        profile?: {
-            firstName?: string
-            lastName?: string
-            jobTitle?: string
-            selectedPhoneNumber?: string
-            city?: string
-            state?: string
-            hostedPhotoUrl?: string
-            photoURL?: string
-            linkedinUrl?: string
-        }
+            profile?: {
+                firstName?: string
+                lastName?: string
+                jobTitle?: string
+                selectedPhoneNumber?: string
+                city?: string
+                state?: string
+                hostedPhotoUrl?: string
+                photoURL?: string
+                linkedinUrl?: string
+                website?: string
+            }
     }
 }
 
@@ -50,6 +51,8 @@ export default function FoundryTemplate({
     const location = [profile?.city, profile?.state].filter(Boolean).join(', ') || 'Fort Worth, TX'
     const photoUrl = profile?.hostedPhotoUrl || profile?.photoURL || ''
     const linkedinUrl = profile?.linkedinUrl || 'https://linkedin.com/company/nodal-point'
+    const websiteRaw = profile?.website || 'nodalpoint.io'
+    const website = /^https?:\/\//i.test(websiteRaw) ? websiteRaw : `https://${websiteRaw.replace(/^www\./i, '')}`
 
     return (
         <Html>
@@ -293,7 +296,7 @@ export default function FoundryTemplate({
                                         </Column>
                                         <Column style={separatorColumn}>//</Column>
                                         <Column style={linkColumn}>
-                                            <a href="https://nodalpoint.io" style={linkStyle}>HQ</a>
+                                            <a href={website} style={linkStyle}>WEBSITE</a>
                                         </Column>
                                         <Column style={separatorColumn}>//</Column>
                                         <Column style={linkColumn}>

@@ -30,6 +30,7 @@ export default function SettingsPage() {
   const [bio, setBio] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [linkedinUrl, setLinkedinUrl] = useState('')
+  const [website, setWebsite] = useState('')
   const [city, setCity] = useState('')
   const [state, setState] = useState('')
   const [localEmail, setLocalEmail] = useState('')
@@ -246,6 +247,7 @@ export default function SettingsPage() {
     setBio(profile.bio || '')
     setJobTitle(profile.jobTitle || '')
     setLinkedinUrl(profile.linkedinUrl || '')
+    setWebsite(profile.website || '')
     setCity(profile.city || '')
     setState(profile.state || '')
     setTwilioNumbers(profile.twilioNumbers || [])
@@ -314,6 +316,7 @@ export default function SettingsPage() {
             selectedPhoneNumber: selectedPhoneNumber,
             bridgeToMobile: bridgeToMobile,
             role: role || 'employee', // Preserve role
+            website: website.trim() || null,
             city: city.trim() || null,
             state: state.trim() || null
           },
@@ -519,7 +522,7 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                   <div className="space-y-2">
                     <Label htmlFor="jobTitle" className="text-zinc-400">Job Title</Label>
                     <Input
@@ -537,6 +540,16 @@ export default function SettingsPage() {
                       placeholder="https://linkedin.com/in/username"
                       value={linkedinUrl}
                       onChange={(e) => setLinkedinUrl(e.target.value)}
+                      className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="website" className="text-zinc-400">Website</Label>
+                    <Input
+                      id="website"
+                      placeholder="https://nodalpoint.io"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
                       className="bg-transparent border-white/10 text-zinc-200 placeholder:text-zinc-600 focus-visible:ring-[#002FA7]"
                     />
                   </div>

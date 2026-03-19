@@ -1401,7 +1401,7 @@ Return exactly one subject line.`,
 
   // Fetch available foundry templates
   const { data: foundryAssets } = useQuery<any[]>({
-    queryKey: ['transmission_assets'],
+    queryKey: ['transmission_assets', 'email_templates'],
     queryFn: async () => {
       const idToken = await (async () => {
         const { data: { session } } = await supabase.auth.getSession()
@@ -1417,7 +1417,7 @@ Return exactly one subject line.`,
         return []
       }
       const data = await res.json()
-      return data.assets || []
+      return (data.assets || []).filter((asset: any) => asset?.content_json?.kind === 'email_template' || asset?.content_json?.templatePath)
     },
     enabled: !!user,
   })
@@ -1445,8 +1445,29 @@ Return exactly one subject line.`,
         const asset = json?.asset
         if (!asset) throw new Error('Template not found')
 
-        // Generate HTML from blocks
-        let html = await generateStaticHtml(asset.content_json?.blocks || [], { profile })
+        const templatePath = typeof asset?.content_json?.templatePath === 'string' ? asset.content_json.templatePath.trim() : ''
+
+        // Prefer the standalone HTML template file when available.
+        let html = ''
+        if (templatePath) {
+          try {
+            const templateRes = await fetch(templatePath)
+            if (templateRes.ok) {
+              html = await templateRes.text()
+            }
+          } catch (templateError) {
+            console.warn('[FoundryCompose] Template fetch failed, falling back to compiled HTML', templateError)
+          }
+        }
+
+        if (!html.trim()) {
+          html = (asset.compiled_html || '').trim()
+        }
+
+        if (!html.trim()) {
+          // Generate HTML from blocks as the last fallback.
+          html = await generateStaticHtml(asset.content_json?.blocks || [], { profile })
+        }
 
         // Build variable map from contact context (use empty values if no context)
         const contactData = {
@@ -1459,7 +1480,34 @@ Return exactly one subject line.`,
           accountDescription: context?.accountDescription || '',
         }
 
-        const variableMap = contactToVariableMap(contactData)
+        const normalizedWebsite = profile.website || user?.email?.split('@')[1] || 'nodalpoint.io'
+        const websiteDomain = normalizedWebsite.replace(/^https?:\/\//i, '').replace(/\/.*$/, '').replace(/^www\./i, '')
+        const websiteUrl = /^https?:\/\//i.test(normalizedWebsite) ? normalizedWebsite : `https://${websiteDomain}`
+        const senderPhoto = profile.hostedPhotoUrl || user?.user_metadata?.avatar_url || ''
+        const senderName = [profile.firstName, profile.lastName].filter(Boolean).join(' ') || profile.name || user?.user_metadata?.full_name || user?.email || 'Nodal Point'
+        const senderLocation = [profile.city, profile.state].filter(Boolean).join(', ')
+
+        const senderVariableMap = {
+          'sender.name': senderName,
+          'sender.title': profile.jobTitle || 'Director of Energy Architecture',
+          'sender.jobTitle': profile.jobTitle || 'Director of Energy Architecture',
+          'sender.email': profile.email || user?.email || '',
+          'sender.phone': profile.selectedPhoneNumber || profile.twilioNumbers?.[0]?.number || '',
+          'sender.city': profile.city || '',
+          'sender.state': profile.state || '',
+          'sender.location': senderLocation,
+          'sender.linkedinUrl': profile.linkedinUrl || 'https://linkedin.com/company/nodal-point',
+          'sender.website': websiteDomain,
+          'sender.websiteUrl': websiteUrl,
+          'sender.photoUrl': senderPhoto,
+          'sender.avatarUrl': senderPhoto,
+          'sender.logoUrl': '/images/nodalpoint-webicon.png',
+        }
+
+        const variableMap = {
+          ...contactToVariableMap(contactData),
+          ...senderVariableMap,
+        }
 
         // Substitute variables
         html = substituteVariables(html, variableMap)
