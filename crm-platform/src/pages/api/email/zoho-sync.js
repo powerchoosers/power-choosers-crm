@@ -993,7 +993,16 @@ function parseZohoMessage(summary, content, ownerEmail) {
         subject: summary.subject,
         text: plainText,
         html: rawHtml, // Zoho content API might return HTML directly
-        timestamp: new Date(parseInt(receivedTime)).toISOString(),
+        timestamp: (() => {
+            // Zoho's receivedTime is a Unix epoch in ms, but some senders' mail servers
+            // embed a non-UTC timezone in the Date header (e.g. +07:00). parseInt() strips
+            // the offset and reads the wall-clock time as UTC, storing a timestamp that
+            // appears 7+ hours in the future. Clamp to now to prevent future-dated records
+            // from floating to the top of the chronological sort.
+            const parsed = parseInt(receivedTime);
+            const ts = Number.isFinite(parsed) && parsed > 0 ? parsed : Date.now();
+            return new Date(Math.min(ts, Date.now() + 60_000)).toISOString();
+        })(),
         type: 'received',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
