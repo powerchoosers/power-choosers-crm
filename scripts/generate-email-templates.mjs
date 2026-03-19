@@ -55,7 +55,7 @@ function renderTemplate(t) {
     body {
       margin: 0;
       padding: 0;
-      background: #f4f4f5;
+      background: #ffffff;
       color: #18181b;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
       -webkit-text-size-adjust: 100%;
@@ -75,7 +75,7 @@ function renderTemplate(t) {
       border-radius: 20px;
       overflow: hidden;
       background: #ffffff;
-      box-shadow: 0 18px 50px rgba(24, 24, 27, 0.08);
+      box-shadow: 0 8px 30px rgba(24, 24, 27, 0.06);
     }
 
     .top {
