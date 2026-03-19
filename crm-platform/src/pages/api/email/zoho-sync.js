@@ -1000,15 +1000,30 @@ function parseZohoMessage(summary, content, ownerEmail) {
     // creates a zoho_* tracking record.  Storing it again as received causes the email
     // to appear in UPLINK_IN looking like an inbound message from yourself.
     const senderEmail = extractEmailAddress(fromAddress || '');
+    const senderHasRealEmail = senderEmail.includes('@');
     const ownerDomain = (ownerEmail || '').split('@')[1] || '';
     const isOwnDomain = ownerDomain === 'nodalpoint.io' || ownerDomain === 'getnodalpoint.com';
-    const isSelfSend =
-        senderEmail && ownerEmail &&
+
+    // Primary check: sender email matches owner or is from the same nodalpoint domain
+    const isSelfSendByEmail =
+        senderHasRealEmail && ownerEmail &&
         (senderEmail.toLowerCase() === ownerEmail.toLowerCase() ||
          (isOwnDomain && (
              senderEmail.toLowerCase().endsWith('@nodalpoint.io') ||
              senderEmail.toLowerCase().endsWith('@getnodalpoint.com')
          )));
+
+    // Fallback check: Zoho sometimes returns only a display name (no email) for alias-sent
+    // emails.  If the display name matches known outbound name patterns and no external
+    // email was extracted, treat it as a self-send.
+    const fromLower = String(fromAddress || '').toLowerCase();
+    const isSelfSendByDisplayName = !senderHasRealEmail && (
+        fromLower.includes('nodal point') ||
+        fromLower.includes('nodalpoint') ||
+        (senderDisplayName && senderDisplayName.toLowerCase().includes('nodal point'))
+    );
+
+    const isSelfSend = isSelfSendByEmail || isSelfSendByDisplayName;
 
     // Prefer concrete email addresses from message content when available.
     const emailData = {
