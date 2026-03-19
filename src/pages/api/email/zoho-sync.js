@@ -513,11 +513,19 @@ function normalizeWebhookHint(value) {
     const messageId = String(value.messageId || '').trim();
     if (!messageId) return null;
 
+    // Decode HTML entities in subject (Zoho sometimes returns &#39; etc.)
+    const decodedSubject = String(value.subject || '')
+        .replace(/&#39;/g, "'")
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>');
+
     return {
         messageId,
         fromAddress: String(value.fromAddress || '').trim() || null,
         toAddress: String(value.toAddress || '').trim() || null,
-        subject: String(value.subject || '').trim() || null,
+        subject: decodedSubject.trim() || null,
         receivedTime: String(value.receivedTime || '').trim() || null,
         folderId: String(value.folderId || '').trim() || null,
         folderName: String(value.folderName || '').trim() || null,
