@@ -541,12 +541,6 @@
     cursor: none !important;
   }
 
-  .network-cursor-enabled input:not([type="button"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]),
-  .network-cursor-enabled textarea,
-  .network-cursor-enabled [contenteditable="true"] {
-    cursor: text !important;
-  }
-
   .network-cursor {
     position: fixed;
     left: 0;
@@ -556,17 +550,21 @@
     width: 14px;
     height: 14px;
     border-radius: 999px;
-    border: 1.5px solid rgba(94, 148, 255, 0.78);
-    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.18), 0 0 14px rgba(94, 148, 255, 0.2);
+    border: 1.5px solid rgba(255, 255, 255, 0.92);
+    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.24), 0 0 16px rgba(94, 148, 255, 0.45);
     transform: translate3d(-50%, -50%, 0);
     opacity: 0;
     transition:
       width 0.18s cubic-bezier(0.23, 1, 0.32, 1),
       height 0.18s cubic-bezier(0.23, 1, 0.32, 1),
       border-color 0.18s cubic-bezier(0.23, 1, 0.32, 1),
+      background-color 0.18s cubic-bezier(0.23, 1, 0.32, 1),
+      border-radius 0.18s cubic-bezier(0.23, 1, 0.32, 1),
       box-shadow 0.18s cubic-bezier(0.23, 1, 0.32, 1),
       opacity 0.16s ease;
     will-change: left, top, width, height;
+    contain: layout paint style;
+    backface-visibility: hidden;
   }
 
   .network-cursor.is-visible {
@@ -576,15 +574,30 @@
   .network-cursor.tone-interactive {
     width: 22px;
     height: 22px;
-    border-color: rgba(132, 176, 255, 0.98);
-    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.24), 0 0 22px rgba(132, 176, 255, 0.36);
+    border-color: rgba(255, 255, 255, 0.98);
+    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.3), 0 0 24px rgba(94, 148, 255, 0.55);
   }
 
   .network-cursor.tone-active {
     width: 16px;
     height: 16px;
-    border-color: rgba(0, 47, 167, 0.95);
-    box-shadow: 0 0 0 2px rgba(0, 47, 167, 0.28), 0 0 16px rgba(0, 47, 167, 0.34);
+    border-color: rgba(255, 255, 255, 0.94);
+    box-shadow: 0 0 0 2px rgba(0, 47, 167, 0.34), 0 0 16px rgba(0, 47, 167, 0.5);
+  }
+
+  .network-cursor.tone-text {
+    width: 14px;
+    height: 14px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(255, 255, 255, 0.96);
+    background: linear-gradient(
+      90deg,
+      transparent calc(50% - 1px),
+      rgba(255, 255, 255, 0.98) calc(50% - 1px),
+      rgba(255, 255, 255, 0.98) calc(50% + 1px),
+      transparent calc(50% + 1px)
+    );
+    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.3), 0 0 18px rgba(94, 148, 255, 0.56);
   }
 }
 
