@@ -3,7 +3,7 @@ export type CallContextRecord = {
   timestamp?: string | null
   direction?: string | null
   status?: string | null
-  duration?: number | null
+  duration?: number | string | null
   transcript?: string | null
   summary?: string | null
   aiInsights?: unknown
