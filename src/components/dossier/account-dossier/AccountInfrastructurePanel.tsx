@@ -168,15 +168,16 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
                                                 <div className="w-px bg-[#002FA7]/20 flex-1" />
                                             </div>
                                             <div className="flex-1 min-w-0 pb-2">
-                                                {entry.showSourceLabel && (
-                                                    <div className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-1.5">
-                                                        {entry.sourceLabel}
-                                                    </div>
-                                                )}
-                                                {entry.timestamp && (
-                                                    <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2">
-                                                        <Clock className="w-3 h-3 shrink-0" />
-                                                        <span>{entry.timestamp}</span>
+                                                {(entry.timestamp || entry.showSourceLabel) && (
+                                                    <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2 flex-wrap uppercase tracking-[0.3em]">
+                                                        {entry.timestamp && (
+                                                            <span className="flex items-center gap-2 text-inherit">
+                                                                <Clock className="w-3 h-3 shrink-0" />
+                                                                <span>{entry.timestamp}</span>
+                                                            </span>
+                                                        )}
+                                                        {entry.timestamp && entry.showSourceLabel && <span className="text-zinc-700">•</span>}
+                                                        {entry.showSourceLabel && <span className="text-zinc-500">{entry.sourceLabel}</span>}
                                                     </div>
                                                 )}
                                                 <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
