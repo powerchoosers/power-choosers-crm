@@ -64,7 +64,7 @@ function EmailIframePreview({ content }: { content: string }) {
   return (
     <iframe
       ref={iframeRef}
-      className="w-full h-[600px] border-0 bg-white"
+      className="w-full h-[760px] border-0 bg-white"
       title="Email Preview"
     />
   )
@@ -1972,8 +1972,8 @@ Return exactly one subject line.`,
                   <div className="relative">
                     {selectedFoundryId ? (
                       // Show HTML preview for Foundry templates - Refined for inbox parity with Iframe Isolation
-                      <div className="w-full min-h-[400px] bg-zinc-100/30 rounded-xl p-4 md:p-20 flex justify-center items-start overflow-hidden border border-white/5 shadow-inner transition-all duration-500">
-                        <div className="w-full max-w-[700px] bg-white shadow-[0_40px_100px_rgba(0,0,0,0.3)] overflow-hidden rounded-xl ring-1 ring-zinc-200/50 flex flex-col transform transition-transform duration-700">
+                      <div className="w-full min-h-[760px] bg-transparent rounded-xl p-0 md:p-0 flex justify-center items-start overflow-x-auto overflow-y-hidden transition-all duration-500">
+                        <div className="w-full max-w-[860px] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.18)] overflow-hidden rounded-xl ring-1 ring-zinc-200/50 flex flex-col transform transition-transform duration-700">
                           <div className="h-12 border-b border-zinc-100 bg-zinc-50 flex items-center px-6 justify-between shrink-0">
                             <div className="flex gap-2.5">
                               <div className="w-3 h-3 rounded-full bg-zinc-200" />
@@ -1982,7 +1982,7 @@ Return exactly one subject line.`,
                             </div>
                             <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.4em] font-bold">Transmission_Voter_Isolated</span>
                           </div>
-                          <div className="flex-1 overflow-x-hidden min-h-[700px] bg-white">
+                          <div className="flex-1 overflow-x-hidden min-h-[760px] bg-white">
                             <EmailIframePreview content={content} />
                           </div>
                         </div>
