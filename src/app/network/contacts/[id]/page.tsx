@@ -103,10 +103,16 @@ export default function ContactDossierPage() {
     const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm')
     const newNote = `[${timestamp}] ${input}`
     const updatedNotes = s.editNotes ? `${s.editNotes}\n\n${newNote}` : newNote
+    const previousNotes = s.editNotes
     try {
-      await s.setEditNotes(updatedNotes)
+      s.setEditNotes(updatedNotes)
+      await s.updateContactMutation.mutateAsync({
+        id,
+        notes: updatedNotes
+      })
       toast.success('Analyst note synchronized')
     } catch (err) {
+      s.setEditNotes(previousNotes)
       toast.error('Sync failed')
     }
   }
@@ -322,6 +328,12 @@ export default function ContactDossierPage() {
                   isEditing={s.isEditing}
                   editNotes={s.editNotes}
                   setEditNotes={s.setEditNotes}
+                  noteSources={[
+                    {
+                      label: `ACCOUNT NOTE • ${s.account?.name || 'UNKNOWN ACCOUNT'}`,
+                      notes: s.account?.description || '',
+                    },
+                  ]}
                   onNoteSubmit={handleTerminalSubmit}
                   onWipe={handleTerminalWipe}
                   maturityInfo={s.editContractEnd ? `Position Maturity: ${s.editContractEnd}` : undefined}
