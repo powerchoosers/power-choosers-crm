@@ -73,9 +73,9 @@ export function buildForensicNoteEntries(sources: ForensicNoteSource[]) {
       const byTimestamp = a.timestamp.localeCompare(b.timestamp)
       if (byTimestamp !== 0) return byTimestamp
     } else if (a.timestamp) {
-      return -1
-    } else if (b.timestamp) {
       return 1
+    } else if (b.timestamp) {
+      return -1
     }
 
     if (a.sourceIndex !== b.sourceIndex) {
