@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { RefObject } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
@@ -80,9 +80,27 @@ export function EmailList({
   showSkeletonRows = false,
 }: EmailListProps) {
   const [internalPage, setInternalPage] = useState(1)
+  const [pullDistance, setPullDistance] = useState(0)
+  const [isPulling, setIsPulling] = useState(false)
+  const [isPullRefreshing, setIsPullRefreshing] = useState(false)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const pullStartYRef = useRef<number | null>(null)
+  const pullDistanceRef = useRef(0)
+  const isRefreshingRef = useRef(false)
+  const settleTimerRef = useRef<number | null>(null)
 
   const currentPage = externalPage || internalPage
   const setCurrentPage = externalOnPageChange || setInternalPage
+  const PULL_THRESHOLD = 72
+  const PULL_MAX = 132
+
+  useEffect(() => {
+    pullDistanceRef.current = pullDistance
+  }, [pullDistance])
+
+  useEffect(() => {
+    isRefreshingRef.current = isPullRefreshing
+  }, [isPullRefreshing])
 
   const itemsPerPage = 15
   const [skeletonRowCount, setSkeletonRowCount] = useState(itemsPerPage)
@@ -179,6 +197,50 @@ export function EmailList({
     setCurrentPage(newPage)
   }
 
+  const clearPullTimer = () => {
+    if (settleTimerRef.current != null) {
+      window.clearTimeout(settleTimerRef.current)
+      settleTimerRef.current = null
+    }
+  }
+
+  const settlePullBack = (delay = 120) => {
+    clearPullTimer()
+    settleTimerRef.current = window.setTimeout(() => {
+      if (isRefreshingRef.current) return
+      pullStartYRef.current = null
+      setIsPulling(false)
+      setPullDistance(0)
+    }, delay)
+  }
+
+  const triggerPullRefresh = async () => {
+    if (isRefreshingRef.current || isSyncing) return
+
+    isRefreshingRef.current = true
+    setIsPullRefreshing(true)
+    setIsPulling(false)
+    setPullDistance(PULL_THRESHOLD)
+    pullDistanceRef.current = PULL_THRESHOLD
+
+    const startedAt = Date.now()
+    try {
+      await onRefresh()
+    } finally {
+      const elapsed = Date.now() - startedAt
+      if (elapsed < 1000) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1000 - elapsed))
+      }
+
+      pullStartYRef.current = null
+      setIsPullRefreshing(false)
+      isRefreshingRef.current = false
+      pullDistanceRef.current = 0
+      setPullDistance(0)
+      settlePullBack(80)
+    }
+  }
+
   useEffect(() => {
     if (!shouldShowSkeletonRows) return
 
@@ -193,28 +255,92 @@ export function EmailList({
     return () => window.removeEventListener('resize', computeRowCount)
   }, [shouldShowSkeletonRows, scrollContainerRef])
 
-  if (!shouldShowSkeletonRows && emails.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-4 animate-in fade-in duration-700">
-        <div className="w-16 h-16 rounded-2xl nodal-glass flex items-center justify-center border border-white/5 shadow-2xl">
-          <Mail className="w-8 h-8 text-zinc-600" />
-        </div>
-        <div className="text-center space-y-1">
-          <p className="text-lg font-semibold text-white tracking-tighter">No_Entropy_Detected</p>
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Awaiting initial uplink synchronization</p>
-        </div>
-        <button
-          onClick={onRefresh}
-          disabled={isSyncing}
-          className="icon-button-forensic text-[10px] font-mono uppercase tracking-widest !text-zinc-500 hover:!text-white px-4 py-2 flex items-center gap-2 group"
-          title="Initialize Sync"
-        >
-          {isSyncing ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" />}
-          Initialize_Sync
-        </button>
-      </div>
-    )
-  }
+  useEffect(() => {
+    const container = scrollContainerRef?.current
+    if (!container) return
+
+    const onWheel = (event: WheelEvent) => {
+      if (isRefreshingRef.current) return
+
+      const atTop = container.scrollTop <= 0
+      const isPullingBack = pullDistanceRef.current > 0
+      const shouldCapture = atTop && event.deltaY < 0 || isPullingBack
+      if (!shouldCapture) return
+
+      event.preventDefault()
+      setIsPulling(true)
+
+      const nextDistance = Math.max(
+        0,
+        Math.min(PULL_MAX, pullDistanceRef.current - event.deltaY * 0.35)
+      )
+
+      pullDistanceRef.current = nextDistance
+      setPullDistance(nextDistance)
+
+      if (nextDistance >= PULL_THRESHOLD) {
+        void triggerPullRefresh()
+        return
+      }
+
+      settlePullBack()
+    }
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (isRefreshingRef.current || container.scrollTop > 0) return
+      pullStartYRef.current = event.touches[0]?.clientY ?? null
+      setIsPulling(false)
+    }
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (isRefreshingRef.current || pullStartYRef.current == null) return
+      if (container.scrollTop > 0) return
+
+      const currentY = event.touches[0]?.clientY ?? pullStartYRef.current
+      const rawDistance = Math.max(0, currentY - pullStartYRef.current)
+      const nextDistance = Math.min(PULL_MAX, rawDistance * 0.9)
+
+      event.preventDefault()
+      setIsPulling(true)
+      pullDistanceRef.current = nextDistance
+      setPullDistance(nextDistance)
+
+      if (nextDistance >= PULL_THRESHOLD) {
+        pullStartYRef.current = null
+        void triggerPullRefresh()
+        return
+      }
+
+      clearPullTimer()
+    }
+
+    const onTouchEnd = () => {
+      if (isRefreshingRef.current) return
+      pullStartYRef.current = null
+
+      if (pullDistanceRef.current >= PULL_THRESHOLD) {
+        void triggerPullRefresh()
+        return
+      }
+
+      settlePullBack(140)
+    }
+
+    container.addEventListener('wheel', onWheel, { passive: false })
+    container.addEventListener('touchstart', onTouchStart, { passive: true })
+    container.addEventListener('touchmove', onTouchMove, { passive: false })
+    container.addEventListener('touchend', onTouchEnd)
+    container.addEventListener('touchcancel', onTouchEnd)
+
+    return () => {
+      clearPullTimer()
+      container.removeEventListener('wheel', onWheel)
+      container.removeEventListener('touchstart', onTouchStart)
+      container.removeEventListener('touchmove', onTouchMove)
+      container.removeEventListener('touchend', onTouchEnd)
+      container.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [scrollContainerRef, onRefresh, isSyncing])
 
   const resolveEmailChannel = (em: Email): { label: string; isMain: boolean } => {
     const isOutboundEmail = em.type === 'sent' || em.type === 'scheduled'
@@ -372,9 +498,47 @@ export function EmailList({
       </div>
 
       {/* Scrollable List */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll">
-        <div>
-          {shouldShowSkeletonRows ? (
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll overscroll-contain relative">
+        <div className={cn(
+          "pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 transition-all duration-200",
+          (pullDistance > 0 || isPullRefreshing) ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
+        )}>
+          <div className="flex items-center gap-2 rounded-full border border-[#002FA7]/30 bg-black/75 px-3 py-1.5 shadow-[0_0_24px_rgba(0,47,167,0.12)] backdrop-blur-md">
+            {isPullRefreshing ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#002FA7]" />
+            ) : (
+              <RefreshCw className="w-3.5 h-3.5 text-[#002FA7]" />
+            )}
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-200">
+              {isPullRefreshing
+                ? 'Refreshing'
+                : pullDistance >= PULL_THRESHOLD
+                  ? 'Release to refresh'
+                  : 'Pull to refresh'}
+            </span>
+          </div>
+        </div>
+        <div
+          ref={contentRef}
+          style={{
+            transform: `translateY(${pullDistance}px)`,
+            transition: isPulling || isPullRefreshing ? 'none' : 'transform 260ms cubic-bezier(0.23, 1, 0.32, 1)',
+            willChange: pullDistance > 0 ? 'transform' : 'auto',
+          }}
+        >
+          {!shouldShowSkeletonRows && emails.length === 0 ? (
+            <div className="flex min-h-[420px] items-center justify-center py-16 text-zinc-500 space-y-4 animate-in fade-in duration-700">
+              <div className="flex flex-col items-center justify-center space-y-4">
+                <div className="w-16 h-16 rounded-2xl nodal-glass flex items-center justify-center border border-white/5 shadow-2xl">
+                  <Mail className="w-8 h-8 text-zinc-600" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-lg font-semibold text-white tracking-tighter">No_Entropy_Detected</p>
+                  <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Pull down in the list to refresh mail</p>
+                </div>
+              </div>
+            </div>
+          ) : shouldShowSkeletonRows ? (
             skeletonRows
           ) : (
             paginatedEmails.map((email, index) => {
