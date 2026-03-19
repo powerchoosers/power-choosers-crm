@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeModal'
 import { useComposeStore } from '@/store/composeStore'
 import { supabase } from '@/lib/supabase'
+import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
 
 type ContactRow = {
   id: string
@@ -77,6 +78,17 @@ export function GlobalComposeModal() {
 
         const contact = contactData as ContactRow
         const account = Array.isArray(contact.accounts) ? contact.accounts[0] : contact.accounts
+        const noteEntries = buildForensicNoteEntries([
+          {
+            label: `CONTACT NOTE • ${contact.name || 'UNKNOWN CONTACT'}`,
+            notes: contact.notes || null,
+          },
+          {
+            label: `ACCOUNT NOTE • ${account?.name || 'UNKNOWN ACCOUNT'}`,
+            notes: account?.description || null,
+          },
+        ])
+        const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : undefined
         const nextContext: ComposeContext = {
           ...(context || {}),
           contactName: context?.contactName || contact.name || undefined,
@@ -87,7 +99,7 @@ export function GlobalComposeModal() {
           accountDescription: context?.accountDescription || account?.description || undefined,
           contactId: contact.id,
           accountId: account?.id || contact.accountId || undefined,
-          contextForAi: context?.contextForAi || contact.notes || undefined,
+          contextForAi: context?.contextForAi || noteContext,
         }
 
         setComposeContext(nextContext)

@@ -1115,6 +1115,7 @@ function ComposePanel({
       if (context.contextForAi?.trim()) {
         lines.push('NOTES / CALL CONTEXT / RESEARCH (use to personalize and reference prior touchpoints or recent activity):')
         lines.push(context.contextForAi.trim())
+        lines.push('RULE: Use only human conversation, substantive notes, or verified account context. Ignore no-answer calls, voicemail menus, extension trees, and other IVR noise.')
       }
       if (lines.length) base += '\n\n' + lines.join('\n')
     }
@@ -1152,6 +1153,7 @@ function ComposePanel({
       if (intelligence.transcripts.length > 0) {
         deepLines.push('')
         deepLines.push('CALL INTELLIGENCE (for post-call or follow-up emails, reference specific talking points from these transcripts):')
+        deepLines.push('RULE: Ignore menu recordings, no-answer calls, voicemail greetings, and extension trees. Use only real conversations or substantive call outcomes.')
         intelligence.transcripts.slice(0, 2).forEach(t => deepLines.push(t.slice(0, 600)))
       }
       if ((intelligence.callHistory?.length ?? 0) > 0) {
