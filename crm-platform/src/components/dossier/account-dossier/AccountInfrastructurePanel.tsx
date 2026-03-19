@@ -7,10 +7,12 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { MeterArray } from '@/components/accounts/MeterArray'
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
+import { buildForensicNoteEntries, formatForensicNoteClipboard, type ForensicNoteSource } from '@/lib/forensic-notes'
 
 interface AccountInfrastructurePanelProps {
     id: string
     account: any
+    contacts?: any[]
     isEditing: boolean
     editNotes: string
     setEditNotes: (v: string) => void
@@ -24,6 +26,7 @@ interface AccountInfrastructurePanelProps {
 export const AccountInfrastructurePanel = memo(function AccountInfrastructurePanel({
     id,
     account,
+    contacts = [],
     isEditing,
     editNotes,
     setEditNotes,
@@ -36,6 +39,17 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
     const [isTyping, setIsTyping] = useState(false)
     const [terminalInput, setTerminalInput] = useState('')
     const [descriptionCopied, setDescriptionCopied] = useState(false)
+    const noteSources: ForensicNoteSource[] = [
+        { label: `ACCOUNT NOTE • ${account?.name || 'UNKNOWN ACCOUNT'}`, notes: editNotes },
+        ...contacts
+            .filter((contact) => String(contact?.notes || '').trim())
+            .map((contact) => ({
+                label: `CONTACT NOTE • ${contact?.name || [contact?.firstName, contact?.lastName].filter(Boolean).join(' ') || contact?.email || 'UNKNOWN CONTACT'}`,
+                notes: contact?.notes,
+            })),
+    ]
+    const noteEntries = buildForensicNoteEntries(noteSources)
+    const clipboardText = formatForensicNoteClipboard(noteEntries)
 
     const handleTerminalClick = () => setIsTyping(true)
 
@@ -129,14 +143,14 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
                             </div>
                         ) : (
                             <div className="group/copyblock relative">
-                                {editNotes?.trim() && (
+                                {noteEntries.length > 0 && (
                                     <span
                                         role="button"
                                         tabIndex={0}
                                         onClick={(e) => {
                                             e.preventDefault()
                                             e.stopPropagation()
-                                            navigator.clipboard.writeText(editNotes).then(() => {
+                                            navigator.clipboard.writeText(clipboardText).then(() => {
                                                 setDescriptionCopied(true)
                                                 setTimeout(() => setDescriptionCopied(false), 2000)
                                             })
@@ -147,30 +161,28 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
                                     </span>
                                 )}
                                 <div className="space-y-4">
-                                    {editNotes ? editNotes.split('\n\n').map((entry, idx) => {
-                                        const timestampMatch = entry.match(/^\[(.*?)\]/)
-                                        const timestamp = timestampMatch ? timestampMatch[1] : null
-                                        const content = timestamp ? entry.replace(/^\[.*?\]/, '').trim() : entry
-                                        return (
-                                            <div key={idx} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300 pb-4 border-b border-white/[0.03] last:border-none">
-                                                <div className="flex flex-col items-center self-stretch flex-none">
-                                                    <div className="w-1 h-1 rounded-full bg-[#002FA7]/40 mt-2.5 flex-none" />
-                                                    <div className="w-px bg-[#002FA7]/20 flex-1" />
+                                    {noteEntries.length > 0 ? noteEntries.map((entry, idx) => (
+                                        <div key={`${entry.sourceLabel}-${entry.timestamp || 'na'}-${idx}`} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300 pb-4 border-b border-white/[0.03] last:border-none">
+                                            <div className="flex flex-col items-center self-stretch flex-none">
+                                                <div className="w-1 h-1 rounded-full bg-[#002FA7]/40 mt-2.5 flex-none" />
+                                                <div className="w-px bg-[#002FA7]/20 flex-1" />
+                                            </div>
+                                            <div className="flex-1 min-w-0 pb-2">
+                                                <div className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-1.5">
+                                                    {entry.sourceLabel}
                                                 </div>
-                                                <div className="flex-1 min-w-0 pb-2">
-                                                    {timestamp && (
-                                                        <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2">
-                                                            <Clock className="w-3 h-3 shrink-0" />
-                                                            <span>{timestamp}</span>
-                                                        </div>
-                                                    )}
-                                                    <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
-                                                        {content}
+                                                {entry.timestamp && (
+                                                    <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2">
+                                                        <Clock className="w-3 h-3 shrink-0" />
+                                                        <span>{entry.timestamp}</span>
                                                     </div>
+                                                )}
+                                                <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
+                                                    {entry.content}
                                                 </div>
                                             </div>
-                                        )
-                                    }) : (
+                                        </div>
+                                    )) : (
                                         <div className="text-zinc-600 italic">No forensic data available. Initiate recon...</div>
                                     )}
                                 </div>

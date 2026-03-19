@@ -7,6 +7,7 @@ import { StakeholderMap } from '@/components/accounts/StakeholderMap'
 import { CallListItem } from '@/components/calls/CallListItem'
 import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
 import { AccountHolderCard } from './AccountHolderCard'
+import { AccountHierarchyCard } from './AccountHierarchyCard'
 import { useUIStore } from '@/store/uiStore'
 import { useUpdateAccount } from '@/hooks/useAccounts'
 
@@ -63,6 +64,11 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                 />
 
                 <StakeholderMap contacts={contacts || []} />
+
+                <AccountHierarchyCard
+                    accountId={id}
+                    account={account}
+                />
 
                 <div className="space-y-4">
                     <div className="flex items-center justify-between px-1">

@@ -417,6 +417,7 @@ export function useContactDossierState(id: string) {
         // Dependency collections for downstream
         apolloNewsSignals,
         domain,
+        updateContactMutation: updateContact,
 
         // Tasks
         pendingTasks,
