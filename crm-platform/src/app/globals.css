@@ -569,23 +569,6 @@
     box-shadow: 0 0 12px rgba(94, 148, 255, 0.72);
   }
 
-  .satellite-uplink-open .network-cursor.tone-text {
-    box-shadow: 0 0 8px rgba(94, 148, 255, 0.42);
-  }
-
-  .network-cursor-enabled :is(a, button, [role="button"], [role="link"], label[for], summary, select, [tabindex]:not([tabindex="-1"])) {
-    transition:
-      box-shadow 0.14s ease,
-      border-color 0.14s ease,
-      background-color 0.14s ease,
-      transform 0.14s ease;
-  }
-
-  .network-cursor-enabled :is(a, button, [role="button"], [role="link"], label[for], summary, select, [tabindex]:not([tabindex="-1"])):hover,
-  .network-cursor-enabled :is(a, button, [role="button"], [role="link"], label[for], summary, select, [tabindex]:not([tabindex="-1"])):focus-visible {
-    box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.18), 0 0 14px rgba(94, 148, 255, 0.12);
-    transform: translateY(-1px);
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
