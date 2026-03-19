@@ -113,31 +113,35 @@ export function EmailList({
   // Pagination Logic
   const totalPages = Math.max(1, Math.ceil(filteredEmails.length / itemsPerPage))
   const paginatedEmails = filteredEmails.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const gridCols = (filter === 'sent' || filter === 'scheduled')
+    ? "grid-cols-[40px_minmax(120px,1fr)_150px_minmax(0,2fr)_auto_150px]"
+    : "grid-cols-[40px_minmax(120px,1fr)_150px_minmax(0,2fr)_150px]"
+  const gridColsBase = "grid-cols-[40px_minmax(120px,1fr)_150px_minmax(0,2fr)_150px]"
+
   const skeletonRows = Array.from({ length: skeletonRowCount }).map((_, idx) => (
     <div
       key={`skeleton-${idx}`}
-      className="grid grid-cols-12 gap-1.5 px-1.5 py-2.5 border-l-2 border-l-transparent border-b border-white/5 bg-zinc-950/30 animate-pulse"
+      className={cn("grid items-center gap-3 px-2 py-3 border-l-2 border-l-transparent border-b border-white/5 bg-zinc-950/30 animate-pulse", gridColsBase)}
     >
-      <div className="col-span-1 flex items-center justify-center">
+      <div className="flex items-center justify-center">
         <span className="h-3.5 w-3.5 rounded bg-white/10" />
       </div>
-      <div className="col-span-1 flex justify-start pl-1">
-        <span className="h-7 w-7 rounded-[10px] bg-white/5" />
+      <div className="flex items-center gap-3">
+        <span className="h-9 w-9 flex-none rounded-[10px] bg-white/5" />
+        <div className="space-y-1.5 min-w-0 flex-1">
+          <span className="block h-2.5 w-3/4 rounded bg-white/10" />
+          <span className="block h-1.5 w-1/2 rounded bg-white/5" />
+        </div>
       </div>
-      <div className="col-span-3 space-y-1.5">
-        <span className="block h-2.5 w-3/4 rounded bg-white/10" />
-        <span className="block h-1.5 w-1/2 rounded bg-white/5" />
+      <div className="flex items-center">
+        <span className="block h-4 w-16 rounded bg-white/10" />
       </div>
-      <div className="col-span-3 space-y-1.5">
+      <div className="space-y-1.5">
         <span className="block h-2.5 w-full rounded bg-white/10" />
         <span className="block h-1.5 w-2/3 rounded bg-white/5" />
       </div>
-      <div className="col-span-2 space-y-1.5">
-        <span className="block h-2.5 w-3/4 rounded bg-white/10" />
-        <span className="block h-1.5 w-1/2 rounded bg-white/5" />
-      </div>
-      <div className="col-span-2 flex justify-end">
-        <span className="h-3.5 w-10 rounded bg-white/10" />
+      <div>
+        <span className="h-3.5 w-16 block rounded bg-white/10" />
       </div>
     </div>
   ))
@@ -217,8 +221,11 @@ export function EmailList({
     const channelAddr = isOutboundEmail
       ? String(em.from || '').toLowerCase()
       : String(em.ownerId || '').toLowerCase()
-    if (channelAddr.includes('getnodalpoint')) return { label: 'GNP', isMain: false }
-    return { label: 'NP', isMain: true }
+    // Extract domain from the email address dynamically
+    const domainMatch = channelAddr.match(/@([^>\s]+)/)
+    const domain = domainMatch ? domainMatch[1] : channelAddr.replace(/.*@/, '')
+    const isMain = domain.includes('nodalpoint.io')
+    return { label: domain || 'unknown', isMain }
   }
 
   const formatDate = (dateString: string | number | undefined) => {
@@ -337,8 +344,11 @@ export function EmailList({
       </div>
 
       {/* Column Headers */}
-      <div className="flex-none px-1.5 py-2.5 border-b border-white/5 nodal-recessed sticky top-0 z-20 grid grid-cols-12 gap-1.5 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
-        <div className="col-span-1 flex items-center justify-center">
+      <div className={cn(
+        "flex-none px-2 py-3 border-b border-white/5 nodal-table-header sticky top-0 z-20 grid items-center gap-3 text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]",
+        gridCols
+      )}>
+        <div className="flex items-center justify-center">
           {onSelectionChange ? (
             <button
               onClick={(e) => { e.stopPropagation(); toggleAllOnPage(); }}
@@ -352,13 +362,13 @@ export function EmailList({
             </button>
           ) : null}
         </div>
-        <div className="col-span-1" />
-        <div className="col-span-3">Entity</div>
-        <div className="col-span-1">Channel</div>
-        <div className={filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4"}>Transmission</div>
-        {filter === 'sent' && <div className="col-span-2">Telemetry</div>}
-        {filter === 'scheduled' && <div className="col-span-2">Review</div>}
-        <div className="col-span-2 text-right">Timestamp</div>
+        <div>Entity</div>
+        <div>Channel</div>
+        <div>Transmission</div>
+        {(filter === 'sent' || filter === 'scheduled') && (
+          <div>{filter === 'sent' ? 'Telemetry' : 'Review'}</div>
+        )}
+        <div>Timestamp</div>
       </div>
 
       {/* Scrollable List */}
@@ -405,7 +415,8 @@ export function EmailList({
                   key={email.id}
                   onClick={() => onSelectEmail(email)}
                 className={cn(
-                  "group grid grid-cols-12 gap-1.5 px-1.5 py-2.5 cursor-pointer transition-all items-center border-l-2 border-b border-white/5",
+                  "group grid items-center gap-3 px-2 py-3 cursor-pointer transition-all border-l-2 border-b border-white/5",
+                  gridCols,
                   hasClicks ? "border-l-[#002FA7]" : selectedEmailId === email.id ? "border-l-[#002FA7]" : "border-l-transparent",
                   email.unread ? "bg-[#002FA7]/8" : "",
                   isSelected ? "selected-container shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
@@ -413,7 +424,7 @@ export function EmailList({
                 )}
               >
                   {/* Select / Row number */}
-                  <div className="col-span-1 flex items-center justify-center relative group/select">
+                  <div className="flex items-center justify-center relative group/select min-h-[40px]">
                     {onSelectionChange ? (
                       <>
                         <span className={cn(
@@ -439,73 +450,70 @@ export function EmailList({
                       <span className="font-mono text-[10px] text-zinc-700">{rowIndex.toString().padStart(2, '0')}</span>
                     )}
                   </div>
-                  {/* Avatar Icon */}
-                  <div className="col-span-1 flex justify-start pl-1 relative">
-                    {email.unread && (
-                      <div className="absolute top-0 right-1/4 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
-                    )}
-                    {primaryContact ? (
-                      <ContactAvatar
-                        name={primaryContact.displayName}
-                        photoUrl={primaryContact.avatarUrl}
-                        size={32}
-                        className="rounded-[10px]"
-                        textClassName="text-[10px]"
-                      />
-                    ) : (
-                      <CompanyIcon
-                        name={primaryEmail || 'Unknown'}
-                        domain={fallbackDomain}
-                        logoUrl={
-                          // Show NP logo when the RECIPIENT is a @nodalpoint.io address,
-                          // or when receiving a system email FROM a @nodalpoint.io sender.
-                          // Never apply email.from check for outbound emails — from is always
-                          // Lewis's personal address and should not override the recipient icon.
-                          primaryEmail.toLowerCase().endsWith('@nodalpoint.io') ||
-                          (!isOutbound && String(email.from || '').toLowerCase().includes('@nodalpoint.io')) ||
-                          (!isOutbound && String(email.from || '').toLowerCase().includes('nodal point'))
-                            ? '/images/nodalpoint-webicon.png'
-                            : undefined
-                        }
-                        size={32}
-                        roundedClassName="rounded-[10px]"
-                      />
-                    )}
-                  </div>
 
-                  {/* Participant */}
-                  <div className="col-span-3 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      {primaryContact && onOpenContact ? (
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onOpenContact(primaryContact.id) }}
-                          className={cn(
-                            "text-[13px] truncate font-mono tracking-tight transition-all origin-left hover:scale-[1.02] hover:text-white underline-offset-4 hover:underline cursor-pointer",
-                            email.unread ? "font-semibold text-white" : "text-zinc-300"
-                          )}
-                          title={`Open ${primaryContact.displayName} dossier`}
-                        >
-                          {participantLabel}
-                        </button>
-                      ) : (
-                        <span className={cn(
-                          "text-[13px] truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.01]",
-                          email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
-                        )}>
-                          {participantLabel}
-                        </span>
+                  {/* Entity: Avatar + Participant (single cell like People table) */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="relative w-9 h-9 flex-none">
+                      {email.unread && (
+                        <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#002FA7] animate-pulse shadow-[0_0_8px_rgba(0,47,167,0.8)] z-10" />
                       )}
-                      {isOutbound ? (
-                        <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
+                      {primaryContact ? (
+                        <ContactAvatar
+                          name={primaryContact.displayName}
+                          photoUrl={primaryContact.avatarUrl}
+                          size={36}
+                          className="w-9 h-9 rounded-[10px]"
+                          textClassName="text-[10px]"
+                        />
                       ) : (
-                        <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
+                        <CompanyIcon
+                          name={primaryEmail || 'Unknown'}
+                          domain={fallbackDomain}
+                          logoUrl={
+                            primaryEmail.toLowerCase().endsWith('@nodalpoint.io') ||
+                            (!isOutbound && String(email.from || '').toLowerCase().includes('@nodalpoint.io')) ||
+                            (!isOutbound && String(email.from || '').toLowerCase().includes('nodal point'))
+                              ? '/images/nodalpoint-webicon.png'
+                              : undefined
+                          }
+                          size={36}
+                          roundedClassName="rounded-[10px]"
+                        />
                       )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        {primaryContact && onOpenContact ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onOpenContact(primaryContact.id) }}
+                            className={cn(
+                              "text-[13px] truncate font-mono tracking-tight transition-all origin-left hover:scale-[1.02] hover:text-white underline-offset-4 hover:underline cursor-pointer",
+                              email.unread ? "font-semibold text-white" : "text-zinc-300"
+                            )}
+                            title={`Open ${primaryContact.displayName} dossier`}
+                          >
+                            {participantLabel}
+                          </button>
+                        ) : (
+                          <span className={cn(
+                            "text-[13px] truncate font-mono tracking-tight transition-all origin-left group-hover:scale-[1.01]",
+                            email.unread ? "font-semibold text-white" : "text-zinc-400 group-hover:text-zinc-200"
+                          )}>
+                            {participantLabel}
+                          </span>
+                        )}
+                        {isOutbound ? (
+                          <ArrowUpRight className="w-3 h-3 text-zinc-700 flex-none group-hover:text-zinc-500" />
+                        ) : (
+                          <ArrowDownLeft className="w-3 h-3 text-zinc-600 flex-none group-hover:text-zinc-400" />
+                        )}
+                      </div>
                     </div>
                   </div>
 
                   {/* Channel Badge */}
-                  <div className="col-span-1 flex items-center -ml-1">
+                  <div className="flex items-center">
                     <span className={cn(
                       "text-[9px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded border whitespace-nowrap",
                       channel.isMain
@@ -517,7 +525,7 @@ export function EmailList({
                   </div>
 
                   {/* Message Preview */}
-                  <div className={cn("min-w-0 space-y-0.5 -ml-1", filter === 'sent' || filter === 'scheduled' ? "col-span-2" : "col-span-4")}>
+                  <div className="min-w-0 space-y-0.5">
                     <div className="flex items-center gap-1.5">
                       <h4 className={cn(
                         "text-[13px] truncate tracking-tight transition-all origin-left group-hover:scale-[1.01] flex-1",
@@ -541,7 +549,7 @@ export function EmailList({
 
                   {/* Telemetry Column - Only show for sent emails filter */}
                   {filter === 'sent' && (
-                    <div className="col-span-2 flex items-center">
+                    <div className="flex items-center">
                       <div className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-2 py-0.5 w-fit">
                         {/* Opens */}
                         <div className="flex items-center gap-1">
@@ -578,7 +586,7 @@ export function EmailList({
                   )}
 
                   {filter === 'scheduled' && (
-                    <div className="col-span-2 flex items-center">
+                    <div className="flex items-center">
                       <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => {
@@ -633,7 +641,7 @@ export function EmailList({
                   )}
 
                   {/* Date */}
-                  <div className="col-span-2 flex justify-end">
+                  <div className="flex items-center">
                     {formatDate(email.date)}
                   </div>
                 </div>
