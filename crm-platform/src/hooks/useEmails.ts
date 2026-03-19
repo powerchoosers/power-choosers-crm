@@ -126,7 +126,6 @@ function applyCommonEmailExclusions(query: any) {
     .not('is_deleted', 'eq', true)
     .not('subject', 'ilike', '%mailwarming%')
     .not('subject', 'ilike', '%mail warming%')
-    .not('subject', 'ilike', '%test email%')
     .not('from', 'ilike', '%apollo.io%')
     .not('from', 'ilike', '%mailwarm%')
     .not('from', 'ilike', '%lemwarm%')
