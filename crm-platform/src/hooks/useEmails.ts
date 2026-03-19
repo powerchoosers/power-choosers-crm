@@ -191,8 +191,8 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
 
         const { data, error, count } = await query
           .range(from, to)
-          .order('timestamp', { ascending: false, nullsFirst: false })
           .order('createdAt', { ascending: false, nullsFirst: false })
+          .order('timestamp', { ascending: false, nullsFirst: false })
 
         if (error) {
           // Silent abort for network cancellations
