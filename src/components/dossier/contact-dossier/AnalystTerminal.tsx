@@ -1,17 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Sparkles, Clock, Copy, Check } from 'lucide-react'
 import { format } from 'date-fns'
 import { toast } from 'sonner'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
+import { buildForensicNoteEntries, formatForensicNoteClipboard, type ForensicNoteSource } from '@/lib/forensic-notes'
 
 interface AnalystTerminalProps {
     id: string
     isEditing: boolean
     editNotes: string
     setEditNotes: (v: string) => void
+    noteSources?: ForensicNoteSource[]
     onNoteSubmit: (note: string) => Promise<void>
     onWipe?: () => Promise<void>
     maturityInfo?: string
@@ -24,6 +26,7 @@ export function AnalystTerminal({
     isEditing,
     editNotes,
     setEditNotes,
+    noteSources = [],
     onNoteSubmit,
     onWipe,
     maturityInfo,
@@ -33,6 +36,11 @@ export function AnalystTerminal({
     const [isTyping, setIsTyping] = useState(false)
     const [terminalInput, setTerminalInput] = useState('')
     const [descriptionCopied, setDescriptionCopied] = useState(false)
+    const noteEntries = useMemo(() => buildForensicNoteEntries([
+        { label: 'CONTACT NOTE', notes: editNotes },
+        ...noteSources
+    ]), [editNotes, noteSources])
+    const clipboardText = useMemo(() => formatForensicNoteClipboard(noteEntries), [noteEntries])
 
     const handleTerminalSubmit = async () => {
         if (!terminalInput.trim()) {
@@ -108,11 +116,11 @@ export function AnalystTerminal({
                     </div>
                 ) : (
                     <div className="group/copyblock relative">
-                        {editNotes?.trim() && (
+                        {noteEntries.length > 0 && (
                             <span
                                 onClick={(e) => {
                                     e.stopPropagation()
-                                    navigator.clipboard.writeText(editNotes)
+                                    navigator.clipboard.writeText(clipboardText)
                                     setDescriptionCopied(true)
                                     setTimeout(() => setDescriptionCopied(false), 2000)
                                 }}
@@ -122,30 +130,28 @@ export function AnalystTerminal({
                             </span>
                         )}
                         <div className="space-y-4">
-                            {editNotes.split('\n\n').map((entry, idx) => {
-                                const timestampMatch = entry.match(/^\[(.*?)\]/)
-                                const timestamp = timestampMatch ? timestampMatch[1] : null
-                                const content = timestamp ? entry.replace(/^\[.*?\]/, '').trim() : entry
-                                return (
-                                    <div key={idx} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300 pb-4 first:border-none last:border-b last:border-white/[0.06]">
-                                        <div className="flex flex-col items-center self-stretch flex-none">
-                                            <div className="w-1 h-1 rounded-full bg-[#002FA7]/40 mt-2.5 flex-none" />
-                                            <div className="w-px bg-[#002FA7]/20 flex-1" />
+                            {noteEntries.map((entry, idx) => (
+                                <div key={`${entry.sourceLabel}-${entry.timestamp || 'na'}-${idx}`} className="group/entry flex gap-4 animate-in fade-in slide-in-from-left-2 duration-300 pb-4 first:border-none last:border-b last:border-white/[0.06]">
+                                    <div className="flex flex-col items-center self-stretch flex-none">
+                                        <div className="w-1 h-1 rounded-full bg-[#002FA7]/40 mt-2.5 flex-none" />
+                                        <div className="w-px bg-[#002FA7]/20 flex-1" />
+                                    </div>
+                                    <div className="flex-1 min-w-0 pb-2">
+                                        <div className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] mb-1.5">
+                                            {entry.sourceLabel}
                                         </div>
-                                        <div className="flex-1 min-w-0 pb-2">
-                                            {timestamp && (
-                                                <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2">
-                                                    <Clock className="w-3 h-3" />
-                                                    <span>{timestamp}</span>
-                                                </div>
-                                            )}
-                                            <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
-                                                {content}
+                                        {entry.timestamp && (
+                                            <div className="text-[10px] text-zinc-600 mb-1.5 flex items-center gap-2">
+                                                <Clock className="w-3 h-3" />
+                                                <span>{entry.timestamp}</span>
                                             </div>
+                                        )}
+                                        <div className="text-zinc-300 group-hover/entry:text-white transition-colors whitespace-pre-wrap break-words">
+                                            {entry.content}
                                         </div>
                                     </div>
-                                )
-                            })}
+                                </div>
+                            ))}
                         </div>
 
                         <div className="flex gap-4 pt-4 border-t border-white/5">
