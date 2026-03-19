@@ -95,6 +95,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import ForensicSignature from '@/components/emails/ForensicSignature';
 import { useUIStore } from '@/store/uiStore';
+import { buildUsableCallContextEntries } from '@/lib/call-context';
 
 // Mock Data for Visualization (The "Test Sequence")
 const MOCK_NODES: Node[] = [
@@ -751,7 +752,7 @@ function ProtocolArchitectInner() {
             contractEndDate: testContact.metadata?.energy?.contractEndDate,
             load_factor: testContact.metadata?.energy?.loadFactor,
             annual_usage: testContact.metadata?.energy?.annualUsage || testContact.annualUsage,
-            transcript: testCalls?.find(c => c.transcript)?.transcript || null,
+            transcript: buildUsableCallContextEntries(testCalls || [], 1)[0]?.transcriptSnippet || null,
             news: testNews?.slice(0, 5).map(n => n.title + ': ' + n.snippet).join(' | '),
             metadata: testContact.metadata
           },
