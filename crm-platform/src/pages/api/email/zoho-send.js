@@ -527,7 +527,7 @@ export default async function handler(req, res) {
                 id: trackingId,
                 to: toRecipients,
                 subject,
-                threadId: requestedThreadId || trackingId,
+                threadId: requestedThreadId || null,
                 html: trackedContent,
                 text: textContent,
                 from: from || ownerEmail || 'noreply@nodalpoint.io',
@@ -628,7 +628,7 @@ export default async function handler(req, res) {
         // If the pre-send insert failed, create the row here so sent email is never swallowed.
         if (supabaseAdmin) {
             try {
-                const finalThreadId = requestedThreadId || result.messageId || trackingId;
+                const finalThreadId = requestedThreadId || null;
                 const attachmentsWithMessageId = normalizedAttachments.map((att, idx) => ({
                     ...att,
                     messageId: result.messageId || null,
