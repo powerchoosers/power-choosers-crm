@@ -113,10 +113,70 @@ export function useMarkEmailAsRead() {
         .eq('id', id)
 
       if (error) throw error
+
+      // Fire-and-forget: mark as read in Zoho Mail portal too
+      supabase.auth.getSession().then(({ data }) => {
+        const token = data?.session?.access_token
+        if (!token) return
+        fetch('/api/email/zoho-mark-read', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ emailId: id }),
+        }).catch(() => {
+          // Zoho sync is best-effort — don't block UI
+        })
+      })
+
       return id
     },
-    onSuccess: (id) => {
-      // Invalidate both the individual email and the list
+    // Optimistic update: instantly mark as read in UI before Supabase responds
+    onMutate: async (id: string) => {
+      // Cancel any outgoing refetches so they don't overwrite our optimistic update
+      await queryClient.cancelQueries({ queryKey: ['emails'] })
+      await queryClient.cancelQueries({ queryKey: ['email', id] })
+
+      // Snapshot previous values for rollback
+      const previousEmail = queryClient.getQueryData<Email | null>(['email', id])
+      const previousEmails = queryClient.getQueriesData({ queryKey: ['emails'] })
+
+      // Optimistically update the individual email cache
+      queryClient.setQueryData<Email | null>(['email', id], (old) => {
+        if (!old) return old
+        return { ...old, unread: false }
+      })
+
+      // Optimistically update the emails list cache (infinite query pages)
+      queryClient.setQueriesData<any>({ queryKey: ['emails'] }, (old: any) => {
+        if (!old?.pages) return old
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => ({
+            ...page,
+            emails: (page.emails || []).map((email: Email) =>
+              email.id === id ? { ...email, unread: false } : email
+            ),
+          })),
+        }
+      })
+
+      return { previousEmail, previousEmails }
+    },
+    onError: (_err, id, context) => {
+      // Rollback on error
+      if (context?.previousEmail !== undefined) {
+        queryClient.setQueryData(['email', id], context.previousEmail)
+      }
+      if (context?.previousEmails) {
+        for (const [key, data] of context.previousEmails) {
+          queryClient.setQueryData(key, data)
+        }
+      }
+    },
+    onSettled: (_data, _error, id) => {
+      // Refetch in background to ensure server state is synced
       queryClient.invalidateQueries({ queryKey: ['email', id] })
       queryClient.invalidateQueries({ queryKey: ['emails'] })
     }
