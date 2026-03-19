@@ -8,6 +8,18 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;')
 }
 
+function normalizeWebsite(value: string | null | undefined, fallbackDomain: string): { domain: string; url: string } {
+  const raw = (value || fallbackDomain || '').trim()
+  const stripped = raw
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/^www\./i, '')
+    .trim()
+  const domain = stripped || fallbackDomain || 'nodalpoint.io'
+  const url = /^https?:\/\//i.test(raw) ? raw : `https://${domain}`
+  return { domain, url }
+}
+
 export function generateNodalSignature(profile: UserProfile, user: any, isDarkMode: boolean = false): string {
   // Name: first + last from profile, else profile.name, else user_metadata.full_name
   const nameParts = [profile.firstName, profile.lastName].filter(Boolean).join(' ')
@@ -16,6 +28,8 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
   const jobTitle = profile.jobTitle || 'Market Architect'
   const email = profile.email || user?.email || 'contact@nodalpoint.io'
   const linkedinUrl = profile.linkedinUrl || 'https://linkedin.com/company/nodal-point'
+  const websiteFallback = email.split('@')[1] || 'nodalpoint.io'
+  const website = normalizeWebsite(profile.website, websiteFallback)
   // Use hosted avatar (from host-avatar) for email reliability, fallback to Supabase user_metadata
   const avatarUrl = profile.hostedPhotoUrl || user?.user_metadata?.avatar_url || ''
 
@@ -85,10 +99,10 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
           
           <td style="color: #d4d4d8; padding: 0 8px;">//</td>
           
-          <!-- NETWORK (Website) -->
+          <!-- WEBSITE -->
           <td>
-            <a href="https://nodalpoint.io" style="color: #002FA7; text-decoration: none; font-weight: 700;">
-              HQ
+            <a href="${esc(website.url)}" style="color: #002FA7; text-decoration: none; font-weight: 700;">
+              WEBSITE
             </a>
           </td>
           
@@ -126,12 +140,9 @@ export function generateForensicSignature(
   const initials = `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`;
   const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Nodal Point Architect';
   const senderEmail = (options?.senderEmail || profile.email || 'contact@nodalpoint.io').trim();
-  const rawDomain = (options?.websiteDomain || senderEmail.split('@')[1] || 'nodalpoint.io')
-    .replace(/^https?:\/\//i, '')
-    .replace(/\/.*$/, '')
-    .trim();
-  const websiteDomain = rawDomain || 'nodalpoint.io';
-  const websiteUrl = `https://${websiteDomain}`;
+  const website = normalizeWebsite(options?.websiteDomain || profile.website, senderEmail.split('@')[1] || 'nodalpoint.io');
+  const websiteDomain = website.domain;
+  const websiteUrl = website.url;
 
   // Theme-aware colors — dark mode for UI preview, light mode for outgoing emails
   const NODAL_BLUE = isDarkMode ? '#6b8eff' : '#002FA7';
