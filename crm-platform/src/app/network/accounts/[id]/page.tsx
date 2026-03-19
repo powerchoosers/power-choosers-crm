@@ -121,6 +121,7 @@ export default function AccountDossierPage() {
             <AccountInfrastructurePanel
               id={id}
               account={state.account}
+              contacts={state.contacts || []}
               isEditing={state.isEditing}
               editNotes={state.editNotes}
               setEditNotes={state.setEditNotes}
