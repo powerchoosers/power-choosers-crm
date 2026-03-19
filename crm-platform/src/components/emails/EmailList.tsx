@@ -93,7 +93,7 @@ export function EmailList({
   const setCurrentPage = externalOnPageChange || setInternalPage
   const PULL_THRESHOLD = 72
   const PULL_MAX = 132
-  const PULL_REFRESH_DISTANCE = 44
+  const PULL_REFRESH_DISTANCE = 16
 
   useEffect(() => {
     pullDistanceRef.current = pullDistance
@@ -500,25 +500,6 @@ export function EmailList({
 
       {/* Scrollable List */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll overscroll-contain relative">
-        <div className={cn(
-          "pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 transition-all duration-200",
-          (pullDistance > 0 || isPullRefreshing) ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
-        )}>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-zinc-950/85 px-3 py-1 shadow-none backdrop-blur-sm">
-            {isPullRefreshing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
-            ) : (
-              <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
-            )}
-            <span className="text-[9px] font-mono uppercase tracking-[0.22em] text-zinc-300">
-              {isPullRefreshing
-                ? 'Refreshing'
-                : pullDistance >= PULL_THRESHOLD
-                  ? 'Release to refresh'
-                  : 'Pull to refresh'}
-            </span>
-          </div>
-        </div>
         <div
           ref={contentRef}
           style={{
@@ -527,8 +508,31 @@ export function EmailList({
             willChange: pullDistance > 0 ? 'transform' : 'auto',
           }}
         >
+          <div
+            className={cn(
+              "overflow-hidden border-b border-white/5 transition-all duration-200 flex items-center justify-center",
+              (pullDistance > 0 || isPullRefreshing)
+                ? "h-9 max-h-9 opacity-100"
+                : "h-0 max-h-0 opacity-0 pointer-events-none"
+            )}
+          >
+            <div className="flex items-center justify-center gap-2 px-2 -translate-y-1.5 text-[9px] leading-none font-mono uppercase tracking-[0.22em] text-zinc-500">
+              {isPullRefreshing ? (
+                <Loader2 className="relative -top-px w-3.5 h-3.5 animate-spin text-zinc-500" />
+              ) : (
+                <RefreshCw className="relative -top-px w-3.5 h-3.5 text-zinc-600" />
+              )}
+              <span className="tabular-nums">
+                {isPullRefreshing
+                  ? 'Refreshing'
+                  : pullDistance >= PULL_THRESHOLD
+                    ? 'Release to refresh'
+                    : 'Pull to refresh'}
+              </span>
+            </div>
+          </div>
           {!shouldShowSkeletonRows && emails.length === 0 ? (
-            <div className="flex min-h-[420px] items-center justify-center py-16 text-zinc-500 space-y-4 animate-in fade-in duration-700">
+            <div className="flex min-h-[420px] items-center justify-center py-14 text-zinc-500 space-y-4 animate-in fade-in duration-700">
               <div className="flex flex-col items-center justify-center space-y-4">
                 <div className="w-16 h-16 rounded-2xl nodal-glass flex items-center justify-center border border-white/5 shadow-2xl">
                   <Mail className="w-8 h-8 text-zinc-600" />
