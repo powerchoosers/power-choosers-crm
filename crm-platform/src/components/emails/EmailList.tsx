@@ -93,6 +93,7 @@ export function EmailList({
   const setCurrentPage = externalOnPageChange || setInternalPage
   const PULL_THRESHOLD = 72
   const PULL_MAX = 132
+  const PULL_REFRESH_DISTANCE = 44
 
   useEffect(() => {
     pullDistanceRef.current = pullDistance
@@ -220,8 +221,8 @@ export function EmailList({
     isRefreshingRef.current = true
     setIsPullRefreshing(true)
     setIsPulling(false)
-    setPullDistance(PULL_THRESHOLD)
-    pullDistanceRef.current = PULL_THRESHOLD
+    setPullDistance(PULL_REFRESH_DISTANCE)
+    pullDistanceRef.current = PULL_REFRESH_DISTANCE
 
     const startedAt = Date.now()
     try {
@@ -500,16 +501,16 @@ export function EmailList({
       {/* Scrollable List */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto min-h-0 scroll-smooth np-scroll overscroll-contain relative">
         <div className={cn(
-          "pointer-events-none absolute left-1/2 top-3 z-20 -translate-x-1/2 transition-all duration-200",
+          "pointer-events-none absolute left-1/2 top-2 z-20 -translate-x-1/2 transition-all duration-200",
           (pullDistance > 0 || isPullRefreshing) ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-2"
         )}>
-          <div className="flex items-center gap-2 rounded-full border border-[#002FA7]/30 bg-black/75 px-3 py-1.5 shadow-[0_0_24px_rgba(0,47,167,0.12)] backdrop-blur-md">
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-zinc-950/85 px-3 py-1 shadow-none backdrop-blur-sm">
             {isPullRefreshing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#002FA7]" />
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-zinc-400" />
             ) : (
-              <RefreshCw className="w-3.5 h-3.5 text-[#002FA7]" />
+              <RefreshCw className="w-3.5 h-3.5 text-zinc-400" />
             )}
-            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-200">
+            <span className="text-[9px] font-mono uppercase tracking-[0.22em] text-zinc-300">
               {isPullRefreshing
                 ? 'Refreshing'
                 : pullDistance >= PULL_THRESHOLD
