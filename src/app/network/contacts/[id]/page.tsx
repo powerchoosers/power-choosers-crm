@@ -152,12 +152,12 @@ export default function ContactDossierPage() {
 
     // Add recent call transcripts to Context
     const recentCallContext = buildUsableCallContextBlock(
-      (s.recentCalls || []).map((c) => ({
+      (s.recentCalls || []).map((c: any) => ({
         id: c.id,
         timestamp: c.date || c.timestamp || null,
         direction: c.type || c.direction || null,
         status: c.status || null,
-        duration: typeof c.duration === 'number' ? c.duration : null,
+        duration: typeof c.duration === 'number' || typeof c.duration === 'string' ? c.duration : null,
         transcript: c.transcript || null,
         summary: c.note || c.summary || null,
         aiInsights: c.aiInsights || null,
