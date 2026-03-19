@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { LoadingOrb } from "@/components/ui/LoadingOrb";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { NetworkCursor } from "@/components/ui/NetworkCursor";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -76,9 +77,10 @@ export function NetworkLayoutClient({
       className={cn(
         inter.className,
         inter.variable,
-        "font-sans bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-[100dvh] w-screen relative"
+        "network-cursor-enabled font-sans bg-zinc-950 text-foreground antialiased overflow-hidden selection:bg-[#002FA7] selection:text-white h-[100dvh] w-screen relative"
       )}
     >
+      <NetworkCursor />
       <TopBar />
       <Sidebar />
       <RightPanel />
