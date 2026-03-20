@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRightLeft, ChevronLeft, ChevronRight, Mic, Sparkles, History } from 'lucide-react'
 import { CallListItem } from '@/components/calls/CallListItem'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 const CALLS_PER_PAGE = 4
 
@@ -16,6 +17,7 @@ interface EngagementLogProps {
     id: string
     contact: any
     account: any
+    variant?: 'default' | 'skinny'
 }
 
 export function EngagementLog({
@@ -26,22 +28,34 @@ export function EngagementLog({
     onViewAll,
     id,
     contact,
-    account
+    account,
+    variant = 'default'
 }: EngagementLogProps) {
     const totalPages = Math.max(1, Math.ceil((recentCalls?.length ?? 0) / CALLS_PER_PAGE))
     const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
     const pageStart = ((safeCurrentPage - 1) * CALLS_PER_PAGE) + 1
     const pageEnd = Math.min(safeCurrentPage * CALLS_PER_PAGE, recentCalls?.length ?? 0)
 
+    const isSkinny = variant === 'skinny'
+
     return (
-        <div className="nodal-void-card p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-4">
+        <div className={cn(
+            "nodal-void-card shadow-xl",
+            isSkinny ? "p-4" : "p-6"
+        )}>
+            <div className={cn(
+                "flex items-center justify-between",
+                isSkinny ? "mb-2" : "mb-4"
+            )}>
                 <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
                     <Mic className="w-3.5 h-3.5" /> Transmission Log
                 </h3>
                 <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{recentCalls?.length ?? 0} RECORDS</span>
             </div>
-            <div className="flex items-center justify-end gap-2 mb-3">
+            <div className={cn(
+                "flex items-center justify-end gap-2",
+                isSkinny ? "mb-2" : "mb-3"
+            )}>
                 <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#002FA7]/20 border border-[#002FA7]/30">
                     <Sparkles className="w-3 h-3 text-[#002FA7]" />
                     <span className="text-[10px] font-mono text-white uppercase tracking-tighter">AI_ENABLED</span>
@@ -73,11 +87,10 @@ export function EngagementLog({
                                     return (
                                         <motion.div
                                             key={call.id}
-                                            layout
-                                            initial={{ opacity: 0, height: 0, x: -10 }}
-                                            animate={{ opacity: 1, height: 'auto', x: 0 }}
-                                            exit={{ opacity: 0, height: 0, x: 10 }}
-                                            className="overflow-hidden"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            transition={{ duration: 0.2 }}
                                         >
                                             <div className="space-y-1">
                                                 {isCompanyCall && (
@@ -112,26 +125,35 @@ export function EngagementLog({
             </div>
 
             {recentCalls && recentCalls.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                    <div className="flex items-center gap-4">
+                <div className={cn(
+                    "mt-4 pt-4 border-t border-white/5 text-[10px] font-mono text-zinc-500 uppercase tracking-widest",
+                    isSkinny ? "flex flex-col gap-3" : "flex items-center justify-between"
+                )}>
+                    <div className={cn(
+                        "flex items-center",
+                        isSkinny ? "gap-2" : "gap-4"
+                    )}>
                         <span className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Sync_Block {String(pageStart).padStart(2, '0')}–{String(pageEnd).padStart(2, '0')}
+                            {String(pageStart).padStart(2, '0')}–{String(pageEnd).padStart(2, '0')}
                         </span>
                         <span className="opacity-40">|</span>
-                        <span>Total_Nodes: {recentCalls.length}</span>
+                        <span>{recentCalls.length} total</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className={cn(
+                        "flex items-center gap-2",
+                        isSkinny && "self-end"
+                    )}>
                         <Button
                             variant="outline"
                             size="icon"
                             onClick={() => setCurrentPage(Math.max(1, safeCurrentPage - 1))}
                             disabled={safeCurrentPage === 1}
-                            className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white"
+                            className="w-7 h-7 border-white/5 bg-transparent text-zinc-600 hover:text-white"
                         >
                             <ChevronLeft className="h-3.5 w-3.5" />
                         </Button>
-                        <span className="min-w-8 text-center tabular-nums">
+                        <span className="min-w-6 text-center tabular-nums">
                             {safeCurrentPage.toString().padStart(2, '0')}
                         </span>
                         <Button
@@ -139,7 +161,7 @@ export function EngagementLog({
                             size="icon"
                             onClick={() => setCurrentPage(safeCurrentPage + 1)}
                             disabled={safeCurrentPage >= totalPages}
-                            className="w-8 h-8 border-white/5 bg-transparent text-zinc-600 hover:text-white"
+                            className="w-7 h-7 border-white/5 bg-transparent text-zinc-600 hover:text-white"
                         >
                             <ChevronRight className="h-3.5 w-3.5" />
                         </Button>
