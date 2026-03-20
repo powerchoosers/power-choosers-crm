@@ -198,6 +198,7 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
   const [hierarchyOverride, setHierarchyOverride] = useState<AccountHierarchy | null>(null)
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const closeControlsTimerRef = useRef<number | null>(null)
   const accountHierarchy = useMemo(
     () => hierarchyOverride ?? parseHierarchy(account?.metadata),
     [account?.metadata, hierarchyOverride]
@@ -231,6 +232,16 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
 
   const handleOpenParent = useCallback(() => openPicker('PARENT'), [openPicker])
   const handleOpenSubsidiary = useCallback(() => openPicker('SUBSIDIARY'), [openPicker])
+  const closeControlsSmoothly = useCallback(() => {
+    closePicker()
+    if (closeControlsTimerRef.current !== null) {
+      window.clearTimeout(closeControlsTimerRef.current)
+    }
+    closeControlsTimerRef.current = window.setTimeout(() => {
+      setControlsOpen(false)
+      closeControlsTimerRef.current = null
+    }, 220)
+  }, [closePicker])
 
   const invalidateAccountQueries = async () => {
     await Promise.all([
@@ -522,8 +533,7 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
 
       setHierarchyOverride(nextCurrent)
       await invalidateAccountQueries()
-      closePicker()
-      setControlsOpen(false)
+      closeControlsSmoothly()
       toast.success(mode === 'PARENT' ? 'Parent company linked' : 'Subsidiary linked')
     } catch (error: any) {
       console.error('Failed to link corporate relationship:', error)
@@ -801,6 +811,14 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
     setHierarchyOverride(null)
   }, [account?.metadata])
 
+  useEffect(() => {
+    return () => {
+      if (closeControlsTimerRef.current !== null) {
+        window.clearTimeout(closeControlsTimerRef.current)
+      }
+    }
+  }, [])
+
   return (
     <div className={cn('nodal-module-glass nodal-monolith-edge rounded-2xl p-4', className)}>
       <div className={cn('flex items-center justify-between', (controlsOpen || hasLinkedAccounts) && 'mb-2')}>
@@ -828,10 +846,10 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
+            transition={{ duration: 0.32, ease: [0.23, 1, 0.32, 1] }}
             className="overflow-hidden"
           >
-            <div className="space-y-4 pb-4">
+            <div className="space-y-4 pb-0">
             {parentAccount && (
               <div className="space-y-1">
                 <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] px-1">Parent</p>
