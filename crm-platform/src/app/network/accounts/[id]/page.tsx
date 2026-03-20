@@ -83,6 +83,7 @@ export default function AccountDossierPage() {
           handlePrev={state.handlePrev}
           handleNext={state.handleNext}
           handleCompleteAndAdvance={state.handleCompleteAndAdvance}
+          isCompleting={state.isCompletingTask}
         />
 
         <div className="flex-1 flex overflow-hidden relative z-10 group/dossier">

@@ -230,6 +230,7 @@ export function useTasks(searchQuery?: string) {
     addTask: addTaskMutation.mutate,
     addTaskAsync: addTaskMutation.mutateAsync,
     updateTask: updateTaskMutation.mutate,
+    updateTaskAsync: updateTaskMutation.mutateAsync,
     deleteTask: deleteTaskMutation.mutate
   }
 }

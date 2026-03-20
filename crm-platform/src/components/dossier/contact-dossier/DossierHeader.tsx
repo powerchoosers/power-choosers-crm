@@ -56,6 +56,7 @@ interface DossierHeaderProps {
     handlePrev: () => void
     handleNext: () => void
     handleCompleteAndAdvance: () => void
+    isCompleting?: boolean
 }
 
 export const DossierHeader = memo(function DossierHeader({
@@ -93,7 +94,8 @@ export const DossierHeader = memo(function DossierHeader({
     useGlobalPagination,
     handlePrev,
     handleNext,
-    handleCompleteAndAdvance
+    handleCompleteAndAdvance,
+    isCompleting = false
 }: DossierHeaderProps) {
     const router = useRouter()
     const contactName = contact?.name || 'Unknown Contact'
@@ -527,6 +529,7 @@ export const DossierHeader = memo(function DossierHeader({
                                     onNext={handleNext}
                                     onSkip={handleNext}
                                     onCompleteAndAdvance={handleCompleteAndAdvance}
+                                    isCompleting={isCompleting}
                                 />
                             )}
 

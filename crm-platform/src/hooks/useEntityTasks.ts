@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import { useAllPendingTasks, type Task } from './useTasks'
-import { isPendingTask } from '@/lib/task-date'
+import { isPendingTask, isTodayOrOverdue } from '@/lib/task-date'
 
 interface EntityTaskScope {
   contactId?: string
@@ -34,8 +34,9 @@ export function taskMatchesEntityScope(task: Task, scope: EntityTaskScope): bool
 }
 
 /**
- * Pending tasks for a single entity (contact or account).
+ * Active tasks for a single entity (contact or account).
  * Same filtering as ContextTasksWidget: by entityId, entityName, or relatedTo.
+ * Future-dated tasks are excluded so dossiers only page through work that is due.
  */
 export function useEntityTasks(entityId: string | undefined, entityName?: string, options?: Omit<EntityTaskScope, 'entityName'>) {
   const { data: allPendingData } = useAllPendingTasks()
@@ -51,7 +52,7 @@ export function useEntityTasks(entityId: string | undefined, entityName?: string
         includeContactIds: options?.includeContactIds,
       })
     )
-    return forEntity.filter(isPendingTask)
+    return forEntity.filter((task: Task) => isPendingTask(task) && isTodayOrOverdue(task.dueDate))
   }, [allPendingData?.allPendingTasks, entityId, entityName, options?.contactId, options?.accountId, options?.includeContactIds])
 
   return { pendingTasks, totalCount: pendingTasks.length }
