@@ -44,62 +44,12 @@ export default function ContactDossierPage() {
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
   const [isRecalibrating, setIsRecalibrating] = useState(false)
 
-  // Task Navigation logic (bridging the hook and UI)
   const taskIdFromUrl = searchParams?.get('taskId') ?? null
   useEffect(() => {
     if (!taskIdFromUrl || !s.pendingTasks.length) return
     const idx = s.pendingTasks.findIndex((t) => t.id === taskIdFromUrl)
     if (idx >= 0) s.setCurrentTaskIndex(idx)
   }, [taskIdFromUrl, s.pendingTasks]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const displayTaskIndex = Math.min(s.currentTaskIndex, Math.max(0, s.pendingTasks.length - 1))
-  const currentTask = s.pendingTasks[displayTaskIndex]
-  const globalIndex = currentTask ? s.allPendingTasks.findIndex((t) => String(t.id) === String(currentTask.id)) : -1
-  const globalPosition = globalIndex >= 0 ? globalIndex + 1 : 0
-  const useGlobalPagination = globalIndex >= 0 && s.globalTotal > 0
-
-  const handlePrev = () => {
-    if (globalIndex <= 0) {
-      s.setCurrentTaskIndex((p) => Math.max(0, p - 1))
-      return
-    }
-    // Deep navigation logic remains in main or moved to hook if possible - keeping here for safety
-    const prevTask = s.allPendingTasks[globalIndex - 1]
-    if (prevTask) {
-      const cid = prevTask.contactId
-      const aid = prevTask.accountId
-      if (cid === id || (aid && aid === (s.contact as any)?.linkedAccountId)) {
-        const localIdx = s.pendingTasks.findIndex(t => t.id === prevTask.id)
-        if (localIdx >= 0) { s.setCurrentTaskIndex(localIdx); return; }
-      }
-      if (cid) router.push(`/network/contacts/${cid}?taskId=${encodeURIComponent(prevTask.id)}`)
-      else if (aid) router.push(`/network/accounts/${aid}?taskId=${encodeURIComponent(prevTask.id)}`)
-    }
-  }
-
-  const handleNext = () => {
-    if (globalIndex < 0 || globalIndex >= s.allPendingTasks.length - 1) {
-      s.setCurrentTaskIndex((p) => Math.min(s.pendingTasks.length - 1, p + 1))
-      return
-    }
-    const nextTask = s.allPendingTasks[globalIndex + 1]
-    if (nextTask) {
-      const cid = nextTask.contactId
-      const aid = nextTask.accountId
-      if (cid === id || (aid && aid === (s.contact as any)?.linkedAccountId)) {
-        const localIdx = s.pendingTasks.findIndex(t => t.id === nextTask.id)
-        if (localIdx >= 0) { s.setCurrentTaskIndex(localIdx); return; }
-      }
-      if (cid) router.push(`/network/contacts/${cid}?taskId=${encodeURIComponent(nextTask.id)}`)
-      else if (aid) router.push(`/network/accounts/${aid}?taskId=${encodeURIComponent(nextTask.id)}`)
-    }
-  }
-
-  const handleCompleteAndAdvance = () => {
-    if (!currentTask) return
-    s.updateTask({ id: currentTask.id, status: 'Completed' })
-    handleNext()
-  }
 
   const handleTerminalSubmit = async (input: string) => {
     const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm')
@@ -236,15 +186,16 @@ export default function ContactDossierPage() {
           setEditLinkedinUrl={s.setEditLinkedinUrl}
           activeEditField={s.activeEditField}
           setActiveEditField={s.setActiveEditField}
-          hasTasks={s.pendingTasks.length > 0}
+          hasTasks={s.hasTasks}
           pendingTasks={s.pendingTasks}
-          displayTaskIndex={displayTaskIndex}
+          displayTaskIndex={s.displayTaskIndex}
           globalTotal={s.globalTotal}
-          globalPosition={globalPosition}
-          useGlobalPagination={useGlobalPagination}
-          handlePrev={handlePrev}
-          handleNext={handleNext}
-          handleCompleteAndAdvance={handleCompleteAndAdvance}
+          globalPosition={s.globalPosition}
+          useGlobalPagination={s.useGlobalPagination}
+          handlePrev={s.handlePrev}
+          handleNext={s.handleNext}
+          handleCompleteAndAdvance={s.handleCompleteAndAdvance}
+          isCompleting={s.isCompletingTask}
         />
 
         <div className="flex-1 flex overflow-hidden relative z-10 group/dossier">
