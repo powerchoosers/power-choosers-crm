@@ -40,18 +40,18 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
         </button>
       </div>
 
-      <AnimatePresence initial={false} mode="popLayout">
-        <motion.div layout className="space-y-2">
+      <AnimatePresence initial={false} mode="sync">
+        <div className="space-y-2 overflow-hidden">
           {contacts.map((contact) => {
             const isInTargetList = contactsInLists?.has(contact.id) || false
 
             return (
               <motion.div
                 key={contact.id}
-                layout
-                initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                layout="position"
+                initial={{ opacity: 0, y: -12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -12 }}
                 transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
                 onClick={() => router.push(`/network/contacts/${contact.id}`)}
                 className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer"
@@ -79,7 +79,7 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
               </motion.div>
             )
           })}
-        </motion.div>
+        </div>
       </AnimatePresence>
     </motion.div>
   )
