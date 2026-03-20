@@ -3,13 +3,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UploadCloud, FileText, X, Loader2, PenTool, AlertTriangle, Download, ChevronLeft, ChevronRight } from 'lucide-react';
-import { Document, Page, pdfjs } from 'react-pdf'
-import 'react-pdf/dist/Page/AnnotationLayer.css'
-import 'react-pdf/dist/Page/TextLayer.css'
+import { UploadCloud, FileText, X, Loader2, PenTool, AlertTriangle, Download } from 'lucide-react';
 import { SpreadsheetViewer } from '@/components/ui/SpreadsheetViewer'
+import dynamic from 'next/dynamic';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/legacy/build/pdf.worker.min.mjs`
+const PdfViewer = dynamic(() => import('@/components/dossier/PdfViewer').then(mod => ({ default: mod.PdfViewer })), {
+  ssr: false,
+  loading: () => null
+});
 import { supabase } from '@/lib/supabase';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
@@ -651,36 +652,14 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
 
                       if (isPdf) {
                         return (
-                          <div
-                            className="absolute inset-0 overflow-auto np-scroll flex flex-col items-center p-6"
-                            style={{ opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
-                          >
-                            {previewNumPages > 1 && (
-                              <div className="flex items-center gap-1 sticky top-0 z-10 px-1 py-1 bg-zinc-950/80 backdrop-blur rounded-full border border-white/5 text-[10px] font-mono text-zinc-400 mb-4">
-                                <button disabled={previewPageNumber <= 1} onClick={() => setPreviewPageNumber(p => p - 1)} className="p-1.5 bg-[#002FA7] hover:bg-[#002FA7]/80 rounded-full disabled:opacity-20 transition-all text-white">
-                                  <ChevronLeft className="w-3.5 h-3.5" />
-                                </button>
-                                <div className="px-3 border-x border-white/5 text-zinc-500">Page <span className="text-zinc-200">{previewPageNumber}</span> / {previewNumPages}</div>
-                                <button disabled={previewPageNumber >= previewNumPages} onClick={() => setPreviewPageNumber(p => p + 1)} className="p-1.5 bg-[#002FA7] hover:bg-[#002FA7]/80 rounded-full disabled:opacity-20 transition-all text-white">
-                                  <ChevronRight className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            )}
-                            <Document
-                              file={previewDoc.signedUrl}
-                              onLoadSuccess={({ numPages }) => { setPreviewNumPages(numPages); setIframeLoaded(true); }}
-                              loading={null}
-                              className="flex flex-col items-center"
-                            >
-                              <Page
-                                pageNumber={previewPageNumber}
-                                renderTextLayer={false}
-                                renderAnnotationLayer={false}
-                                width={Math.min(typeof window !== 'undefined' ? window.innerWidth * 0.72 : 900, 900)}
-                                className="shadow-2xl"
-                              />
-                            </Document>
-                          </div>
+                          <PdfViewer
+                            signedUrl={previewDoc.signedUrl}
+                            onLoadSuccess={(numPages) => { setPreviewNumPages(numPages); setIframeLoaded(true); }}
+                            pageNumber={previewPageNumber}
+                            onPageChange={setPreviewPageNumber}
+                            numPages={previewNumPages}
+                            iframeLoaded={iframeLoaded}
+                          />
                         );
                       }
 
