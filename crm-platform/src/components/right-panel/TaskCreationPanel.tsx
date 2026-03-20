@@ -298,7 +298,9 @@ export function TaskCreationPanel() {
             {/* HEADER */}
             <div className={panelTheme.header}>
                 <div className={panelTheme.headerTitleWrap}>
-                    <Clock className="w-4 h-4 text-white" />
+                    <div className="h-8 w-8 rounded-lg bg-[#002FA7]/20 border border-[#002FA7]/30 flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-white" />
+                    </div>
                     <span className="font-mono text-[10px] tracking-widest text-zinc-300 uppercase">
                         INITIALIZE_TASK_VECTOR
                     </span>
