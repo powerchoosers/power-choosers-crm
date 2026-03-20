@@ -42,61 +42,43 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
 
       <AnimatePresence initial={false} mode="popLayout">
         <motion.div layout className="space-y-2">
-          {contacts.length === 0 ? (
-            <motion.div
-              key="empty-command-chain"
-              initial={{ opacity: 0, height: 0, y: -6 }}
-              animate={{ opacity: 1, height: 'auto', y: 0 }}
-              exit={{ opacity: 0, height: 0, y: -6 }}
-              transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
-              className="overflow-hidden rounded-xl border border-dashed border-white/10 bg-black/20 px-3 py-4 text-center"
-            >
-              <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">
-                No contacts linked yet
-              </p>
-              <p className="mt-1 text-[9px] font-mono text-zinc-700">
-                Add the first contact to start the command chain
-              </p>
-            </motion.div>
-          ) : (
-            contacts.map((contact) => {
-              const isInTargetList = contactsInLists?.has(contact.id) || false
+          {contacts.map((contact) => {
+            const isInTargetList = contactsInLists?.has(contact.id) || false
 
-              return (
-                <motion.div
-                  key={contact.id}
-                  layout
-                  initial={{ opacity: 0, y: -8, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                  transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
-                  onClick={() => router.push(`/network/contacts/${contact.id}`)}
-                  className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer"
-                >
-                  {/* Avatar with Target Badge */}
-                  <ContactAvatar
-                    name={contact.name || ''}
-                    photoUrl={contact.avatarUrl}
-                    size={32}
-                    className="w-8 h-8 rounded-[14px]"
-                    textClassName="text-[10px]"
-                    showListBadge={isInTargetList}
-                  />
+            return (
+              <motion.div
+                key={contact.id}
+                layout
+                initial={{ opacity: 0, y: -8, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -8, scale: 0.98 }}
+                transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+                onClick={() => router.push(`/network/contacts/${contact.id}`)}
+                className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer"
+              >
+                {/* Avatar with Target Badge */}
+                <ContactAvatar
+                  name={contact.name || ''}
+                  photoUrl={contact.avatarUrl}
+                  size={32}
+                  className="w-8 h-8 rounded-[14px]"
+                  textClassName="text-[10px]"
+                  showListBadge={isInTargetList}
+                />
 
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-zinc-300 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left truncate">
-                      {contact.name}
-                    </div>
-                    <div className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">
-                      {(contact as any).title || 'Stakeholder'}
-                    </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-medium text-zinc-300 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left truncate">
+                    {contact.name}
                   </div>
+                  <div className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">
+                    {(contact as any).title || 'Stakeholder'}
+                  </div>
+                </div>
 
-                  <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors" />
-                </motion.div>
-              )
-            })
-          )}
+                <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors" />
+              </motion.div>
+            )
+          })}
         </motion.div>
       </AnimatePresence>
     </motion.div>
