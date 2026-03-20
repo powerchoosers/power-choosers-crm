@@ -118,7 +118,9 @@ export function useEntityEmails(emailAddresses: string[]) {
                         ownerId: item.metadata?.ownerId || (user?.email ?? ''),
                         openCount: item.openCount,
                         clickCount: item.clickCount,
-                        attachments: item.attachments || item.metadata?.attachments
+                        attachments: item.attachments || item.metadata?.attachments,
+                        threadId: item.threadId || item.metadata?.threadId || null,
+                        contactId: item.contactId || null,
                     }
                 }) as Email[]
 
