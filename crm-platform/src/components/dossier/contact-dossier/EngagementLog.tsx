@@ -128,7 +128,6 @@ export function EngagementLog({
                     </div>
                 ) : (
                     <div className="p-8 rounded-2xl border border-dashed border-white/5 bg-zinc-950/20 flex flex-col items-center justify-center gap-3">
-                        <History className="w-12 h-12 text-zinc-600 opacity-20" />
                         <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>
                     </div>
                 )}
