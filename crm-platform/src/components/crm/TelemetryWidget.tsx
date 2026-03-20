@@ -46,6 +46,12 @@ export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weathe
     capacity: metrics.capacity,
     scarcity: metrics.scarcity
   });
+  const formattedPrice = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(metrics.price);
 
   return (
     <div className="space-y-4">
@@ -97,8 +103,8 @@ export default function TelemetryWidget({ location = 'LZ_NORTH', weather, weathe
         </div>
         <p className="text-[10px] text-zinc-500 leading-relaxed italic relative z-10">
           {volatilityIndex > 50 
-            ? `High volatility detected in ${location}. Real-time pricing exceeds $100/MWh.`
-            : `Market conditions in ${location} remain stable. No immediate scarcity risk detected.`}
+            ? `High volatility detected in ${location}. Real-time pricing is ${formattedPrice}/MWh.`
+            : `Market conditions in ${location} remain stable at ${formattedPrice}/MWh. No immediate scarcity risk detected.`}
         </p>
       </div>
     </div>
