@@ -71,6 +71,55 @@ function stripTranscriptNoise(value: string) {
   )
 }
 
+function hasHumanSignal(value: string) {
+  return HUMAN_PATTERNS.some((pattern) => pattern.test(value))
+}
+
+function isNoiseHeavySegment(value: string) {
+  const text = cleanWhitespace(value)
+  if (!text) return true
+
+  const lower = text.toLowerCase()
+  const startsLikeMenu = /^(thank you for calling|for |to |please |if you know your party|press \d|please hold|menu options)/i.test(text)
+  const menuKeywordCount = (lower.match(/\b(press|directory|menu|extension|operator|please hold|try to connect)\b/g) || []).length
+  const noiseSignalCount = NOISE_PATTERNS.reduce((count, pattern) => count + (pattern.test(text) ? 1 : 0), 0)
+
+  // Treat short menu-like snippets as noise unless they also look like a real person exchange.
+  if ((startsLikeMenu || menuKeywordCount >= 2 || noiseSignalCount >= 2) && !hasHumanSignal(text)) {
+    return true
+  }
+  return false
+}
+
+function extractHumanConversationSnippet(rawTranscript: string, maxChars = 500) {
+  const transcript = stripTranscriptNoise(rawTranscript)
+  if (!transcript) return ''
+
+  const segments = transcript
+    .split(/[.?!]\s+/)
+    .map((segment) => cleanWhitespace(segment))
+    .filter(Boolean)
+
+  if (!segments.length) return transcript.slice(0, maxChars)
+
+  const humanCandidateIndexes = segments
+    .map((segment, index) => ({ segment, index }))
+    .filter(({ segment }) => hasHumanSignal(segment) && !isNoiseHeavySegment(segment) && segment.length > 20)
+    .map(({ index }) => index)
+
+  // On transferred calls, later segments are often the real conversation with the target contact.
+  let startIndex = humanCandidateIndexes.length ? humanCandidateIndexes[humanCandidateIndexes.length - 1] : -1
+  if (startIndex < 0) {
+    startIndex = segments.findIndex((segment) => !isNoiseHeavySegment(segment) && segment.length > 20)
+  }
+  if (startIndex < 0) {
+    startIndex = 0
+  }
+
+  const conversation = cleanWhitespace(segments.slice(startIndex).join('. '))
+  return (conversation || transcript).slice(0, maxChars)
+}
+
 function normalizeAiInsights(raw: unknown): string {
   if (!raw) return ''
   try {
@@ -89,18 +138,18 @@ export function parseCallInsightsSummary(raw: unknown): string {
 }
 
 export function isUsableCallContext(record: CallContextRecord): boolean {
-  const transcript = stripTranscriptNoise(String(record.transcript || ''))
+  const transcript = extractHumanConversationSnippet(String(record.transcript || ''))
   const summary = cleanWhitespace(String(record.summary || ''))
   const insights = normalizeAiInsights(record.aiInsights)
   const combined = cleanWhitespace([transcript, summary, insights].filter(Boolean).join(' '))
   if (!combined) return false
 
-  const hasHumanSignal = HUMAN_PATTERNS.some((pattern) => pattern.test(combined))
+  const includesHumanSignal = hasHumanSignal(combined)
   const hasNoiseSignal = NOISE_PATTERNS.some((pattern) => pattern.test(combined))
-  if (hasNoiseSignal && !hasHumanSignal) return false
+  if (hasNoiseSignal && !includesHumanSignal) return false
 
   const tokenCount = combined.split(/\s+/).filter(Boolean).length
-  if (tokenCount < 8 && !hasHumanSignal) return false
+  if (tokenCount < 8 && !includesHumanSignal) return false
 
   return true
 }
@@ -167,7 +216,7 @@ export function buildUsableCallContextEntries(
       const timestamp = String(call.timestamp || '')
       const date = timestamp ? new Date(timestamp) : null
       const validDate = date && !Number.isNaN(date.getTime()) ? date : null
-      const transcript = stripTranscriptNoise(String(call.transcript || ''))
+      const transcript = extractHumanConversationSnippet(String(call.transcript || ''))
       const summary = cleanWhitespace(String(call.summary || ''))
       const insightsSummary = normalizeAiInsights(call.aiInsights)
       const transcriptSnippet = transcript ? transcript.slice(0, 500) : (summary || insightsSummary).slice(0, 500)
