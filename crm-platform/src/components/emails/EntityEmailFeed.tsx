@@ -137,7 +137,7 @@ function EmailActionBar({ email, variant, onReply, isReplying }: { email: Email;
                     <button
                         type="button"
                         onClick={handleViewThread}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-[#002FA7] hover:text-white rounded-md border border-[#002FA7]/20 hover:border-[#002FA7]/40 hover:bg-[#002FA7]/10 transition-all duration-300"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white rounded-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300"
                     >
                         <ExternalLink className="w-3 h-3" />
                         View Thread
@@ -302,9 +302,9 @@ export function EntityEmailFeed({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.98 }}
                 transition={{ 
-                    duration: 0.4, 
+                    duration: 0.6, 
                     ease: [0.23, 1, 0.32, 1],
-                    layout: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+                    layout: { duration: 0.6, ease: [0.23, 1, 0.32, 1] }
                 }}
                 className="group/row"
             >
@@ -437,13 +437,13 @@ export function EntityEmailFeed({
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
                                 exit={{ height: 0, opacity: 0 }}
-                                transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+                                transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
                                 className="overflow-hidden border-t border-white/5"
                             >
                                 <motion.div 
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
-                                    transition={{ duration: 0.4, ease: "linear" }}
+                                    transition={{ duration: 0.6, ease: "linear" }}
                                     className="px-4 py-5"
                                 >
                                     <div className="max-h-[520px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
@@ -457,13 +457,11 @@ export function EntityEmailFeed({
                                     />
                                     <AnimatePresence>
                                         {replyingToId === email.id && (
-                                            <div id={`reply-node-${email.id}`}>
-                                                <InlineReplyComposer
-                                                    email={email}
-                                                    variant={variant}
-                                                    onClose={() => setReplyingToId(null)}
-                                                />
-                                            </div>
+                                            <InlineReplyComposer
+                                                email={email}
+                                                variant={variant}
+                                                onClose={() => setReplyingToId(null)}
+                                            />
                                         )}
                                     </AnimatePresence>
                                 </motion.div>
@@ -601,9 +599,9 @@ export function EntityEmailFeed({
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.95 }}
                                         transition={{ 
-                                            duration: 0.4, 
+                                            duration: 0.6, 
                                             ease: [0.23, 1, 0.32, 1],
-                                            layout: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+                                            layout: { duration: 0.6, ease: [0.23, 1, 0.32, 1] }
                                         }}
                                     >
                                         <div className={cn(
@@ -736,13 +734,13 @@ export function EntityEmailFeed({
                                                         initial={{ height: 0, opacity: 0 }}
                                                         animate={{ height: 'auto', opacity: 1 }}
                                                         exit={{ height: 0, opacity: 0 }}
-                                                        transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+                                                        transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
                                                         className="overflow-hidden border-t border-white/5"
                                                     >
                                                         <motion.div 
                                                             initial={{ opacity: 0 }}
                                                             animate={{ opacity: 1 }}
-                                                            transition={{ duration: 0.4, ease: "linear" }}
+                                                            transition={{ duration: 0.6, ease: "linear" }}
                                                             className="bg-zinc-950/40 p-6 max-h-[600px] overflow-y-auto w-full scrollbar-thin scrollbar-thumb-zinc-800"
                                                         >
                                                             <EmailContent
@@ -758,13 +756,11 @@ export function EntityEmailFeed({
                                                             />
                                                             <AnimatePresence>
                                                                 {replyingToId === email.id && (
-                                                                    <div id={`reply-node-${email.id}`}>
-                                                                        <InlineReplyComposer
-                                                                            email={email}
-                                                                            variant={variant}
-                                                                            onClose={() => setReplyingToId(null)}
-                                                                        />
-                                                                    </div>
+                                                                    <InlineReplyComposer
+                                                                        email={email}
+                                                                        variant={variant}
+                                                                        onClose={() => setReplyingToId(null)}
+                                                                    />
                                                                 )}
                                                             </AnimatePresence>
                                                         </motion.div>

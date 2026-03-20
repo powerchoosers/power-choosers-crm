@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowRightLeft, ChevronLeft, ChevronRight, Mic, Sparkles, History } from 'lucide-react'
 import { CallListItem } from '@/components/calls/CallListItem'
@@ -39,6 +40,24 @@ export function EngagementLog({
     const pageEnd = Math.min(safeCurrentPage * CALLS_PER_PAGE, recentCalls?.length ?? 0)
 
     const isSkinny = variant === 'skinny'
+    const prevTopId = useRef<string | null>(null)
+
+    // Auto-scroll to top when a new call signal arrives at the peak
+    useEffect(() => {
+        const topId = recentCalls?.[0]?.id
+        if (topId && prevTopId.current && topId !== prevTopId.current) {
+            if (safeCurrentPage === 1) {
+                const firstNode = document.getElementById(`call-node-${topId}`)
+                if (firstNode) {
+                    const scrollContainer = firstNode.closest('.np-scroll')
+                    if (scrollContainer) {
+                        scrollContainer.scrollTo({ top: 0, behavior: 'smooth' })
+                    }
+                }
+            }
+        }
+        prevTopId.current = topId
+    }, [recentCalls, safeCurrentPage])
 
     return (
         <div className={cn(
@@ -72,10 +91,16 @@ export function EngagementLog({
                                     return (
                                         <motion.div
                                             key={call.id}
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            exit={{ opacity: 0 }}
-                                            transition={{ duration: 0.2 }}
+                                            id={`call-node-${call.id}`}
+                                            layout
+                                            initial={{ opacity: 0, y: -20 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            transition={{ 
+                                                duration: 0.6, 
+                                                ease: [0.23, 1, 0.32, 1],
+                                                layout: { duration: 0.6, ease: [0.23, 1, 0.32, 1] }
+                                            }}
                                         >
                                             <div className="space-y-1">
                                                  <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-2 h-3 flex items-center">
@@ -93,6 +118,7 @@ export function EngagementLog({
                                                     customerAvatar={isCompanyCall ? 'company' : 'contact'}
                                                     variant="minimal"
                                                     showRelativeDate={showRelativeDate}
+                                                    showDirectionLabel={!!contact}
                                                 />
                                             </div>
                                         </motion.div>
