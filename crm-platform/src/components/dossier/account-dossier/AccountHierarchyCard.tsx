@@ -174,19 +174,20 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
     [account?.metadata, hierarchyOverride]
   )
 
-  const openPicker = (mode: RelationshipMode) => {
-    setControlsOpen(true)
-    setPickerMode(mode)
+  const resetPickerState = () => {
     setQuery('')
     setLocalResults([])
     setApolloResults([])
   }
 
+  const openPicker = (mode: RelationshipMode) => {
+    setControlsOpen(true)
+    resetPickerState()
+    setPickerMode(mode)
+  }
+
   const closePicker = () => {
     setPickerMode(null)
-    setQuery('')
-    setLocalResults([])
-    setApolloResults([])
   }
 
   const toggleControls = () => {
@@ -759,12 +760,8 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
   }, [account?.metadata])
 
   return (
-    <motion.div
-      layout
-      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-      className={cn('nodal-module-glass nodal-monolith-edge rounded-2xl p-4 space-y-4', className)}
-    >
-      <div className="flex items-center justify-between">
+    <div className={cn('nodal-module-glass nodal-monolith-edge rounded-2xl p-4', className)}>
+      <div className={cn('flex items-center justify-between', (controlsOpen || hasLinkedAccounts) && 'mb-4')}>
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.24em] flex items-center gap-2">
           <GitBranch className="w-3 h-3 text-zinc-500" /> Corporate Chain
         </h3>
@@ -786,15 +783,15 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
         {hasLinkedAccounts && (
           <motion.div
             key="linked-accounts"
-            layout
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.34, ease: [0.23, 1, 0.32, 1] }}
-            className="space-y-2"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
           >
+            <div className="space-y-4 pb-4">
             {parentAccount && (
-              <motion.div layout key={`parent-${parentAccount.id}`} className="space-y-1">
+              <div className="space-y-1">
                 <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] px-1">Parent</p>
                 <div
                   role="button"
@@ -837,11 +834,11 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
                   </button>
                   <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors shrink-0" />
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {subsidiaryAccounts.length > 0 && (
-              <motion.div layout className="space-y-1.5">
+              <div className="space-y-1.5">
                 <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-[0.2em] px-1">
                   Subsidiaries ({subsidiaryAccounts.length})
                 </p>
@@ -849,11 +846,10 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
                   {subsidiaryAccounts.map((subsidiary) => (
                     <motion.div
                       key={subsidiary.id}
-                      layout
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.26, ease: [0.23, 1, 0.32, 1] }}
+                      initial={{ opacity: 0, scale: 0.98 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.98 }}
+                      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                     >
                       <div
                         role="button"
@@ -899,8 +895,9 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
                     </motion.div>
                   ))}
                 </AnimatePresence>
-              </motion.div>
+              </div>
             )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -908,143 +905,145 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
       <AnimatePresence initial={false}>
         {controlsOpen && (
           <motion.div
-            key="controls"
             layout
-            initial={{ opacity: 0, height: 0, y: -8 }}
-            animate={{ opacity: 1, height: 'auto', y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -8 }}
-            transition={{ duration: 0.38, ease: [0.23, 1, 0.32, 1] }}
-            className="overflow-hidden space-y-3"
+            key="controls-area"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.32, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
           >
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => openPicker('PARENT')}
-                className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
-              >
-                {parentAccount ? 'Change Parent' : 'Add Parent'}
-              </button>
-              <button
-                onClick={() => openPicker('SUBSIDIARY')}
-                className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
-              >
-                Add Subsidiary
-              </button>
-            </div>
-
-            <AnimatePresence initial={false} mode="wait">
-              {pickerMode && (
-                <motion.div
-                  key={`picker-${pickerMode}`}
-                  layout
-                  initial={{ opacity: 0, height: 0, y: -6 }}
-                  animate={{ opacity: 1, height: 'auto', y: 0 }}
-                  exit={{ opacity: 0, height: 0, y: -6 }}
-                  transition={{ duration: 0.34, ease: [0.23, 1, 0.32, 1] }}
-                  className="overflow-hidden space-y-3 p-3 rounded-xl border border-white/5 bg-black/20"
+            <div className="space-y-3 pb-1 pt-2">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => openPicker('PARENT')}
+                  className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
-                      {pickerMode === 'PARENT' ? 'Find Parent Company' : 'Find Subsidiary'}
-                    </span>
-                    <button
-                      onClick={closePicker}
-                      className="text-[9px] font-mono text-zinc-600 hover:text-zinc-300 uppercase tracking-widest transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
+                  {parentAccount ? 'Change Parent' : 'Parent'}
+                </button>
+                <button
+                  onClick={() => openPicker('SUBSIDIARY')}
+                  className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
+                >
+                  Subsidiary
+                </button>
+              </div>
 
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 pointer-events-none" />
-                    <input
-                      ref={inputRef}
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      onKeyDown={handlePickerKeyDown}
-                      placeholder="Search existing accounts..."
-                      className="w-full bg-black/40 border border-white/5 rounded-xl pl-8 pr-3 py-2.5 text-sm text-white font-mono placeholder:text-zinc-700 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
-                    />
-                  </div>
-
-                  <div className="space-y-1 max-h-56 overflow-y-auto np-scroll">
-                    {isSearchingLocal && (
-                      <p className="text-[10px] font-mono text-zinc-600 text-center py-3 uppercase tracking-widest">Scanning local accounts...</p>
-                    )}
-
-                    {!isSearchingLocal && localResults.map((result) => (
+              <AnimatePresence initial={false} mode="wait" onExitComplete={resetPickerState}>
+                {pickerMode && (
+                  <motion.div
+                    layout
+                    key={`picker-${pickerMode}`}
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+                    className="overflow-hidden pt-3 pb-1"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
+                        {pickerMode === 'PARENT' ? 'Find Parent Company' : 'Find Subsidiary'}
+                      </span>
                       <button
-                        key={`local-${result.id}`}
-                        onClick={() => void handleSelectExisting(result)}
-                        disabled={isSyncingRelationship || isCommittingApollo}
-                        className="w-full group flex items-center gap-3 p-2.5 rounded-xl hover:bg-zinc-950/40 border border-transparent hover:border-white/5 transition-all text-left disabled:opacity-60"
+                        onClick={closePicker}
+                        className="text-[9px] font-mono text-zinc-600 hover:text-zinc-300 uppercase tracking-widest transition-colors"
                       >
-                        <CompanyIcon
-                          name={result.name}
-                          logoUrl={result.logoUrl}
-                          domain={result.domain}
-                          metadata={result.metadata}
-                          size={32}
-                          roundedClassName="rounded-[12px]"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs text-zinc-200 group-hover:text-white truncate">{result.name}</p>
-                          <p className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">{renderAccountSubtitle(result)}</p>
-                        </div>
-                        <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors shrink-0" />
+                        Cancel
                       </button>
-                    ))}
+                    </div>
 
-                    {!isSearchingLocal && query.trim().length >= 2 && localResults.length === 0 && !isSearchingApollo && apolloResults.length === 0 && (
-                      <p className="text-[10px] font-mono text-zinc-700 text-center py-3 uppercase tracking-widest">
-                        No local match. Press Enter to search Apollo.
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 pointer-events-none" />
+                      <input
+                        ref={inputRef}
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        onKeyDown={handlePickerKeyDown}
+                        placeholder="Search existing accounts..."
+                        className="w-full bg-black/40 border border-white/5 rounded-xl pl-8 pr-3 py-2.5 text-sm text-white font-mono placeholder:text-zinc-700 focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                      />
+                    </div>
+
+                    <div className="space-y-1 max-h-56 overflow-y-auto np-scroll">
+                      {isSearchingLocal && (
+                        <p className="text-[10px] font-mono text-zinc-600 text-center py-3 uppercase tracking-widest">Scanning local accounts...</p>
+                      )}
+
+                      {!isSearchingLocal && localResults.map((result) => (
+                        <button
+                          key={`local-${result.id}`}
+                          onClick={() => void handleSelectExisting(result)}
+                          disabled={isSyncingRelationship || isCommittingApollo}
+                          className="w-full group flex items-center gap-3 p-2.5 rounded-xl hover:bg-zinc-950/40 border border-transparent hover:border-white/5 transition-all text-left disabled:opacity-60"
+                        >
+                          <CompanyIcon
+                            name={result.name}
+                            logoUrl={result.logoUrl}
+                            domain={result.domain}
+                            metadata={result.metadata}
+                            size={32}
+                            roundedClassName="rounded-[12px]"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs text-zinc-200 group-hover:text-white truncate">{result.name}</p>
+                            <p className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">{renderAccountSubtitle(result)}</p>
+                          </div>
+                          <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors shrink-0" />
+                        </button>
+                      ))}
+
+                      {!isSearchingLocal && query.trim().length >= 2 && localResults.length === 0 && !isSearchingApollo && apolloResults.length === 0 && (
+                        <p className="text-[10px] font-mono text-zinc-700 text-center py-3 uppercase tracking-widest">
+                          No local match. Press Enter to search Apollo.
+                        </p>
+                      )}
+
+                      {isSearchingApollo && (
+                        <p className="text-[10px] font-mono text-zinc-600 text-center py-3 uppercase tracking-widest">Querying Apollo...</p>
+                      )}
+
+                      {!isSearchingApollo && apolloResults.length > 0 && (
+                        <>
+                          <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest px-1 pt-2">Apollo results</p>
+                          {apolloResults.map((organization, index) => (
+                            <button
+                              key={`apollo-${organization.id || organization.domain || index}`}
+                              onClick={() => void handleSelectApollo(organization)}
+                              disabled={isSyncingRelationship || isCommittingApollo}
+                              className="w-full group flex items-center gap-3 p-2.5 rounded-xl hover:bg-zinc-950/40 border border-transparent hover:border-white/5 transition-all text-left disabled:opacity-60"
+                            >
+                              <CompanyIcon
+                                name={organization.name || 'Unknown Account'}
+                                logoUrl={organization.logoUrl}
+                                domain={organization.domain}
+                                size={32}
+                                roundedClassName="rounded-[12px]"
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-zinc-200 group-hover:text-white truncate">{organization.name || 'Unknown Account'}</p>
+                                <p className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">
+                                  {organization.domain || organization.location || organization.industry || 'Apollo Discovery'}
+                                </p>
+                              </div>
+                              <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors shrink-0" />
+                            </button>
+                          ))}
+                        </>
+                      )}
+                    </div>
+
+                    {(isCommittingApollo || isSyncingRelationship) && (
+                      <p className="text-[10px] font-mono text-zinc-600 text-center py-1 uppercase tracking-widest animate-pulse">
+                        {isCommittingApollo ? 'Ingesting account...' : 'Linking relationship...'}
                       </p>
                     )}
-
-                    {isSearchingApollo && (
-                      <p className="text-[10px] font-mono text-zinc-600 text-center py-3 uppercase tracking-widest">Querying Apollo...</p>
-                    )}
-
-                    {!isSearchingApollo && apolloResults.length > 0 && (
-                      <>
-                        <p className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest px-1 pt-2">Apollo results</p>
-                        {apolloResults.map((organization, index) => (
-                          <button
-                            key={`apollo-${organization.id || organization.domain || index}`}
-                            onClick={() => void handleSelectApollo(organization)}
-                            disabled={isSyncingRelationship || isCommittingApollo}
-                            className="w-full group flex items-center gap-3 p-2.5 rounded-xl hover:bg-zinc-950/40 border border-transparent hover:border-white/5 transition-all text-left disabled:opacity-60"
-                          >
-                            <CompanyIcon
-                              name={organization.name || 'Unknown Account'}
-                              logoUrl={organization.logoUrl}
-                              domain={organization.domain}
-                              size={32}
-                              roundedClassName="rounded-[12px]"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs text-zinc-200 group-hover:text-white truncate">{organization.name || 'Unknown Account'}</p>
-                              <p className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">
-                                {organization.domain || organization.location || organization.industry || 'Apollo Discovery'}
-                              </p>
-                            </div>
-                            <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors shrink-0" />
-                          </button>
-                        ))}
-                      </>
-                    )}
-                  </div>
-
-                  {(isCommittingApollo || isSyncingRelationship) && (
-                    <p className="text-[10px] font-mono text-zinc-600 text-center py-1 uppercase tracking-widest animate-pulse">
-                      {isCommittingApollo ? 'Ingesting account...' : 'Linking relationship...'}
-                    </p>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   )
 }

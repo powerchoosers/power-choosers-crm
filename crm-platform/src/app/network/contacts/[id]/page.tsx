@@ -318,7 +318,7 @@ export default function ContactDossierPage() {
                   currentPage={s.currentCallPage}
                   setCurrentPage={s.setCurrentCallPage}
                   onViewAll={() => router.push('/network/calls')}
-                  showRelativeDate={true}
+                  showRelativeDate={false}
                 />
 
                 <EntityEmailFeed
