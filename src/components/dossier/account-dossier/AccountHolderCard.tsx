@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Mail, ArrowUpRight, X, Search, Smartphone, Landmark, Phone, Building2 } from 'lucide-react'
+import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone, Landmark, Phone, Building2, Plus } from 'lucide-react'
 import { useCallStore } from '@/store/callStore'
 import { useComposeStore } from '@/store/composeStore'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
@@ -133,16 +133,16 @@ export function AccountHolderCard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <UserCheck className="w-3 h-3 text-zinc-500" />
           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Decision Maker</span>
         </div>
-        {holder && !picking && (
-          <button
-            onClick={() => setPicking(true)}
-            className="text-[9px] font-mono text-zinc-600 hover:text-zinc-300 uppercase tracking-widest transition-colors"
-          >
-            Change
-          </button>
-        )}
+        <button
+          onClick={() => setPicking(true)}
+          className="icon-button-forensic w-7 h-7"
+          title={holder ? 'Change decision maker' : 'Assign decision maker'}
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
       </div>
 
       {/* Holder set — show UplinkCard-style */}
@@ -273,15 +273,6 @@ export function AccountHolderCard({
         </div>
       )}
 
-      {/* No holder, not picking */}
-      {!holder && !picking && (
-        <button
-          onClick={() => setPicking(true)}
-          className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-white/10 rounded-xl text-[10px] font-mono text-zinc-600 hover:text-zinc-300 hover:border-white/20 transition-all uppercase tracking-widest"
-        >
-          Assign Decision Maker
-        </button>
-      )}
     </div>
   )
 }
