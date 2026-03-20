@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
@@ -63,6 +63,32 @@ export interface Task {
 }
 
 const PAGE_SIZE = 50
+
+export function refreshTaskCaches(queryClient: QueryClient) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    queryClient.invalidateQueries({ queryKey: ['tasks-count'] }),
+    queryClient.invalidateQueries({ queryKey: ['tasks-metrics'] }),
+    queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] }),
+    queryClient.invalidateQueries({ queryKey: ['tasks-search'] }),
+  ])
+}
+
+function insertTaskIntoPendingCaches(queryClient: QueryClient, task: Task) {
+  queryClient.setQueriesData(
+    { queryKey: ['tasks-all-pending'] },
+    (old: { allPendingTasks: Task[]; totalCount: number } | undefined) => {
+      if (!old) return old
+      if (old.allPendingTasks.some((existing) => existing.id === task.id)) return old
+
+      return {
+        ...old,
+        allPendingTasks: [task, ...old.allPendingTasks],
+        totalCount: old.totalCount + 1,
+      }
+    }
+  )
+}
 
 export function useTasks(searchQuery?: string) {
   const { user, role, loading } = useAuth()
@@ -158,8 +184,9 @@ export function useTasks(searchQuery?: string) {
       if (error) throw error
       return { ...data, relatedTo: newTask.relatedTo, relatedType: newTask.relatedType } as Task
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+    onSuccess: (task) => {
+      insertTaskIntoPendingCaches(queryClient, task as Task)
+      void refreshTaskCaches(queryClient)
       toast.success('Task created successfully')
     },
     onError: (error: unknown) => {
@@ -191,7 +218,7 @@ export function useTasks(searchQuery?: string) {
       return data as Task
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      void refreshTaskCaches(queryClient)
       toast.success('Task updated successfully')
     },
     onError: (error) => {
@@ -211,7 +238,7 @@ export function useTasks(searchQuery?: string) {
       return id
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+      void refreshTaskCaches(queryClient)
       toast.success('Task deleted successfully')
     },
     onError: (error) => {
