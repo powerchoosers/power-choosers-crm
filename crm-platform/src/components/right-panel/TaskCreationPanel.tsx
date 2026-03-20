@@ -21,7 +21,7 @@ import {
 } from 'date-fns'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { useTasks, type Task } from '@/hooks/useTasks'
+import { refreshTaskCaches, useTasks, type Task } from '@/hooks/useTasks'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { useSearchAccounts } from '@/hooks/useAccounts'
 import { useUIStore } from '@/store/uiStore'
@@ -263,7 +263,7 @@ export function TaskCreationPanel() {
                     throw new Error(err.error || 'Failed to initialize transmission')
                 }
 
-                queryClient.invalidateQueries({ queryKey: ['tasks'] })
+                void refreshTaskCaches(queryClient)
                 toast.success('TRANSMISSION_COMPLETE // INVITE_SENT')
             } else {
                 await addTaskAsync(payload)

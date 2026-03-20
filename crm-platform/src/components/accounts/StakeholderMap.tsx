@@ -24,8 +24,13 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
   // Query which contacts are in target lists
   const { data: contactsInLists } = useContactsInTargetLists(contactIds)
 
+  const listTransition = {
+    duration: 0.22,
+    ease: [0.23, 1, 0.32, 1] as const,
+  }
+
   return (
-    <motion.div layout className={cn("nodal-module-glass nodal-monolith-edge rounded-2xl p-4", className)}>
+    <div className={cn("nodal-module-glass nodal-monolith-edge rounded-2xl p-4", className)}>
       <div className={cn("flex items-center justify-between", contacts.length > 0 && "mb-4")}>
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
           <Users className="w-3 h-3" /> Command Chain
@@ -52,7 +57,11 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
                 initial={{ opacity: 0, y: -12 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+                transition={{
+                  y: listTransition,
+                  opacity: { duration: 0.16, ease: [0.23, 1, 0.32, 1] },
+                  layout: listTransition,
+                }}
                 onClick={() => router.push(`/network/contacts/${contact.id}`)}
                 className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer"
               >
@@ -81,6 +90,6 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
           })}
         </div>
       </AnimatePresence>
-    </motion.div>
+    </div>
   )
 }
