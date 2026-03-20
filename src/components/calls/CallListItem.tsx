@@ -43,6 +43,7 @@ interface CallListItemProps {
   customerAvatar?: 'company' | 'contact'
   variant?: 'default' | 'minimal'
   showRelativeDate?: boolean
+  showDirectionLabel?: boolean
 }
 
 function formatTime(seconds: number): string {
@@ -75,7 +76,8 @@ export function CallListItem({
   contactPhotoUrl, 
   customerAvatar = 'company', 
   variant = 'default',
-  showRelativeDate = false
+  showRelativeDate = false,
+  showDirectionLabel = false
 }: CallListItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
@@ -349,6 +351,11 @@ export function CallListItem({
                 <div className="text-[11px] font-semibold text-white flex items-center gap-1.5 flex-nowrap">
                   <div className="flex items-center gap-1 shrink-0">
                     <Phone className="w-3.5 h-3.5 text-white" />
+                    {showDirectionLabel && (
+                      <span className="text-[10px] font-mono text-white font-bold uppercase tracking-widest mx-1.5 shrink-0">
+                        {call.type}
+                      </span>
+                    )}
                     {call.type === 'Inbound' ? (
                       <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
                     ) : (
@@ -412,7 +419,7 @@ export function CallListItem({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                 className="shrink-0"
               >
                 <Button
@@ -446,7 +453,7 @@ export function CallListItem({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                 className="shrink-0"
               >
                 <Button
@@ -487,7 +494,7 @@ export function CallListItem({
                 initial={{ opacity: 0, scale: 0.8 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                 className="shrink-0"
               >
                 <Button
@@ -513,7 +520,7 @@ export function CallListItem({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2 }}
+            transition={{ duration: 0.5, ease: [0.23, 1, 0.32, 1] }}
             className="overflow-hidden"
           >
             <div className="mt-3 pt-3 border-t border-white/5 flex flex-col gap-2 min-w-0">
@@ -567,7 +574,7 @@ export function CallListItem({
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}
+            transition={{ duration: 0.8, ease: [0.23, 1, 0.32, 1] }}
             className="overflow-hidden"
           >
             <div className="mt-6 pt-6 border-t border-white/5 space-y-6">
