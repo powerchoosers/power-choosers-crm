@@ -129,7 +129,7 @@ export function AccountHolderCard({
   }
 
   return (
-    <div className="nodal-void-card p-5 space-y-4">
+    <div className="nodal-module-glass nodal-monolith-edge rounded-2xl p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -147,7 +147,7 @@ export function AccountHolderCard({
 
       {/* Holder set — show UplinkCard-style */}
       {holder && !picking && (
-        <div className="space-y-3">
+        <div className="space-y-3 mt-3">
           {/* Identity row */}
           <div
             role="button"
@@ -228,7 +228,7 @@ export function AccountHolderCard({
 
       {/* Picker — open */}
       {picking && (
-        <div className="space-y-2 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="space-y-2 mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-600 pointer-events-none" />
             <input
