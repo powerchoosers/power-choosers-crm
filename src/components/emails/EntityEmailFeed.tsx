@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronLeft, ChevronRight, Eye, MousePointer2, Reply, Forward, ExternalLink, MessageSquare } from 'lucide-react'
@@ -8,6 +8,7 @@ import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
 import { Email } from '@/hooks/useEmails'
 import { EmailContent } from './EmailContent'
+import { InlineReplyComposer } from './InlineReplyComposer'
 import { cn } from '@/lib/utils'
 import { useEntityEmails } from '@/hooks/useEntityEmails'
 import { useEmailThread } from '@/hooks/useEmailThread'
@@ -44,23 +45,27 @@ function ThreadBadge({ threadKey }: { threadKey: string }) {
 }
 
 /** Action bar rendered inside expanded email card */
-function EmailActionBar({ email, variant }: { email: Email; variant: 'default' | 'skinny' }) {
+function EmailActionBar({ email, variant, onReply, isReplying }: { email: Email; variant: 'default' | 'skinny'; onReply?: () => void; isReplying?: boolean }) {
     const router = useRouter()
     const openCompose = useComposeStore((s) => s.openCompose)
 
     const handleReply = (e: React.MouseEvent) => {
         e.stopPropagation()
-        const fromAddr = extractEmailAddress(email.from || '')
-        const toAddr = email.type === 'sent'
-            ? (Array.isArray(email.to) ? extractEmailAddress(email.to[0] || '') : extractEmailAddress(email.to || ''))
-            : fromAddr
-        openCompose({
-            to: toAddr,
-            subject: email.subject?.startsWith('Re:') ? email.subject : `Re: ${email.subject || ''}`,
-            context: {
-                contactId: email.contactId || undefined,
-            }
-        })
+        if (onReply) {
+            onReply()
+        } else {
+            const fromAddr = extractEmailAddress(email.from || '')
+            const toAddr = email.type === 'sent'
+                ? (Array.isArray(email.to) ? extractEmailAddress(email.to[0] || '') : extractEmailAddress(email.to || ''))
+                : fromAddr
+            openCompose({
+                to: toAddr,
+                subject: email.subject?.startsWith('Re:') ? email.subject : `Re: ${email.subject || ''}`,
+                context: {
+                    contactId: email.contactId || undefined,
+                }
+            })
+        }
     }
 
     const handleForward = (e: React.MouseEvent) => {
@@ -94,7 +99,10 @@ function EmailActionBar({ email, variant }: { email: Email; variant: 'default' |
                     type="button"
                     onClick={handleReply}
                     className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white rounded-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300",
+                        "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider rounded-md border transition-all duration-300",
+                        isReplying
+                            ? "text-white border-[#002FA7]/30 bg-[#002FA7]/50 shadow-[0_0_12px_-4px_#002FA7]"
+                            : "text-zinc-400 hover:text-white border-white/5 hover:border-white/10 hover:bg-zinc-900/60",
                         isSkinny && "flex-1 justify-center"
                     )}
                 >
@@ -150,10 +158,15 @@ export function EntityEmailFeed({
     const { data: fetchEmails, isLoading } = useEntityEmails(emails)
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
+    const [replyingToId, setReplyingToId] = useState<string | null>(null)
+    const prevTopId = useRef<string | null>(null)
 
     const isSkinny = variant === 'skinny'
 
     const toggleExpand = (id: string) => {
+        if (expandedId === id) {
+            setReplyingToId(null)
+        }
         setExpandedId(expandedId === id ? null : id)
     }
 
@@ -167,7 +180,25 @@ export function EntityEmailFeed({
     useEffect(() => {
         setCurrentPage(1)
         setExpandedId(null)
-    }, [layout, emails.join('|')])
+        setReplyingToId(null)
+    }, [layout, emails])
+
+    // Auto-scroll to reply field when opened
+    useEffect(() => {
+        if (replyingToId) {
+            // Wait for both the card expansion and composer entrance
+            setTimeout(() => {
+                const el = document.getElementById(`reply-node-${replyingToId}`)
+                if (el) {
+                    el.scrollIntoView({ 
+                        behavior: 'smooth', 
+                        block: 'center', // Center the composer in the view
+                        inline: 'nearest' 
+                    })
+                }
+            }, 200) // Slightly longer wait for smoother interaction
+        }
+    }, [replyingToId])
 
     useEffect(() => {
         if (expandedId) {
@@ -193,6 +224,24 @@ export function EntityEmailFeed({
     useEffect(() => {
         setCurrentPage((prev) => Math.min(Math.max(prev, 1), totalPages))
     }, [totalPages])
+
+    // Auto-scroll to top when a new email is added to the peak of the list
+    useEffect(() => {
+        const topId = validEmails[0]?.id
+        if (topId && prevTopId.current && topId !== prevTopId.current) {
+            // Check if user is on page 1
+            if (safeCurrentPage === 1) {
+                const firstNode = document.getElementById(`email-node-${topId}`)
+                if (firstNode) {
+                    const scrollContainer = firstNode.closest('.np-scroll')
+                    if (scrollContainer) {
+                        scrollContainer.scrollTo({ top: 0, behavior: 'smooth' })
+                    }
+                }
+            }
+        }
+        prevTopId.current = topId
+    }, [validEmails, safeCurrentPage])
 
     const visibleEmails = useTransmissionLayout
         ? validEmails.slice((safeCurrentPage - 1) * EMAILS_PER_PAGE, safeCurrentPage * EMAILS_PER_PAGE)
@@ -248,10 +297,16 @@ export function EntityEmailFeed({
             <motion.div
                 key={email.id}
                 id={`email-node-${email.id}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2 }}
+                layout
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ 
+                    duration: 0.4, 
+                    ease: [0.23, 1, 0.32, 1],
+                    layout: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+                }}
+                className="group/row"
             >
                 <div className={cn(
                     "group rounded-xl border transition-all duration-300 nodal-recessed",
@@ -394,7 +449,23 @@ export function EntityEmailFeed({
                                     <div className="max-h-[520px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
                                         {renderInlineBody(email)}
                                     </div>
-                                    <EmailActionBar email={email} variant={variant} />
+                                    <EmailActionBar
+                                        email={email}
+                                        variant={variant}
+                                        onReply={() => setReplyingToId(replyingToId === email.id ? null : email.id)}
+                                        isReplying={replyingToId === email.id}
+                                    />
+                                    <AnimatePresence>
+                                        {replyingToId === email.id && (
+                                            <div id={`reply-node-${email.id}`}>
+                                                <InlineReplyComposer
+                                                    email={email}
+                                                    variant={variant}
+                                                    onClose={() => setReplyingToId(null)}
+                                                />
+                                            </div>
+                                        )}
+                                    </AnimatePresence>
                                 </motion.div>
                             </motion.div>
                         )}
@@ -525,10 +596,15 @@ export function EntityEmailFeed({
                                     <motion.div
                                         key={email.id}
                                         id={`email-node-${email.id}`}
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.2 }}
+                                        layout
+                                        initial={{ opacity: 0, y: -20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.95 }}
+                                        transition={{ 
+                                            duration: 0.4, 
+                                            ease: [0.23, 1, 0.32, 1],
+                                            layout: { duration: 0.4, ease: [0.23, 1, 0.32, 1] }
+                                        }}
                                     >
                                         <div className={cn(
                                             "group rounded-xl border transition-all duration-300 nodal-recessed",
@@ -674,7 +750,23 @@ export function EntityEmailFeed({
                                                                 text={email.text}
                                                                 subject={email.subject}
                                                             />
-                                                            <EmailActionBar email={email} variant={variant} />
+                                                            <EmailActionBar
+                                                                email={email}
+                                                                variant={variant}
+                                                                onReply={() => setReplyingToId(replyingToId === email.id ? null : email.id)}
+                                                                isReplying={replyingToId === email.id}
+                                                            />
+                                                            <AnimatePresence>
+                                                                {replyingToId === email.id && (
+                                                                    <div id={`reply-node-${email.id}`}>
+                                                                        <InlineReplyComposer
+                                                                            email={email}
+                                                                            variant={variant}
+                                                                            onClose={() => setReplyingToId(null)}
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </AnimatePresence>
                                                         </motion.div>
                                                     </motion.div>
                                                 )}
