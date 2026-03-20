@@ -136,11 +136,11 @@ export function EngagementLog({
             {recentCalls && recentCalls.length > 0 && (
                 <div className={cn(
                     "mt-4 pt-4 border-t border-white/5 text-[10px] font-mono text-zinc-500 uppercase tracking-widest",
-                    isSkinny ? "flex flex-col gap-3" : "flex items-center justify-between"
+                    isSkinny ? "flex items-center justify-between gap-3" : "flex items-center justify-between"
                 )}>
                     <div className={cn(
                         "flex items-center",
-                        isSkinny ? "gap-2" : "gap-4"
+                        isSkinny ? "gap-2 min-w-0" : "gap-4"
                     )}>
                         <span className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -149,10 +149,7 @@ export function EngagementLog({
                         <span className="opacity-40">|</span>
                         <span>{recentCalls.length} total</span>
                     </div>
-                    <div className={cn(
-                        "flex items-center gap-2",
-                        isSkinny && "self-end"
-                    )}>
+                    <div className="flex items-center gap-2 shrink-0">
                         <Button
                             variant="outline"
                             size="icon"
