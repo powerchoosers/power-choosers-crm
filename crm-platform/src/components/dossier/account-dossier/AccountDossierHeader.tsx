@@ -69,6 +69,7 @@ interface AccountDossierHeaderProps {
     handlePrev: () => void
     handleNext: () => void
     handleCompleteAndAdvance: () => void
+    isCompleting?: boolean
 }
 
 export const AccountDossierHeader = memo(function AccountDossierHeader({
@@ -103,7 +104,8 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
     useGlobalPagination,
     handlePrev,
     handleNext,
-    handleCompleteAndAdvance
+    handleCompleteAndAdvance,
+    isCompleting = false
 }: AccountDossierHeaderProps) {
     const router = useRouter()
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -463,6 +465,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                     onNext={handleNext}
                                     onSkip={handleNext}
                                     onCompleteAndAdvance={handleCompleteAndAdvance}
+                                    isCompleting={isCompleting}
                                 />
                             )}
 

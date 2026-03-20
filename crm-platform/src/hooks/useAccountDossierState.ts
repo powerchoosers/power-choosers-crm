@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useAccountContacts } from '@/hooks/useContacts'
 import { useAccountCalls } from '@/hooks/useCalls'
@@ -11,6 +11,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { toast } from 'sonner'
 import { parseISO, isValid } from 'date-fns'
 import { formatMillValue } from '@/lib/mills'
+import { isTodayOrOverdue } from '@/lib/task-date'
 
 function parseContractEndDate(raw: unknown): Date | null {
     if (!raw) return null
@@ -38,7 +39,6 @@ function clamp01(n: number) {
 
 export function useAccountDossierState(id: string) {
     const router = useRouter()
-    const searchParams = useSearchParams()
 
     const { data: account, isLoading, isFetched } = useAccount(id)
     const { data: contacts, isLoading: isLoadingContacts } = useAccountContacts(id)
@@ -87,14 +87,24 @@ export function useAccountDossierState(id: string) {
     })
     const { data: allPendingData } = useAllPendingTasks()
     const allPendingTasks = allPendingData?.allPendingTasks ?? []
-    const globalTotal = allPendingData?.totalCount ?? 0
-    const { updateTask } = useTasks()
+    const { updateTaskAsync } = useTasks()
     const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
+    const [hiddenTaskIds, setHiddenTaskIds] = useState<Set<string>>(new Set())
+    const [isCompletingTask, setIsCompletingTask] = useState(false)
 
-    const hasTasks = pendingTasks.length > 0
-    const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, pendingTasks.length - 1))
-    const currentTask = pendingTasks[displayTaskIndex]
-    const globalIndex = currentTask ? allPendingTasks.findIndex((t) => String(t.id) === String(currentTask.id)) : -1
+    const visiblePendingTasks = useMemo(
+        () => pendingTasks.filter((task) => isTodayOrOverdue(task.dueDate) && !hiddenTaskIds.has(String(task.id))),
+        [pendingTasks, hiddenTaskIds]
+    )
+    const visibleAllPendingTasks = useMemo(
+        () => allPendingTasks.filter((task) => isTodayOrOverdue(task.dueDate) && !hiddenTaskIds.has(String(task.id))),
+        [allPendingTasks, hiddenTaskIds]
+    )
+    const globalTotal = visibleAllPendingTasks.length
+    const hasTasks = visiblePendingTasks.length > 0
+    const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, visiblePendingTasks.length - 1))
+    const currentTask = visiblePendingTasks[displayTaskIndex]
+    const globalIndex = currentTask ? visibleAllPendingTasks.findIndex((t) => String(t.id) === String(currentTask.id)) : -1
     const globalPosition = globalIndex >= 0 ? globalIndex + 1 : 0
     const useGlobalPagination = globalIndex >= 0 && globalTotal > 0
 
@@ -277,8 +287,8 @@ export function useAccountDossierState(id: string) {
     }, [account, setContext])
 
     useEffect(() => {
-        setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, pendingTasks.length - 1)))
-    }, [pendingTasks.length])
+        setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, visiblePendingTasks.length - 1)))
+    }, [visiblePendingTasks.length])
 
     const navigateToTaskDossier = (task: any) => {
         const cid = (task.contactId != null && String(task.contactId).trim() !== '') ? String(task.contactId).trim() : undefined
@@ -297,26 +307,47 @@ export function useAccountDossierState(id: string) {
         }
         if (globalIndex <= 0) return
         let prevIdx = globalIndex - 1
-        const prevTask = allPendingTasks[prevIdx]
+        const prevTask = visibleAllPendingTasks[prevIdx]
         if (prevTask) navigateToTaskDossier(prevTask)
     }
 
     const handleNext = () => {
         if (globalIndex < 0) {
-            setCurrentTaskIndex((p) => Math.min(pendingTasks.length - 1, p + 1))
+            setCurrentTaskIndex((p) => Math.min(visiblePendingTasks.length - 1, p + 1))
             return
         }
-        if (globalIndex >= allPendingTasks.length - 1) return
-        const nextTask = allPendingTasks[globalIndex + 1]
+        if (globalIndex >= visibleAllPendingTasks.length - 1) return
+        const nextTask = visibleAllPendingTasks[globalIndex + 1]
         if (nextTask) navigateToTaskDossier(nextTask)
     }
 
-    const handleCompleteAndAdvance = () => {
-        const task = pendingTasks[displayTaskIndex]
-        if (!task) return
-        updateTask({ id: task.id, status: 'Completed' })
-        if (globalIndex >= 0 && globalIndex + 1 < allPendingTasks.length) {
-            navigateToTaskDossier(allPendingTasks[globalIndex + 1])
+    const handleCompleteAndAdvance = async () => {
+        const task = visiblePendingTasks[displayTaskIndex]
+        if (!task || isCompletingTask) return
+
+        const taskId = String(task.id)
+        const nextTask = globalIndex >= 0 ? visibleAllPendingTasks[globalIndex + 1] : undefined
+
+        setIsCompletingTask(true)
+        setHiddenTaskIds((prev) => {
+            if (prev.has(taskId)) return prev
+            const next = new Set(prev)
+            next.add(taskId)
+            return next
+        })
+
+        try {
+            await updateTaskAsync({ id: task.id, status: 'Completed' })
+            if (nextTask) navigateToTaskDossier(nextTask)
+        } catch (error) {
+            setHiddenTaskIds((prev) => {
+                if (!prev.has(taskId)) return prev
+                const next = new Set(prev)
+                next.delete(taskId)
+                return next
+            })
+        } finally {
+            setIsCompletingTask(false)
         }
     }
 
@@ -383,8 +414,9 @@ export function useAccountDossierState(id: string) {
         editLogoUrl, setEditLogoUrl, editSupplier, setEditSupplier, editDomain, setEditDomain, editLinkedinUrl, setEditLinkedinUrl,
         editMeters, setEditMeters, editContractEnd, setEditContractEnd, editCompanyPhone, setEditCompanyPhone,
         editAddress, setEditAddress,
-        pendingTasks, hasTasks, displayTaskIndex, globalTotal, globalPosition, useGlobalPagination,
+        pendingTasks: visiblePendingTasks, hasTasks, displayTaskIndex, globalTotal, globalPosition, useGlobalPagination,
         handlePrev, handleNext, handleCompleteAndAdvance,
+        isCompletingTask,
         contractEndDate, daysRemaining, maturityPct, maturityColor, handleIngestionComplete,
         updateAccountMutation: updateAccount
     }

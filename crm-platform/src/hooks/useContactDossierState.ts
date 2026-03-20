@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useParams, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useContactCalls } from '@/hooks/useCalls'
@@ -12,6 +12,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { formatMillValue } from '@/lib/mills'
+import { isTodayOrOverdue } from '@/lib/task-date'
 
 function parseDomainFromWebsite(value?: string | null): string | undefined {
     if (value == null) return undefined
@@ -31,9 +32,7 @@ function parseDomainFromWebsite(value?: string | null): string | undefined {
 }
 
 export function useContactDossierState(id: string) {
-    const params = useParams()
     const router = useRouter()
-    const searchParams = useSearchParams()
 
     const { data: contact, isLoading, isFetched } = useContact(id)
     const { data: account } = useAccount((contact as any)?.linkedAccountId ?? '')
@@ -125,9 +124,26 @@ export function useContactDossierState(id: string) {
     })
     const { data: allPendingData } = useAllPendingTasks()
     const allPendingTasks = allPendingData?.allPendingTasks ?? []
-    const globalTotal = allPendingData?.totalCount ?? 0
-    const { updateTask } = useTasks()
+    const { updateTaskAsync } = useTasks()
     const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
+    const [hiddenTaskIds, setHiddenTaskIds] = useState<Set<string>>(new Set())
+    const [isCompletingTask, setIsCompletingTask] = useState(false)
+
+    const visiblePendingTasks = useMemo(
+        () => pendingTasks.filter((task) => isTodayOrOverdue(task.dueDate) && !hiddenTaskIds.has(String(task.id))),
+        [pendingTasks, hiddenTaskIds]
+    )
+    const visibleAllPendingTasks = useMemo(
+        () => allPendingTasks.filter((task) => isTodayOrOverdue(task.dueDate) && !hiddenTaskIds.has(String(task.id))),
+        [allPendingTasks, hiddenTaskIds]
+    )
+    const globalTotal = visibleAllPendingTasks.length
+    const hasTasks = visiblePendingTasks.length > 0
+    const displayTaskIndex = Math.min(currentTaskIndex, Math.max(0, visiblePendingTasks.length - 1))
+    const currentTask = visiblePendingTasks[displayTaskIndex]
+    const globalIndex = currentTask ? visibleAllPendingTasks.findIndex((t) => String(t.id) === String(currentTask.id)) : -1
+    const globalPosition = globalIndex >= 0 ? globalIndex + 1 : 0
+    const useGlobalPagination = globalIndex >= 0 && globalTotal > 0
 
     useEffect(() => {
         if (prevEditingStateRef.current && !isEditing) {
@@ -177,6 +193,70 @@ export function useContactDossierState(id: string) {
             }
         }
     }, [contact, account, isEditing])
+
+    useEffect(() => {
+        setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, visiblePendingTasks.length - 1)))
+    }, [visiblePendingTasks.length])
+
+    const navigateToTaskDossier = (task: any) => {
+        const cid = (task.contactId != null && String(task.contactId).trim() !== '') ? String(task.contactId).trim() : undefined
+        const aid = (task.accountId != null && String(task.accountId).trim() !== '') ? String(task.accountId).trim() : undefined
+        if (cid) {
+            router.push(`/network/contacts/${cid}?taskId=${encodeURIComponent(task.id)}`)
+        } else if (aid) {
+            router.push(`/network/accounts/${aid}?taskId=${encodeURIComponent(task.id)}`)
+        }
+    }
+
+    const handlePrev = () => {
+        if (globalIndex < 0) {
+            setCurrentTaskIndex((p) => Math.max(0, p - 1))
+            return
+        }
+        if (globalIndex <= 0) return
+        const prevTask = visibleAllPendingTasks[globalIndex - 1]
+        if (prevTask) navigateToTaskDossier(prevTask)
+    }
+
+    const handleNext = () => {
+        if (globalIndex < 0) {
+            setCurrentTaskIndex((p) => Math.min(visiblePendingTasks.length - 1, p + 1))
+            return
+        }
+        if (globalIndex >= visibleAllPendingTasks.length - 1) return
+        const nextTask = visibleAllPendingTasks[globalIndex + 1]
+        if (nextTask) navigateToTaskDossier(nextTask)
+    }
+
+    const handleCompleteAndAdvance = async () => {
+        const task = visiblePendingTasks[displayTaskIndex]
+        if (!task || isCompletingTask) return
+
+        const taskId = String(task.id)
+        const nextTask = globalIndex >= 0 ? visibleAllPendingTasks[globalIndex + 1] : undefined
+
+        setIsCompletingTask(true)
+        setHiddenTaskIds((prev) => {
+            if (prev.has(taskId)) return prev
+            const next = new Set(prev)
+            next.add(taskId)
+            return next
+        })
+
+        try {
+            await updateTaskAsync({ id: task.id, status: 'Completed' })
+            if (nextTask) navigateToTaskDossier(nextTask)
+        } catch (error) {
+            setHiddenTaskIds((prev) => {
+                if (!prev.has(taskId)) return prev
+                const next = new Set(prev)
+                next.delete(taskId)
+                return next
+            })
+        } finally {
+            setIsCompletingTask(false)
+        }
+    }
 
     // Save Effect
     useEffect(() => {
@@ -420,11 +500,19 @@ export function useContactDossierState(id: string) {
         updateContactMutation: updateContact,
 
         // Tasks
-        pendingTasks,
-        allPendingTasks,
+        pendingTasks: visiblePendingTasks,
+        allPendingTasks: visibleAllPendingTasks,
         globalTotal,
+        hasTasks,
+        displayTaskIndex,
+        globalPosition,
+        useGlobalPagination,
+        handlePrev,
+        handleNext,
+        handleCompleteAndAdvance,
+        isCompletingTask,
         currentTaskIndex,
         setCurrentTaskIndex,
-        updateTask
+        updateTask: updateTaskAsync
     }
 }
