@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, KeyboardEvent } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { cn } from '@/lib/utils'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 
@@ -20,6 +21,7 @@ function isValidEmail(value: string) {
 export function EmailChipField({ chips, onChange, placeholder = 'Add email...', autoFocus }: EmailChipFieldProps) {
   const [inputValue, setInputValue] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [isFocused, setIsFocused] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -74,7 +76,7 @@ export function EmailChipField({ chips, onChange, placeholder = 'Add email...', 
     <div ref={containerRef} className="relative flex-1">
       {/* Chip + input row */}
       <div
-        className="flex flex-wrap items-center gap-1 min-h-[32px] border-b border-transparent hover:border-white/10 focus-within:border-[#002FA7]/60 py-1 cursor-text transition-colors"
+        className="flex flex-wrap items-start gap-1 min-h-[24px] border-b border-transparent hover:border-white/10 focus-within:border-[#002FA7]/60 py-0.5 cursor-text transition-all duration-300"
         onClick={() => inputRef.current?.focus()}
       >
         <AnimatePresence initial={false}>
@@ -109,9 +111,19 @@ export function EmailChipField({ chips, onChange, placeholder = 'Add email...', 
             setShowSuggestions(e.target.value.length >= 2)
           }}
           onKeyDown={handleKeyDown}
-          onFocus={() => { if (inputValue.length >= 2) setShowSuggestions(true) }}
+          onFocus={() => { 
+              setIsFocused(true)
+              if (inputValue.length >= 2) setShowSuggestions(true) 
+          }}
+          onBlur={() => {
+              setIsFocused(false)
+              setTimeout(() => setShowSuggestions(false), 200)
+          }}
           placeholder={chips.length === 0 ? placeholder : ''}
-          className="flex-1 min-w-[120px] bg-transparent border-0 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 py-0.5"
+          className={cn(
+             "bg-transparent border-0 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 py-0.5 transition-all duration-300",
+             isFocused || chips.length === 0 ? "flex-1 min-w-[32px] opacity-100" : "flex-0 w-0 min-w-0 opacity-0 pointer-events-none"
+          )}
         />
       </div>
 
