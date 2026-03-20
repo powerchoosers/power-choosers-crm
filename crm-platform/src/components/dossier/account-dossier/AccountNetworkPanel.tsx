@@ -1,11 +1,11 @@
 'use client'
 
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus } from 'lucide-react'
 import { StakeholderMap } from '@/components/accounts/StakeholderMap'
-import { CallListItem } from '@/components/calls/CallListItem'
 import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
+import { EngagementLog } from '@/components/dossier/contact-dossier/EngagementLog'
 import { AccountHolderCard } from './AccountHolderCard'
 import { AccountHierarchyCard } from './AccountHierarchyCard'
 import { useUIStore } from '@/store/uiStore'
@@ -28,6 +28,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
 }: AccountNetworkPanelProps) {
     const { setRightPanelMode, setIngestionContext } = useUIStore()
     const { mutate: updateAccount } = useUpdateAccount()
+    const [callPage, setCallPage] = useState(1)
 
     const handleSetHolder = (contactId: string | null) => {
         updateAccount({ id, primaryContactId: contactId })
@@ -70,63 +71,24 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                     account={account}
                 />
 
-                <div className="space-y-4">
-                    <div className="flex items-center justify-between px-1">
-                        <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                            Transmission Log
-                        </h3>
-                        <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{calls?.length || 0} RECORDS</span>
-                    </div>
-
-                    <div className="space-y-3">
-                        {isLoadingCalls ? (
-                            <div className="text-center py-12 text-xs font-mono text-zinc-600 animate-pulse">
-                                SYNCING LOGS...
-                            </div>
-                        ) : calls && calls.length > 0 ? (
-                            <div className="space-y-2">
-                                <AnimatePresence initial={false} mode="popLayout">
-                                    {calls.slice(0, 5).map(call => {
-                                        const isContactCall = Boolean(call.contactId?.trim())
-                                        const contactForCall = isContactCall ? contacts?.find(c => c.id === call.contactId) : null
-                                        return (
-                                            <motion.div
-                                                key={call.id}
-                                                layout
-                                                initial={{ opacity: 0, height: 0, x: -10 }}
-                                                animate={{ opacity: 1, height: 'auto', x: 0 }}
-                                                exit={{ opacity: 0, height: 0, x: 10 }}
-                                                className="overflow-hidden"
-                                            >
-                                                <CallListItem
-                                                    call={call}
-                                                    contactId={call.contactId || ''}
-                                                    accountId={id}
-                                                    accountLogoUrl={account?.logoUrl}
-                                                    accountDomain={account?.domain}
-                                                    accountName={account?.name}
-                                                    customerAvatar={isContactCall ? 'contact' : 'company'}
-                                                    contactName={contactForCall?.name ?? contactForCall?.firstName ?? ''}
-                                                    contactPhotoUrl={contactForCall?.avatarUrl || contactForCall?.photoUrl}
-                                                    variant="minimal"
-                                                />
-                                            </motion.div>
-                                        )
-                                    })}
-                                </AnimatePresence>
-                            </div>
-                        ) : (
-                            <div className="p-8 rounded-2xl border border-dashed border-white/5 bg-zinc-950/20 flex flex-col items-center justify-center gap-3">
-                                <p className="text-[10px] font-mono text-zinc-600 uppercase tracking-[0.3em]">No signals detected</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <EngagementLog
+                    recentCalls={calls || []}
+                    isLoadingCalls={isLoadingCalls}
+                    currentPage={callPage}
+                    setCurrentPage={setCallPage}
+                    onViewAll={() => {}}
+                    id={id}
+                    contact={null}
+                    account={account}
+                    variant="skinny"
+                />
 
                 <EntityEmailFeed
                     emails={contacts?.map(c => c.email).filter(Boolean) as string[] || []}
                     title="Email Intelligence"
                     density="compact"
+                    layout="transmission"
+                    variant="skinny"
                 />
             </div>
         </div>
