@@ -81,6 +81,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                     contact={null}
                     account={account}
                     variant="skinny"
+                    showRelativeDate={true}
                 />
 
                 <EntityEmailFeed
