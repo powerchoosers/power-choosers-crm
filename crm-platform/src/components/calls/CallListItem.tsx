@@ -19,13 +19,14 @@ import {
   Zap
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { format, isValid } from 'date-fns'
+import { format, isValid, formatDistanceToNow } from 'date-fns'
 import { Call } from '@/hooks/useCalls'
 import { useCallProcessor } from '@/hooks/useCallProcessor'
 import { useAuth } from '@/context/AuthContext'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { Button } from '@/components/ui/button'
+import { ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 
 interface CallListItemProps {
   call: Call
@@ -41,6 +42,7 @@ interface CallListItemProps {
   /** Use contact letter glyph for customer in transcript instead of company icon */
   customerAvatar?: 'company' | 'contact'
   variant?: 'default' | 'minimal'
+  showRelativeDate?: boolean
 }
 
 function formatTime(seconds: number): string {
@@ -62,7 +64,19 @@ function parseDurationToSeconds(value?: string): number {
 
 const squircleAvatar = "rounded-[14px] shrink-0 overflow-hidden bg-zinc-900/80 border border-white/20 shadow-[0_0_10px_rgba(0,0,0,0.5)]"
 
-export function CallListItem({ call, contactId, accountId, accountLogoUrl, accountDomain, accountName, contactName, contactPhotoUrl, customerAvatar = 'company', variant = 'default' }: CallListItemProps) {
+export function CallListItem({ 
+  call, 
+  contactId, 
+  accountId, 
+  accountLogoUrl, 
+  accountDomain, 
+  accountName, 
+  contactName, 
+  contactPhotoUrl, 
+  customerAvatar = 'company', 
+  variant = 'default',
+  showRelativeDate = false
+}: CallListItemProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isPlayerOpen, setIsPlayerOpen] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
@@ -332,22 +346,31 @@ export function CallListItem({ call, contactId, accountId, accountLogoUrl, accou
           <div className="flex-1 min-w-0">
             {isMinimal ? (
               <>
-                <div className="text-[11px] font-semibold text-white flex items-center gap-2 flex-wrap">
-                  <span>{call.type}</span>
-                  <span className="text-zinc-500 font-normal">•</span>
-                  <span className="font-mono tabular-nums text-zinc-400">{compactDuration}</span>
+                <div className="text-[11px] font-semibold text-white flex items-center gap-1.5 flex-nowrap">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Phone className="w-3.5 h-3.5 text-white" />
+                    {call.type === 'Inbound' ? (
+                      <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <ArrowUpRight className="w-3.5 h-3.5 text-white" />
+                    )}
+                  </div>
+                  <div className="w-px h-2.5 bg-white/10 shrink-0 mx-0.5" />
+                  <span className="font-mono tabular-nums text-zinc-400 shrink-0">{compactDuration}</span>
                   {isProcessed && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0" title="Decrypted" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 shrink-0 relative z-50" title="Decrypted" />
                   )}
                 </div>
-                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
+                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider mt-1">
                   {call.date && isValid(new Date(call.date))
-                    ? (() => {
-                      const d = new Date(call.date!)
-                      const dateStr = format(d, 'MMM d, yyyy')
-                      const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
-                      return `${dateStr} ${timeStr}`
-                    })()
+                    ? showRelativeDate 
+                      ? formatDistanceToNow(new Date(call.date), { addSuffix: true })
+                      : (() => {
+                        const d = new Date(call.date!)
+                        const dateStr = format(d, 'MMM d, yyyy')
+                        const timeStr = d.toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit', hour12: true })
+                        return `${dateStr} ${timeStr}`
+                      })()
                     : 'Unknown Date'}
                 </div>
               </>

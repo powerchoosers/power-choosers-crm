@@ -18,6 +18,7 @@ interface EngagementLogProps {
     contact: any
     account: any
     variant?: 'default' | 'skinny'
+    showRelativeDate?: boolean
 }
 
 export function EngagementLog({
@@ -29,7 +30,8 @@ export function EngagementLog({
     id,
     contact,
     account,
-    variant = 'default'
+    variant = 'default',
+    showRelativeDate = false
 }: EngagementLogProps) {
     const totalPages = Math.max(1, Math.ceil((recentCalls?.length ?? 0) / CALLS_PER_PAGE))
     const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
@@ -44,30 +46,13 @@ export function EngagementLog({
             isSkinny ? "p-4" : "p-6"
         )}>
             <div className={cn(
-                "flex items-center justify-between",
-                isSkinny ? "mb-2" : "mb-4"
+                "px-1",
+                isSkinny ? "flex flex-col items-start gap-1 mb-3" : "flex items-center justify-between mb-4"
             )}>
                 <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
-                    <Mic className="w-3.5 h-3.5" /> Transmission Log
+                    {!isSkinny && <History className="w-3.5 h-3.5" />} Transmission Log
                 </h3>
                 <span className="text-[9px] font-mono text-zinc-600 font-bold tabular-nums">{recentCalls?.length ?? 0} RECORDS</span>
-            </div>
-            <div className={cn(
-                "flex items-center justify-end gap-2",
-                isSkinny ? "mb-2" : "mb-3"
-            )}>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-[#002FA7]/20 border border-[#002FA7]/30">
-                    <Sparkles className="w-3 h-3 text-[#002FA7]" />
-                    <span className="text-[10px] font-mono text-white uppercase tracking-tighter">AI_ENABLED</span>
-                </div>
-                <button
-                    type="button"
-                    className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
-                    onClick={onViewAll}
-                    title="View all calls"
-                >
-                    <ArrowRightLeft className="w-4 h-4" />
-                </button>
             </div>
 
             <div className="space-y-3">
@@ -93,11 +78,9 @@ export function EngagementLog({
                                             transition={{ duration: 0.2 }}
                                         >
                                             <div className="space-y-1">
-                                                {isCompanyCall && (
-                                                    <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-2">
-                                                        Company: {account?.name || 'Unknown'}
-                                                    </div>
-                                                )}
+                                                 <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider px-2 h-3 flex items-center">
+                                                     {isCompanyCall ? (account?.name || 'Account_Node') : (call.contactName && call.contactName !== 'Unknown' ? call.contactName : (contact?.name || 'Signal_Subject'))}
+                                                 </div>
                                                 <CallListItem
                                                     call={call}
                                                     contactId={id}
@@ -109,6 +92,7 @@ export function EngagementLog({
                                                     contactPhotoUrl={contact?.avatarUrl || contact?.photoUrl}
                                                     customerAvatar={isCompanyCall ? 'company' : 'contact'}
                                                     variant="minimal"
+                                                    showRelativeDate={showRelativeDate}
                                                 />
                                             </div>
                                         </motion.div>
