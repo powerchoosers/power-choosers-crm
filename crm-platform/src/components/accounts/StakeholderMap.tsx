@@ -26,7 +26,7 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
 
   return (
     <motion.div layout className={cn("nodal-module-glass nodal-monolith-edge rounded-2xl p-4", className)}>
-      <div className="flex items-center justify-between mb-4">
+      <div className={cn("flex items-center justify-between", contacts.length > 0 && "mb-4")}>
         <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] flex items-center gap-2">
           <Users className="w-3 h-3" /> Command Chain
         </h3>
