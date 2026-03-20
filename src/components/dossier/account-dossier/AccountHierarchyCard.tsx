@@ -1,6 +1,6 @@
 'use client'
 
-import { type KeyboardEventHandler, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, type KeyboardEventHandler, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import { ArrowUpRight, Building2, GitBranch, Plus, Search, X } from 'lucide-react'
@@ -58,6 +58,35 @@ interface HierarchyRow {
   metadata: Record<string, unknown>
   hierarchy: AccountHierarchy
 }
+
+interface RelationshipActionsProps {
+  parentLabel: string
+  onOpenParent: () => void
+  onOpenSubsidiary: () => void
+}
+
+const RelationshipActions = memo(function RelationshipActions({
+  parentLabel,
+  onOpenParent,
+  onOpenSubsidiary
+}: RelationshipActionsProps) {
+  return (
+    <div className="grid grid-cols-2 gap-2 shrink-0">
+      <button
+        onClick={onOpenParent}
+        className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
+      >
+        {parentLabel}
+      </button>
+      <button
+        onClick={onOpenSubsidiary}
+        className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
+      >
+        Subsidiary
+      </button>
+    </div>
+  )
+})
 
 const getApolloAuthHeaders = async (includeContentType = false): Promise<Record<string, string>> => {
   const { data: { session } } = await supabase.auth.getSession()
@@ -174,23 +203,23 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
     [account?.metadata, hierarchyOverride]
   )
 
-  const resetPickerState = () => {
+  const resetPickerState = useCallback(() => {
     setQuery('')
     setLocalResults([])
     setApolloResults([])
-  }
+  }, [])
 
-  const openPicker = (mode: RelationshipMode) => {
+  const openPicker = useCallback((mode: RelationshipMode) => {
     setControlsOpen(true)
     resetPickerState()
     setPickerMode(mode)
-  }
+  }, [resetPickerState])
 
-  const closePicker = () => {
+  const closePicker = useCallback(() => {
     setPickerMode(null)
-  }
+  }, [])
 
-  const toggleControls = () => {
+  const toggleControls = useCallback(() => {
     setControlsOpen((prev) => {
       const next = !prev
       if (!next) {
@@ -198,7 +227,10 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
       }
       return next
     })
-  }
+  }, [closePicker])
+
+  const handleOpenParent = useCallback(() => openPicker('PARENT'), [openPicker])
+  const handleOpenSubsidiary = useCallback(() => openPicker('SUBSIDIARY'), [openPicker])
 
   const invalidateAccountQueries = async () => {
     await Promise.all([
@@ -905,7 +937,6 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
       <AnimatePresence initial={false}>
         {controlsOpen && (
           <motion.div
-            layout
             key="controls-area"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
@@ -914,25 +945,15 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
             className="overflow-hidden"
           >
             <div className="space-y-3 pb-1 pt-2">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => openPicker('PARENT')}
-                  className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
-                >
-                  {parentAccount ? 'Change Parent' : 'Parent'}
-                </button>
-                <button
-                  onClick={() => openPicker('SUBSIDIARY')}
-                  className="w-full h-9 px-3 rounded-xl border border-white/10 text-[10px] font-mono text-zinc-400 hover:text-zinc-100 hover:border-white/20 transition-all uppercase tracking-widest flex items-center justify-center leading-none whitespace-nowrap"
-                >
-                  Subsidiary
-                </button>
-              </div>
+              <RelationshipActions
+                parentLabel={parentAccount ? 'Change Parent' : 'Parent'}
+                onOpenParent={handleOpenParent}
+                onOpenSubsidiary={handleOpenSubsidiary}
+              />
 
               <AnimatePresence initial={false} mode="wait" onExitComplete={resetPickerState}>
                 {pickerMode && (
                   <motion.div
-                    layout
                     key={`picker-${pickerMode}`}
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
