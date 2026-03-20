@@ -1,8 +1,9 @@
 'use client'
 
-import { ChevronLeft, ChevronRight, Check, SkipForward } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { type Task } from '@/hooks/useTasks'
 import { cn } from '@/lib/utils'
+import { isTodayOrOverdue } from '@/lib/task-date'
 
 function getTaskTypeLabel(task: Task): string {
   const meta = task.metadata as { taskType?: string } | null | undefined
@@ -43,6 +44,7 @@ export function TaskCommandBar({
   const total = useGlobal ? globalTotal : pendingTasks.length
   const position = useGlobal ? globalPosition : currentIndex + 1
   const label = getTaskTypeLabel(current)
+  const canActOnCurrentTask = isTodayOrOverdue(current.dueDate)
 
   return (
     <div className="flex items-center gap-3">
@@ -69,26 +71,30 @@ export function TaskCommandBar({
           <ChevronRight className="w-4 h-4" />
         </button>
       </div>
-      <button
-        type="button"
-        onClick={onSkip}
-        className="px-2 py-1 rounded text-[10px] font-mono uppercase tracking-widest border border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
-      >
-        SKIP
-      </button>
-      <button
-        type="button"
-        onClick={onCompleteAndAdvance}
-        disabled={isCompleting}
-        className={cn(
-          'flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-widest transition-all',
-          'bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/70',
-          'disabled:opacity-50 disabled:pointer-events-none'
-        )}
-      >
-        <Check className="w-3.5 h-3.5" />
-        COMPLETE & ADVANCE
-      </button>
+      {canActOnCurrentTask && (
+        <>
+          <button
+            type="button"
+            onClick={onSkip}
+            className="px-2 py-1 rounded text-[10px] font-mono uppercase tracking-widest border border-white/10 text-zinc-400 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            SKIP
+          </button>
+          <button
+            type="button"
+            onClick={onCompleteAndAdvance}
+            disabled={isCompleting}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded text-[10px] font-mono uppercase tracking-widest transition-all',
+              'bg-emerald-500/10 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20 hover:border-emerald-500/70',
+              'disabled:opacity-50 disabled:pointer-events-none'
+            )}
+          >
+            <Check className="w-3.5 h-3.5" />
+            COMPLETE & ADVANCE
+          </button>
+        </>
+      )}
     </div>
   )
 }
