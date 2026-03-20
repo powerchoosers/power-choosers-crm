@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone, Landmark, Phone, Building2 } from 'lucide-react'
+import { Mail, ArrowUpRight, X, Search, Smartphone, Landmark, Phone, Building2 } from 'lucide-react'
 import { useCallStore } from '@/store/callStore'
 import { useComposeStore } from '@/store/composeStore'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
@@ -133,7 +133,6 @@ export function AccountHolderCard({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <UserCheck className="w-3 h-3 text-zinc-500" />
           <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Decision Maker</span>
         </div>
         {holder && !picking && (
@@ -280,7 +279,6 @@ export function AccountHolderCard({
           onClick={() => setPicking(true)}
           className="w-full flex items-center justify-center gap-2 py-3 border border-dashed border-white/10 rounded-xl text-[10px] font-mono text-zinc-600 hover:text-zinc-300 hover:border-white/20 transition-all uppercase tracking-widest"
         >
-          <UserCheck className="w-3.5 h-3.5" />
           Assign Decision Maker
         </button>
       )}
