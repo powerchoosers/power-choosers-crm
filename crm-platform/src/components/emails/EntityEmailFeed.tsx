@@ -79,36 +79,63 @@ function EmailActionBar({ email, variant }: { email: Email; variant: 'default' |
         router.push(`/network/emails/${email.id}`)
     }
 
+    const isSkinny = variant === 'skinny'
+
     return (
         <div className={cn(
-            "flex items-center gap-1.5 border-t border-white/5 mt-3",
-            variant === 'skinny' ? "pt-2.5" : "pt-3"
+            "flex border-t border-white/5 mt-3",
+            isSkinny ? "flex-col gap-2 pt-2.5" : "items-center gap-1.5 pt-3"
         )}>
-            <button
-                type="button"
-                onClick={handleReply}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white rounded-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300"
-            >
-                <Reply className="w-3 h-3" />
-                Reply
-            </button>
-            <button
-                type="button"
-                onClick={handleForward}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white rounded-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300"
-            >
-                <Forward className="w-3 h-3" />
-                Forward
-            </button>
-            <div className="flex-1" />
-            <button
-                type="button"
-                onClick={handleViewThread}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-[#002FA7] hover:text-white rounded-md border border-[#002FA7]/20 hover:border-[#002FA7]/40 hover:bg-[#002FA7]/10 transition-all duration-300"
-            >
-                <ExternalLink className="w-3 h-3" />
-                View Thread
-            </button>
+            <div className={cn(
+                "flex items-center gap-1.5",
+                isSkinny && "w-full"
+            )}>
+                <button
+                    type="button"
+                    onClick={handleReply}
+                    className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white rounded-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300",
+                        isSkinny && "flex-1 justify-center"
+                    )}
+                >
+                    <Reply className="w-3 h-3" />
+                    {isSkinny ? 'RE' : 'Reply'}
+                </button>
+                <button
+                    type="button"
+                    onClick={handleForward}
+                    className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white rounded-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300",
+                        isSkinny && "flex-1 justify-center"
+                    )}
+                >
+                    <Forward className="w-3 h-3" />
+                    {isSkinny ? 'FWD' : 'Forward'}
+                </button>
+            </div>
+
+            {isSkinny ? (
+                <button
+                    type="button"
+                    onClick={handleViewThread}
+                    className="inline-flex items-center justify-center gap-1.5 w-full px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white rounded-md border border-white/5 hover:border-white/10 hover:bg-zinc-900/60 transition-all duration-300"
+                >
+                    <ExternalLink className="w-3 h-3" />
+                    View Thread
+                </button>
+            ) : (
+                <>
+                    <div className="flex-1" />
+                    <button
+                        type="button"
+                        onClick={handleViewThread}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-[#002FA7] hover:text-white rounded-md border border-[#002FA7]/20 hover:border-[#002FA7]/40 hover:bg-[#002FA7]/10 transition-all duration-300"
+                    >
+                        <ExternalLink className="w-3 h-3" />
+                        View Thread
+                    </button>
+                </>
+            )}
         </div>
     )
 }
@@ -124,6 +151,8 @@ export function EntityEmailFeed({
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
 
+    const isSkinny = variant === 'skinny'
+
     const toggleExpand = (id: string) => {
         setExpandedId(expandedId === id ? null : id)
     }
@@ -134,12 +163,32 @@ export function EntityEmailFeed({
     const safeCurrentPage = Math.min(Math.max(currentPage, 1), totalPages)
     const pageStart = validEmails.length > 0 ? ((safeCurrentPage - 1) * EMAILS_PER_PAGE) + 1 : 0
     const pageEnd = Math.min(safeCurrentPage * EMAILS_PER_PAGE, validEmails.length)
-    const isSkinny = variant === 'skinny'
 
     useEffect(() => {
         setCurrentPage(1)
         setExpandedId(null)
     }, [layout, emails.join('|')])
+
+    useEffect(() => {
+        if (expandedId) {
+            setTimeout(() => {
+                const element = document.getElementById(`email-node-${expandedId}`)
+                if (element) {
+                    // Find the closest scrollable panel ancestor (np-scroll class)
+                    const scrollContainer = element.closest('.np-scroll') as HTMLElement | null
+                    if (scrollContainer) {
+                        const containerTop = scrollContainer.getBoundingClientRect().top
+                        const elementTop = element.getBoundingClientRect().top
+                        const offset = elementTop - containerTop + scrollContainer.scrollTop - 16
+                        scrollContainer.scrollTo({ top: offset, behavior: 'smooth' })
+                    } else {
+                        // Fallback for contact dossier right panel
+                        element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }
+                }
+            }, 300)
+        }
+    }, [expandedId])
 
     useEffect(() => {
         setCurrentPage((prev) => Math.min(Math.max(prev, 1), totalPages))
@@ -198,6 +247,7 @@ export function EntityEmailFeed({
         return (
             <motion.div
                 key={email.id}
+                id={`email-node-${email.id}`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
@@ -436,7 +486,10 @@ export function EntityEmailFeed({
 
     return (
         <div className="space-y-4">
-            <div className="flex items-center justify-between px-1">
+            <div className={cn(
+                "px-1",
+                isSkinny ? "flex flex-col items-start gap-1 mb-3" : "flex items-center justify-between mb-4"
+            )}>
                 <h3 className="text-[10px] font-mono text-zinc-400 uppercase tracking-[0.2em] flex items-center gap-2">
                     {title}
                 </h3>
@@ -471,6 +524,7 @@ export function EntityEmailFeed({
                                 return (
                                     <motion.div
                                         key={email.id}
+                                        id={`email-node-${email.id}`}
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
