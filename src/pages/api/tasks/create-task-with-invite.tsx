@@ -226,10 +226,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             },
                             location: apptLoc,
                             description: cleanHtml,
-                            attendees: [
-                                { email: contact.email.toLowerCase() }
-                            ],
-                            notify_attendee: 0
+                            url: url,
+                            // attendees: [
+                            //     { email: contact.email.toLowerCase(), permission: 1 }
+                            // ],
+                            notify_attendee: 0 
                         };
 
                         if (taskData.reminders && taskData.reminders.length > 0) {
@@ -245,12 +246,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             await zohoService.updateEvent(userEmail, calendarUid, eventUid, eventData);
                             console.log(`[Zoho Calendar] Successfully updated native calendar event UID: ${eventUid}`);
                         } else {
-                            // Otherwise, create new event
+                            // Step 1: Create new event (silent, no attendees)
                             const result = await zohoService.createEvent(userEmail, defaultCalendar.uid, eventData);
                             console.log(`[Zoho Calendar] Successfully synchronized event to native calendar UID: ${result?.uid}`);
                             
-                            // Save Native Calendar reference back to Task metadata
+                            // Step 2: Add attendees via update (often less noisy or suppresses the "New Invite" branded email)
                             if (result?.uid) {
+                                const finalData = {
+                                    ...eventData,
+                                    attendees: [
+                                        { email: contact.email.toLowerCase(), permission: 1 }
+                                    ],
+                                    notify_attendee: 0
+                                };
+                                await zohoService.updateEvent(userEmail, defaultCalendar.uid, result.uid, finalData);
+
                                 await supabaseAdmin.from('tasks').update({
                                     metadata: { ...metadata, zohoEventId: result.uid, zohoCalendarUid: defaultCalendar.uid }
                                 }).eq('id', task.id);
