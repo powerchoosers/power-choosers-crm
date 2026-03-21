@@ -226,9 +226,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             },
                             location: apptLoc,
                             description: cleanHtml,
-                            url: url,
                             attendees: [
-                                { email: contact.email.toLowerCase(), permission: 1 }
+                                { email: contact.email.toLowerCase() }
                             ],
                             notify_attendee: 0
                         };

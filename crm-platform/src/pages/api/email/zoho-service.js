@@ -486,16 +486,13 @@ export class ZohoMailService {
     async createEvent(userEmail, calendarUid, eventData) {
         try {
             const { accessToken } = await getValidAccessTokenForUser(userEmail);
-            const { notify_attendee, ...jsonPayload } = eventData;
+            const url = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events`;
 
-            let url = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events`;
-            if (notify_attendee !== undefined) {
-                url += `?notify_attendee=${notify_attendee}`;
-            }
 
             
             const formData = new URLSearchParams();
-            formData.append('eventdata', JSON.stringify(jsonPayload));
+            formData.append('eventdata', JSON.stringify(eventData));
+
 
 
             const response = await fetch(url, {
@@ -526,10 +523,10 @@ export class ZohoMailService {
     async updateEvent(userEmail, calendarUid, eventUid, eventData) {
         try {
             const { accessToken } = await getValidAccessTokenForUser(userEmail);
-            const { notify_attendee, ...jsonPayload } = eventData;
             
             // 1. Fetch current event
             const getUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
+
 
             const getResponse = await fetch(getUrl, {
                 method: 'GET',
@@ -544,14 +541,11 @@ export class ZohoMailService {
             }
 
             // 2. Perform the update
-            let putUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
-            if (notify_attendee !== undefined) {
-                putUrl += `?notify_attendee=${notify_attendee}`;
-            }
-
+            const putUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
             
             const formData = new URLSearchParams();
-            formData.append('eventdata', JSON.stringify(jsonPayload));
+            formData.append('eventdata', JSON.stringify(eventData));
+
 
 
 
