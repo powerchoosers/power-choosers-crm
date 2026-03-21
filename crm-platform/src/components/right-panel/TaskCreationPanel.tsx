@@ -670,12 +670,10 @@ export function TaskCreationPanel() {
                                         p === 'Medium' && 'border-amber-900/50 text-amber-900 hover:border-amber-500 hover:text-amber-500',
                                         p === 'Medium' && priority === p && 'bg-amber-500/10 border-amber-500 text-amber-500',
                                         p === 'High' && 'border-rose-900/50 text-rose-900 hover:border-rose-500 hover:text-rose-500',
-                                        p === 'High' && priority === p && 'bg-rose-500/10 border-rose-500 text-rose-500',
-                                        p === 'BRIEFING' && 'border-indigo-900/50 text-indigo-700 hover:border-indigo-500 hover:text-indigo-400',
-                                        p === 'BRIEFING' && priority === p && 'bg-indigo-500/10 border-indigo-500 text-indigo-400 shadow-[0_0_15px_-5px_#6366f1]'
+                                        p === 'High' && priority === p && 'bg-rose-500/10 border-rose-500 text-rose-500'
                                     )}
                                 >
-                                    {p === 'BRIEFING' ? 'BOOK BRIEFING' : p}
+                                    {p}
                                 </button>
                             ))}
                         </div>
