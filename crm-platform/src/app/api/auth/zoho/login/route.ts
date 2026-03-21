@@ -28,7 +28,7 @@ export async function GET(request: Request) {
     const params = new URLSearchParams({
         response_type: 'code',
         client_id: clientId,
-        scope: 'openid email profile ZohoMail.messages.READ ZohoMail.messages.CREATE ZohoMail.accounts.READ ZohoMail.folders.READ',
+        scope: 'openid email profile ZohoMail.messages.READ ZohoMail.messages.CREATE ZohoMail.accounts.READ ZohoMail.folders.READ ZohoCalendar.calendar.ALL ZohoCalendar.event.ALL',
         redirect_uri: redirectUri,
         access_type: 'offline',
         prompt: 'consent',
