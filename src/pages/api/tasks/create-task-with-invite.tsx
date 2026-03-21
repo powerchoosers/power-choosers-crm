@@ -71,6 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 contactId,
                 accountId,
                 ownerId: userEmail,
+                reminders: taskData.reminders || [],
                 metadata,
                 createdAt: now,
                 updatedAt: now
@@ -116,6 +117,45 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const apptDateStr = format(apptDate, 'EEEE, MMMM do, yyyy');
                 const apptTimeStr = format(apptDate, 'h:mm a');
 
+                // Generate Alarms
+                const alarms = (taskData.reminders || []).map((mins: number) => [
+                    'BEGIN:VALARM',
+                    `TRIGGER:-PT${mins}M`,
+                    'ACTION:DISPLAY',
+                    'DESCRIPTION:Reminder',
+                    'END:VALARM'
+                ].join('\r\n')).join('\r\n');
+
+                const nowStr = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
+                const url = metadata?.meetingLink || agentSettings.meetingLink || agentSettings.meeting_link || agentSettings.zoomLink || process.env.NEXT_PUBLIC_DEFAULT_MEETING_LINK || 'https://meet.google.com/nodal-point-secure';
+                const sequenceCount = metadata?.sequence || 0;
+                
+                // Format description for both plain text and HTML
+                const cleanDesc = (description || '').replace(/\r?\n/g, '\\n');
+                const htmlDescription = metadata?.htmlDescription || description || '';
+                const cleanHtml = htmlDescription.replace(/\r?\n/g, '<br/>');
+
+                const apptLoc = url ? url : 'Remote (Nodal Point Forensic Engine)';
+
+                // Timezone structure enforcing CST/CDT rules
+                const vtimezone = [
+                    'BEGIN:VTIMEZONE',
+                    'TZID:America/Chicago',
+                    'BEGIN:DAYLIGHT',
+                    'TZOFFSETFROM:-0600',
+                    'TZOFFSETTO:-0500',
+                    'DTSTART:19700308T020000',
+                    'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+                    'END:DAYLIGHT',
+                    'BEGIN:STANDARD',
+                    'TZOFFSETFROM:-0500',
+                    'TZOFFSETTO:-0600',
+                    'DTSTART:19701101T020000',
+                    'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU',
+                    'END:STANDARD',
+                    'END:VTIMEZONE'
+                ].join('\r\n');
+
                 // Generate ICS
                 const icsContent = [
                     'BEGIN:VCALENDAR',
@@ -123,27 +163,81 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     'PRODID:-//Nodal Point//CRM//EN',
                     'METHOD:REQUEST',
                     'CALSCALE:GREGORIAN',
+                    vtimezone,
                     'BEGIN:VEVENT',
                     `UID:${task.id}@nodalpoint.io`,
-                    `DTSTAMP:${format(new Date(), "yyyyMMdd'T'HHmmss'Z'")}`,
-                    `DTSTART:${format(apptDate, "yyyyMMdd'T'HHmmss'Z'")}`,
-                    `DTEND:${format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss'Z'")}`,
+                    `DTSTAMP:${nowStr}`,
+                    `CREATED:${nowStr}`,
+                    `LAST-MODIFIED:${nowStr}`,
+                    `DTSTART;TZID=America/Chicago:${format(apptDate, "yyyyMMdd'T'HHmmss")}`,
+                    `DTEND;TZID=America/Chicago:${format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss")}`,
                     `SUMMARY:Energy Briefing: ${contactName}`,
-                    `DESCRIPTION:${(description || '').replace(/\n/g, '\\n')}`,
-                    'LOCATION:Remote (Nodal Point Forensic Engine)',
+                    `DESCRIPTION:${cleanDesc}`,
+                    `X-ALT-DESC;FMTTYPE=text/html:<!DOCTYPE HTML><HTML><BODY>${cleanHtml}</BODY></HTML>`,
+                    `LOCATION:${apptLoc}`,
+                    url ? `URL:${url}` : '',
+                    'IMPORTANT:0',
+                    'CLASS:PUBLIC',
                     `ORGANIZER;CN="${sender.name}":MAILTO:${sender.email.toLowerCase()}`,
                     `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN="${contactName}":MAILTO:${contact.email.toLowerCase()}`,
-                    'SEQUENCE:0',
+                    `SEQUENCE:${sequenceCount}`,
                     'STATUS:CONFIRMED',
                     'TRANSP:OPAQUE',
                     'X-MICROSOFT-CDO-BUSYSTATUS:BUSY',
+                    alarms,
                     'END:VEVENT',
                     'END:VCALENDAR'
-                ].join('\r\n');
+                ].filter(Boolean).join('\r\n');
 
                 const zohoService = new ZohoMailService();
 
-                // 1. Upload the ICS attachment first (Zoho requires pre-upload for sent items)
+                // 1. Attempt Native Zoho Calendar Event Creation
+                try {
+                    const calendars = await zohoService.getCalendars(userEmail);
+                    const defaultCalendar = calendars.find((c: any) => c.isdefault) || calendars[0];
+                    if (defaultCalendar?.uid) {
+                        const eventData = {
+                            title: `Energy Briefing: ${contactName}`,
+                            dateandtime: {
+                                timezone: "America/Chicago",
+                                start: format(apptDate, "yyyyMMdd'T'HHmmss'Z'"),
+                                end: format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss'Z'")
+                            },
+                            location: apptLoc,
+                            richtext_description: cleanHtml,
+                            url: url,
+                            attendees: [
+                                { email: contact.email.toLowerCase(), permission: 1 }
+                            ],
+                            reminders: (taskData.reminders || []).map((mins: number) => ({ action: "email", minutes: mins })),
+                            notify_attendee: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites since we send ForensicInvite manually
+                        };
+                        if (metadata?.zohoEventId) {
+                            // If it exists, update the native calendar event
+                            const eventUid = metadata.zohoEventId;
+                            // zohoCalendarUid might not be saved on older ones, fallback to defaultCalendar
+                            const calendarUid = metadata.zohoCalendarUid || defaultCalendar.uid;
+                            
+                            await zohoService.updateEvent(userEmail, calendarUid, eventUid, eventData);
+                            console.log(`[Zoho Calendar] Successfully updated native calendar event UID: ${eventUid}`);
+                        } else {
+                            // Otherwise, create new event
+                            const result = await zohoService.createEvent(userEmail, defaultCalendar.uid, eventData);
+                            console.log(`[Zoho Calendar] Successfully synchronized event to native calendar UID: ${result?.uid}`);
+                            
+                            // Save Native Calendar reference back to Task metadata
+                            if (result?.uid) {
+                                await supabaseAdmin.from('tasks').update({
+                                    metadata: { ...metadata, zohoEventId: result.uid, zohoCalendarUid: defaultCalendar.uid }
+                                }).eq('id', task.id);
+                            }
+                        }
+                    }
+                } catch (calError: any) {
+                    console.warn(`[Zoho Calendar] Native event creation bypassed (missing scopes or unconnected). Defaulting strictly to ICS attachment email flow. Error: ${calError.message}`);
+                }
+
+                // 2. Upload the ICS attachment (Zoho requires pre-upload for sent items)
                 let uploadedAttachments: any[] = [];
                 try {
                     const uploadResult = await zohoService.uploadAttachment(

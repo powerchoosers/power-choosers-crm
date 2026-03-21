@@ -13,7 +13,7 @@ import {
   ColumnFiltersState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, Calendar, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Plus, Filter, MoreHorizontal, Search, Check } from 'lucide-react'
+import { ArrowUpDown, Calendar, CalendarDays, ChevronLeft, ChevronRight, CheckCircle2, Circle, Clock, Plus, Filter, MoreHorizontal, Search, Check, LayoutList } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { useTasks, useTasksCount, Task } from '@/hooks/useTasks'
@@ -48,6 +48,7 @@ import DestructModal from '@/components/network/DestructModal'
 import { toast } from 'sonner'
 import { buildTaskVariableMap, resolveTaskTemplateText } from '@/lib/task-variables'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
+import { TaskCalendarView } from '@/components/network/TaskCalendarView'
 
 const PAGE_SIZE = 50
 
@@ -77,7 +78,8 @@ export default function TasksPage() {
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isAddTaskOpen, setIsAddTaskOpen] = useState(false)
   const [isAddingTask, setIsAddingTask] = useState(false)
-  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'Medium' as 'Low' | 'Medium' | 'High', dueDate: '' })
+  const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'Medium' as 'Low' | 'Medium' | 'High' | 'BRIEFING', dueDate: '' })
+  const [viewMode, setViewMode] = useState<'table' | 'calendar'>('table')
   const scrollKey = (pathname ?? '/network/tasks') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
 
   useEffect(() => {
@@ -364,102 +366,138 @@ export default function TasksPage() {
           onClick: () => setIsAddTaskOpen(true),
           icon: <Plus size={18} className="mr-2" />
         }}
-      />
-
-      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
-          <Table>
-            <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                  {headerGroup.headers.map((header) => {
-                    return (
-                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                      </TableHead>
-                    )
-                  })}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <ForensicTableSkeleton columns={columns.length} rows={12} type="task" />
-              ) : isError ? (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
-                    Error loading tasks. Please check your connection.
-                  </TableCell>
-                </TableRow>
-              ) : table.getRowModel().rows?.length ? (
-                <AnimatePresence mode="popLayout">
-                  {table.getRowModel().rows.map((row, index) => (
-                    <TaskTableRow
-                      key={row.id}
-                      row={row}
-                      index={index}
-                      router={router}
-                      saveScroll={saveScroll}
-                    />
-                  ))}
-                </AnimatePresence>
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                    No tasks found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+      >
+        <div className="flex items-center gap-1.5 p-1 rounded-xl border border-white/5 bg-white/[0.02] ml-4">
+          <button
+            onClick={() => setViewMode('table')}
+            className={cn(
+              "px-3 h-8 rounded-lg text-[10px] font-mono uppercase tracking-widest flex items-center gap-2 transition-all",
+              viewMode === 'table' ? "bg-[#002FA7]/20 text-[#002FA7] border-[#002FA7]/30" : "text-zinc-600 hover:text-zinc-400"
+            )}
+          >
+            <LayoutList className="w-3.5 h-3.5" />
+            Table
+          </button>
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={cn(
+              "px-3 h-8 rounded-lg text-[10px] font-mono uppercase tracking-widest flex items-center gap-2 transition-all",
+              viewMode === 'calendar' ? "bg-[#002FA7]/20 text-[#002FA7] border-[#002FA7]/30" : "text-zinc-600 hover:text-zinc-400"
+            )}
+          >
+            <CalendarDays className="w-3.5 h-3.5" />
+            Calendar
+          </button>
         </div>
+      </CollapsiblePageHeader>
 
-        <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-              <span>Sync_Block {showingStart}–{showingEnd}</span>
-              <div className="h-1 w-1 rounded-full bg-black/40" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
+      {viewMode === 'table' ? (
+        <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
+          <div ref={scrollContainerRef} className="flex-1 overflow-auto relative scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
+            <Table>
+              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
+                    {headerGroup.headers.map((header) => {
+                      return (
+                        <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                              header.column.columnDef.header,
+                              header.getContext()
+                            )}
+                        </TableHead>
+                      )
+                    })}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <ForensicTableSkeleton columns={columns.length} rows={12} type="task" />
+                ) : isError ? (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center text-red-400">
+                      Error loading tasks. Please check your connection.
+                    </TableCell>
+                  </TableRow>
+                ) : table.getRowModel().rows?.length ? (
+                  <AnimatePresence mode="popLayout">
+                    {table.getRowModel().rows.map((row, index) => (
+                      <TaskTableRow
+                        key={row.id}
+                        row={row}
+                        index={index}
+                        router={router}
+                        saveScroll={saveScroll}
+                      />
+                    ))}
+                  </AnimatePresence>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+                      No tasks found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                <span>Sync_Block {showingStart}–{showingEnd}</span>
+                <div className="h-1 w-1 rounded-full bg-black/40" />
+                <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(Math.max(0, pageIndex - 1))}
+                disabled={pageIndex === 0}
+                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+              </button>
+              <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                {(pageIndex + 1).toString().padStart(2, '0')}
+              </div>
+              <button
+                onClick={async () => {
+                  const nextPageIndex = pageIndex + 1
+                  if (nextPageIndex >= displayTotalPages) return
+
+                  const needed = (nextPageIndex + 1) * PAGE_SIZE
+                  if (tasks.length < needed && hasNextPage && !isFetchingNextPage) {
+                    await fetchNextPage()
+                  }
+
+                  setPage(nextPageIndex)
+                }}
+                disabled={pageIndex + 1 >= displayTotalPages}
+                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                aria-label="Next page"
+              >
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage(Math.max(0, pageIndex - 1))}
-              disabled={pageIndex === 0}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-              {(pageIndex + 1).toString().padStart(2, '0')}
-            </div>
-            <button
-              onClick={async () => {
-                const nextPageIndex = pageIndex + 1
-                if (nextPageIndex >= displayTotalPages) return
-
-                const needed = (nextPageIndex + 1) * PAGE_SIZE
-                if (tasks.length < needed && hasNextPage && !isFetchingNextPage) {
-                  await fetchNextPage()
-                }
-
-                setPage(nextPageIndex)
-              }}
-              disabled={pageIndex + 1 >= displayTotalPages}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-              aria-label="Next page"
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 overflow-hidden">
+          <TaskCalendarView 
+            tasks={tasks} 
+            onSelectDate={() => {}} 
+            onCreateTask={(date) => {
+              setNewTask(p => ({ ...p, dueDate: format(date, 'yyyy-MM-dd') }))
+              setIsAddTaskOpen(true)
+            }}
+          />
+        </div>
+      )}
 
       <BulkActionDeck
         selectedCount={selectedCount}
@@ -524,15 +562,16 @@ export default function TasksPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Priority</label>
-                  <select
-                    value={newTask.priority}
-                    onChange={e => setNewTask(p => ({ ...p, priority: e.target.value as 'Low' | 'Medium' | 'High' }))}
-                    className="nodal-recessed border border-white/10 text-sm font-mono bg-zinc-900 text-zinc-300 rounded-md px-3 py-2"
-                  >
-                    <option value="Low">Low</option>
-                    <option value="Medium">Medium</option>
-                    <option value="High">High</option>
-                  </select>
+                    <select
+                      value={newTask.priority}
+                      onChange={e => setNewTask(p => ({ ...p, priority: e.target.value as 'Low' | 'Medium' | 'High' | 'BRIEFING' }))}
+                      className="nodal-recessed border border-white/10 text-sm font-mono bg-zinc-900 text-zinc-300 rounded-md px-3 py-2"
+                    >
+                      <option value="Low">Low</option>
+                      <option value="Medium">Medium</option>
+                      <option value="High">High</option>
+                      <option value="BRIEFING">BRIEFING</option>
+                    </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Due Date</label>

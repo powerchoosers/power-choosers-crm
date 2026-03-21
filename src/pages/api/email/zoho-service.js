@@ -435,4 +435,141 @@ export class ZohoMailService {
             return false;
         }
     }
+
+    /**
+     * Fetch all Zoho Calendars for the user to find the primary calendar UID
+     */
+    async getCalendars(userEmail) {
+        try {
+            const { accessToken } = await getValidAccessTokenForUser(userEmail);
+            const response = await fetch('https://calendar.zoho.com/api/v1/calendars', {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+
+            if (!response.ok) {
+                const txt = await response.text();
+                throw new Error(`Zoho Calendar List API error: ${response.status} - ${txt}`);
+            }
+
+            const result = await response.json();
+            return result.calendars || [];
+        } catch (error) {
+            logger.error(`[Zoho Calendar] List error for ${userEmail}:`, error, 'zoho-service');
+            throw error;
+        }
+    }
+
+    /**
+     * Create an event directly on the user's Zoho Calendar
+     */
+    async createEvent(userEmail, calendarUid, eventData) {
+        try {
+            const { accessToken } = await getValidAccessTokenForUser(userEmail);
+
+            // Zoho Calendar expects eventData to be passed. The API documentation shows it as a JSON payload, sometimes wrapped in an 'eventdata' array/object or just POST body.
+            // Based on standard Zoho Calendar v1 API, we post JSON to the endpoint.
+            const url = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events`;
+            
+            // Format data as a URL encoded FormData string or JSON. The docs say "eventdata JSONObject, mandatory". In many Zoho APIs this means form data with an 'eventdata' stringified JSON payload.
+            const formData = new URLSearchParams();
+            formData.append('eventdata', JSON.stringify(eventData));
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData.toString()
+            });
+
+            if (!response.ok) {
+                const txt = await response.text();
+                throw new Error(`Zoho Calendar Event Create error: ${response.status} - ${txt}`);
+            }
+
+            const result = await response.json();
+            return result.events?.[0] || result;
+        } catch (error) {
+            logger.error(`[Zoho Calendar] Create event error for ${userEmail}:`, error, 'zoho-service');
+            throw error;
+        }
+    }
+
+    /**
+     * Update an event directly on the user's Zoho Calendar
+     */
+    async updateEvent(userEmail, calendarUid, eventUid, eventData) {
+        try {
+            const { accessToken } = await getValidAccessTokenForUser(userEmail);
+            
+            // 1. Fetch current event to get the mandatory etag
+            const getUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
+            const getResponse = await fetch(getUrl, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+            });
+            if (getResponse.ok) {
+                const getResult = await getResponse.json();
+                const currentEvent = getResult.events?.[0];
+                if (currentEvent && currentEvent.etag) {
+                    eventData.etag = currentEvent.etag;
+                }
+            }
+
+            // 2. Perform the update
+            const putUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
+            
+            const formData = new URLSearchParams();
+            formData.append('eventdata', JSON.stringify(eventData));
+
+            const response = await fetch(putUrl, {
+                method: 'PUT',
+                headers: { 
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: formData.toString()
+            });
+
+            if (!response.ok) {
+                const txt = await response.text();
+                throw new Error(`Zoho Calendar Event Update error: ${response.status} - ${txt}`);
+            }
+
+            const result = await response.json();
+            return result.events?.[0] || result;
+        } catch (error) {
+            logger.error(`[Zoho Calendar] Update event error for ${userEmail}:`, error, 'zoho-service');
+            throw error;
+        }
+    }
+
+    /**
+     * Delete an event directly from the user's Zoho Calendar
+     */
+    async deleteEvent(userEmail, calendarUid, eventUid) {
+        try {
+            const { accessToken } = await getValidAccessTokenForUser(userEmail);
+            const url = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
+            
+            const response = await fetch(url, {
+                method: 'DELETE',
+                headers: { 
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+
+            if (!response.ok) {
+                const txt = await response.text();
+                throw new Error(`Zoho Calendar Event Delete error: ${response.status} - ${txt}`);
+            }
+
+            return true;
+        } catch (error) {
+            logger.error(`[Zoho Calendar] Delete event error for ${userEmail}:`, error, 'zoho-service');
+            // Allow silent failure to continue Nodal Point operation
+            return false;
+        }
+    }
 }
