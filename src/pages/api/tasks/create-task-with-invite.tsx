@@ -226,9 +226,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             },
                             location: apptLoc,
                             description: cleanHtml,
+                            url: url,
                             attendees: [
-                                { email: contact.email.toLowerCase() }
-                            ]
+                                { email: contact.email.toLowerCase(), permission: 1 }
+                            ],
+                            notify_attendee: 0
                         };
 
                         if (taskData.reminders && taskData.reminders.length > 0) {
