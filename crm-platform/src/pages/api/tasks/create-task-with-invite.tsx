@@ -230,7 +230,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             attendees: [
                                 { email: contact.email.toLowerCase(), permission: 1 }
                             ],
-                            notifyAttendees: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites natively
+                            notify_attendee: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites natively
                         };
 
                         if (taskData.reminders && taskData.reminders.length > 0) {
