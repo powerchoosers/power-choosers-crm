@@ -285,7 +285,7 @@ export function TaskCreationPanel() {
                 accountId: entityType === 'account' ? entityId : activeEntity?.accountId,
                 relatedTo: entityName,
                 relatedType: entityType === 'contact' ? 'Person' : 'Account',
-                reminders: reminders.length > 0 ? reminders : null,
+                reminders: sendCalendarInvite ? [15, 60] : null,
                 metadata: {
                     taskType,
                     ...(sendCalendarInvite ? { syncCalendar: true, inviteContext: 'forensic_diagnostic' } : {})
@@ -640,15 +640,15 @@ export function TaskCreationPanel() {
                                 type="button"
                                 onClick={() => setSendCalendarInvite(!sendCalendarInvite)}
                                 className={cn(
-                                    "w-full h-12 rounded-xl text-xs font-mono uppercase tracking-widest border transition-all flex items-center justify-center gap-2 px-4 group",
+                                    "w-full py-2 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all flex items-center justify-center gap-2 px-4 group",
                                     sendCalendarInvite
-                                        ? "bg-[#002FA7]/10 border-[#002FA7]/50 text-indigo-400 shadow-[0_0_20px_-10px_#002FA7]"
-                                        : "bg-transparent border-white/5 text-zinc-500 hover:bg-white/[0.02] hover:text-zinc-300"
+                                        ? "bg-[#002FA7]/10 border-[#002FA7]/50 text-indigo-400 shadow-[0_0_15px_-5px_#002FA7]"
+                                        : "bg-transparent border-white/5 text-zinc-500 hover:text-white"
                                 )}
                             >
-                                {sendCalendarInvite && <Check className="w-4 h-4" />}
+                                {sendCalendarInvite && <Check className="w-3 h-3" />}
                                 <span className="tracking-wider">
-                                    {sendCalendarInvite ? 'INVITE WILL BE SENT' : 'CLICK TO ADD INVITE'}
+                                    [ {sendCalendarInvite ? 'INVITE WILL BE SENT' : 'CLICK TO ADD INVITE'} ]
                                 </span>
                             </button>
                         </div>
@@ -658,7 +658,7 @@ export function TaskCreationPanel() {
                     <div className="space-y-4">
                         <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Heatmap_Intensity</div>
                         <div className="flex flex-wrap gap-2">
-                            {PRIORITIES.map((p) => (
+                            {PRIORITIES.filter(p => p !== 'BRIEFING').map((p) => (
                                 <button
                                     key={p}
                                     type="button"
@@ -678,37 +678,6 @@ export function TaskCreationPanel() {
                                     {p === 'BRIEFING' ? 'BOOK BRIEFING' : p}
                                 </button>
                             ))}
-                        </div>
-                    </div>
-
-                    {/* REMINDERS */}
-                    <div className="space-y-4">
-                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                             Chrono_Alerts
-                        </div>
-                        <div className="flex gap-2">
-                            {[15, 60].map((mins) => {
-                                const selected = reminders.includes(mins)
-                                return (
-                                    <button
-                                        key={mins}
-                                        type="button"
-                                        onClick={() => {
-                                            setReminders(prev => 
-                                                prev.includes(mins) ? prev.filter(m => m !== mins) : [...prev, mins]
-                                            )
-                                        }}
-                                        className={cn(
-                                            "flex-1 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all",
-                                            selected
-                                                ? "bg-indigo-500/10 border-indigo-500 text-indigo-400"
-                                                : "bg-transparent border-white/5 text-zinc-600 hover:text-zinc-400"
-                                        )}
-                                    >
-                                        [ {mins}m_prior ]
-                                    </button>
-                                )
-                            })}
                         </div>
                     </div>
                 </div>
