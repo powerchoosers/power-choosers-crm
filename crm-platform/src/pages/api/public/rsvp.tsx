@@ -123,32 +123,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     updatedMetadata.zohoEventId
                 );
 
-                if (currEvent && currEvent.attendees) {
-                    const attendees = currEvent.attendees;
+                if (currEvent) {
+                    let attendees = currEvent.attendees || [];
                     const targetIdx = attendees.findIndex((a: any) => a.email.toLowerCase() === String(email).toLowerCase());
                     
                     if (targetIdx > -1) {
-                        // Zoho accepts 'ACCEPTED', 'DECLINED', 'TENTATIVE', 'NEEDS-ACTION' (often sent lowercase or titlecase in JSON but strictly uppercase in API is safe)
+                        // Already exists, just update status
                         attendees[targetIdx].status = rsvpStatus;
-                        
-                        // We must reconstruct the basic payload. Zoho updateEvent only needs modified fields mostly, but requires dates and title.
-                        const updatePayload = {
-                            title: currEvent.title,
-                            dateandtime: currEvent.dateandtime,
-                            attendees: attendees,
-                            notify_attendee: 0
-                        };
-
-                        await zohoService.updateEvent(
-                            taskData.ownerId, 
-                            updatedMetadata.zohoCalendarUid, 
-                            updatedMetadata.zohoEventId, 
-                            updatePayload
-                        );
-                        console.log(`[RSVP Webhook] Successfully pushed native status ${rsvpStatus} to Zoho Calendar for ${email}`);
                     } else {
-                        console.warn(`[RSVP Webhook] Attendee ${email} not found in native event. They may be the organizer. Skipping native update.`);
+                        // Path A: We add them to the attendee list only now that they have accepted/interacted
+                        attendees.push({
+                            email: String(email).toLowerCase(),
+                            status: rsvpStatus,
+                            permission: 1
+                        });
                     }
+                    
+                    // We must reconstruct the basic payload.
+                    const updatePayload = {
+                        title: currEvent.title,
+                        dateandtime: currEvent.dateandtime,
+                        attendees: attendees,
+                        notify_attendee: 0 // Optional, but helps keep it silent for our custom response
+                    };
+
+                    await zohoService.updateEvent(
+                        taskData.ownerId, 
+                        updatedMetadata.zohoCalendarUid, 
+                        updatedMetadata.zohoEventId, 
+                        updatePayload
+                    );
+                    console.log(`[RSVP Webhook] Successfully pushed attendee ${email} with status ${rsvpStatus} to Zoho Calendar`);
                 }
             } catch (zohoError: any) {
                 console.error(`[RSVP Webhook] Non-fatal fault updating Zoho Calendar natively: ${zohoError.message}`);
