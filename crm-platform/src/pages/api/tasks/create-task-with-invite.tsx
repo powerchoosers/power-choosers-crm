@@ -274,6 +274,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         appointmentTime={apptTimeStr}
                         description={description}
                         operationalVector={(metadata?.taskType || 'Meeting').toUpperCase()}
+                        taskId={task.id}
+                        prospectEmail={contact.email}
                         sender={sender}
                     />
                 );
