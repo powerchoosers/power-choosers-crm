@@ -486,13 +486,16 @@ export class ZohoMailService {
     async createEvent(userEmail, calendarUid, eventData) {
         try {
             const { accessToken } = await getValidAccessTokenForUser(userEmail);
+            const { notify_attendee, ...jsonPayload } = eventData;
 
-            // Zoho Calendar expects eventData to be passed. The API documentation shows it as a JSON payload, sometimes wrapped in an 'eventdata' array/object or just POST body.
-            // Based on standard Zoho Calendar v1 API, we post JSON to the endpoint.
-            const url = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events`;
+            let url = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events`;
+            if (notify_attendee !== undefined) {
+                url += `?notify_attendee=${notify_attendee}`;
+            }
+
             
             const formData = new URLSearchParams();
-            formData.append('eventdata', JSON.stringify(eventData));
+            formData.append('eventdata', JSON.stringify(jsonPayload));
 
 
             const response = await fetch(url, {
@@ -523,9 +526,11 @@ export class ZohoMailService {
     async updateEvent(userEmail, calendarUid, eventUid, eventData) {
         try {
             const { accessToken } = await getValidAccessTokenForUser(userEmail);
+            const { notify_attendee, ...jsonPayload } = eventData;
             
-            // 1. Fetch current event to get the mandatory etag
+            // 1. Fetch current event
             const getUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
+
             const getResponse = await fetch(getUrl, {
                 method: 'GET',
                 headers: { 'Authorization': `Bearer ${accessToken}` }
@@ -534,15 +539,20 @@ export class ZohoMailService {
                 const getResult = await getResponse.json();
                 const currentEvent = getResult.events?.[0];
                 if (currentEvent && currentEvent.etag) {
-                    eventData.etag = currentEvent.etag;
+                    jsonPayload.etag = currentEvent.etag;
                 }
             }
 
             // 2. Perform the update
-            const putUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
+            let putUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
+            if (notify_attendee !== undefined) {
+                putUrl += `?notify_attendee=${notify_attendee}`;
+            }
+
             
             const formData = new URLSearchParams();
-            formData.append('eventdata', JSON.stringify(eventData));
+            formData.append('eventdata', JSON.stringify(jsonPayload));
+
 
 
             const response = await fetch(putUrl, {
