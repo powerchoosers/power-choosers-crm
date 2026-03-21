@@ -536,7 +536,7 @@ export class ZohoMailService {
                 const getResult = await getResponse.json();
                 const currentEvent = getResult.events?.[0];
                 if (currentEvent && currentEvent.etag) {
-                    jsonPayload.etag = currentEvent.etag;
+                    eventData.etag = currentEvent.etag;
                 }
             }
 
