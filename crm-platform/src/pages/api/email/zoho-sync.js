@@ -447,6 +447,63 @@ async function autoIngestInboundAttachments({
                 folderId || 'inbox'
             );
 
+            // ----------------------------------------------------------------
+            // RSVP TELEMETRY INTERCEPTOR
+            // ----------------------------------------------------------------
+            const isIcs = (attachment.filename || '').toLowerCase().endsWith('.ics') || 
+                         (contentType || attachment.mimeType || '').includes('text/calendar');
+                         
+            if (isIcs) {
+                try {
+                    const icsText = fileBuffer.toString('utf-8');
+                    logger.info(`[Zoho Sync] Scanning ICS attachment for RSVP telemetry (${safeFileName})`, 'zoho-sync');
+                    
+                    // Search for our specific Nodal Point task UID 
+                    const uidMatch = icsText.match(/UID:([a-zA-Z0-9-]+)@nodalpoint\.io/i);
+                    const taskId = uidMatch ? uidMatch[1] : null;
+                    
+                    if (taskId) {
+                        const isAccepted = /PARTSTAT=ACCEPTED/i.test(icsText);
+                        const isDeclined = /PARTSTAT=DECLINED/i.test(icsText);
+                        
+                        if (isAccepted || isDeclined) {
+                            const newRsvpStatus = isAccepted ? 'ACCEPTED' : 'DECLINED';
+                            logger.info(`[Zoho Sync] RSVP telemetry detected: Task ${taskId} is ${newRsvpStatus}`, 'zoho-sync');
+                            
+                            // Fetch existing task to merge metadata gracefully
+                            const { data: existingTask } = await supabaseAdmin
+                                .from('tasks')
+                                .select('metadata')
+                                .eq('id', taskId)
+                                .single();
+                                
+                            if (existingTask) {
+                                const updatedMetadata = { 
+                                    ...(existingTask.metadata || {}), 
+                                    rsvpStatus: newRsvpStatus 
+                                };
+                                
+                                const { error: rsvpError } = await supabaseAdmin
+                                    .from('tasks')
+                                    .update({ metadata: updatedMetadata })
+                                    .eq('id', taskId);
+                                    
+                                if (rsvpError) {
+                                    logger.error(`[Zoho Sync] Failed to update RSVP status for task ${taskId}: ${rsvpError.message}`, 'zoho-sync');
+                                }
+                            }
+                        }
+                    }
+                } catch (icsError) {
+                    logger.warn(`[Zoho Sync] Failed to parse ICS telemetry: ${icsError?.message || icsError}`, 'zoho-sync');
+                }
+                
+                // Skip adding calendar responses to the customer documents vault
+                skipped++;
+                continue;
+            }
+            // ----------------------------------------------------------------
+
             const { error: uploadError } = await supabaseAdmin.storage
                 .from('vault')
                 .upload(storagePath, fileBuffer, {

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, Clock, Calendar, Search, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Clock, Calendar, Search, Loader2, Check, AlertTriangle } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import {
@@ -34,7 +34,7 @@ import { ForensicClose } from '@/components/ui/ForensicClose'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
 
 const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
-const PRIORITIES = ['Low', 'Medium', 'High'] as const
+const PRIORITIES = ['Low', 'Medium', 'High', 'BRIEFING'] as const
 type Priority = (typeof PRIORITIES)[number]
 
 const TASK_TYPES_CONTACT = ['Call', 'Email', 'Meeting', 'Follow-up', 'LinkedIn'] as const
@@ -84,12 +84,16 @@ export function TaskCreationPanel() {
     const [ampm, setAmpm] = useState<'AM' | 'PM'>(h24 >= 12 ? 'PM' : 'AM')
 
     const [priority, setPriority] = useState<Priority>('Medium')
+    const [reminders, setReminders] = useState<number[]>([])
     const [taskType, setTaskType] = useState<TaskType>('Call')
     const [sendCalendarInvite, setSendCalendarInvite] = useState(false)
     const [notes, setNotes] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
     const [entityQuery, setEntityQuery] = useState('')
     const [debouncedEntityQuery, setDebouncedEntityQuery] = useState('')
+
+    const [dailyTasks, setDailyTasks] = useState<Task[]>([])
+    const [isDailyLoading, setIsDailyLoading] = useState(false)
 
     const activeEntity = selectedEntity || null
     const entityId = activeEntity?.entityId || ''
@@ -125,6 +129,39 @@ export function TaskCreationPanel() {
             setTaskType('Call')
         }
     }, [entityType, taskType])
+
+    // Auto-select BRIEFING on calendar invite
+    useEffect(() => {
+        if (sendCalendarInvite) {
+            setPriority('BRIEFING')
+        } else if (priority === 'BRIEFING') {
+            setPriority('Medium')
+        }
+    }, [sendCalendarInvite])
+
+    // Fetch daily tasks for double-booking check
+    useEffect(() => {
+        const fetchDaily = async () => {
+            setIsDailyLoading(true)
+            try {
+                const start = startOfDay(selectedDate).toISOString()
+                const end = addDays(startOfDay(selectedDate), 1).toISOString()
+                const { data, error } = await supabase
+                    .from('tasks')
+                    .select('*')
+                    .gte('dueDate', start)
+                    .lt('dueDate', end)
+                    .order('dueDate', { ascending: true })
+
+                if (!error) setDailyTasks(data || [])
+            } catch (err) {
+                console.error('Error fetching daily tasks:', err)
+            } finally {
+                setIsDailyLoading(false)
+            }
+        }
+        fetchDaily()
+    }, [selectedDate])
 
     const calendarDays = useMemo(() => {
         const start = startOfMonth(viewMonth)
@@ -196,6 +233,32 @@ export function TaskCreationPanel() {
         return `${taskType} (${name}) at ${when}`
     }
 
+    const parsedDue = useMemo(() => {
+        let [h, m] = timeStr.split(':').map(Number)
+        if (isNaN(h)) h = 12
+        if (isNaN(m)) m = 0
+        let finalH = h
+        if (ampm === 'PM' && h < 12) finalH += 12
+        if (ampm === 'AM' && h === 12) finalH = 0
+        
+        try {
+            return parseTimeToDate(selectedDate, `${String(finalH).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+        } catch(e) {
+            return new Date()
+        }
+    }, [timeStr, ampm, selectedDate])
+
+    const hasTemporalConflict = useMemo(() => {
+        if (priority !== 'BRIEFING') return false;
+        
+        return dailyTasks.some((t: any) => {
+            if (!t.dueDate) return false;
+            const tDate = new Date(t.dueDate);
+            const diffMins = Math.abs(tDate.getTime() - parsedDue.getTime()) / (1000 * 60);
+            return diffMins < 45 && (t.priority === 'BRIEFING' || t.priority === 'High');
+        });
+    }, [parsedDue, dailyTasks, priority]);
+
     const handleSubmit = async () => {
         if (!entityId) return
         setIsCommitting(true)
@@ -212,7 +275,7 @@ export function TaskCreationPanel() {
             const time24Str = `${String(finalH).padStart(2, '0')}:${String(m).padStart(2, '0')}`
             const due = parseTimeToDate(selectedDate, time24Str)
             const title = formatTaskTitle(due)
-            const payload: Omit<Task, 'id' | 'createdAt'> = {
+            const payload: any = {
                 title,
                 description: notes.trim() || undefined,
                 priority,
@@ -222,6 +285,7 @@ export function TaskCreationPanel() {
                 accountId: entityType === 'account' ? entityId : activeEntity?.accountId,
                 relatedTo: entityName,
                 relatedType: entityType === 'contact' ? 'Person' : 'Account',
+                reminders: reminders.length > 0 ? reminders : null,
                 metadata: {
                     taskType,
                     ...(sendCalendarInvite ? { syncCalendar: true, inviteContext: 'forensic_diagnostic' } : {})
@@ -412,6 +476,56 @@ export function TaskCreationPanel() {
                     )}
                 </div>
 
+                {/* DAILY BREAKDOWN */}
+                <div className="space-y-4">
+                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                            <Clock className="w-3 h-3" /> Daily_Schedule
+                        </div>
+                        <span className="text-[9px] text-zinc-600">{format(selectedDate, 'MMM d').toUpperCase()}</span>
+                    </div>
+
+                    <div className="bg-zinc-950/40 rounded-xl border border-white/5 min-h-[120px] max-h-[240px] overflow-y-auto np-scroll p-3 space-y-2">
+                        {isDailyLoading ? (
+                            <div className="space-y-2 p-1">
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="h-10 rounded-lg bg-zinc-800/10 border border-white/[0.02] flex items-center p-2 gap-3 overflow-hidden animate-pulse">
+                                        <div className="w-8 h-3 rounded bg-zinc-800/50" />
+                                        <div className="flex-1 space-y-1.5">
+                                            <div className="w-2/3 h-3 rounded bg-zinc-800/50" />
+                                            <div className="w-1/3 h-2 rounded bg-zinc-800/30" />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : dailyTasks.length === 0 ? (
+                            <div className="h-full flex flex-col items-center justify-center py-8 opacity-40">
+                                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Clear_Orbit // No_Conflicts</div>
+                            </div>
+                        ) : (
+                            dailyTasks.map((t) => (
+                                <div
+                                    key={t.id}
+                                    className="p-2 rounded-lg bg-zinc-950/60 border border-white/[0.05] flex items-center gap-3 group hover:border-[#002FA7]/30 transition-all"
+                                >
+                                    <div className="text-[10px] font-mono text-zinc-500 tabular-nums whitespace-nowrap">
+                                        {t.dueDate ? format(new Date(t.dueDate), 'h:mm a') : '--:--'} CST
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="text-[11px] text-zinc-300 truncate font-medium group-hover:text-white transition-colors">{t.title}</div>
+                                        <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider">
+                                            {t.priority} // {t.status}
+                                        </div>
+                                    </div>
+                                    {t.priority === 'BRIEFING' && (
+                                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.5)]" />
+                                    )}
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+
                 {/* CALENDAR SELECTION */}
                 <div className="space-y-4">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
@@ -517,27 +631,25 @@ export function TaskCreationPanel() {
 
                     {/* CALENDAR INVITE TOGGLE (Contacts Only) */}
                     {entityType === 'contact' && (
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                                 <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
-                                Transmit_Calendar_Invite
+                                EXTERNAL_INVITATIONS
                             </div>
                             <button
                                 type="button"
                                 onClick={() => setSendCalendarInvite(!sendCalendarInvite)}
                                 className={cn(
-                                    "w-full h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all flex items-center justify-center px-4 relative group",
+                                    "w-full h-12 rounded-xl text-xs font-mono uppercase tracking-widest border transition-all flex items-center justify-center gap-2 px-4 group",
                                     sendCalendarInvite
-                                        ? "bg-transparent border-[#002FA7]/50 text-white shadow-[0_0_20px_-10px_#002FA7]"
-                                        : "bg-transparent border-white/5 text-zinc-500 hover:text-white/80"
+                                        ? "bg-[#002FA7]/10 border-[#002FA7]/50 text-indigo-400 shadow-[0_0_20px_-10px_#002FA7]"
+                                        : "bg-transparent border-white/5 text-zinc-500 hover:bg-white/[0.02] hover:text-zinc-300"
                                 )}
                             >
-                                <span className="tracking-[0.2em]">
-                                    {sendCalendarInvite ? '[ PAYLOAD_ATTACHED ]' : '[ STANDBY ]'}
+                                {sendCalendarInvite && <Check className="w-4 h-4" />}
+                                <span className="tracking-wider">
+                                    {sendCalendarInvite ? 'INVITE WILL BE SENT' : 'CLICK TO ADD INVITE'}
                                 </span>
-                                {sendCalendarInvite && (
-                                    <div className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse shadow-[0_0_10px_2px_#002FA7]" />
-                                )}
                             </button>
                         </div>
                     )}
@@ -545,25 +657,58 @@ export function TaskCreationPanel() {
                     {/* PRIORITY */}
                     <div className="space-y-4">
                         <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Heatmap_Intensity</div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                             {PRIORITIES.map((p) => (
                                 <button
                                     key={p}
                                     type="button"
                                     onClick={() => setPriority(p)}
                                     className={cn(
-                                        'flex-1 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest transition-all border',
+                                        'px-4 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest transition-all border flex-1 min-w-[80px]',
                                         p === 'Low' && 'border-zinc-800 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400',
                                         p === 'Low' && priority === p && 'bg-zinc-500/10 border-zinc-500 text-zinc-300',
                                         p === 'Medium' && 'border-amber-900/50 text-amber-900 hover:border-amber-500 hover:text-amber-500',
                                         p === 'Medium' && priority === p && 'bg-amber-500/10 border-amber-500 text-amber-500',
                                         p === 'High' && 'border-rose-900/50 text-rose-900 hover:border-rose-500 hover:text-rose-500',
-                                        p === 'High' && priority === p && 'bg-rose-500/10 border-rose-500 text-rose-500'
+                                        p === 'High' && priority === p && 'bg-rose-500/10 border-rose-500 text-rose-500',
+                                        p === 'BRIEFING' && 'border-indigo-900/50 text-indigo-700 hover:border-indigo-500 hover:text-indigo-400',
+                                        p === 'BRIEFING' && priority === p && 'bg-indigo-500/10 border-indigo-500 text-indigo-400 shadow-[0_0_15px_-5px_#6366f1]'
                                     )}
                                 >
-                                    {p}
+                                    {p === 'BRIEFING' ? 'BOOK BRIEFING' : p}
                                 </button>
                             ))}
+                        </div>
+                    </div>
+
+                    {/* REMINDERS */}
+                    <div className="space-y-4">
+                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                             Chrono_Alerts
+                        </div>
+                        <div className="flex gap-2">
+                            {[15, 60].map((mins) => {
+                                const selected = reminders.includes(mins)
+                                return (
+                                    <button
+                                        key={mins}
+                                        type="button"
+                                        onClick={() => {
+                                            setReminders(prev => 
+                                                prev.includes(mins) ? prev.filter(m => m !== mins) : [...prev, mins]
+                                            )
+                                        }}
+                                        className={cn(
+                                            "flex-1 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest border transition-all",
+                                            selected
+                                                ? "bg-indigo-500/10 border-indigo-500 text-indigo-400"
+                                                : "bg-transparent border-white/5 text-zinc-600 hover:text-zinc-400"
+                                        )}
+                                    >
+                                        [ {mins}m_prior ]
+                                    </button>
+                                )
+                            })}
                         </div>
                     </div>
                 </div>
@@ -602,9 +747,17 @@ export function TaskCreationPanel() {
 
                 {/* ACTION */}
                 <div className="-mt-2 pb-8">
+                    {hasTemporalConflict && (
+                        <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                            <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest">
+                                [ TEMPORAL CONFLICT DETECTED IN SCHEDULE ]
+                            </span>
+                        </div>
+                    )}
                     <Button
                         onClick={handleSubmit}
-                        disabled={isCommitting || !entityId}
+                        disabled={isCommitting || !entityId || hasTemporalConflict}
                         className={panelTheme.cta}
                     >
                         {isCommitting ? (
@@ -612,6 +765,8 @@ export function TaskCreationPanel() {
                                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                                 INITIATING...
                             </>
+                        ) : hasTemporalConflict ? (
+                            '[ SCHEDULE BLOCKED ]'
                         ) : (
                             '[ INITIATE_TASK ]'
                         )}
