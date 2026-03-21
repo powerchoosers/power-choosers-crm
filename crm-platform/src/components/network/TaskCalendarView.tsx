@@ -224,14 +224,14 @@ export function TaskCalendarView({ tasks, onSelectDate, onCreateTask }: TaskCale
                                             </span>
                                         </div>
                                         <div className="flex items-center gap-1.5">
-                                            {task.metadata?.rsvpStatus && (
+                                            {Boolean(task.metadata?.rsvpStatus) && (
                                                 <span className={cn(
                                                     "text-[8px] font-mono px-1 rounded uppercase tracking-[0.1em]",
-                                                    task.metadata.rsvpStatus === 'ACCEPTED' ? "text-emerald-400 border border-emerald-500/30 bg-emerald-500/5" :
-                                                    task.metadata.rsvpStatus === 'DECLINED' ? "text-rose-400 border border-rose-500/30 bg-rose-500/5" :
+                                                    task.metadata?.rsvpStatus === 'ACCEPTED' ? "text-emerald-400 border border-emerald-500/30 bg-emerald-500/5" :
+                                                    task.metadata?.rsvpStatus === 'DECLINED' ? "text-rose-400 border border-rose-500/30 bg-rose-500/5" :
                                                     "text-zinc-400 border border-zinc-500/30 bg-zinc-500/5"
                                                 )}>
-                                                    *{task.metadata.rsvpStatus}
+                                                    *{String(task.metadata?.rsvpStatus)}
                                                 </span>
                                             )}
                                             {task.priority === 'BRIEFING' && !task.metadata?.rsvpStatus && (
