@@ -94,6 +94,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 .eq('id', contactId)
                 .single();
 
+            // Fetch true account name
+            let targetCompanyName = relatedTo || 'Your Organization';
+            const trueAccountId = contact?.accountId || accountId;
+            if (trueAccountId) {
+                const { data: account } = await supabaseAdmin
+                    .from('accounts')
+                    .select('name')
+                    .eq('id', trueAccountId)
+                    .single();
+                if (account?.name) {
+                    targetCompanyName = account.name;
+                }
+            }
+
             if (contact && contact.email) {
                 // Fetch sender (agent) details
                 const { data: agent } = await supabaseAdmin
@@ -216,7 +230,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             attendees: [
                                 { email: contact.email.toLowerCase(), permission: 1 }
                             ],
-                            notify_attendee: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites since we send ForensicInvite manually
+                            notifyAttendees: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites natively
                         };
 
                         if (taskData.reminders && taskData.reminders.length > 0) {
@@ -275,7 +289,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const emailHtml = await render(
                     <ForensicInvite
                         contactName={contactName}
-                        companyName={relatedTo || 'Your Organization'}
+                        companyName={targetCompanyName}
                         appointmentDate={apptDateStr}
                         appointmentTime={apptTimeStr}
                         description={description}
