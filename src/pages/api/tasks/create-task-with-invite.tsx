@@ -267,6 +267,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     throw new Error(`Signal Interrupted: Failed to uplink calendar payload. Orbit error: ${uploadError.message}`);
                 }
 
+                // Determine base URL for RSVP links
+                const protocol = req.headers['x-forwarded-proto'] || 'http';
+                const host = req.headers.host;
+                const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}://${host}`;
+
                 const emailHtml = await render(
                     <ForensicInvite
                         contactName={contactName}
@@ -279,6 +284,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         taskId={task.id}
                         prospectEmail={contact.email}
                         sender={sender}
+                        baseUrl={baseUrl}
                     />
                 );
 
