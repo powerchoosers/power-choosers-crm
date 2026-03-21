@@ -442,21 +442,42 @@ export class ZohoMailService {
     async getCalendars(userEmail) {
         try {
             const { accessToken } = await getValidAccessTokenForUser(userEmail);
-            const response = await fetch('https://calendar.zoho.com/api/v1/calendars', {
+
+            logger.info(`[Zoho Calendar] Fetching calendars for ${userEmail}...`, 'zoho-service');
+
+            const response = await fetch(`https://calendar.zoho.com/api/v1/calendars`, {
                 headers: { 'Authorization': `Bearer ${accessToken}` }
             });
 
             if (!response.ok) {
                 const txt = await response.text();
-                throw new Error(`Zoho Calendar List API error: ${response.status} - ${txt}`);
+                throw new Error(`Zoho Calendar API error: ${response.status} - ${txt}`);
             }
 
-            const result = await response.json();
-            return result.calendars || [];
+            const data = await response.json();
+            return data.calendars || [];
         } catch (error) {
-            logger.error(`[Zoho Calendar] List error for ${userEmail}:`, error, 'zoho-service');
+            logger.error(`[Zoho Calendar] Failed to fetch calendars for ${userEmail}: ${error.message}`, 'zoho-service');
             throw error;
         }
+    }
+
+    /**
+     * Fetch a specific event
+     */
+    async getEvent(userEmail, calendarUid, eventUid) {
+        const { accessToken } = await getValidAccessTokenForUser(userEmail);
+        const response = await fetch(`https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!response.ok) {
+            const txt = await response.text();
+            throw new Error(`Failed to fetch event: ${response.status} - ${txt}`);
+        }
+
+        const data = await response.json();
+        return data.events ? data.events[0] : null;
     }
 
     /**

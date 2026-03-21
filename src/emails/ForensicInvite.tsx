@@ -8,6 +8,8 @@ interface ForensicInviteProps {
     appointmentTime: string;
     description?: string;
     operationalVector?: string;
+    taskId?: string;
+    prospectEmail?: string;
     sender: {
         name: string;
         title: string;
@@ -26,6 +28,8 @@ export default function ForensicInvite({
     appointmentTime,
     description,
     operationalVector = 'VIDEO_DIAGNOSTIC',
+    taskId,
+    prospectEmail,
     sender
 }: ForensicInviteProps) {
     return (
@@ -95,9 +99,31 @@ export default function ForensicInvite({
                         </div>
                     </Section>
 
+                    {/* RSVP Protocol */}
+                    {taskId && prospectEmail && (
+                        <Section style={rsvpContainer}>
+                            <Text style={cardLabel}>// RESPONSE_REQUIRED</Text>
+                            <div style={{ display: 'inline-block' }}>
+                                <Link
+                                    href={`https://crm.nodalpoint.io/api/public/rsvp?action=accept&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
+                                    style={buttonConfirm}
+                                >
+                                    [ CONFIRM_TRANSMISSION ]
+                                </Link>
+                                <span style={{ display: 'inline-block', width: '16px' }}></span>
+                                <Link
+                                    href={`https://crm.nodalpoint.io/api/public/rsvp?action=decline&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
+                                    style={buttonReject}
+                                >
+                                    [ REJECT_TRANSMISSION ]
+                                </Link>
+                            </div>
+                        </Section>
+                    )}
+
                     {/* Closing */}
                     <Text style={bodyText}>
-                        Please use the native calendar controls at the top of this transmission to confirm your availability. This will synchronize the forensic uplink across our protocols.
+                        Please use the buttons above or your native calendar controls to confirm your availability. This will synchronize the forensic uplink.
                     </Text>
 
                     <Hr style={{ borderColor: "#1a1a1a", margin: "40px 0" }} />
@@ -274,6 +300,38 @@ const locationText = {
     fontFamily: "monospace",
     margin: "8px 0 0",
     letterSpacing: "1px",
+};
+
+const rsvpContainer = {
+    marginTop: "10px",
+    marginBottom: "30px",
+    padding: "20px",
+    border: "1px dashed #333",
+    backgroundColor: "#050505",
+};
+
+const buttonConfirm = {
+    backgroundColor: "transparent",
+    border: "1px solid #002FA7",
+    color: "#002FA7",
+    padding: "12px 20px",
+    textDecoration: "none",
+    fontSize: "12px",
+    fontWeight: "bold",
+    fontFamily: "monospace",
+    display: "inline-block",
+};
+
+const buttonReject = {
+    backgroundColor: "transparent",
+    border: "1px solid #333",
+    color: "#666",
+    padding: "12px 20px",
+    textDecoration: "none",
+    fontSize: "12px",
+    fontWeight: "bold",
+    fontFamily: "monospace",
+    display: "inline-block",
 };
 
 
