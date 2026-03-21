@@ -11,6 +11,7 @@ interface ForensicInviteProps {
     operationalVector?: string;
     taskId?: string;
     prospectEmail?: string;
+    baseUrl?: string;
     sender: {
         name: string;
         title: string;
@@ -32,6 +33,7 @@ export default function ForensicInvite({
     operationalVector = 'VIDEO_MEETING',
     taskId,
     prospectEmail,
+    baseUrl = 'https://nodalpoint.io',
     sender
 }: ForensicInviteProps) {
     return (
@@ -105,14 +107,14 @@ export default function ForensicInvite({
                             <Text style={cardLabel}>// RESPONSE_REQUESTED</Text>
                             <div style={{ display: 'inline-block' }}>
                                 <Link
-                                    href={`https://crm.nodalpoint.io/api/public/rsvp?action=accept&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
+                                    href={`${baseUrl}/api/public/rsvp?action=accept&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
                                     style={buttonConfirm}
                                 >
                                     [ ACCEPT INVITE ]
                                 </Link>
                                 <span style={{ display: 'inline-block', width: '16px' }}></span>
                                 <Link
-                                    href={`https://crm.nodalpoint.io/api/public/rsvp?action=decline&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
+                                    href={`${baseUrl}/api/public/rsvp?action=decline&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
                                     style={buttonReject}
                                 >
                                     [ DECLINE INVITE ]
