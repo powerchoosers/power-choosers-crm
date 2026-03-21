@@ -215,7 +215,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             attendees: [
                                 { email: contact.email.toLowerCase(), permission: 1 }
                             ],
-                            reminders: (taskData.reminders || []).map((mins: number) => ({ action: "email", minutes: mins })),
+                            reminders: (taskData.reminders || []).map((mins: number) => ({ action: "email", minutes: -Math.abs(mins) })),
                             notify_attendee: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites since we send ForensicInvite manually
                         };
                         if (metadata?.zohoEventId) {
@@ -240,7 +240,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         }
                     }
                 } catch (calError: any) {
-                    console.warn(`[Zoho Calendar] Native event creation bypassed (missing scopes or unconnected). Defaulting strictly to ICS attachment email flow. Error: ${calError.message}`);
+                    console.error('[Zoho Calendar Diagnostics] Native API Error: ', calError);
+                    // Throw the error precisely to the UI so the user sees the exact reason it failed
+                    throw new Error(`Calendar Native Integration Fault: ${calError.message || calError}. Ensure you have clicked "Connect Zoho Account" to grant Calendar scopes.`);
                 }
 
                 // 2. Upload the ICS attachment (Zoho requires pre-upload for sent items)
