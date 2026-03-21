@@ -243,24 +243,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             // zohoCalendarUid might not be saved on older ones, fallback to defaultCalendar
                             const calendarUid = metadata.zohoCalendarUid || defaultCalendar.uid;
                             
-                            await zohoService.updateEvent(userEmail, calendarUid, eventUid, eventData);
-                            console.log(`[Zoho Calendar] Successfully updated native calendar event UID: ${eventUid}`);
-                        } else {
                             // Step 1: Create new event (silent, no attendees)
                             const result = await zohoService.createEvent(userEmail, defaultCalendar.uid, eventData);
                             console.log(`[Zoho Calendar] Successfully synchronized event to native calendar UID: ${result?.uid}`);
                             
-                            // Step 2: Add attendees via update (often less noisy or suppresses the "New Invite" branded email)
+                            // Save Native Calendar reference back to Task metadata
+                            // Path A: We do NOT add the attendee yet. We only add them when they Accept via Nodal Point button.
                             if (result?.uid) {
-                                const finalData = {
-                                    ...eventData,
-                                    attendees: [
-                                        { email: contact.email.toLowerCase(), permission: 1 }
-                                    ],
-                                    notify_attendee: 0
-                                };
-                                await zohoService.updateEvent(userEmail, defaultCalendar.uid, result.uid, finalData);
-
                                 await supabaseAdmin.from('tasks').update({
                                     metadata: { ...metadata, zohoEventId: result.uid, zohoCalendarUid: defaultCalendar.uid }
                                 }).eq('id', task.id);
