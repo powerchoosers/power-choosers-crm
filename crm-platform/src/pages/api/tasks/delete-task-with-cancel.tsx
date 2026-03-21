@@ -102,7 +102,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     html: `<html><body><p>This briefing has been cancelled. Please remove it from your calendar.</p></body></html>`,
                     text: `This briefing has been cancelled.`,
                     userEmail: userEmail,
-                    attachmentData: uploadResult ? [uploadResult] : []
+                    uploadedAttachments: uploadResult ? [uploadResult] : []
                 });
 
                 emailSent = true;

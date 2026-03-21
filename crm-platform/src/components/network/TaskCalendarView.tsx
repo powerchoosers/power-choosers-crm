@@ -62,7 +62,7 @@ export function TaskCalendarView({ tasks, onSelectDate, onCreateTask }: TaskCale
             <div className="flex-1 nodal-void-card flex flex-col p-6 min-w-0">
                 <div className="flex items-center justify-between mb-8">
                     <div className="flex flex-col gap-1">
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">Temporal_Surface</span>
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">Schedule Calendar</span>
                         <h2 className="text-xl font-mono uppercase tracking-widest text-zinc-100 tabular-nums">
                             {format(viewMonth, 'MMMM yyyy')}
                         </h2>
@@ -177,7 +177,7 @@ export function TaskCalendarView({ tasks, onSelectDate, onCreateTask }: TaskCale
                 <div className="nodal-void-card flex-1 flex flex-col p-5 overflow-hidden border border-white/5">
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex flex-col gap-1">
-                            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Selected_Pulse</span>
+                            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Day Overview</span>
                             <div className="text-sm font-semibold text-zinc-100 uppercase tracking-tight">
                                 {format(selectedDate, 'EEEE d')}
                             </div>
@@ -195,7 +195,7 @@ export function TaskCalendarView({ tasks, onSelectDate, onCreateTask }: TaskCale
                             <div className="h-full flex flex-col items-center justify-center py-10 opacity-30 gap-3 grayscale">
                                 <Target className="w-8 h-8 text-zinc-500" />
                                 <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest text-center">
-                                    No_Nodes // Clear_Signal
+                                    No Appointments
                                 </div>
                             </div>
                         ) : (
@@ -259,14 +259,14 @@ export function TaskCalendarView({ tasks, onSelectDate, onCreateTask }: TaskCale
                     <div className="flex flex-col h-full justify-between">
                         <div className="flex items-center gap-2">
                             <Clock className="w-4 h-4 text-indigo-400" />
-                            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Briefing_Queue</span>
+                            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Briefing Queue</span>
                         </div>
                         <div className="flex items-end justify-between">
                             <div className="text-2xl font-mono text-indigo-100 tabular-nums">
                                 {tasks.filter(t => t.priority === 'BRIEFING' && t.status !== 'Completed').length.toString().padStart(2, '0')}
                             </div>
                             <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest text-right">
-                                Scheduled_Diagnostic<br/>Events
+                                Active<br/>Briefings
                             </div>
                         </div>
                     </div>

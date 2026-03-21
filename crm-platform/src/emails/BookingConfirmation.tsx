@@ -7,6 +7,7 @@ interface BookingConfirmationProps {
     date: string;
     time: string;
     meetingLink?: string;
+    manualIntro?: string;
 }
 
 export default function BookingConfirmation({
@@ -14,7 +15,8 @@ export default function BookingConfirmation({
     companyName,
     date,
     time,
-    meetingLink
+    meetingLink,
+    manualIntro
 }: BookingConfirmationProps) {
     return (
         <Html>
@@ -31,31 +33,31 @@ export default function BookingConfirmation({
                                 style={{ width: "32px", height: "32px", display: "block", marginRight: "12px" }}
                             />
                             <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>FORENSICS</span>
+                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
                             </Text>
                         </div>
                     </Section>
 
                     <Text style={headerLabel}>
-                        ● PROTOCOL_ESTABLISHED
+                        ● CONFIRMATION_NOTICE
                     </Text>
                     <Text style={mainHeading}>
-                        Briefing Secured.
+                        Briefing Confirmed.
                     </Text>
 
                     {/* Body */}
                     <Text style={bodyText}>
                         {contactName},<br /><br />
-                        Your forensic briefing has been secured. Our intelligence unit will contact you at the designated time window to review your energy infrastructure analysis.
+                        {manualIntro || `Your forensic briefing has been scheduled. We will contact you at the designated time to review your energy infrastructure and market exposure.`}
                     </Text>
 
                     {/* Data Card */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// BRIEFING_VECTOR</Text>
+                        <Text style={cardLabel}>// APPOINTMENT_DETAILS</Text>
 
                         <div style={gridContainer}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>VECTOR_TARGET</Text>
+                                <Text style={itemLabel}>ORGANIZATION</Text>
                                 <Text style={{ color: "#fff", fontSize: "16px", fontWeight: "bold", margin: "5px 0 0", fontFamily: "monospace" }}>{companyName}</Text>
                             </div>
                         </div>
@@ -64,7 +66,7 @@ export default function BookingConfirmation({
 
                         <div style={gridContainer}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>TIME_WINDOW</Text>
+                                <Text style={itemLabel}>SCHEDULED_TIME</Text>
                                 <Text style={{ color: "#00CC88", fontSize: "20px", fontWeight: "bold", margin: "5px 0 0", fontFamily: "monospace" }}>{date}</Text>
                                 <Text style={{ color: "#00CC88", fontSize: "16px", fontWeight: "normal", margin: "2px 0 0", fontFamily: "monospace" }}>@ {time}</Text>
                             </div>
@@ -73,19 +75,19 @@ export default function BookingConfirmation({
                     </Section>
 
                     <Text style={extraContext}>
-                        Please have your recent utility invoices available for cross-verification during the briefing.
+                        Please have your recent utility invoices available for cross-verification during the briefing if possible.
                     </Text>
 
                     {meetingLink && (
                         <Section style={{ textAlign: 'center', marginTop: '40px' }}>
                             <Link href={meetingLink} style={link}>
-                                Access Secure Room (If Applicable)
+                                Access Video Briefing Room
                             </Link>
                         </Section>
                     )}
 
                     <Text style={footer}>
-                        Nodal Point // Signal Over Noise<br />
+                        Nodal Point // Forensic Energy Intelligence<br />
                         Fort Worth, TX
                     </Text>
 

@@ -88,6 +88,7 @@ export function TaskCreationPanel() {
     const [taskType, setTaskType] = useState<TaskType>('Call')
     const [sendCalendarInvite, setSendCalendarInvite] = useState(false)
     const [notes, setNotes] = useState('')
+    const [manualIntro, setManualIntro] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
     const [entityQuery, setEntityQuery] = useState('')
     const [debouncedEntityQuery, setDebouncedEntityQuery] = useState('')
@@ -288,7 +289,8 @@ export function TaskCreationPanel() {
                 reminders: sendCalendarInvite ? [15, 60] : null,
                 metadata: {
                     taskType,
-                    ...(sendCalendarInvite ? { syncCalendar: true, inviteContext: 'forensic_diagnostic' } : {})
+                    ...(sendCalendarInvite ? { syncCalendar: true, inviteContext: 'forensic_diagnostic' } : {}),
+                    manualIntro: manualIntro.trim() || undefined
                 }
             }
 
@@ -366,7 +368,7 @@ export function TaskCreationPanel() {
                         <Clock className="w-4 h-4 text-white" />
                     </div>
                     <span className="font-mono text-[10px] tracking-widest text-zinc-300 uppercase">
-                        INITIALIZE_TASK_VECTOR
+                        Schedule Task
                     </span>
                 </div>
                 <ForensicClose onClick={handleClose} size={16} />
@@ -377,7 +379,7 @@ export function TaskCreationPanel() {
                 <div className="space-y-2">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                         <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
-                        Node_Context
+                        Assign To
                     </div>
                     {entityId ? (
                         <div className="px-4 py-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex items-center justify-between gap-4">
@@ -480,7 +482,7 @@ export function TaskCreationPanel() {
                 <div className="space-y-4">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                            <Clock className="w-3 h-3" /> Daily_Schedule
+                            <Clock className="w-3 h-3" /> Daily Schedule
                         </div>
                         <span className="text-[9px] text-zinc-600">{format(selectedDate, 'MMM d').toUpperCase()}</span>
                     </div>
@@ -500,7 +502,7 @@ export function TaskCreationPanel() {
                             </div>
                         ) : dailyTasks.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center py-8 opacity-40">
-                                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Clear_Orbit // No_Conflicts</div>
+                                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">No Conflicts Detected</div>
                             </div>
                         ) : (
                             dailyTasks.map((t) => (
@@ -529,7 +531,7 @@ export function TaskCreationPanel() {
                 {/* CALENDAR SELECTION */}
                 <div className="space-y-4">
                     <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                        <Calendar className="w-3 h-3" /> Temporal_Target
+                        <Calendar className="w-3 h-3" /> Select Date
                     </div>
 
                     <div className="bg-transparent rounded-xl border border-white/10 p-4 space-y-4">
@@ -591,7 +593,7 @@ export function TaskCreationPanel() {
                 <div className="grid grid-cols-1 gap-8">
                     {/* CHRONO */}
                     <div className="space-y-4">
-                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Chrono_Anchor</div>
+                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Scheduled Time</div>
                         <div className="flex flex-col gap-3">
                             <div className="flex items-center gap-3">
                                 <input
@@ -624,7 +626,7 @@ export function TaskCreationPanel() {
                                 onClick={handleNextHr}
                                 className="w-full py-2 rounded-xl bg-transparent border border-white/5 text-[10px] font-mono text-zinc-500 hover:text-white transition-all uppercase tracking-widest"
                             >
-                                [ Increment_Hour ]
+                                [ Add Hour ]
                             </button>
                         </div>
                     </div>
@@ -634,7 +636,7 @@ export function TaskCreationPanel() {
                         <div className="space-y-3">
                             <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center gap-2">
                                 <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
-                                EXTERNAL_INVITATIONS
+                                Zoho Calendar Sync
                             </div>
                             <button
                                 type="button"
@@ -648,7 +650,7 @@ export function TaskCreationPanel() {
                             >
                                 {sendCalendarInvite && <Check className="w-3 h-3" />}
                                 <span className="tracking-wider">
-                                    [ {sendCalendarInvite ? 'INVITE WILL BE SENT' : 'CLICK TO ADD INVITE'} ]
+                                    [ {sendCalendarInvite ? 'INVITE WILL BE SENT' : 'SEND CALENDAR INVITE'} ]
                                 </span>
                             </button>
                         </div>
@@ -656,7 +658,7 @@ export function TaskCreationPanel() {
 
                     {/* PRIORITY */}
                     <div className="space-y-4">
-                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Heatmap_Intensity</div>
+                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Priority Level</div>
                         <div className="flex flex-wrap gap-2">
                             {PRIORITIES.filter(p => p !== 'BRIEFING').map((p) => (
                                 <button
@@ -682,7 +684,7 @@ export function TaskCreationPanel() {
 
                 {/* TASK TYPE */}
                 <div className="space-y-4">
-                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Operational_Vector</div>
+                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Task Category</div>
                     <Select value={taskType} onValueChange={(v) => setTaskType(v as TaskType)}>
                         <SelectTrigger className={`${panelTheme.selectTrigger} text-xs`}>
                             <SelectValue placeholder="Select Vector" />
@@ -703,14 +705,27 @@ export function TaskCreationPanel() {
 
                 {/* INTEL_NOTES */}
                 <div className="space-y-4">
-                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Intel_Payload</div>
+                    <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Internal Notes</div>
                     <textarea
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
-                        placeholder="Input operational briefing..."
-                        className={`${panelTheme.textarea} bg-transparent h-32 p-4 placeholder:text-zinc-800`}
+                        placeholder="Private details for this task..."
+                        className={`${panelTheme.textarea} bg-transparent h-24 p-4 placeholder:text-zinc-800`}
                     />
                 </div>
+
+                {/* MANUAL_INTRO (Shown only for Invites) */}
+                {sendCalendarInvite && (
+                    <div className="space-y-4">
+                        <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest font-bold">Email Introduction (Customer Facing)</div>
+                        <textarea
+                            value={manualIntro}
+                            onChange={(e) => setManualIntro(e.target.value)}
+                            placeholder="Overwrite the default email opening with a custom message..."
+                            className={`${panelTheme.textarea} bg-[#002FA7]/5 border-[#002FA7]/20 h-24 p-4 placeholder:text-zinc-800 focus:border-[#002FA7]/50`}
+                        />
+                    </div>
+                )}
 
                 {/* ACTION */}
                 <div className="-mt-2 pb-8">
@@ -718,7 +733,7 @@ export function TaskCreationPanel() {
                         <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-center gap-3">
                             <AlertTriangle className="w-4 h-4 text-red-500" />
                             <span className="text-[10px] font-mono text-red-400 uppercase tracking-widest">
-                                [ TEMPORAL CONFLICT DETECTED IN SCHEDULE ]
+                                [ Schedule Conflict Detected ]
                             </span>
                         </div>
                     )}
@@ -730,12 +745,12 @@ export function TaskCreationPanel() {
                         {isCommitting ? (
                             <>
                                 <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                                INITIATING...
+                                CREATING...
                             </>
                         ) : hasTemporalConflict ? (
                             '[ SCHEDULE BLOCKED ]'
                         ) : (
-                            '[ INITIATE_TASK ]'
+                            '[ CREATE TASK ]'
                         )}
                     </Button>
                 </div>
