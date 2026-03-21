@@ -223,11 +223,23 @@ export function TaskCalendarView({ tasks, onSelectDate, onCreateTask }: TaskCale
                                                 {task.dueDate ? format(new Date(task.dueDate), 'h:mm a') : '--:--'} CST
                                             </span>
                                         </div>
-                                        {task.priority === 'BRIEFING' && (
-                                            <span className="text-[8px] font-mono text-indigo-400 border border-indigo-500/30 px-1 rounded uppercase tracking-[0.1em] bg-indigo-500/5">
-                                                Book Briefing
-                                            </span>
-                                        )}
+                                        <div className="flex items-center gap-1.5">
+                                            {task.metadata?.rsvpStatus && (
+                                                <span className={cn(
+                                                    "text-[8px] font-mono px-1 rounded uppercase tracking-[0.1em]",
+                                                    task.metadata.rsvpStatus === 'ACCEPTED' ? "text-emerald-400 border border-emerald-500/30 bg-emerald-500/5" :
+                                                    task.metadata.rsvpStatus === 'DECLINED' ? "text-rose-400 border border-rose-500/30 bg-rose-500/5" :
+                                                    "text-zinc-400 border border-zinc-500/30 bg-zinc-500/5"
+                                                )}>
+                                                    *{task.metadata.rsvpStatus}
+                                                </span>
+                                            )}
+                                            {task.priority === 'BRIEFING' && !task.metadata?.rsvpStatus && (
+                                                <span className="text-[8px] font-mono text-indigo-400 border border-indigo-500/30 px-1 rounded uppercase tracking-[0.1em] bg-indigo-500/5">
+                                                    Meeting
+                                                </span>
+                                            )}
+                                        </div>
                                     </div>
                                     <h4 className="text-xs font-semibold text-zinc-200 group-hover:text-white transition-colors line-clamp-2">
                                         {task.title}
