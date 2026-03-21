@@ -677,13 +677,23 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId, source
     const syncSource = normalizeSyncSource(source);
     const sourceLabel = formatSourceLabel(syncSource);
 
+    let notificationType = 'email';
+    let titleStr = `New email from ${resolvedContactName}`;
+    if (emailDoc.subject) {
+        const lowerSubject = emailDoc.subject.toLowerCase();
+        if (lowerSubject.startsWith('accepted:') || lowerSubject.startsWith('declined:') || lowerSubject.includes('has accepted this event')) {
+            notificationType = 'rsvp';
+            titleStr = `RSVP: ${resolvedContactName}`;
+        }
+    }
+
     const notification = {
         id: `email-notif-${messageId}`,
         ownerId: ownerEmail,
         userId: null,
-        title: `New email from ${resolvedContactName}`,
+        title: titleStr,
         message: emailDoc.subject || snippet,
-        type: 'email',
+        type: notificationType,
         read: false,
         link: `/network/emails/${messageId}`,
         data: {
