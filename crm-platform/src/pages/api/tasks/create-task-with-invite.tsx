@@ -225,12 +225,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 end: zohoNativeEnd
                             },
                             location: apptLoc,
-                            richtext_description: cleanHtml,
-                            url: url,
+                            description: cleanHtml,
                             attendees: [
-                                { email: contact.email.toLowerCase(), permission: 1 }
-                            ],
-                            notify_attendee: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites natively
+                                { email: contact.email.toLowerCase() }
+                            ]
                         };
 
                         if (taskData.reminders && taskData.reminders.length > 0) {

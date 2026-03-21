@@ -491,15 +491,8 @@ export class ZohoMailService {
             // Based on standard Zoho Calendar v1 API, we post JSON to the endpoint.
             const url = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events`;
             
-            // Extract notification flags from eventData to avoid "EXTRA_KEY_FOUND_IN_JSON"
-            const { notify_attendee, notifyAttendees, ...jsonPayload } = eventData;
-            
             const formData = new URLSearchParams();
-            formData.append('eventdata', JSON.stringify(jsonPayload));
-
-            // In Zoho Calendar v1, notify_attendee is often a top-level form parameter
-            if (notify_attendee !== undefined) formData.append('notify_attendee', String(notify_attendee));
-            if (notifyAttendees !== undefined) formData.append('notify_attendee', String(notifyAttendees)); // fallback mapping
+            formData.append('eventdata', JSON.stringify(eventData));
 
 
             const response = await fetch(url, {
@@ -548,14 +541,8 @@ export class ZohoMailService {
             // 2. Perform the update
             const putUrl = `https://calendar.zoho.com/api/v1/calendars/${calendarUid}/events/${eventUid}`;
             
-            // Extract notification flags
-            const { notify_attendee, notifyAttendees, ...jsonPayload } = eventData;
-
             const formData = new URLSearchParams();
-            formData.append('eventdata', JSON.stringify(jsonPayload));
-            
-            if (notify_attendee !== undefined) formData.append('notify_attendee', String(notify_attendee));
-            if (notifyAttendees !== undefined) formData.append('notify_attendee', String(notifyAttendees));
+            formData.append('eventdata', JSON.stringify(eventData));
 
 
             const response = await fetch(putUrl, {
