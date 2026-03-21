@@ -7,7 +7,7 @@ export interface Task {
   id: string
   title: string
   description?: string
-  priority: 'Low' | 'Medium' | 'High' | 'Protocol'
+  priority: 'Low' | 'Medium' | 'High' | 'Protocol' | 'BRIEFING'
   status: 'Pending' | 'In Progress' | 'Completed'
   dueDate?: string // ISO date string
   dueTime?: string
@@ -229,12 +229,33 @@ export function useTasks(searchQuery?: string) {
 
   const deleteTaskMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('tasks')
-        .delete()
-        .eq('id', id)
+      const { data: task } = await supabase.from('tasks').select('priority, metadata').eq('id', id).single()
 
-      if (error) throw error
+      if (task && (task.priority === 'BRIEFING' || task.metadata?.syncCalendar)) {
+        const { data: { session } } = await supabase.auth.getSession()
+        const token = session?.access_token || 'dev-bypass-token'
+        const res = await fetch('/api/tasks/delete-task-with-cancel', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ taskId: id, userEmail: user?.email })
+        })
+
+        if (!res.ok) {
+           const text = await res.text()
+           console.error('Cancellation endpoint failed:', text)
+           throw new Error('Failed to dispatch cancellation signal')
+        }
+      } else {
+        const { error } = await supabase
+          .from('tasks')
+          .delete()
+          .eq('id', id)
+
+        if (error) throw error
+      }
       return id
     },
     onSuccess: () => {
@@ -471,3 +492,4 @@ export function useAllPendingTasks() {
     staleTime: 1000 * 60 * 2,
   })
 }
+
