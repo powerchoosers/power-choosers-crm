@@ -136,7 +136,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             title: currEvent.title,
                             dateandtime: currEvent.dateandtime,
                             attendees: attendees,
-                            notifyAttendees: 0
+                            notify_attendee: 0
                         };
 
                         await zohoService.updateEvent(
