@@ -159,30 +159,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 // Generate ICS
                 const icsContent = [
                     'BEGIN:VCALENDAR',
-                    'VERSION:2.0',
                     'PRODID:-//Nodal Point//CRM//EN',
-                    'METHOD:REQUEST',
+                    'VERSION:2.0',
+                    'X-WR-TIMEZONE:null',
                     'CALSCALE:GREGORIAN',
+                    'METHOD:REQUEST',
                     vtimezone,
                     'BEGIN:VEVENT',
-                    `UID:${task.id}@nodalpoint.io`,
-                    `DTSTAMP:${nowStr}`,
-                    `CREATED:${nowStr}`,
-                    `LAST-MODIFIED:${nowStr}`,
-                    `DTSTART;TZID=America/Chicago:${format(apptDate, "yyyyMMdd'T'HHmmss")}`,
-                    `DTEND;TZID=America/Chicago:${format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss")}`,
                     `SUMMARY:Energy Briefing: ${contactName}`,
                     `DESCRIPTION:${cleanDesc}`,
                     `X-ALT-DESC;FMTTYPE=text/html:<!DOCTYPE HTML><HTML><BODY>${cleanHtml}</BODY></HTML>`,
-                    `LOCATION:${apptLoc}`,
+                    `DTSTART;TZID=America/Chicago:${format(apptDate, "yyyyMMdd'T'HHmmss")}`,
+                    `DTEND;TZID=America/Chicago:${format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss")}`,
+                    `LOCATION:${apptLoc || ''}`,
                     url ? `URL:${url}` : '',
+                    `UID:${task.id}@nodalpoint.io`,
                     'IMPORTANT:0',
                     'CLASS:PUBLIC',
-                    `ORGANIZER;CN="${sender.name}":MAILTO:${sender.email.toLowerCase()}`,
-                    `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN="${contactName}":MAILTO:${contact.email.toLowerCase()}`,
-                    `SEQUENCE:${sequenceCount}`,
                     'STATUS:CONFIRMED',
                     'TRANSP:OPAQUE',
+                    'PRIORITY:0',
+                    `SEQUENCE:${sequenceCount}`,
+                    `CREATED:${nowStr}`,
+                    `LAST-MODIFIED:${nowStr}`,
+                    `DTSTAMP:${nowStr}`,
+                    `ORGANIZER;CN=${sender.name}:MAILTO:${sender.email.toLowerCase()}`,
+                    `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;RSVP=TRUE;PARTSTAT=NEEDS-ACTION:MAILTO:${contact.email.toLowerCase()}`,
                     'X-MICROSOFT-CDO-BUSYSTATUS:BUSY',
                     alarms,
                     'END:VEVENT',
@@ -196,12 +198,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     const calendars = await zohoService.getCalendars(userEmail);
                     const defaultCalendar = calendars.find((c: any) => c.isdefault) || calendars[0];
                     if (defaultCalendar?.uid) {
+                        // Fix: Zoho API specifically demands ISO UTC for these 'Z' literals. We convert JS local Date strictly to UTC string without punctuation.
+                        const zohoNativeStart = apptDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                        const zohoNativeEnd = addHours(apptDate, 1).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
                         const eventData = {
                             title: `Energy Briefing: ${contactName}`,
                             dateandtime: {
                                 timezone: "America/Chicago",
-                                start: format(apptDate, "yyyyMMdd'T'HHmmss'Z'"),
-                                end: format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss'Z'")
+                                start: zohoNativeStart,
+                                end: zohoNativeEnd
                             },
                             location: apptLoc,
                             richtext_description: cleanHtml,
