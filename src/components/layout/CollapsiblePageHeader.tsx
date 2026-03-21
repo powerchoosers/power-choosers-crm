@@ -30,6 +30,7 @@ interface CollapsiblePageHeaderProps {
   onFilterToggle?: () => void
   isFilterActive?: boolean
   placeholder?: string
+  children?: React.ReactNode
 }
 
 export function CollapsiblePageHeader({
@@ -43,7 +44,8 @@ export function CollapsiblePageHeader({
   onSearchChange,
   onFilterToggle,
   isFilterActive,
-  placeholder = "Filter current view..."
+  placeholder = "Filter current view...",
+  children
 }: CollapsiblePageHeaderProps) {
   const [isSearchVisible, setIsSearchVisible] = useState(false)
 
@@ -60,19 +62,22 @@ export function CollapsiblePageHeader({
             </Link>
           )}
           {!hideTitle && (
-            <div className="min-w-0">
-              {typeof title === 'string' ? (
-                <h1 className="text-4xl font-semibold tracking-tighter text-white truncate">{title}</h1>
-              ) : (
-                title
-              )}
-              {description && (
-                typeof description === 'string' ? (
-                  <p className="text-zinc-500 mt-1 truncate">{description}</p>
+            <div className="flex items-center gap-6 min-w-0">
+              <div className="min-w-0">
+                {typeof title === 'string' ? (
+                  <h1 className="text-4xl font-semibold tracking-tighter text-white truncate">{title}</h1>
                 ) : (
-                  description
-                )
-              )}
+                  title
+                )}
+                {description && (
+                  typeof description === 'string' ? (
+                    <p className="text-zinc-500 mt-1 truncate">{description}</p>
+                  ) : (
+                    description
+                  )
+                )}
+              </div>
+              {children}
             </div>
           )}
         </div>
