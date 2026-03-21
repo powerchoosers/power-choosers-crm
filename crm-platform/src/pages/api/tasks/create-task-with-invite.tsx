@@ -202,7 +202,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         const zohoNativeStart = apptDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
                         const zohoNativeEnd = addHours(apptDate, 1).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
-                        const eventData = {
+                        const eventData: any = {
                             title: `Energy Briefing: ${contactName}`,
                             dateandtime: {
                                 timezone: "America/Chicago",
@@ -215,9 +215,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             attendees: [
                                 { email: contact.email.toLowerCase(), permission: 1 }
                             ],
-                            reminders: (taskData.reminders || []).map((mins: number) => ({ action: "email", minutes: -Math.abs(mins) })),
                             notify_attendee: 0 // CRITICAL: Stop Zoho from sending unbranded double-invites since we send ForensicInvite manually
                         };
+
+                        if (taskData.reminders && taskData.reminders.length > 0) {
+                            eventData.reminders = taskData.reminders.map((mins: number) => ({ action: "email", minutes: -Math.abs(mins) }));
+                        }
+
                         if (metadata?.zohoEventId) {
                             // If it exists, update the native calendar event
                             const eventUid = metadata.zohoEventId;
