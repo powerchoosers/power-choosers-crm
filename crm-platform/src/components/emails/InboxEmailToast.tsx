@@ -3,6 +3,7 @@
 import React from 'react'
 import { Mail } from 'lucide-react'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import Link from 'next/link'
 
 const AVATAR_SIZE = 44
 
@@ -13,6 +14,7 @@ export interface InboxEmailToastProps {
   snippet?: string
   photoUrl?: string | null
   hasAttachments?: boolean
+  emailId?: string
 }
 
 export function InboxEmailToast({
@@ -22,6 +24,7 @@ export function InboxEmailToast({
   snippet,
   photoUrl,
   hasAttachments = false,
+  emailId,
 }: InboxEmailToastProps) {
   const contactName = name?.trim() || 'CRM Contact'
 
@@ -30,8 +33,8 @@ export function InboxEmailToast({
   if (subject?.trim()) subtitleParts.push(subject.trim())
   if (hasAttachments) subtitleParts.push('Attachment')
 
-  return (
-    <div className="flex items-start gap-3 min-w-0 w-full">
+  const content = (
+    <div className="flex items-start gap-3 min-w-0 w-full hover:opacity-90 transition-opacity cursor-pointer">
       <div className="relative shrink-0">
         <ContactAvatar
           name={contactName}
@@ -61,4 +64,14 @@ export function InboxEmailToast({
       </div>
     </div>
   )
+
+  if (emailId) {
+    return (
+      <Link href={`/network/emails/${emailId}`} className="block w-full no-underline">
+        {content}
+      </Link>
+    )
+  }
+
+  return content
 }

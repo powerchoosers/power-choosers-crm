@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Eye, MousePointer2 } from 'lucide-react'
 import { playPing } from '@/lib/audio'
 import { useUIStore } from '@/store/uiStore'
+import Link from 'next/link'
 
 /**
  * Listens for real-time email tracking updates (opens/clicks) via Supabase Realtime.
@@ -113,25 +114,29 @@ export function useEmailTrackingNotifications() {
             if (clicked) {
               if (soundEnabled) playPing()
               toast(
-                <div className="flex items-center gap-2">
-                  <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
-                  <div className="flex flex-col">
-                    <span className="font-medium">Link clicked by {recipient}</span>
-                    <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                <Link href={`/network/emails/${email.id}`} className="no-underline block w-full">
+                  <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                    <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-white">Link clicked by {recipient}</span>
+                      <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                    </div>
                   </div>
-                </div>,
+                </Link>,
                 { duration: 5000 }
               )
             } else if (opened) {
               if (soundEnabled) playPing()
               toast(
-                <div className="flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-emerald-400" />
-                  <div className="flex flex-col">
-                    <span className="font-medium">Email opened by {recipient}</span>
-                    <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                <Link href={`/network/emails/${email.id}`} className="no-underline block w-full">
+                  <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                    <Eye className="w-4 h-4 text-emerald-400" />
+                    <div className="flex flex-col">
+                      <span className="font-medium text-white">Email opened by {recipient}</span>
+                      <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                    </div>
                   </div>
-                </div>,
+                </Link>,
                 { duration: 5000 }
               )
             }

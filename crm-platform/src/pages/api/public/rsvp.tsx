@@ -156,6 +156,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
         }
 
+        // 4. Create an RSVP notification so the CRM agent gets an immediate visual toast
+        if (taskData.ownerId) {
+            const notifTitle = actionStr === 'ACCEPT' ? 'Session Confirmed' : 'Session Declined';
+            const notifMessage = `${email} has ${actionStr === 'ACCEPT' ? 'accepted' : 'declined'} the calendar invite.`;
+            await supabaseAdmin.from('notifications').insert({
+                ownerId: taskData.ownerId,
+                title: notifTitle,
+                message: notifMessage,
+                type: 'rsvp',
+                read: false,
+                data: {
+                    contactName: String(email).split('@')[0], 
+                    subject: taskData.metadata?.title || 'Unknown Event',
+                    status: actionStr === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED',
+                    taskId: taskData.id
+                }
+            });
+        }
+
         res.status(200).send(renderHtml(
             'success', 
             actionStr === 'ACCEPT' ? 'Session Confirmed' : 'Session Declined', 

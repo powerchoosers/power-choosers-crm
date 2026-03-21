@@ -13,6 +13,7 @@ export type InboxEmailToastInput = {
   sourceLabel?: string
   photoUrl?: string | null
   duration?: number
+  emailId?: string
 }
 
 export function showInboxEmailToast({
@@ -23,6 +24,7 @@ export function showInboxEmailToast({
   hasAttachments = false,
   photoUrl = null,
   duration = 6500,
+  emailId,
 }: InboxEmailToastInput) {
   const soundEnabled = useUIStore.getState().soundEnabled
   if (soundEnabled) playPing()
@@ -35,6 +37,7 @@ export function showInboxEmailToast({
       snippet={snippet}
       photoUrl={photoUrl}
       hasAttachments={hasAttachments}
+      emailId={emailId}
     />,
     { duration }
   )

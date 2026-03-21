@@ -10,7 +10,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { CheckCircle, Eye } from 'lucide-react'
+import { CheckCircle, Eye, CalendarCheck, CalendarX } from 'lucide-react'
 import { showInboxEmailToast } from '@/lib/inbox-email-toast'
 import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe'
 
@@ -234,7 +234,8 @@ export function GlobalSync() {
           }
 
           if (!notification?.id) return
-          if (notification.type && String(notification.type).toLowerCase() !== 'email') return
+          const notifType = String(notification.type || '').toLowerCase()
+          if (notifType !== 'email' && notifType !== 'rsvp') return
           if (notification.read) return
 
           const ownerId = String(notification.ownerId || '').toLowerCase()
@@ -256,15 +257,40 @@ export function GlobalSync() {
           const hasAttachments = Boolean(notification.data?.hasAttachments)
           const sourceLabel = formatSourceLabel(notification.data?.source || notification.metadata?.source)
 
-          showInboxEmailToast({
-            name,
-            company,
-            subject,
-            snippet,
-            hasAttachments,
-            photoUrl: (notification.data?.photoUrl as string | null) ?? null,
-            sourceLabel: sourceLabel || undefined,
-          })
+          if (notifType === 'rsvp') {
+              const statusStr = String(notification.data?.status || 'UNKNOWN').toUpperCase();
+              const isAccepted = statusStr === 'ACCEPTED' || 
+                                 notification.title?.toLowerCase().includes('confirmed') || 
+                                 notification.message?.toLowerCase().includes('accepted');
+              
+              if (useUIStore.getState().soundEnabled) playPing();
+              
+              toast(
+                  <div className="flex items-center gap-3">
+                      {isAccepted ? (
+                          <CalendarCheck className="w-5 h-5 text-emerald-400" />
+                      ) : (
+                          <CalendarX className="w-5 h-5 text-red-400" />
+                      )}
+                      <div className="flex flex-col">
+                          <span className="font-medium">{notification.title || 'RSVP Update'}</span>
+                          <span className="text-xs text-zinc-400">{notification.message}</span>
+                      </div>
+                  </div>,
+                  { duration: 6000 }
+              )
+          } else {
+              showInboxEmailToast({
+                  name,
+                  company,
+                  subject,
+                  snippet,
+                  hasAttachments,
+                  photoUrl: (notification.data?.photoUrl as string | null) ?? null,
+                  sourceLabel: sourceLabel || undefined,
+                  emailId: signalId || undefined,
+              })
+          }
 
           await supabase
             .from('notifications')
@@ -316,15 +342,41 @@ export function GlobalSync() {
 
         seenInboxSignalIdsRef.current.add(signalId)
 
-        showInboxEmailToast({
-          name: String(payload.contactName || row.title?.replace(/^New email from\s+/i, '') || 'CRM contact'),
-          company: String(payload.company || 'Unknown company'),
-          subject: String(payload.subject || row.message || 'New email from CRM contact'),
-          snippet: String(payload.snippet || row.message || 'New message received'),
-          hasAttachments: Boolean(payload.hasAttachments),
-          photoUrl: (payload.photoUrl as string | null) ?? null,
-          sourceLabel: formatSourceLabel(payload.source || row.metadata?.source),
-        })
+        const notifType = String(row.type || '').toLowerCase();
+        
+        if (notifType === 'rsvp') {
+            const statusStr = String(payload.status || 'UNKNOWN').toUpperCase();
+            const isAccepted = statusStr === 'ACCEPTED' || 
+                               row.title?.toLowerCase().includes('confirmed') || 
+                               row.message?.toLowerCase().includes('accepted');
+            
+            if (soundEnabled) playPing();
+            toast(
+                <div className="flex items-center gap-3">
+                    {isAccepted ? (
+                        <CalendarCheck className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                        <CalendarX className="w-5 h-5 text-red-400" />
+                    )}
+                    <div className="flex flex-col">
+                        <span className="font-medium">{row.title || 'RSVP Update'}</span>
+                        <span className="text-xs text-zinc-400">{row.message}</span>
+                    </div>
+                </div>,
+                { duration: 6000 }
+            );
+        } else {
+            showInboxEmailToast({
+              name: String(payload.contactName || row.title?.replace(/^New email from\s+/i, '') || 'CRM contact'),
+              company: String(payload.company || 'Unknown company'),
+              subject: String(payload.subject || row.message || 'New email from CRM contact'),
+              snippet: String(payload.snippet || row.message || 'New message received'),
+              hasAttachments: Boolean(payload.hasAttachments),
+              photoUrl: (payload.photoUrl as string | null) ?? null,
+              sourceLabel: formatSourceLabel(payload.source || row.metadata?.source),
+              emailId: signalId || undefined,
+            });
+        }
 
         await supabase
           .from('notifications')
