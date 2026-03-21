@@ -135,7 +135,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         const updatePayload = {
                             title: currEvent.title,
                             dateandtime: currEvent.dateandtime,
-                            attendees: attendees
+                            attendees: attendees,
+                            notifyAttendees: 0
                         };
 
                         await zohoService.updateEvent(
@@ -145,6 +146,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                             updatePayload
                         );
                         console.log(`[RSVP Webhook] Successfully pushed native status ${rsvpStatus} to Zoho Calendar for ${email}`);
+                    } else {
+                        console.warn(`[RSVP Webhook] Attendee ${email} not found in native event. They may be the organizer. Skipping native update.`);
                     }
                 }
             } catch (zohoError: any) {
