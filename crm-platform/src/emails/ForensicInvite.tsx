@@ -7,6 +7,7 @@ interface ForensicInviteProps {
     appointmentDate: string;
     appointmentTime: string;
     description?: string;
+    manualIntro?: string;
     operationalVector?: string;
     taskId?: string;
     prospectEmail?: string;
@@ -27,7 +28,8 @@ export default function ForensicInvite({
     appointmentDate,
     appointmentTime,
     description,
-    operationalVector = 'VIDEO_DIAGNOSTIC',
+    manualIntro,
+    operationalVector = 'VIDEO_MEETING',
     taskId,
     prospectEmail,
     sender
@@ -35,7 +37,7 @@ export default function ForensicInvite({
     return (
         <Html>
             <Head />
-            <Preview>Energy Briefing Invite // {contactName}</Preview>
+            <Preview>Briefing Invitation // {contactName}</Preview>
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
@@ -49,38 +51,36 @@ export default function ForensicInvite({
                                 style={{ display: "block", marginRight: "12px" }}
                             />
                             <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>CALIBRATION</span>
+                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
                             </Text>
                         </div>
                     </Section>
 
                     <Text style={headerLabel}>
-                        ● SESSION_INITIALIZATION
+                        ● INVITATION_NOTICE
                     </Text>
                     <Section style={{ marginBottom: "24px" }}>
                         <Text style={mainHeading}>
-                            Calibration for {contactName}.
+                            Briefing for {contactName}.
                         </Text>
                     </Section>
 
-
-
                     {/* Briefing Payload */}
                     <Text style={bodyText}>
-                        {description || `Operational session initialized for ${contactName}. Analysis identifies a scheduled update in the sector. This session will review management protocols to optimize the ${companyName} profile.`}
+                        {manualIntro || description || `A briefing has been scheduled for ${contactName}. This session will review market exposure and energy management protocols for ${companyName}.`}
                     </Text>
 
                     {/* Data Grid */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// {companyName.toUpperCase()} // PERFORMANCE_REVIEW</Text>
+                        <Text style={cardLabel}>// {companyName.toUpperCase()} // BRIEFING_DETAILS</Text>
 
                         <div style={gridRow}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>CHRONO_TARGET</Text>
+                                <Text style={itemLabel}>DATE</Text>
                                 <Text style={itemValue}>{appointmentDate}</Text>
                             </div>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>CHRONO_ANCHOR</Text>
+                                <Text style={itemLabel}>TIME</Text>
                                 <Text style={itemValue}>{appointmentTime}</Text>
                             </div>
                         </div>
@@ -89,11 +89,11 @@ export default function ForensicInvite({
 
                         <div style={gridRow}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>NODE_CONTEXT</Text>
+                                <Text style={itemLabel}>ORGANIZATION</Text>
                                 <Text style={itemValue}>{companyName}</Text>
                             </div>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>OPERATIONAL_VECTOR</Text>
+                                <Text style={itemLabel}>MEETING_TYPE</Text>
                                 <Text style={itemValue}>{operationalVector}</Text>
                             </div>
                         </div>
@@ -102,20 +102,20 @@ export default function ForensicInvite({
                     {/* RSVP Protocol */}
                     {taskId && prospectEmail && (
                         <Section style={rsvpContainer}>
-                            <Text style={cardLabel}>// RESPONSE_REQUIRED</Text>
+                            <Text style={cardLabel}>// RESPONSE_REQUESTED</Text>
                             <div style={{ display: 'inline-block' }}>
                                 <Link
                                     href={`https://crm.nodalpoint.io/api/public/rsvp?action=accept&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
                                     style={buttonConfirm}
                                 >
-                                    [ CONFIRM_TRANSMISSION ]
+                                    [ ACCEPT INVITE ]
                                 </Link>
                                 <span style={{ display: 'inline-block', width: '16px' }}></span>
                                 <Link
                                     href={`https://crm.nodalpoint.io/api/public/rsvp?action=decline&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
                                     style={buttonReject}
                                 >
-                                    [ REJECT_TRANSMISSION ]
+                                    [ DECLINE INVITE ]
                                 </Link>
                             </div>
                         </Section>
@@ -123,7 +123,7 @@ export default function ForensicInvite({
 
                     {/* Closing */}
                     <Text style={bodyText}>
-                        Please use the buttons above or your native calendar controls to confirm your availability. This will synchronize the forensic uplink.
+                        Please use the buttons above or your calendar controls to confirm your availability.
                     </Text>
 
                     <Hr style={{ borderColor: "#1a1a1a", margin: "40px 0" }} />
@@ -167,7 +167,7 @@ export default function ForensicInvite({
                     {/* Compliance Footer */}
                     <Section style={{ marginTop: '40px', textAlign: 'center' as const }}>
                         <Text style={{ color: '#444', fontSize: '10px', fontFamily: 'monospace' }}>
-                            This secure transmission was generated by Nodal Point Architecture for {contactName} at {companyName}.
+                            This message was generated by Nodal Point for {contactName} at {companyName}.
                             If this was sent in error, please disregard.
                         </Text>
                     </Section>

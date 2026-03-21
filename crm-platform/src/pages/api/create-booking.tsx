@@ -28,6 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       appointmentDate,
       selectedTime,
       additionalNotes,
+      manualIntro,
       source = 'schedule' // 'schedule', 'home-page', 'guide-download', 'forensic-briefing'
     } = req.body;
 
@@ -223,6 +224,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             companyName={companyNameTrimmed}
             date={appointmentDate}
             time={selectedTime}
+            manualIntro={manualIntro}
             meetingLink="https://meet.google.com/your-meeting-link" // Optional: Replace with dynamic link if available
           />
         );
