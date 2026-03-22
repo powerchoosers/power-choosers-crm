@@ -259,10 +259,14 @@ export function GlobalSync() {
 
           if (notifType === 'rsvp') {
               const statusStr = String(notification.data?.status || 'UNKNOWN').toUpperCase();
-              const isAccepted = statusStr === 'ACCEPTED' || 
-                                 notification.title?.toLowerCase().includes('confirmed') || 
+              const isAccepted = statusStr === 'ACCEPTED' ||
+                                 notification.title?.toLowerCase().includes('confirmed') ||
                                  notification.message?.toLowerCase().includes('accepted');
-              
+
+              // Immediately refresh task data so the badge updates alongside the toast
+              queryClient.invalidateQueries({ queryKey: ['tasks'] })
+              queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] })
+
               if (useUIStore.getState().soundEnabled) playPing();
               
               toast(
@@ -346,10 +350,14 @@ export function GlobalSync() {
         
         if (notifType === 'rsvp') {
             const statusStr = String(payload.status || 'UNKNOWN').toUpperCase();
-            const isAccepted = statusStr === 'ACCEPTED' || 
-                               row.title?.toLowerCase().includes('confirmed') || 
+            const isAccepted = statusStr === 'ACCEPTED' ||
+                               row.title?.toLowerCase().includes('confirmed') ||
                                row.message?.toLowerCase().includes('accepted');
-            
+
+            // Refresh task data so badge updates
+            queryClient.invalidateQueries({ queryKey: ['tasks'] })
+            queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] })
+
             if (soundEnabled) playPing();
             toast(
                 <div className="flex items-center gap-3">
