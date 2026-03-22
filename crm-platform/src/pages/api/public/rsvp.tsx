@@ -111,55 +111,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             throw new Error(`Failed to update DB: ${updateError.message}`);
         }
 
-        // 3. Opportunistically update Zoho Native Calendar Attendees
-        if (taskData.ownerId && updatedMetadata.zohoEventId && updatedMetadata.zohoCalendarUid) {
-            try {
-                const zohoService = new ZohoMailService();
-                
-                // Fetch the existing event to get full structure
-                const currEvent = await zohoService.getEvent(
-                    taskData.ownerId, 
-                    updatedMetadata.zohoCalendarUid, 
-                    updatedMetadata.zohoEventId
-                );
+        // 3. Local state update complete.
+        // We are no longer syncing with Zoho Calendar natively to preserve 100% Nodal Point branding.
+        console.log(`[RSVP] Status ${rsvpStatus} recorded for ${email}`);
 
-                if (currEvent) {
-                    let attendees = currEvent.attendees || [];
-                    const targetIdx = attendees.findIndex((a: any) => a.email.toLowerCase() === String(email).toLowerCase());
-                    
-                    if (targetIdx > -1) {
-                        // Already exists, just update status
-                        attendees[targetIdx].status = rsvpStatus;
-                    } else {
-                        // Path A: We add them to the attendee list only now that they have accepted/interacted
-                        attendees.push({
-                            email: String(email).toLowerCase(),
-                            status: rsvpStatus,
-                            permission: 1
-                        });
-                    }
-                    
-                    // We must reconstruct the basic payload.
-                    const updatePayload = {
-                        title: currEvent.title,
-                        dateandtime: currEvent.dateandtime,
-                        attendees: attendees,
-                        notify_attendee: 0 // Optional, but helps keep it silent for our custom response
-                    };
-
-                    await zohoService.updateEvent(
-                        taskData.ownerId, 
-                        updatedMetadata.zohoCalendarUid, 
-                        updatedMetadata.zohoEventId, 
-                        updatePayload
-                    );
-                    console.log(`[RSVP Webhook] Successfully pushed attendee ${email} with status ${rsvpStatus} to Zoho Calendar`);
-                }
-            } catch (zohoError: any) {
-                console.error(`[RSVP Webhook] Non-fatal fault updating Zoho Calendar natively: ${zohoError.message}`);
-                // Proceed normally. Supabase holds the single source of truth for the War Room.
-            }
-        }
 
         // 4. Create an RSVP notification so the CRM agent gets an immediate visual toast
         if (taskData.ownerId) {
