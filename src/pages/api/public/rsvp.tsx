@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
+import { format, addHours, parseISO } from 'date-fns';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'GET') {
@@ -9,113 +10,159 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const { action, task, email } = req.query;
 
-    const renderHtml = (status: 'success' | 'error', message: string, detail: string) => `
+    const renderErrorHtml = (message: string, detail: string) => `
 <!DOCTYPE html>
 <html>
 <head>
     <title>Nodal Point // Transmission Status</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { 
-            background-color: #050505; 
-            color: #fff; 
-            font-family: monospace; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            height: 100vh; 
-            margin: 0; 
-            padding: 20px;
-            box-sizing: border-box;
-        }
-        .container { 
-            text-align: center; 
-            border: 1px dashed ${status === 'success' ? '#002FA7' : '#ef4444'}; 
-            padding: 40px; 
-            border-radius: 4px; 
-            max-width: 500px;
-            width: 100%;
-            background: #09090b;
-        }
-        .signal { 
-            color: ${status === 'success' ? '#002FA7' : '#ef4444'}; 
-            font-weight: bold; 
-            letter-spacing: 2px; 
-            margin-bottom: 20px; 
-            font-size: 10px; 
-        }
-        h1 { 
-            font-family: sans-serif; 
-            letter-spacing: -1px; 
-            margin: 0 0 16px; 
-            font-size: 24px;
-        }
-        p { 
-            color: #888; 
-            font-size: 14px;
-            line-height: 1.6;
-            margin: 0;
-        }
+        body { background-color: #050505; color: #fff; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { text-align: center; border: 1px dashed #ef4444; padding: 40px; border-radius: 4px; max-width: 500px; width: 100%; background: #09090b; }
+        .signal { color: #ef4444; font-weight: bold; letter-spacing: 2px; margin-bottom: 20px; font-size: 10px; }
+        h1 { font-family: sans-serif; letter-spacing: -1px; margin: 0 0 16px; font-size: 24px; }
+        p { color: #888; font-size: 14px; line-height: 1.6; margin: 0; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="signal">● PROTOCOL_${status === 'success' ? 'SYNCED' : 'FAULT'}</div>
+        <div class="signal">● PROTOCOL_FAULT</div>
         <h1>${message}</h1>
         <p>${detail}</p>
     </div>
 </body>
-</html>
-`;
+</html>`;
+
+    const renderDeclineHtml = () => `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nodal Point // Transmission Status</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { background-color: #050505; color: #fff; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
+        .container { text-align: center; border: 1px dashed #002FA7; padding: 40px; border-radius: 4px; max-width: 500px; width: 100%; background: #09090b; }
+        .signal { color: #002FA7; font-weight: bold; letter-spacing: 2px; margin-bottom: 20px; font-size: 10px; }
+        h1 { font-family: sans-serif; letter-spacing: -1px; margin: 0 0 16px; font-size: 24px; }
+        p { color: #888; font-size: 14px; line-height: 1.6; margin: 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="signal">● PROTOCOL_SYNCED</div>
+        <h1>Session Declined</h1>
+        <p>Your response has been registered. You may securely close this window.</p>
+    </div>
+</body>
+</html>`;
+
+    const renderAcceptHtml = (
+        icsDataUri: string,
+        googleCalUrl: string,
+        outlookUrl: string,
+        eventTitle: string,
+        eventDate: string,
+        eventTime: string
+    ) => `
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Nodal Point // Session Confirmed</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        * { box-sizing: border-box; }
+        body { background-color: #050505; color: #fff; font-family: monospace; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; }
+        .container { text-align: center; border: 1px dashed #002FA7; padding: 40px; border-radius: 4px; max-width: 520px; width: 100%; background: #09090b; }
+        .signal { color: #002FA7; font-weight: bold; letter-spacing: 2px; margin-bottom: 20px; font-size: 10px; }
+        h1 { font-family: sans-serif; letter-spacing: -1px; margin: 0 0 8px; font-size: 24px; }
+        .sub { color: #888; font-size: 13px; line-height: 1.6; margin: 0 0 28px; }
+        .event-block { background: #111; border: 1px solid #1e1e1e; border-radius: 4px; padding: 16px 20px; margin-bottom: 28px; text-align: left; }
+        .event-label { font-size: 9px; letter-spacing: 2px; color: #555; text-transform: uppercase; margin-bottom: 4px; }
+        .event-value { font-size: 13px; color: #d4d4d8; margin-bottom: 10px; }
+        .event-value:last-child { margin-bottom: 0; }
+        .cal-label { font-size: 9px; letter-spacing: 2px; color: #555; text-transform: uppercase; margin-bottom: 12px; }
+        .btn-group { display: flex; flex-direction: column; gap: 10px; }
+        .btn { display: block; padding: 12px 20px; border-radius: 4px; font-family: monospace; font-size: 12px; font-weight: bold; letter-spacing: 1.5px; text-decoration: none; text-align: center; cursor: pointer; transition: opacity 0.15s; }
+        .btn:hover { opacity: 0.85; }
+        .btn-primary { background: #002FA7; color: #fff; border: none; }
+        .btn-outline { background: transparent; color: #888; border: 1px solid #2a2a2a; }
+        .btn-outline:hover { border-color: #555; color: #ccc; }
+        .divider { border: none; border-top: 1px solid #1e1e1e; margin: 24px 0; }
+        .close-note { font-size: 11px; color: #444; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="signal">● PROTOCOL_SYNCED</div>
+        <h1>Session Confirmed</h1>
+        <p class="sub">Your confirmation has been registered in the secure ledger.</p>
+
+        <div class="event-block">
+            <div class="event-label">Event</div>
+            <div class="event-value">${eventTitle}</div>
+            <div class="event-label">Date</div>
+            <div class="event-value">${eventDate}</div>
+            <div class="event-label">Time</div>
+            <div class="event-value">${eventTime} CST</div>
+        </div>
+
+        <div class="cal-label">// Add to your calendar</div>
+        <div class="btn-group">
+            <a class="btn btn-primary" href="${icsDataUri}" download="nodal-point-invite.ics">
+                ↓ DOWNLOAD CALENDAR FILE (.ICS)
+            </a>
+            <a class="btn btn-outline" href="${googleCalUrl}" target="_blank" rel="noopener noreferrer">
+                OPEN IN GOOGLE CALENDAR
+            </a>
+            <a class="btn btn-outline" href="${outlookUrl}" target="_blank" rel="noopener noreferrer">
+                OPEN IN OUTLOOK
+            </a>
+        </div>
+
+        <hr class="divider" />
+        <p class="close-note">You may securely close this window after adding to your calendar.</p>
+    </div>
+</body>
+</html>`;
 
     if (!action || !task || !email) {
-        res.status(400).send(renderHtml('error', 'Invalid Parameters', 'The transmission link is malformed or incomplete.'));
+        res.status(400).send(renderErrorHtml('Invalid Parameters', 'The transmission link is malformed or incomplete.'));
         return;
     }
 
     const actionStr = String(action).toUpperCase();
     if (actionStr !== 'ACCEPT' && actionStr !== 'DECLINE') {
-        res.status(400).send(renderHtml('error', 'Invalid Action', 'Only ACCEPT and DECLINE actions are permitted.'));
+        res.status(400).send(renderErrorHtml('Invalid Action', 'Only ACCEPT and DECLINE actions are permitted.'));
         return;
     }
 
     const rsvpStatus = actionStr === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED';
 
     try {
-        // 1. Fetch Task
+        // 1. Fetch Task (expanded for ICS generation)
         const { data: taskData, error: taskError } = await supabaseAdmin
             .from('tasks')
-            .select('id, ownerId, metadata, title')
+            .select('id, ownerId, metadata, title, dueDate, description, contactId')
             .eq('id', String(task))
             .single();
 
         if (taskError || !taskData) {
-            res.status(404).send(renderHtml('error', 'Task Not Found', 'The requested session could not be located in the secure ledger.'));
+            res.status(404).send(renderErrorHtml('Task Not Found', 'The requested session could not be located in the secure ledger.'));
             return;
         }
 
-        // 2. Update Supabase
-        const currentMetadata = taskData.metadata || {};
-        const updatedMetadata = {
-            ...currentMetadata,
-            rsvpStatus: rsvpStatus
-        };
-
+        // 2. Update RSVP status
+        const updatedMetadata = { ...(taskData.metadata || {}), rsvpStatus };
         const { error: updateError } = await supabaseAdmin
             .from('tasks')
             .update({ metadata: updatedMetadata })
             .eq('id', taskData.id);
 
-        if (updateError) {
-            throw new Error(`Failed to update DB: ${updateError.message}`);
-        }
+        if (updateError) throw new Error(`Failed to update DB: ${updateError.message}`);
 
-        // 3. Local state update complete.
-        // We are no longer syncing with Zoho Calendar natively to preserve 100% Nodal Point branding.
         console.log(`[RSVP] Status ${rsvpStatus} recorded for ${email}`);
 
-
-        // 4. Create an RSVP notification so the CRM agent gets an immediate visual toast
+        // 3. Fire RSVP notification for CRM toast + badge
         if (taskData.ownerId) {
             const notifTitle = actionStr === 'ACCEPT' ? 'Session Confirmed' : 'Session Declined';
             const notifMessage = `${email} has ${actionStr === 'ACCEPT' ? 'accepted' : 'declined'} the calendar invite.`;
@@ -128,23 +175,125 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 read: false,
                 data: {
                     contactName: String(email).split('@')[0],
-                    subject: (taskData as any).title || taskData.metadata?.title || 'Unknown Event',
-                    status: actionStr === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED',
+                    subject: taskData.title || 'Unknown Event',
+                    status: rsvpStatus,
                     taskId: taskData.id
                 }
             });
         }
 
-        res.status(200).send(renderHtml(
-            'success', 
-            actionStr === 'ACCEPT' ? 'Session Confirmed' : 'Session Declined', 
-            actionStr === 'ACCEPT' 
-                ? 'Your confirmation has been registered. You may securely close this window.'
-                : 'Your response has been registered. You may securely close this window.'
+        // 4. For DECLINE — simple confirmation page
+        if (actionStr === 'DECLINE') {
+            res.status(200).send(renderDeclineHtml());
+            return;
+        }
+
+        // 5. For ACCEPT — generate ICS + calendar deep links
+        // Fetch agent details for organizer field
+        const { data: agent } = await supabaseAdmin
+            .from('users')
+            .select('first_name, last_name, name, job_title, settings')
+            .eq('email', taskData.ownerId)
+            .single();
+
+        const agentSettings = agent?.settings || {};
+        const agentName = (agent?.first_name && agent?.last_name)
+            ? `${agent.first_name} ${agent.last_name}`
+            : agent?.name || taskData.ownerId;
+        const meetingUrl = agentSettings.meetingLink || agentSettings.meeting_link || agentSettings.zoomLink || '';
+
+        // Build Chicago-local timestamps
+        const apptDate = parseISO(taskData.dueDate || new Date().toISOString());
+        const chicagoStr = apptDate.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+        const chicagoDate = new Date(chicagoStr);
+        const chicagoEnd = addHours(chicagoDate, 1);
+
+        const displayDate = format(chicagoDate, 'EEEE, MMMM do, yyyy');
+        const displayTime = format(chicagoDate, 'h:mm a');
+
+        // ICS timestamps — local Chicago format for TZID-anchored fields
+        const dtStart = format(chicagoDate, "yyyyMMdd'T'HHmmss");
+        const dtEnd = format(chicagoEnd, "yyyyMMdd'T'HHmmss");
+        // UTC stamps for DTSTAMP
+        const nowUtc = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
+        // UTC format for Google/Outlook deep links
+        const dtStartUtc = format(apptDate, "yyyyMMdd'T'HHmmss'Z'");
+        const dtEndUtc = format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss'Z'");
+
+        const vtimezone = [
+            'BEGIN:VTIMEZONE',
+            'TZID:America/Chicago',
+            'BEGIN:DAYLIGHT',
+            'TZOFFSETFROM:-0600',
+            'TZOFFSETTO:-0500',
+            'DTSTART:19700308T020000',
+            'RRULE:FREQ=YEARLY;BYMONTH=3;BYDAY=2SU',
+            'END:DAYLIGHT',
+            'BEGIN:STANDARD',
+            'TZOFFSETFROM:-0500',
+            'TZOFFSETTO:-0600',
+            'DTSTART:19701101T020000',
+            'RRULE:FREQ=YEARLY;BYMONTH=11;BYDAY=1SU',
+            'END:STANDARD',
+            'END:VTIMEZONE'
+        ].join('\r\n');
+
+        const cleanDesc = (taskData.description || '').replace(/\r?\n/g, '\\n');
+
+        const icsContent = [
+            'BEGIN:VCALENDAR',
+            'PRODID:-//Nodal Point//CRM//EN',
+            'VERSION:2.0',
+            'X-WR-TIMEZONE:America/Chicago',
+            'CALSCALE:GREGORIAN',
+            'METHOD:REQUEST',
+            vtimezone,
+            'BEGIN:VEVENT',
+            `SUMMARY:${taskData.title || 'Energy Briefing'}`,
+            `DESCRIPTION:${cleanDesc}`,
+            `DTSTART;TZID=America/Chicago:${dtStart}`,
+            `DTEND;TZID=America/Chicago:${dtEnd}`,
+            meetingUrl ? `LOCATION:${meetingUrl}` : 'LOCATION:Remote (Nodal Point Forensic Engine)',
+            meetingUrl ? `URL:${meetingUrl}` : '',
+            `UID:${taskData.id}@nodalpoint.io`,
+            'CLASS:PUBLIC',
+            'STATUS:CONFIRMED',
+            'TRANSP:OPAQUE',
+            `ORGANIZER;CN="${agentName}":MAILTO:${taskData.ownerId}`,
+            `ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;RSVP=FALSE;PARTSTAT=ACCEPTED:MAILTO:${String(email).toLowerCase()}`,
+            `CREATED:${nowUtc}`,
+            `LAST-MODIFIED:${nowUtc}`,
+            `DTSTAMP:${nowUtc}`,
+            'END:VEVENT',
+            'END:VCALENDAR'
+        ].filter(Boolean).join('\r\n');
+
+        // Embed ICS as data URI (universal — works on all calendar apps)
+        const icsDataUri = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`;
+
+        // Google Calendar deep link
+        const gcTitle = encodeURIComponent(taskData.title || 'Energy Briefing');
+        const gcDesc = encodeURIComponent(taskData.description || '');
+        const gcLoc = encodeURIComponent(meetingUrl || 'Remote');
+        const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${gcTitle}&dates=${dtStartUtc.replace(/[-:]/g, '')}/${dtEndUtc.replace(/[-:]/g, '')}&details=${gcDesc}&location=${gcLoc}`;
+
+        // Outlook Web deep link
+        const olTitle = encodeURIComponent(taskData.title || 'Energy Briefing');
+        const olBody = encodeURIComponent(taskData.description || '');
+        const olLoc = encodeURIComponent(meetingUrl || 'Remote');
+        const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${olTitle}&startdt=${apptDate.toISOString()}&enddt=${addHours(apptDate, 1).toISOString()}&body=${olBody}&location=${olLoc}`;
+
+        res.status(200).send(renderAcceptHtml(
+            icsDataUri,
+            googleCalUrl,
+            outlookUrl,
+            taskData.title || 'Energy Briefing',
+            displayDate,
+            displayTime
         ));
 
     } catch (error: any) {
         console.error('[RSVP Webhook] Fatal Error:', error);
-        res.status(500).send(renderHtml('error', 'System Fault', 'The synchronization engine experienced an error processing your response.'));
+        res.status(500).send(renderErrorHtml('System Fault', 'The synchronization engine experienced an error processing your response.'));
     }
 }
