@@ -129,8 +129,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 const contactName = `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Valued Contact';
                 const apptDate = parseISO(dueDate);
-                const apptDateStr = format(apptDate, 'EEEE, MMMM do, yyyy');
-                const apptTimeStr = format(apptDate, 'h:mm a');
+
+                // Convert UTC → America/Chicago for display + ICS timestamps
+                const chicagoStr = apptDate.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+                const chicagoDate = new Date(chicagoStr);
+                const apptDateStr = format(chicagoDate, 'EEEE, MMMM do, yyyy');
+                const apptTimeStr = format(chicagoDate, 'h:mm a');
 
                 // Generate Alarms
                 const alarms = (taskData.reminders || []).map((mins: number) => [
@@ -184,8 +188,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     `SUMMARY:Energy Briefing: ${contactName}`,
                     `DESCRIPTION:${cleanDesc}`,
                     `X-ALT-DESC;FMTTYPE=text/html:<!DOCTYPE HTML><HTML><BODY>${cleanHtml}</BODY></HTML>`,
-                    `DTSTART;TZID=America/Chicago:${format(apptDate, "yyyyMMdd'T'HHmmss")}`,
-                    `DTEND;TZID=America/Chicago:${format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss")}`,
+                    `DTSTART;TZID=America/Chicago:${format(chicagoDate, "yyyyMMdd'T'HHmmss")}`,
+                    `DTEND;TZID=America/Chicago:${format(addHours(chicagoDate, 1), "yyyyMMdd'T'HHmmss")}`,
                     `LOCATION:${apptLoc || ''}`,
                     url ? `URL:${url}` : '',
                     `UID:${task.id}@nodalpoint.io`,
@@ -254,6 +258,31 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     userEmail: userEmail,
                     uploadedAttachments: uploadedAttachments
                 });
+
+                // Log the calendar invite email to the emails table
+                try {
+                    const emailId = `cal_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+                    await supabaseAdmin.from('emails').insert({
+                        id: emailId,
+                        contactId: contactId,
+                        accountId: trueAccountId || null,
+                        from: userEmail,
+                        to: JSON.stringify([contact.email]),
+                        subject: `Energy Briefing: ${contactName}`,
+                        html: emailHtml,
+                        text: description || '',
+                        status: 'sent',
+                        type: 'sent',
+                        ownerId: userEmail,
+                        metadata: {
+                            calendarInvite: true,
+                            taskId: task.id,
+                            inviteContext: metadata?.inviteContext || 'forensic_diagnostic'
+                        }
+                    });
+                } catch (logErr: any) {
+                    console.warn('[Create Task Invite] Failed to log email:', logErr.message);
+                }
             }
         }
 
