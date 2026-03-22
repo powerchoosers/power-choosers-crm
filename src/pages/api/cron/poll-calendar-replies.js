@@ -161,6 +161,7 @@ async function processUserInbox(userEmail, zohoService) {
             const notifMessage = `${attendeeDisplay} has ${rsvpStatus === 'ACCEPTED' ? 'accepted' : 'declined'} the calendar invite (via native calendar).`;
 
             await supabaseAdmin.from('notifications').insert({
+                id: crypto.randomUUID(),
                 ownerId: task.ownerId,
                 title: notifTitle,
                 message: notifMessage,
