@@ -1,6 +1,9 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from '../email/zoho-service.js';
+import { render } from '@react-email/render';
+import ForensicCancel from '../../../emails/ForensicCancel';
+import React from 'react';
 import { format, parseISO, addHours } from 'date-fns';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -25,20 +28,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const zohoService = new ZohoMailService();
 
-        // Native Calendar Delete
-        try {
-            if (task.metadata?.zohoEventId) {
-                const eventUid = task.metadata.zohoEventId;
-                const calendarUid = task.metadata.zohoCalendarUid;
-                if (calendarUid) {
-                    await zohoService.deleteEvent(userEmail, calendarUid, eventUid);
-                    console.log(`[Calendar] Successfully deleted native Zoho Calendar event ${eventUid}`);
-                }
-            }
-        } catch (nativeErr: any) {
-            console.warn(`[Calendar] Native delete failed or skipped. ${nativeErr.message}`);
-        }
-
         // Send Cancellation Email if this was synced
         let emailSent = false;
         if (task.metadata?.syncCalendar && task.contacts?.email) {
@@ -51,7 +40,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 
                 // Fetch agent info
                 const { data: agent } = await supabaseAdmin.from('users').select('*').eq('email', userEmail).single();
-                const senderName = agent?.name || agent?.first_name ? `${agent.first_name} ${agent.last_name}`.trim() : userEmail;
+                const agentSettings = agent?.settings || {};
+                const senderName = (agent?.first_name && agent?.last_name) ? `${agent.first_name} ${agent.last_name}`.trim() : (agent?.name || userEmail);
+                const sender = {
+                    name: senderName,
+                    title: agent?.job_title || agentSettings.jobTitle || 'Nodal Point Architect',
+                    phone: agentSettings.selectedPhoneNumber || agentSettings.twilioNumbers?.[0]?.number || '+1 (817) 754-0695',
+                    email: userEmail,
+                    city: agentSettings.city || 'Fort Worth',
+                    state: agentSettings.state || 'TX',
+                    avatarUrl: agent?.hosted_photo_url || agentSettings.avatar_url || 'https://nodalpoint.io/images/staff/lewis-patterson.png'
+                };
 
                 // Build timezone array
                 const vtimezone = [
@@ -95,12 +94,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 ].join('\r\n');
 
                 const uploadResult = await zohoService.uploadAttachment(userEmail, icsContent, 'cancel.ics', false);
-                
+
+                const apptDateStr = format(apptDate, 'EEEE, MMMM do, yyyy');
+                const apptTimeStr = format(apptDate, 'h:mm a');
+                const emailHtml = await render(
+                    <ForensicCancel
+                        contactName={contactName}
+                        companyName={task.metadata?.relatedTo || 'Your Organization'}
+                        appointmentDate={apptDateStr}
+                        appointmentTime={apptTimeStr}
+                        sender={sender}
+                    />
+                );
+
                 await zohoService.sendEmail({
                     to: contactEmail.toLowerCase(),
+                    fromName: sender.name,
                     subject: `Canceled: Energy Briefing - ${contactName}`,
-                    html: `<html><body><p>This briefing has been cancelled. Please remove it from your calendar.</p></body></html>`,
-                    text: `This briefing has been cancelled.`,
+                    html: emailHtml,
                     userEmail: userEmail,
                     uploadedAttachments: uploadResult ? [uploadResult] : []
                 });
