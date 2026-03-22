@@ -176,7 +176,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     'BEGIN:VCALENDAR',
                     'PRODID:-//Nodal Point//CRM//EN',
                     'VERSION:2.0',
-                    'X-WR-TIMEZONE:null',
+                    'X-WR-TIMEZONE:America/Chicago',
                     'CALSCALE:GREGORIAN',
                     'METHOD:REQUEST',
                     vtimezone,

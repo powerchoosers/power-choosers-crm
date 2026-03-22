@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckSquare, Circle, CheckCircle2 } from 'lucide-react'
+import { CheckSquare, Circle, CheckCircle2, CalendarCheck, CalendarX, CalendarClock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTasks, type Task } from '@/hooks/useTasks'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -70,6 +70,21 @@ function TaskRow({
         </p>
         <div className="flex items-center gap-2 mt-1">
           <PriorityBadge priority={task.priority} labelStyle="suffix" completed={isCompleted} />
+          {task.priority === 'BRIEFING' && !!task.metadata?.syncCalendar && (
+            task.metadata?.rsvpStatus === 'ACCEPTED' ? (
+              <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 rounded">
+                <CalendarCheck size={9} /> ACCEPTED
+              </span>
+            ) : task.metadata?.rsvpStatus === 'DECLINED' ? (
+              <span className="flex items-center gap-1 text-[9px] font-mono text-rose-400 border border-rose-500/30 bg-rose-500/5 px-1.5 py-0.5 rounded">
+                <CalendarX size={9} /> DECLINED
+              </span>
+            ) : (
+              <span className="flex items-center gap-1 text-[9px] font-mono text-amber-400/70 border border-amber-500/20 bg-amber-500/5 px-1.5 py-0.5 rounded">
+                <CalendarClock size={9} /> AWAITING
+              </span>
+            )
+          )}
           {task.relatedTo && (
             <span className="text-[8px] font-mono text-zinc-700 truncate">{task.relatedTo}</span>
           )}
