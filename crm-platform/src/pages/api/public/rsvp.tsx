@@ -120,13 +120,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const notifTitle = actionStr === 'ACCEPT' ? 'Session Confirmed' : 'Session Declined';
             const notifMessage = `${email} has ${actionStr === 'ACCEPT' ? 'accepted' : 'declined'} the calendar invite.`;
             await supabaseAdmin.from('notifications').insert({
+                id: crypto.randomUUID(),
                 ownerId: taskData.ownerId,
                 title: notifTitle,
                 message: notifMessage,
                 type: 'rsvp',
                 read: false,
                 data: {
-                    contactName: String(email).split('@')[0], 
+                    contactName: String(email).split('@')[0],
                     subject: (taskData as any).title || taskData.metadata?.title || 'Unknown Event',
                     status: actionStr === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED',
                     taskId: taskData.id
