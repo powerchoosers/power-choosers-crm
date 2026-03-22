@@ -208,60 +208,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 const zohoService = new ZohoMailService();
 
-                // 1. Attempt Native Zoho Calendar Event Creation
-                try {
-                    const calendars = await zohoService.getCalendars(userEmail);
-                    const defaultCalendar = calendars.find((c: any) => c.isdefault) || calendars[0];
-                    if (defaultCalendar?.uid) {
-                        // Fix: Zoho API specifically demands ISO UTC for these 'Z' literals. We convert JS local Date strictly to UTC string without punctuation.
-                        const zohoNativeStart = apptDate.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-                        const zohoNativeEnd = addHours(apptDate, 1).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-
-                        const eventData: any = {
-                            title: `Energy Briefing: ${contactName}`,
-                            dateandtime: {
-                                timezone: "America/Chicago",
-                                start: zohoNativeStart,
-                                end: zohoNativeEnd
-                            },
-                            location: apptLoc,
-                            description: cleanHtml,
-                            url: url,
-                            // attendees: [
-                            //     { email: contact.email.toLowerCase(), permission: 1 }
-                            // ],
-                            notify_attendee: 0 
-                        };
-
-                        if (taskData.reminders && taskData.reminders.length > 0) {
-                            eventData.reminders = taskData.reminders.map((mins: number) => ({ action: "email", minutes: -Math.abs(mins) }));
-                        }
-
-                        if (metadata?.zohoEventId) {
-                            // If it exists, update the native calendar event
-                            const eventUid = metadata.zohoEventId;
-                            // zohoCalendarUid might not be saved on older ones, fallback to defaultCalendar
-                            const calendarUid = metadata.zohoCalendarUid || defaultCalendar.uid;
-                            
-                            // Step 1: Create new event (silent, no attendees)
-                            const result = await zohoService.createEvent(userEmail, defaultCalendar.uid, eventData);
-                            console.log(`[Zoho Calendar] Successfully synchronized event to native calendar UID: ${result?.uid}`);
-                            
-                            // Save Native Calendar reference back to Task metadata
-                            // Path A: We do NOT add the attendee yet. We only add them when they Accept via Nodal Point button.
-                            if (result?.uid) {
-                                await supabaseAdmin.from('tasks').update({
-                                    metadata: { ...metadata, zohoEventId: result.uid, zohoCalendarUid: defaultCalendar.uid }
-                                }).eq('id', task.id);
-                            }
-                        }
-                    }
-                } catch (calError: any) {
-                    console.error('[Zoho Calendar Diagnostics] Native API Error: ', calError);
-                    // Throw the error precisely to the UI so the user sees the exact reason it failed
-                    throw new Error(`Calendar Native Integration Fault: ${calError.message || calError}. Ensure you have clicked "Connect Zoho Account" to grant Calendar scopes.`);
-                }
-
                 // 2. Upload the ICS attachment (Zoho requires pre-upload for sent items)
                 let uploadedAttachments: any[] = [];
                 try {
