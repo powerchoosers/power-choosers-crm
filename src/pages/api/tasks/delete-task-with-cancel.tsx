@@ -35,6 +35,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const contactEmail = task.contacts.email;
                 const contactName = `${task.contacts.firstName || ''} ${task.contacts.lastName || ''}`.trim() || 'Valued Contact';
                 const apptDate = parseISO(task.dueDate || new Date().toISOString());
+                // Convert UTC → America/Chicago for display + ICS timestamps
+                const chicagoStr = apptDate.toLocaleString('en-US', { timeZone: 'America/Chicago' });
+                const chicagoDate = new Date(chicagoStr);
                 const nowStr = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
                 const sequenceCount = (task.metadata?.sequence || 0) + 1; // Increment sequence for cancel
                 
@@ -81,8 +84,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     'BEGIN:VEVENT',
                     `UID:${task.id}@nodalpoint.io`,
                     `DTSTAMP:${nowStr}`,
-                    `DTSTART;TZID=America/Chicago:${format(apptDate, "yyyyMMdd'T'HHmmss")}`,
-                    `DTEND;TZID=America/Chicago:${format(addHours(apptDate, 1), "yyyyMMdd'T'HHmmss")}`,
+                    `DTSTART;TZID=America/Chicago:${format(chicagoDate, "yyyyMMdd'T'HHmmss")}`,
+                    `DTEND;TZID=America/Chicago:${format(addHours(chicagoDate, 1), "yyyyMMdd'T'HHmmss")}`,
                     `SUMMARY:CANCELED: Energy Briefing: ${contactName}`,
                     `ORGANIZER;CN="${senderName}":MAILTO:${userEmail}`,
                     `ATTENDEE;ROLE=REQ-PARTICIPANT;PARTSTAT=NEEDS-ACTION;RSVP=TRUE;CN="${contactName}":MAILTO:${contactEmail.toLowerCase()}`,
@@ -95,8 +98,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                 const uploadResult = await zohoService.uploadAttachment(userEmail, icsContent, 'cancel.ics', false);
 
-                const apptDateStr = format(apptDate, 'EEEE, MMMM do, yyyy');
-                const apptTimeStr = format(apptDate, 'h:mm a');
+                const apptDateStr = format(chicagoDate, 'EEEE, MMMM do, yyyy');
+                const apptTimeStr = format(chicagoDate, 'h:mm a');
                 const emailHtml = await render(
                     <ForensicCancel
                         contactName={contactName}
