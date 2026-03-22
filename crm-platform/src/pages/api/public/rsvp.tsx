@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
-import { ZohoMailService } from '../email/zoho-service.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'GET') {
@@ -86,7 +85,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // 1. Fetch Task
         const { data: taskData, error: taskError } = await supabaseAdmin
             .from('tasks')
-            .select('id, ownerId, metadata')
+            .select('id, ownerId, metadata, title')
             .eq('id', String(task))
             .single();
 
@@ -128,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 read: false,
                 data: {
                     contactName: String(email).split('@')[0], 
-                    subject: taskData.metadata?.title || 'Unknown Event',
+                    subject: (taskData as any).title || taskData.metadata?.title || 'Unknown Event',
                     status: actionStr === 'ACCEPT' ? 'ACCEPTED' : 'DECLINED',
                     taskId: taskData.id
                 }
