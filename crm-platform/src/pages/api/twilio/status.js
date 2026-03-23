@@ -32,7 +32,7 @@ export default async function handler(req, res) {
         if (!body || typeof body !== 'object') body = {};
 
         // --- Extract CRM context from query parameters ---
-        let contactId, accountId, agentId, agentEmail, targetPhoneFromQuery;
+        let contactId, accountId, agentId, agentEmail, targetPhoneFromQuery, businessPhoneFromQuery;
         try {
             const protocol = req.headers['x-forwarded-proto'] || 'https';
             const host = req.headers.host || req.headers['x-forwarded-host'] || '';
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
             agentId = requestUrl.searchParams.get('agentId');
             agentEmail = requestUrl.searchParams.get('agentEmail');
             targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
+            businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone');
         } catch (_) { }
 
         const {
@@ -94,6 +95,7 @@ export default async function handler(req, res) {
                     status: event,
                     duration: correctedDuration,
                     targetPhone: targetPhoneFromQuery || undefined,
+                    businessPhone: businessPhoneFromQuery || undefined,
                     contactId,
                     accountId,
                     agentId,
@@ -178,6 +180,7 @@ export default async function handler(req, res) {
                             agentId,
                             agentEmail,
                             targetPhone: targetPhoneFromQuery || undefined,
+                            businessPhone: businessPhoneFromQuery || undefined,
                             source: 'status-recording-fallback'
                         }).catch(() => { });
                         logger.log('[Status] Recording fallback attached to:', CallSid, foundRecSid);
