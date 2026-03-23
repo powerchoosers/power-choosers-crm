@@ -24,7 +24,11 @@ const jobSchema = z.object({
 })
 
 const QUEUE_NAME = 'sequence_jobs'
-const API_BASE_URL = 'https://nodal-point-network.vercel.app';
+const API_BASE_URL = (
+    Deno.env.get('PUBLIC_BASE_URL') ||
+    Deno.env.get('NEXT_PUBLIC_BASE_URL') ||
+    'https://www.nodalpoint.io'
+).replace(/\/+$/, '');
 
 function appendPreviewUnsubscribeFooter(html: string, email?: string | null): string {
     const content = String(html || '');

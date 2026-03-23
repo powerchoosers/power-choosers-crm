@@ -73,13 +73,13 @@ async function sendUnsubscribeAlert({ email, preferenceType, pauseUntil, updated
     const initialized = await zohoService.initialize(ALERT_AUTH_EMAIL);
     if (!initialized) {
       logger.warn('[Unsubscribe] Alert email skipped: Zoho init failed');
-      return;
+      return false;
     }
 
     const recipients = await resolveAlertRecipientsForUnsubscribe(email);
     if (recipients.length === 0) {
       logger.warn('[Unsubscribe] Alert email skipped: no recipients resolved');
-      return;
+      return false;
     }
 
     const subject = `Unsubscribe preference: ${preferenceType} (${email})`;
@@ -106,8 +106,10 @@ async function sendUnsubscribeAlert({ email, preferenceType, pauseUntil, updated
     });
 
     logger.log(`[Unsubscribe] Alert email sent for ${email} to: ${recipients.join(', ')}`);
+    return true;
   } catch (error) {
     logger.error('[Unsubscribe] Failed to send alert email:', error);
+    return false;
   }
 }
 
@@ -122,15 +124,16 @@ export default async function handler(req, res) {
 
   try {
     const { email, type = 'permanent' } = req.body;
+    const normalizedEmail = String(email || '').toLowerCase().trim();
 
-    if (!email) {
+    if (!normalizedEmail) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Email address is required' }));
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!emailRegex.test(normalizedEmail)) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Invalid email address' }));
       return;
@@ -139,7 +142,7 @@ export default async function handler(req, res) {
     const validTypes = ['permanent', 'pause_90', 'spike_only'];
     const preferenceType = validTypes.includes(type) ? type : 'permanent';
 
-    logger.log(`[Unsubscribe] Processing "${preferenceType}" preference for: ${email}`);
+    logger.log(`[Unsubscribe] Processing "${preferenceType}" preference for: ${normalizedEmail}`);
 
     if (!supabaseAdmin) {
       logger.error('[Unsubscribe] Supabase client not initialized');
@@ -161,7 +164,7 @@ export default async function handler(req, res) {
       const { error: suppressionError } = await supabaseAdmin
         .from('suppressions')
         .upsert({
-          id: email,
+          id: normalizedEmail,
           reason: REASON_MAP[preferenceType],
           details: preferenceType === 'pause_90'
             ? `Pause requested via unsubscribe page. Resume after ${pauseUntil}`
@@ -182,7 +185,7 @@ export default async function handler(req, res) {
       const { data: contacts, error: fetchError } = await supabaseAdmin
         .from('contacts')
         .select('id, metadata')
-        .eq('email', email);
+        .ilike('email', normalizedEmail);
 
       if (fetchError) throw fetchError;
 
@@ -203,7 +206,7 @@ export default async function handler(req, res) {
           if (!updateError) updatedContactsCount++;
           else logger.error(`[Unsubscribe] Failed to update contact ${contact.id}:`, updateError);
         }
-        logger.log(`[Unsubscribe] Updated ${updatedContactsCount} contact(s) for ${email}`);
+        logger.log(`[Unsubscribe] Updated ${updatedContactsCount} contact(s) for ${normalizedEmail}`);
       }
     } catch (err) {
       logger.error('[Unsubscribe] Error updating contacts:', err);
@@ -217,7 +220,7 @@ export default async function handler(req, res) {
       const { data: matchingContacts } = await supabaseAdmin
         .from('contacts')
         .select('id')
-        .eq('email', email);
+        .ilike('email', normalizedEmail);
 
       if (matchingContacts && matchingContacts.length > 0) {
         const contactIds = matchingContacts.map(c => c.id);
@@ -237,8 +240,8 @@ export default async function handler(req, res) {
       logger.error('[Unsubscribe] Error during sequence pausing:', seqErr);
     }
 
-    await sendUnsubscribeAlert({
-      email,
+    const alertSent = await sendUnsubscribeAlert({
+      email: normalizedEmail,
       preferenceType,
       pauseUntil,
       updatedContactsCount,
@@ -250,8 +253,9 @@ export default async function handler(req, res) {
     res.end(JSON.stringify({
       success: true,
       type: preferenceType,
-      email,
+      email: normalizedEmail,
       pausedSequences,
+      alertSent,
     }));
 
   } catch (error) {
