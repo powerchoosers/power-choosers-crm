@@ -195,15 +195,24 @@ function norm10(v) {
 function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
   const to10 = norm10(to);
   const from10 = norm10(from);
+  const business10 = norm10(businessPhone);
   const envBiz = String(process.env.BUSINESS_NUMBERS || process.env.TWILIO_BUSINESS_NUMBERS || '')
     .split(',').map(norm10).filter(Boolean);
-  const isBiz = (p) => !!p && envBiz.includes(p);
+  const knownBiz = [...new Set([business10, ...envBiz].filter(Boolean))];
+  const isBiz = (p) => !!p && knownBiz.includes(p);
   const biz = businessPhone || (isBiz(to10) ? to : (isBiz(from10) ? from : ''));
   const tgt = targetPhone || (isBiz(to10) && !isBiz(from10) ? from10 : (isBiz(from10) && !isBiz(to10) ? to10 : (to10 || from10)));
 
-  // Logical direction: if From is a known business number, it's outbound.
-  // Otherwise, if To is a known business number, it's inbound.
-  const direction = isBiz(from10) ? 'outbound' : (isBiz(to10) ? 'inbound' : 'outbound');
+  // Prefer the explicit business number from settings/query.
+  // If we know which side is our line, we can safely classify inbound vs outbound.
+  const direction =
+    business10
+      ? (to10 === business10 && from10 !== business10
+        ? 'inbound'
+        : from10 === business10 && to10 !== business10
+          ? 'outbound'
+          : (isBiz(from10) ? 'outbound' : (isBiz(to10) ? 'inbound' : 'outbound')))
+      : (isBiz(from10) ? 'outbound' : (isBiz(to10) ? 'inbound' : 'outbound'));
 
   return { businessPhone: biz || '', targetPhone: tgt || '', direction };
 }

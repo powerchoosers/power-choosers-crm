@@ -259,7 +259,8 @@ export default async function handler(req, res) {
                                                 duration: finalDuration,
                                                 recordingChannels: finalChannels,
                                                 recordingTrack: finalTrack,
-                                                recordingSource: finalSource
+                                                recordingSource: finalSource,
+                                                businessPhone: businessPhone || undefined
                                             })
                                         }).catch(() => { });
                                     }

@@ -81,6 +81,7 @@ export default async function handler(req, res) {
         const agentId = requestUrl.searchParams.get('agentId');
         const agentEmail = requestUrl.searchParams.get('agentEmail');
         const targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
+        const businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone');
 
         const { upsertCallInSupabase } = await import('../calls.js');
         await upsertCallInSupabase({
@@ -92,6 +93,7 @@ export default async function handler(req, res) {
           agentId: agentId || null,
           agentEmail: agentEmail || null,
           targetPhone: targetPhoneFromQuery || body.To || '',
+          businessPhone: businessPhoneFromQuery || undefined,
           source: 'dial-complete'
         }).catch(err => {
           logger.error('[DialComplete] Supabase log failed:', err?.message);
