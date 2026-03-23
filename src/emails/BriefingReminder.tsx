@@ -8,6 +8,7 @@ interface BriefingReminderProps {
     appointmentTime: string;
     taskType: string;
     meetingUrl?: string;
+    contactPreferredPhone?: string;
     sender: {
         name: string;
         title: string;
@@ -26,6 +27,7 @@ export default function BriefingReminder({
     appointmentTime,
     taskType,
     meetingUrl,
+    contactPreferredPhone,
     sender,
 }: BriefingReminderProps) {
     const isVideoCall = taskType?.toLowerCase().includes('video');
@@ -103,11 +105,21 @@ export default function BriefingReminder({
                         </div>
                     </Section>
 
-                    {/* For non-video calls, show contact info as joining instructions */}
+                    {/* For non-video calls, show which number will be dialled */}
                     {!isVideoCall && (
                         <Text style={bodyText}>
-                            Please make sure you are available at the scheduled time. {sender.name} will reach out at{' '}
-                            <Link href={`tel:${sender.phone}`} style={{ color: "#888" }}>{sender.phone}</Link>.
+                            Please make sure you are available at the scheduled time.{' '}
+                            {contactPreferredPhone ? (
+                                <>
+                                    {sender.name} will reach you at{' '}
+                                    <Link href={`tel:${contactPreferredPhone}`} style={{ color: "#fff", fontWeight: "bold" }}>
+                                        {contactPreferredPhone}
+                                    </Link>
+                                    {' '}— please ensure that line is available.
+                                </>
+                            ) : (
+                                <>{sender.name} will reach out at the scheduled time.</>
+                            )}
                         </Text>
                     )}
 
