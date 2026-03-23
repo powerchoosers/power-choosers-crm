@@ -59,10 +59,6 @@ export function useZohoSync() {
                 sourceLabel: sourceLabel || undefined,
             });
 
-            void supabase
-                .from('notifications')
-                .update({ read: true })
-                .eq('id', notification?.id || notificationId);
         });
     }, []);
 

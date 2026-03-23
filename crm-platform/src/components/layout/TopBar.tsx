@@ -22,6 +22,8 @@ import { useAccount } from '@/hooks/useAccounts'
 import { useQueryClient } from '@tanstack/react-query'
 import { playNavigation } from '@/lib/audio'
 import { forensicNotify } from '@/lib/notifications'
+import { NotificationsPanel } from '@/components/notifications/NotificationsPanel'
+import { useNotificationCenter } from '@/hooks/useNotificationCenter'
 
 function getDaysUntilJune() {
   const now = new Date();
@@ -127,6 +129,8 @@ export function TopBar() {
   const queryClient = useQueryClient()
   const storeContext = useGeminiStore((state) => state.activeContext)
   const [mounted, setMounted] = useState(false)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const { unreadCount: notificationsUnreadCount } = useNotificationCenter()
 
   useEffect(() => {
     setMounted(true)
@@ -840,7 +844,7 @@ export function TopBar() {
         <motion.div
           initial={false}
           animate={{
-            width: (isGeminiOpen || isCallHUDOpen) ? 480 : (isDialerOpen ? 350 : 172),
+            width: (isGeminiOpen || isCallHUDOpen || isNotificationsOpen) ? 480 : (isDialerOpen ? 350 : 172),
             borderRadius: 24,
           }}
           transition={{
@@ -863,7 +867,7 @@ export function TopBar() {
           {/* Left Side Buttons - Absolute to prevent vertical jumps */}
           <div className="absolute left-2 top-0 h-12 flex items-center gap-2 pointer-events-auto leading-none z-10">
             <AnimatePresence>
-              {(isDialerOpen || isGeminiOpen) && (
+              {(isDialerOpen || isGeminiOpen || isNotificationsOpen) && (
                 <motion.div
                   key="header-left-actions"
                   initial={{ opacity: 0, x: -10, filter: 'blur(4px)' }}
@@ -893,6 +897,20 @@ export function TopBar() {
                       </span>
                     </div>
                   )}
+
+                  {isNotificationsOpen && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-black/20 backdrop-blur-md">
+                      <div className={cn(
+                        'w-1.5 h-1.5 rounded-full animate-pulse',
+                        notificationsUnreadCount > 0
+                          ? 'bg-[#002FA7] shadow-[0_0_8px_rgba(0,47,167,0.8)]'
+                          : 'bg-zinc-500 shadow-[0_0_8px_rgba(113,113,122,0.5)]'
+                      )} />
+                      <span className="text-[10px] font-mono text-zinc-400 tracking-wider uppercase whitespace-nowrap">
+                        SIGNALS: {notificationsUnreadCount} UNREAD
+                      </span>
+                    </div>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -903,7 +921,11 @@ export function TopBar() {
             {/* Gemini Trigger (Bot/X icon) - Restored to original right-side position */}
             <GeminiChatTrigger
               onToggle={() => {
-                if (!isGeminiOpen) setIsDialerOpen(false)
+                if (!isGeminiOpen) {
+                  setIsDialerOpen(false)
+                  setIsCallHUDOpen(false)
+                  setIsNotificationsOpen(false)
+                }
               }}
             />
 
@@ -917,11 +939,25 @@ export function TopBar() {
             </button>
 
             <button
-              className="icon-button-forensic w-9 h-9 relative"
-              aria-label="Open Notifications"
+              onClick={() => {
+                const nextOpen = !isNotificationsOpen
+                if (nextOpen) {
+                  setIsGeminiOpen(false)
+                  setIsDialerOpen(false)
+                  setIsCallHUDOpen(false)
+                }
+                setIsNotificationsOpen(nextOpen)
+              }}
+              className={cn(
+                'icon-button-forensic w-9 h-9 relative',
+                isNotificationsOpen && 'text-white scale-110'
+              )}
+              aria-label={isNotificationsOpen ? 'Close Notifications' : 'Open Notifications'}
             >
               <Bell size={22} />
-              <span className="absolute top-2 right-2.5 w-2 h-2 bg-signal rounded-full border border-zinc-900" />
+              {notificationsUnreadCount > 0 && (
+                <span className="absolute top-2 right-2.5 w-2 h-2 bg-signal rounded-full border border-zinc-900" />
+              )}
             </button>
 
             {/* Manual Dialer Trigger OR Active Call HUD Trigger */}
@@ -932,6 +968,7 @@ export function TopBar() {
                   if (nextOpen) {
                     setIsGeminiOpen(false)
                     setIsDialerOpen(false)
+                    setIsNotificationsOpen(false)
                   }
                   setIsCallHUDOpen(nextOpen)
                 }}
@@ -958,7 +995,11 @@ export function TopBar() {
               <button
                 onClick={() => {
                   const nextOpen = !isDialerOpen
-                  if (nextOpen) setIsGeminiOpen(false)
+                  if (nextOpen) {
+                    setIsGeminiOpen(false)
+                    setIsCallHUDOpen(false)
+                    setIsNotificationsOpen(false)
+                  }
                   setIsDialerOpen(nextOpen)
                 }}
                 className={cn(
@@ -1037,6 +1078,9 @@ export function TopBar() {
                   <GeminiChatPanel />
                 </div>
               </div>
+            )}
+            {isNotificationsOpen && (
+              <NotificationsPanel />
             )}
             {isCallHUDOpen && (
               <motion.div
