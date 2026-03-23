@@ -329,9 +329,11 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
       queryClient.invalidateQueries({ queryKey: ['emails'] });
       queryClient.invalidateQueries({ queryKey: ['emails-count'] });
       queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['entity-emails'] });
       // Force refetch after a small delay to ensure backend has processed
       setTimeout(() => {
         queryClient.refetchQueries({ queryKey: ['emails'] });
+        queryClient.refetchQueries({ queryKey: ['entity-emails'] });
       }, 500);
     },
     onError: (error: Error) => {
