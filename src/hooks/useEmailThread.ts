@@ -46,6 +46,7 @@ function applyCommonEmailExclusions(query: any) {
     .not('from', 'ilike', '%mailwarm%')
     .not('from', 'ilike', '%lemwarm%')
     .not('from', 'ilike', '%warmup%')
+    .not('type', 'eq', 'tracking')
 }
 
 function normalizeSubject(subject: string) {
