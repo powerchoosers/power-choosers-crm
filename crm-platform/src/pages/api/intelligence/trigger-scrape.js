@@ -25,7 +25,8 @@ export default async function handler(req, res) {
                 // but we pass the service role just in case.
                 'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({ mode: 'all' })
         });
 
         if (!scrapeRes.ok) {
@@ -35,7 +36,15 @@ export default async function handler(req, res) {
 
         const data = await scrapeRes.json();
 
-        res.status(200).json({ success: true, count: data.count || 0 });
+        res.status(200).json({
+            success: true,
+            found: data.found || 0,
+            inserted: data.inserted || 0,
+            skippedDuplicate: data.skippedDuplicate || 0,
+            skippedRegulated: data.skippedRegulated || 0,
+            skippedUnnamed: data.skippedUnnamed || 0,
+            mode: data.mode || 'all',
+        });
 
     } catch (err) {
         console.error('[trigger-scrape] Error:', err);
