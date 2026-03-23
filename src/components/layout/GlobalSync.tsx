@@ -321,10 +321,6 @@ export function GlobalSync() {
               })
           }
 
-          await supabase
-            .from('notifications')
-            .update({ read: true })
-            .eq('id', notification.id)
         }
       )
       .subscribe((status) => {
@@ -436,10 +432,6 @@ export function GlobalSync() {
             });
         }
 
-        await supabase
-          .from('notifications')
-          .update({ read: true })
-          .eq('id', row.id)
       }
     }
 
