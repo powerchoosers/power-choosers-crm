@@ -146,7 +146,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 ].join('\r\n')).join('\r\n');
 
                 const nowStr = format(new Date(), "yyyyMMdd'T'HHmmss'Z'");
-                const url = metadata?.meetingLink || agentSettings.meetingLink || agentSettings.meeting_link || agentSettings.zoomLink || process.env.NEXT_PUBLIC_DEFAULT_MEETING_LINK || 'https://meet.google.com/nodal-point-secure';
+                // URL logic: Video Call uses user-entered link; phone Call uses no link; others fall back to agent settings
+                const taskType = metadata?.taskType || '';
+                let url = '';
+                if (taskType === 'Video Call') {
+                    url = metadata?.videoCallUrl || '';
+                } else if (taskType !== 'Call') {
+                    url = agentSettings.meetingLink || agentSettings.meeting_link || agentSettings.zoomLink || process.env.NEXT_PUBLIC_DEFAULT_MEETING_LINK || '';
+                }
                 const sequenceCount = metadata?.sequence || 0;
                 
                 // Format description for both plain text and HTML
@@ -247,6 +254,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         prospectEmail={contact.email}
                         sender={sender}
                         baseUrl={baseUrl}
+                        meetingUrl={url || undefined}
                     />
                 );
 
