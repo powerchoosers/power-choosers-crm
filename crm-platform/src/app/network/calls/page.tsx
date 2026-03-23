@@ -43,6 +43,7 @@ import { CallTableRow } from '@/components/network/CallTableRow'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import { toast } from 'sonner'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 
 const PAGE_SIZE = 50
 
@@ -177,27 +178,46 @@ export default function CallsPage() {
       },
       cell: ({ row }) => {
         const call = row.original
-        const companyName = call.accountName?.trim() || 'Unknown company'
+        const isInbound = call.type === 'Inbound'
+        const contactName = call.contactName?.trim() || 'Unknown'
+        const companyName = (call.contactCompanyName?.trim() || call.accountName?.trim() || 'Unknown company')
+        const title = call.contactTitle?.trim() || ''
         const location = [call.accountCity, call.accountState].filter(Boolean).join(', ')
         const industry = call.accountIndustry?.trim()
-        const subtitle = location && industry
+        const inboundSubtitle = [
+          title,
+          companyName,
+          location && industry ? `${location} · ${industry}` : location || industry || ''
+        ].filter(Boolean)
+        const outboundSubtitle = location && industry
           ? `${location} · ${industry}`
           : location || industry || call.phoneNumber || '—'
         return (
           <div className="flex items-center gap-3 group/call cursor-pointer">
-            <CompanyIcon
-              logoUrl={call.accountLogoUrl}
-              domain={call.accountDomain}
-              name={companyName}
-              size={32}
-              className="shrink-0 border border-white/5 transition-all"
-              roundedClassName="rounded-[14px]"
-            />
+            {isInbound ? (
+              <ContactAvatar
+                name={contactName}
+                photoUrl={call.contactAvatarUrl}
+                size={32}
+                className="shrink-0 border border-white/5 transition-all"
+              />
+            ) : (
+              <CompanyIcon
+                logoUrl={call.accountLogoUrl}
+                domain={call.accountDomain}
+                name={companyName}
+                size={32}
+                className="shrink-0 border border-white/5 transition-all"
+                roundedClassName="rounded-[14px]"
+              />
+            )}
             <div className="min-w-0">
               <div className="font-medium text-zinc-200 group-hover/call:text-white group-hover/call:scale-[1.02] transition-all origin-left truncate">
-                {companyName}
+                {isInbound ? contactName : companyName}
               </div>
-              <div className="text-xs text-zinc-500 font-mono tabular-nums truncate">{subtitle}</div>
+              <div className="text-xs text-zinc-500 font-mono tabular-nums truncate">
+                {(isInbound ? inboundSubtitle : outboundSubtitle) || '—'}
+              </div>
             </div>
           </div>
         )
