@@ -25,7 +25,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
   const nameParts = [profile.firstName, profile.lastName].filter(Boolean).join(' ')
   const authName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
   const name = nameParts || profile.name || authName || 'Nodal Point Team'
-  const jobTitle = profile.jobTitle || 'Market Architect'
+  const jobTitle = profile.jobTitle || ''
   const email = profile.email || user?.email || 'contact@nodalpoint.io'
   const linkedinUrl = profile.linkedinUrl || 'https://linkedin.com/company/nodal-point'
   const websiteFallback = email.split('@')[1] || 'nodalpoint.io'
@@ -73,9 +73,7 @@ export function generateNodalSignature(profile: UserProfile, user: any, isDarkMo
             <span style="font-weight: 700; letter-spacing: -0.5px; font-size: 16px; color: ${textColor}; display: block;">
               ${esc(name)}
             </span>
-            <span style="font-family: 'Courier New', Courier, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: ${subTextColor}; display: block; margin-top: 4px;">
-              ${esc(jobTitle)}
-            </span>
+            ${jobTitle ? `<span style="font-family: 'Courier New', Courier, monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: ${subTextColor}; display: block; margin-top: 4px;">${esc(jobTitle)}</span>` : ''}
           </td>
         </tr>
       </table>
@@ -177,9 +175,7 @@ export function generateForensicSignature(
         <p style="margin: 0; font-size: 14px; font-weight: 700; color: ${nameColor}; letter-spacing: -0.02em; line-height: 1.2;">
           ${fullName}
         </p>
-        <p style="margin: 2px 0; font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: ${metaColor}; text-transform: uppercase; letter-spacing: 0.05em; line-height: 1.2;">
-          ${profile.jobTitle || 'Market Architect'} // [VECTOR_OPS]
-        </p>
+        ${profile.jobTitle ? `<p style="margin: 2px 0; font-size: 11px; color: ${metaColor}; line-height: 1.2;">${esc(profile.jobTitle)} &middot; Nodal Point</p>` : `<p style="margin: 2px 0; font-size: 11px; color: ${metaColor}; line-height: 1.2;">Nodal Point</p>`}
         <p style="margin: 4px 0 0 0; font-size: 12px; color: ${metaColor}; line-height: 1.3;">
           ${senderEmail}
         </p>
@@ -192,11 +188,10 @@ export function generateForensicSignature(
       </td>
     </tr>
     <tr>
-      <td colspan="2" style="padding-top: 12px;">
-        <div style="font-family: ui-monospace, Consolas, monospace; font-size: 10px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.4;">
-          <div style="color: #10b981;">// SYSTEM_STATUS: OPERATIONAL</div>
-          <div style="color: ${diagnosticColor};">// ACTIVE_DIAGNOSTIC: <span style="color: ${NODAL_BLUE};">[ RUN_FORENSIC_SNAPSHOT ]</span></div>
-        </div>
+      <td colspan="2" style="padding-top: 10px;">
+        <p style="margin: 0; font-style: italic; font-size: 11px; color: ${metaColor};">
+          We do not sell energy. We audit it.
+        </p>
       </td>
     </tr>
   </table>
