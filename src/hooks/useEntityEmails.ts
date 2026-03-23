@@ -54,6 +54,7 @@ export function useEntityEmails(emailAddresses: string[]) {
                     .not('from', 'ilike', '%mailwarm%')
                     .not('from', 'ilike', '%lemwarm%')
                     .not('from', 'ilike', '%warmup%')
+                    .not('type', 'eq', 'tracking')
 
                 const batches = chunk(validEmails, 25)
                 const emailMap = new Map<string, any>()
