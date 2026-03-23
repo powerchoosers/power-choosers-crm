@@ -106,8 +106,14 @@ function deGenericizeFirstTouchCopy(input, strategy) {
   if (!text || !isFirstTouch) return text;
 
   return text
+    // Strip LinkedIn attribution phrases — replace with neutral research language
+    .replace(/I noticed on LinkedIn that\s*/gi, 'I was reviewing the space and saw that ')
+    .replace(/I noticed on LinkedIn[,.]?\s*/gi, 'Based on my research, ')
+    .replace(/I saw on LinkedIn that\s*/gi, 'I was reviewing publicly available information and saw that ')
+    .replace(/I saw on LinkedIn[,.]?\s*/gi, 'I was doing some research and ')
+    .replace(/I came across your (?:profile|page|post) on LinkedIn[,.]?\s*/gi, 'I was reviewing your background and ')
+    .replace(/Came across your ([^<]+?) (?:role|profile|post) on LinkedIn[,.]?\s*/gi, 'Reviewing your background as $1, ')
     .replace(/I noticed on ([^<]+?) website that/gi, 'I was reviewing $1 and saw that')
-    .replace(/Came across your ([^<]+?) role on LinkedIn/gi, 'I saw your $1 role on LinkedIn')
     .replace(/Reviewing ([^<]+?), I noticed/gi, 'I was reviewing $1 and saw')
     .replace(/many organizations in your sector see costs shift constantly in the ERCOT market/gi, 'a lot of companies in your space see those costs move with ERCOT')
     .replace(/I regularly diagnose Texas electricity bills, looking for billing errors or contract issues/gi, 'I review Texas electricity bills for billing issues and contract leaks')
@@ -249,8 +255,8 @@ export default async function handler(req, res) {
             - Never use "Quick question", "Following up", "Just checking in", or "Reaching out" as subject openers.
             - Keep it problem-based and specific (e.g., "Fort Worth industrial billing gap", "before your 2027 contract renewal", "who reviews electricity at [Company]?").
           11. JARGON TRANSLATION RULE:
-            - Never use unexplained acronyms like 4CP, TDU, ESI ID, pass-through, nodal adder, or load zone shorthand in first-touch copy.
-            - Use plain business language first: "energy rate per kWh" and "demand/delivery charges".
+            - Never use unexplained acronyms like 4CP, TDU, ESI ID, pass-through, nodal adder, or load zone shorthand in cold outreach.
+            - Always describe the two cost buckets in plain business language. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". Pick a different pairing every email — the concept stays constant, the exact words must not.
             - If a technical term is necessary, define it in the same sentence in plain English.
           12. CTA RULE:
             - First touch should ask for interest with a concrete offer, not a meeting request.
@@ -456,7 +462,7 @@ export default async function handler(req, res) {
       - Highlight the financial variance, market volatility, or technical risk.
       - NO CITATIONS OR LINKS: Forbid external URLs or bracketed sources.
       - TEXAS/ERCOT SPECIFIC: Avoid UK or non-US energy market references.
-      - Use plain English for energy costs. Prefer "energy rate per kWh" and "demand/delivery charges" over acronyms like 4CP or TDU.
+      - Use plain English for energy costs. Never repeat the exact same phrasing for cost buckets across sends. Vary between: supply rate / energy rate / cost per kWh // delivery charges / demand charges / transmission costs / peak-usage billing. The two cost buckets must appear; the exact words must rotate.
       
       INSTRUCTIONS:
       - Rewrite the draft to be more impactful and aligned with the Nodal Point philosophy.

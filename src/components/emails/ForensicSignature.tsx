@@ -51,8 +51,8 @@ export const ForensicSignature: React.FC<ForensicSignatureProps> = ({ isRawHtml 
                             <p className="m-0 text-sm font-bold text-zinc-900 dark:text-zinc-100 tracking-tight leading-tight">
                                 {fullName}
                             </p>
-                            <p className="m-0.5 font-mono text-[10px] text-zinc-500 uppercase tracking-widest leading-tight">
-                                {profile.jobTitle || 'Market Architect'} // [VECTOR_OPS]
+                            <p className="m-0.5 text-[11px] text-zinc-500 leading-tight">
+                                {profile.jobTitle ? `${profile.jobTitle} · Nodal Point` : 'Nodal Point'}
                             </p>
                             <a
                                 href="https://nodalpoint.io"
@@ -63,13 +63,10 @@ export const ForensicSignature: React.FC<ForensicSignatureProps> = ({ isRawHtml 
                         </td>
                     </tr>
                     <tr>
-                        <td colSpan={2} className="pt-3">
-                            <div className="font-mono text-[10px] font-bold tracking-widest leading-relaxed">
-                                <div className="text-emerald-500">// SYSTEM_STATUS: OPERATIONAL</div>
-                                <div className="text-zinc-900 dark:text-white">
-                  // ACTIVE_DIAGNOSTIC: <span className="text-[#002FA7]">[ RUN_FORENSIC_SNAPSHOT ]</span>
-                                </div>
-                            </div>
+                        <td colSpan={2} className="pt-2.5">
+                            <p className="m-0 italic text-[11px] text-zinc-400">
+                                We do not sell energy. We audit it.
+                            </p>
                         </td>
                     </tr>
                 </tbody>

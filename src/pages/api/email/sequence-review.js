@@ -319,7 +319,7 @@ export default async function handler(req, res) {
         : {
           firstName: 'Lewis',
           lastName: 'Patterson',
-          jobTitle: 'Market Architect',
+          jobTitle: null,
           email: fromEmail
         };
       const signature = generateForensicSignature(profile, { senderEmail: fromEmail, websiteDomain: senderDomain });
