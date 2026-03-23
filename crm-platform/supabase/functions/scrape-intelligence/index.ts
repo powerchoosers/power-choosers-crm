@@ -323,7 +323,15 @@ Deno.serve(async (req: Request) => {
   }
 
   return new Response(
-    JSON.stringify({ success: true, mode, inserted, skippedRegulated, skippedDuplicate, skippedUnnamed }),
+    JSON.stringify({
+      success: true,
+      mode,
+      found: allSignals.length,
+      inserted,
+      skippedRegulated,
+      skippedDuplicate,
+      skippedUnnamed,
+    }),
     { headers: { 'Content-Type': 'application/json' } },
   )
 })

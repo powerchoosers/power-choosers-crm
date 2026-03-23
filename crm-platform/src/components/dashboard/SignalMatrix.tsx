@@ -132,7 +132,13 @@ export function SignalMatrix() {
       const res = await fetch('/api/intelligence/trigger-scrape', { method: 'POST' });
       if (!res.ok) throw new Error('Scrape trigger failed');
       const data = await res.json();
-      toast.success(`Scan complete. ${data.count || 0} new anomalies detected.`, { id: toastId });
+      const found = data.found || 0;
+      const inserted = data.inserted || 0;
+      const skipped = (data.skippedDuplicate || 0) + (data.skippedRegulated || 0) + (data.skippedUnnamed || 0);
+      toast.success(
+        `Scan complete. ${found} leads reviewed, ${inserted} new records added${skipped ? `, ${skipped} filtered out` : ''}.`,
+        { id: toastId }
+      );
       await refetch();
     } catch (err: any) {
       console.error('[SignalMatrix] manual scrape error:', err);
