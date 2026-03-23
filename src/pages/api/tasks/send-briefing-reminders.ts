@@ -72,10 +72,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             if (!windowsToFire.length) continue;
             results.processed++;
 
-            // Fetch contact
+            // Fetch contact (including all phone fields + preferred field)
             const { data: contact } = await supabaseAdmin
                 .from('contacts')
-                .select('firstName, lastName, email, accountId')
+                .select('firstName, lastName, email, accountId, mobile, workDirectPhone, otherPhone, companyPhone, primaryPhoneField')
                 .eq('id', task.contactId)
                 .single();
 
@@ -113,6 +113,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             const taskType = task.metadata?.taskType || 'Call';
             const videoCallUrl: string = task.metadata?.videoCallUrl || '';
+
+            // Resolve contact's preferred phone number (starred in dossier uplink)
+            const preferredField = (contact as any)?.primaryPhoneField || 'mobile';
+            const contactPreferredPhone: string =
+                (contact as any)?.[preferredField] ||
+                (contact as any)?.mobile ||
+                (contact as any)?.workDirectPhone ||
+                (contact as any)?.companyPhone ||
+                '';
             const contactName = contact
                 ? `${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Valued Contact'
                 : 'Valued Contact';
@@ -138,6 +147,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 appointmentTime: apptTimeStr,
                                 taskType,
                                 meetingUrl: videoCallUrl || undefined,
+                                contactPreferredPhone: contactPreferredPhone || undefined,
                                 sender,
                             })
                         );
