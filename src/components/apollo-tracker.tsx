@@ -6,6 +6,7 @@ import { useEffect } from 'react'
 const APOLLO_APP_ID = '691c89270f724f000d121b65'
 const TRACKER_ID = 'apollo-website-tracker'
 const CRM_PATH_PREFIXES = ['/network']
+const CONSENT_KEY = 'np_cookie_consent'
 
 const shouldTrackPath = (pathname: string) => {
   return !CRM_PATH_PREFIXES.some(
@@ -18,13 +19,17 @@ export default function ApolloTracker() {
 
   useEffect(() => {
     // Skip injecting on CRM paths so only the public site is tracked.
-    if (!pathname || !shouldTrackPath(pathname)) {
+    if (!pathname || !shouldTrackPath(pathname)) return
+
+    // Require explicit cookie consent before loading tracker.
+    try {
+      const consent = localStorage.getItem(CONSENT_KEY)
+      if (consent !== 'accepted') return
+    } catch {
       return
     }
 
-    if (document.getElementById(TRACKER_ID)) {
-      return
-    }
+    if (document.getElementById(TRACKER_ID)) return
 
     const script = document.createElement('script')
     script.id = TRACKER_ID

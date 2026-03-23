@@ -30,6 +30,53 @@ const API_BASE_URL = (
     'https://www.nodalpoint.io'
 ).replace(/\/+$/, '');
 
+function generateForensicSignatureHtml(profile: {
+    firstName?: string | null;
+    lastName?: string | null;
+    jobTitle?: string | null;
+    hostedPhotoUrl?: string | null;
+}, senderEmail: string, senderDomain: string): string {
+    const initials = `${profile.firstName?.[0] || ''}${profile.lastName?.[0] || ''}`;
+    const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Nodal Point';
+    const NODAL_BLUE = '#002FA7';
+    const nameColor = '#09090b';
+    const metaColor = '#71717a';
+    const borderColor = '#f3f4f6';
+    const accentBorder = '#002FA7';
+    const avatarBg = '#09090b';
+    const websiteUrl = senderDomain ? `https://${senderDomain}` : 'https://nodalpoint.io';
+    const displayDomain = senderDomain || 'nodalpoint.io';
+    return `
+<!-- NODAL_FORENSIC_SIGNATURE -->
+<div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid ${borderColor}; max-width: 500px;">
+  <table cellpadding="0" cellspacing="0" style="border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+    <tr>
+      <td style="padding-right: 12px; vertical-align: top;">
+        ${profile.hostedPhotoUrl
+            ? `<img src="${profile.hostedPhotoUrl}" alt="${fullName}" style="width: 48px; height: 48px; border-radius: 14px; object-fit: cover; display: block;" />`
+            : `<div style="width: 48px; height: 48px; background-color: ${avatarBg}; border-radius: 14px; color: white; display: block; line-height: 48px; text-align: center; font-weight: bold; font-size: 14px;">${initials}</div>`
+        }
+      </td>
+      <td style="border-left: 2px solid ${accentBorder}; padding-left: 12px; vertical-align: middle;">
+        <p style="margin: 0; font-size: 14px; font-weight: 700; color: ${nameColor}; letter-spacing: -0.02em; line-height: 1.2;">${fullName}</p>
+        ${profile.jobTitle
+            ? `<p style="margin: 2px 0; font-size: 11px; color: ${metaColor}; line-height: 1.2;">${profile.jobTitle} &middot; Nodal Point</p>`
+            : `<p style="margin: 2px 0; font-size: 11px; color: ${metaColor}; line-height: 1.2;">Nodal Point</p>`
+        }
+        <p style="margin: 4px 0 0 0; font-size: 12px; color: ${metaColor}; line-height: 1.3;">${senderEmail}</p>
+        <a href="${websiteUrl}" style="font-size: 12px; color: ${NODAL_BLUE}; text-decoration: none; font-weight: 500;">${displayDomain}</a>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding-top: 10px;">
+        <p style="margin: 0; font-style: italic; font-size: 11px; color: ${metaColor};">We do not sell energy. We audit it.</p>
+      </td>
+    </tr>
+  </table>
+</div>
+  `;
+}
+
 function appendPreviewUnsubscribeFooter(html: string, email?: string | null): string {
     const content = String(html || '');
     const recipient = String(email || '').trim();
@@ -263,7 +310,7 @@ async function handleGeneration(execution, job) {
             ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
             : null;
     const sourceTruthLine = linkedInUrl
-        ? 'SOURCE_TRUTH: LinkedIn available. You may reference LinkedIn once if natural.'
+        ? 'SOURCE_TRUTH: LinkedIn available as a research signal only. Do NOT mention LinkedIn, say you found them on LinkedIn, or reference their LinkedIn profile in the email copy.'
         : website
             ? 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.'
             : 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
@@ -371,8 +418,25 @@ async function handleGeneration(execution, job) {
 
     if (!body) {
         const firstName = String(member.firstName || '').trim();
-        const companyName = String(member.company_name || 'your team').trim();
-        body = `Hi${firstName ? ` ${firstName}` : ''},\n\nI wanted to share a quick energy-forensics snapshot idea for ${companyName}. If you send your most recent electricity bill, I can reply with 2-3 specific observations worth checking.\n\nInterested?`;
+        const greeting = firstName ? `${firstName},\n\n` : '';
+        body = `${greeting}If you send your most recent electricity statement, I can reply with 2-3 specific cost observations worth checking.\n\nInterested?`;
+    }
+
+    if (!body.includes('NODAL_FORENSIC_SIGNATURE') && !body.includes('nodal-signature')) {
+        const lookupEmail = senderEmail && senderEmail.endsWith('@getnodalpoint.com')
+            ? senderEmail.replace('@getnodalpoint.com', '@nodalpoint.io')
+            : senderEmail;
+        const [senderProfile] = lookupEmail
+            ? await sql`SELECT first_name, last_name, job_title, hosted_photo_url FROM users WHERE email = ${lookupEmail} LIMIT 1`
+            : [];
+        const sigProfile = {
+            firstName: senderProfile?.first_name || member.owner_first_name || null,
+            lastName: senderProfile?.last_name || null,
+            jobTitle: senderProfile?.job_title || null,
+            hostedPhotoUrl: senderProfile?.hosted_photo_url || null,
+        };
+        const sigDomain = senderDomain || 'nodalpoint.io';
+        body = `${body}${generateForensicSignatureHtml(sigProfile, senderEmail || '', sigDomain)}`;
     }
 
     const bodyWithFooter = appendPreviewUnsubscribeFooter(body, member.contact_email);
@@ -513,8 +577,9 @@ async function handleSend(execution, job) {
         return;
     }
 
+    const fallbackFirstName = String(member?.firstName || '').trim();
     const htmlBody = String(metadata?.body || metadata?.aiBody || '').trim() ||
-        'Hi there,\n\nIf you share your latest electricity statement, I can reply with a quick 2-3 point forensic snapshot.\n\nInterested?';
+        `${fallbackFirstName ? `${fallbackFirstName},\n\n` : ''}If you send your most recent electricity statement, I can reply with 2-3 specific cost observations worth checking.\n\nInterested?`;
 
     const response = await fetch(`${API_BASE_URL}/api/email/zoho-send-sequence`, {
         method: 'POST',

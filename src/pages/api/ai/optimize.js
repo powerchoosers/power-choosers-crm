@@ -99,6 +99,37 @@ function softenFirstTouchEnergyJargon(input, strategy) {
     .replace(/\bESI\s*ID\b/gi, 'service account number');
 }
 
+function cleanSequenceCopy(input) {
+  let text = String(input || '');
+  if (!text) return text;
+
+  // ── Open tracking disclosure — strip any phrase revealing recipient opened/viewed ──
+  text = text
+    .replace(/[Ss]ince you (?:opened|viewed|read|looked at)(?: my| the)? (?:last |previous |prior )?(?:email|message|note)[,.]?\s*/gi, '')
+    .replace(/[Bb]ecause you (?:opened|viewed|looked at)(?: my)? (?:last |previous |prior )?(?:email|message|note)[,.]?\s*/gi, '')
+    .replace(/(?:I noticed|I saw)(?: that)? you (?:recently |just )?(?:opened|viewed|looked at|read|checked out)(?: my| the)? (?:last |previous |prior )?(?:email|message|note)[^.]*?[.]\s*/gi, '')
+    .replace(/I saw your team[^.]+?(?:opened|viewed|read) my (?:last |previous )?(?:email|message|note)[^.]*?[.]\s*/gi, '')
+    .replace(/my (?:last |previous |prior )?(?:email|note|message) seemed to (?:hit home|resonate|land well|catch your eye|catch your attention)[^.]*?[.]\s*/gi, '')
+    .replace(/you (?:recently |just )?(?:opened|read|viewed|looked at) my (?:last |previous )?(?:email|message|note)[^.]*?[,.]\s*/gi, '')
+
+  // ── "We" → "I" for review/diagnostic language ──
+  text = text
+    .replace(/\bWe review these\b/gi, 'I review these')
+    .replace(/\bwe (?:regularly )?(?:review|audit|diagnose|analyze) (?:these |electricity |energy |power )?(?:bills|statements|invoices)\b/gi, 'I review these bills')
+
+  // ── Past conditional CTAs → present conditional ──
+  text = text
+    .replace(/\bif you sent(?: over| me)?\b/gi, 'if you send')
+    .replace(/\bif you shared\b/gi, 'if you share')
+    .replace(/\bI could reply\b/gi, "I'll reply")
+    .replace(/\bI could send\b/gi, "I'll send")
+    .replace(/\bI could (?:take a look|have a look|look at it|look it over|review it)\b/gi, 'I can take a look')
+    .replace(/\bI could quickly\b/gi, 'I can quickly')
+    .replace(/\bI could (?:highlight|share|give|provide|point out)\b/gi, (m) => m.replace('could', 'can'))
+
+  return text;
+}
+
 function deGenericizeFirstTouchCopy(input, strategy) {
   const text = String(input || '');
   const strategyText = String(strategy || '');
@@ -245,8 +276,9 @@ export default async function handler(req, res) {
           7. NO CITATIONS OR LINKS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
           8. TEXAS DEREGULATED MARKET (ERCOT): Keep context Texas/ERCOT and forbid UK references (like "Citizens Advice").
           9. HOOK RULE:
-            - Sentence one must mention the account city (or the outreach-friendly company name if no city exists) and tie that place to one concrete operational reality—renewal timing, demand spikes, longer run hours, billing cycle hits, etc.
-            - Avoid vague openers like "energy costs are tough" or "utility charges are complex" without grounding them in that specific location and what is shifting now.
+            - Sentence one must mention the account city (or the outreach-friendly company name if no city exists) and tie that place to one SPECIFIC, concrete operational reality.
+            - CRITICAL: City + industry alone is NOT a hook. "For logistics companies in Houston, costs can shift quite a bit" tells the recipient nothing specific about them and reads as a template. Use one fact from: account description, company scale, revenue, a known operational characteristic of that specific industry in that market, or a recent signal. If no specific data exists, make an observation about that industry's energy profile (e.g., "cold storage facilities in Dallas run 24/7 baseload which concentrates demand charge exposure" or "rail service yards carry high fixed-load hours that push peak billing hard") — never a generic "costs can shift" statement.
+            - Avoid vague openers: "energy costs are tough", "costs can shift quite a bit", "utility charges are complex", "getting good value for electricity can be tricky."
             - Do not start with "I noticed on the website", "Came across your", "Reviewing", or "many organizations in your sector". Those sound templated.
           10. SUBJECT RULE:
             - Subject line must be 4–7 words.
@@ -259,17 +291,21 @@ export default async function handler(req, res) {
             - Always describe the two cost buckets in plain business language. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". Pick a different pairing every email — the concept stays constant, the exact words must not.
             - If a technical term is necessary, define it in the same sentence in plain English.
           12. CTA RULE:
-            - First touch should ask for interest with a concrete offer, not a meeting request.
-            - Offer: if they send Lewis their latest electricity statement, he will reply with a 2–3 bullet forensic snapshot of what stands out.
-            - End with a low-friction yes/no question referencing that offer.
+            - First touch: ask for interest with a concrete offer, not a meeting request.
+            - Offer: if they send Lewis their latest electricity statement, he will reply with a 2–3 bullet forensic snapshot.
+            - Use PRESENT conditional: "If you send your latest statement, I'll reply with 2-3 bullet points." NEVER past conditional: "if you sent it, I could reply."
+            - Preferred verb-first CTA forms: "Want me to take a look?", "Send it over and I'll reply with 2-3 observations.", "Worth a quick check?"
+            - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?" — these are indirect and passive.
+            - End with ONE low-friction yes/no question. Never ask twice.
           13. VOICE RULE:
             - Use first-person peer language from Lewis ("I", "I can", "I review"), not corporate team language.
             - Avoid openers like "our firm", "we help businesses", or "at Nodal Point, we...".
             - You may mention Nodal Point once for identity, but keep the voice consultative and person-to-person.
           14. SOURCE TRUTH IS HARD RULE:
-            - If source_label=linkedin (or has_linkedin=true), you may reference LinkedIn once.
-            - If source_label=website (or has_linkedin=false and has_website=true), do NOT mention LinkedIn. Reference website/public company info instead.
-            - If source_label=public_company_info (or has_linkedin=false and has_website=false), do NOT mention LinkedIn or website. Say you were reviewing companies in their industry/area.
+            - NEVER mention LinkedIn, the contact's LinkedIn profile, or say you found/saw them on LinkedIn in any email copy, regardless of source_label.
+            - LinkedIn data is a research signal only — use it to understand the contact's role and company background, but do NOT surface it in the email.
+            - If source_label=website, you may reference the company website or public company info once.
+            - If source_label=public_company_info, use generic market/industry research wording only.
             - Never claim a source that is not supported by SOURCE_TRUTH.
           15. COMPANY NAME RULE:
             - Use COMPANY_OUTREACH_NAME in copy, not the full legal entity name.
@@ -288,6 +324,18 @@ export default async function handler(req, res) {
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
             - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
             - Never state certainty about exact contract month/day unless explicitly provided as verified in STRATEGY text.
+          18. OPEN TRACKING RULE:
+            - NEVER disclose that the recipient opened, viewed, or looked at a previous email. Open signals route which sequence branch fires — they must never appear in copy.
+            - Forbidden phrases: "since you opened my email", "I noticed you looked at my message", "you viewed my last note", "my note seemed to hit home", "I saw you opened", "since you read my message", or any variation.
+            - Reference prior contact by CONTENT only: "following up on my note about [company's] electricity costs" or "circling back on the forensic review I mentioned."
+          19. CTA TENSE RULE:
+            - All CTAs must use present conditional, never past conditional.
+            - CORRECT: "If you send your latest statement, I'll reply." WRONG: "If you sent it over, I could reply."
+            - Use "I'll" or "I can" — never "I could" in a CTA.
+          20. ANTI-FILLER RULE:
+            - Every sentence must earn its place with a specific observation. Delete any sentence that could apply to any company in any industry.
+            - BANNED filler: "getting a handle on these details can help with budgeting and future planning", "small billing details can add up", "it helps when you're keeping things moving", "a quick review can show some interesting things", "reviewing historical usage helps spot hidden fees and opportunities."
+            - A tight 3-sentence email beats a padded 5-sentence one. If you cannot make a specific observation, use fewer sentences.
 
           HIGH_AGENCY_IDENTITY_RESOLUTION:
           - NEVER wait for bracketed variables like {{company}} or {{industry}}.
@@ -393,9 +441,11 @@ export default async function handler(req, res) {
           const bodyCandidate = parsed.body_html || parsed.body || parsed.content || '';
           finalResult = {
             optimized: ensureThanksSignoff(
-              deGenericizeFirstTouchCopy(
-                softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
-                prompt
+              cleanSequenceCopy(
+                deGenericizeFirstTouchCopy(
+                  softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
+                  prompt
+                )
               ),
               contact?.sender_first_name
             ),
@@ -406,9 +456,11 @@ export default async function handler(req, res) {
           // Fallback if AI didn't return valid JSON despite instructions
           finalResult = {
             optimized: ensureThanksSignoff(
-              deGenericizeFirstTouchCopy(
-                softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
-                prompt
+              cleanSequenceCopy(
+                deGenericizeFirstTouchCopy(
+                  softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
+                  prompt
+                )
               ),
               contact?.sender_first_name
             ),
