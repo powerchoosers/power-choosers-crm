@@ -55,6 +55,16 @@ export const playPing = () => {
 };
 
 /**
+ * Soft Incoming Notification
+ * Gentler variant for email toast events to avoid jarring alerts.
+ */
+export const playSoftPing = () => {
+  if (useUIStore.getState().soundIncomingEnabled) {
+    playSynth('sine', 620, 520, 0.14, 0.07);
+  }
+};
+
+/**
  * Navigation Transition
  * A softer, sine-based sound for menu selections.
  */

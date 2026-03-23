@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { Eye, MousePointer2 } from 'lucide-react'
-import { playPing } from '@/lib/audio'
+import { playSoftPing } from '@/lib/audio'
 import { useUIStore } from '@/store/uiStore'
 import Link from 'next/link'
 
@@ -17,6 +17,7 @@ export function useEmailTrackingNotifications() {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const lastEventRef = useRef<Map<string, number>>(new Map())
+  const canonicalEventRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
     if (!user?.email) return
@@ -66,7 +67,7 @@ export function useEmailTrackingNotifications() {
           const isOwner = sameOwner || sameFrom
           if (!isOwner) return
 
-          // Dedupe: max 1 notification per email per 5 seconds
+          // Dedupe: max 1 notification per email row per 5 seconds
           const now = Date.now()
           const lastTime = lastEventRef.current.get(email.id) || 0
           if (now - lastTime < 5000) return
@@ -115,10 +116,16 @@ export function useEmailTrackingNotifications() {
           const subject = email.subject?.slice(0, 35) || 'your email'
           const subjectTruncated = email.subject && email.subject.length > 35 ? '...' : ''
           const routeEmailId = String(email.metadata?.email_id || email.metadata?.emailId || email.id)
+          const eventType = clicked ? 'click' : 'open'
+          const canonicalEventKey = `${routeEmailId}:${eventType}`
+          const lastCanonicalTime = canonicalEventRef.current.get(canonicalEventKey) || 0
+          // Sequence tracking updates both tracking row and parent row. Keep one toast.
+          if (now - lastCanonicalTime < 9000) return
+          canonicalEventRef.current.set(canonicalEventKey, now)
 
           if (!isContractEmail) {
             if (clicked) {
-              if (soundEnabled) playPing()
+              if (soundEnabled) playSoftPing()
               toast(
                 <Link href={`/network/emails/${routeEmailId}`} className="no-underline block w-full">
                   <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
@@ -132,7 +139,7 @@ export function useEmailTrackingNotifications() {
                 { duration: 5000 }
               )
             } else if (opened) {
-              if (soundEnabled) playPing()
+              if (soundEnabled) playSoftPing()
               toast(
                 <Link href={`/network/emails/${routeEmailId}`} className="no-underline block w-full">
                   <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">

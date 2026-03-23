@@ -1,6 +1,6 @@
 import React from 'react'
 import { toast } from 'sonner'
-import { playPing } from './audio'
+import { playSoftPing } from './audio'
 import { useUIStore } from '@/store/uiStore'
 import { InboxEmailToast } from '@/components/emails/InboxEmailToast'
 
@@ -27,7 +27,7 @@ export function showInboxEmailToast({
   emailId,
 }: InboxEmailToastInput) {
   const soundEnabled = useUIStore.getState().soundEnabled
-  if (soundEnabled) playPing()
+  if (soundEnabled) playSoftPing()
 
   toast(
     <InboxEmailToast
