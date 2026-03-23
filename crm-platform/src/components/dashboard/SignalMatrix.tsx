@@ -331,6 +331,7 @@ export function SignalMatrix() {
                       {signal.entity_name && (
                         <ForensicDataPoint
                           inline
+                          compact
                           copyValue={displayProspectName(signal.entity_name)}
                           value={displayProspectName(signal.entity_name)}
                           valueClassName="text-[10px] font-mono text-zinc-400 mt-0.5 truncate"
