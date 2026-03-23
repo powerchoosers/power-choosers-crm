@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { usePathname } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useEmailTrackingNotifications } from '@/hooks/useEmailTrackingNotifications'
@@ -60,26 +61,35 @@ function formatSourceLabel(value?: string | null) {
   return ''
 }
 
+const CRM_ROUTE_PREFIXES = ['/network', '/market-data']
+
+function isCrmRoute(pathname: string | null) {
+  if (!pathname) return false
+  return CRM_ROUTE_PREFIXES.some(prefix => pathname.startsWith(prefix))
+}
+
 export function GlobalSync() {
+  const pathname = usePathname()
   const { user, loading } = useAuth()
   const { performSync } = useZohoSync()
   const queryClient = useQueryClient()
   const ownerScopeRef = useRef<string[]>([])
   const seenInboxSignalIdsRef = useRef<Set<string>>(new Set())
   const soundEnabled = useUIStore(s => s.soundEnabled)
+  const onCrmRoute = isCrmRoute(pathname)
 
-  // Real-time email tracking notifications (opens/clicks)
-  useEmailTrackingNotifications()
+  // Real-time email tracking notifications (opens/clicks) — CRM routes only
+  useEmailTrackingNotifications({ enabled: onCrmRoute })
 
   // Resolve owner scope once on mount (covers shared inboxes like signal@nodalpoint.io)
   useEffect(() => {
-    if (!user) return
+    if (!user || !onCrmRoute) return
     resolveOwnerScope(user).then(scope => { ownerScopeRef.current = scope })
-  }, [user])
+  }, [user, onCrmRoute])
 
   // Automated Background Sync Lifecycle
   useEffect(() => {
-    if (loading || !user) return
+    if (loading || !user || !onCrmRoute) return
 
     // Immediately trigger a sync on load (silent)
     const timer = setTimeout(() => {
@@ -335,10 +345,10 @@ export function GlobalSync() {
       supabase.removeChannel(emailChannel)
       supabase.removeChannel(notificationChannel)
     }
-  }, [loading, user, performSync, queryClient])
+  }, [loading, user, performSync, queryClient, onCrmRoute])
 
   useEffect(() => {
-    if (loading || !user?.email) return
+    if (loading || !user?.email || !onCrmRoute) return
 
     let cancelled = false
 
@@ -444,7 +454,7 @@ export function GlobalSync() {
       cancelled = true
       clearInterval(interval)
     }
-  }, [loading, user?.email])
+  }, [loading, user?.email, onCrmRoute])
 
   return null
 }

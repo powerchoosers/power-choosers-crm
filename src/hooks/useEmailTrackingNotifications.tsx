@@ -82,14 +82,14 @@ function getLatestNewClick(prevCount: number, clicks?: TrackingClickEvent[]) {
  * Shows instant toast notifications when a CRM-sent email is opened or clicked.
  * Low impact: single channel subscription, filters by owner, dedupes rapid events.
  */
-export function useEmailTrackingNotifications() {
+export function useEmailTrackingNotifications({ enabled = true }: { enabled?: boolean } = {}) {
   const { user } = useAuth()
   const queryClient = useQueryClient()
   const lastEventRef = useRef<Map<string, number>>(new Map())
   const canonicalEventRef = useRef<Map<string, number>>(new Map())
 
   useEffect(() => {
-    if (!user?.email) return
+    if (!enabled || !user?.email) return
 
     // Listen to all email UPDATEs (Realtime doesn't support LIKE filter); filter in callback
     const channel = supabase
@@ -235,5 +235,5 @@ export function useEmailTrackingNotifications() {
     return () => {
       channel.unsubscribe()
     }
-  }, [user?.email])
+  }, [user?.email, enabled])
 }
