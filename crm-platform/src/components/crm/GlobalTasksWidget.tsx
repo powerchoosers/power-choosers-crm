@@ -3,6 +3,7 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckSquare, Circle, CheckCircle2, CalendarCheck, CalendarX, CalendarClock } from 'lucide-react'
+import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useTasks, type Task } from '@/hooks/useTasks'
 import { PriorityBadge } from '@/components/ui/PriorityBadge'
@@ -66,23 +67,24 @@ function TaskRow({
             isCompleted ? 'text-zinc-500 line-through' : 'text-zinc-300 group-hover:text-white'
           )}
         >
-          {task.title}
+          {task.title.replace(/ at (Sun|Mon|Tue|Wed|Thu|Fri|Sat).*$/i, '').trim()}
         </p>
-        <div className="flex items-center gap-2 mt-1">
+        {task.dueDate && (
+          <p className="text-[10px] font-mono tabular-nums text-zinc-500 mt-0.5">
+            {format(new Date(task.dueDate), 'h:mm a')}
+            <span className="text-zinc-700 mx-1">·</span>
+            {format(new Date(task.dueDate), 'EEE, MMM d')}
+          </p>
+        )}
+        <div className="flex items-center gap-2 mt-1.5">
           <PriorityBadge priority={task.priority} labelStyle="suffix" completed={isCompleted} />
           {task.priority === 'BRIEFING' && !!task.metadata?.syncCalendar && (
             task.metadata?.rsvpStatus === 'ACCEPTED' ? (
-              <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/5 px-1.5 py-0.5 rounded">
-                <CalendarCheck size={9} /> ACCEPTED
-              </span>
+              <CalendarCheck size={10} className="text-emerald-400 shrink-0" />
             ) : task.metadata?.rsvpStatus === 'DECLINED' ? (
-              <span className="flex items-center gap-1 text-[9px] font-mono text-rose-400 border border-rose-500/30 bg-rose-500/5 px-1.5 py-0.5 rounded">
-                <CalendarX size={9} /> DECLINED
-              </span>
+              <CalendarX size={10} className="text-rose-400 shrink-0" />
             ) : (
-              <span className="flex items-center gap-1 text-[9px] font-mono text-amber-400/70 border border-amber-500/20 bg-amber-500/5 px-1.5 py-0.5 rounded">
-                <CalendarClock size={9} /> AWAITING
-              </span>
+              <CalendarClock size={10} className="text-amber-400/50 shrink-0" />
             )
           )}
           {task.relatedTo && (
