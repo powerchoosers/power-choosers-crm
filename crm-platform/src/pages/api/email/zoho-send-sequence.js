@@ -175,7 +175,7 @@ export default async function handler(req, res) {
         // Appended before tracking so the unsubscribe link is also click-tracked.
         if (htmlContent && !isSelfSend && !isInternalTest) {
             try {
-                const baseUrl = (process.env.PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://nodal-point-network.vercel.app').replace(/\/+$/, '');
+                const baseUrl = (process.env.PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://www.nodalpoint.io').replace(/\/+$/, '');
                 const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(toEmail)}`;
                 const unsubscribeFooter = buildUnsubscribeFooter(unsubscribeUrl);
                 htmlContent = htmlContent + unsubscribeFooter;

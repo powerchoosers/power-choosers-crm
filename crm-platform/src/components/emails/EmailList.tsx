@@ -565,7 +565,18 @@ export function EmailList({
                 ? extractEmailAddress(String(toList[0] || ''))
                 : extractEmailAddress(String(email.from || ''))
               const channel = resolveEmailChannel(email)
-              const primaryContact = (email.contact || (email.contactId ? contactById[email.contactId] : undefined)) || contactByEmail[primaryEmail]
+              const linkedContact = email.contact || (email.contactId ? contactById[email.contactId] : undefined)
+              const linkedContactEmail = extractEmailAddress(linkedContact?.email)
+              const linkedContactMismatchedRecipient =
+                isOutbound
+                && !!linkedContact
+                && !!linkedContactEmail
+                && !!primaryEmail
+                && linkedContactEmail !== primaryEmail
+              const primaryContact =
+                (linkedContactMismatchedRecipient ? contactByEmail[primaryEmail] : linkedContact)
+                || contactByEmail[primaryEmail]
+                || linkedContact
               const recipientLabels = toList
                 .map((raw, idx) => {
                   const addr = extractEmailAddress(String(raw || ''))

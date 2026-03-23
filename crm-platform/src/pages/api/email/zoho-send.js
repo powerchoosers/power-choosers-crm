@@ -62,6 +62,14 @@ function normalizeRecipientList(raw) {
     return Array.from(new Set(normalized));
 }
 
+function providedContactMatchesRecipients(contact, recipients) {
+    if (!contact) return false;
+    const contactEmail = extractValidEmail(contact.email || '').toLowerCase();
+    if (!contactEmail) return false;
+    const recipientSet = new Set(normalizeRecipientList(recipients).map((entry) => entry.toLowerCase()));
+    return recipientSet.has(contactEmail);
+}
+
 function normalizeOwnerKey(value) {
     return String(value || '').trim().toLowerCase();
 }
@@ -519,6 +527,8 @@ export default async function handler(req, res) {
         const providedContact = (supabaseAdmin && contactId)
             ? await resolveProvidedContact(contactId)
             : null;
+        const canUseProvidedContact = providedContactMatchesRecipients(providedContact, toRecipients);
+        const scopedProvidedContact = canUseProvidedContact ? providedContact : null;
         const threadResolvedRecipient = (supabaseAdmin && requestedThreadId)
             ? await resolveContactFromThread(ownerEmail, requestedThreadId, toRecipients[0])
             : { contactId: null, accountId: null, contactName: null, contactCompany: null };
@@ -526,35 +536,41 @@ export default async function handler(req, res) {
         if (contactId && !providedContact) {
             logger.warn(`[Zoho] Provided contactId '${contactId}' was not found. Falling back to recipient resolution.`, 'zoho-send');
         }
+        if (providedContact?.id && !canUseProvidedContact) {
+            logger.info(
+                `[Zoho] Ignoring provided contactId '${providedContact.id}' because recipient '${toRecipients[0]}' does not match contact email '${providedContact.email}'.`,
+                'zoho-send'
+            );
+        }
         if (!providedContact?.id && !resolvedRecipient.contactId && threadResolvedRecipient.contactId) {
             logger.info(`[Zoho] Recovered contact linkage from thread fallback: ${threadResolvedRecipient.contactId}`, 'zoho-send');
         }
 
         const persistedContactId =
-            providedContact?.id
+            scopedProvidedContact?.id
             || resolvedRecipient.contactId
             || directMatchRecipient.contactId
             || threadResolvedRecipient.contactId
             || null;
         const persistedAccountId =
-            providedContact?.accountId
+            scopedProvidedContact?.accountId
             || resolvedRecipient.accountId
             || directMatchRecipient.accountId
             || threadResolvedRecipient.accountId
             || null;
         const persistedContactName =
-            buildContactName(providedContact)
+            buildContactName(scopedProvidedContact)
             || resolvedRecipient.contactName
             || directMatchRecipient.contactName
             || threadResolvedRecipient.contactName
-            || contactName
+            || (canUseProvidedContact ? contactName : null)
             || null;
         const persistedContactCompany =
-            buildContactCompany(providedContact)
+            buildContactCompany(scopedProvidedContact)
             || resolvedRecipient.contactCompany
             || directMatchRecipient.contactCompany
             || threadResolvedRecipient.contactCompany
-            || contactCompany
+            || (canUseProvidedContact ? contactCompany : null)
             || null;
 
         // Persist the email record before sending so Sent/Scheduled lists always have a row.
