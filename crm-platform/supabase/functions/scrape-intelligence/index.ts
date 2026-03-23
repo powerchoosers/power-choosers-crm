@@ -110,12 +110,12 @@ async function verifyWithApollo(entityName: string): Promise<{ domain: string; l
   }
 }
 
-function getJobs() {
+function getJobs(mode: string) {
   const today = new Date()
   const year = today.getFullYear()
   const stamp = today.toDateString()
 
-  return [
+  const allJobs = [
     {
       type: 'new_location',
       prompt: `Find 5-10 real Texas companies opening new facilities, breaking ground, or relocating in ${year} or ${year + 1}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, entity_domain, headline, summary, source_url, relevance_score, city, state. Only return named companies with specific cities.`,
@@ -133,6 +133,25 @@ function getJobs() {
       prompt: `Find SEC filings, 8-Ks, earnings releases, and investor updates that signal facility growth, new load, or operational expansion for Texas-relevant commercial and industrial companies in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
     },
   ]
+
+  if (mode === 'location') {
+    return allJobs.filter((job) => ['new_location', 'expansion'].includes(job.type))
+  }
+
+  if (mode === 'buyer') {
+    return allJobs.filter((job) => ['energy_rfp', 'sec_filing'].includes(job.type))
+  }
+
+  if (mode === 'people') {
+    return [
+      {
+        type: 'exec_hire',
+        prompt: `Find Texas or Texas-relevant executive hires, facility leaders, plant managers, CFOs, COOs, and operations leaders for ${year}. Focus on companies that look like real energy prospects: manufacturers, data centers, logistics, cold storage, healthcare, hospitality, and industrial processing. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
+      },
+    ]
+  }
+
+  return allJobs
 }
 
 async function callPerplexity(prompt: string): Promise<any[]> {
@@ -189,8 +208,11 @@ Deno.serve(async (req: Request) => {
     })
   }
 
+  const payload = await req.json().catch(() => ({}))
+  const mode = cleanText(payload?.mode).toLowerCase() || 'all'
+
   const allSignals: any[] = []
-  for (const job of getJobs()) {
+  for (const job of getJobs(mode)) {
     const signals = await callPerplexity(job.prompt)
     allSignals.push(...signals.map((signal) => ({ ...signal, signal_type: job.type })))
   }
@@ -301,7 +323,7 @@ Deno.serve(async (req: Request) => {
   }
 
   return new Response(
-    JSON.stringify({ success: true, inserted, skippedRegulated, skippedDuplicate, skippedUnnamed }),
+    JSON.stringify({ success: true, mode, inserted, skippedRegulated, skippedDuplicate, skippedUnnamed }),
     { headers: { 'Content-Type': 'application/json' } },
   )
 })
