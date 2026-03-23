@@ -26,6 +26,7 @@ interface IntelSignal {
   crm_match_score?: number;
   source_url?: string;
   relevance_score?: number;
+  fit_score?: number;
   created_at: string;
   accounts?: { id: string; name: string; domain?: string } | null;
 }
@@ -68,6 +69,11 @@ const SIGNAL_CONFIG: Record<SignalType, { icon: React.ReactNode; label: string; 
     border: 'border-cyan-500/30',
   },
 };
+
+function formatFitScore(score?: number): string | null {
+  if (typeof score !== 'number' || Number.isNaN(score)) return null;
+  return `FIT_${Math.round(score)}`;
+}
 
 function formatRelativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -306,6 +312,11 @@ export function SignalMatrix() {
                         ) : (
                           <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-[#002FA7]/10 border border-[#002FA7]/30 text-[#4D88FF]">
                             NEW_PROSPECT
+                          </span>
+                        )}
+                        {formatFitScore(signal.fit_score) && (
+                          <span className="text-[8px] font-mono uppercase tracking-widest px-1.5 py-0.5 rounded bg-white/[0.04] border border-white/10 text-zinc-400">
+                            {formatFitScore(signal.fit_score)}
                           </span>
                         )}
                       </div>
