@@ -10,7 +10,7 @@ function asObject(value) {
 }
 
 function buildSourceTruthLine(linkedInUrl, website) {
-  if (linkedInUrl) return 'SOURCE_TRUTH: LinkedIn available. You may reference LinkedIn once if natural.';
+  if (linkedInUrl) return 'SOURCE_TRUTH: LinkedIn available as a research signal only. Do NOT mention LinkedIn, say you found them on LinkedIn, or reference their LinkedIn profile in the email copy.';
   if (website) return 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.';
   return 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
 }

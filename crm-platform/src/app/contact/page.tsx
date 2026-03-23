@@ -85,15 +85,24 @@ export default function Contact() {
             >
               Open a <br/> <span className="text-[#002FA7]">Channel.</span>
             </motion.h1>
-            <motion.p 
+            <motion.p
               initial={{ opacity: 0, y: 20, filter: "blur(10px)" }}
               animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
               transition={{ duration: 0.8, delay: 0.1 }}
               className="text-xl text-zinc-400 leading-relaxed max-w-md"
             >
-              We do not have a sales team. We have engineers. 
+              We do not have a sales team. We have engineers.
               When you call, you speak to the architects of the strategy, not a script.
             </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.25 }}
+              className="flex items-center gap-2 mt-5"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">We respond within 24 hours · Mon – Fri</span>
+            </motion.div>
           </div>
 
           {/* Right Column: The Interface Card */}

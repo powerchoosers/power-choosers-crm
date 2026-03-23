@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { Activity, Layers, Users, ArrowRight } from 'lucide-react'
+import { Activity, Layers, Users, ArrowRight, ShieldCheck, Lock, Zap, Database, Quote } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 
 const TICKER_ITEMS = [
@@ -409,6 +409,30 @@ export function LandingSections() {
         </div>
       </section>
 
+      {/* TRUST STRIP */}
+      <section className="bg-white border-t border-zinc-100 py-10">
+        <div className="max-w-5xl mx-auto px-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+            {[
+              { icon: Lock, label: 'AES-256 Encrypted', sub: 'Data in transit & at rest' },
+              { icon: ShieldCheck, label: 'SOC 2 Infrastructure', sub: 'Enterprise-grade security' },
+              { icon: Zap, label: 'Texas ERCOT Specialist', sub: '100+ tariff structures mapped' },
+              { icon: Database, label: 'TLS Secured', sub: 'End-to-end encryption' },
+            ].map(({ icon: Icon, label, sub }) => (
+              <div key={label} className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-[#002FA7]" />
+                </div>
+                <div>
+                  <div className="font-mono text-[10px] text-zinc-800 uppercase tracking-widest font-semibold leading-tight">{label}</div>
+                  <div className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest leading-tight">{sub}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section className="bg-white px-6 pt-16 pb-8 border-t border-zinc-100">
         <div className="max-w-5xl mx-auto">
@@ -452,6 +476,53 @@ export function LandingSections() {
               <p className="text-zinc-500 text-sm leading-relaxed">
                 Yes. We've mapped 100+ ERCOT supplier tariff structures across all load zones. TXU, Reliant, Direct Energy, Constellation, and all major REPs operating in the South, Houston, North, and West zones.
               </p>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* WHAT OPERATORS SAY */}
+      {/* TODO: Replace placeholder quotes with real client testimonials before launch */}
+      <section className="bg-[#F5F5F7] px-6 py-20 border-t border-zinc-100">
+        <div className="max-w-6xl mx-auto">
+          <div className="mb-12 reveal-on-scroll">
+            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">SIGNAL_FROM_THE_FIELD</p>
+            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">What operators say.</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll flex flex-col">
+              <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
+              <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
+                &ldquo;We found over $47,000 in recoverable demand charges our supplier had never flagged. The forensic breakdown was immediate — no back-and-forth, no waiting.&rdquo;
+              </p>
+              <div className="border-t border-zinc-100 pt-5">
+                <div className="font-semibold text-zinc-900 text-sm tracking-tight">Operations Director</div>
+                <div className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">North Texas Manufacturing</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll delay-100 flex flex-col">
+              <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
+              <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
+                &ldquo;The 4CP analysis alone exposed exposure we had no visibility into. We were completely vulnerable mid-contract and didn&apos;t know it. This platform fixed that.&rdquo;
+              </p>
+              <div className="border-t border-zinc-100 pt-5">
+                <div className="font-semibold text-zinc-900 text-sm tracking-tight">VP of Facilities</div>
+                <div className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Dallas Commercial Real Estate</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll delay-200 flex flex-col">
+              <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
+              <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
+                &ldquo;Upload your bill, get a forensic breakdown in under a minute. We&apos;ve tried other advisors — nobody else works at this speed or depth. It&apos;s a different category.&rdquo;
+              </p>
+              <div className="border-t border-zinc-100 pt-5">
+                <div className="font-semibold text-zinc-900 text-sm tracking-tight">CFO</div>
+                <div className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Multi-Site Logistics Group, ERCOT</div>
+              </div>
             </div>
 
           </div>
