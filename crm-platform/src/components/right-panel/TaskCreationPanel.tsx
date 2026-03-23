@@ -25,7 +25,7 @@ import { refreshTaskCaches, useTasks, type Task } from '@/hooks/useTasks'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { useSearchAccounts } from '@/hooks/useAccounts'
 import { useUIStore } from '@/store/uiStore'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -37,7 +37,7 @@ const WEEKDAYS = ['S', 'M', 'T', 'W', 'T', 'F', 'S']
 const PRIORITIES = ['Low', 'Medium', 'High', 'BRIEFING'] as const
 type Priority = (typeof PRIORITIES)[number]
 
-const TASK_TYPES_CONTACT = ['Call', 'Email', 'Meeting', 'Follow-up', 'LinkedIn'] as const
+const TASK_TYPES_CONTACT = ['Call', 'Video Call', 'Email', 'Meeting', 'Follow-up', 'LinkedIn'] as const
 const TASK_TYPES_ACCOUNT = ['Call', 'Email', 'Meeting', 'Follow-up'] as const
 type TaskTypeContact = (typeof TASK_TYPES_CONTACT)[number]
 type TaskTypeAccount = (typeof TASK_TYPES_ACCOUNT)[number]
@@ -87,6 +87,7 @@ export function TaskCreationPanel() {
     const [reminders, setReminders] = useState<number[]>([])
     const [taskType, setTaskType] = useState<TaskType>('Call')
     const [sendCalendarInvite, setSendCalendarInvite] = useState(false)
+    const [videoCallUrl, setVideoCallUrl] = useState('')
     const [notes, setNotes] = useState('')
     const [manualIntro, setManualIntro] = useState('')
     const [isCommitting, setIsCommitting] = useState(false)
@@ -290,6 +291,7 @@ export function TaskCreationPanel() {
                 metadata: {
                     taskType,
                     ...(sendCalendarInvite ? { syncCalendar: true, inviteContext: 'forensic_diagnostic' } : {}),
+                    ...(taskType === 'Video Call' && videoCallUrl.trim() ? { videoCallUrl: videoCallUrl.trim() } : {}),
                     manualIntro: manualIntro.trim() || undefined
                 }
             }
@@ -658,26 +660,38 @@ export function TaskCreationPanel() {
 
                     {/* PRIORITY */}
                     <div className="space-y-4">
-                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Priority Level</div>
+                        <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest flex items-center justify-between">
+                            Priority Level
+                            {sendCalendarInvite && (
+                                <span className="text-[9px] font-mono text-indigo-500/70 tracking-widest">BRIEFING AUTO-SET</span>
+                            )}
+                        </div>
                         <div className="flex flex-wrap gap-2">
-                            {PRIORITIES.filter(p => p !== 'BRIEFING').map((p) => (
-                                <button
-                                    key={p}
-                                    type="button"
-                                    onClick={() => setPriority(p)}
-                                    className={cn(
-                                        'px-4 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest transition-all border flex-1 min-w-[80px]',
-                                        p === 'Low' && 'border-zinc-800 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400',
-                                        p === 'Low' && priority === p && 'bg-zinc-500/10 border-zinc-500 text-zinc-300',
-                                        p === 'Medium' && 'border-amber-900/50 text-amber-900 hover:border-amber-500 hover:text-amber-500',
-                                        p === 'Medium' && priority === p && 'bg-amber-500/10 border-amber-500 text-amber-500',
-                                        p === 'High' && 'border-rose-900/50 text-rose-900 hover:border-rose-500 hover:text-rose-500',
-                                        p === 'High' && priority === p && 'bg-rose-500/10 border-rose-500 text-rose-500'
-                                    )}
-                                >
-                                    {p}
-                                </button>
-                            ))}
+                            {sendCalendarInvite ? (
+                                <div className="w-full px-4 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest border border-indigo-500/30 bg-indigo-500/5 text-indigo-400 flex items-center justify-center gap-2 select-none">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]" />
+                                    BRIEFING
+                                </div>
+                            ) : (
+                                PRIORITIES.filter(p => p !== 'BRIEFING').map((p) => (
+                                    <button
+                                        key={p}
+                                        type="button"
+                                        onClick={() => setPriority(p)}
+                                        className={cn(
+                                            'px-4 h-9 rounded-xl text-[10px] font-mono uppercase tracking-widest transition-all border flex-1 min-w-[80px]',
+                                            p === 'Low' && 'border-zinc-800 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400',
+                                            p === 'Low' && priority === p && 'bg-zinc-500/10 border-zinc-500 text-zinc-300',
+                                            p === 'Medium' && 'border-amber-900/50 text-amber-900 hover:border-amber-500 hover:text-amber-500',
+                                            p === 'Medium' && priority === p && 'bg-amber-500/10 border-amber-500 text-amber-500',
+                                            p === 'High' && 'border-rose-900/50 text-rose-900 hover:border-rose-500 hover:text-rose-500',
+                                            p === 'High' && priority === p && 'bg-rose-500/10 border-rose-500 text-rose-500'
+                                        )}
+                                    >
+                                        {p}
+                                    </button>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
@@ -702,6 +716,37 @@ export function TaskCreationPanel() {
                         </SelectContent>
                     </Select>
                 </div>
+
+                {/* VIDEO CALL URL (animated in when Video Call is selected) */}
+                <AnimatePresence>
+                    {taskType === 'Video Call' && (
+                        <motion.div
+                            key="video-call-url"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.2, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                        >
+                            <div className="space-y-3">
+                                <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest font-bold flex items-center gap-2">
+                                    <div className="w-1 h-1 bg-[#002FA7] rounded-full" />
+                                    Video Call Link
+                                </div>
+                                <input
+                                    type="url"
+                                    value={videoCallUrl}
+                                    onChange={(e) => setVideoCallUrl(e.target.value)}
+                                    placeholder="https://meet.google.com/..."
+                                    className={`${panelTheme.field} w-full bg-[#002FA7]/5 border-[#002FA7]/20 focus:border-[#002FA7]/50 placeholder:text-zinc-700`}
+                                />
+                                <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                                    This link will appear in the calendar invite and email sent to the contact.
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 {/* INTEL_NOTES */}
                 <div className="space-y-4">

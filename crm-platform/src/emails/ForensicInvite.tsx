@@ -12,6 +12,7 @@ interface ForensicInviteProps {
     taskId?: string;
     prospectEmail?: string;
     baseUrl?: string;
+    meetingUrl?: string;
     sender: {
         name: string;
         title: string;
@@ -34,6 +35,7 @@ export default function ForensicInvite({
     taskId,
     prospectEmail,
     baseUrl = 'https://nodalpoint.io',
+    meetingUrl,
     sender
 }: ForensicInviteProps) {
     return (
@@ -99,6 +101,16 @@ export default function ForensicInvite({
                                 <Text style={itemValue}>{operationalVector}</Text>
                             </div>
                         </div>
+
+                        {meetingUrl && (
+                            <>
+                                <Hr style={hr} />
+                                <Text style={itemLabel}>VIDEO_LINK</Text>
+                                <Link href={meetingUrl} style={meetingLinkStyle}>
+                                    ▶ JOIN VIDEO BRIEFING
+                                </Link>
+                            </>
+                        )}
                     </Section>
 
                     {/* RSVP Protocol */}
@@ -334,6 +346,20 @@ const buttonReject = {
     fontWeight: "bold",
     fontFamily: "monospace",
     display: "inline-block",
+};
+
+const meetingLinkStyle = {
+    display: "inline-block",
+    marginTop: "8px",
+    padding: "10px 20px",
+    backgroundColor: "#002FA7",
+    color: "#ffffff",
+    fontSize: "12px",
+    fontWeight: "bold",
+    fontFamily: "monospace",
+    textDecoration: "none",
+    letterSpacing: "1px",
+    borderRadius: "4px",
 };
 
 
