@@ -10,6 +10,7 @@ import { useUIStore } from '@/store/uiStore';
 import { useProspectRadar, useIngestProspect, useDismissProspect } from '@/hooks/useProspectRadar';
 import { supabase } from '@/lib/supabase';
 import { formatProspectLocationLabel, normalizeOrganizationName } from '@/lib/apollo-prospect';
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint';
 
 
 type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion';
@@ -322,9 +323,13 @@ export function SignalMatrix() {
                       </div>
 
                       {signal.entity_name && (
-                        <p className="text-[10px] font-mono text-zinc-400 mt-0.5 truncate">
-                          {signal.entity_name}
-                        </p>
+                        <ForensicDataPoint
+                          inline
+                          copyValue={displayProspectName(signal.entity_name)}
+                          value={displayProspectName(signal.entity_name)}
+                          valueClassName="text-[10px] font-mono text-zinc-400 mt-0.5 truncate"
+                          className="mt-0.5 min-w-0"
+                        />
                       )}
 
                       <p className="text-xs text-zinc-200 mt-0.5 font-mono leading-snug line-clamp-2">
