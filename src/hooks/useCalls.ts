@@ -7,6 +7,11 @@ export interface Call {
   id: string
   callSid?: string
   contactName: string
+  contactTitle?: string
+  contactAvatarUrl?: string
+  contactCompanyName?: string
+  contactCompanyDomain?: string
+  contactCompanyLogoUrl?: string
   phoneNumber: string
   type: 'Inbound' | 'Outbound'
   status: 'Completed' | 'Busy' | 'No-answer' | 'Failed' | 'Canceled'
@@ -150,7 +155,14 @@ export function useCallsCount(searchQuery?: string) {
 
 type CallContact = {
   name?: string | null
+  title?: string | null
+  avatarUrl?: string | null
+  avatar_url?: string | null
+  photoUrl?: string | null
+  photo_url?: string | null
+  accountId?: string | null
   ownerId?: string | null
+  accounts?: CallAccount | CallAccount[] | null
 }
 
 type CallRow = {
@@ -236,10 +248,10 @@ export function useCalls(searchQuery?: string) {
     queryFn: async ({ pageParam = 0 }) => {
       if (loading || !user) return { calls: [], nextCursor: null }
 
-      // Join accounts for company display (name, city, state, industry, logo); use explicit FK
+      // Join accounts for company display and contact details; use explicit FK
       let query = supabase
         .from('calls')
-        .select('*, accounts!calls_accountId_fkey(name, city, state, industry, logo_url, domain)', { count: 'exact' })
+        .select('*, accounts!calls_accountId_fkey(name, city, state, industry, logo_url, domain), contacts!calls_contactId_fkey(name, title, avatarUrl, avatar_url, photoUrl, photo_url, accountId, accounts!contacts_accountId_fkey(name, domain, logo_url))', { count: 'exact' })
 
       if (searchQuery) {
         query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
@@ -270,12 +282,18 @@ export function useCalls(searchQuery?: string) {
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
 
         const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+        const contactAccount = Array.isArray(contact?.accounts) ? contact.accounts[0] : contact?.accounts
         const contactName = contact?.name ?? 'Unknown'
         const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
 
         return {
           id: item.id,
           contactName,
+          contactTitle: contact?.title || undefined,
+          contactAvatarUrl: contact?.avatarUrl || contact?.avatar_url || contact?.photoUrl || contact?.photo_url || undefined,
+          contactCompanyName: contactAccount?.name || undefined,
+          contactCompanyDomain: contactAccount?.domain || undefined,
+          contactCompanyLogoUrl: contactAccount?.logo_url || undefined,
           phoneNumber: item.direction === 'outbound' ? (item.to || '') : (item.from || ''),
           type: type as Call['type'],
           status: status as Call['status'],
@@ -375,11 +393,17 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
         const seconds = (item.duration || 0) % 60
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
         const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+        const contactAccount = Array.isArray(contact?.accounts) ? contact.accounts[0] : contact?.accounts
 
         return {
           id: item.id,
           callSid: item.callSid || item.call_sid || item.id,
           contactName: contact?.name || 'Unknown',
+          contactTitle: contact?.title || undefined,
+          contactAvatarUrl: contact?.avatarUrl || contact?.avatar_url || contact?.photoUrl || contact?.photo_url || undefined,
+          contactCompanyName: contactAccount?.name || undefined,
+          contactCompanyDomain: contactAccount?.domain || undefined,
+          contactCompanyLogoUrl: contactAccount?.logo_url || undefined,
           phoneNumber: item.direction === 'outbound' ? (item.to || '') : (item.from || ''),
           type: type as Call['type'],
           status: status as Call['status'],
@@ -518,11 +542,18 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
         const fromVal = item.from
         const toVal = item.to
+        const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+        const contactAccount = Array.isArray(contact?.accounts) ? contact.accounts[0] : contact?.accounts
 
         return {
           id: item.id,
           callSid: item.callSid || item.call_sid || item.id,
-          contactName: '',
+          contactName: contact?.name || 'Unknown',
+          contactTitle: contact?.title || undefined,
+          contactAvatarUrl: contact?.avatarUrl || contact?.avatar_url || contact?.photoUrl || contact?.photo_url || undefined,
+          contactCompanyName: contactAccount?.name || undefined,
+          contactCompanyDomain: contactAccount?.domain || undefined,
+          contactCompanyLogoUrl: contactAccount?.logo_url || undefined,
           phoneNumber: item.direction === 'outbound' ? (toVal || '') : (fromVal || ''),
           type: type as Call['type'],
           status: status as Call['status'],
