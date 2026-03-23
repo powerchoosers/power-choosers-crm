@@ -35,7 +35,7 @@ export default async function handler(req, res) {
     }
 
     // --- Extract CRM context from query params (passed by voice.js) ---
-    let contactId = '', accountId = '', agentId = '', agentEmail = '', targetPhoneFromQuery = '';
+    let contactId = '', accountId = '', agentId = '', agentEmail = '', targetPhoneFromQuery = '', businessPhoneFromQuery = '';
     try {
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || req.headers['x-forwarded-host'] || '';
@@ -45,6 +45,7 @@ export default async function handler(req, res) {
       agentId = requestUrl.searchParams.get('agentId') || '';
       agentEmail = requestUrl.searchParams.get('agentEmail') || '';
       targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone') || '';
+      businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone') || '';
     } catch (_) { }
 
     // --- Parse event details ---
@@ -119,6 +120,7 @@ export default async function handler(req, res) {
           agentId: agentId || null,
           agentEmail: agentEmail || null,
           targetPhone: targetPhoneFromQuery || resolvedTo || '',
+          businessPhone: businessPhoneFromQuery || undefined,
           source: 'dial-status-v3'
         };
 
@@ -175,6 +177,7 @@ export default async function handler(req, res) {
             if (agentId) callbackParams.append('agentId', agentId);
             if (agentEmail) callbackParams.append('agentEmail', agentEmail);
             if (targetPhoneFromQuery) callbackParams.append('targetPhone', targetPhoneFromQuery);
+            if (businessPhoneFromQuery) callbackParams.append('businessPhone', businessPhoneFromQuery);
             const cbq = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
             const rec = await client.calls(targetSid).recordings.create({
