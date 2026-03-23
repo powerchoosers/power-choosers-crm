@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, memo } from 'react'
+import { useState, useCallback, useEffect, memo } from 'react'
 import { Copy, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -42,8 +42,19 @@ export const ForensicDataPoint = memo(function ForensicDataPoint({
   compact = false
 }: ForensicDataPointProps) {
   const [copied, setCopied] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
   const toCopy = copyValue !== undefined && copyValue !== '' ? copyValue : value
   const isEmpty = !toCopy.trim()
+
+  useEffect(() => {
+    if (!copied || isHovered) return
+
+    const timer = setTimeout(() => {
+      setCopied(false)
+    }, COPIED_DURATION_MS)
+
+    return () => clearTimeout(timer)
+  }, [copied, isHovered])
 
   const handleCopy = useCallback(
     (e: React.MouseEvent | React.KeyboardEvent) => {
@@ -53,7 +64,6 @@ export const ForensicDataPoint = memo(function ForensicDataPoint({
       navigator.clipboard.writeText(toCopy).then(
         () => {
           setCopied(true)
-          setTimeout(() => setCopied(false), COPIED_DURATION_MS)
         },
         () => { }
       )
@@ -97,6 +107,11 @@ export const ForensicDataPoint = memo(function ForensicDataPoint({
 
   return (
     <Wrapper
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => {
+        setIsHovered(false)
+        setCopied(false)
+      }}
       className={cn(
         'group/dp relative flex items-center',
         compact ? 'gap-0' : 'gap-2',
