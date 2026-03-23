@@ -430,7 +430,14 @@ export function SignalMatrix() {
 
                       {/* Name + meta */}
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-mono text-zinc-100 leading-tight">{displayName}</p>
+                        <ForensicDataPoint
+                          inline
+                          compact
+                          copyValue={displayName}
+                          value={displayName}
+                          valueClassName="text-xs font-mono text-zinc-100 leading-tight truncate"
+                          className="min-w-0 max-w-full"
+                        />
                         <div className="flex items-center gap-2 mt-1 min-w-0 flex-wrap">
                           {prospect.industry && (
                             <span className="text-[9px] font-mono text-zinc-500 truncate max-w-[120px]">{prospect.industry}</span>
