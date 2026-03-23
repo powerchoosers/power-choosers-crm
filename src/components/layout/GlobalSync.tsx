@@ -10,7 +10,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-import { CheckCircle, Eye, CalendarCheck, CalendarX } from 'lucide-react'
+import { CheckCircle, Eye, CalendarCheck, CalendarX, Bell, Video } from 'lucide-react'
 import { showInboxEmailToast } from '@/lib/inbox-email-toast'
 import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe'
 
@@ -235,7 +235,7 @@ export function GlobalSync() {
 
           if (!notification?.id) return
           const notifType = String(notification.type || '').toLowerCase()
-          if (notifType !== 'email' && notifType !== 'rsvp') return
+          if (notifType !== 'email' && notifType !== 'rsvp' && notifType !== 'reminder') return
           if (notification.read) return
 
           const ownerId = String(notification.ownerId || '').toLowerCase()
@@ -257,7 +257,32 @@ export function GlobalSync() {
           const hasAttachments = Boolean(notification.data?.hasAttachments)
           const sourceLabel = formatSourceLabel(notification.data?.source || notification.metadata?.source)
 
-          if (notifType === 'rsvp') {
+          if (notifType === 'reminder') {
+              const mins = notification.data?.reminderMinutes as number | undefined;
+              const videoUrl = notification.data?.videoCallUrl as string | null | undefined;
+              const isUrgent = mins === 15;
+              if (useUIStore.getState().soundEnabled) isUrgent ? playAlert() : playPing();
+              toast(
+                  <div className="flex items-start gap-3">
+                      {videoUrl ? (
+                          <Video className="w-5 h-5 text-[#002FA7] shrink-0 mt-0.5" />
+                      ) : (
+                          <Bell className={`w-5 h-5 shrink-0 mt-0.5 ${isUrgent ? 'text-amber-400' : 'text-zinc-400'}`} />
+                      )}
+                      <div className="flex flex-col gap-0.5">
+                          <span className="font-medium text-sm">{notification.title}</span>
+                          <span className="text-xs text-zinc-400">{notification.message}</span>
+                          {videoUrl && (
+                              <a href={videoUrl} target="_blank" rel="noopener noreferrer"
+                                 className="text-xs text-[#002FA7] underline mt-1 font-mono">
+                                  Join Video Briefing →
+                              </a>
+                          )}
+                      </div>
+                  </div>,
+                  { duration: isUrgent ? 30000 : 10000 }
+              )
+          } else if (notifType === 'rsvp') {
               const statusStr = String(notification.data?.status || 'UNKNOWN').toUpperCase();
               const isAccepted = statusStr === 'ACCEPTED' ||
                                  notification.title?.toLowerCase().includes('confirmed') ||
@@ -268,7 +293,7 @@ export function GlobalSync() {
               queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] })
 
               if (useUIStore.getState().soundEnabled) playPing();
-              
+
               toast(
                   <div className="flex items-center gap-3">
                       {isAccepted ? (
@@ -347,8 +372,33 @@ export function GlobalSync() {
         seenInboxSignalIdsRef.current.add(signalId)
 
         const notifType = String(row.type || '').toLowerCase();
-        
-        if (notifType === 'rsvp') {
+
+        if (notifType === 'reminder') {
+            const mins = payload.reminderMinutes as number | undefined;
+            const videoUrl = payload.videoCallUrl as string | null | undefined;
+            const isUrgent = mins === 15;
+            if (soundEnabled) isUrgent ? playAlert() : playPing();
+            toast(
+                <div className="flex items-start gap-3">
+                    {videoUrl ? (
+                        <Video className="w-5 h-5 text-[#002FA7] shrink-0 mt-0.5" />
+                    ) : (
+                        <Bell className={`w-5 h-5 shrink-0 mt-0.5 ${isUrgent ? 'text-amber-400' : 'text-zinc-400'}`} />
+                    )}
+                    <div className="flex flex-col gap-0.5">
+                        <span className="font-medium text-sm">{row.title}</span>
+                        <span className="text-xs text-zinc-400">{row.message}</span>
+                        {videoUrl && (
+                            <a href={videoUrl} target="_blank" rel="noopener noreferrer"
+                               className="text-xs text-[#002FA7] underline mt-1 font-mono">
+                                Join Video Briefing →
+                            </a>
+                        )}
+                    </div>
+                </div>,
+                { duration: isUrgent ? 30000 : 10000 }
+            );
+        } else if (notifType === 'rsvp') {
             const statusStr = String(payload.status || 'UNKNOWN').toUpperCase();
             const isAccepted = statusStr === 'ACCEPTED' ||
                                row.title?.toLowerCase().includes('confirmed') ||
