@@ -51,9 +51,27 @@ export function useEmail(id: string) {
         console.error('Error fetching email from Supabase:', error)
         return null
       }
+
+      let emailRow = data
+
+      // Tracking rows are transport wrappers, not the human-visible sent message.
+      // If this ID points to a tracking record, load and return its parent email row.
+      if (emailRow && String(emailRow.type || '').toLowerCase() === 'tracking') {
+        const parentId = emailRow.metadata?.email_id || emailRow.metadata?.emailId
+        if (parentId && parentId !== emailRow.id) {
+          const { data: parentData, error: parentError } = await supabase
+            .from('emails')
+            .select('*, contact:contacts(id, email, name, firstName, lastName, accountId, metadata)')
+            .eq('id', parentId)
+            .single()
+          if (!parentError && parentData) {
+            emailRow = parentData
+          }
+        }
+      }
       
-      if (data) {
-        const rawType = String(data.type || '').toLowerCase()
+      if (emailRow) {
+        const rawType = String(emailRow.type || '').toLowerCase()
         const normalizedType: Email['type'] =
           rawType === 'sent' || rawType === 'uplink_out'
             ? 'sent'
@@ -62,36 +80,36 @@ export function useEmail(id: string) {
               : rawType === 'draft'
                 ? 'draft'
                 : 'received'
-        const provider = data.metadata?.provider || null
-        const normalizedAttachments = normalizeAttachments(data.metadata?.attachments || data.attachments, provider)
-        const plainText = stripHtml(data.text)
-        const plainHtml = stripHtml(data.html)
+        const provider = emailRow.metadata?.provider || null
+        const normalizedAttachments = normalizeAttachments(emailRow.metadata?.attachments || emailRow.attachments, provider)
+        const plainText = stripHtml(emailRow.text)
+        const plainHtml = stripHtml(emailRow.html)
         return {
-          id: data.id,
-          subject: data.subject,
-          from: data.from,
-          fromName: data.metadata?.fromName || null,
-          to: data.to,
-          contactId: data.contactId || null,
-          accountId: data.accountId || null,
-          threadId: data.threadId || data.metadata?.threadId || null,
-          html: data.html,
+          id: emailRow.id,
+          subject: emailRow.subject,
+          from: emailRow.from,
+          fromName: emailRow.metadata?.fromName || null,
+          to: emailRow.to,
+          contactId: emailRow.contactId || null,
+          accountId: emailRow.accountId || null,
+          threadId: emailRow.threadId || emailRow.metadata?.threadId || null,
+          html: emailRow.html,
           text: plainText || plainHtml,
           snippet: (plainText || plainHtml || '').slice(0, 140),
-          date: data.timestamp || data.created_at,
-          timestamp: new Date(data.timestamp || data.created_at).getTime(),
-          unread: !data.is_read,
+          date: emailRow.timestamp || emailRow.created_at,
+          timestamp: new Date(emailRow.timestamp || emailRow.created_at).getTime(),
+          unread: !emailRow.is_read,
           type: normalizedType,
-          status: data.status,
-          ownerId: data.metadata?.ownerId || data.ownerId || null,
-          openCount: data.openCount,
-          clickCount: data.clickCount,
+          status: emailRow.status,
+          ownerId: emailRow.metadata?.ownerId || emailRow.ownerId || null,
+          openCount: emailRow.openCount,
+          clickCount: emailRow.clickCount,
           attachments: normalizedAttachments,
-          contact: data.contact
+          contact: emailRow.contact
             ? {
-                ...data.contact,
-                displayName: data.contact.name || [data.contact.firstName, data.contact.lastName].filter(Boolean).join(' ').trim() || data.contact.email,
-                avatarUrl: resolveContactPhotoUrl(data.contact) || null,
+                ...emailRow.contact,
+                displayName: emailRow.contact.name || [emailRow.contact.firstName, emailRow.contact.lastName].filter(Boolean).join(' ').trim() || emailRow.contact.email,
+                avatarUrl: resolveContactPhotoUrl(emailRow.contact) || null,
               }
             : null
         } as Email

@@ -37,12 +37,13 @@ export function useEmailTrackingNotifications() {
             subject?: string
             to?: string[]
             from?: string
+            ownerId?: string
             openCount?: number
             clickCount?: number
-            metadata?: { ownerId?: string }
+            metadata?: { ownerId?: string; email_id?: string; emailId?: string }
           }
-          // Only CRM-sent emails use tracked IDs (zoho_, sig_, sig_exec_)
-          if (!email.id || (!email.id.startsWith('zoho_') && !email.id.startsWith('sig_') && !email.id.startsWith('sig_exec_'))) return
+          // Only CRM-sent emails use tracked IDs (zoho_, sig_, sig_exec_, seq_exec_)
+          if (!email.id || (!email.id.startsWith('zoho_') && !email.id.startsWith('sig_') && !email.id.startsWith('sig_exec_') && !email.id.startsWith('seq_exec_'))) return
 
           // Signature/contract emails are handled exclusively by GlobalSync's contract notifications.
           // Still update React Query caches below for live counter updates, but skip toasts.
@@ -54,11 +55,15 @@ export function useEmailTrackingNotifications() {
           } | null
 
           // Only notify for current user's emails (ownerId from metadata, or from address as fallback if metadata was wiped)
-          const ownerEmail = email.metadata?.ownerId?.toLowerCase()
+          const ownerEmail = String(email.metadata?.ownerId || email.ownerId || '').toLowerCase()
           const fromEmail = typeof email.from === 'string' && email.from.includes('@')
             ? email.from.replace(/^.*<([^>]+)>.*$/, '$1').trim().toLowerCase()
             : ''
-          const isOwner = ownerEmail === user.email?.toLowerCase() || fromEmail === user.email?.toLowerCase()
+          const userEmail = String(user.email || '').toLowerCase()
+          const normalizeOwner = (value: string) => value.replace('@getnodalpoint.com', '@nodalpoint.io')
+          const sameOwner = normalizeOwner(ownerEmail) === normalizeOwner(userEmail)
+          const sameFrom = normalizeOwner(fromEmail) === normalizeOwner(userEmail)
+          const isOwner = sameOwner || sameFrom
           if (!isOwner) return
 
           // Dedupe: max 1 notification per email per 5 seconds
@@ -109,12 +114,13 @@ export function useEmailTrackingNotifications() {
           const recipient = Array.isArray(email.to) ? email.to[0] : 'recipient'
           const subject = email.subject?.slice(0, 35) || 'your email'
           const subjectTruncated = email.subject && email.subject.length > 35 ? '...' : ''
+          const routeEmailId = String(email.metadata?.email_id || email.metadata?.emailId || email.id)
 
           if (!isContractEmail) {
             if (clicked) {
               if (soundEnabled) playPing()
               toast(
-                <Link href={`/network/emails/${email.id}`} className="no-underline block w-full">
+                <Link href={`/network/emails/${routeEmailId}`} className="no-underline block w-full">
                   <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
                     <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
                     <div className="flex flex-col">
@@ -128,7 +134,7 @@ export function useEmailTrackingNotifications() {
             } else if (opened) {
               if (soundEnabled) playPing()
               toast(
-                <Link href={`/network/emails/${email.id}`} className="no-underline block w-full">
+                <Link href={`/network/emails/${routeEmailId}`} className="no-underline block w-full">
                   <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
                     <Eye className="w-4 h-4 text-emerald-400" />
                     <div className="flex flex-col">
