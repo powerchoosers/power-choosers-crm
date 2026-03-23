@@ -687,8 +687,9 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId, source
         }
     }
 
+    const notificationId = `email-notif-${messageId}`;
     const notification = {
-        id: `email-notif-${messageId}`,
+        id: notificationId,
         ownerId: ownerEmail,
         userId: null,
         title: titleStr,
@@ -720,9 +721,28 @@ async function createInboxNotification({ emailDoc, ownerEmail, messageId, source
         },
     };
 
+    const { data: existingNotification, error: existingNotificationError } = await supabaseAdmin
+        .from('notifications')
+        .select('id, read, createdAt')
+        .eq('id', notificationId)
+        .maybeSingle();
+
+    if (existingNotificationError) {
+        logger.warn(`[Zoho Sync] Notification pre-check failed for ${messageId}: ${existingNotificationError.message}`, 'zoho-sync');
+    }
+
+    // Keep notification state stable once created (avoid re-opening read items).
+    if (existingNotification?.id) {
+        return {
+            ...notification,
+            read: Boolean(existingNotification.read),
+            createdAt: existingNotification.createdAt || notification.createdAt,
+        };
+    }
+
     const { error } = await supabaseAdmin
         .from('notifications')
-        .upsert(notification, { onConflict: 'id' });
+        .insert(notification);
 
     if (error) {
         logger.warn(`[Zoho Sync] Notification insert failed for ${messageId}: ${error.message}`, 'zoho-sync');
@@ -824,11 +844,13 @@ export default async function handler(req, res) {
                 // 2. Check for duplicates in Supabase using the primary 'id' column
                 const { data: existing } = await supabaseAdmin
                     .from('emails')
-                    .select('id, from, metadata, contactId, accountId, threadId, subject')
+                    .select('id, from, metadata, contactId, accountId, threadId, subject, type, text, timestamp')
                     .eq('id', messageId)
                     .maybeSingle();
 
                 if (existing) {
+                    let resolvedContactId = existing?.contactId || null;
+                    let resolvedAccountId = existing?.accountId || null;
                     // Backfill attachments and sender email for previously-synced rows.
                     const existingAttachments = Array.isArray(existing?.metadata?.attachments) ? existing.metadata.attachments : [];
                     const hasExistingAttachments = existingAttachments.length > 0;
@@ -890,9 +912,20 @@ export default async function handler(req, res) {
                     if (!existing?.contactId) {
                         try {
                             const fallbackThreadId = existing?.threadId || determineThreadId({ subject: msgSummary?.subject || existing?.subject || '', ownerId: userEmail });
-                            const byName = await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || existing?.metadata?.fromAddress || '');
-                            const fallbackIdentity = byName?.contactId ? byName : await resolveContactAndAccountFromThread(userEmail, fallbackThreadId);
+                            const senderRaw = msgSummary?.senderAddress || existing?.metadata?.fromAddress || existing?.from || msgSummary?.sender || '';
+                            const senderEmail = extractEmailAddress(senderRaw);
+                            const byEmail = isLikelyEmail(senderEmail)
+                                ? await resolveContactAndAccount(userEmail, senderEmail)
+                                : { contactId: null, accountId: null };
+                            const byName = byEmail?.contactId
+                                ? byEmail
+                                : await resolveContactAndAccountBySenderName(userEmail, msgSummary?.sender || senderRaw);
+                            const fallbackIdentity = byName?.contactId
+                                ? byName
+                                : await resolveContactAndAccountFromThread(userEmail, fallbackThreadId);
                             if (fallbackIdentity?.contactId) {
+                                resolvedContactId = fallbackIdentity.contactId;
+                                resolvedAccountId = fallbackIdentity.accountId;
                                 await supabaseAdmin
                                     .from('emails')
                                     .update({
@@ -904,6 +937,29 @@ export default async function handler(req, res) {
                             }
                         } catch (identityBackfillError) {
                             logger.warn(`[Zoho Sync] Contact backfill failed for existing message ${messageId}: ${identityBackfillError?.message || identityBackfillError}`, 'zoho-sync');
+                        }
+                    }
+
+                    const existingType = String(existing?.type || '').toLowerCase();
+                    const isInboundExisting = existingType === 'received' || existingType === 'uplink_in' || !existingType;
+                    if (isInboundExisting && resolvedContactId) {
+                        const notification = await createInboxNotification({
+                            emailDoc: {
+                                id: existing.id,
+                                contactId: resolvedContactId,
+                                accountId: resolvedAccountId,
+                                subject: existing.subject || msgSummary?.subject || '',
+                                text: existing.text || '',
+                                message: existing.text || existing.subject || '',
+                                metadata: existing.metadata || {},
+                                type: existing.type || 'received',
+                            },
+                            ownerEmail: userEmail,
+                            messageId,
+                            source: syncSource,
+                        });
+                        if (notification) {
+                            notifications.push(notification);
                         }
                     }
                     skippedCount++;
