@@ -6,6 +6,7 @@ import { UserCheck, Mail, ArrowUpRight, X, Search, Smartphone, Landmark, Phone, 
 import { AnimatePresence, motion } from 'framer-motion'
 import { useCallStore } from '@/store/callStore'
 import { useComposeStore } from '@/store/composeStore'
+import type { ComposeContext } from '@/components/emails/ComposeModal'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { cn } from '@/lib/utils'
@@ -30,6 +31,7 @@ interface AccountHolderCardProps {
   contacts: HolderContact[]
   primaryContactId?: string | null
   onSetHolder: (contactId: string | null) => void
+  composeContext?: ComposeContext | null
 }
 
 export function AccountHolderCard({
@@ -38,6 +40,7 @@ export function AccountHolderCard({
   contacts,
   primaryContactId,
   onSetHolder,
+  composeContext,
 }: AccountHolderCardProps) {
   const initiateCall = useCallStore(s => s.initiateCall)
   const router = useRouter()
@@ -110,11 +113,12 @@ export function AccountHolderCard({
     openCompose({
       to: holder.email,
       context: {
+        ...(composeContext || {}),
         contactId: holder.id,
         contactName: holder.name,
         contactTitle: holder.title,
-        accountId: accountId,
-        accountName: accountName,
+        accountId: composeContext?.accountId || accountId,
+        accountName: composeContext?.accountName || accountName,
       },
     })
   }
