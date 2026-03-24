@@ -221,6 +221,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     `;
 
     // 6. Log email to CRM
+    const sentAt = new Date().toISOString();
     await supabaseAdmin.from('emails').insert({
       id: trackingId,
       contactId: contactId,
@@ -233,9 +234,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       text: `Please review and sign the document here: ${signingUrl}`,
       status: 'sent',
       type: 'sent',
-      timestamp: new Date().toISOString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      timestamp: sentAt,
+      sentAt,
+      createdAt: sentAt,
+      updatedAt: sentAt,
       metadata: { isSignatureRequest: true, documentId, dealId }
     });
 

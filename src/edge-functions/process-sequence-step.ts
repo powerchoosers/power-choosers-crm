@@ -555,6 +555,7 @@ async function handleSend(execution, job) {
             String(existingEmailRecord.status || '').toLowerCase() === 'sent'
             || !!existingEmailRecord?.metadata?.messageId
             || !!existingEmailRecord?.metadata?.zohoMessageId
+            || !!existingEmailRecord?.sentAt
             || !!existingEmailRecord?.metadata?.sentAt
         );
     if (alreadySentForExecution) {
@@ -567,7 +568,7 @@ async function handleSend(execution, job) {
               wait_until = COALESCE(wait_until, NOW() + (${delayVal} || ' ' || ${delayUnit})::INTERVAL),
               metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({
             messageId: existingEmailRecord?.metadata?.messageId || existingEmailRecord?.metadata?.zohoMessageId || null,
-            sentAt: existingEmailRecord?.metadata?.sentAt || new Date().toISOString(),
+            sentAt: existingEmailRecord?.sentAt || existingEmailRecord?.metadata?.sentAt || new Date().toISOString(),
             from: existingEmailRecord?.from || fromEmail
         })}::jsonb,
               updated_at = NOW()
@@ -601,6 +602,7 @@ async function handleSend(execution, job) {
         // Determine wait window for interaction (default 3 days if not specified)
         const delayVal = parseInt(metadata?.delay || metadata?.interval || '3');
         const delayUnit = metadata?.delayUnit || 'days';
+        const sentAt = new Date().toISOString();
 
         // Update to 'waiting' state
         await sql`
@@ -609,7 +611,7 @@ async function handleSend(execution, job) {
            wait_until = NOW() + (${delayVal} || ' ' || ${delayUnit})::INTERVAL,
            metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({
             messageId: result.messageId,
-            sentAt: new Date().toISOString(),
+            sentAt,
             from: fromEmail
         })}::jsonb
        WHERE id = ${execution.id}

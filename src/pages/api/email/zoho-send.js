@@ -223,9 +223,10 @@ async function resolveContactFromThread(ownerEmail, threadId, recipientEmail) {
 
     const { data: rows, error } = await supabaseAdmin
         .from('emails')
-        .select('contactId, accountId, from, to, ownerId, metadata, timestamp, createdAt')
+        .select('contactId, accountId, from, to, ownerId, metadata, sentAt, timestamp, createdAt')
         .or(`threadId.eq.${normalizedThreadId},metadata->>threadId.eq.${normalizedThreadId}`)
         .not('contactId', 'is', null)
+        .order('sentAt', { ascending: false, nullsFirst: false })
         .order('timestamp', { ascending: false, nullsFirst: false })
         .order('createdAt', { ascending: false, nullsFirst: false })
         .limit(50);
@@ -576,6 +577,7 @@ export default async function handler(req, res) {
         // Persist the email record before sending so Sent/Scheduled lists always have a row.
         // Tracking remains optional; it only affects injected pixels/links and tracking metadata.
         if (supabaseAdmin) {
+            const preSendAt = new Date().toISOString();
             const emailRecord = {
                 id: trackingId,
                 to: toRecipients,
@@ -592,9 +594,10 @@ export default async function handler(req, res) {
                 clicks: [],
                 openCount: 0,
                 clickCount: 0,
-                timestamp: new Date().toISOString(),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
+                timestamp: preSendAt,
+                sentAt: null,
+                createdAt: preSendAt,
+                updatedAt: preSendAt,
                 ownerId: ownerEmail,
                 metadata: {
                     fromName: fromName || null,
@@ -677,6 +680,8 @@ export default async function handler(req, res) {
             userEmail: ownerEmail
         });
 
+        const sentAt = new Date().toISOString();
+
         // Update the persisted row with final send status and Zoho message ID.
         // If the pre-send insert failed, create the row here so sent email is never swallowed.
         if (supabaseAdmin) {
@@ -702,7 +707,7 @@ export default async function handler(req, res) {
 
                 const mergedMetadata = {
                     ...(existingRow?.metadata && typeof existingRow.metadata === 'object' ? existingRow.metadata : {}),
-                    sentAt: new Date().toISOString(),
+                    sentAt,
                     zohoMessageId: result.messageId,
                     messageId: result.messageId,
                     zohoFolder: 'sent',
@@ -722,7 +727,8 @@ export default async function handler(req, res) {
                             threadId: finalThreadId,
                             contactId: persistedContactId,
                             accountId: persistedAccountId,
-                            updatedAt: new Date().toISOString(),
+                            updatedAt: sentAt,
+                            sentAt,
                             metadata: mergedMetadata
                         })
                         .eq('id', trackingId);
@@ -745,9 +751,10 @@ export default async function handler(req, res) {
                         clicks: [],
                         openCount: 0,
                         clickCount: 0,
-                        timestamp: new Date().toISOString(),
-                        createdAt: new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
+                        timestamp: sentAt,
+                        sentAt,
+                        createdAt: sentAt,
+                        updatedAt: sentAt,
                         ownerId: ownerEmail,
                         metadata: mergedMetadata
                     };
