@@ -17,7 +17,7 @@ const SUPABASE_SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-const MAX_TOTAL_ROWS = 900
+const MAX_TOTAL_ROWS = 450
 const MAX_SUMMARY_LEN = 320
 const MAX_NAME_LEN = 120
 const MAX_HEADLINE_LEN = 180
@@ -32,7 +32,7 @@ const TARGET_ZONES = `Target only businesses in deregulated ERCOT territory:
 - Entergy Texas: Beaumont, Port Arthur, Orange, Lufkin, Nacogdoches, East Texas
 - TNMP: Pecos, Fort Stockton, Alpine, Big Spring, Sweetwater, Clute, Lake Jackson, Angleton, Alvin, Gulf Coast`
 
-const EXCLUSIONS = `Strictly exclude Austin Energy, CPS Energy, El Paso Electric, Xcel SPS/Amarillo, rural co-ops, residential projects, unnamed entities, and companies with more than 5,000 employees.`
+const EXCLUSIONS = `Strictly exclude energy producers, utilities (e.g. Austin Energy, CPS, CenterPoint, Oncor), retail electric providers (REPs), solar installers, battery manufacturers, and companies with more than 5,000 employees. Focus on energy CONSUMERS (industrial, commercial, data centers). No residential, no unnamed entities.`
 
 function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
@@ -132,14 +132,38 @@ function getJobs(mode: string) {
       type: 'sec_filing',
       prompt: `Find SEC filings, 8-Ks, earnings releases, and investor updates that signal facility growth, new load, or operational expansion for Texas-relevant commercial and industrial companies in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
     },
+    {
+      type: 'capital_raise',
+      prompt: `Find 3-5 Texas commercial/industrial companies that recently closed Series B/C+ venture rounds, PE investments, or IPOs in ${year}. These represent high-growth energy consumers. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+    },
+    {
+      type: 'merger_acquisition',
+      prompt: `Find 3-5 M&A deals involving Texas-based industrial or commercial entities in ${year}. Mergers often trigger energy contract reviews. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+    },
+    {
+      type: 'hiring_spree',
+      prompt: `Find 3-5 Texas companies (industrial, data centers, cold storage) announcing major hiring pushes (>50 people) in ${year}. High headcount growth = increased load. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+    },
+    {
+      type: 'data_center',
+      prompt: `Find 3-5 new data center announcements, expansions, or land acquisitions in Texas (Oncor/CenterPoint/AEP) for ${year}. Data centers are massive 24/7 energy loads. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+    },
+    {
+      type: 'tax_abatement',
+      prompt: `Find recent Texas Chapter 312 or 313 tax abatement applications or approvals for industrial, manufacturing, or commercial projects in ${year}. These are definitive signals of new facility construction. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+    },
   ]
 
+  if (mode === 'growth') {
+    return allJobs.filter((job) => ['capital_raise', 'hiring_spree', 'expansion', 'data_center'].includes(job.type))
+  }
+
   if (mode === 'location') {
-    return allJobs.filter((job) => ['new_location', 'expansion'].includes(job.type))
+    return allJobs.filter((job) => ['new_location', 'expansion', 'merger_acquisition', 'tax_abatement'].includes(job.type))
   }
 
   if (mode === 'buyer') {
-    return allJobs.filter((job) => ['energy_rfp', 'sec_filing'].includes(job.type))
+    return allJobs.filter((job) => ['energy_rfp', 'sec_filing', 'capital_raise'].includes(job.type))
   }
 
   if (mode === 'people') {
@@ -174,7 +198,7 @@ async function callPerplexity(prompt: string): Promise<any[]> {
         { role: 'user', content: prompt },
       ],
       temperature: 0.2,
-      search_recency_filter: 'month',
+      search_recency_filter: 'week',
     }),
   })
 

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X, Users, DollarSign, Loader2 } from 'lucide-react';
+import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X, Users, DollarSign, Loader2, Wrench, ArrowRightLeft, Zap as ZapIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import { formatProspectLocationLabel, normalizeOrganizationName } from '@/lib/ap
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint';
 
 
-type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion';
+type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion' | 'capital_raise' | 'merger_acquisition' | 'hiring_spree' | 'data_center' | 'tax_abatement';
 
 interface IntelSignal {
   id: string;
@@ -68,6 +68,41 @@ const SIGNAL_CONFIG: Record<SignalType, { icon: React.ReactNode; label: string; 
     color: 'text-cyan-400',
     bg: 'bg-cyan-500/10',
     border: 'border-cyan-500/30',
+  },
+  capital_raise: {
+    icon: <DollarSign className="w-4 h-4" />,
+    label: 'CAPITAL_RAISE',
+    color: 'text-emerald-400',
+    bg: 'bg-emerald-500/10',
+    border: 'border-emerald-500/30',
+  },
+  merger_acquisition: {
+    icon: <ArrowRightLeft className="w-4 h-4" />,
+    label: 'M&A_DEAL',
+    color: 'text-indigo-400',
+    bg: 'bg-indigo-500/10',
+    border: 'border-indigo-500/30',
+  },
+  hiring_spree: {
+    icon: <Users className="w-4 h-4" />,
+    label: 'HIRING_SPREE',
+    color: 'text-rose-400',
+    bg: 'bg-rose-500/10',
+    border: 'border-rose-500/30',
+  },
+  data_center: {
+    icon: <Zap className="w-4 h-4" />,
+    label: 'DATA_CENTER',
+    color: 'text-yellow-400',
+    bg: 'bg-yellow-500/10',
+    border: 'border-yellow-500/30',
+  },
+  tax_abatement: {
+    icon: <Wrench className="w-4 h-4" />,
+    label: 'TAX_ABATEMENT',
+    color: 'text-orange-400',
+    bg: 'bg-orange-500/10',
+    border: 'border-orange-500/30',
   },
 };
 
