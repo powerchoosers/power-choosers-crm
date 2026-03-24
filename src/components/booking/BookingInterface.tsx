@@ -89,15 +89,23 @@ export default function BookingInterface({ email }: { email: string }) {
             <div className="flex-1 flex flex-col items-center justify-center p-6">
                 <div className="max-w-md w-full">
                     <div className="flex items-center gap-2 mb-6">
-                        <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
-                            IDENTITY_VECTOR_MISSING
+                            FORENSIC_BRIEFING // ACCESS
                         </span>
                     </div>
                     <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Book a Briefing</h2>
-                    <p className="text-zinc-500 text-sm mb-8 leading-relaxed">
-                        Enter your work email to access the scheduling system and personalize your forensic briefing.
+                    <p className="text-zinc-500 text-sm mb-4 leading-relaxed">
+                        A 30-minute call with a Nodal Point strategist. We pull your bill apart live and show you exactly where you&apos;re exposed — demand charges, ratchet clauses, 4CP risk — before you commit to anything.
                     </p>
+                    <div className="flex flex-col gap-1.5 mb-8">
+                        {['No sales pitch. No script. Engineers only.', 'You see the numbers before we discuss next steps.', 'Cancellable up to 2 hours before.'].map(line => (
+                            <div key={line} className="flex items-center gap-2 text-xs text-zinc-500">
+                                <div className="w-1 h-1 rounded-full bg-[#002FA7] shrink-0" />
+                                <span>{line}</span>
+                            </div>
+                        ))}
+                    </div>
                     <div className="space-y-3">
                         <input
                             type="email"

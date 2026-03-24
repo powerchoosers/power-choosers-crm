@@ -1,13 +1,31 @@
 'use client'
 
 import { motion } from 'framer-motion';
-import { Mail, Phone, MapPin, ArrowRight, Menu, X, Activity } from 'lucide-react';
+import { Mail, Phone, MapPin, ArrowRight, Menu, X, Activity, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
 export default function Contact() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [formState, setFormState] = useState({ name: '', company: '', email: '', message: '' });
+  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormStatus('sending');
+    try {
+      const res = await fetch('/api/contact-submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(formState),
+      });
+      if (!res.ok) throw new Error('Failed');
+      setFormStatus('sent');
+    } catch {
+      setFormStatus('error');
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => {
@@ -165,6 +183,78 @@ export default function Contact() {
         </div>
       </div>
 
+      {/* CONTACT FORM */}
+      <section className="px-6 pb-20 relative z-10">
+        <div className="max-w-2xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.6 }}
+          >
+            <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-3">OR_SEND_A_MESSAGE</p>
+            <h2 className="text-2xl font-bold text-white tracking-tight mb-8">Drop a signal.</h2>
+
+            {formStatus === 'sent' ? (
+              <div className="bg-zinc-900/50 border border-emerald-500/20 rounded-2xl p-8 text-center">
+                <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                </div>
+                <p className="font-mono text-sm text-emerald-400 uppercase tracking-widest mb-2">SIGNAL_RECEIVED</p>
+                <p className="text-zinc-400 text-sm">We&apos;ll respond within 24 hours, Mon–Fri.</p>
+              </div>
+            ) : (
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <input
+                    type="text"
+                    placeholder="Your name"
+                    required
+                    value={formState.name}
+                    onChange={e => setFormState(s => ({ ...s, name: e.target.value }))}
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Company (optional)"
+                    value={formState.company}
+                    onChange={e => setFormState(s => ({ ...s, company: e.target.value }))}
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors"
+                  />
+                </div>
+                <input
+                  type="email"
+                  placeholder="Work email"
+                  required
+                  value={formState.email}
+                  onChange={e => setFormState(s => ({ ...s, email: e.target.value }))}
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors"
+                />
+                <textarea
+                  placeholder="What can we help you analyze?"
+                  required
+                  rows={4}
+                  value={formState.message}
+                  onChange={e => setFormState(s => ({ ...s, message: e.target.value }))}
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-zinc-600 text-sm focus:outline-none focus:border-[#002FA7]/60 transition-colors resize-none"
+                />
+                {formStatus === 'error' && (
+                  <p className="text-rose-400 text-xs font-mono">TRANSMISSION_FAILED — try emailing signal@nodalpoint.io directly.</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={formStatus === 'sending'}
+                  className="flex items-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Send className="w-4 h-4" />
+                  {formStatus === 'sending' ? 'Transmitting...' : 'Transmit'}
+                </button>
+              </form>
+            )}
+          </motion.div>
+        </div>
+      </section>
+
       {/* FOOTER */}
       <footer className="bg-zinc-900 text-zinc-400 py-20 border-t border-zinc-800 relative z-10 w-full">
         <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-8 px-6">
@@ -176,7 +266,7 @@ export default function Contact() {
           {/* System Status Line */}
           <div className="w-full border-t border-zinc-800/50 mt-8 pt-8 flex justify-center text-center">
             <p className="text-zinc-600 text-xs font-mono tracking-wider">
-              ERCOT NODE: LZ_HOUSTON // LATENCY: 24ms // CONNECTION: SECURE
+              ERCOT NODE: LZ_NORTH // LATENCY: 24ms // CONNECTION: SECURE
             </p>
           </div>
         </div>

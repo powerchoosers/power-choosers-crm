@@ -1,6 +1,11 @@
+import type { Metadata } from 'next'
 import { LandingHeader } from '@/components/landing/LandingHeader'
 import { HeroSection } from '@/components/landing/HeroSection'
 import { LandingSections } from '@/components/landing/LandingSections'
+
+export const metadata: Metadata = {
+  alternates: { canonical: 'https://nodalpoint.io' },
+}
 
 /**
  * Landing page: server-rendered hero for fast LCP; header and sections are client for interactivity.

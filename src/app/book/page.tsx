@@ -6,8 +6,9 @@ import { cn } from '@/lib/utils';
 import { PageReveal } from '@/components/motion/PageReveal';
 
 export const metadata: Metadata = {
-    title: 'Nodal Protocol | Booking Interface',
-    description: 'Finalize your forensic energy analysis with a direct consultation window.',
+    title: 'Nodal Point | Book a Briefing',
+    description: 'Schedule a 30-minute forensic energy briefing with a Nodal Point strategist. We pull your bill apart live and show you exactly where you are exposed.',
+    alternates: { canonical: 'https://nodalpoint.io/book' },
 };
 
 const BACK_LABELS: Record<string, string> = {
