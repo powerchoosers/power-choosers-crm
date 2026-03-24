@@ -1013,7 +1013,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                           exit={{ opacity: 0, y: 10 }}
                         >
                           <Select value={selectedListId} onValueChange={setSelectedListId}>
-                            <SelectTrigger className="bg-black/40 nodal-monolith-edge text-white focus:ring-0 focus:border-white/40 transition-colors">
+                            <SelectTrigger className="w-full bg-black/40 nodal-monolith-edge text-white focus:ring-0 focus:border-white/40 transition-colors">
                               <SelectValue placeholder="Select Target List..." />
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-950 nodal-monolith-edge">
@@ -1139,7 +1139,6 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     </Dialog>
   );
 }
-
 
 
 
