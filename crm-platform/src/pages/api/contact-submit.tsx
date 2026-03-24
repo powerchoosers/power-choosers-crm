@@ -1,12 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import React from 'react'
-import sgMail from '@sendgrid/mail'
 import { render } from '@react-email/render'
 import { cors } from './_cors.js'
+import { ZohoMailService } from './email/zoho-service.js'
 import ContactAdminAlert from '../../emails/ContactAdminAlert'
 import ContactConfirmation from '../../emails/ContactConfirmation'
-
-sgMail.setApiKey(process.env.SENDGRID_API_KEY || '')
 
 const APOLLO_BASE_URL = 'https://api.apollo.io/v1'
 const ADMIN_EMAIL = 'l.patterson@nodalpoint.io'
@@ -71,6 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    const zohoService = new ZohoMailService()
+
     // 1. Render confirmation email and kick off Apollo enrichment in parallel
     const [confirmationHtml, enrichment] = await Promise.all([
       render(<ContactConfirmation name={name} />),
@@ -78,15 +78,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     ])
 
     // 2. Send confirmation to submitter
-    await sgMail.send({
+    await zohoService.sendEmail({
       to: email,
-      from: FROM_EMAIL,
-      replyTo: ADMIN_EMAIL,
       subject: 'Signal received // Nodal Point',
       html: confirmationHtml,
+      from: FROM_EMAIL,
+      fromName: 'Nodal Point',
+      userEmail: ADMIN_EMAIL,
     })
 
-    // 3. Render + send admin alert with enrichment data if available
+    // 3. Render + send admin alert with enrichment data
     const adminHtml = await render(
       <ContactAdminAlert
         name={name}
@@ -96,12 +97,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         enrichment={enrichment ?? undefined}
       />
     )
-    await sgMail.send({
+    await zohoService.sendEmail({
       to: ADMIN_EMAIL,
-      from: FROM_EMAIL,
-      replyTo: email,
       subject: `[CONTACT] ${name}${company ? ` — ${company}` : ''}`,
       html: adminHtml,
+      from: FROM_EMAIL,
+      fromName: 'Nodal Point Signal',
+      replyTo: email,
+      userEmail: ADMIN_EMAIL,
     })
 
     return res.status(200).json({ success: true })

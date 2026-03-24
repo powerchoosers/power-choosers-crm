@@ -16,6 +16,7 @@ interface IdentityData {
     location: string;
     linkedinUrl?: string;
     phone?: string;
+    logoUrl?: string;
 }
 
 interface IdentityDossierProps {
@@ -208,6 +209,7 @@ export default function IdentityDossier({
                             <div className="flex items-start gap-4">
                                 <div className="p-1.5 rounded-lg bg-white/5 w-10 h-10 flex items-center justify-center overflow-hidden">
                                     <CompanyIcon
+                                        logoUrl={data?.logoUrl}
                                         domain={data?.email?.split('@')[1]}
                                         name={data?.company || 'Company'}
                                         className="w-6 h-6 object-contain"
