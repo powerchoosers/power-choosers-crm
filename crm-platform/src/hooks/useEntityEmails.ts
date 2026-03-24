@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { Email } from './useEmails'
+import { applyEmailOwnerScope, resolveEmailOwnerScope } from '@/lib/email-scope'
 
 function stripHtml(html: string | undefined | null) {
     if (!html) return ''
@@ -42,7 +43,8 @@ export function useEntityEmails(emailAddresses: string[]) {
 
                 // Default security check based on how `useEmails` works
                 if (role !== 'admin' && user?.email) {
-                    query = query.eq('metadata->>ownerId', user.email.toLowerCase())
+                    const owners = await resolveEmailOwnerScope(user)
+                    query = applyEmailOwnerScope(query, owners.length > 0 ? owners : [user.email.toLowerCase()])
                 }
 
                 // Filter out noise
