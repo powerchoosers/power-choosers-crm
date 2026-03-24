@@ -62,7 +62,7 @@ const SECTIONS = [
     title: 'Security',
     content: (
       <>
-        <p>All data is encrypted in transit (TLS) and at rest (AES-256) within SOC 2 compliant infrastructure. We use Supabase for database storage and SendGrid for transactional email — both operate under industry-standard security practices.</p>
+        <p>All data is encrypted in transit (TLS) and at rest (AES-256) within SOC 2 compliant infrastructure. We use Supabase for database storage and Zoho Mail for transactional email — both operate under industry-standard security practices.</p>
         <p>No system is perfectly secure. If you discover a vulnerability, please report it to <a href="mailto:signal@nodalpoint.io">signal@nodalpoint.io</a> and we will respond within 48 hours.</p>
       </>
     ),
@@ -76,7 +76,7 @@ const SECTIONS = [
         <p>We use the following third-party services to operate the platform:</p>
         <ul>
           <li><strong>Supabase</strong> — database and authentication infrastructure.</li>
-          <li><strong>SendGrid</strong> — transactional email delivery.</li>
+          <li><strong>Zoho Mail</strong> — transactional email delivery.</li>
           <li><strong>Google (Gemini API)</strong> — AI-assisted analysis processing.</li>
           <li><strong>Vercel</strong> — application hosting and edge delivery.</li>
         </ul>
