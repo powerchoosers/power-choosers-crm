@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X, Users, DollarSign, Loader2, Wrench, ArrowRightLeft, Zap as ZapIcon } from 'lucide-react';
+import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X, Users, DollarSign, Loader2, Wrench, ArrowRightLeft, Zap as ZapIcon, Factory, Thermometer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -13,7 +13,7 @@ import { formatProspectLocationLabel, normalizeOrganizationName } from '@/lib/ap
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint';
 
 
-type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion' | 'capital_raise' | 'merger_acquisition' | 'hiring_spree' | 'data_center' | 'tax_abatement' | 'industrial_permit';
+type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion' | 'capital_raise' | 'merger_acquisition' | 'hiring_spree' | 'data_center' | 'tax_abatement' | 'industrial_permit' | 'cold_storage' | 'manufacturing';
 
 interface IntelSignal {
   id: string;
@@ -110,6 +110,20 @@ const SIGNAL_CONFIG: Record<SignalType, { icon: React.ReactNode; label: string; 
     color: 'text-blue-300',
     bg: 'bg-blue-300/10',
     border: 'border-blue-300/30',
+  },
+  cold_storage: {
+    icon: <Thermometer className="w-4 h-4" />,
+    label: 'COLD_STORAGE',
+    color: 'text-cyan-300',
+    bg: 'bg-cyan-500/10',
+    border: 'border-cyan-500/30',
+  },
+  manufacturing: {
+    icon: <Factory className="w-4 h-4" />,
+    label: 'MANUFACTURING',
+    color: 'text-indigo-300',
+    bg: 'bg-indigo-500/10',
+    border: 'border-indigo-500/30',
   },
 };
 
