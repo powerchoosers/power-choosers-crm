@@ -70,13 +70,13 @@ function isCrmRoute(pathname: string | null) {
 
 export function GlobalSync() {
   const pathname = usePathname()
+  const onCrmRoute = isCrmRoute(pathname)
   const { user, loading } = useAuth()
   const { performSync } = useZohoSync()
   const queryClient = useQueryClient()
   const ownerScopeRef = useRef<string[]>([])
   const seenInboxSignalIdsRef = useRef<Set<string>>(new Set())
   const soundEnabled = useUIStore(s => s.soundEnabled)
-  const onCrmRoute = isCrmRoute(pathname)
 
   // Real-time email tracking notifications (opens/clicks) — CRM routes only
   useEmailTrackingNotifications({ enabled: onCrmRoute })

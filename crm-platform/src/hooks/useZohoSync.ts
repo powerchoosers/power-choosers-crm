@@ -1,10 +1,13 @@
 
 import { useEffect, useCallback, useRef } from 'react';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import { useSyncStore } from '@/store/syncStore';
 import { supabase } from '@/lib/supabase';
 import { showInboxEmailToast } from '@/lib/inbox-email-toast';
 import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe';
+
+const CRM_PREFIXES = ['/network', '/market-data'];
 
 const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {};
 
@@ -34,6 +37,8 @@ async function getOwnerScope(user: { id?: string; email?: string | null }) {
  * Hook for automated Zoho Mail synchronization
  */
 export function useZohoSync() {
+    const pathname = usePathname();
+    const onCrmRoute = CRM_PREFIXES.some(p => pathname?.startsWith(p));
     const { user } = useAuth();
     const { isSyncing, setIsSyncing, setLastSyncTime, syncCount, setSyncCount } = useSyncStore();
     const syncInProgress = useRef(false);
@@ -108,7 +113,7 @@ export function useZohoSync() {
     }, [user, setIsSyncing, setLastSyncTime, setSyncCount, syncCount, showSyncNotifications]);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user || !onCrmRoute) return;
 
         // Perform initial sync on mount
         performSync(true);
@@ -119,7 +124,7 @@ export function useZohoSync() {
         }, 3 * 60 * 1000);
 
         return () => clearInterval(interval);
-    }, [user, performSync]);
+    }, [user, performSync, onCrmRoute]);
 
     return { performSync, isSyncing };
 }

@@ -1,7 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 import sgMail from '@sendgrid/mail'
 import { render } from '@react-email/render'
-import React from 'react'
 import { cors } from './_cors.js'
 import ContactAdminAlert from '../../emails/ContactAdminAlert'
 import ContactConfirmation from '../../emails/ContactConfirmation'
@@ -18,17 +17,17 @@ async function enrichViaApollo(email: string, name: string, company?: string) {
 
   try {
     const nameParts = name.trim().split(' ')
-    const body: Record<string, string> = {
-      email,
-      reveal_personal_emails: 'false',
-      reveal_phone_number: 'false',
-    }
+    const body: Record<string, string | boolean> = { email }
     if (nameParts[0]) body.first_name = nameParts[0]
     if (nameParts.length > 1) body.last_name = nameParts.slice(1).join(' ')
     if (company) body.organization_name = company
 
-    const resp = await Promise.race([
-      fetch(`${APOLLO_BASE_URL}/people/match`, {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 4000)
+
+    let resp: Response
+    try {
+      resp = await fetch(`${APOLLO_BASE_URL}/people/match`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -36,12 +35,13 @@ async function enrichViaApollo(email: string, name: string, company?: string) {
           'X-Api-Key': apiKey,
         },
         body: JSON.stringify(body),
-      }),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
-    ])
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeout)
+    }
 
-    if (!resp || !(resp instanceof Response) || !resp.ok) return null
-
+    if (!resp.ok) return null
     const data = await resp.json()
     const p = data?.person
     if (!p) return null
@@ -70,11 +70,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // 1. Send confirmation to submitter immediately (don't await enrichment first)
-    const confirmationHtml = await render(
-      React.createElement(ContactConfirmation, { name })
-    )
-    const confirmationSend = sgMail.send({
+    // 1. Render confirmation email and kick off Apollo enrichment in parallel
+    const [confirmationHtml, enrichment] = await Promise.all([
+      render(<ContactConfirmation name={name} />),
+      enrichViaApollo(email, name, company),
+    ])
+
+    // 2. Send confirmation to submitter
+    await sgMail.send({
       to: email,
       from: FROM_EMAIL,
       replyTo: ADMIN_EMAIL,
@@ -82,21 +85,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       html: confirmationHtml,
     })
 
-    // 2. Attempt Apollo enrichment (4s timeout)
-    const [enrichment] = await Promise.all([
-      enrichViaApollo(email, name, company),
-      confirmationSend,
-    ])
-
-    // 3. Send admin alert with enrichment data if available
+    // 3. Render + send admin alert with enrichment data if available
     const adminHtml = await render(
-      React.createElement(ContactAdminAlert, {
-        name,
-        company,
-        email,
-        message,
-        enrichment: enrichment ?? undefined,
-      })
+      <ContactAdminAlert
+        name={name}
+        company={company}
+        email={email}
+        message={message}
+        enrichment={enrichment ?? undefined}
+      />
     )
     await sgMail.send({
       to: ADMIN_EMAIL,
