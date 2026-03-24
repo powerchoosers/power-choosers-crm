@@ -16,6 +16,7 @@ interface IdentityData {
     linkedinUrl?: string;
     phone?: string;
     accountId?: string;
+    logoUrl?: string;
 }
 
 /**
@@ -119,7 +120,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
 
         const { data: existing, error: fetchError } = await supabaseAdmin
             .from('contacts')
-            .select('*, accounts!contacts_accountId_fkey(id, name)')
+            .select('*, accounts!contacts_accountId_fkey(id, name, logo_url)')
             .eq('email', email)
             .maybeSingle();
 
@@ -141,7 +142,8 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
                 location: [existing.city, existing.state].filter(Boolean).join(', ') || 'Unknown Location',
                 linkedinUrl: existing.linkedinUrl,
                 phone: existing.phone,
-                accountId: (existing.accounts as any)?.id
+                accountId: (existing.accounts as any)?.id,
+                logoUrl: (existing.accounts as any)?.logo_url || undefined
             };
         }
 
