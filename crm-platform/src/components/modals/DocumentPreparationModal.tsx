@@ -7,6 +7,7 @@ import { X, LayoutTemplate, ArrowRight } from 'lucide-react'
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Rnd } from 'react-rnd'
+import type { SignatureRequestKind } from '@/lib/signature-request'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -30,9 +31,10 @@ interface DocumentPreparationModalProps {
     onClose: () => void
     onComplete: (fields: SignatureField[]) => void
     pdfUrl: string
+    documentKind?: SignatureRequestKind
 }
 
-export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }: DocumentPreparationModalProps) {
+export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl, documentKind = 'CONTRACT' }: DocumentPreparationModalProps) {
     const [numPages, setNumPages] = useState<number>(0)
     const [pageNumber, setPageNumber] = useState(1)
     const [fields, setFields] = useState<SignatureField[]>([])
@@ -271,7 +273,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl }
                                     disabled={fields.length === 0}
                                     className="group w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
-                                    [ DEPLOY_CONTRACT ]
+                                    {documentKind === 'LOE' ? '[ DEPLOY_LOE ]' : '[ DEPLOY_CONTRACT ]'}
                                     <ArrowRight className="w-3 h-3 transition-transform group-hover:translate-x-1" />
                                 </button>
                                 {fields.length === 0 && (

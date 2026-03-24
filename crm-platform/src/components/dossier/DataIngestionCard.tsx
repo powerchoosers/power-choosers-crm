@@ -16,6 +16,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUIStore } from '@/store/uiStore';
+import { inferSignatureRequestKindFromDocument } from '@/lib/signature-request'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +32,7 @@ interface Document {
   name: string;
   size: string;
   type?: string;
+  document_type?: string | null;
   metadata?: any;
   url: string;
   storage_path: string;
@@ -199,9 +201,11 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                 ? 'BILL ANALYZED'
                 : t === 'USAGE_DATA'
                   ? 'TELEMETRY LABELED'
-                  : t === 'PROPOSAL'
-                    ? 'PROPOSAL LABELED'
-                    : 'DATA NODES UPDATED';
+                  : t === 'LOE'
+                    ? 'LOE LABELED'
+                    : t === 'PROPOSAL'
+                      ? 'PROPOSAL LABELED'
+                      : 'DATA NODES UPDATED';
             toast.success(`${label}: Data Nodes Updated`, { id: toastId });
 
             // ============================================
@@ -493,7 +497,12 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
                                 documentName: file.name,
                                 documentUrl: data.signedUrl,
                                 storagePath: file.storage_path,
-                                accountId: accountId
+                                accountId: accountId,
+                                documentType: file.document_type ?? file.metadata?.ai_extraction?.type ?? null,
+                                requestKind: inferSignatureRequestKindFromDocument(
+                                  file.document_type ?? null,
+                                  file.metadata?.ai_extraction?.type ?? null
+                                ),
                               });
                               setRightPanelMode('CREATE_SIGNATURE_REQUEST');
                             }

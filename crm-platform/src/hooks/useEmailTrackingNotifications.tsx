@@ -106,9 +106,9 @@ export function useEmailTrackingNotifications({ enabled = true }: { enabled?: bo
           // Only CRM-sent emails use tracked IDs (zoho_, sig_, sig_exec_, seq_exec_)
           if (!email.id || (!email.id.startsWith('zoho_') && !email.id.startsWith('sig_') && !email.id.startsWith('sig_exec_') && !email.id.startsWith('seq_exec_'))) return
 
-          // Signature/contract emails are handled exclusively by GlobalSync's contract notifications.
-          // Still update React Query caches below for live counter updates, but skip toasts.
-          const isContractEmail = email.id.startsWith('sig_') || email.id.startsWith('sig_exec_')
+          // Signature emails still use GlobalSync for open/view/completed toasts.
+          // We let click events through here so the sender still sees link-click activity.
+          const isSignatureEmail = email.id.startsWith('sig_') || email.id.startsWith('sig_exec_')
 
           const oldEmail = payload.old as {
             openCount?: number
@@ -197,7 +197,7 @@ export function useEmailTrackingNotifications({ enabled = true }: { enabled?: bo
           if (now - lastCanonicalTime < 9000) return
           canonicalEventRef.current.set(canonicalEventKey, now)
 
-          if (!isContractEmail) {
+          if (isSignatureEmail) {
             if (eventType === 'click') {
               if (soundEnabled) playSoftPing()
               toast(
@@ -212,21 +212,38 @@ export function useEmailTrackingNotifications({ enabled = true }: { enabled?: bo
                 </Link>,
                 { duration: 5000 }
               )
-            } else {
-              if (soundEnabled) playSoftPing()
-              toast(
-                <Link href={`/network/emails/${routeEmailId}`} className="no-underline block w-full">
-                  <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
-                    <Eye className="w-4 h-4 text-emerald-400" />
-                    <div className="flex flex-col">
-                      <span className="font-medium text-white">Email opened by {recipient}</span>
-                      <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
-                    </div>
-                  </div>
-                </Link>,
-                { duration: 5000 }
-              )
             }
+            return
+          }
+
+          if (eventType === 'click') {
+            if (soundEnabled) playSoftPing()
+            toast(
+              <Link href={`/network/emails/${routeEmailId}`} className="no-underline block w-full">
+                <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                  <MousePointer2 className="w-4 h-4 text-[#002FA7]" />
+                  <div className="flex flex-col">
+                    <span className="font-medium text-white">Link clicked by {recipient}</span>
+                    <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                  </div>
+                </div>
+              </Link>,
+              { duration: 5000 }
+            )
+          } else {
+            if (soundEnabled) playSoftPing()
+            toast(
+              <Link href={`/network/emails/${routeEmailId}`} className="no-underline block w-full">
+                <div className="flex items-center gap-2 hover:opacity-90 transition-opacity">
+                  <Eye className="w-4 h-4 text-emerald-400" />
+                  <div className="flex flex-col">
+                    <span className="font-medium text-white">Email opened by {recipient}</span>
+                    <span className="text-xs text-zinc-400">{subject}{subjectTruncated}</span>
+                  </div>
+                </div>
+              </Link>,
+              { duration: 5000 }
+            )
           }
         }
       )
