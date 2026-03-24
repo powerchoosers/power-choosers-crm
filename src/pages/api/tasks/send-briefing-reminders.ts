@@ -164,6 +164,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
                         // Log to emails table
                         try {
+                            const sentAt = new Date().toISOString();
                             await supabaseAdmin.from('emails').insert({
                                 id: `reminder_60_${task.id}_${Date.now()}`,
                                 contactId: task.contactId,
@@ -175,6 +176,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 text: '',
                                 status: 'sent',
                                 type: 'sent',
+                                timestamp: sentAt,
+                                sentAt,
+                                createdAt: sentAt,
+                                updatedAt: sentAt,
                                 ownerId: task.ownerId,
                                 metadata: { reminderEmail: true, reminderMinutes: 60, taskId: task.id },
                             });
