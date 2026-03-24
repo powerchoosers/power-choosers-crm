@@ -410,27 +410,28 @@ export function LandingSections() {
       </section>
 
       {/* TRUST STRIP */}
-      <section className="bg-zinc-950 py-12 relative overflow-hidden">
-        {/* Subtle dot texture */}
-        <div className="absolute inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.06] pointer-events-none" />
+      <section className="py-12 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #e8eef8 0%, #dde6f5 40%, #e4eaf6 70%, #edf1fa 100%)' }}>
+        {/* Frosted glass inner card */}
         <div className="max-w-5xl mx-auto px-6 relative z-10">
-          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
-            {[
-              { icon: Lock, label: 'AES-256 Encrypted', sub: 'Data in transit & at rest' },
-              { icon: ShieldCheck, label: 'SOC 2 Infrastructure', sub: 'Enterprise-grade security' },
-              { icon: Zap, label: 'Texas ERCOT Specialist', sub: '100+ tariff structures mapped' },
-              { icon: Database, label: 'TLS Secured', sub: 'End-to-end encryption' },
-            ].map(({ icon: Icon, label, sub }) => (
-              <div key={label} className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-[#4169E1]" />
+          <div className="bg-white/40 backdrop-blur-sm border border-[#002FA7]/10 rounded-2xl px-8 py-6 shadow-sm shadow-[#002FA7]/5">
+            <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+              {[
+                { icon: Lock, label: 'AES-256 Encrypted', sub: 'Data in transit & at rest' },
+                { icon: ShieldCheck, label: 'SOC 2 Infrastructure', sub: 'Enterprise-grade security' },
+                { icon: Zap, label: 'Texas ERCOT Specialist', sub: '100+ tariff structures mapped' },
+                { icon: Database, label: 'TLS Secured', sub: 'End-to-end encryption' },
+              ].map(({ icon: Icon, label, sub }) => (
+                <div key={label} className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-[#002FA7]/8 border border-[#002FA7]/15 flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 text-[#002FA7]" />
+                  </div>
+                  <div>
+                    <div className="font-mono text-[10px] text-zinc-700 uppercase tracking-widest font-semibold leading-tight">{label}</div>
+                    <div className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest leading-tight mt-0.5">{sub}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="font-mono text-[10px] text-zinc-100 uppercase tracking-widest font-semibold leading-tight">{label}</div>
-                  <div className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest leading-tight mt-0.5">{sub}</div>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
