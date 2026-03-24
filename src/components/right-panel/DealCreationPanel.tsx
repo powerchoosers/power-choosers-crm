@@ -24,7 +24,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useCreateDeal, useUpdateDeal } from '@/hooks/useDeals'
+import { useCreateDeal, useUpdateDeal, useDealsByAccount } from '@/hooks/useDeals'
 import { type DealStage, DEAL_STAGES } from '@/types/deals'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -48,6 +48,7 @@ export function DealCreationPanel() {
     const createDeal = useCreateDeal()
     const updateDeal = useUpdateDeal()
     const queryClient = useQueryClient()
+    const { data: accountDeals = [] } = useDealsByAccount(dealContext?.accountId)
 
     const [step, setStep] = useState<'SELECT_ACCOUNT' | 'DEAL_DETAILS'>(
         () => (dealContext?.accountId ? 'DEAL_DETAILS' : 'SELECT_ACCOUNT')
@@ -69,6 +70,11 @@ export function DealCreationPanel() {
     const [isCommitting, setIsCommitting] = useState(false)
 
     const isEditMode = dealContext?.mode === 'edit' && !!dealContext?.dealId
+    const siblingDealCount = useMemo(() => {
+        if (!dealContext?.accountId) return 0
+        return accountDeals.filter((deal) => deal.id !== dealContext?.dealId).length
+    }, [accountDeals, dealContext?.accountId, dealContext?.dealId])
+    const showMultipleContractNote = !isEditMode && siblingDealCount > 0
     const commissionRate = role === 'admin' ? 0.7 : 0.5
     const commissionLabel = role === 'admin' ? 'Admin' : 'Agent'
     
@@ -426,6 +432,18 @@ export function DealCreationPanel() {
                                     </div>
                                 </div>
                             </div>
+
+                            {showMultipleContractNote && (
+                                <div className="rounded-xl border border-white/5 bg-black/20 px-3 py-2 space-y-1">
+                                    <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-500">
+                                        Existing Contract Records
+                                    </div>
+                                    <div className="font-mono text-[10px] text-zinc-400 leading-relaxed">
+                                        This account already has {siblingDealCount} contract record{siblingDealCount === 1 ? '' : 's'}.
+                                        Saving now creates another one instead of replacing the old record.
+                                    </div>
+                                </div>
+                            )}
 
                             {/* CORE INFO */}
                             <div className="space-y-4">
