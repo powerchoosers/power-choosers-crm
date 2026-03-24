@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
-export type DocumentTypeFilter = 'ALL_ASSETS' | 'CONTRACT' | 'INVOICE' | 'USAGE_DATA' | 'PROPOSAL'
+export type DocumentTypeFilter = 'ALL_ASSETS' | 'CONTRACT' | 'INVOICE' | 'USAGE_DATA' | 'LOE' | 'PROPOSAL'
 
 export interface VaultDocument {
   id: string
