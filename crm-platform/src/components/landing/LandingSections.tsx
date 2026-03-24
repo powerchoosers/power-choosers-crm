@@ -11,6 +11,7 @@ const TICKER_ITEMS = [
   { label: 'CENTERPOINT', sub: 'TDSP' },
   { label: 'AEP TEXAS', sub: 'TDSP' },
   { label: 'TNMP', sub: 'TDSP' },
+  { label: 'LUBBOCK LIGHT & POWER', sub: 'TDSP' },
   { label: 'TXU ENERGY', sub: 'REP' },
   { label: 'RELIANT', sub: 'REP' },
   { label: 'CONSTELLATION', sub: 'REP' },
