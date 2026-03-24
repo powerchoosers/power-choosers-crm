@@ -270,6 +270,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 // Log the calendar invite email to the emails table
                 try {
                     const emailId = `cal_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+                    const sentAt = new Date().toISOString();
                     await supabaseAdmin.from('emails').insert({
                         id: emailId,
                         contactId: contactId,
@@ -281,6 +282,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         text: description || '',
                         status: 'sent',
                         type: 'sent',
+                        timestamp: sentAt,
+                        sentAt,
+                        createdAt: sentAt,
+                        updatedAt: sentAt,
                         ownerId: userEmail,
                         metadata: {
                             calendarInvite: true,

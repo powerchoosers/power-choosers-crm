@@ -84,8 +84,8 @@ export function useEntityEmails(emailAddresses: string[]) {
 
                 const emails = Array.from(emailMap.values())
                     .sort((a, b) => {
-                        const ta = new Date(a.timestamp || a.createdAt || a.created_at || 0).getTime()
-                        const tb = new Date(b.timestamp || b.createdAt || b.created_at || 0).getTime()
+                        const ta = new Date((a.sentAt || a.metadata?.sentAt || a.scheduledSendTime || a.timestamp || a.createdAt || a.created_at) || 0).getTime()
+                        const tb = new Date((b.sentAt || b.metadata?.sentAt || b.scheduledSendTime || b.timestamp || b.createdAt || b.created_at) || 0).getTime()
                         return tb - ta
                     })
                     .slice(0, 50)
@@ -101,7 +101,8 @@ export function useEntityEmails(emailAddresses: string[]) {
                         type = 'draft'
                     }
 
-                    const date = item.timestamp || item.createdAt || item.created_at
+                    const sentAt = item.sentAt || item.metadata?.sentAt || null
+                    const date = sentAt || item.scheduledSendTime || item.timestamp || item.createdAt || item.created_at
 
                     return {
                         id: item.id,
@@ -120,6 +121,8 @@ export function useEntityEmails(emailAddresses: string[]) {
                         openCount: item.openCount,
                         clickCount: item.clickCount,
                         attachments: item.attachments || item.metadata?.attachments,
+                        sentAt,
+                        scheduledSendTime: item.scheduledSendTime || null,
                         threadId: item.threadId || item.metadata?.threadId || null,
                         contactId: item.contactId || null,
                     }

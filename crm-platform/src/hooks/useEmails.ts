@@ -49,6 +49,7 @@ export interface Email {
   clickCount?: number
   attachments?: EmailAttachment[]
   metadata?: Record<string, any>
+  sentAt?: string | null
   scheduledSendTime?: string | null
   contact?: EmailContact | null
 }
@@ -188,11 +189,24 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
 
         const from = pageParam * PAGE_SIZE
         const to = from + PAGE_SIZE - 1
+        const primarySortColumn =
+          typeFilter === 'sent'
+            ? 'sentAt'
+            : typeFilter === 'scheduled'
+              ? 'scheduledSendTime'
+              : 'timestamp'
 
-        const { data, error, count } = await query
+        let orderedQuery = query
           .range(from, to)
-          .order('createdAt', { ascending: false, nullsFirst: false })
-          .order('timestamp', { ascending: false, nullsFirst: false })
+          .order(primarySortColumn, { ascending: false, nullsFirst: false })
+
+        if (primarySortColumn !== 'timestamp') {
+          orderedQuery = orderedQuery.order('timestamp', { ascending: false, nullsFirst: false })
+        }
+
+        orderedQuery = orderedQuery.order('createdAt', { ascending: false, nullsFirst: false })
+
+        const { data, error, count } = await orderedQuery
 
         if (error) {
           // Silent abort for network cancellations
@@ -223,7 +237,8 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
             type = 'received' // default for 'received', 'uplink_in', or anything else
           }
 
-          const date = item.timestamp || item.createdAt || item.created_at
+          const sentAt = item.sentAt || item.metadata?.sentAt || null
+          const date = sentAt || item.scheduledSendTime || item.timestamp || item.createdAt || item.created_at
 
           const plainText = stripHtml(item.text)
           const plainHtml = stripHtml(item.html)
@@ -249,6 +264,7 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
             clickCount: item.clickCount,
             attachments: item.attachments || item.metadata?.attachments,
             metadata: item.metadata || {},
+            sentAt,
             scheduledSendTime: item.scheduledSendTime || null,
             contact: item.contact
               ? {
@@ -393,7 +409,7 @@ export function useSearchEmails(queryTerm: string) {
           id: item.id,
           subject: item.subject,
           from: item.from,
-          date: item.timestamp || item.created_at
+          date: item.sentAt || item.metadata?.sentAt || item.scheduledSendTime || item.timestamp || item.createdAt || item.created_at
         }))
       } catch (error: any) {
         if (error?.name === 'AbortError' || error?.message === 'Fetch is aborted' || error?.message?.includes('abort')) {

@@ -369,7 +369,8 @@ export default async function handler(req, res) {
       reviewAccepted: false,
       previewGeneratedAt: nowIso,
       emailRecordId: targetEmailId,
-      status: 'pending_send'
+      status: 'pending_send',
+      sentAt: null
     };
     // Always use the sequence-configured fromEmail (from bgvector.settings.senderEmail).
     // Do NOT preserve the existing `from` — the DB trigger writes the owner's primary email
@@ -390,6 +391,7 @@ export default async function handler(req, res) {
       is_read: true,
       scheduledSendTime: execution.scheduled_at,
       timestamp: execution.scheduled_at,
+      sentAt: null,
       updatedAt: nowIso,
       ownerId: preservedOwner,
       metadata: nextEmailMeta

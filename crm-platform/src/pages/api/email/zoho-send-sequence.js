@@ -238,6 +238,7 @@ export default async function handler(req, res) {
         });
 
         logger.info(`[Zoho Sequence] Email sent successfully: messageId=${result.messageId}`, 'zoho-send-sequence');
+        const sentAt = new Date().toISOString();
 
         // Logic for CRM Recording / Uplink Out Sync
         // Map burner domain to primary for ownerId so emails appear under the correct profile
@@ -254,11 +255,13 @@ export default async function handler(req, res) {
                     subject,
                     html: htmlContent || '',
                     text: textContent || '',
-                    timestamp: new Date().toISOString(),
+                    timestamp: sentAt,
+                    sentAt,
+                    updatedAt: sentAt,
                     metadata: {
                         ...body.metadata,
                         messageId: result.messageId,
-                        sentAt: new Date().toISOString(),
+                        sentAt,
                         zohoMessageId: result.messageId,
                         trackingId: trackingId
                     }
@@ -289,9 +292,10 @@ export default async function handler(req, res) {
                     clickCount: 0,
                     opens: [],
                     clicks: [],
-                    timestamp: new Date().toISOString(),
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
+                    timestamp: sentAt,
+                    sentAt,
+                    createdAt: sentAt,
+                    updatedAt: sentAt,
                     ownerId: ownerEmail,
                     ...(contactId ? { contactId } : {}),
                     metadata: {
@@ -327,9 +331,10 @@ export default async function handler(req, res) {
                     clickCount: 0,
                     opens: [],
                     clicks: [],
-                    timestamp: new Date().toISOString(),
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
+                    timestamp: sentAt,
+                    sentAt,
+                    createdAt: sentAt,
+                    updatedAt: sentAt,
                     ownerId: ownerEmail,
                     ...(contactId ? { contactId } : {}),
                     metadata: {
@@ -341,7 +346,7 @@ export default async function handler(req, res) {
                         isSequenceEmail: true,
                         messageId: result.messageId,
                         zohoMessageId: result.messageId,
-                        sentAt: new Date().toISOString(),
+                        sentAt,
                         trackingId,
                         ...((body.metadata && typeof body.metadata === 'object') ? body.metadata : {})
                     }

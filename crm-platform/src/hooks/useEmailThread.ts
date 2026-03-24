@@ -187,8 +187,8 @@ export function useEmailThread(threadKey?: string) {
         // Re-sort the merged array so secondary (subject-matched) entries interleave
         // correctly with primary thread messages instead of always appending at the end.
         allData.sort((a: any, b: any) => {
-          const ta = new Date(a.timestamp || a.createdAt || a.created_at || 0).getTime()
-          const tb = new Date(b.timestamp || b.createdAt || b.created_at || 0).getTime()
+          const ta = new Date((a.sentAt || a.metadata?.sentAt || a.scheduledSendTime || a.timestamp || a.createdAt || a.created_at) || 0).getTime()
+          const tb = new Date((b.sentAt || b.metadata?.sentAt || b.scheduledSendTime || b.timestamp || b.createdAt || b.created_at) || 0).getTime()
           return tb - ta // descending — newest first
         })
 
@@ -204,7 +204,8 @@ export function useEmailThread(threadKey?: string) {
             type = 'draft'
           }
 
-          const date = item.timestamp || item.createdAt || item.created_at
+          const sentAt = item.sentAt || item.metadata?.sentAt || null
+          const date = sentAt || item.scheduledSendTime || item.timestamp || item.createdAt || item.created_at
 
           return {
             id: item.id,
@@ -225,6 +226,8 @@ export function useEmailThread(threadKey?: string) {
             openCount: item.openCount,
             clickCount: item.clickCount,
             attachments: normalizeAttachments(item.metadata?.attachments || item.attachments),
+            sentAt,
+            scheduledSendTime: item.scheduledSendTime || null,
             threadId: item.threadId || item.metadata?.threadId || null,
             fromName: item.metadata?.fromName || null,
             contact: item.contact

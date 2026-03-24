@@ -68,19 +68,19 @@ export default async function handler(req, res) {
           .single();
 
         if (!fetchError && emailData) {
-          stats = {
-            trackingId,
-            openCount: emailData.openCount || 0,
-            replyCount: emailData.replyCount || 0,
-            lastOpened: emailData.metadata?.lastOpened || emailData.lastOpened || null,
-            lastReplied: emailData.metadata?.lastReplied || emailData.lastReplied || null,
-            opens: emailData.opens || [],
-            replies: emailData.replies || [],
-            status: emailData.status || 'unknown',
-            sentAt: emailData.metadata?.sentAt || emailData.sentAt || null,
-            subject: emailData.subject || '',
-            to: emailData.to || []
-          };
+            stats = {
+              trackingId,
+              openCount: emailData.openCount || 0,
+              replyCount: emailData.replyCount || 0,
+              lastOpened: emailData.metadata?.lastOpened || emailData.lastOpened || null,
+              lastReplied: emailData.metadata?.lastReplied || emailData.lastReplied || null,
+              opens: emailData.opens || [],
+              replies: emailData.replies || [],
+              status: emailData.status || 'unknown',
+              sentAt: emailData.sentAt || emailData.metadata?.sentAt || emailData.timestamp || null,
+              subject: emailData.subject || '',
+              to: emailData.to || []
+            };
         } else {
           logger.log('[Email] Email document not found:', trackingId);
         }
