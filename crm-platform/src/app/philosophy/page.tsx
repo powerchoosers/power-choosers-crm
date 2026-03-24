@@ -57,17 +57,50 @@ export default function Philosophy() {
         </div>
       </section>
 
-      {/* SECTION 3: THE ENDGAME */}
-      <section className="h-[80vh] flex flex-col items-center justify-center bg-white border-t border-zinc-200 relative overflow-hidden">
+      {/* SECTION 3: THE ORIGIN */}
+      <section className="py-20 md:py-40 px-6 bg-white border-t border-zinc-200">
+        <div className="max-w-5xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-100px' }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            className="grid grid-cols-1 md:grid-cols-12 gap-8"
+          >
+            <div className="md:col-span-2">
+              <span className="text-sm font-mono text-[#002FA7] tracking-widest">ORIGIN</span>
+            </div>
+            <div className="md:col-span-10 space-y-6">
+              <p className="text-xl md:text-3xl text-zinc-700 font-medium leading-tight tracking-tight max-w-3xl">
+                We started this because we watched business owners overpay for energy, year after year, while their suppliers stayed silent.
+              </p>
+              <p className="text-lg text-zinc-500 leading-relaxed max-w-2xl">
+                ERCOT&apos;s complexity isn&apos;t accidental. Demand charges stay buried. Ratchet clauses go unexplained. 4CP peaks land without warning. Suppliers don&apos;t volunteer this information because confusion is profitable for them.
+              </p>
+              <p className="text-lg text-zinc-500 leading-relaxed max-w-2xl">
+                We decided someone should fight back with data. Not with 50 contract options or a sales script — with forensic analysis, run by engineers, on the actual bill in front of you.
+              </p>
+              <p className="text-base font-mono text-zinc-400 tracking-widest uppercase">
+                North Texas &mdash; ERCOT Region &mdash; Est. 2024
+              </p>
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* SECTION 4: THE ENDGAME */}
+      <section className="h-[80vh] flex flex-col items-center justify-center bg-zinc-950 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.08] pointer-events-none" />
         <motion.div
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 1 }}
           className="text-center z-10 px-6"
         >
-          <h2 className="text-3xl md:text-6xl font-bold tracking-tighter text-black mb-12 break-words">
-            &ldquo;Simplicity is the <br/> ultimate sophistication.&rdquo;
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tighter text-white mb-4 break-words max-w-3xl mx-auto">
+            Every 15-minute peak you don&apos;t manage<br className="hidden md:block" /> is a cost your supplier is happy to collect.
           </h2>
+          <p className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest mb-12">Nodal Point Operating Principle</p>
 
           <Link href="/technical-docs" className="group inline-flex items-center gap-2 text-[#002FA7] text-lg font-bold tracking-tight hover:opacity-80 transition-opacity">
             <span>Read the Technical Documentation</span>

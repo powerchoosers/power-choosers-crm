@@ -87,8 +87,8 @@ export default function MarketData() {
   const season = getSeason(currentMonth);
 
   // Personalization state
-  const [peakLoad, setPeakLoad] = useState(500);      // current month billed kW
-  const [ratchetKW, setRatchetKW] = useState(500);    // 12-month historical peak (ratchet)
+  const [peakLoad, setPeakLoad] = useState(150);      // current month billed kW
+  const [ratchetKW, setRatchetKW] = useState(150);    // 12-month historical peak (ratchet)
   const [monthlyKWh, setMonthlyKWh] = useState(50000);
   const [energyRate, setEnergyRate] = useState('0.085');
   const [isCalcExpanded, setIsCalcExpanded] = useState(false);
@@ -638,8 +638,8 @@ export default function MarketData() {
                   <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5" />
                   <div>
                     <div className="text-[10px] font-bold text-orange-500 uppercase tracking-widest mb-1 flex justify-between items-center">
-                      <span>Grid Stress Alert</span>
-                      <span className="text-[8px] opacity-60 font-mono italic">SIMULATED</span>
+                      <span>Scenario Alert</span>
+                      <span className="text-[8px] font-mono px-1 py-0.5 rounded bg-orange-500/10 text-orange-400">SCENARIO</span>
                     </div>
                     <p className="text-[10px] text-zinc-400 leading-tight">
                       Wind generation historically drops 40–60% in late-February cold fronts.
@@ -699,7 +699,7 @@ export default function MarketData() {
                 <div className="lg:col-span-1">
                   <div className="text-[10px] font-bold text-[#002FA7] uppercase tracking-widest mb-4 flex items-center gap-2">
                     <Shield className="w-3 h-3" />
-                    2025 Texas Grid Benchmark
+                    Historical Grid Reference
                   </div>
                   <div className="space-y-4">
                     <div className="flex justify-between items-center text-xs font-mono">
