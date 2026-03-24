@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mail, Phone, MapPin, ArrowRight, Menu, X, Activity, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { LandingFooter } from '@/components/landing/LandingFooter';
 
 export default function Contact() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -171,12 +172,19 @@ export default function Contact() {
 
             </div>
 
-            {/* Bottom Action */}
-            <div className="mt-12 pt-8 border-t border-white/5 relative z-10">
-              <p className="text-zinc-500 text-sm mb-4">Ready to bypass the conversation?</p>
-              <a href="/bill-debugger" className="flex items-center gap-2 text-white font-bold hover:gap-4 hover:text-[#002FA7] transition-all">
-                Initiate Bill Debugger Upload <ArrowRight className="w-4 h-4" />
-              </a>
+            {/* Bottom Actions */}
+            <div className="mt-12 pt-8 border-t border-white/5 relative z-10 space-y-4">
+              <div>
+                <p className="text-zinc-500 text-sm mb-2">Ready to bypass the conversation?</p>
+                <a href="/bill-debugger" className="flex items-center gap-2 text-white font-bold hover:gap-4 hover:text-[#002FA7] transition-all">
+                  Initiate Bill Debugger Upload <ArrowRight className="w-4 h-4" />
+                </a>
+              </div>
+              <div>
+                <a href="#contact-form" className="flex items-center gap-2 text-zinc-500 text-sm hover:text-zinc-300 transition-colors">
+                  Or send a written message <ArrowRight className="w-3 h-3 rotate-90" />
+                </a>
+              </div>
             </div>
 
           </motion.div>
@@ -184,7 +192,7 @@ export default function Contact() {
       </div>
 
       {/* CONTACT FORM */}
-      <section className="px-6 pb-20 relative z-10">
+      <section id="contact-form" className="px-6 pb-20 relative z-10">
         <div className="max-w-2xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -255,22 +263,7 @@ export default function Contact() {
         </div>
       </section>
 
-      {/* FOOTER */}
-      <footer className="bg-zinc-900 text-zinc-400 py-20 border-t border-zinc-800 relative z-10 w-full">
-        <div className="max-w-7xl mx-auto flex flex-col items-center justify-center gap-8 px-6">
-          <div className="bg-white p-3 rounded-3xl">
-            <img src="/images/nodalpoint.png" alt="Nodal Point Logo" className="h-12 w-auto" />
-          </div>
-          <p className="font-mono text-sm tracking-widest opacity-60">&copy; 2026 Nodal Point. All Systems Nominal.</p>
-          
-          {/* System Status Line */}
-          <div className="w-full border-t border-zinc-800/50 mt-8 pt-8 flex justify-center text-center">
-            <p className="text-zinc-600 text-xs font-mono tracking-wider">
-              ERCOT NODE: LZ_NORTH // LATENCY: 24ms // CONNECTION: SECURE
-            </p>
-          </div>
-        </div>
-      </footer>
+      <LandingFooter />
 
     </div>
   );
