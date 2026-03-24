@@ -46,7 +46,8 @@ function calculateOutreachFit(signal) {
     const locationBoost = tdsp && tdsp !== 'ERCOT_Unknown' ? 6 : -4;
 
     const freshnessDays = Math.max((Date.now() - new Date(signal.created_at).getTime()) / 86400000, 0);
-    const freshnessBoost = Math.max(12 - freshnessDays, 0) * 0.8;
+    // Aggressive freshness decay: new signals always surface above older ones
+    const freshnessBoost = freshnessDays < 1 ? 60 : freshnessDays < 2 ? 35 : freshnessDays < 3 ? 18 : freshnessDays < 7 ? 6 : 0;
 
     return Math.round(
         typeWeight +
