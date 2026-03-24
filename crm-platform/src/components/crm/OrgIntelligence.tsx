@@ -233,6 +233,14 @@ interface ApolloCompany {
   revenue?: string;
 }
 
+interface ApolloSearchCache {
+  company: ApolloCompany | null;
+  contacts: ApolloContactRow[];
+  timestamp: number;
+  searchTerm?: string;
+  currentPage?: number;
+}
+
 interface RevealState {
   revealingEmail: boolean;
   revealingPhone: boolean;
@@ -295,6 +303,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const phoneRevealTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const phoneRevealWarningTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const cacheLoadVersionRef = useRef(0);
   const { initiateCall } = useCallStore();
   const openCompose = useComposeStore((s) => s.openCompose);
   const queryClient = useQueryClient();
@@ -385,16 +394,29 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
   // Load cache on mount or when domain/company changes
   useEffect(() => {
+    const loadVersion = ++cacheLoadVersionRef.current;
+    let cancelled = false;
+
+    const applyCachedData = (cacheData: ApolloSearchCache) => {
+      if (cancelled || cacheLoadVersionRef.current !== loadVersion) return;
+
+      const cachedContacts = Array.isArray(cacheData.contacts) ? cacheData.contacts : [];
+      setData(cachedContacts);
+      setCompanySummary(cacheData.company || null);
+      setScanStatus('complete');
+      if (typeof cacheData.searchTerm === 'string') {
+        setSearchTerm(cacheData.searchTerm);
+      }
+      if (typeof cacheData.currentPage === 'number' && cacheData.currentPage > 0) {
+        setCurrentPage(cacheData.currentPage);
+      }
+      setContactsLoading(false);
+    };
+
     async function loadCache() {
       if (typeof window === 'undefined') return;
 
-      // Clear current data immediately to prevent stale views when switching entities
-      setData([]);
-      setCompanySummary(null);
-      setScanStatus('idle');
       setContactsLoading(false);
-      setSearchTerm('');
-      setCurrentPage(1);
 
       const keysToCheck: string[] = [];
       if (accountId) keysToCheck.push(`ACCOUNT_${accountId}`);
@@ -403,6 +425,39 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       if (companyName && !keysToCheck.includes(companyName)) keysToCheck.push(companyName);
 
       if (keysToCheck.length === 0) return;
+
+      const readLocalCache = (cacheKey: string): ApolloSearchCache | null => {
+        const cached = localStorage.getItem(cacheKey);
+        if (!cached) return null;
+
+        try {
+          const parsed = JSON.parse(cached) as Partial<ApolloSearchCache>;
+          if (parsed && Array.isArray(parsed.contacts)) {
+            const timestamp = typeof parsed.timestamp === 'number' ? parsed.timestamp : 0;
+            if (Date.now() - timestamp < 1000 * 60 * 60 * 24) {
+              return {
+                company: (parsed.company as ApolloCompany | null) || null,
+                contacts: parsed.contacts as ApolloContactRow[],
+                timestamp,
+                searchTerm: typeof parsed.searchTerm === 'string' ? parsed.searchTerm : undefined,
+                currentPage: typeof parsed.currentPage === 'number' ? parsed.currentPage : undefined
+              };
+            }
+          }
+        } catch (err) {
+          console.error('Failed to parse Apollo cache:', err);
+        }
+
+        return null;
+      };
+
+      for (const key of keysToCheck) {
+        const cached = readLocalCache(`apollo_cache_${key}`);
+        if (cached) {
+          applyCachedData(cached);
+          return;
+        }
+      }
 
       // 1. Try Supabase first (Persistent Cloud Cache) with prioritized keys
       try {
@@ -418,17 +473,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           if (!bestMatch) bestMatch = supabaseItems[0];
 
           if (bestMatch && bestMatch.data) {
-            const { company, contacts, timestamp } = bestMatch.data;
-            setData(contacts);
-            setCompanySummary(company);
-            setScanStatus('complete');
+            const cacheData = bestMatch.data as ApolloSearchCache;
+            applyCachedData(cacheData);
 
             // Save back to local storage for speed
             if (domainKey) {
               localStorage.setItem(`apollo_cache_${domainKey}`, JSON.stringify({
-                company,
-                contacts,
-                timestamp: timestamp || new Date(bestMatch.created_at).getTime()
+                ...cacheData,
+                timestamp: cacheData.timestamp || new Date(bestMatch.created_at).getTime()
               }));
             }
             return;
@@ -438,31 +490,23 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         console.warn('Supabase cache fetch failed:', err);
       }
 
-      // 2. Fallback to LocalStorage
-      const cacheKey = domainKey ? `apollo_cache_${domainKey}` : null;
-      const cached = cacheKey ? localStorage.getItem(cacheKey) : null;
-
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached);
-          const { company, contacts, timestamp } = parsed;
-          if (Date.now() - timestamp < 1000 * 60 * 60 * 24) {
-            setData(contacts);
-            setCompanySummary(company);
-            setScanStatus('complete');
-            if (domainKey) saveToSupabase(domainKey, parsed);
-            return;
-          }
-        } catch (e) {
-          console.error('Failed to parse Apollo cache:', e);
-        }
-      }
+      if (cancelled || cacheLoadVersionRef.current !== loadVersion) return;
 
       // If no cache, stay in idle mode so the user can trigger the scan manually
+      setData([]);
+      setCompanySummary(null);
       setScanStatus('idle');
+      setSearchTerm('');
+      setCurrentPage(1);
+      setContactsLoading(false);
     }
 
     loadCache();
+
+    return () => {
+      cancelled = true;
+      cacheLoadVersionRef.current += 1;
+    };
   }, [domain, companyName, accountId]);
 
   useEffect(() => {
@@ -584,7 +628,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   };
 
-  async function saveToSupabase(key: string, data: any) {
+  async function saveToSupabase(key: string, data: ApolloSearchCache) {
     try {
       await supabase
         .from('apollo_searches')
@@ -598,15 +642,21 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
   }
 
-  const saveToCache = (company: ApolloCompany | null, contacts: ApolloContactRow[]) => {
+  const saveToCache = (
+    company: ApolloCompany | null,
+    contacts: ApolloContactRow[],
+    options?: { searchTerm?: string; currentPage?: number }
+  ) => {
     if (typeof window === 'undefined') return;
 
     const key = cacheKeyFromDomainOrName(domain, companyName);
 
-    const cacheData = {
+    const cacheData: ApolloSearchCache = {
       company,
       contacts,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      searchTerm: options?.searchTerm ?? searchTerm,
+      currentPage: options?.currentPage ?? currentPage
     };
 
     // Save by Account ID if available for maximum stability
@@ -1002,20 +1052,26 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       setTimeout(() => setLastEnrichedContactId(null), 3500);
 
       // 3. Update local state (phones from immediate response; keep type for W/M/O display)
+      const immediatePhonesToPersist: PhoneEntry[] = [];
+      if (assignedImmediatePhones.patch.mobile) {
+        immediatePhonesToPersist.push({ number: assignedImmediatePhones.patch.mobile, type: 'mobile' });
+      }
+      if (assignedImmediatePhones.patch.workPhone) {
+        immediatePhonesToPersist.push({ number: assignedImmediatePhones.patch.workPhone, type: 'work' });
+      }
+      if (assignedImmediatePhones.patch.otherPhone) {
+        immediatePhonesToPersist.push({ number: assignedImmediatePhones.patch.otherPhone, type: 'other' });
+      }
       const newPhonesTyped: PhoneEntry[] = (enriched.phones || []).map((ph: { number?: string; type?: string }) =>
         ph?.number ? { number: ph.number, type: ph.type } : null
       ).filter(Boolean) as PhoneEntry[];
       const hasImmediatePhones = newPhonesTyped.length > 0;
       const existingNormalized: PhoneEntry[] = (person.phones || []).map((e) => (typeof e === 'string' ? e : e));
-      const existingNums = new Set(existingNormalized.map(phoneDisplayNumber));
-      const mergedPhones: PhoneEntry[] = [...existingNormalized];
-      newPhonesTyped.forEach((entry) => {
-        const num = phoneDisplayNumber(entry);
-        if (!existingNums.has(num)) {
-          existingNums.add(num);
-          mergedPhones.push(entry);
-        }
-      });
+      const mergedPhones = normalizeRevealedPhones([
+        ...existingNormalized,
+        ...immediatePhonesToPersist,
+        ...newPhonesTyped
+      ]);
 
       const updatedData = data.map(p =>
         p.id === person.id ? {
@@ -1046,7 +1102,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       // 4. Save updated contact list to cache so refresh doesn't lose revealed data
-      saveToCache(companySummary, updatedData);
+      saveToCache(companySummary, updatedData, {
+        searchTerm: searchTerm.trim(),
+        currentPage,
+      });
 
       // 5. If we requested phone reveal, Apollo delivers phones asynchronously via webhook (can take several minutes).
       // Poll phone-retrieve until ready, then update contact and local state.
@@ -1127,7 +1186,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   const updatedDataWithPhones = prev.map(p =>
                     p.id === person.id ? { ...p, phones: merged } : p
                   );
-                  saveToCache(companySummary, updatedDataWithPhones);
+                  saveToCache(companySummary, updatedDataWithPhones, {
+                    searchTerm: searchTerm.trim(),
+                    currentPage,
+                  });
                   return updatedDataWithPhones;
                 });
                 const displayName = person.name || [person.firstName, person.lastName].filter(Boolean).join(' ').trim() || 'Contact';
@@ -1355,7 +1417,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       setScanStatus('complete');
 
       // Save to cache
-      saveToCache(currentSummary, mappedData);
+      saveToCache(currentSummary, mappedData, {
+        searchTerm: '',
+        currentPage: 1,
+      });
     } catch (error) {
       console.error('Apollo Scan Error:', error);
       setScanStatus('idle');
@@ -1520,7 +1585,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           const existingIds = new Set(existingContacts.map(c => c.id));
           const newContacts = mappedData.filter(c => !existingIds.has(c.id));
           if (newContacts.length > 0) {
-            saveToCache(companySummary, [...existingContacts, ...newContacts]);
+            saveToCache(companySummary, [...existingContacts, ...newContacts], {
+              searchTerm: term,
+              currentPage: 1,
+            });
           }
         }
       } else {
