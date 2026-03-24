@@ -194,7 +194,27 @@ export default function MarketData() {
               {item.label}
             </a>
           ))}
+          <div className={`mt-4 flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500 delay-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+            <a href="/bill-debugger" className="flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 transition-all">
+              <Activity className="w-4 h-4" />
+              Run Analysis
+            </a>
+            <a href="/book" className="flex items-center justify-center gap-2 border border-white/20 text-white px-6 py-3 rounded-full text-base font-medium hover:border-white/40 transition-all">
+              Book a Briefing
+            </a>
+          </div>
         </div>
+      </div>
+
+      {/* MOBILE STICKY CTA — visible on small screens only */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden bg-zinc-950/95 backdrop-blur-xl border-t border-white/10 px-4 py-3 flex gap-3">
+        <a href="/bill-debugger" className="flex-1 flex items-center justify-center gap-2 bg-[#002FA7] text-white py-2.5 rounded-full text-sm font-medium">
+          <Activity className="w-4 h-4" />
+          Run Analysis
+        </a>
+        <a href="/book" className="flex-1 flex items-center justify-center border border-white/20 text-white py-2.5 rounded-full text-sm font-medium hover:border-white/40 transition-colors">
+          Book a Briefing
+        </a>
       </div>
 
       {/* BACKGROUND TEXTURE */}
