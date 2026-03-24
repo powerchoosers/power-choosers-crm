@@ -10,13 +10,20 @@
 import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 
-const RECON_TYPES = ['new_location', 'exec_hire', 'energy_rfp', 'sec_filing', 'expansion'];
+const RECON_TYPES = ['new_location', 'exec_hire', 'energy_rfp', 'sec_filing', 'expansion', 'capital_raise', 'hiring_spree', 'data_center', 'tax_abatement', 'industrial_permit', 'cold_storage', 'manufacturing'];
 const SIGNAL_TYPE_WEIGHT = {
     energy_rfp: 100,
     sec_filing: 82,
     exec_hire: 76,
     new_location: 70,
+    data_center: 68,
     expansion: 62,
+    capital_raise: 60,
+    manufacturing: 58,
+    cold_storage: 56,
+    tax_abatement: 54,
+    hiring_spree: 50,
+    industrial_permit: 48,
 };
 
 function parseNumericScore(value) {
@@ -102,8 +109,7 @@ export default async function handler(req, res) {
             return;
         }
 
-        // Cache for 15 minutes
-        res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=300');
+        res.setHeader('Cache-Control', 'no-store');
         const signals = (data || [])
             .map((signal) => ({
                 ...signal,
