@@ -250,8 +250,7 @@ async function callPerplexity(prompt: string): Promise<{ signals: any[]; citatio
           },
           { role: 'user', content: prompt },
         ],
-        temperature: 0.1,
-        search_recency_filter: 'week',
+        temperature: 0.3,
       }),
     })
   } catch (fetchErr) {
@@ -335,6 +334,65 @@ Deno.serve(async (req: Request) => {
     })
   }
 
+  const payload = await req.json().catch(() => ({}))
+
+  // ── Diagnostic ping mode ───────────────────────────────────────────────────
+  // POST { mode: 'ping' } → makes one minimal Perplexity call and returns the
+  // raw HTTP status + content preview so we can confirm the API key is working.
+  if (cleanText(payload?.mode).toLowerCase() === 'ping') {
+    const keyPresent = Boolean(PERPLEXITY_API_KEY)
+    if (!keyPresent) {
+      return new Response(JSON.stringify({ ping: 'fail', reason: 'PERPLEXITY_API_KEY not set' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+    try {
+      const res = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${PERPLEXITY_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'sonar-pro',
+          messages: [{ role: 'user', content: 'Say the word PONG and nothing else.' }],
+          temperature: 0,
+          max_tokens: 10,
+        }),
+      })
+      const body = await res.text()
+      return new Response(JSON.stringify({ ping: res.ok ? 'ok' : 'fail', status: res.status, preview: body.slice(0, 400) }), { headers: { 'Content-Type': 'application/json' } })
+    } catch (e: any) {
+      return new Response(JSON.stringify({ ping: 'fail', reason: e?.message }), { headers: { 'Content-Type': 'application/json' } })
+    }
+  }
+  // ── End diagnostic ping mode ───────────────────────────────────────────────
+
+  // ── Debug mode: raw Perplexity response for one real production prompt ─────
+  // POST { mode: 'debug' } → runs one real scrape prompt and returns the full
+  // raw Perplexity response body so we can see exactly what the model returns.
+  if (cleanText(payload?.mode).toLowerCase() === 'debug') {
+    if (!PERPLEXITY_API_KEY) {
+      return new Response(JSON.stringify({ debug: 'fail', reason: 'PERPLEXITY_API_KEY not set' }), { headers: { 'Content-Type': 'application/json' } })
+    }
+    const testPrompt = `Find 3 Texas industrial companies opening new facilities or breaking ground in 2026. Focus on Houston and Dallas metro areas in ERCOT deregulated territory. Return ONLY a valid JSON array with fields: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`
+    try {
+      const res = await fetch('https://api.perplexity.ai/chat/completions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${PERPLEXITY_API_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'sonar-pro',
+          messages: [
+            { role: 'system', content: 'You are an energy brokerage analyst. Return ONLY a valid JSON array — no prose, no markdown, no explanation.' },
+            { role: 'user', content: testPrompt },
+          ],
+          temperature: 0.1,
+          search_recency_filter: 'month',
+        }),
+      })
+      const body = await res.text()
+      return new Response(JSON.stringify({ debug: res.ok ? 'ok' : 'fail', status: res.status, raw: body }), { headers: { 'Content-Type': 'application/json' } })
+    } catch (e: any) {
+      return new Response(JSON.stringify({ debug: 'fail', reason: e?.message }), { headers: { 'Content-Type': 'application/json' } })
+    }
+  }
+  // ── End debug mode ──────────────────────────────────────────────────────────
+
   if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY) {
     return new Response(JSON.stringify({ error: 'Supabase not configured' }), {
       status: 500,
@@ -342,7 +400,6 @@ Deno.serve(async (req: Request) => {
     })
   }
 
-  const payload = await req.json().catch(() => ({}))
   const mode = cleanText(payload?.mode).toLowerCase() || 'all'
 
   const jobs = getJobs(mode)
