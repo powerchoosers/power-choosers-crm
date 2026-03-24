@@ -13,7 +13,7 @@ import { formatProspectLocationLabel, normalizeOrganizationName } from '@/lib/ap
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint';
 
 
-type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion' | 'capital_raise' | 'merger_acquisition' | 'hiring_spree' | 'data_center' | 'tax_abatement';
+type SignalType = 'new_location' | 'exec_hire' | 'energy_rfp' | 'sec_filing' | 'expansion' | 'capital_raise' | 'merger_acquisition' | 'hiring_spree' | 'data_center' | 'tax_abatement' | 'industrial_permit';
 
 interface IntelSignal {
   id: string;
@@ -103,6 +103,13 @@ const SIGNAL_CONFIG: Record<SignalType, { icon: React.ReactNode; label: string; 
     color: 'text-orange-400',
     bg: 'bg-orange-500/10',
     border: 'border-orange-500/30',
+  },
+  industrial_permit: {
+    icon: <FileText className="w-4 h-4" />,
+    label: 'INDUSTRIAL_PERMIT',
+    color: 'text-blue-300',
+    bg: 'bg-blue-300/10',
+    border: 'border-blue-300/30',
   },
 };
 
