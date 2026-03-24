@@ -119,7 +119,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
 
         const { data: existing, error: fetchError } = await supabaseAdmin
             .from('contacts')
-            .select('*, accounts(id, name)')
+            .select('*, accounts!contacts_accountId_fkey(id, name)')
             .eq('email', email)
             .maybeSingle();
 
@@ -172,7 +172,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
                 id: contactId,
                 name: identity.name,
                 email: identity.email,
-                account_id: accountId, // Link to account if created
+                accountId: accountId, // Link to account if created
                 status: 'Active',
                 metadata: { source: 'Bill Debugger (Raw)' }
             });
@@ -213,7 +213,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
             city: apolloPerson.city,
             state: apolloPerson.state,
             status: 'Active',
-            account_id: accountId, // LINK THE CONTACT TO THE ACCOUNT
+            accountId: accountId, // LINK THE CONTACT TO THE ACCOUNT
             metadata: {
                 source: 'Bill Debugger Identity Resolution',
                 acquired_at: new Date().toISOString(),
