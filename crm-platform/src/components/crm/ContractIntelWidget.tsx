@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useDealsByAccount, useDealsByContact } from '@/hooks/useDeals'
 import { type Deal, type DealStage } from '@/types/deals'
 import { differenceInDays, format } from 'date-fns'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useUIStore } from '@/store/uiStore'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -292,6 +293,29 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
   )
 }
 
+function HistoryDealRow({ deal }: { deal: Deal }) {
+  return (
+    <Link
+      href={`/network/contracts/${deal.id}`}
+      className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-2.5 transition-colors hover:border-white/10 hover:bg-black/30 group"
+    >
+      <div className="min-w-0 flex-1">
+        <div className="font-mono text-[10px] uppercase tracking-wider text-zinc-200 truncate">
+          {deal.title}
+        </div>
+        <div className="mt-0.5 flex items-center gap-2 font-mono text-[9px] text-zinc-500 uppercase tracking-widest">
+          <span className={cn('h-1.5 w-1.5 rounded-full flex-none', STAGE_DOT[deal.stage])} />
+          <span>{deal.stage}</span>
+          {deal.closeDate && (
+            <span>Closes {format(new Date(deal.closeDate), 'MMM d, yyyy')}</span>
+          )}
+        </div>
+      </div>
+      <Clock className="w-3 h-3 text-zinc-600 group-hover:text-zinc-400 transition-colors flex-none" />
+    </Link>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // ContractIntelWidget — shown in RightPanel Active_Context dossier
 // ---------------------------------------------------------------------------
@@ -312,8 +336,9 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
   const deals: Deal[] = accountId ? accountDeals : contactDeals
   const isLoading = accountId ? loadingAccount : loadingContact
 
-  // Filter out TERMINATED for the dossier (keep it clean)
-  const activeDeals = deals.filter(d => d.stage !== 'TERMINATED' && !removedDealIds[d.id])
+  const visibleDeals = deals.filter(d => !removedDealIds[d.id])
+  const activeDeals = visibleDeals.filter(d => d.stage !== 'TERMINATED')
+  const historicalDeals = visibleDeals.filter(d => d.stage === 'TERMINATED')
 
   const openEditInRightPanel = (deal: Deal) => {
     setDealContext({
@@ -354,14 +379,19 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
   }
 
   if (!accountId && !contactId) return null
-  if (activeDeals.length === 0) return null
+  if (visibleDeals.length === 0) return null
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">
-          Contract_Intel
-        </h3>
+        <div className="flex items-center gap-2 min-w-0">
+          <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">
+            Contract_Intel
+          </h3>
+          <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600">
+            {activeDeals.length} active / {historicalDeals.length} history
+          </span>
+        </div>
         <button
           onClick={() => {
             setDealContext({ accountId, contactId })
@@ -374,25 +404,43 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
         </button>
       </div>
 
-      <div className="space-y-1.5">
-        <AnimatePresence initial={false}>
-          {activeDeals.map(deal => (
-            <motion.div
-              key={deal.id}
-              initial={{ opacity: 0, height: 0, scale: 0.95 }}
-              animate={{ opacity: 1, height: 'auto', scale: 1 }}
-              exit={{ opacity: 0, height: 0, scale: 0.95 }}
-              transition={{ duration: 0.3, ease: 'easeOut' }}
-            >
-              <DealCard
-                deal={deal}
-                onEdit={openEditInRightPanel}
-                onRequestDelete={(dealId) => setDeleteId(dealId)}
-              />
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+      {activeDeals.length > 0 && (
+        <div className="space-y-1.5">
+          <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600">
+            Current Contracts
+          </div>
+          <AnimatePresence initial={false}>
+            {activeDeals.map(deal => (
+              <motion.div
+                key={deal.id}
+                initial={{ opacity: 0, height: 0, scale: 0.95 }}
+                animate={{ opacity: 1, height: 'auto', scale: 1 }}
+                exit={{ opacity: 0, height: 0, scale: 0.95 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
+                <DealCard
+                  deal={deal}
+                  onEdit={openEditInRightPanel}
+                  onRequestDelete={(dealId) => setDeleteId(dealId)}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {historicalDeals.length > 0 && (
+        <div className="space-y-1.5 pt-2 border-t border-white/5">
+          <div className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600">
+            Contract History
+          </div>
+          <div className="space-y-1.5">
+            {historicalDeals.map((deal) => (
+              <HistoryDealRow key={deal.id} deal={deal} />
+            ))}
+          </div>
+        </div>
+      )}
 
       <Dialog open={!!deleteId} onOpenChange={v => !v && setDeleteId(null)}>
         <DialogContent className="bg-zinc-950 border-white/10 max-w-sm">

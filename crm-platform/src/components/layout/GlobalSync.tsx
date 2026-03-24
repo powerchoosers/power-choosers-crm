@@ -15,6 +15,7 @@ import { CheckCircle, Eye, CalendarCheck, CalendarX, Bell, Video } from 'lucide-
 import { showInboxEmailToast } from '@/lib/inbox-email-toast'
 import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe'
 import { getSignatureRequestKindConfig, normalizeSignatureRequestKind } from '@/lib/signature-request'
+import { getFallbackEmailOwnerScope, isEmailInOwnerScope } from '@/lib/email-scope'
 
 const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -85,6 +86,7 @@ export function GlobalSync() {
   // Resolve owner scope once on mount (covers shared inboxes like signal@nodalpoint.io)
   useEffect(() => {
     if (!user || !onCrmRoute) return
+    ownerScopeRef.current = getFallbackEmailOwnerScope(user.email)
     resolveOwnerScope(user).then(scope => { ownerScopeRef.current = scope })
   }, [user, onCrmRoute])
 
@@ -212,24 +214,25 @@ export function GlobalSync() {
           }
 
           if (!email?.id) return
-
-          const normalizedType = String(email.type || '').toLowerCase()
-          if (normalizedType !== 'received' && normalizedType !== 'uplink_in') return
+          if (String(email.type || '').toLowerCase() === 'tracking') return
 
           // Check against full owner scope (primary + shared inboxes like signal@nodalpoint.io)
-          const ownerId = String(email.metadata?.ownerId || email.ownerId || '').toLowerCase()
           const userEmail = String(user.email || '').toLowerCase()
           const scope = ownerScopeRef.current.length > 0
             ? ownerScopeRef.current
             : [userEmail]
-          
-          if (ownerId && !scope.includes(ownerId)) return
 
-          // Always refresh inbox queries on new inbound rows for this owner.
-          // Notification enrichment can fail (e.g., sender is display-name-only), but list refresh should not.
+          if (!isEmailInOwnerScope(email, scope)) return
+
+          // Refresh every inbox query family when a new owned email row lands.
+          // This covers sent, received, reminder, sequence, and signature rows without a browser reload.
           queryClient.invalidateQueries({ queryKey: ['emails'] })
           queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
+          queryClient.invalidateQueries({ queryKey: ['email'] })
+          queryClient.invalidateQueries({ queryKey: ['email-thread'] })
+          queryClient.invalidateQueries({ queryKey: ['emails-search'] })
           queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+          queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
         }
       )
       .subscribe((status) => {

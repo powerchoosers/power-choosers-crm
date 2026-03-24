@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { Email } from './useEmails'
+import { applyEmailOwnerScope, resolveEmailOwnerScope } from '@/lib/email-scope'
 
 function stripHtml(value?: string | null) {
   if (!value) return ''
@@ -92,12 +93,17 @@ export function useEmailThread(threadKey?: string) {
       if (!user?.email && role !== 'admin') return []
 
       try {
+        const ownerScope = role !== 'admin' && user?.email
+          ? await resolveEmailOwnerScope(user)
+          : []
+        const scopedOwners = ownerScope.length > 0 ? ownerScope : [ownerEmail]
+
         let query: any = supabase
           .from('emails')
           .select('*, contact:contacts(id, email, name, firstName, lastName, accountId, metadata)')
 
         if (role !== 'admin' && user?.email) {
-          query = query.or(`metadata->>ownerId.eq.${ownerEmail},ownerId.eq.${ownerEmail}`)
+          query = applyEmailOwnerScope(query, scopedOwners)
         }
 
         query = applyCommonEmailExclusions(query)
@@ -144,7 +150,7 @@ export function useEmailThread(threadKey?: string) {
               .ilike('subject', `%${baseSubject}%`)
 
             if (role !== 'admin' && user?.email) {
-              sentQuery = sentQuery.eq('ownerId', ownerEmail)
+              sentQuery = applyEmailOwnerScope(sentQuery, scopedOwners)
             }
 
             sentQuery = applyCommonEmailExclusions(sentQuery)

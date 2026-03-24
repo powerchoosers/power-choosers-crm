@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatMillValue, millDecimal } from '@/lib/mills'
-import { useDeal, useUpdateDeal } from '@/hooks/useDeals'
+import { useDeal, useUpdateDeal, useDealsByAccount } from '@/hooks/useDeals'
 import { useAccountBillIntelligence, useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useAccountContacts } from '@/hooks/useContacts'
 import { UsageProfilePanel } from '@/components/dossier/account-dossier/UsageProfilePanel'
@@ -466,6 +466,54 @@ function CommissionPanel({
 }
 
 // ---------------------------------------------------------------------------
+// Related contracts on the same account
+// ---------------------------------------------------------------------------
+
+function RelatedContractsPanel({ deals }: { deals: Deal[] }) {
+  if (deals.length === 0) return null
+
+  return (
+    <div className="nodal-glass rounded-2xl p-5 space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+          Other Contracts
+        </span>
+        <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600">
+          {deals.length}
+        </span>
+      </div>
+
+      <div className="space-y-1.5">
+        {deals.map((otherDeal) => (
+          <Link
+            key={otherDeal.id}
+            href={`/network/contracts/${otherDeal.id}`}
+            className="flex items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-2.5 transition-colors hover:border-white/10 hover:bg-black/30 group"
+          >
+            <div className="min-w-0 flex-1">
+              <div className="font-mono text-[10px] uppercase tracking-wider text-zinc-200 truncate">
+                {otherDeal.title}
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 font-mono text-[9px] uppercase tracking-widest text-zinc-500">
+                <span className={cn('inline-flex rounded border px-1.5 py-0.5', STAGE_COLORS[otherDeal.stage])}>
+                  {otherDeal.stage}
+                </span>
+                <span>
+                  {otherDeal.closeDate
+                    ? `Close ${format(new Date(otherDeal.closeDate), 'MMM d, yyyy')}`
+                    : `Created ${format(new Date(otherDeal.createdAt), 'MMM d, yyyy')}`}
+                </span>
+              </div>
+            </div>
+            <ArrowUpRight className="w-3 h-3 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity flex-none" />
+          </Link>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Bill Intelligence Panel — surfaces analyze-document data for this account
 // ---------------------------------------------------------------------------
 
@@ -589,6 +637,7 @@ export default function ContractDetailPage() {
     : 'Agent Commission / yr'
 
   const { data: deal, isLoading } = useDeal(id)
+  const { data: accountDeals = [] } = useDealsByAccount(deal?.accountId)
   const updateDeal = useUpdateDeal()
   const { data: billIntel } = useAccountBillIntelligence(deal?.accountId)
   const { data: account } = useAccount(deal?.accountId ?? '')
@@ -638,6 +687,14 @@ export default function ContractDetailPage() {
       impliedSpend,
     }
   }, [deal, commissionRate])
+
+  const relatedContracts = useMemo(() => {
+    if (!deal) return []
+
+    return [...accountDeals]
+      .filter((otherDeal) => otherDeal.id !== deal.id)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  }, [accountDeals, deal?.id])
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -943,6 +1000,7 @@ export default function ContractDetailPage() {
         {/* RIGHT — Sidebar panels */}
         <div className="col-span-4 flex flex-col gap-4 overflow-y-auto pb-8 np-scroll">
           <AccountIntelPanel deal={deal} />
+          <RelatedContractsPanel deals={relatedContracts} />
 
           {/* Decision Maker */}
           {deal?.accountId && (

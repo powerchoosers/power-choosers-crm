@@ -17,6 +17,26 @@ function normalizeAddressKey(value) {
   return normalizeAddress(value).toUpperCase();
 }
 
+function normalizeDocumentName(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function inferFilenameDocumentType(fileName) {
+  const normalized = normalizeDocumentName(fileName);
+  if (!normalized) return null;
+
+  if (/\b(letter of engagement|engagement letter|general loe|loe)\b/.test(normalized)) {
+    return 'LOE';
+  }
+
+  return null;
+}
+
 function extractAddressFromServiceEntry(entry) {
   if (!entry) return '';
   if (typeof entry === 'string') return normalizeAddress(entry);
@@ -232,6 +252,7 @@ export default async function handler(req, res) {
     
     The original filename is: "${safeFileName}"
     Use the filename as a strong signal for classification (e.g. "OncorSummaryUsageData", "annual usage", "12 month usage", "usage data", ".csv" → USAGE_DATA).
+    If the filename/title clearly says LOE, Letter of Engagement, Engagement Letter, or General LOE, classify it as LOE.
     
     Task 1: Classify the document type.
     - "SIGNED_CONTRACT": A signed Energy Service Agreement (ESA) or similar binding contract with visible signatures, signature blocks, or executed/countersigned language.
@@ -379,6 +400,17 @@ export default async function handler(req, res) {
 
     if (!analysis) {
       throw new Error('Analysis failed on all available models');
+    }
+
+    const filenameHintType = inferFilenameDocumentType(safeFileName);
+    if (filenameHintType && analysis.type !== filenameHintType) {
+      logger.log(
+        `[Analyze Document] Overriding AI type ${analysis.type} with filename hint ${filenameHintType} for ${safeFileName}`
+      );
+      analysis = {
+        ...analysis,
+        type: filenameHintType
+      };
     }
 
     logger.log('[Analyze Document] Analysis successful:', analysis.type);
