@@ -118,39 +118,43 @@ function getJobs(mode: string) {
   const allJobs = [
     {
       type: 'new_location',
-      prompt: `Find 5-10 real Texas companies opening new facilities, breaking ground, or relocating in ${year} or ${year + 1}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, entity_domain, headline, summary, source_url, relevance_score, city, state. Only return named companies with specific cities.`,
+      prompt: `Find 10-15 real Texas companies opening new facilities, breaking ground, or relocating in ${year} or ${year + 1}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, entity_domain, headline, summary, source_url, relevance_score, city, state. Only return named companies with specific cities.`,
     },
     {
       type: 'energy_rfp',
-      prompt: `Find active open RFPs after ${stamp} for retail electricity supply, energy consulting, or energy management services for commercial and industrial buyers. ${TARGET_ZONES} ${EXCLUSIONS} Include city and state where possible.`,
+      prompt: `Find 5-10 active open RFPs after ${stamp} for retail electricity supply, energy consulting, or energy management services for commercial and industrial buyers in Texas. ${TARGET_ZONES} ${EXCLUSIONS} Include city and state where possible.`,
     },
     {
       type: 'expansion',
-      prompt: `Find Texas company expansion announcements, plant expansions, capex projects, and tax-abatement backed growth stories for ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
+      prompt: `Find 10-15 Texas industrial or commercial company expansion announcements, plant expansions, and capex projects for ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
     },
     {
       type: 'sec_filing',
-      prompt: `Find SEC filings, 8-Ks, earnings releases, and investor updates that signal facility growth, new load, or operational expansion for Texas-relevant commercial and industrial companies in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
+      prompt: `Find 5-10 SEC filings, 8-Ks, earnings releases, and investor updates that signal facility growth, new load, or operational expansion for Texas-relevant commercial and industrial companies in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
     },
     {
       type: 'capital_raise',
-      prompt: `Find 3-5 Texas commercial/industrial companies that recently closed Series B/C+ venture rounds, PE investments, or IPOs in ${year}. These represent high-growth energy consumers. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 5-10 Texas commercial/industrial companies that recently closed Series B/C+ venture rounds, PE investments, or IPOs in ${year}. These represent high-growth energy consumers. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
     },
     {
       type: 'merger_acquisition',
-      prompt: `Find 3-5 M&A deals involving Texas-based industrial or commercial entities in ${year}. Mergers often trigger energy contract reviews. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 5-10 M&A deals involving Texas-based industrial or commercial entities in ${year}. Mergers often trigger energy contract reviews. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
     },
     {
       type: 'hiring_spree',
-      prompt: `Find 3-5 Texas companies (industrial, data centers, cold storage) announcing major hiring pushes (>50 people) in ${year}. High headcount growth = increased load. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 5-10 Texas companies (industrial, data centers, cold storage) announcing major hiring pushes (>50 people) in ${year}. High headcount growth = increased load. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
     },
     {
       type: 'data_center',
-      prompt: `Find 3-5 new data center announcements, expansions, or land acquisitions in Texas (Oncor/CenterPoint/AEP) for ${year}. Data centers are massive 24/7 energy loads. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 10-15 new data center announcements, expansions, or land acquisitions in Texas (specifically near Oncor/CenterPoint/AEP) for ${year}. Data centers are massive 24/7 energy loads. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
     },
     {
       type: 'tax_abatement',
-      prompt: `Find recent Texas Chapter 312 or 313 tax abatement applications or approvals for industrial, manufacturing, or commercial projects in ${year}. These are definitive signals of new facility construction. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 10-15 recent Texas Chapter 312 or 313 tax abatement applications or approvals for industrial, manufacturing, or commercial projects in ${year}. These are definitive signals of new facility construction. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+    },
+    {
+      type: 'industrial_permit',
+      prompt: `Find 5-10 new high-value ($>1M) industrial/commercial building permits, air permits, or wastewater permits recently filed for new facilities in Texas. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, city, summary, and source_url.`,
     },
   ]
 
@@ -198,7 +202,7 @@ async function callPerplexity(prompt: string): Promise<any[]> {
         { role: 'user', content: prompt },
       ],
       temperature: 0.2,
-      search_recency_filter: 'week',
+      search_recency_filter: 'month',
     }),
   })
 
@@ -235,11 +239,15 @@ Deno.serve(async (req: Request) => {
   const payload = await req.json().catch(() => ({}))
   const mode = cleanText(payload?.mode).toLowerCase() || 'all'
 
+  const jobs = getJobs(mode)
+  console.log(`[scrape-intelligence] Executing ${jobs.length} jobs in ${mode} mode...`)
   const allSignals: any[] = []
-  for (const job of getJobs(mode)) {
+  for (const job of jobs) {
     const signals = await callPerplexity(job.prompt)
+    console.log(`  - ${job.type}: found ${signals.length} raw results`)
     allSignals.push(...signals.map((signal) => ({ ...signal, signal_type: job.type })))
   }
+  console.log(`[scrape-intelligence] Total raw signals: ${allSignals.length}`)
 
   let inserted = 0
   let skippedRegulated = 0
