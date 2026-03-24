@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X, Users, DollarSign, Loader2, Wrench, ArrowRightLeft, Zap as ZapIcon, Factory, Thermometer } from 'lucide-react';
+import { Radar, AlertTriangle, Zap, Plus, Phone, MapPin, UserCheck, FileText, TrendingUp, Building2, RefreshCw, ExternalLink, X, Users, DollarSign, Loader2, Factory, Thermometer } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -191,8 +191,9 @@ export function SignalMatrix() {
       const found = data.found || 0;
       const inserted = data.inserted || 0;
       const skipped = (data.skippedDuplicate || 0) + (data.skippedRegulated || 0) + (data.skippedUnnamed || 0);
+      const hallucinated = data.skippedHallucinated || 0;
       toast.success(
-        `Scan complete. ${found} leads reviewed, ${inserted} new records added${skipped ? `, ${skipped} filtered out` : ''}.`,
+        `Scan complete. ${found} leads reviewed, ${inserted} new records added${skipped ? `, ${skipped} filtered out` : ''}${hallucinated ? `, ${hallucinated} hallucinated` : ''}.`,
         { id: toastId }
       );
       await refetch();
