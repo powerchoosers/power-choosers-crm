@@ -83,6 +83,9 @@ export function TrustGate({ onNext }: TrustGateProps) {
                 <p className="text-sm text-zinc-400">
                     Takes less than 60 seconds • No commitment required
                 </p>
+                <p className="text-xs text-zinc-500 max-w-sm text-center leading-relaxed">
+                    Upload your bill → AI extracts demand charges, delivery costs, and ratchet exposure → You receive a forensic breakdown. No human required.
+                </p>
             </motion.div>
 
         </div>

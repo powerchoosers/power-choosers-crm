@@ -52,9 +52,7 @@ export const metadata: Metadata = {
     description: 'Reverse-engineer your supplier tariffs. Eliminate hidden cost leakage. No noise.',
     images: ['/images/nodalpoint-webicon.png'],
   },
-  alternates: {
-    canonical: BASE_URL,
-  },
+  alternates: {},
 }
 
 const SCHEMA_ORG = {
