@@ -1,5 +1,4 @@
 // Email tracking helper - injects tracking pixel and wraps links for click tracking
-// Replaces SendGrid's native tracking with custom pixel tracking
 import logger from '../_logger.js';
 
 // Base URL for tracking endpoints

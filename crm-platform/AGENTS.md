@@ -35,7 +35,8 @@ If the answer is no, simplify.
 ## Important Paths
 
 - `src/app/` - App Router UI
-- `src/pages/api/` - API routes
+- `src/app/api/` - App Router route handlers for a few auth/webhook endpoints
+- `src/pages/api/` - legacy API routes
 - `src/components/` - reusable UI
 - `src/hooks/` - data hooks and normalization
 - `src/lib/` - utilities, Supabase, Firebase
@@ -64,9 +65,12 @@ Run from repo root:
 
 ```bash
 npm run dev:turbo
+npm run dev
 npm run build
 npm run typecheck
 ```
+
+Turbo dev is fine here and often preferred. Only use `npm run dev` if you are specifically checking webpack-only behavior.
 
 TypeScript must stay clean before shipping changes.
 
@@ -79,9 +83,23 @@ TypeScript must stay clean before shipping changes.
   1. top-level camelCase
   2. underscored legacy fields
   3. nested values inside `metadata`
+- `/network` access is gated by the `np_session=1` cookie. If you touch auth, update `middleware.ts`, the login page, the Zoho callback routes, and `src/app/network/layout.tsx` together.
+- Zoho and Twilio auth/webhook flows assume the canonical production host is `www.nodalpoint.io`. Do not simplify redirect or cookie-domain logic without checking the login and callback paths.
 
 Important relationship:
 - `contacts.accountId` links to `accounts.id`
+- Do not assume `ownerId` means the same thing everywhere. `calls.ownerId` must stay aligned with the Supabase auth UUID for RLS, while other tables may still use email-based ownership. Check the table before copying ownership logic.
+
+## Supabase Jobs
+
+Supabase is doing more than storage in this repo.
+
+- Cron jobs live both in `vercel.json` and in Supabase `cron.job`, so check both before changing any background flow.
+- Current scheduled jobs cover embeddings processing, Apollo/news refresh, sequence processing and timeout/requeue, intelligence scrapes, prospect discovery, Zoho refresh, calendar reply polling, and briefing reminders.
+- Background queues use `pgmq`, especially `embedding_jobs` and `sequence_jobs`.
+- Semantic search is automated. Tables with embedding or search plumbing include `accounts`, `contacts`, `calls`, `emails`, `apollo_news_articles`, `market_telemetry`, and `meters`. If you change the content that should be searchable, update the matching `*_embedding_input` function and make sure `util.process_embeddings()` still covers it.
+- Supabase edge functions include `embed`, `process-sequence-step`, `scrape-intelligence`, and `discover-apollo-prospects`.
+- `process-sequence-step` exists in two places: `src/edge-functions/process-sequence-step.ts` and `supabase/functions/process-sequence-step/index.ts`. Keep them in sync.
 
 ## UI Rules
 
@@ -113,7 +131,7 @@ Avoid:
 
 ## API Conventions
 
-API handlers live under `src/pages/api/[category]/[handler].js`
+API handlers live under both `src/pages/api/[category]/[handler].js` and `src/app/api/[category]/route.ts`
 
 Expected patterns:
 - Return JSON using `res.status(code).json({ error })` for failures
@@ -159,6 +177,7 @@ Use MCP Supabase tools for:
 - applying schema migrations
 - checking security or performance advisors
 - searching current Supabase docs before making database-specific assumptions
+- checking live cron jobs, queue-backed jobs, triggers, and edge-function versions before changing background behavior
 
 Rules:
 - Do not store secrets, keys, or raw credentials in this file.
@@ -166,6 +185,7 @@ Rules:
 - Use `apply_migration` for DDL changes like creating or altering tables.
 - Use raw SQL execution for data checks or non-DDL queries.
 - If a database change is risky, inspect schema and advisors first.
+- After schema changes, rerun the advisors. This project already has warnings around mutable `search_path`, permissive RLS on some tables, and unindexed foreign keys, so do not assume an old warning is harmless.
 
 ## Working Rules For Codex
 

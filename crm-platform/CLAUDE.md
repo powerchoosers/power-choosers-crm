@@ -66,6 +66,7 @@ This project uses **both** Next.js routing systems:
 ### Key API Directories
 
 ```
+src/app/api/     → App Router route handlers for auth/webhooks
 src/pages/api/
   ai/               → AI inference endpoints
   apollo/           → Apollo data enrichment
@@ -141,7 +142,7 @@ npm run typecheck    # tsc --noEmit (run before commits)
 npm run lint         # ESLint
 ```
 
-**Always use `npm run dev` (webpack), not turbo, unless specifically testing turbo.**
+**Turbo is fine for normal work. Use `npm run dev` only if you need to compare webpack behavior or debug a Turbo-specific issue.**
 
 ---
 
@@ -180,7 +181,6 @@ Required in `.env.local`:
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 - `SUPABASE_SERVICE_ROLE_KEY`
-- `SENDGRID_API_KEY`
 - `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`
 - `GOOGLE_GENERATIVE_AI_API_KEY`
 - `ALGOLIA_APP_ID`, `ALGOLIA_API_KEY`, `NEXT_PUBLIC_ALGOLIA_APP_ID`, `NEXT_PUBLIC_ALGOLIA_SEARCH_KEY`

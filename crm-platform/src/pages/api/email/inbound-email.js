@@ -1,6 +1,6 @@
 /**
- * Power Choosers CRM - SendGrid Inbound Parse Webhook Handler
- * parses multipart data and saves to Supabase
+ * Power Choosers CRM - Email Inbound Handler
+ * Parses multipart email data and saves to Supabase
  */
 
 import { supabaseAdmin } from '@/lib/supabase';
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
 
   // Optional Basic Auth via env
   if (!checkBasicAuth(req)) {
-    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="SendGrid Inbound"', 'Content-Type': 'application/json' });
+    res.writeHead(401, { 'WWW-Authenticate': 'Basic realm="Email Inbound"', 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
   }
@@ -112,15 +112,15 @@ export default async function handler(req, res) {
       receivedAt: new Date().toISOString(),
       type: 'received',
       emailType: 'received',     // For consistency with filtering logic
-      provider: 'sendgrid_inbound',
+      provider: 'email_inbound',
       inReplyTo: '',
       references: [],
       headers: {}
     };
 
-    // Prefer parsing the raw RFC822 when provided by SendGrid
+    // Parse raw RFC822 email data if provided
     let rawMime = first(fields.email);
-    // Some SendGrid configurations may send the raw MIME as a file part named 'email'
+    // Some configurations may send the raw MIME as a file part named 'email'
     if (!rawMime && files && files.email) {
       const emailFile = Array.isArray(files.email) ? files.email[0] : files.email;
       try {
