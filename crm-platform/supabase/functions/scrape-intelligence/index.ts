@@ -24,15 +24,9 @@ const MAX_HEADLINE_LEN = 180
 
 const REGULATED_CITIES = ['austin', 'san antonio', 'el paso', 'amarillo', 'new braunfels', 'converse', 'schertz', 'selma']
 
-const TARGET_ZONES = `Target only businesses in deregulated ERCOT territory:
-- Oncor: Dallas, Fort Worth, DFW, North Texas, Waco, Midland, Odessa, Tyler, Longview, Wichita Falls, Abilene, Lubbock
-- CenterPoint: Houston, Greater Houston, Sugar Land, The Woodlands, Conroe, Katy, Pasadena, Baytown, Galveston, League City, Beaumont
-- AEP Texas Central: Corpus Christi, Victoria, Laredo, McAllen, Harlingen, Brownsville
-- AEP Texas North: Abilene, Wichita Falls region
-- Entergy Texas: Beaumont, Port Arthur, Orange, Lufkin, Nacogdoches, East Texas
-- TNMP: Pecos, Fort Stockton, Alpine, Big Spring, Sweetwater, Clute, Lake Jackson, Angleton, Alvin, Gulf Coast`
+const TARGET_ZONES = `Focus on the Texas deregulated market (ERCOT). Major hubs include DFW, Houston, Rio Grande Valley, and the Coastal Bend. Use your knowledge to identify if the city is in a deregulated territory (Oncor, CenterPoint, AEP, TNMP). Strictly exclude municipal utilities in Austin (Austin Energy) and San Antonio (CPS Energy).`
 
-const EXCLUSIONS = `Strictly exclude energy producers, utilities (e.g. Austin Energy, CPS, CenterPoint, Oncor), retail electric providers (REPs), solar installers, battery manufacturers, and companies with more than 5,000 employees. Focus on energy CONSUMERS (industrial, commercial, data centers). No residential, no unnamed entities.`
+const EXCLUSIONS = `Strictly exclude energy producers/sellers and residential projects. Focus on real commercial and industrial CONSUMERS. No unnamed entities. Targeting enterprise and mid-market buyers (no employee cap).`
 
 function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
@@ -66,12 +60,17 @@ function safeHostname(value: unknown): string | null {
 
 function isRegulatedTerritory(signal: any): boolean {
   const city = cleanText(signal.city || signal.metadata?.city).toLowerCase()
-  const blob = `${cleanText(signal.headline)} ${cleanText(signal.summary)}`.toLowerCase()
-  if (city) return REGULATED_CITIES.some((term) => city.includes(term))
-  return REGULATED_CITIES.some((term) => blob.includes(term))
+  if (!city) return false
+  return REGULATED_CITIES.some((term) => city.includes(term))
 }
 
-function determineTdspZone(city: string): string {
+function determineTdspZone(city: string, foundTdsp?: string): string {
+  if (foundTdsp && ['oncor', 'centerpoint', 'aep', 'tnmp'].some(x => foundTdsp.toLowerCase().includes(x))) {
+    if (foundTdsp.toLowerCase().includes('oncor')) return 'Oncor'
+    if (foundTdsp.toLowerCase().includes('centerpoint')) return 'CenterPoint'
+    if (foundTdsp.toLowerCase().includes('aep')) return 'AEP Texas'
+    if (foundTdsp.toLowerCase().includes('tnmp')) return 'TNMP'
+  }
   const c = city.toLowerCase()
   if (['houston', 'beaumont', 'port arthur', 'baytown', 'pasadena', 'pearland', 'sugar land', 'the woodlands', 'conroe', 'galveston', 'lufkin', 'nacogdoches'].some((x) => c.includes(x))) return 'CenterPoint'
   if (['dallas', 'fort worth', 'arlington', 'plano', 'irving', 'garland', 'mesquite', 'mckinney', 'frisco', 'grand prairie', 'waco', 'lubbock', 'tyler', 'longview', 'wichita falls', 'abilene', 'midland', 'odessa'].some((x) => c.includes(x))) return 'Oncor'
@@ -84,15 +83,18 @@ async function verifyWithApollo(entityName: string): Promise<{ domain: string; l
   if (!APOLLO_API_KEY || !entityName) return null
 
   try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000)
     const response = await fetch('https://api.apollo.io/v1/mixed_companies/search', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Cache-Control': 'no-cache',
         'Content-Type': 'application/json',
         'X-Api-Key': APOLLO_API_KEY,
       },
       body: JSON.stringify({ q_organization_name: entityName, per_page: 1 }),
-    })
+    }).finally(() => clearTimeout(timeout))
 
     if (!response.ok) return null
 
@@ -118,43 +120,51 @@ function getJobs(mode: string) {
   const allJobs = [
     {
       type: 'new_location',
-      prompt: `Find 10-15 real Texas companies opening new facilities, breaking ground, or relocating in ${year} or ${year + 1}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, entity_domain, headline, summary, source_url, relevance_score, city, state. Only return named companies with specific cities.`,
+      prompt: `Find 10-15 Texas companies opening new facilities, breaking ground, or relocating in ${year}. Focus on high-intensity energy users: cold storage, data centers, food processing, logistics. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, entity_domain, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'energy_rfp',
-      prompt: `Find 5-10 active open RFPs after ${stamp} for retail electricity supply, energy consulting, or energy management services for commercial and industrial buyers in Texas. ${TARGET_ZONES} ${EXCLUSIONS} Include city and state where possible.`,
+      prompt: `Find 5-10 active open RFPs after ${stamp} for retail electricity supply, energy consulting, or energy management for Texas commercial/industrial. ${TARGET_ZONES} ${EXCLUSIONS} Include: city, state, tdsp.`,
     },
     {
       type: 'expansion',
-      prompt: `Find 10-15 Texas industrial or commercial company expansion announcements, plant expansions, and capex projects for ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
+      prompt: `Find 10-15 Texas industrial expansions, plant growth, and manufacturing projects in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'sec_filing',
-      prompt: `Find 5-10 SEC filings, 8-Ks, earnings releases, and investor updates that signal facility growth, new load, or operational expansion for Texas-relevant commercial and industrial companies in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
+      prompt: `Find 5-10 SEC filings/investor updates signaling Texas facility growth or new load. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'capital_raise',
-      prompt: `Find 5-10 Texas commercial/industrial companies that recently closed Series B/C+ venture rounds, PE investments, or IPOs in ${year}. These represent high-growth energy consumers. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 5-10 Texas mid-market/enterprise companies that recently closed investment rounds or IPOs in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'merger_acquisition',
-      prompt: `Find 5-10 M&A deals involving Texas-based industrial or commercial entities in ${year}. Mergers often trigger energy contract reviews. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 5-10 M&A deals involving Texas-based industrial/commercial entities in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'hiring_spree',
-      prompt: `Find 5-10 Texas companies (industrial, data centers, cold storage) announcing major hiring pushes (>50 people) in ${year}. High headcount growth = increased load. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 5-10 Texas companies (industrial, cold storage, tech) announcing hiring pushes (>50 people). ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'data_center',
-      prompt: `Find 10-15 new data center announcements, expansions, or land acquisitions in Texas (specifically near Oncor/CenterPoint/AEP) for ${year}. Data centers are massive 24/7 energy loads. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 10-15 new data center announcements or expansions in Texas deregulated zones for ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'tax_abatement',
-      prompt: `Find 10-15 recent Texas Chapter 312 or 313 tax abatement applications or approvals for industrial, manufacturing, or commercial projects in ${year}. These are definitive signals of new facility construction. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url.`,
+      prompt: `Find 10-15 recent Texas Chapter 312 or 313 tax abatement applications or industrial growth stories. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
     {
       type: 'industrial_permit',
-      prompt: `Find 5-10 new high-value ($>1M) industrial/commercial building permits, air permits, or wastewater permits recently filed for new facilities in Texas. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, city, summary, and source_url.`,
+      prompt: `Find 5-10 high-value industrial/commercial permits recently filed for new facilities in Texas. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+    },
+    {
+      type: 'cold_storage',
+      prompt: `Find 5-10 new cold storage facility announcements, refrigerated warehouse expansions, or food processing startups in Texas for ${year}. High load factor leads. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+    },
+    {
+      type: 'manufacturing',
+      prompt: `Find 5-10 new manufacturing facilities (steel, chemical, battery components, semiconductors) breaking ground in Texas in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
     },
   ]
 
@@ -288,7 +298,7 @@ Deno.serve(async (req: Request) => {
 
       const city = truncate(signal.city || signal.metadata?.city, 80) || ''
       const state = truncate(signal.state || signal.metadata?.state || 'TX', 32) || 'TX'
-      const tdspZone = city ? determineTdspZone(city) : 'ERCOT_Unknown'
+      const tdspZone = determineTdspZone(city, signal.tdsp)
       const apolloVerified = await verifyWithApollo(entityName)
 
       let crmMatchId = null
