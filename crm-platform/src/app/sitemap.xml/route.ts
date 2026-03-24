@@ -4,10 +4,14 @@ import logger from '@/pages/api/_logger.js';
 
 const staticPages = [
   { url: 'https://nodalpoint.io/', changefreq: 'weekly', priority: '1.0' },
-  { url: 'https://nodalpoint.io/philosophy', changefreq: 'monthly', priority: '0.9' },
   { url: 'https://nodalpoint.io/bill-debugger', changefreq: 'monthly', priority: '0.9' },
-  { url: 'https://nodalpoint.io/technical-docs', changefreq: 'monthly', priority: '0.8' },
+  { url: 'https://nodalpoint.io/book', changefreq: 'monthly', priority: '0.8' },
   { url: 'https://nodalpoint.io/market-data', changefreq: 'weekly', priority: '0.8' },
+  { url: 'https://nodalpoint.io/philosophy', changefreq: 'yearly', priority: '0.7' },
+  { url: 'https://nodalpoint.io/technical-docs', changefreq: 'yearly', priority: '0.7' },
+  { url: 'https://nodalpoint.io/contact', changefreq: 'monthly', priority: '0.6' },
+  { url: 'https://nodalpoint.io/privacy', changefreq: 'yearly', priority: '0.3' },
+  { url: 'https://nodalpoint.io/terms', changefreq: 'yearly', priority: '0.3' },
 ];
 
 type SitemapEntry = {

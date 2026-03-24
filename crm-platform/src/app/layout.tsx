@@ -39,18 +39,18 @@ export const metadata: Metadata = {
     url: BASE_URL,
     images: [
       {
-        url: '/images/nodalpoint-webicon.png',
-        width: 512,
-        height: 512,
+        url: '/images/og-card.jpg',
+        width: 1200,
+        height: 630,
         alt: 'Nodal Point — Commercial Energy Forensics',
       },
     ],
   },
   twitter: {
-    card: 'summary',
+    card: 'summary_large_image',
     title: 'Nodal Point | Commercial Energy Forensics & Audit',
     description: 'Reverse-engineer your supplier tariffs. Eliminate hidden cost leakage. No noise.',
-    images: ['/images/nodalpoint-webicon.png'],
+    images: ['/images/og-card.jpg'],
   },
   alternates: {},
 }
