@@ -414,16 +414,16 @@ export function LandingSections() {
         {/* Frosted glass inner card */}
         <div className="max-w-5xl mx-auto px-6 relative z-10">
           <div className="bg-white/40 backdrop-blur-sm border border-[#002FA7]/10 rounded-2xl px-8 py-6 shadow-sm shadow-[#002FA7]/5">
-            <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+            <div className="flex flex-nowrap items-center justify-center gap-x-10">
               {[
                 { icon: Lock, label: 'AES-256 Encrypted', sub: 'Data in transit & at rest' },
                 { icon: ShieldCheck, label: 'SOC 2 Infrastructure', sub: 'Enterprise-grade security' },
                 { icon: Zap, label: 'Texas ERCOT Specialist', sub: '100+ tariff structures mapped' },
                 { icon: Database, label: 'TLS Secured', sub: 'End-to-end encryption' },
               ].map(({ icon: Icon, label, sub }) => (
-                <div key={label} className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-lg bg-[#002FA7]/8 border border-[#002FA7]/15 flex items-center justify-center shrink-0">
-                    <Icon className="w-4 h-4 text-[#002FA7]" />
+                <div key={label} className="flex items-center gap-3 shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-[#002FA7] flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4 text-white" />
                   </div>
                   <div>
                     <div className="font-mono text-[10px] text-zinc-700 uppercase tracking-widest font-semibold leading-tight">{label}</div>
