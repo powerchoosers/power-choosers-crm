@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { getSignatureRequestKindConfig, normalizeSignatureRequestKind } from '@/lib/signature-request'
 
 const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -68,6 +69,8 @@ function getSignatureOwner(metadata: unknown): string {
   const candidates = [
     record.ownerId,
     record.owner_id,
+    record.agentEmail,
+    record.agent_email,
     record.createdByEmail,
     record.created_by_email,
     record.userEmail,
@@ -192,6 +195,8 @@ export function useNotificationCenter() {
         if (ownerEmail && !ownerScope.includes(ownerEmail)) continue
         const mapped = mapSignatureStatus(String(row.status || ''))
         if (!mapped) continue
+        const signatureKind = normalizeSignatureRequestKind((row.metadata as any)?.documentKind || (row.metadata as any)?.document_kind || null)
+        const kindLabel = getSignatureRequestKindConfig(signatureKind).uiLabel
         const createdAt = String(row.updated_at || row.created_at || new Date().toISOString())
         const accountId = String(row.account_id || '').trim()
         const contactId = String(row.contact_id || '').trim()
@@ -199,15 +204,15 @@ export function useNotificationCenter() {
           ? `/network/accounts/${accountId}`
           : (contactId ? `/network/contacts/${contactId}` : '/network')
         const title = mapped === 'contract_signed'
-          ? 'Contract Signed'
+          ? `${kindLabel} Signed`
           : mapped === 'contract_viewed'
-            ? 'Contract Viewed'
-            : 'Contract Opened'
+            ? `${kindLabel} Viewed`
+            : `${kindLabel} Opened`
         const message = mapped === 'contract_signed'
-          ? 'A signer completed execution on a contract request.'
+          ? 'A signer completed execution on the signing request.'
           : mapped === 'contract_viewed'
-            ? 'A signer viewed the secure contract portal.'
-            : 'A signer opened the contract invitation.'
+            ? 'A signer viewed the secure signing portal.'
+            : 'A signer opened the secure signing invitation.'
         contracts.push({
           id: `contract:${String(row.id)}:${String(row.status || '').toLowerCase()}`,
           type: mapped,
@@ -308,4 +313,3 @@ export function useNotificationCenter() {
     markAllRead,
   }
 }
-

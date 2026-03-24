@@ -2,6 +2,11 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import crypto from 'crypto';
 import { ZohoMailService } from '../email/zoho-service';
+import {
+  getSignatureRequestKindConfig,
+  inferSignatureRequestKindFromDocument,
+  normalizeSignatureRequestKind,
+} from '@/lib/signature-request'
 
 const SIGNATURE_EXPIRY_TIME_ZONE = 'America/Chicago';
 const SIGNATURE_EXPIRY_HOUR = 16;
@@ -81,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { documentId, contactId, accountId, dealId, userEmail, message, signatureFields } = req.body;
+  const { documentId, contactId, accountId, dealId, userEmail, message, signatureFields, documentKind } = req.body;
 
   if (!documentId || !contactId || !userEmail) {
     return res.status(400).json({ error: 'Missing required parameters: documentId, contactId, userEmail' });
@@ -107,6 +112,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const contactEmail = contact.email;
     if (!contactEmail) throw new Error('Contact has no email address');
+
+    const inferredKind = inferSignatureRequestKindFromDocument(
+      document.document_type,
+      document?.metadata?.ai_extraction?.type
+    )
+    const requestKind = normalizeSignatureRequestKind(documentKind ?? inferredKind)
+    const kindConfig = getSignatureRequestKindConfig(requestKind)
 
     const agentFirstName = agentUser?.first_name || 'your advisor';
 
@@ -155,7 +167,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         deal_id: dealId || null,
         access_token: token,
         signature_fields: signatureFields || [],
-        metadata: { agentEmail: userEmail },
+        metadata: { agentEmail: userEmail, ownerId: userEmail, documentKind: requestKind },
         status: 'pending',
         expires_at: expiresAt
       })
@@ -171,7 +183,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // 5. Construct signing URL + email
     const signingUrl = `${appBaseUrl}/secure-portal/sign/${token}`;
     const trackingId = `sig_${Date.now()}_${token.substring(0, 8)}`;
-    const emailSubject = `Action Required: Your Energy Agreement is Ready to Sign`;
+    const emailSubject = `Action Required: Your ${kindConfig.documentLabel} is Ready to Sign`;
+    const emailMessage = message || `Please review and sign the following ${kindConfig.documentLabel.toLowerCase()} at your earliest convenience.`;
+    const buttonLabel = `Review & Sign ${kindConfig.documentLabel}`;
 
     const emailHeader = `
       <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:32px; padding-bottom:20px; border-bottom:1px solid #27272a; width:100%;">
@@ -195,7 +209,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         </p>
 
         <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:32px; color:#f4f4f5;">
-          ${message || 'Please review and sign the following document at your earliest convenience.'}
+          ${emailMessage}
         </p>
 
         <p style="font-family:sans-serif; font-size:13px; line-height:1.6; margin-bottom:24px; color:#a1a1aa;">
@@ -203,9 +217,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         </p>
 
         <div style="text-align:center; margin-bottom:32px;">
-          <a href="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=opened&redirect=/secure-portal/sign/${token}"
+          <a href="${appBaseUrl}/api/signatures/telemetry?token=${token}&action=clicked&redirect=/secure-portal/sign/${token}"
             style="display:inline-block; background-color:#002fa7; color:white; padding:14px 32px; text-decoration:none; font-weight:bold; border-radius:4px; text-transform:uppercase; letter-spacing:0.08em; font-size:13px; font-family:monospace;">
-            Review &amp; Sign Document
+            ${buttonLabel}
           </a>
         </div>
 
@@ -231,14 +245,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       to: [contactEmail],
       subject: emailSubject,
       html: emailHtml,
-      text: `Please review and sign the document here: ${signingUrl}`,
+      text: `Please review and sign the ${kindConfig.documentLabel.toLowerCase()} here: ${signingUrl}`,
       status: 'sent',
       type: 'sent',
       timestamp: sentAt,
       sentAt,
       createdAt: sentAt,
       updatedAt: sentAt,
-      metadata: { isSignatureRequest: true, documentId, dealId }
+      metadata: { isSignatureRequest: true, documentId, dealId, documentKind: requestKind }
     });
 
     // 7. Send via Zoho
@@ -254,7 +268,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       to: [contactEmail],
       subject: emailSubject,
       html: emailHtml,
-      text: `Please review and sign the document here: ${signingUrl}`,
+      text: `Please review and sign the ${kindConfig.documentLabel.toLowerCase()} here: ${signingUrl}`,
       userEmail: authEmail,
       from: fromEmail,
       fromName: 'Nodal Point Secure Vault'
