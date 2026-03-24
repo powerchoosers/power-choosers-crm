@@ -495,7 +495,7 @@ export function LandingSections() {
             <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll flex flex-col">
               <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
               <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
-                &ldquo;We found over $47,000 in recoverable demand charges our supplier had never flagged. The forensic breakdown was immediate — no back-and-forth, no waiting.&rdquo;
+                &ldquo;We had $47,000 sitting in demand charges we never knew about. Our supplier wasn&apos;t going to tell us. Nodal Point caught it in minutes, no phone tag, nothing.&rdquo;
               </p>
               <div className="border-t border-zinc-100 pt-5">
                 <div className="font-semibold text-zinc-900 text-sm tracking-tight">Operations Director</div>
@@ -506,7 +506,7 @@ export function LandingSections() {
             <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll delay-100 flex flex-col">
               <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
               <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
-                &ldquo;The 4CP analysis alone exposed exposure we had no visibility into. We were completely vulnerable mid-contract and didn&apos;t know it. This platform fixed that.&rdquo;
+                &ldquo;I didn&apos;t fully understand 4CP exposure before this. Turns out we were wide open mid-contract and had zero visibility into it. Now we actually know what we&apos;re looking at.&rdquo;
               </p>
               <div className="border-t border-zinc-100 pt-5">
                 <div className="font-semibold text-zinc-900 text-sm tracking-tight">VP of Facilities</div>
@@ -517,7 +517,7 @@ export function LandingSections() {
             <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll delay-200 flex flex-col">
               <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
               <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
-                &ldquo;Upload your bill, get a forensic breakdown in under a minute. We&apos;ve tried other advisors — nobody else works at this speed or depth. It&apos;s a different category.&rdquo;
+                &ldquo;We&apos;ve used a few energy advisors over the years. Nobody came close to this. You upload the bill and within a minute you actually understand what you&apos;re paying for. That was genuinely new for us.&rdquo;
               </p>
               <div className="border-t border-zinc-100 pt-5">
                 <div className="font-semibold text-zinc-900 text-sm tracking-tight">CFO</div>
