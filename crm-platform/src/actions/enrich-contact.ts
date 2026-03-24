@@ -114,18 +114,23 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
 
     try {
         // 1. Check local DB first (Fastest)
+        const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+        console.log(`[resolveIdentity] Looking up ${email} | service_key=${hasServiceKey}`);
+
         const { data: existing, error: fetchError } = await supabaseAdmin
             .from('contacts')
             .select('*, accounts(id, name)')
             .eq('email', email)
             .maybeSingle();
 
+        console.log(`[resolveIdentity] Supabase result: data=${existing ? 'FOUND' : 'NULL'}, error=${fetchError?.message || 'none'}`);
+
         if (fetchError) {
-            console.error('[resolveIdentity] Supabase lookup failed:', fetchError.message, '— is SUPABASE_SERVICE_ROLE_KEY set?');
+            console.error('[resolveIdentity] Supabase lookup failed:', fetchError.message, fetchError.code, fetchError.details);
         }
 
         if (existing) {
-            console.log('Identity resolved via Supabase:', email);
+            console.log('[resolveIdentity] Resolved via Supabase:', email, existing.name);
             return {
                 name: existing.name || 'Unknown Entity',
                 firstName: existing.firstName,
