@@ -690,6 +690,7 @@ export default function ContractDetailPage() {
     setSignatureRequestContext({
       accountId: deal.accountId,
       dealId: deal.id,
+      requestKind: 'CONTRACT',
     })
     setRightPanelMode('CREATE_SIGNATURE_REQUEST')
   }

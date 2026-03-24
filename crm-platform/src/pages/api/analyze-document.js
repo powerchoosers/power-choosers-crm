@@ -109,7 +109,7 @@ function deriveAnnualUsageFromHistory(rows) {
 
 /**
  * AI-powered document analysis for Nodal Point CRM.
- * Handles both standard bills and signed contracts.
+ * Handles bills, usage files, contracts, proposals, and LOEs.
  * Primary: Perplexity (Sonar-Pro), Fallback: OpenRouter (gpt-4o-mini)
  */
 export default async function handler(req, res) {
@@ -238,10 +238,10 @@ export default async function handler(req, res) {
     - "CONTRACT": An unsigned contract, draft contract, MSA, ESA template, or execution-ready agreement without signature. Also blank contracts awaiting signature.
     - "BILL": A standard utility bill, invoice, or monthly statement. This explicitly includes documents titled in Spanish such as "recibo", "factura", "recibos luz", "servicio electrico" or any variation indicating a utility bill.
     - "USAGE_DATA": Usage/telemetry: ERCOT or utility usage summaries, OncorSummaryUsageData, annual usage, 12-month or 13-month usage, CSV usage data profiles.
-    - "PROPOSAL": ANY document proposing a service, engagement, or contract to a prospect or customer. This is a BROAD category covering TWO types:
-        TYPE A — Energy Pricing Proposals: Documents with proposed kWh rates, $/MWh pricing, contract terms, and energy cost breakdowns from a supplier or broker. Examples: "First Texas Energy Proposal", "Energy Supply Quote", "Rate Proposal", "Pricing Sheet".
-        TYPE B — Advisory / Pitch / Outreach Proposals: Business development documents, energy audit proposals, broker engagement letters, consulting proposals, tariff forensics presentations, commercial real estate energy proposals, or any document presenting a service offering to a prospect — even if they contain NO energy rates. Examples: "Nodal Point Proposal", "Energy Audit Proposal", "Energy Advisory Presentation", documents addressed to a company presenting services or a program.
-        WHEN IN DOUBT between PROPOSAL and OTHER, classify as PROPOSAL if the document is addressed to a prospect and proposes any kind of engagement.
+    - "LOE": A Letter of Engagement, engagement letter, scope-confirmation letter, or advisory onboarding document that formalizes a service relationship without being a full pricing proposal or contract. Use this for documents titled "LOE", "Letter of Engagement", "General LOE", or similar engagement letters.
+      WHEN IN DOUBT between LOE and PROPOSAL, use LOE for service-scope or engagement letters and PROPOSAL for actual pricing/quote/pitch packages.
+    - "PROPOSAL": Any document proposing a service, engagement, or contract to a prospect or customer that is not a standalone LOE. This covers pricing proposals, energy quotes, pitch decks, advisory proposals, and commercial service proposals.
+      WHEN IN DOUBT between PROPOSAL and OTHER, classify as PROPOSAL if the document is addressed to a prospect and proposes a clear service offering.
     - "OTHER": Anything else that does not fit the above categories.
 
     Task 2: Extract key data fields.
@@ -261,7 +261,7 @@ export default async function handler(req, res) {
 
     Return ONLY a JSON object:
     {
-      "type": "SIGNED_CONTRACT" | "CONTRACT" | "BILL" | "USAGE_DATA" | "PROPOSAL" | "OTHER",
+      "type": "SIGNED_CONTRACT" | "CONTRACT" | "BILL" | "USAGE_DATA" | "LOE" | "PROPOSAL" | "OTHER",
       "data": {
         "contract_end_date": "YYYY-MM-DD" or null,
         "strike_price": number or null,
@@ -400,6 +400,7 @@ export default async function handler(req, res) {
       CONTRACT: 'CONTRACT',
       BILL: 'INVOICE',
       USAGE_DATA: 'USAGE_DATA',
+      LOE: 'LOE',
       PROPOSAL: 'PROPOSAL',
       OTHER: null,
     };

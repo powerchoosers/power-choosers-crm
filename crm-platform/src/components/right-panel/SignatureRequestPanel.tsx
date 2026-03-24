@@ -21,6 +21,13 @@ import dynamic from 'next/dynamic'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
+import {
+  documentMatchesSignatureRequestKind,
+  getSignatureRequestKindConfig,
+  inferSignatureRequestKindFromDocument,
+  normalizeSignatureRequestKind,
+  type SignatureRequestKind,
+} from '@/lib/signature-request'
 
 const DocumentPreparationModal = dynamic(
   () =>
@@ -30,7 +37,7 @@ const DocumentPreparationModal = dynamic(
   { ssr: false }
 )
 
-interface ContractDocument {
+interface SignatureDocument {
   id: string
   name: string
   storage_path: string
@@ -48,25 +55,38 @@ export function SignatureRequestPanel() {
   const [selectedContactId, setSelectedContactId] = useState<string>('')
   const [selectedDealId, setSelectedDealId] = useState<string>('')
   const [selectedDocumentId, setSelectedDocumentId] = useState<string>('')
+  const [requestKind, setRequestKind] = useState<SignatureRequestKind>(
+    normalizeSignatureRequestKind(
+      signatureRequestContext?.requestKind ??
+        inferSignatureRequestKindFromDocument(
+          signatureRequestContext?.documentType,
+          null
+        )
+    )
+  )
   const [message, setMessage] = useState(
     'Please review and execute the following document.'
   )
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPreparingDocument, setIsPreparingDocument] = useState(false)
-  const [uploadingContract, setUploadingContract] = useState(false)
+  const [uploadingDocument, setUploadingDocument] = useState(false)
   const [showPrepModal, setShowPrepModal] = useState(false)
 
   const accountId = signatureRequestContext?.accountId || ''
+  const requestKindConfig = useMemo(
+    () => getSignatureRequestKindConfig(requestKind),
+    [requestKind]
+  )
 
   const { data: contacts, isLoading: loadingContacts } = useAccountContacts(accountId)
   const { data: deals, isLoading: loadingDeals } = useDealsByAccount(accountId)
 
   const {
-    data: contractDocuments = [],
-    isLoading: loadingContractDocuments,
-    refetch: refetchContractDocuments,
+    data: signatureDocuments = [],
+    isLoading: loadingDocuments,
+    refetch: refetchDocuments,
   } = useQuery({
-    queryKey: ['signature-contract-documents', accountId],
+    queryKey: ['signature-documents', accountId, requestKind],
     enabled: !!accountId,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -77,37 +97,63 @@ export function SignatureRequestPanel() {
 
       if (error) throw error
 
-      const docs = (data ?? []) as ContractDocument[]
-      return docs.filter((doc) => {
-        const aiType = doc?.metadata?.ai_extraction?.type
-        return (
-          doc.document_type === 'CONTRACT' ||
-          aiType === 'CONTRACT' ||
-          aiType === 'SIGNED_CONTRACT'
-        )
-      })
+      const docs = (data ?? []) as SignatureDocument[]
+      return docs.filter((doc) => documentMatchesSignatureRequestKind(doc, requestKind))
     },
   })
 
   const selectedDocument = useMemo(
-    () => contractDocuments.find((d) => d.id === selectedDocumentId) ?? null,
-    [contractDocuments, selectedDocumentId]
+    () => signatureDocuments.find((d) => d.id === selectedDocumentId) ?? null,
+    [selectedDocumentId, signatureDocuments]
   )
 
   useEffect(() => {
     setSelectedDocumentId(signatureRequestContext?.documentId || '')
     setSelectedDealId(signatureRequestContext?.dealId || '')
+    setRequestKind(
+      normalizeSignatureRequestKind(
+        signatureRequestContext?.requestKind ??
+          inferSignatureRequestKindFromDocument(
+            signatureRequestContext?.documentType,
+            null
+          )
+      )
+    )
   }, [
     signatureRequestContext?.accountId,
     signatureRequestContext?.documentId,
     signatureRequestContext?.dealId,
+    signatureRequestContext?.documentType,
+    signatureRequestContext?.requestKind,
   ])
 
   useEffect(() => {
-    if (!selectedDocumentId && contractDocuments.length > 0) {
-      setSelectedDocumentId(contractDocuments[0].id)
+    if (signatureDocuments.length === 0) {
+      if (selectedDocumentId) {
+        setSelectedDocumentId('')
+      }
+      return
     }
-  }, [selectedDocumentId, contractDocuments])
+
+    const selectedStillExists = signatureDocuments.some((doc) => doc.id === selectedDocumentId)
+    if (!selectedStillExists) {
+      setSelectedDocumentId(signatureDocuments[0].id)
+    }
+  }, [selectedDocumentId, signatureDocuments])
+
+  const handleRequestKindChange = (kind: SignatureRequestKind) => {
+    setRequestKind(kind)
+    setSelectedDocumentId('')
+    setSignatureRequestContext({
+      ...(signatureRequestContext || {}),
+      documentId: undefined,
+      documentName: undefined,
+      documentUrl: undefined,
+      storagePath: undefined,
+      documentType: null,
+      requestKind: kind,
+    })
+  }
 
   const handleContactSelection = (value: string) => {
     setSelectedContactId(value === '__none__' ? '' : value)
@@ -125,7 +171,7 @@ export function SignatureRequestPanel() {
   useEscClose(handleClose, showPrepModal)
 
   const buildNextSignatureContext = (
-    document: ContractDocument,
+    document: SignatureDocument,
     documentUrl?: string
   ) => ({
     ...(signatureRequestContext || {}),
@@ -134,36 +180,42 @@ export function SignatureRequestPanel() {
     documentName: document.name,
     storagePath: document.storage_path,
     documentUrl,
+    documentType:
+      document.document_type ??
+      document?.metadata?.ai_extraction?.type ??
+      signatureRequestContext?.documentType ??
+      null,
+    requestKind,
   })
 
-  const hydrateDocumentUrl = async (document: ContractDocument) => {
+  const hydrateDocumentUrl = async (document: SignatureDocument) => {
     const { data, error } = await supabase.storage
       .from('vault')
       .createSignedUrl(document.storage_path, 3600)
 
     if (error || !data?.signedUrl) {
-      throw new Error(error?.message || 'Failed to access secure contract')
+      throw new Error(error?.message || 'Failed to access secure document')
     }
 
     setSignatureRequestContext(buildNextSignatureContext(document, data.signedUrl))
   }
 
-  const handleContractSelection = (documentId: string) => {
+  const handleDocumentSelection = (documentId: string) => {
     setSelectedDocumentId(documentId)
-    const doc = contractDocuments.find((d) => d.id === documentId)
+    const doc = signatureDocuments.find((d) => d.id === documentId)
     if (doc) {
       setSignatureRequestContext(buildNextSignatureContext(doc))
     }
   }
 
-  const handleUploadContract = async (
+  const handleUploadDocument = async (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const files = Array.from(e.target.files || [])
     if (!accountId || files.length === 0) return
 
-    setUploadingContract(true)
-    const toastId = toast.loading('Uploading contract...')
+    setUploadingDocument(true)
+    const toastId = toast.loading('Uploading document...')
 
     try {
       for (const file of files) {
@@ -185,7 +237,7 @@ export function SignatureRequestPanel() {
             type: file.type,
             storage_path: filePath,
             url: '',
-            document_type: 'CONTRACT',
+            document_type: requestKindConfig.storedDocumentType,
           })
           .select('id, name, storage_path, created_at, document_type')
           .single()
@@ -204,34 +256,30 @@ export function SignatureRequestPanel() {
 
         const analyzeJson = await analyzeRes.json().catch(() => null)
         const analysisType = analyzeJson?.analysis?.type
-        if (
-          analysisType &&
-          analysisType !== 'CONTRACT' &&
-          analysisType !== 'SIGNED_CONTRACT'
-        ) {
+        if (analysisType && !requestKindConfig.sourceAnalysisTypes.includes(analysisType)) {
           toast.warning(
-            `Uploaded, but AI labeled this as ${analysisType}. It may not appear in contract filters.`,
+            `Uploaded, but AI labeled this as ${analysisType}. It may not appear in ${requestKindConfig.uiLabel} filters.`,
             { id: toastId }
           )
         } else {
-          toast.success('Contract uploaded and indexed for signature flow.', {
+          toast.success(`${requestKindConfig.uiLabel} uploaded and indexed for signature flow.`, {
             id: toastId,
           })
         }
 
         setSelectedDocumentId(insertedDoc.id)
         setSignatureRequestContext(
-          buildNextSignatureContext(insertedDoc as ContractDocument)
+          buildNextSignatureContext(insertedDoc as SignatureDocument)
         )
       }
 
-      await refetchContractDocuments()
+      await refetchDocuments()
       queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
       queryClient.invalidateQueries({ queryKey: ['vault-accounts'] })
     } catch (error: any) {
-      toast.error(error?.message || 'Contract upload failed', { id: toastId })
+      toast.error(error?.message || 'Document upload failed', { id: toastId })
     } finally {
-      setUploadingContract(false)
+      setUploadingDocument(false)
       e.target.value = ''
     }
   }
@@ -240,7 +288,7 @@ export function SignatureRequestPanel() {
     e.preventDefault()
 
     if (!selectedDocument) {
-      toast.error('Please select a contract first')
+      toast.error('Please select a document first')
       return
     }
     if (!selectedContactId) {
@@ -261,7 +309,7 @@ export function SignatureRequestPanel() {
 
   const executeDispatch = async (signatureFields: any[]) => {
     if (!signatureRequestContext?.documentId) {
-      toast.error('No contract selected')
+      toast.error('No document selected')
       return
     }
 
@@ -281,6 +329,7 @@ export function SignatureRequestPanel() {
           userEmail: user?.email || 'test@nodalpoint.io',
           message,
           signatureFields,
+          documentKind: requestKind,
         }),
       })
 
@@ -289,7 +338,7 @@ export function SignatureRequestPanel() {
         throw new Error(result.error || 'Failed to dispatch request')
       }
 
-      toast.success('Signature request dispatched successfully', { id: toastId })
+      toast.success(`${requestKindConfig.uiLabel} request dispatched successfully`, { id: toastId })
 
       queryClient.invalidateQueries({ queryKey: ['emails'] })
       queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
@@ -319,6 +368,7 @@ export function SignatureRequestPanel() {
         onClose={() => setShowPrepModal(false)}
         onComplete={executeDispatch}
         pdfUrl={signatureRequestContext?.documentUrl || ''}
+        documentKind={requestKind}
       />
 
       <div className={panelTheme.header}>
@@ -331,7 +381,7 @@ export function SignatureRequestPanel() {
               Request Signature
             </h2>
             <div className="text-zinc-200 font-sans text-sm truncate max-w-[190px]">
-              {selectedDocument?.name || 'Select contract'}
+              {selectedDocument?.name || 'Select document'}
             </div>
           </div>
         </div>
@@ -342,25 +392,50 @@ export function SignatureRequestPanel() {
         <form id="sig-form" onSubmit={handleInitialSubmit} className="space-y-6">
           <div className="space-y-2">
             <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-              Contract Source <span className="text-rose-500">*</span>
+              Request Type
+            </label>
+            <div className="grid grid-cols-2 gap-2 rounded-xl border border-white/10 bg-black/30 p-1">
+              {(['CONTRACT', 'LOE'] as const).map((kind) => {
+                const isActive = requestKind === kind
+                return (
+                  <button
+                    key={kind}
+                    type="button"
+                    onClick={() => handleRequestKindChange(kind)}
+                    className={`rounded-lg px-3 py-2 text-[10px] font-mono uppercase tracking-widest transition-colors ${
+                      isActive
+                        ? 'bg-[#002FA7] text-white'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {kind === 'CONTRACT' ? 'Contract' : 'LOE'}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+              {requestKindConfig.uiLabel} Source <span className="text-rose-500">*</span>
             </label>
 
             {accountId ? (
               <>
-                {loadingContractDocuments ? (
+                {loadingDocuments ? (
                   <div className="text-xs font-mono text-zinc-600">
-                    Loading uploaded contracts...
+                    Loading {requestKindConfig.uiLabel} documents...
                   </div>
-                ) : contractDocuments.length > 0 ? (
+                ) : signatureDocuments.length > 0 ? (
                   <Select
                     value={selectedDocumentId}
-                    onValueChange={(value) => handleContractSelection(value)}
+                    onValueChange={(value) => handleDocumentSelection(value)}
                   >
                     <SelectTrigger className={panelTheme.selectTrigger}>
-                      <SelectValue placeholder="Select contract" />
+                      <SelectValue placeholder="Select document" />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-950 border-white/10 text-white">
-                      {contractDocuments.map((doc) => (
+                      {signatureDocuments.map((doc) => (
                         <SelectItem
                           key={doc.id}
                           value={doc.id}
@@ -373,7 +448,7 @@ export function SignatureRequestPanel() {
                   </Select>
                 ) : (
                   <div className="text-xs font-mono text-zinc-600">
-                    No contract documents found for this account yet.
+                    No {requestKindConfig.uiLabel} documents found for this account yet.
                   </div>
                 )}
 
@@ -390,7 +465,7 @@ export function SignatureRequestPanel() {
                 )}
 
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-[#002FA7]/60 bg-[#002FA7]/40 text-white text-[10px] font-mono uppercase tracking-widest cursor-pointer hover:bg-[#002FA7]/55 transition-colors w-full justify-center">
-                  {uploadingContract ? (
+                  {uploadingDocument ? (
                     <>
                       <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
                       Uploading...
@@ -398,21 +473,21 @@ export function SignatureRequestPanel() {
                   ) : (
                     <>
                       <UploadCloud className="w-3.5 h-3.5 text-white" />
-                      Upload Contract
+                      Upload {requestKindConfig.uiLabel}
                     </>
                   )}
                   <input
                     type="file"
                     className="hidden"
                     accept=".pdf,.doc,.docx,.txt"
-                    onChange={handleUploadContract}
-                    disabled={uploadingContract}
+                    onChange={handleUploadDocument}
+                    disabled={uploadingDocument}
                   />
                 </label>
               </>
             ) : (
               <div className="text-xs font-mono text-rose-400">
-                No account context found. Open this panel from an account or contract.
+                No account context found. Open this panel from an account or document.
               </div>
             )}
           </div>
@@ -519,7 +594,7 @@ export function SignatureRequestPanel() {
             isSubmitting ||
             isPreparingDocument ||
             !selectedContactId ||
-            !selectedDocumentId
+            !selectedDocument
           }
           className={panelTheme.cta}
         >

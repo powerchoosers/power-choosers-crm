@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { CheckCircle, Eye, CalendarCheck, CalendarX, Bell, Video } from 'lucide-react'
 import { showInboxEmailToast } from '@/lib/inbox-email-toast'
 import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe'
+import { getSignatureRequestKindConfig, normalizeSignatureRequestKind } from '@/lib/signature-request'
 
 const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -105,8 +106,18 @@ export function GlobalSync() {
         (payload) => {
           const oldRecord = payload.old as { status?: string }
           const newRecord = payload.new as { status?: string, created_by?: string, metadata?: any }
-
-          const isOwner = newRecord.created_by === user.id || newRecord.metadata?.ownerId === user.email || user.email === 'l.patterson@nodalpoint.io'
+          const signatureKind = normalizeSignatureRequestKind(newRecord.metadata?.documentKind)
+          const kindLabel = getSignatureRequestKindConfig(signatureKind).uiLabel
+          const ownerEmail = String(
+            newRecord.metadata?.ownerId ||
+            newRecord.metadata?.agentEmail ||
+            newRecord.created_by ||
+            ''
+          ).toLowerCase()
+          const scope = ownerScopeRef.current.length > 0
+            ? ownerScopeRef.current
+            : [String(user.email || '').toLowerCase()]
+          const isOwner = scope.includes(ownerEmail) || user.email === 'l.patterson@nodalpoint.io'
 
           const invalidateDeals = () => {
             queryClient.invalidateQueries({ queryKey: ['deals'] })
@@ -132,7 +143,7 @@ export function GlobalSync() {
           if (oldRecord.status !== 'completed' && newRecord.status === 'completed') {
             if (isOwner) {
               if (soundEnabled) playPing();
-              toast('Contract Secured', {
+              toast(`${kindLabel} Secured`, {
                 icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
               })
             }
@@ -144,7 +155,7 @@ export function GlobalSync() {
           } else if (oldRecord.status !== 'opened' && newRecord.status === 'opened') {
             if (isOwner) {
               if (soundEnabled) playPing();
-              toast('Signature Email Opened', {
+              toast(`${kindLabel} Email Opened`, {
                 icon: <Eye className="w-4 h-4 text-emerald-400" />
               })
             }
@@ -154,7 +165,7 @@ export function GlobalSync() {
           } else if (oldRecord.status !== 'viewed' && newRecord.status === 'viewed') {
             if (isOwner) {
               if (soundEnabled) playPing();
-              toast('Contract Viewed by Signatory', {
+              toast(`${kindLabel} Viewed by Signatory`, {
                 icon: <Eye className="w-4 h-4 text-emerald-400" />
               })
             }

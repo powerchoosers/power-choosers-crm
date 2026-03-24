@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { type DealStage } from '@/types/deals'
+import type { SignatureRequestKind } from '@/lib/signature-request'
 
 export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'SEND_PORTAL_ACCESS';
 
@@ -11,6 +12,8 @@ export interface SignatureRequestContext {
   storagePath?: string
   accountId?: string
   dealId?: string
+  documentType?: string | null
+  requestKind?: SignatureRequestKind
 }
 
 export interface IngestionContext {

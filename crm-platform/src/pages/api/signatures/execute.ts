@@ -3,6 +3,11 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import { ZohoMailService } from '../email/zoho-service';
 import crypto from 'crypto';
+import {
+  getSignatureRequestKindConfig,
+  inferSignatureRequestKindFromDocument,
+  normalizeSignatureRequestKind,
+} from '@/lib/signature-request'
 
 export const config = {
     api: {
@@ -34,6 +39,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         if (fetchError || !request) {
             return res.status(404).json({ error: 'Invalid or expired secure token' });
         }
+
+        const signatureKind = normalizeSignatureRequestKind(
+            request.metadata?.documentKind ??
+            inferSignatureRequestKindFromDocument(
+                request.document?.document_type,
+                request.document?.metadata?.ai_extraction?.type
+            )
+        );
+        const kindConfig = getSignatureRequestKindConfig(signatureKind);
 
         if (request.expires_at && new Date(request.expires_at) < new Date()) {
             return res.status(410).json({ error: 'This signing link has expired. Please contact your representative to request a new one.' });
@@ -271,11 +285,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .eq('id', request.id);
 
         if (request.deal_id) {
-            await supabaseAdmin.from('deals').update({ stage: 'SECURED' }).eq('id', request.deal_id);
+            await supabaseAdmin.from('deals').update({ stage: kindConfig.executionDealStage }).eq('id', request.deal_id);
         }
 
-        // Advance account lifecycle: Active Load → Customer on contract execution
-        if (request.account_id) {
+        // Advance account lifecycle only for full contracts.
+        if (kindConfig.promoteAccountToCustomer && request.account_id) {
             const extracted = request.document?.metadata?.ai_extraction?.data || null;
             const accountUpdates: Record<string, any> = { status: 'Customer' };
 
@@ -323,8 +337,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const contactFullName = [contactFirstName, contactLastName].filter(Boolean).join(' ') || request.contact?.email || 'Contact';
             const accountName = request.account?.name || '';
 
-            const customerSubject = `Your Energy Agreement Has Been Executed`;
-            const internalSubject = `EXECUTED — ${contactFullName}${accountName ? ` · ${accountName}` : ''}`;
+            const customerSubject = `Your ${kindConfig.documentLabel} Has Been Executed`;
+            const internalSubject = `EXECUTED ${kindConfig.uiLabel.toUpperCase()} — ${contactFullName}${accountName ? ` · ${accountName}` : ''}`;
 
             // Shared email header with logo
             const emailHeader = `
@@ -344,10 +358,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const customerEmailHtml = `
               <div style="font-family:monospace; background-color:#09090b; color:#f4f4f5; padding:40px; border:1px solid #27272a; max-width:600px; margin:0 auto;">
                 ${emailHeader}
-                <h2 style="text-transform:uppercase; letter-spacing:0.1em; color:#10b981; font-size:13px; margin-top:0; margin-bottom:24px;">Contract Executed</h2>
+                <h2 style="text-transform:uppercase; letter-spacing:0.1em; color:#10b981; font-size:13px; margin-top:0; margin-bottom:24px;">Document Executed</h2>
                 <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:16px; color:#f4f4f5;">Hi ${contactFirstName},</p>
                 <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:20px; color:#f4f4f5;">
-                  Your energy services agreement has been fully executed and cryptographically sealed. A signed copy is attached for your records.
+                  Your ${kindConfig.documentLabel.toLowerCase()} has been fully executed and cryptographically sealed. A signed copy is attached for your records.
                 </p>
                 <p style="font-family:sans-serif; font-size:15px; line-height:1.6; margin-bottom:0; color:#a1a1aa;">
                   If you have any questions, please don't hesitate to reach out to your advisor, ${agentFirstName}.
@@ -362,7 +376,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             const internalEmailHtml = `
               <div style="font-family:monospace; background-color:#09090b; color:#f4f4f5; padding:40px; border:1px solid #27272a; max-width:600px; margin:0 auto;">
                 ${emailHeader}
-                <h2 style="text-transform:uppercase; letter-spacing:0.1em; color:#10b981; font-size:13px; margin-top:0; margin-bottom:24px;">Contract Executed</h2>
+                <h2 style="text-transform:uppercase; letter-spacing:0.1em; color:#10b981; font-size:13px; margin-top:0; margin-bottom:24px;">Document Executed</h2>
                 <div style="background-color:#18181b; padding:16px; border:1px solid #27272a; border-radius:4px; margin-bottom:24px;">
                   <div style="font-size:10px; color:#71717a; text-transform:uppercase; letter-spacing:0.1em; margin-bottom:6px; font-family:monospace;">Signatory</div>
                   <div style="font-size:15px; color:#f4f4f5; font-family:sans-serif; margin-bottom:2px;">${contactFullName}</div>
@@ -370,7 +384,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                   ${accountName ? `<div style="font-size:11px; color:#52525b; font-family:monospace; margin-top:6px; text-transform:uppercase; letter-spacing:0.05em;">${accountName}</div>` : ''}
                 </div>
                 <p style="font-family:sans-serif; font-size:14px; line-height:1.6; color:#a1a1aa; margin-bottom:0;">
-                  The executed document and Forensic Audit Certificate are attached. The signed record has been archived in the secure vault.
+                  The executed ${kindConfig.documentLabel.toLowerCase()} and Forensic Audit Certificate are attached. The signed record has been archived in the secure vault.
                 </p>
                 <div style="margin-top:40px; font-size:11px; color:#52525b; border-top:1px solid #27272a; padding-top:16px; font-family:monospace;">
                   Nodal Point Forensic Systems &middot; Signal Intelligence
@@ -417,7 +431,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 to: [request.contact.email],
                 subject: customerSubject,
                 html: customerEmailHtml,
-                text: `Your energy services agreement has been fully executed. A signed copy is attached.`,
+                text: `Your ${kindConfig.documentLabel.toLowerCase()} has been fully executed. A signed copy is attached.`,
                 status: 'sent',
                 type: 'sent',
                 timestamp: sentAt,
@@ -428,7 +442,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     isSignatureExecution: true,
                     documentId: request.document.id,
                     dealId: request.deal_id,
-                    signedDocumentPath: finalStoragePath
+                    signedDocumentPath: finalStoragePath,
+                    documentKind: signatureKind,
                 }
             });
             if (emailInsertError) {
@@ -440,7 +455,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 to: [request.contact.email],
                 subject: customerSubject,
                 html: customerEmailHtml,
-                text: `Your energy services agreement has been fully executed. A signed copy is attached.`,
+                text: `Your ${kindConfig.documentLabel.toLowerCase()} has been fully executed. A signed copy is attached.`,
                 uploadedAttachments: customerZohoAttachment ? [customerZohoAttachment] : undefined,
                 userEmail: authEmail,
                 from: fromEmail,
@@ -452,7 +467,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 to: [resolvedAgentEmail],
                 subject: internalSubject,
                 html: internalEmailHtml,
-                text: `${contactFullName} has executed their energy agreement. Full document and Forensic Audit Certificate attached.`,
+                text: `${contactFullName} has executed their ${kindConfig.documentLabel.toLowerCase()}. Full document and Forensic Audit Certificate attached.`,
                 uploadedAttachments: internalZohoAttachment ? [internalZohoAttachment] : undefined,
                 userEmail: authEmail,
                 from: fromEmail,

@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input'
 const VAULT_FILTERS: { id: DocumentTypeFilter; label: string; icon: React.ElementType }[] = [
   { id: 'ALL_ASSETS', label: 'All Assets', icon: FileStack },
   { id: 'CONTRACT', label: 'Contracts', icon: FileText },
+  { id: 'LOE', label: 'LOEs', icon: FileText },
   { id: 'INVOICE', label: 'Invoices', icon: Receipt },
   { id: 'USAGE_DATA', label: 'Telemetry', icon: Activity },
   { id: 'PROPOSAL', label: 'Proposals', icon: FileText },
@@ -39,6 +40,7 @@ const VAULT_FILTERS: { id: DocumentTypeFilter; label: string; icon: React.Elemen
 
 const DOC_TYPES: { value: DocumentTypeFilter; label: string }[] = [
   { value: 'CONTRACT', label: 'Contract' },
+  { value: 'LOE', label: 'LOE' },
   { value: 'INVOICE', label: 'Invoice' },
   { value: 'USAGE_DATA', label: 'Usage Data' },
   { value: 'PROPOSAL', label: 'Proposal' },
@@ -179,7 +181,7 @@ export default function VaultPage() {
         })
         if (dbError) throw dbError
 
-        // AI classifies and sets document_type (CONTRACT/INVOICE/USAGE_DATA/PROPOSAL) so Vault tabs work
+        // AI classifies and sets document_type (CONTRACT/LOE/INVOICE/USAGE_DATA/PROPOSAL) so Vault tabs work
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || ''
         const apiUrl = apiBaseUrl ? `${apiBaseUrl}/api/analyze-document` : '/api/analyze-document'
         try {
@@ -198,7 +200,18 @@ export default function VaultPage() {
             if (t === 'SIGNED_CONTRACT' || t === 'CONTRACT' || t === 'BILL') {
               toast.success('Asset Secured. Account Status Upgraded to Customer.', { id: toastId })
             } else {
-              toast.success(`Document labeled: ${t === 'USAGE_DATA' ? 'Telemetry' : t === 'PROPOSAL' ? 'Proposal' : 'Ingested'}.`, { id: toastId })
+              toast.success(
+                `Document labeled: ${
+                  t === 'USAGE_DATA'
+                    ? 'Telemetry'
+                    : t === 'LOE'
+                      ? 'LOE'
+                      : t === 'PROPOSAL'
+                        ? 'Proposal'
+                        : 'Ingested'
+                }.`,
+                { id: toastId }
+              )
             }
           } else {
             toast.success('Document ingested.', { id: toastId })
@@ -607,7 +620,7 @@ export default function VaultPage() {
                   </select>
                 </div>
                 <p className="text-[10px] font-mono text-zinc-600">
-                  {ingestionFiles.length} file(s). {ingestionDocType === 'CONTRACT' && 'Account will be set to CUSTOMER on upload.'}
+                  {ingestionFiles.length} file(s). {ingestionDocType === 'CONTRACT' && 'Account will be set to CUSTOMER on upload.'}{ingestionDocType === 'LOE' && 'LOE files stay in the LOE bucket.'}
                 </p>
               </div>
               <div className="p-4 border-t border-white/5 flex justify-end gap-2">

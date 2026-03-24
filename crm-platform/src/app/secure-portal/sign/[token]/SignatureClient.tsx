@@ -6,6 +6,7 @@ import { motion } from 'framer-motion'
 import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronLeft, ChevronRight, Download, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { Document, Page, pdfjs } from 'react-pdf'
+import { getSignatureRequestKindConfig, inferSignatureRequestKindFromDocument, normalizeSignatureRequestKind } from '@/lib/signature-request'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -37,6 +38,14 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
     const hasDrawnRef = useRef(false)
     const captureTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [drawPending, setDrawPending] = useState(false)
+    const signatureKind = normalizeSignatureRequestKind(
+        request?.metadata?.documentKind ??
+        inferSignatureRequestKindFromDocument(
+            request?.document?.document_type,
+            request?.document?.metadata?.ai_extraction?.type
+        )
+    )
+    const kindConfig = getSignatureRequestKindConfig(signatureKind)
 
     // ── Responsive Scaling ────────────────────────────────────────────────────
     useEffect(() => {
@@ -254,7 +263,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     className="max-w-md p-6 border border-white/5 bg-white/[0.02] rounded-lg space-y-4"
                 >
                     <p className="text-sm text-zinc-400 font-sans leading-relaxed">
-                        The energy services agreement has been cryptographically sealed with a forensic audit trail. A final copy is being dispatched to you and our compliance team.
+                        The {kindConfig.documentLabel.toLowerCase()} has been cryptographically sealed with a forensic audit trail. A final copy is being dispatched to you and our compliance team.
                     </p>
                     <div className="pt-4 border-t border-white/5 flex flex-col items-center gap-2">
                         <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Nodal Point forensic systems</span>
@@ -600,7 +609,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             ) : (
                                 <>
                                     <ShieldCheck className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                                    <span>Execute Agreement</span>
+                                    <span>Complete Signing</span>
                                 </>
                             )}
                         </button>
