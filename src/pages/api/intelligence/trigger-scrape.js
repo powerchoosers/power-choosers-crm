@@ -43,6 +43,7 @@ export default async function handler(req, res) {
             skippedDuplicate: data.skippedDuplicate || 0,
             skippedRegulated: data.skippedRegulated || 0,
             skippedUnnamed: data.skippedUnnamed || 0,
+            skippedHallucinated: data.skippedHallucinated || 0,
             mode: data.mode || 'all',
         });
 
