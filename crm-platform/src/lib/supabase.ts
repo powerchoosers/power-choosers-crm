@@ -21,6 +21,9 @@ export const supabase = createClient(
 
 // Admin client for backend operations (bypasses RLS)
 // This will only work on the server side
+if (typeof window === 'undefined' && !supabaseServiceKey) {
+  console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY is not set — supabaseAdmin will use the anon key and RLS will NOT be bypassed')
+}
 export const supabaseAdmin = createClient(
   supabaseUrl!,
   supabaseServiceKey || supabaseAnonKey!

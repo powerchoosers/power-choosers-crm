@@ -120,6 +120,10 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
             .eq('email', email)
             .maybeSingle();
 
+        if (fetchError) {
+            console.error('[resolveIdentity] Supabase lookup failed:', fetchError.message, '— is SUPABASE_SERVICE_ROLE_KEY set?');
+        }
+
         if (existing) {
             console.log('Identity resolved via Supabase:', email);
             return {
