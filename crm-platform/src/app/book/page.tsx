@@ -56,7 +56,7 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
                 <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-[#002FA7]/5 blur-[120px] rounded-full pointer-events-none animate-pulse" />
                 <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-[#002FA7]/3 blur-[100px] rounded-full pointer-events-none" />
 
-                <PageReveal className="flex-1 relative z-10" delay={0.05}>
+                <PageReveal className="flex-1 min-h-0 relative z-10" delay={0.05}>
                     <div className="h-full nodal-void-card flex flex-col lg:overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]">
                         <BookingInterface email={email} />
                     </div>
