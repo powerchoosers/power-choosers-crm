@@ -19,14 +19,8 @@ export function CookieBanner() {
 
   if (!visible) return null
 
-  const accept = () => {
+  const dismiss = () => {
     try { localStorage.setItem(CONSENT_KEY, 'accepted') } catch {}
-    setVisible(false)
-    window.location.reload()
-  }
-
-  const decline = () => {
-    try { localStorage.setItem(CONSENT_KEY, 'declined') } catch {}
     setVisible(false)
   }
 
@@ -44,13 +38,13 @@ export function CookieBanner() {
         </div>
         <div className="flex items-center gap-3 shrink-0">
           <button
-            onClick={decline}
+            onClick={dismiss}
             className="text-sm text-zinc-500 hover:text-zinc-900 transition-colors font-medium px-4 py-2 rounded-full hover:bg-zinc-100"
           >
             Decline
           </button>
           <button
-            onClick={accept}
+            onClick={dismiss}
             className="bg-[#002FA7] text-white text-sm font-medium px-5 py-2.5 rounded-full hover:scale-105 active:scale-95 transition-transform shadow-lg shadow-blue-900/20"
           >
             Accept
