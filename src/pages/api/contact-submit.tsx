@@ -3,12 +3,37 @@ import React from 'react'
 import { render } from '@react-email/render'
 import { cors } from './_cors.js'
 import { ZohoMailService } from './email/zoho-service.js'
+import { supabaseAdmin } from '@/lib/supabase'
 import ContactAdminAlert from '../../emails/ContactAdminAlert'
 import ContactConfirmation from '../../emails/ContactConfirmation'
 
 const APOLLO_BASE_URL = 'https://api.apollo.io/v1'
 const ADMIN_EMAIL = 'l.patterson@nodalpoint.io'
 const FROM_EMAIL = 'signal@nodalpoint.io'
+
+async function lookupSupabase(email: string) {
+  if (!email) return null
+  try {
+    const { data } = await supabaseAdmin
+      .from('contacts')
+      .select('*, accounts!contacts_accountId_fkey(id, name, logo_url)')
+      .eq('email', email)
+      .maybeSingle()
+
+    if (data) {
+      return {
+        jobTitle: data.title || '',
+        companyName: (data.accounts as any)?.name || '',
+        linkedin: data.linkedinUrl || '',
+        location: [data.city, data.state].filter(Boolean).join(', '),
+        phone: data.phone || '',
+      }
+    }
+  } catch (err) {
+    console.error('[Contact Submit] Supabase lookup error:', err)
+  }
+  return null
+}
 
 async function enrichViaApollo(email: string, name: string, company?: string) {
   const apiKey = process.env.APOLLO_API_KEY
@@ -71,11 +96,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const zohoService = new ZohoMailService()
 
-    // 1. Render confirmation email and kick off Apollo enrichment in parallel
-    const [confirmationHtml, enrichment] = await Promise.all([
-      render(<ContactConfirmation name={name} />),
-      enrichViaApollo(email, name, company),
-    ])
+    // 1. Render confirmation email and try Supabase lookup, then Apollo as fallback
+    const confirmationHtml = await render(<ContactConfirmation name={name} />)
+
+    let enrichment = await lookupSupabase(email)
+    if (!enrichment) {
+      enrichment = await enrichViaApollo(email, name, company)
+    }
 
     // 2. Send confirmation to submitter
     await zohoService.sendEmail({
