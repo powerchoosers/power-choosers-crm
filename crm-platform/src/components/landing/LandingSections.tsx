@@ -410,9 +410,11 @@ export function LandingSections() {
       </section>
 
       {/* TRUST STRIP */}
-      <section className="bg-white border-t border-zinc-100 py-10">
-        <div className="max-w-5xl mx-auto px-6">
-          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6">
+      <section className="bg-zinc-950 py-12 relative overflow-hidden">
+        {/* Subtle dot texture */}
+        <div className="absolute inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:24px_24px] opacity-[0.06] pointer-events-none" />
+        <div className="max-w-5xl mx-auto px-6 relative z-10">
+          <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-8">
             {[
               { icon: Lock, label: 'AES-256 Encrypted', sub: 'Data in transit & at rest' },
               { icon: ShieldCheck, label: 'SOC 2 Infrastructure', sub: 'Enterprise-grade security' },
@@ -420,12 +422,12 @@ export function LandingSections() {
               { icon: Database, label: 'TLS Secured', sub: 'End-to-end encryption' },
             ].map(({ icon: Icon, label, sub }) => (
               <div key={label} className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 flex items-center justify-center shrink-0">
-                  <Icon className="w-4 h-4 text-[#002FA7]" />
+                <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                  <Icon className="w-4 h-4 text-[#4169E1]" />
                 </div>
                 <div>
-                  <div className="font-mono text-[10px] text-zinc-800 uppercase tracking-widest font-semibold leading-tight">{label}</div>
-                  <div className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest leading-tight">{sub}</div>
+                  <div className="font-mono text-[10px] text-zinc-100 uppercase tracking-widest font-semibold leading-tight">{label}</div>
+                  <div className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest leading-tight mt-0.5">{sub}</div>
                 </div>
               </div>
             ))}
