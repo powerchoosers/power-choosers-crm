@@ -192,8 +192,13 @@ function getJobs(mode: string) {
   return allJobs
 }
 
-async function callPerplexity(prompt: string): Promise<any[]> {
-  if (!PERPLEXITY_API_KEY) return []
+/**
+ * Returns signals alongside the citation URLs Perplexity actually fetched.
+ * Citations are the ground truth — if a source_url's domain isn't in citations,
+ * the signal may be hallucinated.
+ */
+async function callPerplexity(prompt: string): Promise<{ signals: any[]; citations: string[] }> {
+  if (!PERPLEXITY_API_KEY) return { signals: [], citations: [] }
 
   const response = await fetch('https://api.perplexity.ai/chat/completions', {
     method: 'POST',
@@ -216,18 +221,63 @@ async function callPerplexity(prompt: string): Promise<any[]> {
     }),
   })
 
-  if (!response.ok) return []
+  if (!response.ok) return { signals: [], citations: [] }
 
   const data = await response.json()
+  const citations: string[] = Array.isArray(data.citations) ? data.citations : []
   const content = data.choices?.[0]?.message?.content?.trim()
-  if (!content) return []
+  if (!content) return { signals: [], citations }
 
   const cleaned = content.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim()
   try {
     const parsed = JSON.parse(cleaned)
-    return Array.isArray(parsed) ? parsed : parsed.signals || []
+    const signals = Array.isArray(parsed) ? parsed : parsed.signals || []
+    return { signals, citations }
   } catch {
-    return []
+    return { signals: [], citations }
+  }
+}
+
+/**
+ * Check if the signal's source domain appears in Perplexity's citation list.
+ * Domain-level match is intentional — exact URL paths often differ slightly
+ * between what Perplexity cites and what it puts in the JSON.
+ */
+function isInCitations(sourceUrl: string, citations: string[]): boolean {
+  if (!sourceUrl || citations.length === 0) return false
+  try {
+    const sourceHost = new URL(sourceUrl).hostname.replace(/^www\./, '')
+    return citations.some((c) => {
+      try {
+        return new URL(c).hostname.replace(/^www\./, '') === sourceHost
+      } catch {
+        return false
+      }
+    })
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Last-resort HEAD check. Only called when citation validation fails.
+ * 4s timeout — a real page on a live server responds quickly.
+ * Accepts any non-4xx response (3xx redirects, 200 OK, even 5xx is ambiguous).
+ */
+async function verifyUrl(url: string): Promise<boolean> {
+  if (!url) return false
+  try {
+    const controller = new AbortController()
+    const tid = setTimeout(() => controller.abort(), 4000)
+    const res = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; NodalPointBot/1.0)' },
+    }).finally(() => clearTimeout(tid))
+    // 404, 410, 403 on a URL that should be public = doesn't exist
+    return res.status !== 404 && res.status !== 410
+  } catch {
+    return false
   }
 }
 
@@ -253,9 +303,9 @@ Deno.serve(async (req: Request) => {
   console.log(`[scrape-intelligence] Executing ${jobs.length} jobs in ${mode} mode...`)
   const allSignals: any[] = []
   for (const job of jobs) {
-    const signals = await callPerplexity(job.prompt)
-    console.log(`  - ${job.type}: found ${signals.length} raw results`)
-    allSignals.push(...signals.map((signal) => ({ ...signal, signal_type: job.type })))
+    const { signals, citations } = await callPerplexity(job.prompt)
+    console.log(`  - ${job.type}: found ${signals.length} raw results, ${citations.length} citations`)
+    allSignals.push(...signals.map((signal) => ({ ...signal, signal_type: job.type, _citations: citations })))
   }
   console.log(`[scrape-intelligence] Total raw signals: ${allSignals.length}`)
 
@@ -263,6 +313,7 @@ Deno.serve(async (req: Request) => {
   let skippedRegulated = 0
   let skippedDuplicate = 0
   let skippedUnnamed = 0
+  let skippedHallucinated = 0
 
   for (const signal of allSignals) {
     try {
@@ -295,6 +346,25 @@ Deno.serve(async (req: Request) => {
         skippedDuplicate++
         continue
       }
+
+      // ── Hallucination gate ──────────────────────────────────────────────────
+      // 1. Check if the source URL's domain appears in Perplexity's citation list
+      // 2. If not, fall back to a HEAD request to verify the URL is real
+      // 3. If both fail, the signal is likely fabricated — reject it
+      const sourceUrl = cleanText(signal.source_url)
+      const citations: string[] = signal._citations || []
+      if (sourceUrl) {
+        const inCitations = isInCitations(sourceUrl, citations)
+        if (!inCitations) {
+          const urlLive = await verifyUrl(sourceUrl)
+          if (!urlLive) {
+            console.warn(`[hallucination] rejected: ${entityName} — ${sourceUrl}`)
+            skippedHallucinated++
+            continue
+          }
+        }
+      }
+      // ── End hallucination gate ──────────────────────────────────────────────
 
       const city = truncate(signal.city || signal.metadata?.city, 80) || ''
       const state = truncate(signal.state || signal.metadata?.state || 'TX', 32) || 'TX'
@@ -373,6 +443,7 @@ Deno.serve(async (req: Request) => {
       skippedRegulated,
       skippedDuplicate,
       skippedUnnamed,
+      skippedHallucinated,
     }),
     { headers: { 'Content-Type': 'application/json' } },
   )
