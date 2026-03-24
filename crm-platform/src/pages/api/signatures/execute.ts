@@ -407,6 +407,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             // Log customer email to CRM emails table
             const execEmailId = `sig_exec_${Date.now()}_${request.id.substring(0, 8)}`;
+            const sentAt = new Date().toISOString();
             const { error: emailInsertError } = await supabaseAdmin.from('emails').insert({
                 id: execEmailId,
                 contactId: request.contact_id,
@@ -419,9 +420,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 text: `Your energy services agreement has been fully executed. A signed copy is attached.`,
                 status: 'sent',
                 type: 'sent',
-                timestamp: new Date().toISOString(),
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
+                timestamp: sentAt,
+                sentAt,
+                createdAt: sentAt,
+                updatedAt: sentAt,
                 metadata: {
                     isSignatureExecution: true,
                     documentId: request.document.id,
