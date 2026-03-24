@@ -43,7 +43,7 @@ export function LandingHeader() {
               className="hidden md:flex items-center gap-1.5 border border-black/15 text-black/70 hover:text-black hover:border-black/30 px-4 py-2 rounded-full font-mono text-[10px] uppercase tracking-widest transition-all duration-200 hover:bg-black/[0.03]"
             >
               <Lock className="w-3 h-3" />
-              Client Portal
+              Sign In
             </Link>
             <a
               href="/bill-debugger"

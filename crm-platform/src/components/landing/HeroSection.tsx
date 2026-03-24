@@ -41,7 +41,7 @@ export function HeroSection() {
           </Link>
           <Link
             href="/book"
-            className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-300 text-zinc-600 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 transition-all duration-300 whitespace-nowrap"
+            className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-400 bg-white/60 text-zinc-700 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 whitespace-nowrap shadow-sm"
           >
             <span>Book a Briefing</span>
           </Link>

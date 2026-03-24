@@ -199,6 +199,16 @@ export default function BillDebuggerPage() {
                 opacity: 0.1
             }}></div>
 
+            {/* Wordmark — top left brand anchor */}
+            <a href="/" className="absolute top-4 left-4 md:top-6 md:left-8 z-50 flex items-center gap-2 opacity-40 hover:opacity-100 transition-opacity duration-300">
+                <div className="bg-black/10 p-1.5 rounded-lg">
+                    <img src="/images/nodalpoint.png" alt="Nodal Point" className="h-5 w-auto" />
+                </div>
+                <span className="font-bold text-sm tracking-tighter text-zinc-700 hidden sm:block">
+                    Nodal <span className="text-[#002FA7]">Point</span>
+                </span>
+            </a>
+
             {/* Exit Button - PRESERVED */}
             <button
                 onClick={() => router.back()}
