@@ -112,59 +112,88 @@ async function verifyWithApollo(entityName: string): Promise<{ domain: string; l
   }
 }
 
+// ── Rotation tables — vary search territory on every run ─────────────────────
+// Industry bucket rotates by hour-of-day (8 buckets → changes 3x/day across crons)
+const INDUSTRY_BUCKETS = [
+  'cold storage, food processing, meat packing, dairy, beverage manufacturing, brewery',
+  'data centers, colocation facilities, hyperscale computing, cloud infrastructure',
+  'hospitals, health systems, surgery centers, long-term care, specialty clinics',
+  'petrochemical, chemical processing, plastics manufacturing, rubber, specialty chemicals',
+  'automotive plants, auto parts, stamping, tier-1 suppliers, EV component manufacturing',
+  'logistics hubs, distribution centers, fulfillment centers, refrigerated 3PL warehousing',
+  'hotel chains, resort operations, convention centers, casino resorts, large hospitality',
+  'steel mills, metal fabrication, aluminum processing, foundries, pipe and tube manufacturing',
+]
+
+// City cluster rotates by day-of-epoch (4 buckets → different ERCOT geography each day)
+const CITY_CLUSTERS = [
+  'Houston, Beaumont, Port Arthur, Baytown, Pasadena, Sugar Land, The Woodlands, Conroe, Galveston',
+  'Dallas, Fort Worth, Arlington, Plano, Irving, McKinney, Frisco, Denton, Waco, Garland',
+  'Corpus Christi, Victoria, McAllen, Laredo, Harlingen, Brownsville, Edinburg',
+  'Midland, Odessa, Abilene, Lubbock, Wichita Falls, Tyler, Longview, Lufkin, Nacogdoches',
+]
+
+function getRotation(): { industry: string; cities: string } {
+  const hourSlot = Math.floor(Date.now() / 3_600_000) % INDUSTRY_BUCKETS.length
+  const daySlot = Math.floor(Date.now() / 86_400_000) % CITY_CLUSTERS.length
+  return { industry: INDUSTRY_BUCKETS[hourSlot], cities: CITY_CLUSTERS[daySlot] }
+}
+
 function getJobs(mode: string) {
   const today = new Date()
   const year = today.getFullYear()
   const stamp = today.toDateString()
+  const { industry, cities } = getRotation()
+  const FOCUS = `This run focuses on: ${industry}. Priority cities: ${cities}.`
 
   const allJobs = [
     {
       type: 'new_location',
-      prompt: `Find 10-15 Texas companies opening new facilities, breaking ground, or relocating in ${year}. Focus on high-intensity energy users: cold storage, data centers, food processing, logistics. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, entity_domain, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 10-15 Texas companies opening new facilities, breaking ground, or relocating in ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'energy_rfp',
-      prompt: `Find 5-10 active open RFPs after ${stamp} for retail electricity supply, energy consulting, or energy management for Texas commercial/industrial. ${TARGET_ZONES} ${EXCLUSIONS} Include: city, state, tdsp.`,
+      prompt: `Find 5-10 active open RFPs issued after ${stamp} for retail electricity supply, energy consulting, or commercial energy management in Texas. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'expansion',
-      prompt: `Find 10-15 Texas industrial expansions, plant growth, and manufacturing projects in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 10-15 Texas industrial plant expansions, capex investments, new production lines, or manufacturing growth projects in ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'sec_filing',
-      prompt: `Find 5-10 SEC filings/investor updates signaling Texas facility growth or new load. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 5-10 SEC filings (8-K, 10-Q) or investor updates in ${year} signaling new Texas facility growth, significant new electrical load, or major operational capex. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'capital_raise',
-      prompt: `Find 5-10 Texas mid-market/enterprise companies that recently closed investment rounds or IPOs in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 5-10 Texas mid-market or enterprise companies that closed investment rounds, issued bonds, or completed IPOs in ${year} and are deploying capital into facilities or operations. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'merger_acquisition',
-      prompt: `Find 5-10 M&A deals involving Texas-based industrial/commercial entities in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 5-10 M&A deals, private equity buyouts, or ownership changes involving Texas-based commercial or industrial companies in ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'hiring_spree',
-      prompt: `Find 5-10 Texas companies (industrial, cold storage, tech) announcing hiring pushes (>50 people). ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 5-10 Texas companies announcing significant hiring campaigns (50+ jobs), new shift additions, or workforce expansions tied to operational growth in ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'data_center',
-      prompt: `Find 10-15 new data center announcements or expansions in Texas deregulated zones for ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 10-15 new data center campus announcements, hyperscale expansions, or colocation facility groundbreakings in Texas deregulated zones for ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'tax_abatement',
-      prompt: `Find 10-15 recent Texas Chapter 312 or 313 tax abatement applications or industrial growth stories. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 10-15 Texas Chapter 312 or 313 tax abatement applications, economic development agreements, or industrial district incentive grants approved in ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'industrial_permit',
-      prompt: `Find 5-10 high-value industrial/commercial permits recently filed for new facilities in Texas. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 5-10 high-value industrial or commercial building permits, TCEQ air quality permit applications, or Texas Railroad Commission facility registrations filed in ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'cold_storage',
-      prompt: `Find 5-10 new cold storage facility announcements, refrigerated warehouse expansions, or food processing startups in Texas for ${year}. High load factor leads. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 5-10 new cold storage facility announcements, refrigerated warehouse expansions, or food processing plant openings in Texas in ${year}. These are high load-factor energy prospects. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
     {
       type: 'manufacturing',
-      prompt: `Find 5-10 new manufacturing facilities (steel, chemical, battery components, semiconductors) breaking ground in Texas in ${year}. ${TARGET_ZONES} ${EXCLUSIONS} Include: entity_name, headline, summary, source_url, city, tdsp.`,
+      prompt: `Find 5-10 new manufacturing facilities (steel, chemicals, battery components, semiconductors, EV parts) breaking ground or announcing site selection in Texas in ${year}. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, city, tdsp, relevance_score.`,
     },
   ]
 
@@ -184,7 +213,7 @@ function getJobs(mode: string) {
     return [
       {
         type: 'exec_hire',
-        prompt: `Find Texas or Texas-relevant executive hires, facility leaders, plant managers, CFOs, COOs, and operations leaders for ${year}. Focus on companies that look like real energy prospects: manufacturers, data centers, logistics, cold storage, healthcare, hospitality, and industrial processing. ${TARGET_ZONES} ${EXCLUSIONS} Include entity_name, headline, summary, source_url, relevance_score, city, state.`,
+        prompt: `Find Texas executive hires, plant managers, facility directors, COOs, and operations leaders announced in ${year}. New leadership = new supplier relationships. ${FOCUS} ${TARGET_ZONES} ${EXCLUSIONS} Return JSON array: entity_name, entity_domain, headline, summary, source_url, relevance_score, city, state.`,
       },
     ]
   }
@@ -198,35 +227,51 @@ function getJobs(mode: string) {
  * the signal may be hallucinated.
  */
 async function callPerplexity(prompt: string): Promise<{ signals: any[]; citations: string[] }> {
-  if (!PERPLEXITY_API_KEY) return { signals: [], citations: [] }
+  if (!PERPLEXITY_API_KEY) {
+    console.error('[perplexity] PERPLEXITY_API_KEY is not set')
+    return { signals: [], citations: [] }
+  }
 
-  const response = await fetch('https://api.perplexity.ai/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'sonar-pro',
-      messages: [
-        {
-          role: 'system',
-          content:
-            'You are an energy brokerage analyst focused on the Texas deregulated ERCOT market. Return valid JSON only. Only include real, named prospects with specific city-level locations. Never include regulated utility territories, unnamed entities, or residential projects.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      temperature: 0.2,
-      search_recency_filter: 'month',
-    }),
-  })
+  let response: Response
+  try {
+    response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PERPLEXITY_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'sonar-pro',
+        messages: [
+          {
+            role: 'system',
+            content:
+              'You are an energy brokerage analyst focused on the Texas deregulated ERCOT market. Return ONLY a valid JSON array — no prose, no markdown, no explanation. Only include real named commercial or industrial companies that buy electricity. Never include energy producers, utilities, REPs, or residential projects.',
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.1,
+        search_recency_filter: 'week',
+      }),
+    })
+  } catch (fetchErr) {
+    console.error('[perplexity] fetch error:', fetchErr)
+    return { signals: [], citations: [] }
+  }
 
-  if (!response.ok) return { signals: [], citations: [] }
+  if (!response.ok) {
+    const errBody = await response.text().catch(() => '')
+    console.error(`[perplexity] HTTP ${response.status}: ${errBody.slice(0, 200)}`)
+    return { signals: [], citations: [] }
+  }
 
   const data = await response.json()
   const citations: string[] = Array.isArray(data.citations) ? data.citations : []
   const content = data.choices?.[0]?.message?.content?.trim()
-  if (!content) return { signals: [], citations }
+  if (!content) {
+    console.warn('[perplexity] empty content in response')
+    return { signals: [], citations }
+  }
 
   const cleaned = content.replace(/^```json\s*/i, '').replace(/```\s*$/i, '').trim()
   try {
@@ -234,6 +279,7 @@ async function callPerplexity(prompt: string): Promise<{ signals: any[]; citatio
     const signals = Array.isArray(parsed) ? parsed : parsed.signals || []
     return { signals, citations }
   } catch {
+    console.warn(`[perplexity] JSON parse failed. Content preview: ${cleaned.slice(0, 300)}`)
     return { signals: [], citations }
   }
 }
