@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import React from 'react'
 import sgMail from '@sendgrid/mail'
 import { render } from '@react-email/render'
 import { cors } from './_cors.js'
