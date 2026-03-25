@@ -6,8 +6,11 @@ import React from 'react';
 import { NextApiRequest, NextApiResponse } from 'next';
 import { format, addHours, parseISO } from 'date-fns';
 import { requireUser } from '@/lib/supabase';
+import { cors } from '../_cors.js';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+    if (cors(req, res)) return;
+
     if (req.method !== 'POST') {
         res.status(405).json({ error: 'Method not allowed' });
         return;
