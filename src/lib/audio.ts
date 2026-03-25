@@ -149,3 +149,47 @@ export const playThud = () => {
     playSynth('sine', 150, 40, 0.2, 0.3);
   }
 };
+
+/**
+ * Email Send Whoosh
+ * Used only after the server confirms a message actually sent.
+ */
+export const playWhoosh = () => {
+  if (!useUIStore.getState().soundEnabled) return;
+  if (!useUIStore.getState().soundActionEnabled) return;
+  if (typeof window === 'undefined' || !window.AudioContext) return;
+
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const duration = 0.22;
+    const bufferSize = Math.max(1, Math.floor(audioCtx.sampleRate * duration));
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i++) {
+      const progress = i / bufferSize;
+      const envelope = Math.pow(1 - progress, 1.8);
+      data[i] = (Math.random() * 2 - 1) * envelope;
+    }
+
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(2200, audioCtx.currentTime);
+    filter.frequency.exponentialRampToValueAtTime(520, audioCtx.currentTime + duration);
+    filter.Q.value = 0.85;
+
+    const gain = audioCtx.createGain();
+    gain.gain.setValueAtTime(0.085, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+    source.connect(filter);
+    filter.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start();
+  } catch (e) {
+    console.warn('Audio generation failed or blocked by browser:', e);
+  }
+};

@@ -1420,6 +1420,8 @@ export default async function handler(req, res) {
     }
 
     const { messages, userProfile, jsonMode } = req.body;
+    const webMode = String(req.body?.webSearchMode || 'crm_plus_web');
+    const webEnabled = webMode !== 'crm_only';
     const contextPurpose = String(req.body?.contextPurpose || '').trim();
     const isActiveCallScript = contextPurpose === 'active_call_script';
     const activeCallSystemPrompt = `You are Nodal Point's NEPQ Texas call coach for commercial electricity outreach.
@@ -1522,6 +1524,15 @@ Output rules:
     const historyCandidates = cleanedMessages.slice(0, lastUserIndex);
 
     const firstName = userProfile?.firstName || 'Trey';
+    const publicResearchPattern = /\b(search the web|search the internet|internet|online|website|official site|linkedin|owner|ceo|president|founder|headquarters|address|subsidiary|parent company|who works at|who is|alternate phone|other number|office number|public phone|company phone|number on the internet|check online)\b/i;
+    const internalOnlyPattern = /\b(most recent call|recent call|last call|call transcript|transcript|voicemail|he told me|she told me|what did he say|what did she say|email he told me|email he gave me|my inbox|recent email|contract end|contract expiration|bill|invoice|document|file|task|notes?)\b/i;
+    const noResultPattern = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don't find|i searched the database|not in crm|limited to apollo|could not locate|can only return contract details)/i;
+    const shouldEscalateToWebFallback = (assistantText: string) => {
+      if (!webEnabled || jsonMode || !perplexityApiKey) return false
+      if (!assistantText || !noResultPattern.test(assistantText)) return false
+      if (internalOnlyPattern.test(String(prompt || ''))) return false
+      return publicResearchPattern.test(String(prompt || ''))
+    }
 
     // Pre-fetch dossier context (notes + recent calls) when user is viewing a contact or account
     let dossierContextBlock = '';
@@ -2318,8 +2329,6 @@ Output rules:
     if (!jsonMode && await maybeHandleGroundedCrmRequest()) return;
 
     const buildSystemPrompt = () => {
-      const webMode = String(req.body?.webSearchMode || 'crm_plus_web');
-      const webEnabled = webMode !== 'crm_only';
       return `
         You are the Nodal Architect, the cognitive core of the Nodal Point CRM.
         Your tone is professional, technical, and high-agency.
@@ -2367,6 +2376,7 @@ Output rules:
         - **Next-Step Discovery**: Based on missing data (Data Voids), suggest a **NEPQ-style question**.
           - *Example for missing expiration*: "Tonie, when you look at your current energy agreement, is the expiration date something that's actively monitored, or is it one of those things that usually just rolls over without much review?"
           - *Example for missing usage*: "How does the seasonal change in your production schedule typically affect your energy budget expectations?"
+        - If the user says "most recent call", "last call", "what did he say", or "he told me", search the preloaded call context first, then use \`search_transcripts\` or \`search_interactions\` with broad terms like "email", "number", "contact", or the nearest clue from the request. Do NOT ask for a keyword before searching those sources.
 
         PERSON vs COMPANY (CRITICAL):
         - If the user asks to find a PERSON (e.g. "find a Louis", "someone named X", "who works at this company", "a person that works for this company"), you MUST use \`list_contacts\` with the person's name in \`search\` and, when the user is on an account page, \`accountId\` from context. Do NOT use \`list_accounts\` for person names.
@@ -2394,8 +2404,8 @@ Output rules:
 
         ANTI_HALLUCINATION_PROTOCOL:
         - CRITICAL: NEVER invent names, companies, email addresses, phone numbers, or energy metrics (kWh, strike price, contract dates).
-        - **No Internal Knowledge Fallback**: If a tool (like \`list_accounts\` or \`list_contacts\`) returns zero results for a company in the CRM, you MUST NOT use your internal training data or general web search to "guess" who the President is or when their contract expires.
-        - If the tool says "no results", the correct answer is "${firstName}, I searched the database but found no records for [Entity]."
+        - **No Guessing**: If a CRM tool returns zero results, do not invent or guess from memory. First exhaust broader CRM searches. If the question is about a public-facing company/person fact, pivot to web research instead of stopping. If the question is about a private CRM-only field, say it is not in CRM and give the next best action.
+        - If the tool says "no results" for a private CRM field, the correct answer is "${firstName}, I searched the database but found no records for [Entity]."
         - DO NOT invent "Contract End Dates" if the tool returns null or undefined. If a date is missing, you MUST say "Unknown" or "Not in CRM".
         - DO NOT change dates of existing accounts to match the user's query (e.g., if an account expires in 2028, do not say it expires in 2026 just because the user asked for 2026 expirations).
         - If the user asks for "accounts expiring this year" and you find none, do not invent them.
@@ -2441,16 +2451,23 @@ Output rules:
         WEB_SEARCH_RESTRICTION:
         - YOU ARE NOT A GENERAL SEARCH ENGINE.
         - ${webEnabled
-          ? 'Internet assist is ON. You may use web-enabled tools for phone discovery and market/news/prospect enrichment, but CRM checks still come first.'
+          ? 'Internet assist is ON. CRM checks still come first, but if CRM is empty on a public-facing company/person question, pivot to web research instead of ending with "not in CRM".'
           : 'Internet assist is OFF. Stay in CRM-only mode unless a grounded phone discovery route is already running.'}
-        - When web search is used, prefer official company domains and disclose source in output.
-        - DO NOT search the web for "Who works at [Company in CRM]?" if you haven't searched the CRM first.
-        - If the user asks about a record you can't find, ask for clarification instead of guessing from the web.
+        - When web search is used, prefer official company domains and disclose the source in plain language.
+        - Do NOT search the web for a CRM-only/private field like contract end date, bill amount, or internal note and then present it as fact if the CRM has nothing.
+        - If the user asks about a record you can't find and it is a public-facing fact, continue with web research instead of guessing. If it is a private CRM field, ask for the next actionable detail.
+
+        CRM_MISS_ESCALATION:
+        - If CRM searches come back empty on a public-facing question, do not stop at "not in CRM".
+        - First try broader CRM searches: related contacts, transcripts, emails, account notes, and account lookups.
+        - If that still yields nothing and the question is public-facing, use public web research and return the best verified answer with a short source note.
+        - If the question is about private CRM data, say what is missing and what source would resolve it.
 
         CRM_DATA_INTEGRITY:
         - YOU ARE THE SOURCE OF TRUTH FOR THE CRM.
         - If the user asks for accounts, contacts, or internal data, you MUST use the tools.
-        - CRITICAL: If the tools return zero results, do NOT search the web for "expiring accounts" or "credits". Do NOT cite researchallofus.org or any other external site for internal CRM data.
+        - CRITICAL: If the tools return zero results for internal CRM data, do NOT search the web for "expiring accounts" or "credits". Do NOT cite external sites for internal CRM data.
+        - For public-facing questions about a company/person, if CRM returns nothing, use web research rather than stopping.
         - To find accounts expiring in 2026, call \`list_accounts({ expiration_year: 2026 })\`.
         - If the user asks about bills, contracts, or documents for a specific company (like "Camp Fire"), you MUST call \`list_account_documents({ account_id: "..." })\` after finding the account.
         - NEVER say "I don't see any bills" or "no documents found" unless you have specifically called \`list_account_documents\` for that account.
@@ -2694,12 +2711,16 @@ Output rules:
       throw new Error('Max tool recursion depth reached');
     };
 
-    const callPerplexity = async (modelName, diagnostics = []) => {
+    const callPerplexity = async (modelName, diagnostics = [], fallbackOptions = {}) => {
       if (!perplexityApiKey) {
         throw new Error('Perplexity API key not configured');
       }
 
       const model = modelName || perplexityModel;
+      const fallbackMode = fallbackOptions?.mode || 'normal';
+      const fallbackReason = typeof fallbackOptions?.reason === 'string' && fallbackOptions.reason.trim()
+        ? fallbackOptions.reason.trim()
+        : '';
 
       const lastFailure = diagnostics.findLast(d => d.status === 'failed');
       const failureContext = lastFailure ? `(Reason: Previous attempt with ${lastFailure.model} failed: ${lastFailure.error})` : '';
@@ -2743,6 +2764,7 @@ Output rules:
         You DO NOT have direct access to the CRM database tools (list_accounts, list_contacts, etc.) in this session.
         Do NOT attempt to use them or tell the user you have access to them.
         Instead, provide the best answer possible using your internal knowledge and web search.
+        ${fallbackMode === 'web_fallback' ? `PUBLIC_RESEARCH_FALLBACK: The CRM search was empty or insufficient. Search aggressively for public-facing information on the open web using official company sites, public directories, state/federal records, and recent news. If the question is about a private CRM-only field, say it could not be verified publicly and explain the next best step.${fallbackReason ? ` Trigger reason: ${fallbackReason}.` : ''}` : ''}
         If the context provided in your system prompt above covers the user's request (e.g. they are asking for an email draft and the context has contact details), USE THAT CONTEXT and complete the task.
         ONLY if someone asks for a direct real-time database query that isn't in your context, explain that the primary model encountered an error.
       `.trim();
@@ -3117,6 +3139,33 @@ Output rules:
 
         if (!text || text.trim().length === 0) {
           throw new Error('Empty response from model');
+        }
+
+        const trimmedText = text.trim();
+        if (shouldEscalateToWebFallback(trimmedText)) {
+          routingDiagnostics.push({
+            provider: 'perplexity',
+            model: perplexityModel,
+            status: 'attempting',
+            reason: 'crm_miss_web_fallback'
+          });
+
+          const fallbackContent = await callPerplexity(null, routingDiagnostics, {
+            mode: 'web_fallback',
+            reason: trimmedText.slice(0, 160)
+          });
+
+          const fallbackDiagnostic = routingDiagnostics.find((d) => d.provider === 'perplexity' && d.reason === 'crm_miss_web_fallback' && d.status === 'attempting');
+          if (fallbackDiagnostic) fallbackDiagnostic.status = 'success';
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            content: fallbackContent,
+            provider: 'perplexity',
+            model: perplexityModel,
+            diagnostics: routingDiagnostics
+          }));
+          return;
         }
 
         if (lastMarketPulseData) {
