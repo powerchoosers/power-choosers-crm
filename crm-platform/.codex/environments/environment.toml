@@ -12,3 +12,8 @@ command = '''
 cd "C:\Users\Lap3p\OneDrive\Documents\Power Choosers CRM\crm-platform"
 npm run dev:turbo
 '''
+
+[[actions]]
+name = "Build Extension"
+icon = "tool"
+command = "npm run build:extension"
