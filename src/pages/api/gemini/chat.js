@@ -1524,9 +1524,9 @@ Output rules:
     const historyCandidates = cleanedMessages.slice(0, lastUserIndex);
 
     const firstName = userProfile?.firstName || 'Trey';
-    const publicResearchPattern = /\b(search the web|search the internet|internet|online|website|official site|linkedin|owner|ceo|president|founder|headquarters|address|subsidiary|parent company|who works at|who is|alternate phone|other number|office number|public phone|company phone|number on the internet|check online)\b/i;
+    const publicResearchPattern = /\b(search the web|search the internet|internet|online|website|official site|linkedin|owner|owners?|owns|ceo|president|founder|headquarters|hq|address|subsidiary|parent company|revenue|headcount|employee count|employees?|company size|founded|founding|market cap|who works at|who is|who runs|runs the company|leadership|decision maker|decision-makers?|alternate phone|other number|office number|direct phone|public phone|company phone|number on the internet|contact info|check online)\b/i;
     const internalOnlyPattern = /\b(most recent call|recent call|last call|call transcript|transcript|voicemail|he told me|she told me|what did he say|what did she say|email he told me|email he gave me|my inbox|recent email|contract end|contract expiration|bill|invoice|document|file|task|notes?)\b/i;
-    const noResultPattern = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don't find|i searched the database|not in crm|limited to apollo|could not locate|can only return contract details)/i;
+    const noResultPattern = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don['’]t find|i searched the database|not in crm|limited to apollo|could not locate|can only return contract details|need a keyword|please specify|keyword|need more context|not enough information|can['’]t verify|cannot verify|no record|no records)/i;
     const shouldEscalateToWebFallback = (assistantText: string) => {
       if (!webEnabled || jsonMode || !perplexityApiKey) return false
       if (!assistantText || !noResultPattern.test(assistantText)) return false
@@ -1826,9 +1826,14 @@ Output rules:
 
       const lower = p.toLowerCase();
       const webSearchMode = String(req.body?.webSearchMode || 'crm_plus_web');
+      const publicWebIntent = /\b(owner|owners?|owns|ceo|president|founder|headquarters|hq|address|subsidiary|parent company|linkedin|official site|website|revenue|headcount|employee count|employees?|company size|founded|founding|market cap|who runs|runs the company|leadership|decision maker|decision-makers?|public phone|office number|direct phone|alternate phone|other number|contact info)\b/.test(lower);
       const asksForPhone = /(phone\s*number|number\s+for|phone\s+for|another\s+number|other\s+number|alternate\s+number|different\s+number|dial|call\s+them)/.test(lower);
       const asksForInternet = /(internet|online|web|website|search|look up|find)/.test(lower);
       const internetPhoneIntent = asksForPhone && asksForInternet;
+
+      if (webSearchMode !== 'crm_only' && publicWebIntent && !internetPhoneIntent) {
+        return false;
+      }
 
       if (internetPhoneIntent && webSearchMode !== 'crm_only') {
         const diagnostics = [
@@ -1921,9 +1926,6 @@ Output rules:
         }
       }
 
-      // Grounded path DISABLED: user wants full LLM so they get identity_card (clickable dossier links),
-      // contract end dates in containers, and rich components—not the backend-built table-only response.
-      return false;
       // Intent locking: force full LLM for who/phone/email/call/said so grounded path does not return generic company info
       const forceFullLLM = /\b(who|phone|email|call|said)\b/.test(lower);
       if (forceFullLLM) return false;
@@ -2458,7 +2460,7 @@ Output rules:
         - If the user asks about a record you can't find and it is a public-facing fact, continue with web research instead of guessing. If it is a private CRM field, ask for the next actionable detail.
 
         CRM_MISS_ESCALATION:
-        - If CRM searches come back empty on a public-facing question, do not stop at "not in CRM".
+        - If CRM searches come back empty on a public-facing question, do not stop at "not in CRM" or ask for a keyword instead of searching.
         - First try broader CRM searches: related contacts, transcripts, emails, account notes, and account lookups.
         - If that still yields nothing and the question is public-facing, use public web research and return the best verified answer with a short source note.
         - If the question is about private CRM data, say what is missing and what source would resolve it.
