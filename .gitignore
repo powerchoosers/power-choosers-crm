@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# extension build output
+/extension/dist/
+
 # production
 /build
 

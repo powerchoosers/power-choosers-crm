@@ -1,0 +1,111 @@
+import { normalizeAuthPayload, trimText } from './shared'
+
+type SessionProbe = Record<string, unknown>
+
+let lastSignature = ''
+
+function isCandidateKey(key: string) {
+  return key.startsWith('sb-') && key.includes('auth-token')
+}
+
+function readSessionFromStorage(): SessionProbe | null {
+  try {
+    const storage = window.localStorage
+    const keys = Object.keys(storage).filter(isCandidateKey)
+    for (const key of keys) {
+      const raw = storage.getItem(key)
+      if (!raw) continue
+      try {
+        const parsed = JSON.parse(raw) as SessionProbe
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.currentSession && typeof parsed.currentSession === 'object') {
+            return parsed.currentSession as SessionProbe
+          }
+          if (
+            typeof parsed.access_token === 'string' ||
+            typeof parsed.accessToken === 'string' ||
+            typeof parsed.token === 'string'
+          ) {
+            return parsed
+          }
+        }
+      } catch {
+        continue
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
+function buildSignature(session: SessionProbe | null): string {
+  if (!session) return 'none'
+  const accessToken = trimText(session.access_token ?? session.accessToken ?? session.token)
+  const refreshToken = trimText(session.refresh_token ?? session.refreshToken)
+  const user = session.user as SessionProbe | undefined
+  const email = trimText(session.email ?? user?.email)
+  const userId = trimText(session.userId ?? user?.id)
+  const expiresAt = trimText(session.expires_at ?? session.expiresAt)
+  return [accessToken, refreshToken, email, userId, expiresAt].join('|')
+}
+
+function sendAuthState() {
+  const session = readSessionFromStorage()
+  const signature = buildSignature(session)
+  if (signature === lastSignature) return
+  lastSignature = signature
+
+  const payload = normalizeAuthPayload(
+    session
+      ? {
+          ...session,
+          appOrigin: window.location.origin,
+        }
+      : null,
+    window.location.origin
+  )
+
+  if (payload) {
+    chrome.runtime.sendMessage(
+      {
+        type: 'AUTH_SYNC',
+        payload,
+      },
+      () => {
+        void chrome.runtime.lastError
+      }
+    )
+    return
+  }
+
+  chrome.runtime.sendMessage(
+    {
+      type: 'AUTH_CLEAR',
+      payload: {
+        appOrigin: window.location.origin,
+      },
+    },
+    () => {
+      void chrome.runtime.lastError
+    }
+  )
+}
+
+function scheduleSync() {
+  sendAuthState()
+  window.setInterval(sendAuthState, 5000)
+  window.addEventListener('storage', sendAuthState)
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      sendAuthState()
+    }
+  })
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', scheduleSync, { once: true })
+} else {
+  scheduleSync()
+}

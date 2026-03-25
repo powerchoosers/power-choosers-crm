@@ -1,0 +1,51 @@
+{
+  "manifest_version": 3,
+  "name": "Nodal Point Command Deck",
+  "version": "0.1.0",
+  "description": "Side-panel CRM capture, note logging, and Twilio calling for Nodal Point.",
+  "permissions": [
+    "activeTab",
+    "alarms",
+    "notifications",
+    "offscreen",
+    "scripting",
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://nodalpoint.io/*",
+    "https://www.nodalpoint.io/*",
+    "https://nodal-point-network.vercel.app/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Nodal Point Command Deck"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "http://127.0.0.1:3000/*",
+        "https://nodalpoint.io/*",
+        "https://www.nodalpoint.io/*",
+        "https://nodal-point-network.vercel.app/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icon.svg"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
