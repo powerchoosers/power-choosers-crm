@@ -10,7 +10,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useEmails } from '@/hooks/useEmails'
 import { useAuth } from '@/context/AuthContext'
 import { generateNodalSignature } from '@/lib/signature'
-import { playClick, playPing, playAlert, playThud } from '@/lib/audio'
+import { playClick, playWhoosh } from '@/lib/audio'
 import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap, Type, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, Palette } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -1749,7 +1749,6 @@ Return exactly one subject line.`,
       })
     )
 
-    playClick()
     sendEmail(
       {
         to: toChips.join(', '),
@@ -1765,6 +1764,7 @@ Return exactly one subject line.`,
       },
       {
         onSuccess: () => {
+          playWhoosh()
           onClose()
         },
       }

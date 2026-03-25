@@ -11,7 +11,7 @@ import { generateNodalSignature, generateForensicSignature } from '@/lib/signatu
 import { useAuth } from '@/context/AuthContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { playClick } from '@/lib/audio'
+import { playWhoosh } from '@/lib/audio'
 import type { Email } from '@/hooks/useEmails'
 import type { Editor } from '@tiptap/react'
 
@@ -121,7 +121,6 @@ export function InlineReplyComposer({ email, variant, onClose, onSent }: InlineR
             return
         }
 
-        playClick()
         setIsSending(true)
 
         try {
@@ -198,6 +197,7 @@ export function InlineReplyComposer({ email, variant, onClose, onSent }: InlineR
                 throw new Error(err?.error || err?.message || 'Failed to send reply')
             }
 
+            playWhoosh()
             toast.success('Reply sent')
             setReplyHtml('')
             setToAddress('')
