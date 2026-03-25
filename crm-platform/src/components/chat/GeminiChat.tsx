@@ -23,7 +23,7 @@ import { useTasks } from '@/hooks/useTasks'
 interface Diagnostic {
   model: string
   provider: string
-  status: 'attempting' | 'success' | 'failed' | 'retry'
+  status: 'attempting' | 'success' | 'failed' | 'retry' | 'tool_call'
   reason?: string
   error?: string
   tools?: string[]
@@ -44,6 +44,9 @@ interface GeminiMessage {
   type?: 'text' | 'component'
   componentData?: unknown
   timestamp?: number
+  provider?: string
+  model?: string
+  diagnostics?: Diagnostic[]
 }
 
 type NewsTickerItem = {
@@ -68,6 +71,25 @@ type ContactDossier = {
   contractStatus: 'active' | 'expired' | 'negotiating'
   contractExpiration?: string
   id: string
+}
+
+type IdentityCardData = {
+  type: 'contact' | 'account'
+  id: string
+  name: string
+  title?: string
+  company?: string
+  industry?: string
+  status?: 'active' | 'risk'
+  initials?: string
+  logoUrl?: string
+  domain?: string
+  contractEndDate?: string
+  contactCount?: number
+  subtitle?: string
+  discoveredPhone?: string
+  discoveredSource?: string
+  sourceReliability?: string
 }
 
 type PositionMaturity = {
@@ -243,10 +265,40 @@ type PromptSuggestion = {
   prompt: string
 }
 
-const NO_RESULT_PATTERN = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don't find)/i
+const NO_RESULT_PATTERN = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don['’]t find|not in crm|need a keyword|please specify|keyword|need more context|not enough information|can['’]t verify|cannot verify|no record|no records)/i
 
 function isNoResultResponse(text: string): boolean {
   return NO_RESULT_PATTERN.test(text || '')
+}
+
+function formatModelLabel(model?: string) {
+  if (!model) return ''
+  return model
+    .replace(/^google\//i, '')
+    .replace(/^anthropic\//i, '')
+    .replace(/^openai\//i, '')
+    .replace(/^meta-llama\//i, '')
+    .replace(/^mistral\//i, '')
+    .toUpperCase()
+}
+
+function getAnswerRouteLabel(message: GeminiMessage) {
+  const diagnostics = Array.isArray(message.diagnostics) ? message.diagnostics : []
+  const provider = String(message.provider || '').toLowerCase()
+  const hasGrounded = diagnostics.some((d) => {
+    const diagnosticProvider = String(d.provider || '').toLowerCase()
+    return diagnosticProvider === 'grounded' || diagnosticProvider === 'supabase'
+  })
+  const hasPerplexity = diagnostics.some((d) => String(d.provider || '').toLowerCase() === 'perplexity')
+  const hasWebFallback = diagnostics.some((d) => String(d.provider || '').toLowerCase() === 'perplexity' && d.reason === 'crm_miss_web_fallback')
+  const hasToolCalls = diagnostics.some((d) => d.status === 'tool_call')
+
+  if (hasGrounded && hasPerplexity) return 'CRM → WEB'
+  if (hasWebFallback) return 'CRM → WEB'
+  if (provider === 'grounded' || hasGrounded) return 'CRM'
+  if (provider === 'perplexity' || hasPerplexity) return 'WEB'
+  if (provider === 'gemini' || provider === 'openrouter') return hasToolCalls ? 'CRM' : 'MODEL'
+  return ''
 }
 
 function FlightCheckBlock({
@@ -311,150 +363,135 @@ function FlightCheckBlock({
   )
 }
 
+function IdentityCardView({ card }: { card: IdentityCardData }) {
+  const router = useRouter()
+  const { mutateAsync: updateAccount } = useUpdateAccount()
+  const [isEnriching, setIsEnriching] = useState(false)
+  const [enriched, setEnriched] = useState(false)
+
+  const path = card.type === 'contact' ? '/network/contacts' : '/network/accounts'
+  const initials = card.initials ?? (card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?')
+  const secondLine = card.subtitle ?? (card.contractEndDate ? `Contract: ${card.contractEndDate}` : (typeof card.contactCount === 'number' ? `${card.contactCount} contacts` : null))
+
+  const handleEnrich = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!card.discoveredPhone || card.type !== 'account' || isEnriching || enriched) return
+
+    setIsEnriching(true)
+    try {
+      const updates: any = { companyPhone: card.discoveredPhone }
+      updates.metadata = {
+        discrepancy_log: [
+          {
+            field: 'phone',
+            old_value: 'N/A or Outdated',
+            new_value: card.discoveredPhone,
+            source: card.discoveredSource || 'Forensic Discovery',
+            timestamp: new Date().toISOString()
+          }
+        ]
+      }
+      await updateAccount({ id: card.id, ...updates })
+      setEnriched(true)
+    } catch (err) {
+      console.error('Enrichment failed:', err)
+    } finally {
+      setIsEnriching(false)
+    }
+  }
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (card.discoveredPhone) {
+      navigator.clipboard.writeText(card.discoveredPhone)
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-md bg-zinc-950/80 nodal-monolith-edge backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer group"
+      onClick={() => router.push(`${path}/${card.id}`)}
+    >
+      <div className="p-4 flex items-center gap-4">
+        <div className="shrink-0 w-14 h-14 rounded-[14px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
+          {card.type === 'account' && (card.logoUrl || card.domain) ? (
+            <CompanyIcon logoUrl={card.logoUrl} domain={card.domain} name={card.name} size={56} roundedClassName="rounded-[14px]" />
+          ) : (
+            <span className="font-mono font-bold text-lg text-zinc-300">{initials}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-white font-semibold text-base truncate">{card.name}</h3>
+            <span className={cn('w-2 h-2 rounded-full shrink-0', card.status === 'risk' ? 'bg-red-500' : 'bg-emerald-500')} />
+          </div>
+          <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">{[card.title, card.company ?? card.industry].filter(Boolean).join(' · ')}</p>
+        </div>
+      </div>
+
+      {card.discoveredPhone && (
+        <div className="mx-4 mb-4 p-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] font-bold">Forensic Discovery</span>
+            <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest bg-black/40 px-1.5 py-0.5 rounded border border-white/5">
+              Source: {card.discoveredSource || 'Deep Web'}
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
+                <Phone size={12} />
+              </div>
+              <span className="text-sm font-mono font-bold text-white tabular-nums truncate">
+                {card.discoveredPhone}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 rounded-lg hover:bg-white/5 text-zinc-400"
+                onClick={handleCopy}
+              >
+                <Copy size={12} />
+              </Button>
+              <Button
+                size="sm"
+                className={cn(
+                  "h-7 font-mono text-[9px] uppercase tracking-widest px-3 transition-all",
+                  enriched
+                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                    : "bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+                )}
+                onClick={handleEnrich}
+                disabled={isEnriching || enriched}
+              >
+                {isEnriching ? <Loader2 size={10} className="animate-spin" /> : enriched ? "ENRICHED" : "ENRICH"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="px-4 py-2 border-t border-white/5 group-hover:bg-[#002FA7]/10 transition-colors flex flex-col gap-0.5">
+        {secondLine && <span className="text-[10px] font-mono text-zinc-500 truncate">{secondLine}</span>}
+        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Open dossier →</span>
+      </div>
+    </motion.div>
+  )
+}
+
 function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: string; data: unknown; onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>; contextInfo?: ContextInfo }) {
   const router = useRouter()
 
   switch (type) {
     case 'identity_card': {
       if (!isRecord(data)) return null
-      const card = data as {
-        type: 'contact' | 'account'
-        id: string
-        name: string
-        title?: string
-        company?: string
-        industry?: string
-        status?: 'active' | 'risk'
-        initials?: string
-        logoUrl?: string
-        domain?: string
-        contractEndDate?: string
-        contactCount?: number
-        subtitle?: string
-        discoveredPhone?: string
-        discoveredSource?: string
-        sourceReliability?: string
-      }
-      const path = card.type === 'contact' ? '/network/people' : '/network/accounts'
-      const initials = card.initials ?? (card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?')
-      const secondLine = card.subtitle ?? (card.contractEndDate ? `Contract: ${card.contractEndDate}` : (typeof card.contactCount === 'number' ? `${card.contactCount} contacts` : null))
-      const { mutateAsync: updateAccount } = useUpdateAccount()
-      const [isEnriching, setIsEnriching] = useState(false)
-      const [enriched, setEnriched] = useState(false)
-
-      const handleEnrich = async (e: React.MouseEvent) => {
-        e.stopPropagation()
-        if (!card.discoveredPhone || card.type !== 'account' || isEnriching || enriched) return
-
-        setIsEnriching(true)
-        try {
-          const updates: any = { companyPhone: card.discoveredPhone }
-          // Log discrepancy in metadata
-          updates.metadata = {
-            discrepancy_log: [
-              {
-                field: 'phone',
-                old_value: 'N/A or Outdated',
-                new_value: card.discoveredPhone,
-                source: card.discoveredSource || 'Forensic Discovery',
-                timestamp: new Date().toISOString()
-              }
-            ]
-          }
-          await updateAccount({ id: card.id, ...updates })
-          setEnriched(true)
-        } catch (err) {
-          console.error('Enrichment failed:', err)
-        } finally {
-          setIsEnriching(false)
-        }
-      }
-
-      const handleCopy = (e: React.MouseEvent) => {
-        e.stopPropagation()
-        if (card.discoveredPhone) {
-          navigator.clipboard.writeText(card.discoveredPhone)
-          // Simple local feedback would be better but let's stick to core logic
-        }
-      }
-
-      return (
-        <motion.div
-          initial={{ opacity: 0, y: 4 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-zinc-950/80 nodal-monolith-edge backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer group"
-          onClick={() => router.push(`${path}/${card.id}`)}
-        >
-          <div className="p-4 flex items-center gap-4">
-            <div className="shrink-0 w-14 h-14 rounded-[14px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
-              {card.type === 'account' && (card.logoUrl || card.domain) ? (
-                <CompanyIcon logoUrl={card.logoUrl} domain={card.domain} name={card.name} size={56} roundedClassName="rounded-[14px]" />
-              ) : (
-                <span className="font-mono font-bold text-lg text-zinc-300">{initials}</span>
-              )}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <h3 className="text-white font-semibold text-base truncate">{card.name}</h3>
-                <span className={cn('w-2 h-2 rounded-full shrink-0', card.status === 'risk' ? 'bg-red-500' : 'bg-emerald-500')} />
-              </div>
-              <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">{[card.title, card.company ?? card.industry].filter(Boolean).join(' · ')}</p>
-            </div>
-          </div>
-
-          {/* Forensic Data Discovery Block */}
-          {card.discoveredPhone && (
-            <div className="mx-4 mb-4 p-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] font-bold">Forensic Discovery</span>
-                <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest bg-black/40 px-1.5 py-0.5 rounded border border-white/5">
-                  Source: {card.discoveredSource || 'Deep Web'}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
-                    <Phone size={12} />
-                  </div>
-                  <span className="text-sm font-mono font-bold text-white tabular-nums truncate">
-                    {card.discoveredPhone}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 rounded-lg hover:bg-white/5 text-zinc-400"
-                    onClick={handleCopy}
-                  >
-                    <Copy size={12} />
-                  </Button>
-                  <Button
-                    size="sm"
-                    className={cn(
-                      "h-7 font-mono text-[9px] uppercase tracking-widest px-3 transition-all",
-                      enriched
-                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                        : "bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
-                    )}
-                    onClick={handleEnrich}
-                    disabled={isEnriching || enriched}
-                  >
-                    {isEnriching ? <Loader2 size={10} className="animate-spin" /> : enriched ? "ENRICHED" : "ENRICH"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="px-4 py-2 border-t border-white/5 group-hover:bg-[#002FA7]/10 transition-colors flex flex-col gap-0.5">
-            {secondLine && <span className="text-[10px] font-mono text-zinc-500 truncate">{secondLine}</span>}
-            <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Open dossier →</span>
-          </div>
-        </motion.div>
-      )
+      return <IdentityCardView card={data as IdentityCardData} />
     }
     case 'flight_check': {
       if (!isRecord(data)) return null
@@ -522,7 +559,7 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
             <Button
               size="sm"
               className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.4)] h-8"
-              onClick={(e) => { e.stopPropagation(); dossier.id && router.push(`/network/people/${dossier.id}`); }}
+              onClick={(e) => { e.stopPropagation(); dossier.id && router.push(`/network/contacts/${dossier.id}`); }}
             >
               INITIATE
             </Button>
@@ -1142,7 +1179,7 @@ export function GeminiChatPanel() {
         },
         {
           label: 'Decision Makers',
-          prompt: 'Find likely decision-maker names and titles for energy agreements at this company.'
+          prompt: 'Find likely decision-maker names and titles for energy agreements at this company using public web sources.'
         },
       ]
     }
@@ -1204,12 +1241,19 @@ export function GeminiChatPanel() {
   const loadSession = async (sessionId: string) => {
     const { data } = await supabase.from('chat_messages').select('*').eq('session_id', sessionId).order('created_at', { ascending: true })
     if (data) {
-      setMessages(data.map((m: { id: string; role: string; content: string; created_at: string }) => ({
-        id: m.id,
-        role: m.role === 'model' ? 'assistant' : m.role as 'user' | 'assistant',
-        content: m.content,
-        timestamp: new Date(m.created_at).getTime()
-      })))
+      setMessages(data.map((m: { id: string; role: string; content: string; created_at: string; metadata?: Record<string, unknown> | null }) => {
+        const metadata = isRecord(m.metadata) ? m.metadata : null
+        return {
+          id: m.id,
+          role: m.role === 'model' ? 'assistant' : m.role as 'user' | 'assistant',
+          content: m.content,
+          timestamp: new Date(m.created_at).getTime(),
+          provider: typeof metadata?.provider === 'string' ? metadata.provider : undefined,
+          model: typeof metadata?.model === 'string' ? metadata.model : undefined,
+          diagnostics: Array.isArray(metadata?.diagnostics) ? metadata.diagnostics as Diagnostic[] : undefined,
+          componentData: metadata?.componentData,
+        }
+      }))
       setCurrentSessionId(sessionId)
       sessionIdRef.current = sessionId
       setIsHistoryOpen(false)
@@ -1265,15 +1309,24 @@ export function GeminiChatPanel() {
     }
   }, [buildSessionTitle, contextInfo.id, contextInfo.type])
 
-  const saveMessageToDb = async (role: 'user' | 'model', content: string) => {
+  const saveMessageToDb = async (role: 'user' | 'model', content: string, metadata?: Record<string, unknown>) => {
     try {
       const sessionId = await ensureSessionId(content)
       if (sessionId) {
-        await supabase.from('chat_messages').insert({
+        const payload: {
+          session_id: string
+          role: 'user' | 'model'
+          content: string
+          metadata?: Record<string, unknown>
+        } = {
           session_id: sessionId,
           role,
           content
-        })
+        }
+        if (metadata && Object.keys(metadata).length > 0) {
+          payload.metadata = metadata
+        }
+        await supabase.from('chat_messages').insert(payload)
         await supabase.from('chat_sessions').update({ updated_at: new Date().toISOString() }).eq('id', sessionId)
       }
     } catch (err) {
@@ -1541,14 +1594,20 @@ SELECT * FROM hybrid_search_accounts(
       const isNewsRequest = /news|company news|give me the news|what'?s the news|latest news|news on|any news|news about|reports? about/i.test(messageText.trim())
       const isFirstExchange = messagesForApi.length <= 1
       const showNewsCard = (contextInfo.type === 'contact' || contextInfo.type === 'account') && (isNewsRequest || isFirstExchange) && apolloNewsSignals && apolloNewsSignals.length > 0
+      const assistantMetadata = {
+        provider: typeof data.provider === 'string' ? data.provider : undefined,
+        model: typeof data.model === 'string' ? data.model : undefined,
+        diagnostics: Array.isArray(data.diagnostics) ? data.diagnostics as Diagnostic[] : undefined,
+        ...(showNewsCard ? { componentData: { type: 'company_news', articles: apolloNewsSignals } } : {})
+      }
       setMessages((prev) => [...prev, {
         role: 'assistant',
         content: data.content,
         id: crypto.randomUUID(),
         timestamp: Date.now(),
-        ...(showNewsCard ? { componentData: { type: 'company_news', articles: apolloNewsSignals } } : {})
+        ...assistantMetadata
       }])
-      await saveMessageToDb('model', data.content)
+      await saveMessageToDb('model', data.content, assistantMetadata)
     } catch (err: unknown) {
       console.error('Chat error:', err)
       const errorWithDiagnostics = err as { diagnostics?: Diagnostic[] }
@@ -1580,18 +1639,58 @@ SELECT * FROM hybrid_search_accounts(
   }
 
   const noResultActions = useMemo(() => {
+    if (!internetAssistEnabled) {
+      if (contextInfo.type === 'account') {
+        return [
+          {
+            label: 'Broaden CRM',
+            prompt: 'Search CRM notes, calls, emails, and related contacts again for this account.'
+          },
+          {
+            label: 'Check Calls',
+            prompt: 'Search recent calls and transcripts for this account.'
+          },
+          {
+            label: 'Related Contacts',
+            prompt: 'Find other contacts at this company in the CRM.'
+          }
+        ]
+      }
+      if (contextInfo.type === 'contact') {
+        return [
+          {
+            label: 'Broaden CRM',
+            prompt: 'Search CRM notes, calls, emails, and related contacts again for this contact.'
+          },
+          {
+            label: 'Check Calls',
+            prompt: 'Search recent calls and transcripts for this contact.'
+          },
+          {
+            label: 'Linked Account',
+            prompt: 'Open the linked account context and search that CRM record.'
+          }
+        ]
+      }
+      return [
+        {
+          label: 'Broaden CRM',
+          prompt: 'Search the CRM again using related records, notes, calls, and emails.'
+        }
+      ]
+    }
     if (contextInfo.type === 'account') {
       return [
         {
-          label: 'Search Internet Numbers',
+          label: 'Web Search',
           prompt: 'Find alternate corporate phone numbers for this company from the internet, include source URLs, and mark the highest-confidence number.'
         },
         {
           label: 'Find Decision Makers',
-          prompt: 'Find likely decision-maker names and titles for energy agreements at this company.'
+          prompt: 'Find likely decision-maker names and titles for energy agreements at this company using public web sources.'
         },
         {
-          label: 'Build Research Checklist',
+          label: 'Checklist',
           prompt: 'Create a short checklist to fill missing phone and contact data for this account.'
         }
       ]
@@ -1599,22 +1698,22 @@ SELECT * FROM hybrid_search_accounts(
     if (contextInfo.type === 'contact') {
       return [
         {
-          label: 'Search Contact Number',
+          label: 'Phone Search',
           prompt: 'Search the internet for this contact or company phone number and include source URLs.'
         },
         {
-          label: 'Find Alternate Contact',
-          prompt: 'Find other contacts at this company who likely handle energy decisions.'
+          label: 'Alt Contact',
+          prompt: 'Find other contacts at this company who likely handle energy decisions using public web sources.'
         },
         {
-          label: 'Build Research Checklist',
+          label: 'Checklist',
           prompt: 'Create a short checklist to fill missing contact data before the next call.'
         }
       ]
     }
     return [
       {
-        label: 'Search Internet',
+        label: 'Web Search',
         prompt: 'Search the internet for better contact details and provide source URLs with confidence.'
       }
     ]
@@ -1883,6 +1982,23 @@ SELECT * FROM hybrid_search_accounts(
                         <span className="text-[10px] font-sans text-[#002FA7] uppercase tracking-widest font-bold">
                           NODAL_ARCHITECT // v2.0
                         </span>
+                        {getAnswerRouteLabel(m) && (
+                          <span className={cn(
+                            "text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full border",
+                            getAnswerRouteLabel(m) === 'WEB'
+                              ? "text-amber-400 border-amber-500/20 bg-amber-500/10"
+                              : getAnswerRouteLabel(m) === 'CRM → WEB'
+                                ? "text-[#002FA7] border-[#002FA7]/20 bg-[#002FA7]/10"
+                                : "text-zinc-400 border-white/10 bg-white/5"
+                          )}>
+                            {getAnswerRouteLabel(m)}
+                          </span>
+                        )}
+                        {formatModelLabel(m.model) && (
+                          <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-wider border border-white/10 bg-white/5 px-2 py-0.5 rounded-full">
+                            {formatModelLabel(m.model)}
+                          </span>
+                        )}
                         {isLoading && i === messages.length - 1 && <Waveform />}
                       </div>
                       {i === messages.length - 1 && isBackupFallback && (
@@ -2065,9 +2181,9 @@ SELECT * FROM hybrid_search_accounts(
                     ? 'text-[#002FA7] border-[#002FA7]/40 bg-[#002FA7]/10'
                     : 'text-zinc-500 border-white/10 bg-white/5'
                 )}
-                title={internetAssistEnabled ? 'Internet assist enabled' : 'Internet assist disabled'}
+                title={internetAssistEnabled ? 'Search CRM first, then web' : 'CRM-only mode'}
               >
-                {internetAssistEnabled ? 'WEB ON' : 'WEB OFF'}
+                {internetAssistEnabled ? 'CRM+WEB' : 'CRM ONLY'}
               </button>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
               <span className="text-[10px] font-sans text-emerald-500/80 uppercase tracking-tighter leading-none">
