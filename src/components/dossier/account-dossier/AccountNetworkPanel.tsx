@@ -18,6 +18,7 @@ interface AccountNetworkPanelProps {
     account: any
     contacts: any[]
     calls: any[]
+    isLoadingContacts: boolean
     isLoadingCalls: boolean
 }
 
@@ -26,6 +27,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
     account,
     contacts,
     calls,
+    isLoadingContacts,
     isLoadingCalls
 }: AccountNetworkPanelProps) {
     const { setRightPanelMode, setIngestionContext } = useUIStore()
@@ -110,11 +112,16 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                         primaryContactId={account?.primaryContactId}
                         onSetHolder={handleSetHolder}
                         composeContext={composeContext}
+                        isLoadingContacts={isLoadingContacts}
                     />
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>
-                    <StakeholderMap contacts={contacts || []} onAddContact={handleAddContact} />
+                    <StakeholderMap
+                        contacts={contacts || []}
+                        onAddContact={handleAddContact}
+                        isLoadingContacts={isLoadingContacts}
+                    />
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>

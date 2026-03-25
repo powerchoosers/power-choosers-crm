@@ -7,6 +7,7 @@ import { ArrowUpRight, Building2, GitBranch, Plus, Search, X } from 'lucide-reac
 import { AnimatePresence, motion } from 'framer-motion'
 import { toast } from 'sonner'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { DottedEmptyState } from '@/components/dossier/DottedEmptyState'
 import { supabase } from '@/lib/supabase'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { cn } from '@/lib/utils'
@@ -196,6 +197,7 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
   const [parentAccount, setParentAccount] = useState<RelatedAccount | null>(null)
   const [subsidiaryAccounts, setSubsidiaryAccounts] = useState<RelatedAccount[]>([])
   const [hierarchyOverride, setHierarchyOverride] = useState<AccountHierarchy | null>(null)
+  const [isHierarchyLoaded, setIsHierarchyLoaded] = useState(false)
 
   const inputRef = useRef<HTMLInputElement>(null)
   const closeControlsTimerRef = useRef<number | null>(null)
@@ -800,6 +802,10 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
           setParentAccount(null)
           setSubsidiaryAccounts([])
         }
+      } finally {
+        if (!cancelled) {
+          setIsHierarchyLoaded(true)
+        }
       }
     }
 
@@ -958,6 +964,19 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
               </div>
             )}
             </div>
+          </motion.div>
+        )}
+
+        {!controlsOpen && isHierarchyLoaded && !hasLinkedAccounts && (
+          <motion.div
+            key="corporate-chain-empty"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.32, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden mt-3"
+          >
+            <DottedEmptyState message="No corporate chain linked" />
           </motion.div>
         )}
       </AnimatePresence>
