@@ -8,6 +8,7 @@ import { useCallStore } from '@/store/callStore'
 import { useComposeStore } from '@/store/composeStore'
 import type { ComposeContext } from '@/components/emails/ComposeModal'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { DottedEmptyState } from '@/components/dossier/DottedEmptyState'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { cn } from '@/lib/utils'
 
@@ -32,6 +33,7 @@ interface AccountHolderCardProps {
   primaryContactId?: string | null
   onSetHolder: (contactId: string | null) => void
   composeContext?: ComposeContext | null
+  isLoadingContacts?: boolean
 }
 
 export function AccountHolderCard({
@@ -41,6 +43,7 @@ export function AccountHolderCard({
   primaryContactId,
   onSetHolder,
   composeContext,
+  isLoadingContacts = false,
 }: AccountHolderCardProps) {
   const initiateCall = useCallStore(s => s.initiateCall)
   const router = useRouter()
@@ -239,6 +242,19 @@ export function AccountHolderCard({
                 </button>
               )}
             </div>
+          </motion.div>
+        )}
+
+        {!holder && !picking && !isLoadingContacts && (
+          <motion.div
+            key="holder-empty"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden mt-3"
+          >
+            <DottedEmptyState message="No decision maker assigned" />
           </motion.div>
         )}
 

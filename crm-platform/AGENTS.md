@@ -74,6 +74,12 @@ Turbo dev is fine here and often preferred. Only use `npm run dev` if you are sp
 
 TypeScript must stay clean before shipping changes.
 
+## Image Renders
+
+- `playwright` is already in `devDependencies` and is the default tool for crisp LinkedIn-style screenshots and HTML renders.
+- When capturing images, use a 2x render scale or `deviceScaleFactor: 2` so text stays sharp on mobile and feed previews.
+- `sharp` is also available if an image needs a resize, crop, or cleanup pass after capture.
+
 ## Data Rules
 
 - Supabase is the main database.

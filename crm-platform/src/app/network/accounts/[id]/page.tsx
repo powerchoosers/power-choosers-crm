@@ -138,6 +138,7 @@ export default function AccountDossierPage() {
               account={state.account}
               contacts={state.contacts || []}
               calls={state.calls || []}
+              isLoadingContacts={state.isLoadingContacts}
               isLoadingCalls={state.isLoadingCalls}
             />
           </div>
