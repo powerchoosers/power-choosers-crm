@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Reply, ReplyAll, Forward, Trash2, MoreHorizontal, Printer, Star, Paperclip, Download, Loader2, Send, X, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, ChevronDown, ChevronLeft, ChevronRight, Eye, MousePointer2, ArrowUpRight, ArrowDownLeft, Clock } from 'lucide-react'
 import { format } from 'date-fns'
-import { playClick } from '@/lib/audio'
+import { playWhoosh } from '@/lib/audio'
 import { EmailContent } from '@/components/emails/EmailContent'
 import { generateNodalSignature, generateForensicSignature } from '@/lib/signature'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
@@ -676,7 +676,6 @@ export default function EmailDetailPage() {
       return
     }
 
-    playClick()
     setIsSendingReply(true)
     try {
       const firstName = profile?.firstName || profile?.name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Nodal Point'
@@ -808,6 +807,7 @@ export default function EmailDetailPage() {
         setPendingFocusMessageId(String(payload.trackingId))
       }
 
+      playWhoosh()
       toast.success(composerMode === 'forward' ? 'Forward sent' : 'Reply sent')
       setReplyHtml('')
       setToChips([])
