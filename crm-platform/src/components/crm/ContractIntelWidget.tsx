@@ -389,7 +389,7 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
             Contract_Intel
           </h3>
           <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-zinc-600">
-            {activeDeals.length} active / {historicalDeals.length} history
+            {activeDeals.length} {activeDeals.length === 1 ? 'active contract' : 'active contracts'}
           </span>
         </div>
         <button

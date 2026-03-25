@@ -238,6 +238,11 @@ function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }
 
 type ContextInfo = { type: string; id?: string | string[]; displayLabel?: string }
 
+type PromptSuggestion = {
+  label: string
+  prompt: string
+}
+
 const NO_RESULT_PATTERN = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don't find)/i
 
 function isNoResultResponse(text: string): boolean {
@@ -1124,25 +1129,52 @@ export function GeminiChatPanel() {
     }
   }, [contextInfo.type])
 
-  const trySuggestions = useMemo(() => {
+  const trySuggestions = useMemo<PromptSuggestion[]>(() => {
     if (contextInfo.type === 'account') {
       return [
-        'Run deep-dive forensic analysis for this account',
-        'Find alternate phone numbers for this company on the internet',
-        "Who's at this company?",
+        {
+          label: 'Deep Dive',
+          prompt: 'Run deep-dive forensic analysis for this account.'
+        },
+        {
+          label: 'Phone Hunt',
+          prompt: 'Find alternate phone numbers for this company on the internet.'
+        },
+        {
+          label: 'Decision Makers',
+          prompt: 'Find likely decision-maker names and titles for energy agreements at this company.'
+        },
       ]
     }
     if (contextInfo.type === 'contact') {
       return [
-        'Run deep-dive forensic analysis for this contact',
-        "Find this contact's direct phone or office number online",
-        'Draft a follow-up email for this contact',
+        {
+          label: 'Deep Dive',
+          prompt: 'Run deep-dive forensic analysis for this contact.'
+        },
+        {
+          label: 'Phone Hunt',
+          prompt: "Find this contact's direct phone or office number online."
+        },
+        {
+          label: 'Follow Up',
+          prompt: 'Draft a follow-up email for this contact.'
+        },
       ]
     }
     return [
-      'Accounts expiring in 2026',
-      "Who's at this company?",
-      'Market volatility',
+      {
+        label: 'Expiring Accounts',
+        prompt: 'Accounts expiring in 2026'
+      },
+      {
+        label: 'Decision Makers',
+        prompt: "Who's at this company?"
+      },
+      {
+        label: 'Market Pulse',
+        prompt: 'Market volatility'
+      },
     ]
   }, [contextInfo.type])
 
@@ -1540,8 +1572,8 @@ SELECT * FROM hybrid_search_accounts(
     }
   }, [contextInfo, selectedModel, profile?.firstName, apolloNewsSignals, internetAssistEnabled])
 
-  const handleSend = async () => {
-    const messageText = input.trim()
+  const handleSend = async (messageOverride?: string) => {
+    const messageText = (messageOverride ?? input).trim()
     if (!messageText || isLoading) return
     setInput('')
     await sendWithMessage(messageText)
@@ -2050,12 +2082,12 @@ SELECT * FROM hybrid_search_accounts(
               <span className="text-[9px] font-sans text-zinc-600 uppercase tracking-wider shrink-0">Try:</span>
               {trySuggestions.map((s) => (
                 <button
-                  key={s}
+                  key={s.label}
                   type="button"
-                  onClick={() => setInput(s)}
+                  onClick={() => void handleSend(s.prompt)}
                   className="text-[10px] font-sans text-zinc-500 hover:text-zinc-300 border border-white/10 hover:border-white/20 px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
                 >
-                  {s}
+                  {s.label}
                 </button>
               ))}
             </div>
