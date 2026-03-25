@@ -6,6 +6,7 @@ import { Contact } from '@/hooks/useContacts'
 import { Users, ArrowUpRight, Plus } from 'lucide-react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { DottedEmptyState } from '@/components/dossier/DottedEmptyState'
 import { useContactsInTargetLists } from '@/hooks/useListMemberships'
 import { cn } from '@/lib/utils'
 
@@ -13,9 +14,15 @@ interface StakeholderMapProps {
   contacts?: Contact[]
   className?: string
   onAddContact?: () => void
+  isLoadingContacts?: boolean
 }
 
-export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], className, onAddContact }) => {
+export const StakeholderMap: React.FC<StakeholderMapProps> = ({
+  contacts = [],
+  className,
+  onAddContact,
+  isLoadingContacts = false,
+}) => {
   const router = useRouter()
 
   // Get all contact IDs
@@ -46,49 +53,64 @@ export const StakeholderMap: React.FC<StakeholderMapProps> = ({ contacts = [], c
       </div>
 
       <AnimatePresence initial={false} mode="sync">
-        <div className="space-y-2 overflow-hidden">
-          {contacts.map((contact) => {
-            const isInTargetList = contactsInLists?.has(contact.id) || false
+        {!isLoadingContacts && contacts.length === 0 && (
+          <motion.div
+            key="command-chain-empty"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.32, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden mt-3"
+          >
+            <DottedEmptyState message="No contacts mapped" />
+          </motion.div>
+        )}
 
-            return (
-              <motion.div
-                key={contact.id}
-                layout="position"
-                initial={{ opacity: 0, y: -12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{
-                  y: listTransition,
-                  opacity: { duration: 0.16, ease: [0.23, 1, 0.32, 1] },
-                  layout: listTransition,
-                }}
-                onClick={() => router.push(`/network/contacts/${contact.id}`)}
-                className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer"
-              >
-                {/* Avatar with Target Badge */}
-                <ContactAvatar
-                  name={contact.name || ''}
-                  photoUrl={contact.avatarUrl}
-                  size={32}
-                  className="w-8 h-8 rounded-[14px]"
-                  textClassName="text-[10px]"
-                  showListBadge={isInTargetList}
-                />
+        {contacts.length > 0 && (
+          <div className="space-y-2 overflow-hidden">
+            {contacts.map((contact) => {
+              const isInTargetList = contactsInLists?.has(contact.id) || false
 
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium text-zinc-300 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left truncate">
-                    {contact.name}
+              return (
+                <motion.div
+                  key={contact.id}
+                  layout="position"
+                  initial={{ opacity: 0, y: -12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -12 }}
+                  transition={{
+                    y: listTransition,
+                    opacity: { duration: 0.16, ease: [0.23, 1, 0.32, 1] },
+                    layout: listTransition,
+                  }}
+                  onClick={() => router.push(`/network/contacts/${contact.id}`)}
+                  className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer"
+                >
+                  {/* Avatar with Target Badge */}
+                  <ContactAvatar
+                    name={contact.name || ''}
+                    photoUrl={contact.avatarUrl}
+                    size={32}
+                    className="w-8 h-8 rounded-[14px]"
+                    textClassName="text-[10px]"
+                    showListBadge={isInTargetList}
+                  />
+
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-medium text-zinc-300 group-hover:text-white group-hover:scale-[1.02] transition-all origin-left truncate">
+                      {contact.name}
+                    </div>
+                    <div className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">
+                      {(contact as any).title || 'Stakeholder'}
+                    </div>
                   </div>
-                  <div className="text-[10px] text-zinc-600 group-hover:text-zinc-500 truncate font-mono">
-                    {(contact as any).title || 'Stakeholder'}
-                  </div>
-                </div>
 
-                <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors" />
-              </motion.div>
-            )
-          })}
-        </div>
+                  <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-[#002FA7] transition-colors" />
+                </motion.div>
+              )
+            })}
+          </div>
+        )}
       </AnimatePresence>
     </div>
   )
