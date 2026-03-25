@@ -11,9 +11,10 @@ export function cors(req, res) {
     'https://www.nodalpoint.io',
     'https://nodal-point-network.vercel.app'
   ];
+  const isChromeExtension = typeof origin === 'string' && origin.startsWith('chrome-extension://');
 
   // Only echo specific origins we trust. Do NOT fall back to localhost in production.
-  if (allowedOrigins.includes(origin)) {
+  if (allowedOrigins.includes(origin) || isChromeExtension) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
