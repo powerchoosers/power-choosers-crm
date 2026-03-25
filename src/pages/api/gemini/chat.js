@@ -1527,7 +1527,7 @@ Output rules:
     const publicResearchPattern = /\b(search the web|search the internet|internet|online|website|official site|linkedin|owner|owners?|owns|ceo|president|founder|headquarters|hq|address|subsidiary|parent company|revenue|headcount|employee count|employees?|company size|founded|founding|market cap|who works at|who is|who runs|runs the company|leadership|decision maker|decision-makers?|alternate phone|other number|office number|direct phone|public phone|company phone|number on the internet|contact info|check online)\b/i;
     const internalOnlyPattern = /\b(most recent call|recent call|last call|call transcript|transcript|voicemail|he told me|she told me|what did he say|what did she say|email he told me|email he gave me|my inbox|recent email|contract end|contract expiration|bill|invoice|document|file|task|notes?)\b/i;
     const noResultPattern = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don['’]t find|i searched the database|not in crm|limited to apollo|could not locate|can only return contract details|need a keyword|please specify|keyword|need more context|not enough information|can['’]t verify|cannot verify|no record|no records)/i;
-    const shouldEscalateToWebFallback = (assistantText: string) => {
+    const shouldEscalateToWebFallback = (assistantText) => {
       if (!webEnabled || jsonMode || !perplexityApiKey) return false
       if (!assistantText || !noResultPattern.test(assistantText)) return false
       if (internalOnlyPattern.test(String(prompt || ''))) return false
