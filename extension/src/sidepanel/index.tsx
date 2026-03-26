@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Phone, Building2, ArrowUpRight, Star, MapPin } from 'lucide-react'
 import {
   defaultCallState,
   formatElapsed,
@@ -14,6 +15,8 @@ import {
   type MatchAccount,
   type MatchContact,
 } from '../shared'
+import { mapLocationToZone, LOAD_ZONE_COLOR_MAP, ERCOT_ZONES, type ErcotZone } from '../../../src/lib/market-mapping'
+import { resolveContactPhotoUrl } from '../../../src/lib/contactAvatar'
 
 type MessageResponse<T> = {
   ok: boolean
@@ -80,37 +83,99 @@ function entityInitials(value: string | null | undefined) {
   return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase()
 }
 
-function EntityMark({
+function EntityAvatar({
   name,
-  logoUrl,
+  imageUrl,
+  size = 56,
+  className,
 }: {
   name: string
-  logoUrl: string | null | undefined
+  imageUrl: string | null | undefined
+  size?: number
+  className?: string
 }) {
   const [failed, setFailed] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
     setFailed(false)
-  }, [logoUrl, name])
+    setLoaded(false)
+  }, [imageUrl, name])
 
   const initials = entityInitials(name)
+  const showPhoto = Boolean(imageUrl && !failed)
 
-  if (logoUrl && !failed) {
-    return (
-      <img
-        className="np-entity-mark__img"
-        src={logoUrl}
-        alt=""
-        onError={() => setFailed(true)}
-      />
-    )
-  }
+  return (
+    <motion.div
+      className={className || 'np-entity-mark'}
+      style={{ width: size, height: size }}
+      initial={false}
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        {showPhoto && loaded ? (
+          <motion.img
+            key={`photo-${imageUrl}`}
+            src={imageUrl || ''}
+            alt={name}
+            initial={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }}
+            animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+            transition={{ duration: 0.28, ease: FORENSIC_EASE }}
+            className="np-entity-mark__img"
+            onError={() => setFailed(true)}
+          />
+        ) : (
+          <motion.span
+            key={`initials-${name}-${imageUrl || 'none'}`}
+            initial={{ opacity: 0.75, scale: 0.96 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96 }}
+            transition={{ duration: 0.2, ease: FORENSIC_EASE }}
+            className="np-entity-mark__initials"
+          >
+            {initials}
+          </motion.span>
+        )}
+      </AnimatePresence>
 
-  return <span className="np-entity-mark__initials">{initials}</span>
+      {showPhoto && !loaded && (
+        <img
+          src={imageUrl || ''}
+          alt=""
+          aria-hidden="true"
+          loading="lazy"
+          className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+        />
+      )}
+    </motion.div>
+  )
+}
+
+function resolveContactPhoto(contact: MatchContact | null) {
+  if (!contact) return null
+  return trimText(
+    resolveContactPhotoUrl(
+      contact as unknown as Record<string, unknown>,
+      (contact as any)?.metadata || null
+    ) || ''
+  ) || null
 }
 
 function contactPhone(contact: MatchContact | null) {
   return trimText(contact?.phone || contact?.mobile || contact?.workPhone || contact?.companyPhone || '') || ''
+}
+
+function accountPhone(account: MatchAccount | null) {
+  return trimText(
+    account?.phone ||
+      (account as any)?.companyPhone ||
+      (account as any)?.company_phone ||
+      (account as any)?.phoneNumber ||
+      (account as any)?.phone_number ||
+      ''
+  ) || ''
 }
 
 function primaryPhone(
@@ -121,7 +186,7 @@ function primaryPhone(
 ) {
   const fallbackContact = accountContacts.find((item) => Boolean(contactPhone(item))) || null
   return (
-    trimText(contactPhone(contact) || contactPhone(fallbackContact) || account?.phone || pagePhone || '') ||
+    trimText(contactPhone(contact) || contactPhone(fallbackContact) || accountPhone(account) || pagePhone || '') ||
     ''
   )
 }
@@ -244,6 +309,14 @@ function App() {
   const contact = match?.contact
   const pageDomain = extractDomain(page?.origin || page?.url) || null
   const selectedNumber = resolveCallerId(auth)
+  const accountLocation = trimText((account as any)?.city || (account as any)?.state || (account as any)?.address || '')
+  const accountZone = mapLocationToZone((account as any)?.city || undefined, (account as any)?.state || undefined, accountLocation || undefined)
+  const zoneColor = LOAD_ZONE_COLOR_MAP[accountZone] || LOAD_ZONE_COLOR_MAP[ERCOT_ZONES.NORTH]
+  const zoneStyle = {
+    color: zoneColor,
+    backgroundColor: `${zoneColor}1f`,
+    borderColor: `${zoneColor}2f`,
+  }
 
   const pagePhoneCandidate = ((page as any)?.phones?.[0] || (page as any)?.phoneNumber || null) as string | null
   const dialTarget = normalizeTwilioPhone(primaryPhone(account as any, contact as any, pagePhoneCandidate, accountContacts) || '')
@@ -268,6 +341,13 @@ function App() {
   const allContacts = accountContacts.length > 0 ? accountContacts : match?.contacts || []
   const visibleContacts = allContacts.slice(0, 5)
   const hasMoreContacts = allContacts.length > visibleContacts.length
+  const accountLogoUrl = trimText(
+    (account as any)?.logoUrl ||
+      (account as any)?.logo_url ||
+      (account as any)?.metadata?.logoUrl ||
+      (account as any)?.metadata?.logo_url ||
+      ''
+  ) || null
   
   const callLabel =
     call.state === 'incoming'
@@ -358,9 +438,7 @@ function App() {
                 className="np-card np-card--hero"
               >
                 <div className="np-hero-identity">
-                  <div className="np-entity-mark np-entity-mark--large">
-                    <EntityMark name={heroTitle} logoUrl={account?.logoUrl || null} />
-                  </div>
+                  <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={56} className="np-entity-mark np-entity-mark--large" />
                   <div className="np-hero-copy">
                     <div className="np-kicker font-mono">CURRENT DOSSIER</div>
                     <h2 className="np-hero-title">{heroTitle}</h2>
@@ -417,14 +495,22 @@ function App() {
                         }}
                         disabled={busy === 'dial' || !showCallButton}
                       >
-                        <span className="np-uplink-primary__label">Corporate Phone</span>
-                        <span className="np-uplink-primary__value">
-                          {busy === 'dial'
-                            ? 'Connecting...'
-                            : showCallButton
-                              ? `Call ${formatPhone(outboundTarget) || outboundTarget} via ${formatPhone(selectedNumber) || selectedNumber}`
-                              : 'No matched phone found'}
-                        </span>
+                        <div className="np-uplink-primary__row">
+                          <div className="np-uplink-icon np-uplink-icon--phone">
+                            <Phone className="w-4 h-4" />
+                            <Star className="w-2 h-2 fill-current absolute -top-1 -right-1 text-yellow-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="np-uplink-primary__label">Corporate Phone</span>
+                            <span className="np-uplink-primary__value">
+                              {busy === 'dial'
+                                ? 'Connecting...'
+                                : showCallButton
+                                  ? `Call ${formatPhone(outboundTarget) || outboundTarget} via ${formatPhone(selectedNumber) || selectedNumber}`
+                                  : 'No matched phone found'}
+                            </span>
+                          </div>
+                        </div>
                       </button>
 
                       <button
@@ -438,8 +524,16 @@ function App() {
                         }}
                         disabled={!trimText((account as any)?.website || account?.domain || '')}
                       >
-                        <span className="np-uplink-row__kicker">Digital Domain</span>
-                        <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain'}</span>
+                        <div className="np-uplink-row__main">
+                          <div className="np-uplink-icon">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="np-uplink-row__kicker">Digital Domain</span>
+                            <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain'}</span>
+                          </div>
+                          <ArrowUpRight className="w-3 h-3 text-zinc-700 shrink-0 ml-auto" />
+                        </div>
                       </button>
 
                       <button
@@ -452,11 +546,28 @@ function App() {
                         }}
                         disabled={!trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', '))}
                       >
-                        <span className="np-uplink-row__kicker">Asset Recon (Location)</span>
-                        <span className="np-uplink-row__value">
-                          {trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', ')) || 'No location'}
-                        </span>
+                        <div className="np-uplink-row__main">
+                          <div className="np-uplink-icon">
+                            <MapPin className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="np-uplink-row__kicker">Asset Recon (Location)</span>
+                            <span className="np-uplink-row__value">
+                              {trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', ')) || 'No location'}
+                            </span>
+                          </div>
+                          <ArrowUpRight className="w-3 h-3 text-zinc-700 shrink-0 ml-auto" />
+                        </div>
                       </button>
+
+                      <div className="np-uplink-row np-uplink-row--static">
+                        <span className="np-uplink-row__kicker">Zone Identifier</span>
+                        <span className="np-uplink-row__value np-uplink-row__value--chip">
+                          <span className="np-zone-chip" style={zoneStyle}>
+                            {accountZone}
+                          </span>
+                        </span>
+                      </div>
 
                       {call.state === 'incoming' && (
                         <button className="np-button np-button--success np-button--full" onClick={() => void runAction('answer', answerCall)}>
@@ -563,9 +674,7 @@ function App() {
                       {visibleContacts.map((c) => (
                         <div key={c.id} className="np-contact-entry">
                           <div className="np-contact-info">
-                            <div className="np-entity-mark np-entity-mark--sm">
-                              <EntityMark name={c.name} logoUrl={null} />
-                            </div>
+                            <EntityAvatar name={c.name} imageUrl={resolveContactPhoto(c)} size={32} className="np-entity-mark np-entity-mark--sm" />
                             <div className="np-contact-copy">
                               <div className="np-contact-name">{c.name}</div>
                               <div className="np-micro">{c.title || 'Executive'}</div>
