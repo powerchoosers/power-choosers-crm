@@ -510,14 +510,15 @@ async function disposeTwilio() {
 }
 
 chrome.runtime.onMessage.addListener((message: any, _sender: any, sendResponse: (value: any) => void) => {
+  const type = trimText(message?.type || '')
+  const handledTypes = new Set(['TWILIO_INIT', 'TWILIO_DIAL', 'TWILIO_ANSWER', 'TWILIO_HANGUP', 'TWILIO_MUTE', 'TWILIO_DIGITS', 'TWILIO_DISPOSE', 'OFFSCREEN_PING'])
+  if (!handledTypes.has(type)) {
+    return false
+  }
+
   void (async () => {
     try {
-      if (!message || typeof message !== 'object') {
-        sendResponse({ ok: false, error: 'Invalid message' })
-        return
-      }
-
-      switch (message.type) {
+      switch (type) {
         case 'TWILIO_INIT':
           sendResponse(await initializeTwilio((message.payload || {}) as InitPayload))
           return
@@ -547,9 +548,6 @@ chrome.runtime.onMessage.addListener((message: any, _sender: any, sendResponse: 
             apiBase: currentApiBase || null,
           })
           return
-        default:
-          sendResponse({ ok: false, error: `Unknown offscreen message type: ${message.type}` })
-          return
       }
     } catch (error) {
       sendResponse({
@@ -561,4 +559,3 @@ chrome.runtime.onMessage.addListener((message: any, _sender: any, sendResponse: 
 
   return true
 })
-

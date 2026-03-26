@@ -46,16 +46,20 @@ function snippet(value: string | null | undefined, max = 180) {
   return `${text.slice(0, max).trimEnd()}…`
 }
 
-function formatStatusLabel(state: ExtensionState | null) {
-  if (!state?.auth) return 'Disconnected'
+function formatCrmStatus(state: ExtensionState | null) {
+  return state?.auth ? 'CRM synced' : 'CRM not synced'
+}
+
+function formatCallStatus(state: ExtensionState | null) {
+  if (!state?.auth) return 'Calls off'
   if (state.call.state === 'error') return 'Call error'
   if (state.call.state === 'initializing') return 'Connecting calls'
-  if (state.call.state === 'incoming') return 'Incoming call'
+  if (state.call.state === 'incoming') return 'Ringing'
   if (state.call.state === 'connected') return 'Live call'
   if (state.call.state === 'dialing') return 'Dialing'
   if (state.call.enabled && state.call.deviceReady) return 'Calls ready'
   if (state.call.enabled) return 'Connecting calls'
-  return 'Connected'
+  return 'Calls off'
 }
 
 function entityInitials(value: string | null | undefined) {
@@ -100,9 +104,19 @@ function EntityMark({
   return <span className="np-entity-mark__initials">{initials}</span>
 }
 
-function primaryPhone(account: MatchAccount | null, contact: MatchContact | null, pagePhone: string | null) {
+function contactPhone(contact: MatchContact | null) {
+  return trimText(contact?.phone || contact?.mobile || contact?.workPhone || contact?.companyPhone || '') || ''
+}
+
+function primaryPhone(
+  account: MatchAccount | null,
+  contact: MatchContact | null,
+  pagePhone: string | null,
+  accountContacts: MatchContact[]
+) {
+  const fallbackContact = accountContacts.find((item) => Boolean(contactPhone(item))) || null
   return (
-    trimText(contact?.phone || contact?.mobile || contact?.workPhone || contact?.companyPhone || account?.phone || pagePhone || '') ||
+    trimText(contactPhone(contact) || contactPhone(fallbackContact) || account?.phone || pagePhone || '') ||
     ''
   )
 }
@@ -159,10 +173,11 @@ function App() {
   const call = state?.call || defaultCallState()
   const account = match?.account || null
   const contact = match?.contact || null
+  const accountContacts = state?.accountContacts || []
   const notes = state?.notes || []
   const chats = state?.chat || []
   const selectedNumber = auth?.profile?.selectedPhoneNumber || auth?.profile?.twilioNumbers?.[0]?.number || null
-  const dialTarget = trimText(primaryPhone(account, contact, page?.phones?.[0] || null) || page?.phones?.[0] || '')
+  const dialTarget = trimText(primaryPhone(account, contact, page?.phones?.[0] || null, accountContacts) || page?.phones?.[0] || '')
   const readyToDial = Boolean(auth && dialTarget && call.deviceReady && call.state !== 'initializing')
   const latestAssistant = [...chats].reverse().find((entry) => entry.role === 'assistant')?.content || ''
 
@@ -280,7 +295,8 @@ function App() {
     applyResponse(response)
   }
 
-  const statePill =
+  const crmPill = auth ? 'np-pill np-pill--green' : 'np-pill np-pill--amber'
+  const callPill =
     call.state === 'error'
       ? 'np-pill np-pill--red'
       : call.state === 'initializing'
@@ -309,7 +325,10 @@ function App() {
         'Contact matched from page capture.'
       : pageDomain || 'Capture a page to start the match.'
   const heroSummary = match?.summary || 'Capture the active tab to resolve the record.'
-  const heroMatchLabel = match ? (contact ? 'Contact matched' : 'Account matched') : 'No match yet'
+  const allContacts = accountContacts.length > 0 ? accountContacts : match?.contacts || []
+  const visibleContacts = allContacts.slice(0, 5)
+  const hasMoreContacts = allContacts.length > visibleContacts.length
+  const showRescan = Boolean(auth && page && match)
   const callLabel =
     call.state === 'incoming'
       ? `Incoming from ${call.incomingDisplay || call.incomingFrom || 'unknown'}`
@@ -337,7 +356,8 @@ function App() {
           </div>
         </div>
         <div className="np-status-row">
-          <span className={statePill}>{formatStatusLabel(state)}</span>
+          <span className={crmPill}>{formatCrmStatus(state)}</span>
+          <span className={callPill}>{formatCallStatus(state)}</span>
           {auth?.email ? <span className="np-pill">{auth.email}</span> : <span className="np-pill np-pill--amber">Not connected</span>}
         </div>
       </div>
@@ -366,10 +386,17 @@ function App() {
                 </div>
               </div>
 
-              <div className="np-hero-status">
-                <span className={auth ? 'np-pill np-pill--green' : 'np-pill np-pill--amber'}>{auth ? 'Synced' : 'Disconnected'}</span>
-                <span className={match ? 'np-pill np-pill--blue' : 'np-pill'}>{heroMatchLabel}</span>
-              </div>
+              {showRescan ? (
+                <div className="np-section-head__actions">
+                  <button
+                    className="np-button np-button--sm np-button--ghost"
+                    onClick={() => void runAction('capture', captureAndMatch)}
+                    disabled={!auth || busy === 'capture'}
+                  >
+                    {busy === 'capture' ? 'Rescanning...' : 'Rescan'}
+                  </button>
+                </div>
+              ) : null}
             </div>
 
             <p className="np-copy np-copy--tight">{heroSummary}</p>
@@ -383,13 +410,15 @@ function App() {
             </p>
 
             <div className="np-record__actions np-record__actions--tight">
-              <button
-                className="np-button np-button--primary"
-                onClick={() => void runAction('capture', captureAndMatch)}
-                disabled={!auth || busy === 'capture'}
-              >
-                {busy === 'capture' ? 'Capturing...' : 'Capture & Match'}
-              </button>
+              {!match ? (
+                <button
+                  className="np-button np-button--primary"
+                  onClick={() => void runAction('capture', captureAndMatch)}
+                  disabled={!auth || busy === 'capture'}
+                >
+                  {busy === 'capture' ? 'Capturing...' : 'Capture & Match'}
+                </button>
+              ) : null}
               <button
                 className="np-button"
                 onClick={() => void runAction('open-account', () => openRecord('account', account?.id || null))}
@@ -397,16 +426,11 @@ function App() {
               >
                 Open Account
               </button>
-              <button
-                className="np-button"
-                onClick={() => void runAction('open-contact', () => openRecord('contact', contact?.id || null))}
-                disabled={!contact || busy === 'open-contact'}
-              >
-                Open Contact
-              </button>
-              <button className="np-button" onClick={() => void runAction('dial-call', dialCall)} disabled={!readyToDial || busy === 'dial-call'}>
-                Call
-              </button>
+              {dialTarget ? (
+                <button className="np-button np-button--primary" onClick={() => void runAction('dial-call', dialCall)} disabled={!readyToDial || busy === 'dial-call'}>
+                  Call
+                </button>
+              ) : null}
             </div>
 
             <p className="np-compact np-call-note">
@@ -416,6 +440,53 @@ function App() {
                   : 'Connecting calls in the background.'
                 : 'No phone number found on this record.'}
             </p>
+
+            {visibleContacts.length > 0 ? (
+              <>
+                <div className="np-divider" />
+
+                <div className="np-section-head np-section-head--compact">
+                  <div>
+                    <div className="np-kicker">Contacts</div>
+                    <h2 className="np-title">People on this account</h2>
+                  </div>
+                  <span className="np-pill">{accountContacts.length > 0 ? `${accountContacts.length} loaded` : `${visibleContacts.length} shown`}</span>
+                </div>
+
+                <div className="np-contact-list">
+                  {visibleContacts.map((item) => {
+                    const detail =
+                      item.title ||
+                      formatPhone(contactPhone(item)) ||
+                      item.email ||
+                      item.reason ||
+                      'Contact on this account'
+
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="np-contact-row"
+                        onClick={() => void runAction(`open-contact-${item.id}`, () => openRecord('contact', item.id))}
+                        disabled={!item.id || busy === `open-contact-${item.id}`}
+                      >
+                        <div className="np-contact-row__main">
+                          <div className="np-contact-row__name">{item.name}</div>
+                          <div className="np-contact-row__sub">{detail}</div>
+                        </div>
+                        <div className="np-contact-row__meta">Open</div>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {hasMoreContacts ? (
+                  <p className="np-compact np-copy--tight">
+                    +{allContacts.length - visibleContacts.length} more contacts in CRM.
+                  </p>
+                ) : null}
+              </>
+            ) : null}
           </section>
 
           <section className="np-card">
@@ -496,7 +567,7 @@ function App() {
                 <div className="np-kicker">Live Call</div>
                 <h3 className="np-title">{callLabel}</h3>
               </div>
-              <span className={statePill}>
+              <span className={callPill}>
                 {call.state === 'incoming' ? 'RINGING' : call.state === 'connected' ? 'LIVE' : 'DIALING'}
               </span>
             </div>

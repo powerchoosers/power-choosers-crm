@@ -3,6 +3,7 @@ import { normalizeAuthPayload, trimText } from './shared'
 type SessionProbe = Record<string, unknown>
 
 let lastSignature = ''
+let hasSyncedSession = false
 
 function isCandidateKey(key: string) {
   return key.startsWith('sb-') && key.includes('auth-token')
@@ -54,38 +55,43 @@ function buildSignature(session: SessionProbe | null): string {
 function sendAuthState() {
   const session = readSessionFromStorage()
   const signature = buildSignature(session)
-  if (signature === lastSignature) return
-  lastSignature = signature
-
-  const payload = normalizeAuthPayload(
-    session
-      ? {
-          ...session,
-          appOrigin: window.location.origin,
+  if (!session) {
+    if (hasSyncedSession) {
+      hasSyncedSession = false
+      lastSignature = 'none'
+      chrome.runtime.sendMessage(
+        {
+          type: 'AUTH_CLEAR',
+          payload: {
+            appOrigin: window.location.origin,
+          },
+        },
+        () => {
+          void chrome.runtime.lastError
         }
-      : null,
-    window.location.origin
-  )
-
-  if (payload) {
-    chrome.runtime.sendMessage(
-      {
-        type: 'AUTH_SYNC',
-        payload,
-      },
-      () => {
-        void chrome.runtime.lastError
-      }
-    )
+      )
+    }
     return
   }
 
+  if (signature === lastSignature) return
+  lastSignature = signature
+  hasSyncedSession = true
+
+  const payload = normalizeAuthPayload(
+    {
+      ...session,
+      appOrigin: window.location.origin,
+    },
+    window.location.origin
+  )
+
+  if (!payload) return
+
   chrome.runtime.sendMessage(
     {
-      type: 'AUTH_CLEAR',
-      payload: {
-        appOrigin: window.location.origin,
-      },
+      type: 'AUTH_SYNC',
+      payload,
     },
     () => {
       void chrome.runtime.lastError
