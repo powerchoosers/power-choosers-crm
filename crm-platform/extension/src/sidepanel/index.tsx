@@ -497,9 +497,9 @@ function App() {
                         disabled={busy === 'dial' || !showCallButton}
                       >
                         <div className="np-uplink-primary__row">
-                          <div style={{ position: 'relative', flexShrink: 0, marginTop: 1 }}>
-                            <Phone className="w-5 h-5" style={{ color: 'rgba(255,255,255,0.7)' }} />
-                            <Star className="w-2 h-2" style={{ fill: '#eab308', color: '#eab308', position: 'absolute', top: -4, right: -4 }} />
+                          <div style={{ position: 'relative', flexShrink: 0 }}>
+                            <Phone style={{ width: 20, height: 20, color: 'rgba(255,255,255,0.7)' }} />
+                            <Star style={{ width: 8, height: 8, fill: '#eab308', color: '#eab308', position: 'absolute', top: -4, right: -4 }} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <span className="np-uplink-primary__label">Corporate Phone</span>
@@ -511,7 +511,7 @@ function App() {
                                   : 'No matched phone found'}
                             </span>
                           </div>
-                          <ArrowUpRight className="w-3 h-3 shrink-0" style={{ color: 'rgba(255,255,255,0.5)' }} />
+                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: 'rgba(255,255,255,0.5)' }} />
                         </div>
                       </button>
 
@@ -526,13 +526,13 @@ function App() {
                         }}
                         disabled={!trimText((account as any)?.website || account?.domain || '')}
                       >
-                        <div className="np-uplink-row__main" style={{ alignItems: 'center' }}>
-                          <Globe className="w-4 h-4 shrink-0" style={{ color: '#71717a' }} />
-                          <div className="min-w-0 flex-1">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minWidth: 0 }}>
+                          <Globe style={{ width: 16, height: 16, color: '#71717a', flexShrink: 0 }} />
+                          <div style={{ minWidth: 0, flex: 1 }}>
                             <span className="np-uplink-row__kicker">Digital Domain</span>
                             <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain'}</span>
                           </div>
-                          <ArrowUpRight className="w-3 h-3 shrink-0" style={{ color: '#3f3f46' }} />
+                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
                         </div>
                       </button>
 
@@ -546,26 +546,22 @@ function App() {
                         }}
                         disabled={!accountLocationValue}
                       >
-                        <div className="np-uplink-row__main" style={{ alignItems: 'center' }}>
-                          <MapPin className="w-4 h-4 shrink-0" style={{ color: '#71717a' }} />
-                          <div className="min-w-0 flex-1">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minWidth: 0 }}>
+                          <MapPin style={{ width: 16, height: 16, color: '#71717a', flexShrink: 0 }} />
+                          <div style={{ minWidth: 0, flex: 1 }}>
                             <span className="np-uplink-row__kicker">Asset Recon (Location)</span>
-                            <span className="np-uplink-row__value">
-                              {accountLocationValue || 'No location'}
-                            </span>
+                            <span className="np-uplink-row__value">{accountLocationValue || 'No location'}</span>
                           </div>
-                          <ArrowUpRight className="w-3 h-3 shrink-0" style={{ color: '#3f3f46' }} />
+                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
                         </div>
                       </button>
 
-                      <div className="np-uplink-row np-uplink-row--static" style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                        <Building2 className="w-4 h-4 shrink-0" style={{ color: '#71717a' }} />
+                      <div className="np-uplink-row np-uplink-row--static" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Building2 style={{ width: 16, height: 16, color: '#71717a', flexShrink: 0 }} />
                         <div style={{ minWidth: 0, flex: 1 }}>
                           <span className="np-uplink-row__kicker">Zone Identifier</span>
                           <span className="np-uplink-row__value np-uplink-row__value--chip">
-                            <span className="np-zone-chip" style={zoneStyle}>
-                              {accountZone}
-                            </span>
+                            <span className="np-zone-chip" style={zoneStyle}>{accountZone}</span>
                           </span>
                         </div>
                       </div>
