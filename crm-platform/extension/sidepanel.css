@@ -439,8 +439,8 @@ a {
 
 .np-uplink-primary__row {
   display: flex;
-  align-items: flex-start;
-  gap: 10px;
+  align-items: center;
+  gap: 12px;
   width: 100%;
 }
 
