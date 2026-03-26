@@ -377,10 +377,16 @@ async function captureActiveTab(windowId?: number | null) {
   }
 
   let screenshot: string | null = null
-  try {
-    screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' })
-  } catch (error) {
-    console.warn('[Extension] Screenshot capture failed:', error)
+  const now = Date.now()
+  if (now - lastScreenshotTaken >= SCREENSHOT_COOLDOWN_MS) {
+    try {
+      screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' })
+      lastScreenshotTaken = now
+    } catch (error) {
+      console.warn('[Extension] Screenshot capture failed:', error)
+    }
+  } else {
+    screenshot = latestScreenshot
   }
 
   const snapshot: PageSnapshot = {
@@ -440,7 +446,7 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.overflow = 'hidden'
 
   const icon = document.createElement('img')
-  icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('nodalpoint-webicon.png') : '') || ''
+  icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('icon32.png') : '') || ''
   icon.alt = ''
   icon.style.width = '20px'
   icon.style.height = '20px'
@@ -640,8 +646,11 @@ function scheduleActiveTabCapture(windowId?: number | null) {
         console.warn('[Extension] Auto capture after tab change failed:', error)
       }
     })()
-  }, 250)
+  }, 800)
 }
+
+let lastScreenshotTaken = 0
+const SCREENSHOT_COOLDOWN_MS = 5000
 
 async function saveTransmissionNote(payload: any) {
   if (!state.auth?.accessToken) {
@@ -1316,8 +1325,17 @@ async function handleOpenSidePanel() {
   return { ok: true, state: cloneState() }
 }
 
+// Configure side panel behavior to open on toolbar icon click
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
+
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
+  void chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
+})
+
+chrome.action.onClicked.addListener((tab: any) => {
+  if (tab.windowId) {
+    void chrome.sidePanel.open({ windowId: tab.windowId }).catch(() => {})
+  }
 })
 
 chrome.runtime.onStartup.addListener(() => {
