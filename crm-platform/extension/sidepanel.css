@@ -78,10 +78,9 @@ a {
 .np-brand-mark {
   width: 38px;
   height: 38px;
-  border-radius: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 0 0 1px rgba(0, 47, 167, 0.12), 0 12px 28px rgba(0, 0, 0, 0.22);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
   flex: 0 0 auto;
 }
