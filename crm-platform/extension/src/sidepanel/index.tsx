@@ -60,13 +60,17 @@ function formatCrmStatus(state: ExtensionState | null) {
 
 function formatCallStatus(state: ExtensionState | null) {
   if (!state?.auth) return 'Calls off'
-  if (state.call.state === 'error') return 'Call error'
-  if (state.call.state === 'initializing') return 'Connecting calls'
-  if (state.call.state === 'incoming') return 'Ringing'
-  if (state.call.state === 'connected') return 'Live call'
-  if (state.call.state === 'dialing') return 'Dialing'
-  if (state.call.enabled && state.call.deviceReady) return 'Calls ready'
-  if (state.call.enabled) return 'Connecting calls'
+  const call = state.call
+  if (call.state === 'error') {
+    if (call.lastError) console.warn('[Extension] Active Twilio Error:', call.lastError)
+    return `Call Error: ${call.lastError?.slice(0, 16) || 'check settings'}`
+  }
+  if (call.state === 'initializing') return 'Connecting calls'
+  if (call.state === 'incoming') return 'Ringing'
+  if (call.state === 'connected') return 'Live call'
+  if (call.state === 'dialing') return 'Dialing'
+  if (call.enabled && call.deviceReady) return 'Calls ready'
+  if (call.enabled) return 'Connecting'
   return 'Calls off'
 }
 
@@ -382,7 +386,7 @@ function App() {
         </div>
         <div className="np-status-row">
           <span className={crmPill}>{crmStatus}</span>
-          <span className={callPill}>{callStatus}</span>
+          <span className={callPill} title={state.call.lastError || callStatus}>{callStatus}</span>
           {auth?.email ? (
             <span className="np-pill" title={auth.email}>{snippet(auth.email, 12)}</span>
           ) : (
