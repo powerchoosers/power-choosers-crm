@@ -649,7 +649,7 @@ export default function SettingsPage() {
                         
                         <div className="flex items-center gap-2">
                           {selectedIdx === idx && (
-                            <Badge variant="outline" className="border-[#002FA7]/30 text-[9px] font-mono text-[#002FA7] bg-[#002FA7]/5 uppercase px-1.5 h-5 leading-none">
+                            <Badge variant="outline" className="border-[#002FA7]/40 text-[9px] font-mono text-white bg-[#002FA7]/20 uppercase px-1.5 h-5 leading-none">
                               Active Uplink
                             </Badge>
                           )}
