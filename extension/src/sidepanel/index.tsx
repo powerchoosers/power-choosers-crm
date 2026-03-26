@@ -511,7 +511,7 @@ function App() {
                                   : 'No matched phone found'}
                             </span>
                           </div>
-                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: 'rgba(255,255,255,0.5)' }} />
+                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: 'rgba(255,255,255,0.5)', marginLeft: 'auto' }} />
                         </div>
                       </button>
 
