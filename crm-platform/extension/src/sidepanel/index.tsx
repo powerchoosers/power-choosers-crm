@@ -131,7 +131,6 @@ function App() {
   const [noteDraft, setNoteDraft] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [manualDial, setManualDial] = useState('')
   const [initStuckMs, setInitStuckMs] = useState(0)
   const autoCaptureRan = useRef(false)
   const initStuckTimer = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -248,8 +247,7 @@ function App() {
 
   const pagePhoneCandidate = ((page as any)?.phones?.[0] || (page as any)?.phoneNumber || null) as string | null
   const dialTarget = normalizeTwilioPhone(primaryPhone(account as any, contact as any, pagePhoneCandidate, accountContacts) || '')
-  const manualDialTarget = normalizeTwilioPhone(manualDial)
-  const outboundTarget = manualDialTarget || dialTarget
+  const outboundTarget = dialTarget
 
   const crmStatus = formatCrmStatus(state)
   const callStatus = formatCallStatus(state)
@@ -284,8 +282,7 @@ function App() {
               ? 'Ready to call'
               : 'Connecting calls'
   const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
-  const callNeedsManualNumber = !dialTarget && !callIsLive
-  const showCallButton = Boolean(selectedNumber && (dialTarget || manualDialTarget || callNeedsManualNumber))
+  const showCallButton = Boolean(selectedNumber && dialTarget && !callIsLive)
 
   // Branded Loading Splash
   const isSyncing = busy === 'auto-capture' || (auth && !match && busy !== 'capture' && busy !== 'sync-profile') || busy === 'initial-sync'
@@ -391,7 +388,7 @@ function App() {
                     className="np-card"
                   >
                     <div className="np-section-head">
-                      <h3 className="np-title">Transmission</h3>
+                      <h3 className="np-title">Uplinks</h3>
                       <div className="np-section-head__actions">
                         {call.state === 'error' && (
                           <button
@@ -411,56 +408,55 @@ function App() {
                       </div>
                     </div>
 
-                    {!callIsLive && (
-                      <div className="np-dialer-input">
-                        <input
-                          type="tel"
-                          className="nodal-input"
-                          placeholder="Manual entry..."
-                          value={manualDial}
-                          onChange={(e) => setManualDial(e.target.value)}
-                        />
-                      </div>
-                    )}
-
                     <div className="np-action-grid">
-                      {showCallButton ? (
-                        <button
-                          className="np-button np-button--primary np-button--full"
-                          onClick={() => {
-                            if (!outboundTarget) return
-                            void runAction('dial', () => dialCall(outboundTarget, contact?.id, account?.id))
-                          }}
-                          disabled={busy === 'dial' || !outboundTarget}
-                        >
-                          {busy === 'dial' ? 'Connecting...' : `Call ${formatPhone(outboundTarget) || '...'} via ${formatPhone(selectedNumber) || selectedNumber}`}
-                        </button>
-                      ) : (
-                        <div className="np-alert-card">
-                           <p className="np-micro" style={{ marginBottom: 12 }}>
-                            {selectedNumber 
-                              ? 'Enter a number to initiate transmission.' 
-                              : 'No Caller ID selected in CRM settings.'}
-                           </p>
-                           {!selectedNumber && (
-                             <div className="np-stack--tight">
-                                <button 
-                                  className="np-button np-button--sm np-button--primary np-button--full" 
-                                  onClick={() => void runAction('sync-profile', bootstrapProfile)}
-                                  disabled={busy === 'sync-profile'}
-                                >
-                                  {busy === 'sync-profile' ? 'SYNCING...' : 'RE-SYNC CRM PROFILE'}
-                                </button>
-                                <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
-                                  Verify in Settings
-                                </button>
-                                <p className="np-micro" style={{ fontSize: 8, marginTop: 4, opacity: 0.6 }}>
-                                  If sync persists, ensure a number is saved in your CRM profile.
-                                </p>
-                             </div>
-                           )}
-                        </div>
-                      )}
+                      <button
+                        className="np-uplink-primary"
+                        onClick={() => {
+                          if (!outboundTarget) return
+                          void runAction('dial', () => dialCall(outboundTarget, contact?.id, account?.id))
+                        }}
+                        disabled={busy === 'dial' || !showCallButton}
+                      >
+                        <span className="np-uplink-primary__label">Corporate Phone</span>
+                        <span className="np-uplink-primary__value">
+                          {busy === 'dial'
+                            ? 'Connecting...'
+                            : showCallButton
+                              ? `Call ${formatPhone(outboundTarget) || outboundTarget} via ${formatPhone(selectedNumber) || selectedNumber}`
+                              : 'No matched phone found'}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="np-uplink-row"
+                        onClick={() => {
+                          const domain = trimText((account as any)?.website || account?.domain || '')
+                          if (!domain) return
+                          const normalized = domain.startsWith('http://') || domain.startsWith('https://') ? domain : `https://${domain}`
+                          window.open(normalized, '_blank')
+                        }}
+                        disabled={!trimText((account as any)?.website || account?.domain || '')}
+                      >
+                        <span className="np-uplink-row__kicker">Digital Domain</span>
+                        <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="np-uplink-row"
+                        onClick={() => {
+                          const location = trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', '))
+                          if (!location) return
+                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank')
+                        }}
+                        disabled={!trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', '))}
+                      >
+                        <span className="np-uplink-row__kicker">Asset Recon (Location)</span>
+                        <span className="np-uplink-row__value">
+                          {trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', ')) || 'No location'}
+                        </span>
+                      </button>
 
                       {call.state === 'incoming' && (
                         <button className="np-button np-button--success np-button--full" onClick={() => void runAction('answer', answerCall)}>
@@ -487,6 +483,24 @@ function App() {
                         </div>
                       )}
                     </div>
+
+                    {!selectedNumber ? (
+                      <div className="np-alert-card">
+                        <p className="np-micro" style={{ marginBottom: 12 }}>
+                          No Caller ID selected in CRM settings.
+                        </p>
+                        <button
+                          className="np-button np-button--sm np-button--primary np-button--full"
+                          onClick={() => void runAction('sync-profile', bootstrapProfile)}
+                          disabled={busy === 'sync-profile'}
+                        >
+                          {busy === 'sync-profile' ? 'SYNCING...' : 'RE-SYNC CRM PROFILE'}
+                        </button>
+                        <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
+                          Verify in Settings
+                        </button>
+                      </div>
+                    ) : null}
                   </motion.section>
 
                   <motion.section 
