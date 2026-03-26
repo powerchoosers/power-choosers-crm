@@ -224,6 +224,14 @@ function App() {
     if (response?.state) setState(response.state)
   }
 
+  const recoverCalls = async () => {
+    const response = await sendMessage('ENABLE_CALLS', {
+      appOrigin: auth?.appOrigin || null,
+      callerId: selectedNumber || null,
+    })
+    if (response?.state) setState(response.state)
+  }
+
   const loginToCrm = () => {
     const origin = state?.auth?.appOrigin || 'https://www.nodalpoint.io'
     chrome.tabs.create({ url: origin })
@@ -383,6 +391,15 @@ function App() {
                     <div className="np-section-head">
                       <h3 className="np-title">Transmission</h3>
                       <div className="np-section-head__actions">
+                        {call.state === 'error' && (
+                          <button
+                            className="np-button np-button--sm np-button--ghost"
+                            onClick={() => void runAction('recover-calls', recoverCalls)}
+                            disabled={busy === 'recover-calls'}
+                          >
+                            {busy === 'recover-calls' ? 'Recovering...' : 'Recover Calls'}
+                          </button>
+                        )}
                         {callIsLive && (
                           <div className="np-pulse-tag">
                             <span className="np-pulse-dot" />
