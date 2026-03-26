@@ -274,9 +274,14 @@ function App() {
       void bootstrapProfile()
     } catch (err) {
       console.error('[Extension] Mic request failed:', err)
-      setError('Microphone access denied. Please allow access in browser settings.')
+      setError('Microphone access is BLOCKED. You must manually unblock it in Chrome settings.')
       setBusy(null)
     }
+  }
+
+  const openExtensionSettings = () => {
+    const eid = chrome.runtime.id
+    chrome.tabs.create({ url: `chrome://settings/content/siteDetails?site=chrome-extension://${eid}` })
   }
 
   const dialCall = async (phone: string, contactId?: string, accountId?: string) => {
@@ -455,17 +460,30 @@ function App() {
 
               {call.state === 'error' && (call.lastError?.includes('Permission') || call.lastError?.includes('mic')) ? (
                 <div className="np-error-box np-void-card" style={{ marginBottom: 12, border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
-                  <p className="np-copy" style={{ color: '#fca5a5', fontSize: '12px', marginBottom: '8px' }}>
-                    Microphone access is required to make calls.
+                  <p className="np-copy" style={{ color: '#fca5a5', fontSize: '11px', marginBottom: '8px' }}>
+                    {error?.includes('BLOCKED') 
+                      ? "The microphone is blocked in your browser for this extension. Please open settings and set Microphone to 'Allow'." 
+                      : "Microphone access is required to make calls."}
                   </p>
-                  <button 
-                    className="np-btn np-btn--primary" 
-                    style={{ width: '100%', height: '32px', fontSize: '12px' }}
-                    onClick={requestMicrophone}
-                    disabled={busy === 'mic'}
-                  >
-                    {busy === 'mic' ? 'Requesting...' : 'Grant Microphone Permission'}
-                  </button>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      className="np-btn np-btn--primary" 
+                      style={{ flex: 1, height: '32px', fontSize: '12px' }}
+                      onClick={requestMicrophone}
+                      disabled={busy === 'mic' || !!error?.includes('BLOCKED')}
+                    >
+                      {busy === 'mic' ? 'Requesting...' : 'Grant Permission'}
+                    </button>
+                    {error?.includes('BLOCKED') && (
+                      <button 
+                        className="np-btn" 
+                        style={{ flex: 1, height: '32px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
+                        onClick={openExtensionSettings}
+                      >
+                        Open Settings
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : null}
 
