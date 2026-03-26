@@ -22,6 +22,29 @@ import {
 const DEFAULT_APP_ORIGIN = 'https://www.nodalpoint.io'
 const INCOMING_NOTIFICATION_ID = 'nodal-point-incoming-call'
 
+type TabActiveInfo = {
+  tabId: number
+  windowId: number
+}
+
+type TabChangeInfo = {
+  status?: string
+  url?: string
+}
+
+type CapturedTab = {
+  active?: boolean
+  url?: string | null
+  windowId: number
+}
+
+type PageBadgePayload = {
+  accountName: string
+  accountId: string
+  domain: string | null
+  contactCount: number
+}
+
 let state: ExtensionState = defaultState()
 let latestBodyText = ''
 let latestScreenshot: string | null = null
@@ -67,6 +90,17 @@ async function hydrateState() {
   }
   hydrated = true
   await updateBadge()
+
+  try {
+    if (state.match?.account?.id && state.page?.url) {
+      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+      if (tab?.id && tab.url && trimText(tab.url) === trimText(state.page.url)) {
+        await syncPageBadge(tab.id, state.match)
+      }
+    }
+  } catch (error) {
+    console.warn('[Extension] Failed to restore page badge:', error)
+  }
 }
 
 function getApiOrigin(fallbackOrigin?: string | null) {
@@ -324,8 +358,9 @@ function collectPageSnapshot() {
   return { title, url: location.href, selectedText, description, headings, emails, phones, bodyText }
 }
 
-async function captureActiveTab() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+async function captureActiveTab(windowId?: number | null) {
+  const query = windowId != null ? { active: true, windowId } : { active: true, currentWindow: true }
+  const [tab] = await chrome.tabs.query(query)
   if (!tab?.id || !tab.url) {
     throw new Error('No active tab found.')
   }
@@ -364,6 +399,76 @@ async function captureActiveTab() {
   latestScreenshot = screenshot
 
   return { tab, snapshot, screenshot }
+}
+
+function renderPageBadge(payload: PageBadgePayload | null) {
+  const existing = document.getElementById('nodal-point-page-badge-root')
+  if (existing) {
+    existing.remove()
+  }
+
+  if (!payload) return
+
+  const root = document.createElement('div')
+  root.id = 'nodal-point-page-badge-root'
+  root.style.position = 'fixed'
+  root.style.top = '120px'
+  root.style.right = '0'
+  root.style.zIndex = '2147483647'
+  root.style.pointerEvents = 'auto'
+
+  const host = document.createElement('button')
+  host.type = 'button'
+  host.setAttribute('aria-label', `Open Nodal Point for ${payload.accountName}`)
+  host.style.all = 'unset'
+  host.style.display = 'flex'
+  host.style.alignItems = 'center'
+  host.style.justifyContent = 'center'
+  host.style.width = '34px'
+  host.style.height = '34px'
+  host.style.marginRight = '0'
+  host.style.borderTopLeftRadius = '10px'
+  host.style.borderBottomLeftRadius = '10px'
+  host.style.borderTopRightRadius = '0'
+  host.style.borderBottomRightRadius = '0'
+  host.style.border = '1px solid rgba(255,255,255,0.12)'
+  host.style.borderRight = 'none'
+  host.style.background = 'rgba(0, 47, 167, 0.92)'
+  host.style.boxShadow = '0 10px 24px rgba(0,0,0,0.4)'
+  host.style.cursor = 'pointer'
+  host.style.position = 'relative'
+  host.style.overflow = 'hidden'
+
+  const icon = document.createElement('img')
+  icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('nodalpoint-webicon.png') : '') || ''
+  icon.alt = ''
+  icon.style.width = '20px'
+  icon.style.height = '20px'
+  icon.style.objectFit = 'contain'
+  icon.style.filter = 'brightness(0) invert(1)'
+  icon.style.pointerEvents = 'none'
+
+  const dot = document.createElement('span')
+  dot.style.position = 'absolute'
+  dot.style.right = '4px'
+  dot.style.bottom = '4px'
+  dot.style.width = '7px'
+  dot.style.height = '7px'
+  dot.style.borderRadius = '999px'
+  dot.style.background = '#10b981'
+  dot.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.45)'
+
+  host.appendChild(icon)
+  host.appendChild(dot)
+
+  host.addEventListener('click', () => {
+    chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL' }, () => {
+      void chrome.runtime.lastError
+    })
+  })
+
+  root.appendChild(host)
+  document.documentElement.appendChild(root)
 }
 
 function normalizeMatchAccount(raw: any): MatchResult['account'] {
@@ -455,19 +560,87 @@ async function matchPageAgainstCrm(snapshot: PageSnapshot) {
   return match
 }
 
-async function captureAndMatch() {
+async function syncPageBadge(tabId: number | null | undefined, match: MatchResult | null) {
+  if (!tabId || !match?.account?.id) {
+    try {
+      if (tabId) {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          func: renderPageBadge,
+          args: [null],
+        })
+      }
+    } catch (error) {
+      console.warn('[Extension] Page badge clear failed:', error)
+    }
+    return
+  }
+
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: renderPageBadge,
+      args: [
+        {
+          accountName: match.account.name,
+          accountId: match.account.id,
+          domain: match.account.domain || match.account.website || null,
+          contactCount: Array.isArray(match.contacts) ? match.contacts.length : 0,
+        },
+      ],
+    })
+  } catch (error) {
+    console.warn('[Extension] Page badge inject failed:', error)
+  }
+}
+
+async function captureAndMatch(windowId?: number | null) {
   if (!state.auth?.accessToken) {
     throw new Error('Connect your Nodal Point session before capturing CRM records.')
   }
 
-  const { snapshot, screenshot } = await captureActiveTab()
+  const { tab, snapshot, screenshot } = await captureActiveTab(windowId)
   await setState((draft) => {
     draft.page = snapshot
     draft.match = null
     draft.accountContacts = []
   })
   const match = await matchPageAgainstCrm(snapshot)
+  await syncPageBadge(tab?.id || null, match)
   return { snapshot, screenshot, match }
+}
+
+let activeTabCaptureTimer: ReturnType<typeof setTimeout> | null = null
+
+function isCaptureableTabUrl(url: string | null | undefined) {
+  const value = trimText(url || '')
+  return /^https?:\/\//i.test(value)
+}
+
+function scheduleActiveTabCapture(windowId?: number | null) {
+  if (activeTabCaptureTimer !== null) {
+    clearTimeout(activeTabCaptureTimer)
+  }
+
+  activeTabCaptureTimer = setTimeout(() => {
+    void (async () => {
+      await hydrateState()
+      if (!state.auth?.accessToken) return
+
+      try {
+        const query = windowId != null ? { active: true, windowId } : { active: true, currentWindow: true }
+        const [tab] = await chrome.tabs.query(query)
+        if (!tab?.url || !isCaptureableTabUrl(tab.url)) return
+        if (trimText(state.page?.url || '') === trimText(tab.url)) {
+          await syncPageBadge(tab.id || null, state.match)
+          return
+        }
+        await captureAndMatch(windowId)
+      } catch (error) {
+        console.warn('[Extension] Auto capture after tab change failed:', error)
+      }
+    })()
+  }, 250)
 }
 
 async function saveTransmissionNote(payload: any) {
@@ -1093,6 +1266,11 @@ async function handleRecentCallsRefresh() {
   return { ok: true, state: cloneState() }
 }
 
+async function handleOpenSidePanel() {
+  await openSidePanelForCurrentWindow()
+  return { ok: true, state: cloneState() }
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch(() => {})
 })
@@ -1115,6 +1293,22 @@ chrome.runtime.onStartup.addListener(() => {
       })
     }
   })
+})
+
+chrome.tabs.onActivated.addListener((activeInfo: TabActiveInfo) => {
+  scheduleActiveTabCapture(activeInfo.windowId)
+})
+
+chrome.tabs.onUpdated.addListener((_tabId: number, changeInfo: TabChangeInfo, tab: CapturedTab) => {
+  if (changeInfo.status !== 'complete') return
+  if (!tab?.active) return
+  if (!isCaptureableTabUrl(tab.url)) return
+  scheduleActiveTabCapture(tab.windowId)
+})
+
+chrome.windows.onFocusChanged.addListener((windowId: number) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return
+  scheduleActiveTabCapture(windowId)
 })
 
 chrome.notifications.onClicked.addListener(() => {
@@ -1193,6 +1387,9 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           return
         case 'REQUEST_RECENT_CALLS':
           sendResponse(await handleRecentCallsRefresh())
+          return
+        case 'OPEN_SIDE_PANEL':
+          sendResponse(await handleOpenSidePanel())
           return
         default:
           sendResponse({ ok: false, error: `Unknown message type: ${message.type}` })

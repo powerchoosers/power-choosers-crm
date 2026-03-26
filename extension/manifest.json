@@ -24,7 +24,16 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Open Nodal Point Command Deck"
+    "default_title": "Open Nodal Point Command Deck",
+    "default_icon": {
+      "16": "nodalpoint-webicon.png",
+      "32": "nodalpoint-webicon.png",
+      "48": "nodalpoint-webicon.png",
+      "128": "nodalpoint-webicon.png"
+    }
+  },
+  "icons": {
+    "128": "nodalpoint-webicon.png"
   },
   "side_panel": {
     "default_path": "sidepanel.html"
