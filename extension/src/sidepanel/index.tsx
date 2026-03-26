@@ -262,6 +262,23 @@ function App() {
     if (response?.state) setState(response.state)
   }
 
+  const requestMicrophone = async () => {
+    setBusy('mic')
+    setError(null)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      stream.getTracks().forEach((t) => t.stop())
+      setBusy(null)
+      // Once granted in sidepanel, the extension origin is authorized.
+      // Re-bootstrap to let the offscreen worker take over.
+      void bootstrapProfile()
+    } catch (err) {
+      console.error('[Extension] Mic request failed:', err)
+      setError('Microphone access denied. Please allow access in browser settings.')
+      setBusy(null)
+    }
+  }
+
   const dialCall = async (phone: string, contactId?: string, accountId?: string) => {
     const response = await sendMessage('CALL_DIAL', { phone, contactId, accountId })
     if (response?.state) setState(response.state)
@@ -433,6 +450,22 @@ function App() {
                     Action failed
                   </p>
                   <p className="np-copy">{error}</p>
+                </div>
+              ) : null}
+
+              {call.state === 'error' && (call.lastError?.includes('Permission') || call.lastError?.includes('mic')) ? (
+                <div className="np-error-box np-void-card" style={{ marginBottom: 12, border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
+                  <p className="np-copy" style={{ color: '#fca5a5', fontSize: '12px', marginBottom: '8px' }}>
+                    Microphone access is required to make calls.
+                  </p>
+                  <button 
+                    className="np-btn np-btn--primary" 
+                    style={{ width: '100%', height: '32px', fontSize: '12px' }}
+                    onClick={requestMicrophone}
+                    disabled={busy === 'mic'}
+                  >
+                    {busy === 'mic' ? 'Requesting...' : 'Grant Microphone Permission'}
+                  </button>
                 </div>
               ) : null}
 
