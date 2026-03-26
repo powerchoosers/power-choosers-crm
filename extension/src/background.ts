@@ -929,7 +929,7 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
   })
 
   await ensureOffscreenDocument()
-  await sendExtensionMessage({
+  const initResult = await sendExtensionMessage({
     type: 'TWILIO_INIT',
     payload: {
       identity: `agent-${state.auth.userId || state.auth.email || 'agent'}`,
@@ -939,6 +939,16 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
     },
   })
 
+  if (initResult && initResult.ok === false) {
+    const errMsg = trimText(initResult.error || 'Twilio failed to initialize.')
+    console.error('[Extension] TWILIO_INIT failed:', errMsg)
+    await setState((draft) => {
+      draft.call.state = 'error'
+      draft.call.lastError = errMsg
+    })
+    return { ok: false, state: cloneState() }
+  }
+
   // Recovery: if the device is still stuck in 'initializing' after 15s, retry once automatically
   setTimeout(() => {
     void (async () => {
@@ -946,7 +956,7 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
         console.warn('[Extension] Call device stuck in initializing — auto-retrying bootstrap')
         try {
           await ensureOffscreenDocument()
-          await sendExtensionMessage({
+          const retryResult = await sendExtensionMessage({
             type: 'TWILIO_INIT',
             payload: {
               identity: `agent-${state.auth?.userId || state.auth?.email || 'agent'}`,
@@ -955,6 +965,14 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
               auth: state.auth,
             },
           })
+          if (retryResult && retryResult.ok === false) {
+            const errMsg = trimText(retryResult.error || 'Twilio failed to initialize on retry.')
+            console.error('[Extension] TWILIO_INIT retry failed:', errMsg)
+            await setState((draft) => {
+              draft.call.state = 'error'
+              draft.call.lastError = errMsg
+            })
+          }
         } catch (error) {
           console.warn('[Extension] Auto-retry bootstrap failed:', error)
           await setState((draft) => {
