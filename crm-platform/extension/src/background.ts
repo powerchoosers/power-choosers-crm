@@ -451,7 +451,6 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   icon.style.width = '20px'
   icon.style.height = '20px'
   icon.style.objectFit = 'contain'
-  icon.style.filter = 'brightness(0) invert(1)'
   icon.style.pointerEvents = 'none'
 
   const dot = document.createElement('span')
@@ -1320,7 +1319,11 @@ async function handleRecentCallsRefresh() {
   return { ok: true, state: cloneState() }
 }
 
-async function handleOpenSidePanel() {
+async function handleOpenSidePanel(sender?: { tab?: { id?: number } }) {
+  if (sender?.tab?.id) {
+    await chrome.sidePanel.open({ tabId: sender.tab.id })
+    return { ok: true, state: cloneState() }
+  }
   await openSidePanelForCurrentWindow()
   return { ok: true, state: cloneState() }
 }
@@ -1452,7 +1455,7 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           sendResponse(await handleRecentCallsRefresh())
           return
         case 'OPEN_SIDE_PANEL':
-          sendResponse(await handleOpenSidePanel())
+          sendResponse(await handleOpenSidePanel(sender))
           return
         default:
           sendResponse({ ok: false, error: `Unknown message type: ${message.type}` })
