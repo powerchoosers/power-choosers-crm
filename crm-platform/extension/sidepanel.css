@@ -213,6 +213,13 @@ a {
   margin-bottom: 8px;
 }
 
+.np-section-head__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
 .np-kicker {
   font-size: 10px;
   letter-spacing: 0.28em;
@@ -651,6 +658,78 @@ a {
 
 .np-call-note {
   margin-top: 8px;
+}
+
+.np-contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.np-contact-row {
+  width: 100%;
+  appearance: none;
+  border: 1px solid var(--np-border);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--np-text);
+  border-radius: 14px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    background 140ms ease;
+  text-align: left;
+}
+
+.np-contact-row:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--np-border-strong);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.np-contact-row:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.np-contact-row__main {
+  min-width: 0;
+  flex: 1;
+}
+
+.np-contact-row__name {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.2;
+  font-weight: 600;
+  color: #f8fafc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.np-contact-row__sub {
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--np-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.np-contact-row__meta {
+  flex: 0 0 auto;
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--np-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .np-call-meta {
