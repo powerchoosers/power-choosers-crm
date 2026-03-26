@@ -10,6 +10,7 @@ const distDir = path.join(__dirname, 'dist')
 async function copyStaticFiles() {
   const extensionFiles = ['manifest.json', 'sidepanel.html', 'offscreen.html', 'sidepanel.css', 'icon.svg']
   const imageFiles = ['nodalpoint.png', 'nodalpoint-webicon.png']
+  const iconSizes = [16, 32, 48, 128]
 
   await Promise.all(
     extensionFiles.map(async (file) => {
@@ -23,6 +24,22 @@ async function copyStaticFiles() {
       await copyFile(path.join(publicImagesDir, file), path.join(distDir, file))
     })
   )
+
+  // Generate properly-sized icons for the Chrome toolbar
+  try {
+    const { default: sharp } = await import('sharp')
+    const srcIcon = path.join(publicImagesDir, 'nodalpoint-webicon.png')
+    await Promise.all(
+      iconSizes.map((size) =>
+        sharp(srcIcon)
+          .resize(size, size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toFile(path.join(distDir, `icon${size}.png`))
+      )
+    )
+  } catch {
+    console.warn('[build] sharp not available — skipping sized icon generation')
+  }
 }
 
 async function main() {
