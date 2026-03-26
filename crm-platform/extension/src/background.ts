@@ -1146,7 +1146,26 @@ async function handleAnswerCall() {
 }
 
 async function handleHangupCall() {
-  await sendExtensionMessage({ type: 'TWILIO_HANGUP' })
+  console.log('[Extension] Hangup requested. Sending to offscreen and clearing state.')
+  
+  // 1. Attempt to tell Twilio to disconnect
+  try {
+    await sendExtensionMessage({ type: 'TWILIO_HANGUP' })
+  } catch (error) {
+    console.warn('[Extension] Could not send hangup to offscreen (worker likely dead):', error)
+  }
+
+  // 2. ABSOLUTE PATH: Always clear state locally to un-stick the UI
+  await setState((draft) => {
+    draft.call.state = 'idle'
+    draft.call.activeCallSid = null
+    draft.call.startedAt = null
+    draft.call.durationSec = 0
+    draft.call.muted = false
+    draft.call.incomingFrom = null
+    draft.call.lastError = null
+  }).catch(() => {})
+
   return { ok: true, state: cloneState() }
 }
 
@@ -1590,7 +1609,9 @@ void hydrateState().then(() => {
 
 setInterval(() => {
   const call = state.call
-  if (call.state === 'connected' || call.state === 'dialing' || call.state === 'incoming') {
+  const isCallActive = call.state === 'connected' || call.state === 'dialing' || call.state === 'incoming'
+  
+  if (isCallActive) {
     const startedAt = call.startedAt
     const duration = startedAt ? Math.max(0, Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000)) : call.durationSec
     if (duration !== call.durationSec) {
@@ -1598,6 +1619,12 @@ setInterval(() => {
         draft.call.durationSec = duration
       })
     }
+    
+    // Heartbeat: Keep offscreen document alive while call is active
+    void sendExtensionMessage({ type: 'OFFSCREEN_PING' }).catch(() => {
+      console.warn('[Extension] Offscreen heartbeat failed during active call. Re-ensuring...')
+      void ensureOffscreenDocument().catch(() => {})
+    })
   }
   void updateBadgeFromState()
 }, 1000)
