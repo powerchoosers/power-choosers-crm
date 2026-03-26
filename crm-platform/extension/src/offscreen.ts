@@ -257,8 +257,6 @@ async function initializeTwilio(payload: InitPayload) {
   currentApiBase = apiBase
   currentCallerId = callerId || currentCallerId
 
-  await requestMicrophonePermission()
-
   const token = await fetchToken(identity, apiBase)
   lastToken = token
 
