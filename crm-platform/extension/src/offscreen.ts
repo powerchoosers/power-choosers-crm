@@ -254,6 +254,12 @@ async function initializeTwilio(payload: InitPayload) {
   const callerId = trimText(payload.callerId || resolveCallerId((payload.auth as any) || null) || '')
 
   console.log(`[Twilio Offscreen] Initializing with identity: ${identity}, origin: ${apiBase}, callerId: ${callerId}`)
+  
+  try {
+    await requestMicrophonePermission()
+  } catch (error) {
+    console.warn('[Twilio Offscreen] Microphone permission check failed:', error)
+  }
 
   currentIdentity = identity
   currentApiBase = apiBase

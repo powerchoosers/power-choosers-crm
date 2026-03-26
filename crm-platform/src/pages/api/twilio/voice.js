@@ -14,7 +14,7 @@ function normalizePhoneNumber(value) {
     const cleaned = str.replace(/\D/g, '');
     if (cleaned.length === 10) return `+1${cleaned}`;
     if (cleaned.length === 11 && cleaned.startsWith('1')) return `+${cleaned}`;
-    if (str.startsWith('+')) return str.replace(/\s+/g, '');
+    if (str.startsWith('+')) return '+' + str.slice(1).replace(/\D/g, '');
     return null;
 }
 
