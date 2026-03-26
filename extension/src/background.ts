@@ -431,23 +431,22 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.display = 'flex'
   host.style.alignItems = 'center'
   host.style.justifyContent = 'center'
-  host.style.paddingLeft = '8px'
-  host.style.paddingRight = '8px'
-  host.style.gap = '8px'
+  host.style.paddingLeft = '10px'
+  host.style.paddingRight = '10px'
   host.style.height = '42px'
   host.style.marginRight = '0'
-  host.style.borderTopLeftRadius = '12px'
-  host.style.borderBottomLeftRadius = '12px'
+  host.style.borderTopLeftRadius = '14px'
+  host.style.borderBottomLeftRadius = '14px'
   host.style.borderTopRightRadius = '0'
   host.style.borderBottomRightRadius = '0'
   host.style.border = '1px solid rgba(255,255,255,0.12)'
   host.style.borderRight = 'none'
   host.style.background = 'rgba(0, 47, 167, 0.92)'
-  host.style.boxShadow = '0 10px 24px rgba(0,0,0,0.4)'
+  host.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)'
   host.style.cursor = 'pointer'
   host.style.position = 'relative'
   host.style.overflow = 'hidden'
-  host.style.transition = 'background 0.2s ease'
+  host.style.transition = 'background 0.2s ease, padding 0.2s ease'
 
   const icon = document.createElement('img')
   icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('icon32.png') : '') || ''
@@ -457,16 +456,24 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   icon.style.objectFit = 'contain'
   icon.style.pointerEvents = 'none'
 
+  const section = document.createElement('div')
+  section.style.display = 'flex'
+  section.style.alignItems = 'center'
+  section.style.gap = '8px'
+  section.style.width = '0'
+  section.style.opacity = '0'
+  section.style.overflow = 'hidden'
+  section.style.transition = 'width 0.2s ease, opacity 0.2s ease, margin 0.2s ease'
+
   const divider = document.createElement('div')
   divider.style.width = '1px'
   divider.style.height = '18px'
-  divider.style.background = 'rgba(255,255,255,0.15)'
+  divider.style.background = 'rgba(255,255,255,0.2)'
 
   const grip = document.createElement('div')
   grip.style.display = 'grid'
   grip.style.gridTemplateColumns = 'repeat(2, 3px)'
   grip.style.gap = '3px'
-  grip.style.opacity = '0.5'
   
   for (let i = 0; i < 6; i++) {
     const dot = document.createElement('div')
@@ -477,17 +484,25 @@ function renderPageBadge(payload: PageBadgePayload | null) {
     grip.appendChild(dot)
   }
 
+  section.appendChild(divider)
+  section.appendChild(grip)
+
   host.appendChild(icon)
-  host.appendChild(divider)
-  host.appendChild(grip)
+  host.appendChild(section)
 
   host.addEventListener('mouseenter', () => {
     host.style.background = '#00268a'
-    grip.style.opacity = '0.9'
+    host.style.paddingRight = '12px'
+    section.style.width = '20px'
+    section.style.opacity = '1'
+    section.style.marginLeft = '4px'
   })
   host.addEventListener('mouseleave', () => {
     host.style.background = 'rgba(0, 47, 167, 0.92)'
-    grip.style.opacity = '0.5'
+    host.style.paddingRight = '10px'
+    section.style.width = '0'
+    section.style.opacity = '0'
+    section.style.marginLeft = '0'
   })
 
   host.addEventListener('click', (e) => {
@@ -1345,13 +1360,23 @@ async function handleRecentCallsRefresh() {
   return { ok: true, state: cloneState() }
 }
 
-async function handleOpenSidePanel(sender?: { tab?: { id?: number } }) {
-  if (sender?.tab?.id) {
-    await chrome.sidePanel.open({ tabId: sender.tab.id })
+async function handleOpenSidePanel(sender?: { tab?: { id?: number; windowId?: number } }) {
+  console.log('[Extension] handleOpenSidePanel triggered by sender:', sender)
+  try {
+    if (sender?.tab?.id) {
+      if (sender.tab.windowId) {
+        await chrome.windows.update(sender.tab.windowId, { focused: true })
+      }
+      await chrome.sidePanel.open({ tabId: sender.tab.id })
+      console.log('[Extension] chrome.sidePanel.open called for tab:', sender.tab.id)
+      return { ok: true, state: cloneState() }
+    }
+    await openSidePanelForCurrentWindow()
     return { ok: true, state: cloneState() }
+  } catch (error) {
+    console.error('[Extension] handleOpenSidePanel failed:', error)
+    return { ok: false, error: trimText((error as Error)?.message || 'Side panel failed to open') }
   }
-  await openSidePanelForCurrentWindow()
-  return { ok: true, state: cloneState() }
 }
 
 // Configure side panel behavior to open on toolbar icon click
