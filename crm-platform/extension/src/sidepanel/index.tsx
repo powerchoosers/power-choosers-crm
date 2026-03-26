@@ -129,7 +129,9 @@ function App() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [manualDial, setManualDial] = useState('')
+  const [initStuckMs, setInitStuckMs] = useState(0)
   const autoCaptureRan = useRef(false)
+  const initStuckTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const loadState = async () => {
     const response = await sendMessage<{ state: ExtensionState }>('GET_STATE')
@@ -152,6 +154,29 @@ function App() {
     chrome.storage.onChanged.addListener(handleStorageChange)
     return () => chrome.storage.onChanged.removeListener(handleStorageChange)
   }, [])
+
+  // Track how long calls have been stuck in initializing state
+  useEffect(() => {
+    if (initStuckTimer.current) {
+      clearInterval(initStuckTimer.current)
+      initStuckTimer.current = null
+    }
+    const callState = state?.call
+    if (callState?.state === 'initializing' || (callState?.enabled && !callState?.deviceReady && callState?.state !== 'error')) {
+      setInitStuckMs(0)
+      initStuckTimer.current = setInterval(() => {
+        setInitStuckMs((prev) => prev + 1000)
+      }, 1000)
+    } else {
+      setInitStuckMs(0)
+    }
+    return () => {
+      if (initStuckTimer.current) {
+        clearInterval(initStuckTimer.current)
+        initStuckTimer.current = null
+      }
+    }
+  }, [state?.call?.state, state?.call?.enabled, state?.call?.deviceReady])
 
   useEffect(() => {
     if (!state?.auth) {
@@ -179,10 +204,14 @@ function App() {
   const notes = state?.notes || []
   const chats = state?.chat || []
   const selectedNumber = resolveCallerId(auth)
+  // Profile loads async after auth — distinguish "no profile yet" from "no number configured"
+  const profileLoaded = Boolean(auth?.profile)
+  const callerIdPending = auth && !profileLoaded
   const dialTarget = trimText(primaryPhone(account, contact, page?.phones?.[0] || null, accountContacts) || page?.phones?.[0] || '')
   const manualDialTarget = trimText(manualDial)
   const outgoingTarget = dialTarget || manualDialTarget
   const readyToDial = Boolean(auth && selectedNumber && outgoingTarget && call.deviceReady && call.state !== 'initializing')
+  const callStuck = initStuckMs >= 8000
   const latestAssistant = [...chats].reverse().find((entry) => entry.role === 'assistant')?.content || ''
 
   const applyResponse = (response: MessageResponse<Record<string, unknown>>) => {
@@ -412,7 +441,11 @@ function App() {
               <span className="np-dossier-meta__sep">|</span>
               {pageDomain || 'No origin'}
               <span className="np-dossier-meta__sep">|</span>
-              {selectedNumber ? `Caller ID: ${formatPhone(selectedNumber) || selectedNumber}` : 'Caller ID not selected'}
+              {selectedNumber
+                ? `Caller ID: ${formatPhone(selectedNumber) || selectedNumber}`
+                : callerIdPending
+                  ? 'Loading caller ID…'
+                  : 'Caller ID not in settings'}
             </p>
 
             <div className="np-record__actions np-record__actions--tight">
@@ -452,16 +485,32 @@ function App() {
                   Call
                 </button>
               ) : null}
+              {callStuck && auth ? (
+                <button
+                  className="np-button"
+                  onClick={() => {
+                    setInitStuckMs(0)
+                    void runAction('retry-calls', () => sendMessage('ENABLE_CALLS', { appOrigin: auth.appOrigin }).then(() => {}))
+                  }}
+                  disabled={busy === 'retry-calls'}
+                >
+                  {busy === 'retry-calls' ? 'Retrying…' : 'Retry calls'}
+                </button>
+              ) : null}
             </div>
 
             <p className="np-compact np-call-note">
               {outgoingTarget
                 ? readyToDial
                   ? `Dial ${formatPhone(outgoingTarget) || outgoingTarget} in the background.`
-                  : 'Connecting calls in the background.'
+                  : callStuck
+                    ? 'Call device not ready. Check mic permission or retry.'
+                    : 'Connecting calls in the background.'
                 : selectedNumber
                   ? 'This page does not expose a phone number yet.'
-                  : 'Caller ID is not selected in settings.'}
+                  : callerIdPending
+                    ? 'Loading your Twilio number from settings…'
+                    : 'No caller ID found. Set a Twilio number in settings.'}
             </p>
 
             {visibleContacts.length > 0 ? (
