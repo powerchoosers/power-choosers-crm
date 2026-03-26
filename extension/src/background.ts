@@ -59,6 +59,7 @@ async function hydrateState() {
         ...defaultCallState(),
         ...(saved.call || {}),
       },
+      accountContacts: Array.isArray(saved.accountContacts) ? saved.accountContacts : [],
       notes: Array.isArray(saved.notes) ? saved.notes : [],
       chat: Array.isArray(saved.chat) ? saved.chat : [],
       recentCalls: Array.isArray(saved.recentCalls) ? saved.recentCalls : [],
@@ -267,6 +268,35 @@ async function refreshRecentCalls(fallbackOrigin?: string | null) {
   }
 }
 
+async function loadAccountContacts(accountId?: string | null, fallbackOrigin?: string | null) {
+  const normalizedAccountId = trimText(accountId || '')
+
+  if (!normalizedAccountId) {
+    await setState((draft) => {
+      draft.accountContacts = []
+    })
+    return []
+  }
+
+  const data = await fetchAuthedJson(
+    `/api/extension/account-contacts?accountId=${encodeURIComponent(normalizedAccountId)}`,
+    { method: 'GET' },
+    fallbackOrigin
+  )
+
+  const contacts: NonNullable<MatchResult['contact']>[] = Array.isArray(data?.contacts)
+    ? data.contacts
+        .map((item: unknown) => normalizeMatchContact(item))
+        .filter((item: NonNullable<MatchResult['contact']>) => Boolean(item))
+    : []
+
+  await setState((draft) => {
+    draft.accountContacts = contacts
+  })
+
+  return contacts
+}
+
 function collectPageSnapshot() {
   const normalize = (value: unknown) => String(value ?? '').trim().replace(/\s+/g, ' ')
 
@@ -413,6 +443,15 @@ async function matchPageAgainstCrm(snapshot: PageSnapshot) {
     draft.match = match
   })
 
+  try {
+    await loadAccountContacts(match.account?.id || null, snapshot.origin)
+  } catch (error) {
+    console.warn('[Extension] Account contacts load failed:', error)
+    await setState((draft) => {
+      draft.accountContacts = []
+    })
+  }
+
   return match
 }
 
@@ -425,6 +464,7 @@ async function captureAndMatch() {
   await setState((draft) => {
     draft.page = snapshot
     draft.match = null
+    draft.accountContacts = []
   })
   const match = await matchPageAgainstCrm(snapshot)
   return { snapshot, screenshot, match }
@@ -627,6 +667,7 @@ async function handleAuthSync(payload: any, sender: { origin?: string | null }) 
     draft.call = identityChanged ? defaultCallState() : draft.call
     draft.page = identityChanged ? null : draft.page
     draft.match = identityChanged ? null : draft.match
+    draft.accountContacts = identityChanged ? [] : draft.accountContacts
   })
 
   try {
@@ -639,6 +680,14 @@ async function handleAuthSync(payload: any, sender: { origin?: string | null }) 
     await refreshRecentCalls(appOrigin)
   } catch (error) {
     console.warn('[Extension] Recent calls refresh failed:', error)
+  }
+
+  try {
+    if (state.match?.account?.id) {
+      await loadAccountContacts(state.match.account.id, appOrigin)
+    }
+  } catch (error) {
+    console.warn('[Extension] Account contacts refresh failed:', error)
   }
 
   try {
@@ -660,6 +709,7 @@ async function handleAuthClear() {
     draft.auth = null
     draft.page = null
     draft.match = null
+    draft.accountContacts = []
     draft.call = defaultCallState()
     draft.recentCalls = []
     draft.notes = priorNotes

@@ -144,6 +144,7 @@ export type ExtensionState = {
   auth: ExtensionAuth | null
   page: PageSnapshot | null
   match: MatchResult | null
+  accountContacts: MatchContact[]
   call: CallState
   notes: NoteEntry[]
   chat: ChatEntry[]
@@ -181,6 +182,7 @@ export function defaultState(): ExtensionState {
     auth: null,
     page: null,
     match: null,
+    accountContacts: [],
     call: defaultCallState(),
     notes: [],
     chat: [],
