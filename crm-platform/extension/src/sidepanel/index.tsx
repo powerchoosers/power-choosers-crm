@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
-  buildRecentActivityLabel,
   defaultCallState,
   formatElapsed,
   formatPhone,
@@ -11,7 +10,6 @@ import {
   type ExtensionState,
   type MatchAccount,
   type MatchContact,
-  type RecentCall,
 } from '../shared'
 
 type MessageResponse<T> = {
@@ -48,24 +46,15 @@ function snippet(value: string | null | undefined, max = 180) {
   return `${text.slice(0, max).trimEnd()}…`
 }
 
-function formatDateTime(value: string | null | undefined) {
-  if (!value) return 'Unknown'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return 'Unknown'
-  return date.toLocaleString([], {
-    month: 'short',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  })
-}
-
 function formatStatusLabel(state: ExtensionState | null) {
   if (!state?.auth) return 'Disconnected'
+  if (state.call.state === 'error') return 'Call error'
+  if (state.call.state === 'initializing') return 'Connecting calls'
   if (state.call.state === 'incoming') return 'Incoming call'
   if (state.call.state === 'connected') return 'Live call'
   if (state.call.state === 'dialing') return 'Dialing'
-  if (state.call.enabled) return 'Calls enabled'
+  if (state.call.enabled && state.call.deviceReady) return 'Calls ready'
+  if (state.call.enabled) return 'Connecting calls'
   return 'Connected'
 }
 
@@ -118,66 +107,10 @@ function primaryPhone(account: MatchAccount | null, contact: MatchContact | null
   )
 }
 
-function chipList(values: string[]) {
-  return values.filter(Boolean).map((value) => trimText(value))
-}
-
-function MatchCard({
-  label,
-  score,
-  reason,
-  children,
-  actions,
-}: {
-  label: string
-  score: number
-  reason: string
-  children: React.ReactNode
-  actions?: React.ReactNode
-}) {
-  return (
-    <div className="np-record">
-      <div className="np-section-head" style={{ marginBottom: 8 }}>
-        <div>
-          <p className="np-record__title">{label}</p>
-          <p className="np-record__meta">Score {score}</p>
-        </div>
-        <span className="np-pill np-pill--blue">{score > 90 ? 'Top match' : 'Candidate'}</span>
-      </div>
-      <p className="np-copy" style={{ marginBottom: 10 }}>
-        {reason}
-      </p>
-      {children}
-      {actions ? <div className="np-record__actions">{actions}</div> : null}
-    </div>
-  )
-}
-
-function MetricBlock({
-  label,
-  value,
-  subtext,
-}: {
-  label: string
-  value: string
-  subtext: string
-}) {
-  return (
-    <div className="np-metric">
-      <div className="np-metric__label">{label}</div>
-      <div className="np-metric__value">{value}</div>
-      <div className="np-metric__sub">{subtext}</div>
-    </div>
-  )
-}
-
 function App() {
   const [state, setState] = useState<ExtensionState | null>(null)
-  const [screenshot, setScreenshot] = useState<string | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [phoneDraft, setPhoneDraft] = useState('')
-  const [digits, setDigits] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const autoCaptureRan = useRef(false)
@@ -220,33 +153,17 @@ function App() {
     return () => window.clearTimeout(timer)
   }, [state?.auth])
 
-  useEffect(() => {
-    const contact = state?.match?.contact
-    const account = state?.match?.account
-    const pagePhone = state?.page?.phones?.[0] || null
-    const target = primaryPhone(account || null, contact || null, pagePhone)
-    if (!phoneDraft && target) {
-      setPhoneDraft(target)
-    }
-  }, [phoneDraft, state?.match?.contact, state?.match?.account, state?.page?.phones])
-
   const auth = state?.auth || null
   const page = state?.page || null
   const match = state?.match || null
   const call = state?.call || defaultCallState()
   const account = match?.account || null
   const contact = match?.contact || null
-  const recentCalls = state?.recentCalls || []
   const notes = state?.notes || []
   const chats = state?.chat || []
   const selectedNumber = auth?.profile?.selectedPhoneNumber || auth?.profile?.twilioNumbers?.[0]?.number || null
-  const dialTarget = trimText(
-    phoneDraft ||
-      primaryPhone(account, contact, page?.phones?.[0] || null) ||
-      page?.phones?.[0] ||
-      ''
-  )
-  const readyToDial = Boolean(auth && call.enabled && dialTarget)
+  const dialTarget = trimText(primaryPhone(account, contact, page?.phones?.[0] || null) || page?.phones?.[0] || '')
+  const readyToDial = Boolean(auth && dialTarget && call.deviceReady && call.state !== 'initializing')
   const latestAssistant = [...chats].reverse().find((entry) => entry.role === 'assistant')?.content || ''
 
   const applyResponse = (response: MessageResponse<Record<string, unknown>>) => {
@@ -268,9 +185,8 @@ function App() {
   }
 
   const captureAndMatch = async () => {
-    const response = await sendMessage<{ snapshot: ExtensionState['page']; screenshot: string | null; match: ExtensionState['match'] }>('CAPTURE_AND_MATCH')
+    const response = await sendMessage<{ snapshot: ExtensionState['page']; match: ExtensionState['match'] }>('CAPTURE_AND_MATCH')
     applyResponse(response)
-    setScreenshot((response as any)?.screenshot || null)
   }
 
   const saveNote = async (source: 'manual' | 'ai' = 'manual') => {
@@ -325,22 +241,9 @@ function App() {
     setPrompt('')
   }
 
-  const enableCalls = async () => {
-    const response = await sendMessage('ENABLE_CALLS', {
-      callerId: selectedNumber || null,
-      appOrigin: auth?.appOrigin || null,
-    })
-    applyResponse(response)
-  }
-
-  const disableCalls = async () => {
-    const response = await sendMessage('DISABLE_CALLS')
-    applyResponse(response)
-  }
-
   const dialCall = async () => {
     if (!dialTarget) {
-      throw new Error('Enter a number first.')
+      throw new Error('No phone number found on this record.')
     }
 
     const response = await sendMessage('CALL_DIAL', {
@@ -367,16 +270,6 @@ function App() {
     applyResponse(response)
   }
 
-  const sendDigits = async () => {
-    const value = trimText(digits)
-    if (!value) {
-      throw new Error('Enter digits first.')
-    }
-    const response = await sendMessage('CALL_DIGITS', { digits: value })
-    applyResponse(response)
-    setDigits('')
-  }
-
   const openRecord = async (type: 'contact' | 'account', id: string | null) => {
     if (!id) throw new Error('No record selected.')
     const response = await sendMessage('OPEN_RECORD', {
@@ -387,23 +280,21 @@ function App() {
     applyResponse(response)
   }
 
-  const refreshRecentCalls = async () => {
-    const response = await sendMessage('REQUEST_RECENT_CALLS')
-    applyResponse(response)
-  }
-
   const statePill =
-    call.state === 'incoming'
+    call.state === 'error'
       ? 'np-pill np-pill--red'
-      : call.state === 'connected' || call.state === 'dialing'
-        ? 'np-pill np-pill--blue'
-        : call.enabled
-          ? 'np-pill np-pill--green'
-          : 'np-pill'
+      : call.state === 'initializing'
+        ? 'np-pill np-pill--amber'
+        : call.state === 'incoming'
+          ? 'np-pill np-pill--red'
+          : call.state === 'connected' || call.state === 'dialing'
+            ? 'np-pill np-pill--blue'
+            : call.enabled && call.deviceReady
+              ? 'np-pill np-pill--green'
+              : call.enabled
+                ? 'np-pill np-pill--amber'
+                : 'np-pill'
 
-  const currentNotes = useMemo(() => notes.slice(0, 3), [notes])
-  const currentCalls = useMemo(() => recentCalls.slice(0, 3), [recentCalls])
-  const currentChats = useMemo(() => chats.slice(-4), [chats])
   const pageDomain = extractDomain(page?.origin || page?.url)
   const heroTitle = account?.name || contact?.accountName || contact?.name || page?.title || 'No CRM match yet'
   const heroAccountName = account?.name || null
@@ -417,14 +308,8 @@ function App() {
         pageDomain ||
         'Contact matched from page capture.'
       : pageDomain || 'Capture a page to start the match.'
-  const heroSummary = match?.summary || 'Click Capture & Match to read the active tab and resolve the record.'
+  const heroSummary = match?.summary || 'Capture the active tab to resolve the record.'
   const heroMatchLabel = match ? (contact ? 'Contact matched' : 'Account matched') : 'No match yet'
-  const heroScore = contact?.score || account?.score || 0
-  const pageHints = chipList([
-    ...(page?.emails || []).slice(0, 3),
-    ...(page?.phones || []).slice(0, 3).map((value) => formatPhone(value) || value),
-  ]).slice(0, 4)
-  const pageSnippet = snippet(page?.selectedText || '', 180)
   const callLabel =
     call.state === 'incoming'
       ? `Incoming from ${call.incomingDisplay || call.incomingFrom || 'unknown'}`
@@ -432,9 +317,12 @@ function App() {
         ? 'Live call'
         : call.state === 'dialing'
           ? 'Dialing'
-          : call.enabled
-            ? 'Ready to call'
-            : 'Calls disabled'
+          : call.state === 'initializing'
+            ? 'Connecting calls'
+            : call.deviceReady
+              ? 'Ready to call'
+              : 'Connecting calls'
+  const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
 
   return (
     <div className="np-shell">
@@ -445,7 +333,7 @@ function App() {
           </div>
           <div className="np-brand-copy">
             <h1 className="np-brand-title">Nodal Point</h1>
-            <div className="np-brand-subtitle">Command Deck</div>
+            <div className="np-brand-subtitle">CRM Uplink</div>
           </div>
         </div>
         <div className="np-status-row">
@@ -455,7 +343,7 @@ function App() {
       </div>
 
       {error ? (
-        <div className="np-card np-card--accent" style={{ borderColor: 'rgba(239, 68, 68, 0.35)' }}>
+        <div className="np-card" style={{ borderColor: 'rgba(239, 68, 68, 0.35)' }}>
           <p className="np-title" style={{ color: '#fecaca', marginBottom: 4 }}>
             Action failed
           </p>
@@ -465,7 +353,7 @@ function App() {
 
       <div className="np-scroll">
         <div className="np-stack">
-          <section className="np-card np-card--accent np-card--hero">
+          <section className="np-card np-card--hero">
             <div className="np-section-head np-section-head--hero">
               <div className="np-hero-identity">
                 <div className="np-entity-mark np-entity-mark--large">
@@ -479,45 +367,20 @@ function App() {
               </div>
 
               <div className="np-hero-status">
-                <span className={auth ? 'np-pill np-pill--green' : 'np-pill np-pill--amber'}>
-                  {auth?.bootstrapStatus || (auth ? 'Synced' : 'Disconnected')}
-                </span>
+                <span className={auth ? 'np-pill np-pill--green' : 'np-pill np-pill--amber'}>{auth ? 'Synced' : 'Disconnected'}</span>
                 <span className={match ? 'np-pill np-pill--blue' : 'np-pill'}>{heroMatchLabel}</span>
-                <span className="np-pill">{pageDomain || 'No origin'}</span>
               </div>
             </div>
 
             <p className="np-copy np-copy--tight">{heroSummary}</p>
 
-            <div className="np-grid np-grid--three np-hero-metrics">
-              <MetricBlock
-                label="Page"
-                value={page?.title || 'No page captured yet'}
-                subtext={pageDomain || 'Capture the active tab to resolve the record.'}
-              />
-              <MetricBlock
-                label="Signals"
-                value={pageHints.length ? `${pageHints.length} hints` : 'No page hints'}
-                subtext={pageSnippet || 'Selected text is optional, but it sharpens the match.'}
-              />
-              <MetricBlock
-                label="Call"
-                value={callLabel}
-                subtext={selectedNumber ? formatPhone(selectedNumber) || selectedNumber : 'No caller ID selected'}
-              />
-            </div>
-
-            <div className="np-chip-row">
-              {pageHints.length > 0 ? (
-                pageHints.map((hint) => (
-                  <span className="np-chip" key={hint}>
-                    {hint}
-                  </span>
-                ))
-              ) : (
-                <span className="np-compact">No page hints extracted yet.</span>
-              )}
-            </div>
+            <p className="np-micro np-dossier-meta">
+              {page?.title ? `Page: ${snippet(page.title, 64)}` : 'Page not captured yet'}
+              <span className="np-dossier-meta__sep">|</span>
+              {pageDomain || 'No origin'}
+              <span className="np-dossier-meta__sep">|</span>
+              {selectedNumber ? `Caller ID: ${formatPhone(selectedNumber) || selectedNumber}` : 'Caller ID not selected'}
+            </p>
 
             <div className="np-record__actions np-record__actions--tight">
               <button
@@ -525,10 +388,7 @@ function App() {
                 onClick={() => void runAction('capture', captureAndMatch)}
                 disabled={!auth || busy === 'capture'}
               >
-                {busy === 'capture' ? 'Capturing…' : 'Capture & Match'}
-              </button>
-              <button className="np-button" onClick={() => void runAction('refresh', loadState)} disabled={busy === 'refresh'}>
-                Refresh
+                {busy === 'capture' ? 'Capturing...' : 'Capture & Match'}
               </button>
               <button
                 className="np-button"
@@ -544,16 +404,27 @@ function App() {
               >
                 Open Contact
               </button>
+              <button className="np-button" onClick={() => void runAction('dial-call', dialCall)} disabled={!readyToDial || busy === 'dial-call'}>
+                Call
+              </button>
             </div>
+
+            <p className="np-compact np-call-note">
+              {dialTarget
+                ? readyToDial
+                  ? `Dial ${formatPhone(dialTarget) || dialTarget} in the background.`
+                  : 'Connecting calls in the background.'
+                : 'No phone number found on this record.'}
+            </p>
           </section>
 
           <section className="np-card">
-            <div className="np-section-head">
+            <div className="np-section-head np-section-head--compact">
               <div>
                 <div className="np-kicker">Transmission Log</div>
                 <h2 className="np-title">Notes that land in CRM</h2>
               </div>
-              <span className="np-pill">{notes.length} saved</span>
+              <span className="np-pill">{notes.length ? `${notes.length} saved` : 'Empty'}</span>
             </div>
 
             <div className="np-field">
@@ -612,180 +483,56 @@ function App() {
               </button>
             </div>
 
-            <div className="np-divider" />
-
-            <div className="np-list np-list--compact">
-              {currentNotes.length > 0 ? (
-                currentNotes.map((entry) => (
-                  <div className="np-list-item" key={entry.id}>
-                    <div className="np-list-item__main">
-                      <p className="np-list-item__title">{entry.title || 'Transmission log'}</p>
-                      <p className="np-list-item__sub">
-                        {snippet(entry.text, 160)}
-                        <br />
-                        {formatDateTime(entry.createdAt)} • {entry.source}
-                      </p>
-                    </div>
-                    <span className={entry.source === 'ai' ? 'np-pill np-pill--blue' : 'np-pill'}>{entry.savedToCrm ? 'Saved' : 'Draft'}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="np-compact">No saved notes yet.</p>
-              )}
-            </div>
-
-            <div className="np-divider" />
-
-            <div className="np-list np-list--compact">
-              {currentChats.length > 0 ? (
-                currentChats.map((entry, index) => (
-                  <div className="np-list-item" key={`${entry.role}-${entry.createdAt}-${index}`}>
-                    <div className="np-list-item__main">
-                      <p className="np-list-item__title">{entry.role === 'assistant' ? 'Assistant' : 'You'}</p>
-                      <p className="np-list-item__sub" style={{ whiteSpace: 'pre-wrap' }}>
-                        {snippet(entry.content, 160)}
-                      </p>
-                    </div>
-                    <span className={entry.role === 'assistant' ? 'np-pill np-pill--blue' : 'np-pill'}>{formatDateTime(entry.createdAt)}</span>
-                  </div>
-                ))
-              ) : (
-                <p className="np-compact">No AI conversation yet.</p>
-              )}
-            </div>
+            <p className="np-compact np-copy--tight">AI writes the summary into the log before you save it to CRM.</p>
           </section>
         </div>
       </div>
 
-      <div className="np-callbar">
-        <div className="np-card np-card--accent np-callbar__inner">
-          <div className="np-call-status">
-            <div>
-              <div className="np-kicker">Call Deck</div>
-              <h3 className="np-title">{callLabel}</h3>
-            </div>
-            <div className="np-callbar-head">
-              <span className={statePill}>{call.state.toUpperCase()}</span>
-              <button className="np-button np-button--sm" onClick={() => void runAction('refresh-calls', refreshRecentCalls)}>
-                Refresh
-              </button>
-            </div>
-          </div>
-
-          {call.lastError ? <p className="np-copy np-copy--error">{call.lastError}</p> : null}
-          <div className="np-call-timer">{formatElapsed(call.startedAt, Date.now())}</div>
-
-          {call.state === 'incoming' ? (
-            <div className="np-call-actions">
-              <button className="np-button np-button--primary" onClick={() => void runAction('answer-call', answerCall)} disabled={busy === 'answer-call'}>
-                Answer
-              </button>
-              <button className="np-button np-button--danger" onClick={() => void runAction('hangup-call', hangupCall)} disabled={busy === 'hangup-call'}>
-                Decline
-              </button>
-              <button className="np-button" onClick={() => setPhoneDraft(call.incomingFrom || phoneDraft)}>
-                Use number
-              </button>
-            </div>
-          ) : null}
-
-          {call.state === 'connected' || call.state === 'dialing' ? (
-            <>
-              <div className="np-call-actions">
-                <button className="np-button" onClick={() => void runAction('toggle-mute', toggleMute)} disabled={busy === 'toggle-mute'}>
-                  {call.muted ? 'Unmute' : 'Mute'}
-                </button>
-                <button className="np-button np-button--danger" onClick={() => void runAction('hangup-call', hangupCall)} disabled={busy === 'hangup-call'}>
-                  Hang Up
-                </button>
-                <button className="np-button" onClick={() => void runAction('disable-calls', disableCalls)} disabled={busy === 'disable-calls'}>
-                  Disable
-                </button>
+      {callIsLive ? (
+        <div className="np-callbar">
+          <div className="np-card np-live-strip">
+            <div className="np-live-strip__top">
+              <div>
+                <div className="np-kicker">Live Call</div>
+                <h3 className="np-title">{callLabel}</h3>
               </div>
-
-              <div className="np-grid np-grid--two">
-                <div className="np-field">
-                  <label className="np-label" htmlFor="digits">
-                    Digits
-                  </label>
-                  <input
-                    id="digits"
-                    className="np-input"
-                    value={digits}
-                    onChange={(event) => setDigits(event.target.value)}
-                    placeholder="1234#"
-                  />
-                </div>
-                <div className="np-field">
-                  <label className="np-label" htmlFor="dialTarget">
-                    Call target
-                  </label>
-                  <input
-                    id="dialTarget"
-                    className="np-input"
-                    value={phoneDraft}
-                    onChange={(event) => setPhoneDraft(event.target.value)}
-                    placeholder="(555) 555-5555"
-                  />
-                </div>
-              </div>
-
-              <div className="np-call-actions np-call-actions--two">
-                <button className="np-button" onClick={() => void runAction('send-digits', sendDigits)} disabled={busy === 'send-digits'}>
-                  Send Digits
-                </button>
-                <button className="np-button" onClick={() => setPhoneDraft(primaryPhone(account, contact, page?.phones?.[0] || null))}>
-                  Restore Match
-                </button>
-              </div>
-            </>
-          ) : null}
-
-          {call.state !== 'incoming' && call.state !== 'connected' && call.state !== 'dialing' ? (
-            <div className="np-call-actions">
-              <button className="np-button np-button--primary" onClick={() => void runAction('enable-calls', enableCalls)} disabled={!auth || busy === 'enable-calls'}>
-                Enable Calls
-              </button>
-              <button className="np-button" onClick={() => void runAction('dial-call', dialCall)} disabled={!readyToDial || busy === 'dial-call'}>
-                {dialTarget ? `Call ${formatPhone(dialTarget) || dialTarget}` : 'Call'}
-              </button>
-              <button className="np-button" onClick={() => setPhoneDraft(primaryPhone(account, contact, page?.phones?.[0] || null))} disabled={!dialTarget}>
-                Use Match
-              </button>
+              <span className={statePill}>
+                {call.state === 'incoming' ? 'RINGING' : call.state === 'connected' ? 'LIVE' : 'DIALING'}
+              </span>
             </div>
-          ) : null}
 
-          <div className="np-divider" />
-
-          <div className="np-section-head np-section-head--compact">
-            <div>
-              <div className="np-kicker">Recent Calls</div>
-              <p className="np-copy np-copy--tight">Last calls in CRM</p>
+            {call.lastError ? <p className="np-copy np-copy--error">{call.lastError}</p> : null}
+            <div className="np-call-meta">
+              <span>{formatElapsed(call.startedAt, Date.now())}</span>
+              <span>{call.incomingDisplay || call.incomingFrom || dialTarget || selectedNumber || 'Waiting'}</span>
             </div>
-            <span className="np-pill">{currentCalls.length} loaded</span>
-          </div>
 
-          <div className="np-list np-list--compact">
-            {currentCalls.length > 0 ? (
-              currentCalls.map((item: RecentCall) => (
-                <div className="np-list-item" key={item.id}>
-                  <div className="np-list-item__main">
-                    <p className="np-list-item__title">{buildRecentActivityLabel(item)}</p>
-                    <p className="np-list-item__sub">
-                      {item.direction || 'unknown'} • {formatDateTime(item.callTime || item.timestamp)} • {item.duration ? `${item.duration}s` : 'live'}
-                    </p>
-                  </div>
-                  <span className={item.status === 'completed' ? 'np-pill np-pill--green' : item.status === 'failed' ? 'np-pill np-pill--red' : 'np-pill np-pill--blue'}>
-                    {item.status || 'Call'}
-                  </span>
-                </div>
-              ))
-            ) : (
-              <p className="np-compact">No recent calls loaded.</p>
-            )}
+            <div className="np-call-actions np-call-actions--compact">
+              {call.state === 'incoming' ? (
+                <>
+                  <button className="np-button np-button--primary" onClick={() => void runAction('answer-call', answerCall)} disabled={busy === 'answer-call'}>
+                    Answer
+                  </button>
+                  <button className="np-button np-button--danger" onClick={() => void runAction('hangup-call', hangupCall)} disabled={busy === 'hangup-call'}>
+                    Decline
+                  </button>
+                </>
+              ) : null}
+
+              {call.state === 'connected' || call.state === 'dialing' ? (
+                <>
+                  <button className="np-button" onClick={() => void runAction('toggle-mute', toggleMute)} disabled={busy === 'toggle-mute'}>
+                    {call.muted ? 'Unmute' : 'Mute'}
+                  </button>
+                  <button className="np-button np-button--danger" onClick={() => void runAction('hangup-call', hangupCall)} disabled={busy === 'hangup-call'}>
+                    Hang Up
+                  </button>
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
     </div>
   )
 }

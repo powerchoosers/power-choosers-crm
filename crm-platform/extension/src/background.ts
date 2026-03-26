@@ -641,24 +641,14 @@ async function handleAuthSync(payload: any, sender: { origin?: string | null }) 
     console.warn('[Extension] Recent calls refresh failed:', error)
   }
 
-  if (state.call.enabled && state.auth?.accessToken) {
-    try {
-      await ensureOffscreenDocument()
-      await sendExtensionMessage({
-        type: 'TWILIO_INIT',
-        payload: {
-          identity: `agent-${state.auth.userId || state.auth.email || 'agent'}`,
-          apiBase: getApiOrigin(appOrigin),
-          callerId: getCallerId(),
-          auth: state.auth,
-        },
-      })
-    } catch (error) {
-      await setState((draft) => {
-        draft.call.state = 'error'
-        draft.call.lastError = trimText((error as Error)?.message || 'Failed to initialize calls.')
-      })
-    }
+  try {
+    await handleAutoCallBootstrap(appOrigin)
+  } catch (error) {
+    await setState((draft) => {
+      draft.call.state = 'error'
+      draft.call.enabled = true
+      draft.call.lastError = trimText((error as Error)?.message || 'Failed to initialize calls.')
+    })
   }
 
   return { ok: true, state: cloneState() }
@@ -692,13 +682,26 @@ async function handleAuthClear() {
 }
 
 async function handleEnableCalls(payload: any) {
+  return handleAutoCallBootstrap(payload?.appOrigin || state.auth?.appOrigin || null, payload?.callerId || null)
+}
+
+async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?: string | null) {
   if (!state.auth?.accessToken) {
     throw new Error('Connect your Nodal Point session before enabling calls.')
+  }
+
+  if (
+    state.call.enabled &&
+    state.call.deviceReady &&
+    (state.call.state === 'ready' || state.call.state === 'incoming' || state.call.state === 'connected' || state.call.state === 'dialing')
+  ) {
+    return { ok: true, state: cloneState() }
   }
 
   await setState((draft) => {
     draft.call.enabled = true
     draft.call.state = 'initializing'
+    draft.call.deviceReady = false
     draft.call.lastError = null
   })
 
@@ -707,8 +710,8 @@ async function handleEnableCalls(payload: any) {
     type: 'TWILIO_INIT',
     payload: {
       identity: `agent-${state.auth.userId || state.auth.email || 'agent'}`,
-      apiBase: getApiOrigin(payload?.appOrigin || state.auth.appOrigin),
-      callerId: payload?.callerId || getCallerId(),
+      apiBase: getApiOrigin(fallbackOrigin || state.auth.appOrigin),
+      callerId: callerId || getCallerId(),
       auth: state.auth,
     },
   })
@@ -1163,19 +1166,9 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
 })
 
 void hydrateState().then(() => {
-  if (state.call.enabled && state.auth?.accessToken) {
-    void ensureOffscreenDocument().then(() => {
-      void sendExtensionMessage({
-        type: 'TWILIO_INIT',
-        payload: {
-          identity: `agent-${state.auth?.userId || state.auth?.email || 'agent'}`,
-          apiBase: getApiOrigin(),
-          callerId: getCallerId(),
-          auth: state.auth,
-        },
-      }).catch((error) => {
-        console.warn('[Extension] Initial Twilio bootstrap failed:', error)
-      })
+  if (state.auth?.accessToken) {
+    void handleAutoCallBootstrap(state.auth.appOrigin, getCallerId()).catch((error) => {
+      console.warn('[Extension] Initial Twilio bootstrap failed:', error)
     })
   }
 })
