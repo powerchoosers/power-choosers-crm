@@ -939,6 +939,33 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
     },
   })
 
+  // Recovery: if the device is still stuck in 'initializing' after 15s, retry once automatically
+  setTimeout(() => {
+    void (async () => {
+      if (state.call.state === 'initializing' && state.call.enabled && !state.call.deviceReady && state.auth?.accessToken) {
+        console.warn('[Extension] Call device stuck in initializing — auto-retrying bootstrap')
+        try {
+          await ensureOffscreenDocument()
+          await sendExtensionMessage({
+            type: 'TWILIO_INIT',
+            payload: {
+              identity: `agent-${state.auth?.userId || state.auth?.email || 'agent'}`,
+              apiBase: getApiOrigin(state.auth?.appOrigin),
+              callerId: getCallerId(),
+              auth: state.auth,
+            },
+          })
+        } catch (error) {
+          console.warn('[Extension] Auto-retry bootstrap failed:', error)
+          await setState((draft) => {
+            draft.call.state = 'error'
+            draft.call.lastError = trimText((error as Error)?.message || 'Call device failed to initialize. Check microphone permission.')
+          })
+        }
+      }
+    })()
+  }, 15000)
+
   return { ok: true, state: cloneState() }
 }
 
