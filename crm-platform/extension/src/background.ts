@@ -263,6 +263,10 @@ async function loadBootstrapProfile(fallbackOrigin?: string | null) {
     
     if (!profile) {
       console.warn('[Extension] Bootstrap returned no profile data')
+    } else {
+      console.log('[Extension] Profile data keys detected:', Object.keys(profile))
+      console.log(`[Extension] profile.selectedPhoneNumber: ${profile.selectedPhoneNumber}`)
+      console.log(`[Extension] profile.twilioNumbers count: ${Array.isArray(profile.twilioNumbers) ? profile.twilioNumbers.length : 0}`)
     }
 
     await setState((draft) => {
@@ -1384,22 +1388,30 @@ async function handleRecentCallsRefresh() {
 async function handleOpenSidePanel(sender?: any) {
   try {
     const tabId = sender?.tab?.id
+    const windowId = sender?.tab?.windowId
+    
     if (tabId) {
-      const windowId = sender.tab.windowId || (await chrome.tabs.get(tabId)).windowId
+      // Synchronous path preferred for user gesture reliability in Edge/Chrome
+      chrome.sidePanel.open({ tabId }).catch((error: any) => {
+         console.warn('[Extension] sidePanel.open (tabId) failed:', error)
+      })
+      
       if (windowId) {
-        await chrome.windows.update(windowId, { focused: true })
+        chrome.windows.update(windowId, { focused: true }).catch(() => {})
       }
-      await chrome.sidePanel.open({ tabId })
       return { ok: true, state: cloneState() }
     }
     
-    // Fallback: Use current focused window
-    const window = await chrome.windows.getLastFocused()
-    if (window?.id != null) {
-      await chrome.windows.update(window.id, { focused: true })
-      await chrome.sidePanel.open({ windowId: window.id })
+    // Fallback: If no tabId (unexpected), use windowId synchronously if available
+    if (windowId != null) {
+      chrome.sidePanel.open({ windowId }).catch((error: any) => {
+         console.warn('[Extension] sidePanel.open (windowId) failed:', error)
+      })
+      chrome.windows.update(windowId, { focused: true }).catch(() => {})
+      return { ok: true, state: cloneState() }
     }
-    return { ok: true, state: cloneState() }
+
+    return { ok: false, error: 'Target context missing for gesture open.' }
   } catch (error) {
     console.error('[Extension] handleOpenSidePanel failed:', error)
     return { ok: false, error: trimText((error as Error)?.message || 'Side panel focus failed') }
@@ -1468,6 +1480,12 @@ chrome.notifications.onButtonClicked.addListener(() => {
 })
 
 chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (value: any) => void) => {
+  // CRITICAL: OPEN_SIDE_PANEL must be handled synchronously before ANY awaits to preserve user gesture
+  if (message?.type === 'OPEN_SIDE_PANEL') {
+    void handleOpenSidePanel(sender).then(sendResponse)
+    return true
+  }
+
   void (async () => {
     await hydrateState()
 
