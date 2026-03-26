@@ -390,9 +390,12 @@ export function normalizeAuthPayload(payload: any, appOrigin?: string | null): E
 export function resolveCallerId(auth: ExtensionAuth | null): string | null {
   const selected = normalizeTwilioPhone(auth?.profile?.selectedPhoneNumber)
   if (selected) return selected
-  const numbers = auth?.profile?.twilioNumbers ?? []
-  const first = numbers.find((entry) => normalizeTwilioPhone(entry?.number))
-  return normalizeTwilioPhone(first?.number) || null
+  const numbers = auth?.profile?.twilioNumbers
+  if (Array.isArray(numbers) && numbers.length > 0) {
+    const first = numbers.find((entry) => entry && normalizeTwilioPhone(entry.number))
+    if (first) return normalizeTwilioPhone(first.number)
+  }
+  return null
 }
 
 export function buildPageContext(page: PageSnapshot | null): string {

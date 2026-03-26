@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   defaultCallState,
   formatElapsed,
@@ -18,6 +19,8 @@ type MessageResponse<T> = {
   error?: string
   state?: ExtensionState
 } & T
+
+const FORENSIC_EASE = [0.23, 1, 0.32, 1]
 
 function sendMessage<T = Record<string, unknown>>(type: string, payload?: unknown): Promise<MessageResponse<T>> {
   return new Promise((resolve, reject) => {
@@ -125,7 +128,6 @@ function primaryPhone(
 function App() {
   const [state, setState] = useState<ExtensionState | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
-  const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [manualDial, setManualDial] = useState('')
@@ -155,205 +157,102 @@ function App() {
     return () => chrome.storage.onChanged.removeListener(handleStorageChange)
   }, [])
 
-  // Track how long calls have been stuck in initializing state
   useEffect(() => {
-    if (initStuckTimer.current) {
-      clearInterval(initStuckTimer.current)
-      initStuckTimer.current = null
-    }
-    const callState = state?.call
-    if (callState?.state === 'initializing' || (callState?.enabled && !callState?.deviceReady && callState?.state !== 'error')) {
-      setInitStuckMs(0)
+    const callState = state?.call?.state
+    const isStuck = callState === 'initializing'
+    
+    if (isStuck && !initStuckTimer.current) {
       initStuckTimer.current = setInterval(() => {
         setInitStuckMs((prev) => prev + 1000)
       }, 1000)
-    } else {
+    } else if (!isStuck && initStuckTimer.current) {
+      clearInterval(initStuckTimer.current)
+      initStuckTimer.current = null
       setInitStuckMs(0)
     }
+    
     return () => {
-      if (initStuckTimer.current) {
-        clearInterval(initStuckTimer.current)
-        initStuckTimer.current = null
-      }
+      if (initStuckTimer.current) clearInterval(initStuckTimer.current)
     }
-  }, [state?.call?.state, state?.call?.enabled, state?.call?.deviceReady])
+  }, [state?.call?.state])
 
-  useEffect(() => {
-    if (!state?.auth) {
-      autoCaptureRan.current = false
-      return
-    }
-
-    if (autoCaptureRan.current) return
-    autoCaptureRan.current = true
-
-    const timer = window.setTimeout(() => {
-      void runAction('auto-capture', captureAndMatch)
-    }, 150)
-
-    return () => window.clearTimeout(timer)
-  }, [state?.auth])
-
-  const auth = state?.auth || null
-  const page = state?.page || null
-  const match = state?.match || null
-  const call = state?.call || defaultCallState()
-  const account = match?.account || null
-  const contact = match?.contact || null
-  const accountContacts = state?.accountContacts || []
-  const notes = state?.notes || []
-  const chats = state?.chat || []
-  const selectedNumber = resolveCallerId(auth)
-  // Profile loads async after auth — distinguish "no profile yet" from "no number configured"
-  const profileLoaded = Boolean(auth?.profile)
-  const callerIdPending = auth && !profileLoaded
-  const dialTarget = trimText(primaryPhone(account, contact, page?.phones?.[0] || null, accountContacts) || page?.phones?.[0] || '')
-  const manualDialTarget = trimText(manualDial)
-  const outgoingTarget = dialTarget || manualDialTarget
-  const readyToDial = Boolean(auth && selectedNumber && outgoingTarget && call.deviceReady && call.state !== 'initializing')
-  const callStuck = initStuckMs >= 8000
-  const latestAssistant = [...chats].reverse().find((entry) => entry.role === 'assistant')?.content || ''
-
-  const applyResponse = (response: MessageResponse<Record<string, unknown>>) => {
-    if (response?.state) {
-      setState(response.state)
-    }
-  }
-
-  const runAction = async (label: string, action: () => Promise<void>) => {
-    setBusy(label)
+  const runAction = async (key: string, fn: () => Promise<unknown>) => {
+    setBusy(key)
     setError(null)
     try {
-      await action()
+      await fn()
     } catch (err) {
-      setError(trimText((err as Error)?.message || 'Request failed.'))
+      setError((err as Error).message || 'Action failed')
     } finally {
       setBusy(null)
     }
   }
 
   const captureAndMatch = async () => {
-    const response = await sendMessage<{ snapshot: ExtensionState['page']; match: ExtensionState['match'] }>('CAPTURE_AND_MATCH')
-    applyResponse(response)
+    const response = await sendMessage('CAPTURE_AND_MATCH')
+    if (response?.state) setState(response.state)
   }
 
-  const saveNote = async (source: 'manual' | 'ai' = 'manual') => {
-    const text = trimText(noteDraft || page?.selectedText || latestAssistant || match?.summary || '')
-    if (!text) {
-      throw new Error('Write a note first.')
-    }
-
-    const response = await sendMessage('SAVE_NOTE', {
-      note: text,
-      contactId: contact?.id || null,
-      accountId: account?.id || null,
-      source,
-    })
-    applyResponse(response)
-    setNoteDraft('')
-  }
-
-  const summarizePage = async () => {
-    const response = await sendMessage('CHAT_AI', {
-      mode: 'summary',
-      prompt: prompt.trim() || 'Summarize this page for the transmission log.',
-      messages: chats,
-      noteDraft,
-      model: 'gemini-3-flash-preview',
-    })
-    applyResponse(response)
-    setPrompt('')
-  }
-
-  const writeRecap = async () => {
-    const response = await sendMessage('CHAT_AI', {
-      mode: 'recap',
-      prompt: prompt.trim() || 'Write a short follow-up recap for this account or call.',
-      messages: chats,
-      noteDraft,
-      model: 'gemini-3-flash-preview',
-    })
-    applyResponse(response)
-    setPrompt('')
-  }
-
-  const askAi = async () => {
-    const response = await sendMessage('CHAT_AI', {
-      mode: 'chat',
-      prompt: prompt.trim() || 'Answer using the current page and CRM context.',
-      messages: chats,
-      noteDraft,
-      model: 'gemini-3-flash-preview',
-    })
-    applyResponse(response)
-    setPrompt('')
-  }
-
-  const dialCall = async () => {
-    if (!outgoingTarget) {
-      throw new Error('Enter a phone number to call.')
-    }
-
-    const response = await sendMessage('CALL_DIAL', {
-      to: outgoingTarget,
-      callerId: selectedNumber || null,
-      contactId: contact?.id || null,
-      accountId: account?.id || null,
-    })
-    applyResponse(response)
+  const dialCall = async (phone: string, contactId?: string, accountId?: string) => {
+    const response = await sendMessage('CALL_DIAL', { phone, contactId, accountId })
+    if (response?.state) setState(response.state)
   }
 
   const answerCall = async () => {
     const response = await sendMessage('CALL_ANSWER')
-    applyResponse(response)
+    if (response?.state) setState(response.state)
   }
 
   const hangupCall = async () => {
     const response = await sendMessage('CALL_HANGUP')
-    applyResponse(response)
+    if (response?.state) setState(response.state)
   }
 
-  const toggleMute = async () => {
-    const response = await sendMessage('CALL_MUTE', { muted: !call.muted })
-    applyResponse(response)
+  const muteCall = async (muted: boolean) => {
+    const response = await sendMessage('CALL_MUTE', { muted })
+    if (response?.state) setState(response.state)
   }
 
-  const openRecord = async (type: 'contact' | 'account', id: string | null) => {
-    if (!id) throw new Error('No record selected.')
-    const response = await sendMessage('OPEN_RECORD', {
-      type,
-      id,
-      appOrigin: auth?.appOrigin || null,
-    })
-    applyResponse(response)
+  const saveNote = async (payload: { note: string; contactId?: string; accountId?: string }) => {
+    const response = await sendMessage('SAVE_NOTE', payload)
+    if (response?.state) setState(response.state)
+    return response
   }
 
-  const crmPill = auth ? 'np-pill np-pill--green' : 'np-pill np-pill--amber'
-  const callPill =
-    call.state === 'error'
-      ? 'np-pill np-pill--red'
-      : call.state === 'initializing'
-        ? 'np-pill np-pill--amber'
-        : call.state === 'incoming'
-          ? 'np-pill np-pill--red'
-          : call.state === 'connected' || call.state === 'dialing'
-            ? 'np-pill np-pill--blue'
-            : call.enabled && call.deviceReady
-              ? 'np-pill np-pill--green'
-              : call.enabled
-                ? 'np-pill np-pill--amber'
-                : 'np-pill'
+  const bootstrapProfile = async () => {
+    const response = await sendMessage('AUTH_SYNC')
+    if (response?.state) setState(response.state)
+  }
 
-  const pageDomain = extractDomain(page?.origin || page?.url)
-  const heroTitle = account?.name || contact?.accountName || contact?.name || page?.title || 'No CRM match yet'
-  const heroAccountName = account?.name || null
-  const heroContactAccountName = contact?.accountName || heroAccountName
+  const loginToCrm = () => {
+    const origin = state?.auth?.appOrigin || 'https://www.nodalpoint.io'
+    chrome.tabs.create({ url: origin })
+  }
+
+  if (!state) return null
+
+  const { auth, page, match, call, accountContacts, notes } = state
+  const account = match?.account
+  const contact = match?.contact
+  const pageDomain = extractDomain(page?.origin || page?.url) || null
+  const selectedNumber = resolveCallerId(auth)
+
+  const dialTarget = primaryPhone(account, contact, page?.phoneNumber || null, accountContacts)
+  let manualDialTarget = trimText(manualDial).replace(/[^0-9+]/g, '')
+  if (manualDialTarget.length < 3) manualDialTarget = ''
+
+  const crmStatus = formatCrmStatus(state)
+  const callStatus = formatCallStatus(state)
+  const crmPill = `np-pill ${auth ? 'np-pill--blue' : 'np-pill--amber'}`
+  const callPill = `np-pill ${call.state === 'error' ? 'np-pill--red' : call.deviceReady ? 'np-pill--blue' : 'np-pill--amber'}`
+
+  const heroTitle = account?.name || contact?.name || page?.title || 'No record identified'
   const heroSubtitle = account
     ? [account.industry, [account.city, account.state].filter(Boolean).join(', ')].filter(Boolean).join(' | ') ||
       pageDomain ||
       'Account matched from page capture.'
     : contact
-      ? [contact.title, heroContactAccountName].filter(Boolean).join(' | ') ||
+      ? [contact.title, contact.accountName || account?.name].filter(Boolean).join(' | ') ||
         pageDomain ||
         'Contact matched from page capture.'
       : pageDomain || 'Capture a page to start the match.'
@@ -361,7 +260,7 @@ function App() {
   const allContacts = accountContacts.length > 0 ? accountContacts : match?.contacts || []
   const visibleContacts = allContacts.slice(0, 5)
   const hasMoreContacts = allContacts.length > visibleContacts.length
-  const showRescan = Boolean(auth && page && match)
+  
   const callLabel =
     call.state === 'incoming'
       ? `Incoming from ${call.incomingDisplay || call.incomingFrom || 'unknown'}`
@@ -378,6 +277,9 @@ function App() {
   const callNeedsManualNumber = !dialTarget && !callIsLive
   const showCallButton = Boolean(selectedNumber && (dialTarget || manualDialTarget || callNeedsManualNumber))
 
+  // Branded Loading Splash
+  const isSyncing = busy === 'auto-capture' || (auth && !match && busy !== 'capture' && busy !== 'sync-profile') || busy === 'initial-sync'
+
   return (
     <div className="np-shell">
       <div className="np-header">
@@ -391,296 +293,299 @@ function App() {
           </div>
         </div>
         <div className="np-status-row">
-          <span className={crmPill}>{formatCrmStatus(state)}</span>
-          <span className={callPill}>{formatCallStatus(state)}</span>
-          {auth?.email ? <span className="np-pill">{auth.email}</span> : <span className="np-pill np-pill--amber">Not connected</span>}
+          <span className={crmPill}>{crmStatus}</span>
+          <span className={callPill}>{callStatus}</span>
+          {auth?.email ? (
+            <span className="np-pill" title={auth.email}>{snippet(auth.email, 12)}</span>
+          ) : (
+            <span className="np-pill np-pill--amber">Offline</span>
+          )}
         </div>
       </div>
 
-      {error ? (
-        <div className="np-card" style={{ borderColor: 'rgba(239, 68, 68, 0.35)' }}>
-          <p className="np-title" style={{ color: '#fecaca', marginBottom: 4 }}>
-            Action failed
-          </p>
-          <p className="np-copy">{error}</p>
-        </div>
-      ) : null}
-
-      <div className="np-scroll">
-        <div className="np-stack">
-          <section className="np-card np-card--hero">
-            <div className="np-section-head np-section-head--hero">
-              <div className="np-hero-identity">
-                <div className="np-entity-mark np-entity-mark--large">
-                  <EntityMark name={heroTitle} logoUrl={account?.logoUrl || null} />
-                </div>
-                <div className="np-hero-copy">
-                  <div className="np-kicker">Current dossier</div>
-                  <h2 className="np-hero-title">{heroTitle}</h2>
-                  <p className="np-hero-subtitle">{heroSubtitle}</p>
-                </div>
-              </div>
-
-              {showRescan ? (
-                <div className="np-section-head__actions">
-                  <button
-                    className="np-button np-button--sm np-button--ghost"
-                    onClick={() => void runAction('capture', captureAndMatch)}
-                    disabled={!auth || busy === 'capture'}
-                  >
-                    {busy === 'capture' ? 'Rescanning...' : 'Rescan'}
-                  </button>
-                </div>
-              ) : null}
-            </div>
-
-            <p className="np-copy np-copy--tight">{heroSummary}</p>
-
-            <p className="np-micro np-dossier-meta">
-              {page?.title ? `Page: ${snippet(page.title, 64)}` : 'Page not captured yet'}
-              <span className="np-dossier-meta__sep">|</span>
-              {pageDomain || 'No origin'}
-              <span className="np-dossier-meta__sep">|</span>
-              {selectedNumber
-                ? `Caller ID: ${formatPhone(selectedNumber) || selectedNumber}`
-                : callerIdPending
-                  ? 'Loading caller ID…'
-                  : 'Caller ID not in settings'}
-            </p>
-
-            <div className="np-record__actions np-record__actions--tight">
-              {!match ? (
-                <button
-                  className="np-button np-button--primary"
-                  onClick={() => void runAction('capture', captureAndMatch)}
-                  disabled={!auth || busy === 'capture'}
-                >
-                  {busy === 'capture' ? 'Capturing...' : 'Capture & Match'}
-                </button>
-              ) : null}
-              <button
-                className="np-button"
-                onClick={() => void runAction('open-account', () => openRecord('account', account?.id || null))}
-                disabled={!account || busy === 'open-account'}
+      <AnimatePresence mode="wait">
+        {isSyncing ? (
+          <motion.div
+            key="sync-splash"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="np-sync-splash"
+          >
+            <div className="np-sync-loader">
+              <motion.div
+                animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                className="np-sync-logo"
               >
-                Open Account
-              </button>
-              {selectedNumber && callNeedsManualNumber ? (
-                <div className="np-field np-field--compact np-dial-field">
-                  <label className="np-label" htmlFor="manualDial">
-                    Dial number
-                  </label>
-                  <input
-                    id="manualDial"
-                    className="np-input"
-                    inputMode="tel"
-                    placeholder="Enter a number to call"
-                    value={manualDial}
-                    onChange={(event) => setManualDial(event.target.value)}
-                  />
-                </div>
-              ) : null}
-              {showCallButton ? (
-                <button className="np-button np-button--primary" onClick={() => void runAction('dial-call', dialCall)} disabled={!readyToDial || busy === 'dial-call'}>
-                  Call
-                </button>
-              ) : null}
-              {callStuck && auth ? (
-                <button
-                  className="np-button"
-                  onClick={() => {
-                    setInitStuckMs(0)
-                    void runAction('retry-calls', () => sendMessage('ENABLE_CALLS', { appOrigin: auth.appOrigin }).then(() => {}))
-                  }}
-                  disabled={busy === 'retry-calls'}
-                >
-                  {busy === 'retry-calls' ? 'Retrying…' : 'Retry calls'}
-                </button>
-              ) : null}
+                 <img src="./nodalpoint-webicon.png" alt="" />
+              </motion.div>
+              <div className="np-sync-meta">
+                <div className="np-sync-title font-mono">QUANTUM UPLINK</div>
+                <div className="np-sync-body font-sans">Identifying session context...</div>
+              </div>
             </div>
-
-            <p className="np-compact np-call-note">
-              {outgoingTarget
-                ? readyToDial
-                  ? `Dial ${formatPhone(outgoingTarget) || outgoingTarget} in the background.`
-                  : !selectedNumber
-                    ? 'No caller ID selected. Configure a number in settings.'
-                    : callStuck
-                      ? 'Call device not ready. Check mic permission or retry.'
-                      : 'Connecting calls in the background.'
-                : selectedNumber
-                  ? 'This page does not expose a phone number yet.'
-                  : callerIdPending
-                    ? 'Loading your Twilio number from settings…'
-                    : 'No caller ID found. Set a Twilio number in settings.'}
-            </p>
-
-            {visibleContacts.length > 0 ? (
-              <>
-                <div className="np-divider" />
-
-                <div className="np-section-head np-section-head--compact">
-                  <div>
-                    <div className="np-kicker">Contacts</div>
-                    <h2 className="np-title">People on this account</h2>
-                  </div>
-                  <span className="np-pill">{accountContacts.length > 0 ? `${accountContacts.length} loaded` : `${visibleContacts.length} shown`}</span>
-                </div>
-
-                <div className="np-contact-list">
-                  {visibleContacts.map((item) => {
-                    const detail =
-                      item.title ||
-                      formatPhone(contactPhone(item)) ||
-                      item.email ||
-                      item.reason ||
-                      'Contact on this account'
-
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="np-contact-row"
-                        onClick={() => void runAction(`open-contact-${item.id}`, () => openRecord('contact', item.id))}
-                        disabled={!item.id || busy === `open-contact-${item.id}`}
-                      >
-                        <div className="np-contact-row__main">
-                          <div className="np-contact-row__name">{item.name}</div>
-                          <div className="np-contact-row__sub">{detail}</div>
-                        </div>
-                        <div className="np-contact-row__meta">Open</div>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {hasMoreContacts ? (
-                  <p className="np-compact np-copy--tight">
-                    +{allContacts.length - visibleContacts.length} more contacts in CRM.
+          </motion.div>
+        ) : (
+          <motion.div
+            key="content"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, ease: FORENSIC_EASE }}
+            className="np-scroll"
+          >
+            <div className="np-stack">
+              {error ? (
+                <div className="np-card np-card--error">
+                  <p className="np-title" style={{ color: '#fecaca', marginBottom: 4 }}>
+                    Action failed
                   </p>
-                ) : null}
-              </>
-            ) : null}
-          </section>
+                  <p className="np-copy">{error}</p>
+                </div>
+              ) : null}
 
-          <section className="np-card">
-            <div className="np-section-head np-section-head--compact">
-              <div>
-                <div className="np-kicker">Transmission Log</div>
-                <h2 className="np-title">Notes that land in CRM</h2>
-              </div>
-              <span className="np-pill">{notes.length ? `${notes.length} saved` : 'Empty'}</span>
-            </div>
-
-            <div className="np-field">
-              <label className="np-label" htmlFor="noteDraft">
-                Note
-              </label>
-              <textarea
-                id="noteDraft"
-                className="np-textarea np-textarea--tall"
-                placeholder="Type the note you want saved to the log."
-                value={noteDraft}
-                onChange={(event) => setNoteDraft(event.target.value)}
-              />
-            </div>
-
-            <div className="np-record__actions np-record__actions--tight">
-              <button
-                className="np-button np-button--primary"
-                onClick={() => void runAction('save-note', () => saveNote('manual'))}
-                disabled={!auth || busy === 'save-note'}
+              <motion.section 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
+                className="np-card np-card--hero"
               >
-                Save Note
-              </button>
-              <button className="np-button" onClick={() => setNoteDraft(page?.selectedText || match?.summary || '')}>
-                Use selection
-              </button>
-              <button className="np-button" onClick={() => setNoteDraft(latestAssistant || match?.summary || '')} disabled={!latestAssistant && !match?.summary}>
-                Use AI recap
-              </button>
+                <div className="np-hero-identity">
+                  <div className="np-entity-mark np-entity-mark--large">
+                    <EntityMark name={heroTitle} logoUrl={account?.logoUrl || null} />
+                  </div>
+                  <div className="np-hero-copy">
+                    <div className="np-kicker font-mono">CURRENT DOSSIER</div>
+                    <h2 className="np-hero-title">{heroTitle}</h2>
+                    <p className="np-hero-subtitle">{heroSubtitle}</p>
+                  </div>
+                </div>
+
+                <p className="np-copy np-copy--tight">{heroSummary}</p>
+
+                <p className="np-micro np-dossier-meta font-mono">
+                  {page?.title ? `Page: ${snippet(page.title, 64)}` : 'No page nexus'}
+                  <span className="np-dossier-meta__sep">|</span>
+                  {selectedNumber
+                    ? `Caller ID: ${formatPhone(selectedNumber)}`
+                    : <span className="text-amber-400">CALLER ID: MISSING IN SETTINGS</span>}
+                </p>
+              </motion.section>
+
+              {auth ? (
+                <>
+                  <motion.section 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.4, ease: FORENSIC_EASE }}
+                    className="np-card"
+                  >
+                    <div className="np-section-head">
+                      <h3 className="np-title">Transmission</h3>
+                      <div className="np-section-head__actions">
+                        {callIsLive && (
+                          <div className="np-pulse-tag">
+                            <span className="np-pulse-dot" />
+                            {callLabel}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {!callIsLive && (
+                      <div className="np-dialer-input">
+                        <input
+                          type="tel"
+                          className="nodal-input"
+                          placeholder="Manual entry..."
+                          value={manualDial}
+                          onChange={(e) => setManualDial(e.target.value)}
+                        />
+                      </div>
+                    )}
+
+                    <div className="np-action-grid">
+                      {showCallButton ? (
+                        <button
+                          className="np-button np-button--primary np-button--full"
+                          onClick={() => void runAction('dial', () => dialCall(manualDialTarget || dialTarget, contact?.id, account?.id))}
+                          disabled={busy === 'dial'}
+                        >
+                          {busy === 'dial' ? 'Connecting...' : `Call ${formatPhone(manualDialTarget || dialTarget) || '...'} via ${formatPhone(selectedNumber)}`}
+                        </button>
+                      ) : (
+                        <div className="np-alert-card">
+                           <p className="np-micro">
+                            {selectedNumber 
+                              ? 'Enter a number to call.' 
+                              : 'No caller ID selected. Configure a number in settings and sync below.'}
+                           </p>
+                           {!selectedNumber && (
+                             <div className="np-stack--tight">
+                                <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
+                                  Open Settings
+                                </button>
+                                <button 
+                                  className="np-button np-button--sm np-button--ghost np-button--full" 
+                                  onClick={() => void runAction('sync-profile', bootstrapProfile)}
+                                  disabled={busy === 'sync-profile'}
+                                >
+                                  {busy === 'sync-profile' ? 'Syncing...' : 'Sync Profile Now'}
+                                </button>
+                             </div>
+                           )}
+                        </div>
+                      )}
+
+                      {call.state === 'incoming' && (
+                        <button className="np-button np-button--success np-button--full" onClick={() => void runAction('answer', answerCall)}>
+                          Answer Incoming
+                        </button>
+                      )}
+
+                      {callIsLive && (
+                        <div className="np-live-controls">
+                          <div className="np-live-stats font-mono">
+                            {formatElapsed(call.durationSec)}
+                          </div>
+                          <div className="np-live-actions">
+                            <button
+                              className={`np-button np-button--sm ${call.muted ? 'np-button--amber' : 'np-button--ghost'}`}
+                              onClick={() => void muteCall(!call.muted)}
+                            >
+                              {call.muted ? 'Unmute' : 'Mute'}
+                            </button>
+                            <button className="np-button np-button--sm np-button--danger" onClick={() => void runAction('hangup', hangupCall)}>
+                              Hangup
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </motion.section>
+
+                  <motion.section 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3, duration: 0.4, ease: FORENSIC_EASE }}
+                    className="np-card"
+                  >
+                    <div className="np-section-head">
+                      <h3 className="np-title">Intelligence</h3>
+                      <span className="np-micro">{notes.length} log{notes.length === 1 ? '' : 's'}</span>
+                    </div>
+                    <div className="np-note-composer">
+                      <textarea
+                        className="nodal-input nodal-input--textarea"
+                        placeholder="Log forensic findings..."
+                        rows={3}
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                      />
+                      <div className="np-composer-actions">
+                        <button
+                          className="np-button np-button--primary"
+                          onClick={() => void runAction('save-note', async () => {
+                            await saveNote({ note: noteDraft, contactId: contact?.id, accountId: account?.id })
+                            setNoteDraft('')
+                          })}
+                          disabled={!noteDraft.trim() || busy === 'save-note'}
+                        >
+                          {busy === 'save-note' ? 'Saving...' : 'Commit Note'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="np-note-list">
+                      {notes.map((note) => (
+                        <div key={note.id} className="np-note-entry">
+                          <div className="np-note-meta">
+                            <span className="np-note-source">{note.source === 'ai' ? 'Forensic AI' : 'Field Agent'}</span>
+                            <span className="np-note-date">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <p className="np-note-text">{note.text}</p>
+                        </div>
+                      ))}
+                      {notes.length === 0 && <p className="np-micro text-center pt-2">No logs captured for this session.</p>}
+                    </div>
+                  </motion.section>
+
+                  <motion.section 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.4, duration: 0.4, ease: FORENSIC_EASE }}
+                    className="np-card"
+                  >
+                    <div className="np-section-head">
+                      <h3 className="np-title">Contacts</h3>
+                      <span className="np-micro">{allContacts.length} total</span>
+                    </div>
+                    <div className="np-contact-list">
+                      {visibleContacts.map((c) => (
+                        <div key={c.id} className="np-contact-entry">
+                          <div className="np-contact-info">
+                            <div className="np-entity-mark np-entity-mark--sm">
+                              <EntityMark name={c.name} logoUrl={null} />
+                            </div>
+                            <div className="np-contact-copy">
+                              <div className="np-contact-name">{c.name}</div>
+                              <div className="np-micro">{c.title || 'Executive'}</div>
+                            </div>
+                          </div>
+                          {contactPhone(c) && !callIsLive && (
+                            <button
+                              className="np-button np-button--sm np-button--ghost"
+                              onClick={() => void runAction('dial', () => dialCall(contactPhone(c), c.id, c.accountId || undefined))}
+                              disabled={busy === 'dial'}
+                            >
+                              Call
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                      {allContacts.length === 0 && <p className="np-micro text-center pt-2">No contact records found.</p>}
+                      {hasMoreContacts && (
+                        <button className="np-button np-button--xs np-button--full np-button--ghost" style={{ marginTop: 8 }}>
+                          View all {allContacts.length} contacts
+                        </button>
+                      )}
+                    </div>
+                  </motion.section>
+                </>
+              ) : (
+                <section className="np-card np-card--hero" style={{ textAlign: 'center', padding: '40px 20px' }}>
+                  <h3 className="np-hero-title">CRM Disconnected</h3>
+                  <p className="np-copy" style={{ marginTop: 12, marginBottom: 24 }}>
+                    Your forensic session has expired or is not yet initialized.
+                  </p>
+                  <button className="np-button np-button--primary np-button--full" onClick={loginToCrm}>
+                    Uplink Now
+                  </button>
+                </section>
+              )}
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <div className="np-divider" />
-
-            <div className="np-field np-field--compact">
-              <label className="np-label" htmlFor="prompt">
-                AI prompt
-              </label>
-              <input
-                id="prompt"
-                className="np-input"
-                placeholder="Ask for a page summary, recap, or follow-up."
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-              />
-            </div>
-
-            <div className="np-record__actions np-record__actions--tight">
-              <button className="np-button" onClick={() => void runAction('ai-summary', summarizePage)} disabled={!auth || busy === 'ai-summary'}>
-                Summarize Page
-              </button>
-              <button className="np-button" onClick={() => void runAction('ai-recap', writeRecap)} disabled={!auth || busy === 'ai-recap'}>
-                Write Recap
-              </button>
-              <button className="np-button" onClick={() => void runAction('ai-ask', askAi)} disabled={!auth || busy === 'ai-ask'}>
-                Ask
-              </button>
-            </div>
-
-            <p className="np-compact np-copy--tight">AI writes the summary into the log before you save it to CRM.</p>
-          </section>
+      <div className="np-footer">
+        <div className="np-footer-left">
+          <span className="np-micro font-mono">v1.2.4</span>
+        </div>
+        <div className="np-footer-right">
+          <button className="np-button-forensic" title="Help">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
+          <button className="np-button-forensic" title="Settings" onClick={loginToCrm}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          </button>
         </div>
       </div>
-
-      {callIsLive ? (
-        <div className="np-callbar">
-          <div className="np-card np-live-strip">
-            <div className="np-live-strip__top">
-              <div>
-                <div className="np-kicker">Live Call</div>
-                <h3 className="np-title">{callLabel}</h3>
-              </div>
-              <span className={callPill}>
-                {call.state === 'incoming' ? 'RINGING' : call.state === 'connected' ? 'LIVE' : 'DIALING'}
-              </span>
-            </div>
-
-            {call.lastError ? <p className="np-copy np-copy--error">{call.lastError}</p> : null}
-            <div className="np-call-meta">
-              <span>{formatElapsed(call.startedAt, Date.now())}</span>
-              <span>{call.incomingDisplay || call.incomingFrom || dialTarget || selectedNumber || 'Waiting'}</span>
-            </div>
-
-            <div className="np-call-actions np-call-actions--compact">
-              {call.state === 'incoming' ? (
-                <>
-                  <button className="np-button np-button--primary" onClick={() => void runAction('answer-call', answerCall)} disabled={busy === 'answer-call'}>
-                    Answer
-                  </button>
-                  <button className="np-button np-button--danger" onClick={() => void runAction('hangup-call', hangupCall)} disabled={busy === 'hangup-call'}>
-                    Decline
-                  </button>
-                </>
-              ) : null}
-
-              {call.state === 'connected' || call.state === 'dialing' ? (
-                <>
-                  <button className="np-button" onClick={() => void runAction('toggle-mute', toggleMute)} disabled={busy === 'toggle-mute'}>
-                    {call.muted ? 'Unmute' : 'Mute'}
-                  </button>
-                  <button className="np-button np-button--danger" onClick={() => void runAction('hangup-call', hangupCall)} disabled={busy === 'hangup-call'}>
-                    Hang Up
-                  </button>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
     </div>
   )
 }
 
-const root = createRoot(document.getElementById('root') as HTMLElement)
-root.render(<App />)
+const rootElement = document.getElementById('root')
+if (rootElement) {
+  createRoot(rootElement).render(<App />)
+}
