@@ -430,11 +430,11 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.display = 'flex'
   host.style.alignItems = 'center'
   host.style.justifyContent = 'center'
-  host.style.width = '34px'
-  host.style.height = '34px'
+  host.style.width = '42px'
+  host.style.height = '42px'
   host.style.marginRight = '0'
-  host.style.borderTopLeftRadius = '10px'
-  host.style.borderBottomLeftRadius = '10px'
+  host.style.borderTopLeftRadius = '12px'
+  host.style.borderBottomLeftRadius = '12px'
   host.style.borderTopRightRadius = '0'
   host.style.borderBottomRightRadius = '0'
   host.style.border = '1px solid rgba(255,255,255,0.12)'
@@ -448,23 +448,12 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   const icon = document.createElement('img')
   icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('icon32.png') : '') || ''
   icon.alt = ''
-  icon.style.width = '20px'
-  icon.style.height = '20px'
+  icon.style.width = '26px'
+  icon.style.height = '26px'
   icon.style.objectFit = 'contain'
   icon.style.pointerEvents = 'none'
 
-  const dot = document.createElement('span')
-  dot.style.position = 'absolute'
-  dot.style.right = '4px'
-  dot.style.bottom = '4px'
-  dot.style.width = '7px'
-  dot.style.height = '7px'
-  dot.style.borderRadius = '999px'
-  dot.style.background = '#10b981'
-  dot.style.boxShadow = '0 0 0 2px rgba(0,0,0,0.45)'
-
   host.appendChild(icon)
-  host.appendChild(dot)
 
   host.addEventListener('click', () => {
     chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL' }, () => {
