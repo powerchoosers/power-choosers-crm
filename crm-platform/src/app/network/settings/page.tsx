@@ -253,8 +253,13 @@ export default function SettingsPage() {
     setState(profile.state || '')
     setTwilioNumbers(profile.twilioNumbers || [])
     const twilioList = profile.twilioNumbers || []
-    const idx = twilioList.findIndex(n => n.number === profile.selectedPhoneNumber)
-    setSelectedIdx(idx !== -1 ? idx : (twilioList.length > 0 ? 0 : null))
+    
+    // Recovery logic: prioritize 'selected' flag, fall back to number matching
+    const savedIdx = twilioList.findIndex(n => (n as any).selected === true)
+    const fallbackIdx = twilioList.findIndex(n => n.number === profile.selectedPhoneNumber)
+    const idx = savedIdx !== -1 ? savedIdx : (fallbackIdx !== -1 ? fallbackIdx : (twilioList.length > 0 ? 0 : null))
+    
+    setSelectedIdx(idx)
     setSelectedPhoneNumber(profile.selectedPhoneNumber || (twilioList.length > 0 ? twilioList[0].number : null))
     setBridgeToMobile(profile.bridgeToMobile || false)
   }, [profile, user?.user_metadata?.full_name])
@@ -316,7 +321,10 @@ export default function SettingsPage() {
           linkedin_url: linkedinUrl.trim() || null,
           settings: {
             name: computedName || null,
-            twilioNumbers: twilioNumbers,
+            twilioNumbers: twilioNumbers.map((num, i) => ({
+              ...num,
+              selected: i === selectedIdx
+            })),
             selectedPhoneNumber: selectedIdx !== null ? twilioNumbers[selectedIdx]?.number : selectedPhoneNumber,
             bridgeToMobile: bridgeToMobile,
             role: role || 'employee', // Preserve role
