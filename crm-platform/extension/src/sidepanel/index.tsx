@@ -506,7 +506,7 @@ function App() {
                             <span className="np-uplink-primary__value">
                               {busy === 'dial'
                                 ? 'Connecting...'
-                                : showCallButton
+                                : outboundTarget
                                   ? formatPhone(outboundTarget) || outboundTarget
                                   : 'No matched phone found'}
                             </span>
