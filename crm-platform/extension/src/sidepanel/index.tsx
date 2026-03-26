@@ -321,6 +321,7 @@ function App() {
   const pagePhoneCandidate = ((page as any)?.phones?.[0] || (page as any)?.phoneNumber || null) as string | null
   const dialTarget = normalizeTwilioPhone(primaryPhone(account as any, contact as any, pagePhoneCandidate, accountContacts) || '')
   const outboundTarget = dialTarget
+  const accountLocationValue = trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', ')) || ''
 
   const crmStatus = formatCrmStatus(state)
   const callStatus = formatCallStatus(state)
@@ -497,19 +498,20 @@ function App() {
                       >
                         <div className="np-uplink-primary__row">
                           <div className="np-uplink-icon np-uplink-icon--phone">
-                            <Phone className="w-4 h-4" />
-                            <Star className="w-2 h-2 fill-current absolute -top-1 -right-1 text-yellow-400" />
+                            <Phone className="w-5 h-5" />
+                            <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400 absolute -top-1 -right-1" />
                           </div>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="np-uplink-primary__label">Corporate Phone</span>
                             <span className="np-uplink-primary__value">
                               {busy === 'dial'
                                 ? 'Connecting...'
                                 : showCallButton
-                                  ? `Call ${formatPhone(outboundTarget) || outboundTarget} via ${formatPhone(selectedNumber) || selectedNumber}`
+                                  ? formatPhone(outboundTarget) || outboundTarget
                                   : 'No matched phone found'}
                             </span>
                           </div>
+                          <ArrowUpRight className="w-3 h-3 text-zinc-100/70 shrink-0 ml-auto" />
                         </div>
                       </button>
 
@@ -540,11 +542,11 @@ function App() {
                         type="button"
                         className="np-uplink-row"
                         onClick={() => {
-                          const location = trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', '))
+                          const location = accountLocationValue
                           if (!location) return
                           window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank')
                         }}
-                        disabled={!trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', '))}
+                        disabled={!accountLocationValue}
                       >
                         <div className="np-uplink-row__main">
                           <div className="np-uplink-icon">
@@ -553,7 +555,7 @@ function App() {
                           <div className="min-w-0">
                             <span className="np-uplink-row__kicker">Asset Recon (Location)</span>
                             <span className="np-uplink-row__value">
-                              {trimText((account as any)?.address || [account?.city, account?.state].filter(Boolean).join(', ')) || 'No location'}
+                              {accountLocationValue || 'No location'}
                             </span>
                           </div>
                           <ArrowUpRight className="w-3 h-3 text-zinc-700 shrink-0 ml-auto" />

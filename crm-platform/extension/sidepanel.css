@@ -444,6 +444,14 @@ a {
   width: 100%;
 }
 
+.np-uplink-primary__main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+}
+
 .np-uplink-primary:hover:not(:disabled) {
   background: #002fa7;
   border-color: rgba(255, 255, 255, 0.24);
@@ -456,6 +464,7 @@ a {
 }
 
 .np-uplink-primary__label {
+  display: block;
   font-size: 9px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -464,6 +473,8 @@ a {
 }
 
 .np-uplink-primary__value {
+  display: block;
+  margin-top: 2px;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -472,8 +483,8 @@ a {
 
 .np-uplink-icon {
   position: relative;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -483,7 +494,9 @@ a {
 }
 
 .np-uplink-icon--phone {
-  color: rgba(255, 255, 255, 0.84);
+  width: 26px;
+  height: 26px;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .np-uplink-row {
@@ -521,6 +534,7 @@ a {
 }
 
 .np-uplink-row__kicker {
+  display: block;
   font-size: 8px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -529,6 +543,8 @@ a {
 }
 
 .np-uplink-row__value {
+  display: block;
+  margin-top: 2px;
   font-size: 12px;
   color: var(--np-muted);
   line-height: 1.35;
