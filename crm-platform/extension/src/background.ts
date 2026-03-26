@@ -11,6 +11,7 @@ import {
   extractPhoneCandidates,
   normalizeAuthPayload,
   normalizeOrigin,
+  normalizeTwilioPhone,
   resolveCallerId,
   trimText,
   type ExtensionState,
@@ -1162,9 +1163,16 @@ async function handleDialCall(payload: any) {
     throw new Error('Connect your Nodal Point session before making calls.')
   }
 
-  const destination = trimText(payload?.to || payload?.phone || state.match?.contact?.phone || state.match?.account?.phone)
+  const destination = normalizeTwilioPhone(
+    payload?.to || payload?.phone || state.match?.contact?.phone || state.match?.account?.phone
+  )
   if (!destination) {
-    throw new Error('Enter a phone number to call.')
+    throw new Error('Enter a valid 10-digit phone number to call.')
+  }
+
+  const callerId = normalizeTwilioPhone(payload?.from || payload?.callerId || getCallerId())
+  if (!callerId) {
+    throw new Error('Caller ID is missing or invalid in settings.')
   }
 
   await ensureOffscreenDocument()
@@ -1180,7 +1188,7 @@ async function handleDialCall(payload: any) {
     type: 'TWILIO_DIAL',
     payload: {
       to: destination,
-      callerId: trimText(payload?.from || getCallerId()),
+      callerId,
       metadata: {
         contactId: payload?.contactId || state.match?.contact?.id || null,
         accountId: payload?.accountId || state.match?.account?.id || null,
