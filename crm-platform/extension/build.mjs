@@ -8,10 +8,19 @@ const __dirname = path.dirname(__filename)
 const distDir = path.join(__dirname, 'dist')
 
 async function copyStaticFiles() {
-  const files = ['manifest.json', 'sidepanel.html', 'offscreen.html', 'sidepanel.css', 'icon.svg']
+  const extensionFiles = ['manifest.json', 'sidepanel.html', 'offscreen.html', 'sidepanel.css', 'icon.svg']
+  const imageFiles = ['nodalpoint.png', 'nodalpoint-webicon.png']
+
   await Promise.all(
-    files.map(async (file) => {
+    extensionFiles.map(async (file) => {
       await copyFile(path.join(__dirname, file), path.join(distDir, file))
+    })
+  )
+
+  const publicImagesDir = path.resolve(__dirname, '..', 'public', 'images')
+  await Promise.all(
+    imageFiles.map(async (file) => {
+      await copyFile(path.join(publicImagesDir, file), path.join(distDir, file))
     })
   )
 }
