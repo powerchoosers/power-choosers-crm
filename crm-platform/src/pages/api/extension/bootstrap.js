@@ -7,7 +7,7 @@ function normalizePhoneNumber(value) {
   if (!raw) return null
 
   if (raw.startsWith('+')) {
-    const cleaned = raw.replace(/\s+/g, '')
+    const cleaned = '+' + raw.slice(1).replace(/\D/g, '')
     return /^\+\d{10,15}$/.test(cleaned) ? cleaned : null
   }
 
