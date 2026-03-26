@@ -1181,6 +1181,11 @@ async function handleDialCall(payload: any) {
     throw new Error('Caller ID is missing or invalid in settings.')
   }
 
+  // FORCE: retry initialization if the device is not strictly ready
+  await handleAutoCallBootstrap(state.auth.appOrigin, callerId).catch((error) => {
+     console.warn('[Extension] Bootstrap failed during handleDialCall:', error)
+  })
+
   await ensureOffscreenDocument()
   await setState((draft) => {
     draft.call.state = 'dialing'
