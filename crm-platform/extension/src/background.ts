@@ -610,7 +610,7 @@ async function openSidePanelForCurrentWindow() {
   }
 }
 
-async function handleAuthSync(payload: any, sender: chrome.runtime.MessageSender) {
+async function handleAuthSync(payload: any, sender: { origin?: string | null }) {
   const appOrigin = normalizeOrigin(payload?.appOrigin || sender.origin || state.auth?.appOrigin || DEFAULT_APP_ORIGIN)
   const normalized = normalizeAuthPayload(payload, appOrigin)
   if (!normalized) {
@@ -846,7 +846,7 @@ async function handlePageMatchRequest() {
 
 async function handleTaskSave(payload: any) {
   const result = await saveTransmissionNote(payload)
-  return { ok: true, ...result, state: cloneState() }
+  return { ...result, state: cloneState() }
 }
 
 async function handleAiChat(payload: any) {
