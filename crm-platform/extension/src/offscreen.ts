@@ -253,12 +253,16 @@ async function initializeTwilio(payload: InitPayload) {
   const apiBase = getBaseOrigin(payload.apiBase || currentApiBase)
   const callerId = trimText(payload.callerId || resolveCallerId((payload.auth as any) || null) || '')
 
+  console.log(`[Twilio Offscreen] Initializing with identity: ${identity}, origin: ${apiBase}, callerId: ${callerId}`)
+
   currentIdentity = identity
   currentApiBase = apiBase
   currentCallerId = callerId || currentCallerId
 
   const token = await fetchToken(identity, apiBase)
   lastToken = token
+
+  console.log(`[Twilio Offscreen] Fetched token, len: ${token.length}`)
 
   const canReuseDevice =
     !!device &&
@@ -267,6 +271,7 @@ async function initializeTwilio(payload: InitPayload) {
     currentApiBase === apiBase
 
   if (canReuseDevice) {
+    console.log('[Twilio Offscreen] Reusing existing device in state:', device!.state)
     try {
       await Promise.resolve(device!.updateToken(token))
       setAudioDevices(device!)
@@ -276,12 +281,14 @@ async function initializeTwilio(payload: InitPayload) {
         reused: true,
       })
       return
-    } catch {
+    } catch (error) {
+       console.warn('[Twilio Offscreen] Token update failed, recreating device', error)
       // fall through to recreation
     }
   }
 
   if (device) {
+    console.log('[Twilio Offscreen] Destroying old device')
     try {
       device.destroy()
     } catch {
@@ -290,18 +297,22 @@ async function initializeTwilio(payload: InitPayload) {
     device = null
   }
 
+  console.log('[Twilio Offscreen] Creating new Device instance')
   const nextDevice = new Device(token, {
     codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU],
     enableImprovedSignalingErrorPrecision: true,
-    logLevel: 'silent',
+    logLevel: 'debug',
     edge: ['ashburn', 'roaming'],
     maxCallSignalingTimeoutMs: 30000,
     tokenRefreshMs: 30000,
   })
 
+  // Set top-level variable before register so state calls work
+  device = nextDevice
   setAudioDevices(nextDevice)
 
   nextDevice.on('registered', () => {
+    console.log('[Twilio Offscreen] Device REGISTERED successfully')
     postEvent('ready', {
       identity,
       callerId: currentCallerId || null,
@@ -309,11 +320,16 @@ async function initializeTwilio(payload: InitPayload) {
     })
   })
 
+  nextDevice.on('registering', () => {
+     console.log('[Twilio Offscreen] Device REGISTERING...')
+  })
+
   nextDevice.on('tokenWillExpire', () => {
     void refreshToken()
   })
 
   nextDevice.on('incoming', (call) => {
+    console.log('[Twilio Offscreen] INCOMING call detected:', getCallSid(call))
     incomingCall = call
     currentCall = null
     attachCallListeners(call, 'incoming')
@@ -330,6 +346,7 @@ async function initializeTwilio(payload: InitPayload) {
   })
 
   nextDevice.on('error', (error: any) => {
+    console.error('[Twilio Offscreen] Device ERROR event:', error)
     postEvent('error', {
       code: error?.code ?? null,
       message: trimText(error?.message || 'Twilio device error'),
@@ -337,13 +354,16 @@ async function initializeTwilio(payload: InitPayload) {
   })
 
   nextDevice.on('unregistered', () => {
+    console.warn('[Twilio Offscreen] Device UNREGISTERED')
     postEvent('state', {
       deviceState: 'unregistered',
     })
   })
 
+  console.log('[Twilio Offscreen] Starting device registration...')
   await nextDevice.register()
-  device = nextDevice
+  console.log('[Twilio Offscreen] Device register() call completed. Current state:', nextDevice.state)
+
   postEvent('state', {
     deviceState: nextDevice.state,
   })
