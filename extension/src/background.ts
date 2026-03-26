@@ -425,12 +425,15 @@ function renderPageBadge(payload: PageBadgePayload | null) {
 
   const host = document.createElement('button')
   host.type = 'button'
+  host.id = 'nodal-point-badge-host'
   host.setAttribute('aria-label', `Open Nodal Point for ${payload.accountName}`)
   host.style.all = 'unset'
   host.style.display = 'flex'
   host.style.alignItems = 'center'
   host.style.justifyContent = 'center'
-  host.style.width = '42px'
+  host.style.paddingLeft = '8px'
+  host.style.paddingRight = '8px'
+  host.style.gap = '8px'
   host.style.height = '42px'
   host.style.marginRight = '0'
   host.style.borderTopLeftRadius = '12px'
@@ -444,20 +447,54 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.cursor = 'pointer'
   host.style.position = 'relative'
   host.style.overflow = 'hidden'
+  host.style.transition = 'background 0.2s ease'
 
   const icon = document.createElement('img')
   icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('icon32.png') : '') || ''
   icon.alt = ''
-  icon.style.width = '26px'
-  icon.style.height = '26px'
+  icon.style.width = '24px'
+  icon.style.height = '24px'
   icon.style.objectFit = 'contain'
   icon.style.pointerEvents = 'none'
 
-  host.appendChild(icon)
+  const divider = document.createElement('div')
+  divider.style.width = '1px'
+  divider.style.height = '18px'
+  divider.style.background = 'rgba(255,255,255,0.15)'
 
-  host.addEventListener('click', () => {
+  const grip = document.createElement('div')
+  grip.style.display = 'grid'
+  grip.style.gridTemplateColumns = 'repeat(2, 3px)'
+  grip.style.gap = '3px'
+  grip.style.opacity = '0.5'
+  
+  for (let i = 0; i < 6; i++) {
+    const dot = document.createElement('div')
+    dot.style.width = '3px'
+    dot.style.height = '3px'
+    dot.style.borderRadius = '50%'
+    dot.style.background = '#fff'
+    grip.appendChild(dot)
+  }
+
+  host.appendChild(icon)
+  host.appendChild(divider)
+  host.appendChild(grip)
+
+  host.addEventListener('mouseenter', () => {
+    host.style.background = '#00268a'
+    grip.style.opacity = '0.9'
+  })
+  host.addEventListener('mouseleave', () => {
+    host.style.background = 'rgba(0, 47, 167, 0.92)'
+    grip.style.opacity = '0.5'
+  })
+
+  host.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
     chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL' }, () => {
-      void chrome.runtime.lastError
+       void chrome.runtime.lastError
     })
   })
 
