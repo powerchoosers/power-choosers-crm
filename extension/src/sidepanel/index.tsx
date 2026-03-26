@@ -503,9 +503,11 @@ function App() {
               {outgoingTarget
                 ? readyToDial
                   ? `Dial ${formatPhone(outgoingTarget) || outgoingTarget} in the background.`
-                  : callStuck
-                    ? 'Call device not ready. Check mic permission or retry.'
-                    : 'Connecting calls in the background.'
+                  : !selectedNumber
+                    ? 'No caller ID selected. Configure a number in settings.'
+                    : callStuck
+                      ? 'Call device not ready. Check mic permission or retry.'
+                      : 'Connecting calls in the background.'
                 : selectedNumber
                   ? 'This page does not expose a phone number yet.'
                   : callerIdPending
