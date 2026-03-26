@@ -49,6 +49,8 @@ let state: ExtensionState = defaultState()
 let latestBodyText = ''
 let latestScreenshot: string | null = null
 let hydrated = false
+let twilioRecoveryInFlight = false
+let lastTwilioRecoveryAt = 0
 
 function nowIso() {
   return new Date().toISOString()
@@ -109,6 +111,54 @@ function getApiOrigin(fallbackOrigin?: string | null) {
 
 function getCallerId() {
   return resolveCallerId(state.auth)
+}
+
+function isTransientTwilioIssue(message: string) {
+  const lower = message.toLowerCase()
+  return (
+    lower.includes('fetch') ||
+    lower.includes('network') ||
+    lower.includes('token') ||
+    lower.includes('signaling') ||
+    lower.includes('websocket') ||
+    lower.includes('register')
+  )
+}
+
+async function queueTwilioRecovery(reason: string, options?: { force?: boolean; minIntervalMs?: number }) {
+  if (!state.auth?.accessToken) return
+  if (twilioRecoveryInFlight) return
+
+  const minIntervalMs = options?.minIntervalMs ?? 10000
+  const now = Date.now()
+  if (!options?.force && now - lastTwilioRecoveryAt < minIntervalMs) return
+
+  twilioRecoveryInFlight = true
+  lastTwilioRecoveryAt = now
+
+  await setState((draft) => {
+    draft.call.enabled = true
+    draft.call.deviceReady = false
+    if (draft.call.state !== 'connected' && draft.call.state !== 'incoming' && draft.call.state !== 'dialing') {
+      draft.call.state = 'initializing'
+    }
+  })
+
+  console.warn(`[Extension] Twilio recovery queued (${reason})`)
+
+  try {
+    await handleAutoCallBootstrap(state.auth.appOrigin, getCallerId())
+  } catch (error) {
+    const message = trimText((error as Error)?.message || 'Twilio recovery failed.')
+    await setState((draft) => {
+      draft.call.enabled = true
+      draft.call.deviceReady = false
+      draft.call.state = 'initializing'
+      draft.call.lastError = message
+    })
+  } finally {
+    twilioRecoveryInFlight = false
+  }
 }
 
 async function sendExtensionMessage(message: Record<string, unknown>) {
@@ -940,11 +990,14 @@ async function handleAuthSync(payload: any, sender: any) {
   try {
     await handleAutoCallBootstrap(appOrigin)
   } catch (error) {
+    const message = trimText((error as Error)?.message || 'Failed to initialize calls.')
     await setState((draft) => {
-      draft.call.state = 'error'
+      draft.call.state = 'initializing'
       draft.call.enabled = true
-      draft.call.lastError = trimText((error as Error)?.message || 'Failed to initialize calls.')
+      draft.call.deviceReady = false
+      draft.call.lastError = message
     })
+    void queueTwilioRecovery('auth-sync-bootstrap-failed', { force: true, minIntervalMs: 5000 })
   }
 
   return { ok: true, state: cloneState() }
@@ -1017,9 +1070,12 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
     const errMsg = trimText(initResult.error || 'Twilio failed to initialize.')
     console.error('[Extension] TWILIO_INIT failed:', errMsg)
     await setState((draft) => {
-      draft.call.state = 'error'
+      draft.call.state = 'initializing'
+      draft.call.enabled = true
+      draft.call.deviceReady = false
       draft.call.lastError = errMsg
     })
+    void queueTwilioRecovery('twilio-init-response-error', { minIntervalMs: 5000 })
     return { ok: false, state: cloneState() }
   }
 
@@ -1043,16 +1099,22 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
             const errMsg = trimText(retryResult.error || 'Twilio failed to initialize on retry.')
             console.error('[Extension] TWILIO_INIT retry failed:', errMsg)
             await setState((draft) => {
-              draft.call.state = 'error'
+              draft.call.state = 'initializing'
+              draft.call.enabled = true
+              draft.call.deviceReady = false
               draft.call.lastError = errMsg
             })
+            void queueTwilioRecovery('twilio-init-retry-response-error', { minIntervalMs: 5000 })
           }
         } catch (error) {
           console.warn('[Extension] Auto-retry bootstrap failed:', error)
           await setState((draft) => {
-            draft.call.state = 'error'
+            draft.call.state = 'initializing'
+            draft.call.enabled = true
+            draft.call.deviceReady = false
             draft.call.lastError = trimText((error as Error)?.message || 'Call device failed to initialize. Check microphone permission.')
           })
+          void queueTwilioRecovery('twilio-init-retry-threw', { minIntervalMs: 5000 })
         }
       }
     })()
@@ -1378,16 +1440,22 @@ async function handleTwilioEvent(payload: any) {
   }
 
   if (kind === 'error') {
+    const message = trimText(payload?.message || payload?.error || 'Unexpected Twilio error.')
+    const transient = isTransientTwilioIssue(message)
     await setState((draft) => {
-      draft.call.state = 'error'
+      draft.call.state = transient ? 'initializing' : 'error'
+      draft.call.enabled = true
       draft.call.deviceReady = false
-      draft.call.lastError = trimText(payload?.message || payload?.error || 'Unexpected Twilio error.')
+      draft.call.lastError = message
       draft.call.lineStatus = 'error'
     })
     try {
       await chrome.notifications.clear(INCOMING_NOTIFICATION_ID)
     } catch {
       // ignore
+    }
+    if (transient) {
+      void queueTwilioRecovery('twilio-event-error-transient', { minIntervalMs: 5000 })
     }
     return { ok: true, state: cloneState() }
   }
@@ -1581,10 +1649,19 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
       if (message.type === 'CALL_DIAL' || message.type === 'ENABLE_CALLS' || message.type === 'CHAT_AI' || message.type === 'SAVE_NOTE') {
         await setState((draft) => {
           draft.call.lastError = messageText
-          if (message.type !== 'CHAT_AI' && message.type !== 'SAVE_NOTE') {
-            draft.call.state = 'error'
+          if (message.type === 'ENABLE_CALLS') {
+            draft.call.enabled = true
+            draft.call.deviceReady = false
+            draft.call.state = 'initializing'
+          } else if (message.type === 'CALL_DIAL') {
+            draft.call.enabled = true
+            draft.call.deviceReady = false
+            draft.call.state = isTransientTwilioIssue(messageText) ? 'initializing' : 'error'
           }
         }).catch(() => {})
+        if ((message.type === 'ENABLE_CALLS' || message.type === 'CALL_DIAL') && isTransientTwilioIssue(messageText)) {
+          void queueTwilioRecovery(`message-${message.type.toLowerCase()}-failed`, { minIntervalMs: 5000 })
+        }
       }
       sendResponse({ ok: false, error: messageText })
     }
@@ -1623,7 +1700,9 @@ setInterval(() => {
     // Heartbeat: Keep offscreen document alive while call is active
     void sendExtensionMessage({ type: 'OFFSCREEN_PING' }).catch(() => {
       console.warn('[Extension] Offscreen heartbeat failed during active call. Re-ensuring...')
-      void ensureOffscreenDocument().catch(() => {})
+      void ensureOffscreenDocument()
+        .then(() => queueTwilioRecovery('offscreen-heartbeat-failed', { minIntervalMs: 5000 }))
+        .catch(() => {})
     })
   }
   void updateBadgeFromState()
