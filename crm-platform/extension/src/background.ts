@@ -1044,7 +1044,13 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
   if (
     state.call.enabled &&
     state.call.deviceReady &&
-    (state.call.state === 'ready' || state.call.state === 'incoming' || state.call.state === 'connected' || state.call.state === 'dialing')
+    (
+      state.call.state === 'ready' ||
+      state.call.state === 'ended' ||
+      state.call.state === 'incoming' ||
+      state.call.state === 'connected' ||
+      state.call.state === 'dialing'
+    )
   ) {
     return { ok: true, state: cloneState() }
   }
@@ -1416,7 +1422,7 @@ async function handleTwilioEvent(payload: any) {
   if (kind === 'ended' || kind === 'disconnected' || kind === 'cancelled') {
     const durationSec = Number(payload?.durationSec || payload?.duration || state.call.durationSec || 0) || 0
     await setState((draft) => {
-      draft.call.state = 'ended'
+      draft.call.state = 'ready'
       draft.call.deviceReady = true
       draft.call.activeCallSid = null
       draft.call.startedAt = null
