@@ -6,6 +6,7 @@ import {
   formatElapsed,
   formatPhone,
   extractDomain,
+  normalizeTwilioPhone,
   resolveCallerId,
   STATE_KEY,
   trimText,
@@ -245,9 +246,10 @@ function App() {
   const pageDomain = extractDomain(page?.origin || page?.url) || null
   const selectedNumber = resolveCallerId(auth)
 
-  const dialTarget = primaryPhone(account as any, contact as any, (page as any)?.phoneNumber || null, accountContacts)
-  let manualDialTarget = trimText(manualDial).replace(/[^0-9+]/g, '')
-  if (manualDialTarget.length < 3) manualDialTarget = ''
+  const pagePhoneCandidate = ((page as any)?.phones?.[0] || (page as any)?.phoneNumber || null) as string | null
+  const dialTarget = normalizeTwilioPhone(primaryPhone(account as any, contact as any, pagePhoneCandidate, accountContacts) || '')
+  const manualDialTarget = normalizeTwilioPhone(manualDial)
+  const outboundTarget = manualDialTarget || dialTarget
 
   const crmStatus = formatCrmStatus(state)
   const callStatus = formatCallStatus(state)
@@ -425,10 +427,13 @@ function App() {
                       {showCallButton ? (
                         <button
                           className="np-button np-button--primary np-button--full"
-                          onClick={() => void runAction('dial', () => dialCall(manualDialTarget || dialTarget, contact?.id, account?.id))}
-                          disabled={busy === 'dial'}
+                          onClick={() => {
+                            if (!outboundTarget) return
+                            void runAction('dial', () => dialCall(outboundTarget, contact?.id, account?.id))
+                          }}
+                          disabled={busy === 'dial' || !outboundTarget}
                         >
-                          {busy === 'dial' ? 'Connecting...' : `Call ${formatPhone(manualDialTarget || dialTarget) || '...'} via ${formatPhone(selectedNumber)}`}
+                          {busy === 'dial' ? 'Connecting...' : `Call ${formatPhone(outboundTarget) || '...'} via ${formatPhone(selectedNumber) || selectedNumber}`}
                         </button>
                       ) : (
                         <div className="np-alert-card">
