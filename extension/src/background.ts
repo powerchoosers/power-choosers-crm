@@ -255,36 +255,55 @@ async function fetchAuthedJson(path: string, init?: RequestInit, fallbackOrigin?
 }
 
 async function loadBootstrapProfile(fallbackOrigin?: string | null) {
-  const data = await fetchAuthedJson('/api/extension/bootstrap', { method: 'GET' }, fallbackOrigin)
-  const profile = data?.profile || null
+  console.log('[Extension] Bootstrapping profile...')
+  try {
+    const data = await fetchAuthedJson('/api/extension/bootstrap', { method: 'GET' }, fallbackOrigin)
+    const profile = data?.profile || null
+    
+    if (!profile) {
+      console.warn('[Extension] Bootstrap returned no profile data')
+    } else {
+      console.log(`[Extension] Profile bootstrap result: ${profile.email}, numbers: ${Array.isArray(profile.twilioNumbers) ? profile.twilioNumbers.length : 0}`)
+    }
 
-  if (!state.auth) return
+    if (!state.auth) return
 
-  state.auth = {
-    ...state.auth,
-    appOrigin: normalizeOrigin(data?.appOrigin || fallbackOrigin || state.auth.appOrigin || DEFAULT_APP_ORIGIN),
-    profile: profile
-      ? {
-          email: profile.email ?? state.auth.email,
-          name: profile.name ?? state.auth.fullName,
-          firstName: profile.firstName ?? state.auth.firstName,
-          lastName: profile.lastName ?? state.auth.lastName,
-          jobTitle: profile.jobTitle ?? null,
-          hostedPhotoUrl: profile.hostedPhotoUrl ?? null,
-          city: profile.city ?? null,
-          state: profile.state ?? null,
-          website: profile.website ?? null,
-          twilioNumbers: Array.isArray(profile.twilioNumbers) ? profile.twilioNumbers : [],
-          selectedPhoneNumber: profile.selectedPhoneNumber ?? null,
-          bridgeToMobile: Boolean(profile.bridgeToMobile),
-        }
-      : state.auth.profile,
-    bootstrapStatus: 'bootstrapped',
+    state.auth = {
+      ...state.auth,
+      appOrigin: normalizeOrigin(data?.appOrigin || fallbackOrigin || state.auth.appOrigin || DEFAULT_APP_ORIGIN),
+      profile: profile
+        ? {
+            email: profile.email ?? state.auth.email,
+            name: profile.name ?? state.auth.fullName,
+            firstName: profile.firstName ?? state.auth.firstName,
+            lastName: profile.lastName ?? state.auth.lastName,
+            jobTitle: profile.jobTitle ?? null,
+            hostedPhotoUrl: profile.hostedPhotoUrl ?? null,
+            city: profile.city ?? null,
+            state: profile.state ?? null,
+            website: profile.website ?? null,
+            twilioNumbers: Array.isArray(profile.twilioNumbers) ? profile.twilioNumbers : [],
+            selectedPhoneNumber: profile.selectedPhoneNumber ?? null,
+            bridgeToMobile: Boolean(profile.bridgeToMobile),
+          }
+        : state.auth.profile,
+      bootstrapStatus: 'bootstrapped',
+    }
+
+    const callerId = resolveCallerId(state.auth)
+    if (!callerId) {
+      console.warn('[Extension] Profile bootstrapped but no callerId found')
+    } else {
+      console.log(`[Extension] Caller ID resolved to: ${callerId}`)
+    }
+
+    await setState((draft) => {
+      draft.auth = state.auth
+    })
+  } catch (error) {
+    console.error('[Extension] Bootstrap profile failed:', error)
+    throw error
   }
-
-  await setState((draft) => {
-    draft.auth = state.auth
-  })
 }
 
 async function refreshRecentCalls(fallbackOrigin?: string | null) {
@@ -431,9 +450,9 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.display = 'flex'
   host.style.alignItems = 'center'
   host.style.justifyContent = 'center'
-  host.style.paddingLeft = '10px'
-  host.style.paddingRight = '10px'
-  host.style.height = '42px'
+  host.style.paddingLeft = '12px'
+  host.style.paddingRight = '12px'
+  host.style.height = '48px'
   host.style.marginRight = '0'
   host.style.borderTopLeftRadius = '14px'
   host.style.borderBottomLeftRadius = '14px'
@@ -441,7 +460,7 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.borderBottomRightRadius = '0'
   host.style.border = '1px solid rgba(255,255,255,0.12)'
   host.style.borderRight = 'none'
-  host.style.background = 'rgba(0, 47, 167, 0.92)'
+  host.style.background = 'rgba(0, 47, 167, 0.96)'
   host.style.boxShadow = '0 10px 30px rgba(0,0,0,0.5)'
   host.style.cursor = 'pointer'
   host.style.position = 'relative'
@@ -451,8 +470,8 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   const icon = document.createElement('img')
   icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('icon32.png') : '') || ''
   icon.alt = ''
-  icon.style.width = '24px'
-  icon.style.height = '24px'
+  icon.style.width = '28px'
+  icon.style.height = '28px'
   icon.style.objectFit = 'contain'
   icon.style.pointerEvents = 'none'
 
@@ -498,8 +517,8 @@ function renderPageBadge(payload: PageBadgePayload | null) {
     section.style.marginLeft = '4px'
   })
   host.addEventListener('mouseleave', () => {
-    host.style.background = 'rgba(0, 47, 167, 0.92)'
-    host.style.paddingRight = '10px'
+    host.style.background = 'rgba(0, 47, 167, 0.96)'
+    host.style.paddingRight = '12px'
     section.style.width = '0'
     section.style.opacity = '0'
     section.style.marginLeft = '0'
@@ -1527,6 +1546,12 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
   })()
 
   return true
+})
+
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
+    console.warn('[Extension] Failed to set side panel behavior:', err)
+  })
 })
 
 void hydrateState().then(() => {
