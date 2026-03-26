@@ -20,7 +20,7 @@ type MessageResponse<T> = {
   state?: ExtensionState
 } & T
 
-const FORENSIC_EASE = [0.23, 1, 0.32, 1]
+const FORENSIC_EASE: any = [0.23, 1, 0.32, 1]
 
 function sendMessage<T = Record<string, unknown>>(type: string, payload?: unknown): Promise<MessageResponse<T>> {
   return new Promise((resolve, reject) => {
@@ -115,7 +115,7 @@ function contactPhone(contact: MatchContact | null) {
 function primaryPhone(
   account: MatchAccount | null,
   contact: MatchContact | null,
-  pagePhone: string | null,
+  pagePhone: string | null | undefined,
   accountContacts: MatchContact[]
 ) {
   const fallbackContact = accountContacts.find((item) => Boolean(contactPhone(item))) || null
@@ -237,7 +237,7 @@ function App() {
   const pageDomain = extractDomain(page?.origin || page?.url) || null
   const selectedNumber = resolveCallerId(auth)
 
-  const dialTarget = primaryPhone(account, contact, page?.phoneNumber || null, accountContacts)
+  const dialTarget = primaryPhone(account as any, contact as any, (page as any)?.phoneNumber || null, accountContacts)
   let manualDialTarget = trimText(manualDial).replace(/[^0-9+]/g, '')
   if (manualDialTarget.length < 3) manualDialTarget = ''
 
@@ -246,13 +246,13 @@ function App() {
   const crmPill = `np-pill ${auth ? 'np-pill--blue' : 'np-pill--amber'}`
   const callPill = `np-pill ${call.state === 'error' ? 'np-pill--red' : call.deviceReady ? 'np-pill--blue' : 'np-pill--amber'}`
 
-  const heroTitle = account?.name || contact?.name || page?.title || 'No record identified'
+  const heroTitle = (account as any)?.name || (contact as any)?.name || page?.title || 'No record identified'
   const heroSubtitle = account
     ? [account.industry, [account.city, account.state].filter(Boolean).join(', ')].filter(Boolean).join(' | ') ||
       pageDomain ||
       'Account matched from page capture.'
     : contact
-      ? [contact.title, contact.accountName || account?.name].filter(Boolean).join(' | ') ||
+      ? [(contact as any).title, (contact as any).accountName || (account as any)?.name].filter(Boolean).join(' | ') ||
         pageDomain ||
         'Contact matched from page capture.'
       : pageDomain || 'Capture a page to start the match.'
@@ -415,23 +415,26 @@ function App() {
                         </button>
                       ) : (
                         <div className="np-alert-card">
-                           <p className="np-micro">
+                           <p className="np-micro" style={{ marginBottom: 12 }}>
                             {selectedNumber 
-                              ? 'Enter a number to call.' 
-                              : 'No caller ID selected. Configure a number in settings and sync below.'}
+                              ? 'Enter a number to initiate transmission.' 
+                              : 'No Caller ID selected in CRM settings.'}
                            </p>
                            {!selectedNumber && (
                              <div className="np-stack--tight">
-                                <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
-                                  Open Settings
-                                </button>
                                 <button 
-                                  className="np-button np-button--sm np-button--ghost np-button--full" 
+                                  className="np-button np-button--sm np-button--primary np-button--full" 
                                   onClick={() => void runAction('sync-profile', bootstrapProfile)}
                                   disabled={busy === 'sync-profile'}
                                 >
-                                  {busy === 'sync-profile' ? 'Syncing...' : 'Sync Profile Now'}
+                                  {busy === 'sync-profile' ? 'SYNCING...' : 'RE-SYNC CRM PROFILE'}
                                 </button>
+                                <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
+                                  Verify in Settings
+                                </button>
+                                <p className="np-micro" style={{ fontSize: 8, marginTop: 4, opacity: 0.6 }}>
+                                  If sync persists, ensure a number is saved in your CRM profile.
+                                </p>
                              </div>
                            )}
                         </div>
@@ -446,7 +449,7 @@ function App() {
                       {callIsLive && (
                         <div className="np-live-controls">
                           <div className="np-live-stats font-mono">
-                            {formatElapsed(call.durationSec)}
+                            {formatElapsed(call.startedAt)}
                           </div>
                           <div className="np-live-actions">
                             <button

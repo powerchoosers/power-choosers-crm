@@ -255,6 +255,7 @@ async function fetchAuthedJson(path: string, init?: RequestInit, fallbackOrigin?
 }
 
 async function loadBootstrapProfile(fallbackOrigin?: string | null) {
+  if (!state.auth?.accessToken) return;
   console.log('[Extension] Bootstrapping profile...')
   try {
     const data = await fetchAuthedJson('/api/extension/bootstrap', { method: 'GET' }, fallbackOrigin)
@@ -262,33 +263,27 @@ async function loadBootstrapProfile(fallbackOrigin?: string | null) {
     
     if (!profile) {
       console.warn('[Extension] Bootstrap returned no profile data')
-    } else {
-      console.log(`[Extension] Profile bootstrap result: ${profile.email}, numbers: ${Array.isArray(profile.twilioNumbers) ? profile.twilioNumbers.length : 0}`)
     }
 
-    if (!state.auth) return
-
-    state.auth = {
-      ...state.auth,
-      appOrigin: normalizeOrigin(data?.appOrigin || fallbackOrigin || state.auth.appOrigin || DEFAULT_APP_ORIGIN),
-      profile: profile
-        ? {
-            email: profile.email ?? state.auth.email,
-            name: profile.name ?? state.auth.fullName,
-            firstName: profile.firstName ?? state.auth.firstName,
-            lastName: profile.lastName ?? state.auth.lastName,
-            jobTitle: profile.jobTitle ?? null,
-            hostedPhotoUrl: profile.hostedPhotoUrl ?? null,
-            city: profile.city ?? null,
-            state: profile.state ?? null,
-            website: profile.website ?? null,
-            twilioNumbers: Array.isArray(profile.twilioNumbers) ? profile.twilioNumbers : [],
-            selectedPhoneNumber: profile.selectedPhoneNumber ?? null,
-            bridgeToMobile: Boolean(profile.bridgeToMobile),
-          }
-        : state.auth.profile,
-      bootstrapStatus: 'bootstrapped',
-    }
+    await setState((draft) => {
+      if (!draft.auth) return
+      draft.auth.appOrigin = normalizeOrigin(data?.appOrigin || fallbackOrigin || draft.auth.appOrigin || DEFAULT_APP_ORIGIN)
+      draft.auth.profile = profile ? {
+        email: profile.email || draft.auth.email || null,
+        name: profile.name || null,
+        firstName: profile.firstName || null,
+        lastName: profile.lastName || null,
+        jobTitle: profile.jobTitle || null,
+        hostedPhotoUrl: profile.hostedPhotoUrl || null,
+        city: profile.city || null,
+        state: profile.state || null,
+        website: profile.website || null,
+        twilioNumbers: Array.isArray(profile.twilioNumbers) ? profile.twilioNumbers : [],
+        selectedPhoneNumber: profile.selectedPhoneNumber || null,
+        bridgeToMobile: Boolean(profile.bridgeToMobile),
+      } : draft.auth.profile
+      draft.auth.bootstrapStatus = 'bootstrapped'
+    })
 
     const callerId = resolveCallerId(state.auth)
     if (!callerId) {
@@ -296,10 +291,6 @@ async function loadBootstrapProfile(fallbackOrigin?: string | null) {
     } else {
       console.log(`[Extension] Caller ID resolved to: ${callerId}`)
     }
-
-    await setState((draft) => {
-      draft.auth = state.auth
-    })
   } catch (error) {
     console.error('[Extension] Bootstrap profile failed:', error)
     throw error
@@ -891,12 +882,23 @@ async function openSidePanelForCurrentWindow() {
   }
 }
 
-async function handleAuthSync(payload: any, sender: { origin?: string | null }) {
-  const appOrigin = normalizeOrigin(payload?.appOrigin || sender.origin || state.auth?.appOrigin || DEFAULT_APP_ORIGIN)
+async function handleAuthSync(payload: any, sender: any) {
+  // If no payload is provided, this is a manual sync request from the sidepanel
+  if (!payload && state.auth?.accessToken) {
+    try {
+      await loadBootstrapProfile(state.auth.appOrigin)
+      await refreshRecentCalls(state.auth.appOrigin)
+      return { ok: true, state: cloneState() }
+    } catch (error) {
+      return { ok: false, error: trimText((error as Error)?.message || 'Manual profile sync failed.') }
+    }
+  }
+
+  const appOrigin = normalizeOrigin(payload?.appOrigin || sender?.origin || state.auth?.appOrigin || DEFAULT_APP_ORIGIN)
   const normalized = normalizeAuthPayload(payload, appOrigin)
   if (!normalized) {
     await handleAuthClear()
-    return { ok: false, error: 'Missing session payload' }
+    return { ok: false, error: 'Authorization payload missing or malformed.' }
   }
 
   const previousIdentity = state.auth?.userId || state.auth?.email || ''
@@ -1379,22 +1381,28 @@ async function handleRecentCallsRefresh() {
   return { ok: true, state: cloneState() }
 }
 
-async function handleOpenSidePanel(sender?: { tab?: { id?: number; windowId?: number } }) {
-  console.log('[Extension] handleOpenSidePanel triggered by sender:', sender)
+async function handleOpenSidePanel(sender?: any) {
   try {
-    if (sender?.tab?.id) {
-      if (sender.tab.windowId) {
-        await chrome.windows.update(sender.tab.windowId, { focused: true })
+    const tabId = sender?.tab?.id
+    if (tabId) {
+      const windowId = sender.tab.windowId || (await chrome.tabs.get(tabId)).windowId
+      if (windowId) {
+        await chrome.windows.update(windowId, { focused: true })
       }
-      await chrome.sidePanel.open({ tabId: sender.tab.id })
-      console.log('[Extension] chrome.sidePanel.open called for tab:', sender.tab.id)
+      await chrome.sidePanel.open({ tabId })
       return { ok: true, state: cloneState() }
     }
-    await openSidePanelForCurrentWindow()
+    
+    // Fallback: Use current focused window
+    const window = await chrome.windows.getLastFocused()
+    if (window?.id != null) {
+      await chrome.windows.update(window.id, { focused: true })
+      await chrome.sidePanel.open({ windowId: window.id })
+    }
     return { ok: true, state: cloneState() }
   } catch (error) {
     console.error('[Extension] handleOpenSidePanel failed:', error)
-    return { ok: false, error: trimText((error as Error)?.message || 'Side panel failed to open') }
+    return { ok: false, error: trimText((error as Error)?.message || 'Side panel focus failed') }
   }
 }
 
@@ -1549,7 +1557,7 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
 })
 
 chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err) => {
+  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((err: any) => {
     console.warn('[Extension] Failed to set side panel behavior:', err)
   })
 })
