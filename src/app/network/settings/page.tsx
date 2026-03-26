@@ -38,6 +38,7 @@ export default function SettingsPage() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
   const [twilioNumbers, setTwilioNumbers] = useState<Array<{ name: string; number: string }>>([])
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [selectedPhoneNumber, setSelectedPhoneNumber] = useState<string | null>(null)
   const [bridgeToMobile, setBridgeToMobile] = useState(false)
   const [newNumber, setNewNumber] = useState('')
@@ -251,7 +252,10 @@ export default function SettingsPage() {
     setCity(profile.city || '')
     setState(profile.state || '')
     setTwilioNumbers(profile.twilioNumbers || [])
-    setSelectedPhoneNumber(profile.selectedPhoneNumber || null)
+    const twilioList = profile.twilioNumbers || []
+    const idx = twilioList.findIndex(n => n.number === profile.selectedPhoneNumber)
+    setSelectedIdx(idx !== -1 ? idx : (twilioList.length > 0 ? 0 : null))
+    setSelectedPhoneNumber(profile.selectedPhoneNumber || (twilioList.length > 0 ? twilioList[0].number : null))
     setBridgeToMobile(profile.bridgeToMobile || false)
   }, [profile, user?.user_metadata?.full_name])
 
@@ -313,7 +317,7 @@ export default function SettingsPage() {
           settings: {
             name: computedName || null,
             twilioNumbers: twilioNumbers,
-            selectedPhoneNumber: selectedPhoneNumber,
+            selectedPhoneNumber: selectedIdx !== null ? twilioNumbers[selectedIdx]?.number : selectedPhoneNumber,
             bridgeToMobile: bridgeToMobile,
             role: role || 'employee', // Preserve role
             website: website.trim() || null,
@@ -340,12 +344,12 @@ export default function SettingsPage() {
 
   const handleAddNumber = () => {
     if (!newNumber || !newNumberName) return
-    // Ensure the number is formatted correctly before adding
     const formatted = strictFormat(newNumber)
     const updated = [...twilioNumbers, { name: newNumberName, number: formatted }]
     setTwilioNumbers(updated)
-    // If it's the first number, select it automatically
-    if (updated.length === 1) {
+    // If it's the first number or we want to switch to new one immediately
+    if (updated.length === 1 || !selectedPhoneNumber) {
+      setSelectedIdx(updated.length - 1)
       setSelectedPhoneNumber(formatted)
     }
     setNewNumber('')
@@ -356,8 +360,12 @@ export default function SettingsPage() {
     const updated = [...twilioNumbers]
     const removed = updated.splice(index, 1)[0]
     setTwilioNumbers(updated)
-    if (selectedPhoneNumber === removed.number) {
-      setSelectedPhoneNumber(null)
+    
+    if (selectedIdx === index) {
+      setSelectedIdx(updated.length > 0 ? 0 : null)
+      setSelectedPhoneNumber(updated.length > 0 ? updated[0].number : null)
+    } else if (selectedIdx !== null && selectedIdx > index) {
+      setSelectedIdx(selectedIdx - 1)
     }
   }
 
@@ -597,32 +605,64 @@ export default function SettingsPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {twilioNumbers.map((num, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-3 rounded-lg nodal-glass nodal-glass-hover group">
-                        <div className="flex items-center gap-3">
+                      <div 
+                        key={idx} 
+                        onClick={() => {
+                          setSelectedIdx(idx)
+                          setSelectedPhoneNumber(num.number)
+                        }}
+                        className={cn(
+                          "flex items-center justify-between p-4 rounded-xl transition-all duration-300 cursor-pointer group relative overflow-hidden",
+                          selectedIdx === idx 
+                            ? "bg-[#002FA7]/10 border border-[#002FA7]/30 ring-1 ring-[#002FA7]/20" 
+                            : "bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.04]"
+                        )}
+                      >
+                        {selectedIdx === idx && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#002FA7]" />
+                        )}
+                        <div className="flex items-center gap-4">
                           <div
                             className={cn(
-                              "w-4 h-4 rounded-full border flex items-center justify-center cursor-pointer transition-colors",
-                              selectedPhoneNumber === num.number
-                                ? "bg-[#002FA7] border-[#002FA7]"
-                                : "border-white/20 hover:border-white/40"
+                              "w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300",
+                              selectedIdx === idx
+                                ? "bg-[#002FA7] border-[#002FA7] scale-110"
+                                : "border-white/20 group-hover:border-white/40"
                             )}
-                            onClick={() => setSelectedPhoneNumber(num.number)}
                           >
-                            {selectedPhoneNumber === num.number && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                            {selectedIdx === idx && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-zinc-200">{num.name}</p>
-                            <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-tight">{num.number}</p>
+                            <p className={cn(
+                              "text-sm font-medium transition-colors",
+                              selectedIdx === idx ? "text-white" : "text-zinc-300"
+                            )}>
+                              {num.name}
+                            </p>
+                            <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-wide mt-0.5">
+                              {num.number}
+                            </p>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleDeleteNumber(idx)}
-                          className="icon-button-forensic opacity-0 group-hover:opacity-100 h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        
+                        <div className="flex items-center gap-2">
+                          {selectedIdx === idx && (
+                            <Badge variant="outline" className="border-[#002FA7]/30 text-[9px] font-mono text-[#002FA7] bg-[#002FA7]/5 uppercase px-1.5 h-5 leading-none">
+                              Active Uplink
+                            </Badge>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDeleteNumber(idx)
+                            }}
+                            className="icon-button-forensic opacity-0 group-hover:opacity-100 h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all hover:bg-red-400/10 rounded-lg"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     ))}
 
