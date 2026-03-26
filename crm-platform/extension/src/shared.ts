@@ -239,6 +239,21 @@ export function formatPhone(value: string | null | undefined): string | null {
   return digits || null
 }
 
+export function normalizeTwilioPhone(value: string | null | undefined): string | null {
+  const raw = trimText(value)
+  if (!raw) return null
+
+  if (raw.startsWith('+')) {
+    const cleaned = raw.replace(/\s+/g, '')
+    return /^\+\d{10,15}$/.test(cleaned) ? cleaned : null
+  }
+
+  const digits = normalizeDigits(raw)
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  return null
+}
+
 export function extractPhoneCandidates(text: string | null | undefined): string[] {
   const source = trimText(text)
   if (!source) return []
@@ -308,11 +323,13 @@ export function normalizeTwilioNumbers(raw: unknown): ExtensionTwilioNumber[] {
     .map((entry) => {
       if (!entry) return null
       if (typeof entry === 'string') {
-        return { name: 'Primary', number: trimText(entry) }
+        const number = normalizeTwilioPhone(entry)
+        if (!number) return null
+        return { name: 'Primary', number }
       }
       if (typeof entry === 'object') {
         const candidate = entry as Record<string, unknown>
-        const number = trimText(candidate.number ?? candidate.phone ?? '')
+        const number = normalizeTwilioPhone(String(candidate.number ?? candidate.phone ?? ''))
         if (!number) return null
         return {
           name: trimText(candidate.name ?? 'Primary') || 'Primary',
@@ -371,11 +388,11 @@ export function normalizeAuthPayload(payload: any, appOrigin?: string | null): E
 }
 
 export function resolveCallerId(auth: ExtensionAuth | null): string | null {
-  const selected = trimText(auth?.profile?.selectedPhoneNumber)
+  const selected = normalizeTwilioPhone(auth?.profile?.selectedPhoneNumber)
   if (selected) return selected
   const numbers = auth?.profile?.twilioNumbers ?? []
-  const first = numbers.find((entry) => trimText(entry?.number))
-  return trimText(first?.number) || null
+  const first = numbers.find((entry) => normalizeTwilioPhone(entry?.number))
+  return normalizeTwilioPhone(first?.number) || null
 }
 
 export function buildPageContext(page: PageSnapshot | null): string {

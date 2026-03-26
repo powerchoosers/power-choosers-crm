@@ -5,6 +5,7 @@ import {
   formatElapsed,
   formatPhone,
   extractDomain,
+  resolveCallerId,
   STATE_KEY,
   trimText,
   type ExtensionState,
@@ -127,6 +128,7 @@ function App() {
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [manualDial, setManualDial] = useState('')
   const autoCaptureRan = useRef(false)
 
   const loadState = async () => {
@@ -176,9 +178,11 @@ function App() {
   const accountContacts = state?.accountContacts || []
   const notes = state?.notes || []
   const chats = state?.chat || []
-  const selectedNumber = auth?.profile?.selectedPhoneNumber || auth?.profile?.twilioNumbers?.[0]?.number || null
+  const selectedNumber = resolveCallerId(auth)
   const dialTarget = trimText(primaryPhone(account, contact, page?.phones?.[0] || null, accountContacts) || page?.phones?.[0] || '')
-  const readyToDial = Boolean(auth && dialTarget && call.deviceReady && call.state !== 'initializing')
+  const manualDialTarget = trimText(manualDial)
+  const outgoingTarget = dialTarget || manualDialTarget
+  const readyToDial = Boolean(auth && selectedNumber && outgoingTarget && call.deviceReady && call.state !== 'initializing')
   const latestAssistant = [...chats].reverse().find((entry) => entry.role === 'assistant')?.content || ''
 
   const applyResponse = (response: MessageResponse<Record<string, unknown>>) => {
@@ -257,12 +261,12 @@ function App() {
   }
 
   const dialCall = async () => {
-    if (!dialTarget) {
-      throw new Error('No phone number found on this record.')
+    if (!outgoingTarget) {
+      throw new Error('Enter a phone number to call.')
     }
 
     const response = await sendMessage('CALL_DIAL', {
-      to: dialTarget,
+      to: outgoingTarget,
       callerId: selectedNumber || null,
       contactId: contact?.id || null,
       accountId: account?.id || null,
@@ -342,6 +346,8 @@ function App() {
               ? 'Ready to call'
               : 'Connecting calls'
   const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
+  const callNeedsManualNumber = !dialTarget && !callIsLive
+  const showCallButton = Boolean(selectedNumber && (dialTarget || manualDialTarget || callNeedsManualNumber))
 
   return (
     <div className="np-shell">
@@ -426,7 +432,22 @@ function App() {
               >
                 Open Account
               </button>
-              {dialTarget ? (
+              {selectedNumber && callNeedsManualNumber ? (
+                <div className="np-field np-field--compact np-dial-field">
+                  <label className="np-label" htmlFor="manualDial">
+                    Dial number
+                  </label>
+                  <input
+                    id="manualDial"
+                    className="np-input"
+                    inputMode="tel"
+                    placeholder="Enter a number to call"
+                    value={manualDial}
+                    onChange={(event) => setManualDial(event.target.value)}
+                  />
+                </div>
+              ) : null}
+              {showCallButton ? (
                 <button className="np-button np-button--primary" onClick={() => void runAction('dial-call', dialCall)} disabled={!readyToDial || busy === 'dial-call'}>
                   Call
                 </button>
@@ -434,11 +455,13 @@ function App() {
             </div>
 
             <p className="np-compact np-call-note">
-              {dialTarget
+              {outgoingTarget
                 ? readyToDial
-                  ? `Dial ${formatPhone(dialTarget) || dialTarget} in the background.`
+                  ? `Dial ${formatPhone(outgoingTarget) || outgoingTarget} in the background.`
                   : 'Connecting calls in the background.'
-                : 'No phone number found on this record.'}
+                : selectedNumber
+                  ? 'This page does not expose a phone number yet.'
+                  : 'Caller ID is not selected in settings.'}
             </p>
 
             {visibleContacts.length > 0 ? (

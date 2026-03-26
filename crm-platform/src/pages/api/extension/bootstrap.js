@@ -2,6 +2,21 @@ import { cors } from '../_cors.js'
 import { requireUser, supabaseAdmin } from '@/lib/supabase'
 import { inferNameParts, trimText } from './_shared.js'
 
+function normalizePhoneNumber(value) {
+  const raw = trimText(value)
+  if (!raw) return null
+
+  if (raw.startsWith('+')) {
+    const cleaned = raw.replace(/\s+/g, '')
+    return /^\+\d{10,15}$/.test(cleaned) ? cleaned : null
+  }
+
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 10) return `+1${digits}`
+  if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+  return null
+}
+
 function normalizeTwilioNumbers(raw) {
   if (!Array.isArray(raw)) return []
 
@@ -9,11 +24,13 @@ function normalizeTwilioNumbers(raw) {
     .map((entry) => {
       if (!entry) return null
       if (typeof entry === 'string') {
-        return { name: 'Primary', number: trimText(entry) }
+        const number = normalizePhoneNumber(entry)
+        if (!number) return null
+        return { name: 'Primary', number }
       }
       if (typeof entry === 'object') {
         const candidate = entry
-        const number = trimText(candidate.number ?? candidate.phone ?? '')
+        const number = normalizePhoneNumber(candidate.number ?? candidate.phone ?? '')
         if (!number) return null
         return {
           name: trimText(candidate.name ?? 'Primary') || 'Primary',
@@ -34,7 +51,7 @@ function normalizeProfile(row, emailFallback) {
   )
 
   const twilioNumbers = normalizeTwilioNumbers(settings.twilioNumbers || [])
-  const selectedPhoneNumber = trimText(
+  const selectedPhoneNumber = normalizePhoneNumber(
     settings.selectedPhoneNumber || row.selected_phone_number || row.selectedPhoneNumber || twilioNumbers[0]?.number || ''
   ) || null
 
@@ -106,4 +123,3 @@ export default async function handler(req, res) {
     })
   }
 }
-
