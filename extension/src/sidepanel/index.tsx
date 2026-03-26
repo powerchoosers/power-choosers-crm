@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Building2, ArrowUpRight, Star, MapPin } from 'lucide-react'
+import { Phone, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock } from 'lucide-react'
 import {
   defaultCallState,
   formatElapsed,
@@ -497,9 +497,9 @@ function App() {
                         disabled={busy === 'dial' || !showCallButton}
                       >
                         <div className="np-uplink-primary__row">
-                          <div className="np-uplink-icon np-uplink-icon--phone">
+                          <div className="np-uplink-icon np-uplink-icon--phone" style={{ position: 'relative' }}>
                             <Phone className="w-5 h-5" />
-                            <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400 absolute -top-1 -right-1" />
+                            <Star className="w-2.5 h-2.5 fill-yellow-400 text-yellow-400" style={{ position: 'absolute', top: -4, right: -4 }} />
                           </div>
                           <div className="min-w-0 flex-1">
                             <span className="np-uplink-primary__label">Corporate Phone</span>
@@ -511,7 +511,7 @@ function App() {
                                   : 'No matched phone found'}
                             </span>
                           </div>
-                          <ArrowUpRight className="w-3 h-3 text-zinc-100/70 shrink-0 ml-auto" />
+                          <ArrowUpRight className="w-3 h-3 shrink-0 ml-auto" style={{ color: 'rgba(255,255,255,0.5)', marginTop: 2 }} />
                         </div>
                       </button>
 
@@ -527,14 +527,14 @@ function App() {
                         disabled={!trimText((account as any)?.website || account?.domain || '')}
                       >
                         <div className="np-uplink-row__main">
-                          <div className="np-uplink-icon">
-                            <Building2 className="w-4 h-4" />
+                          <div className="np-uplink-icon" style={{ flexShrink: 0 }}>
+                            <Building2 className="w-4 h-4" style={{ color: '#71717a' }} />
                           </div>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="np-uplink-row__kicker">Digital Domain</span>
                             <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain'}</span>
                           </div>
-                          <ArrowUpRight className="w-3 h-3 text-zinc-700 shrink-0 ml-auto" />
+                          <ArrowUpRight className="w-3 h-3 shrink-0 ml-auto" style={{ color: '#3f3f46', marginTop: 2 }} />
                         </div>
                       </button>
 
@@ -549,16 +549,16 @@ function App() {
                         disabled={!accountLocationValue}
                       >
                         <div className="np-uplink-row__main">
-                          <div className="np-uplink-icon">
-                            <MapPin className="w-4 h-4" />
+                          <div className="np-uplink-icon" style={{ flexShrink: 0 }}>
+                            <MapPin className="w-4 h-4" style={{ color: '#71717a' }} />
                           </div>
-                          <div className="min-w-0">
+                          <div className="min-w-0 flex-1">
                             <span className="np-uplink-row__kicker">Asset Recon (Location)</span>
                             <span className="np-uplink-row__value">
                               {accountLocationValue || 'No location'}
                             </span>
                           </div>
-                          <ArrowUpRight className="w-3 h-3 text-zinc-700 shrink-0 ml-auto" />
+                          <ArrowUpRight className="w-3 h-3 shrink-0 ml-auto" style={{ color: '#3f3f46', marginTop: 2 }} />
                         </div>
                       </button>
 
