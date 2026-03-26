@@ -6,6 +6,7 @@
   "permissions": [
     "activeTab",
     "alarms",
+    "microphone",
     "notifications",
     "offscreen",
     "scripting",
@@ -14,11 +15,7 @@
     "tabs"
   ],
   "host_permissions": [
-    "http://localhost:3000/*",
-    "http://127.0.0.1:3000/*",
-    "https://nodalpoint.io/*",
-    "https://www.nodalpoint.io/*",
-    "https://nodal-point-network.vercel.app/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
@@ -40,13 +37,7 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "http://localhost:3000/*",
-        "http://127.0.0.1:3000/*",
-        "https://nodalpoint.io/*",
-        "https://www.nodalpoint.io/*",
-        "https://nodal-point-network.vercel.app/*"
-      ],
+      "matches": ["<all_urls>"],
       "js": ["content.js"],
       "run_at": "document_idle"
     }
