@@ -243,12 +243,13 @@ export function normalizeTwilioPhone(value: string | null | undefined): string |
   const raw = trimText(value)
   if (!raw) return null
 
+  const digits = normalizeDigits(raw)
   if (raw.startsWith('+')) {
-    const cleaned = raw.replace(/\s+/g, '')
-    return /^\+\d{10,15}$/.test(cleaned) ? cleaned : null
+    if (digits.length === 10) return `+1${digits}`
+    if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
+    return digits.length >= 10 ? `+${digits}` : null
   }
 
-  const digits = normalizeDigits(raw)
   if (digits.length === 10) return `+1${digits}`
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
   return null
