@@ -535,43 +535,77 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   mark.style.display = 'flex'
   mark.style.alignItems = 'center'
   mark.style.justifyContent = 'center'
+  mark.style.gap = '10px'
+  mark.style.paddingRight = '0'
+  let plusOverlay: HTMLDivElement | null = null
 
   mark.appendChild(icon)
   if (payload.mode === 'ingest') {
-    const overlay = document.createElement('div')
-    overlay.style.position = 'absolute'
-    overlay.style.right = '-2px'
-    overlay.style.bottom = '-2px'
-    overlay.style.width = '14px'
-    overlay.style.height = '14px'
-    overlay.style.borderRadius = '999px'
-    overlay.style.display = 'flex'
-    overlay.style.alignItems = 'center'
-    overlay.style.justifyContent = 'center'
-    overlay.style.background = 'rgba(15, 23, 42, 0.95)'
-    overlay.style.border = '1px solid rgba(250, 204, 21, 0.6)'
-    overlay.style.color = '#facc15'
-    overlay.style.fontSize = '11px'
-    overlay.style.lineHeight = '1'
-    overlay.style.fontWeight = '700'
-    overlay.style.transition = 'transform 0.2s ease'
-    overlay.textContent = '+'
-    mark.appendChild(overlay)
+    plusOverlay = document.createElement('div')
+    plusOverlay.style.position = 'absolute'
+    plusOverlay.style.right = '-2px'
+    plusOverlay.style.bottom = '-2px'
+    plusOverlay.style.width = '14px'
+    plusOverlay.style.height = '14px'
+    plusOverlay.style.borderRadius = '999px'
+    plusOverlay.style.display = 'flex'
+    plusOverlay.style.alignItems = 'center'
+    plusOverlay.style.justifyContent = 'center'
+    plusOverlay.style.background = 'rgba(15, 23, 42, 0.95)'
+    plusOverlay.style.border = '1px solid rgba(250, 204, 21, 0.6)'
+    plusOverlay.style.color = '#facc15'
+    plusOverlay.style.fontSize = '11px'
+    plusOverlay.style.lineHeight = '1'
+    plusOverlay.style.fontWeight = '700'
+    plusOverlay.style.transition = 'transform 0.2s ease'
+    plusOverlay.textContent = '+'
+    mark.appendChild(plusOverlay)
   }
+
+  const grip = document.createElement('div')
+  grip.style.display = 'grid'
+  grip.style.gridTemplateColumns = 'repeat(2, 3px)'
+  grip.style.gridTemplateRows = 'repeat(3, 3px)'
+  grip.style.gap = '3px'
+  grip.style.alignContent = 'center'
+  grip.style.justifyContent = 'center'
+  grip.style.width = '0'
+  grip.style.opacity = '0'
+  grip.style.overflow = 'hidden'
+  grip.style.transition = 'width 0.2s ease, opacity 0.2s ease, margin 0.2s ease'
+  grip.style.marginLeft = '0'
+  grip.style.pointerEvents = 'none'
+  for (let i = 0; i < 6; i += 1) {
+    const dot = document.createElement('div')
+    dot.style.width = '3px'
+    dot.style.height = '3px'
+    dot.style.borderRadius = '999px'
+    dot.style.background = 'rgba(255,255,255,0.95)'
+    grip.appendChild(dot)
+  }
+  mark.appendChild(grip)
 
   host.appendChild(mark)
 
   host.addEventListener('mouseenter', () => {
     host.style.background = '#00268a'
-    host.style.paddingRight = '12px'
-    const overlay = mark.querySelector('div:last-child') as HTMLElement | null
-    if (overlay) overlay.style.transform = 'scale(1.04)'
+    host.style.paddingRight = '16px'
+    grip.style.width = '20px'
+    grip.style.opacity = '1'
+    grip.style.marginLeft = '2px'
+    if (payload.mode === 'ingest' && plusOverlay) {
+      plusOverlay.style.transform = 'scale(1.04)'
+    }
   })
   host.addEventListener('mouseleave', () => {
     host.style.background = 'rgba(0, 47, 167, 0.96)'
     host.style.paddingRight = '12px'
-    const overlay = mark.querySelector('div:last-child') as HTMLElement | null
-    if (overlay) overlay.style.transform = 'scale(1)'
+    grip.style.width = '0'
+    grip.style.opacity = '0'
+    grip.style.marginLeft = '0'
+    if (payload.mode === 'ingest' && plusOverlay) {
+      plusOverlay.style.transform = 'scale(1)'
+    }
   })
 
   host.addEventListener('click', (e) => {

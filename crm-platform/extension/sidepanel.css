@@ -989,3 +989,12 @@ a {
   text-transform: uppercase;
   font-weight: 500;
 }
+
+@keyframes np-contact-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
