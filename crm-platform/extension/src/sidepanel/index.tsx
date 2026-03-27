@@ -201,6 +201,7 @@ function App() {
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [initStuckMs, setInitStuckMs] = useState(0)
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const autoCaptureRan = useRef(false)
   const initStuckTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -351,8 +352,8 @@ function App() {
 
   const crmStatus = formatCrmStatus(state)
   const callStatus = formatCallStatus(state)
-  const crmPill = `np-pill ${auth ? 'np-pill--blue' : 'np-pill--amber'}`
-  const callPill = `np-pill ${call.state === 'error' ? 'np-pill--red' : call.deviceReady ? 'np-pill--blue' : 'np-pill--amber'}`
+  const crmPill = `np-pill font-mono ${auth ? 'np-pill--blue' : 'np-pill--amber'}`
+  const callPill = `np-pill font-mono ${call.state === 'error' ? 'np-pill--red' : call.deviceReady ? 'np-pill--blue' : 'np-pill--amber'}`
 
   const heroTitle = (account as any)?.name || (contact as any)?.name || page?.title || 'No record identified'
   const heroSubtitle = account
@@ -363,8 +364,16 @@ function App() {
       ? [(contact as any).title, (contact as any).accountName || (account as any)?.name].filter(Boolean).join(' | ') ||
         pageDomain ||
         'Contact matched from page capture.'
-      : pageDomain || 'Capture a page to start the match.'
-  const heroSummary = match?.summary || 'Capture the active tab to resolve the record.'
+      : pageDomain || 'Identify a session to start the match.'
+
+  const rawSummary = account?.description || match?.summary || ''
+  const isBoilerplate = rawSummary.toLowerCase().startsWith('matched the page to')
+  const heroSummary = isBoilerplate && account?.description ? account.description : rawSummary
+  const summaryToDisplay = isBoilerplate && !account?.description ? '' : heroSummary
+  
+  const MAX_SUMMARY = 120
+  const isTruncated = summaryToDisplay.length > MAX_SUMMARY && !descriptionExpanded
+  const finalSummary = isTruncated ? `${summaryToDisplay.slice(0, MAX_SUMMARY).trimEnd()}…` : summaryToDisplay
   const allContacts = accountContacts.length > 0 ? accountContacts : match?.contacts || []
   const visibleContacts = allContacts.slice(0, 5)
   const hasMoreContacts = allContacts.length > visibleContacts.length
@@ -497,19 +506,33 @@ function App() {
                   <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={56} className="np-entity-mark np-entity-mark--large" />
                   <div className="np-hero-copy">
                     <div className="np-kicker font-mono">CURRENT DOSSIER</div>
-                    <h2 className="np-hero-title">{heroTitle}</h2>
-                    <p className="np-hero-subtitle">{heroSubtitle}</p>
+                    <h2 className="np-hero-title font-sans">{heroTitle}</h2>
+                    <p className="np-hero-subtitle font-sans">{heroSubtitle}</p>
                   </div>
                 </div>
 
-                <p className="np-copy np-copy--tight">{heroSummary}</p>
+                {summaryToDisplay && (
+                  <p className="np-copy np-copy--tight font-sans">
+                    {finalSummary}
+                    {summaryToDisplay.length > MAX_SUMMARY && (
+                      <button 
+                        className="np-read-more"
+                        onClick={() => setDescriptionExpanded((prev) => !prev)}
+                      >
+                        {descriptionExpanded ? 'Read Less' : 'Read More'}
+                      </button>
+                    )}
+                  </p>
+                )}
 
                 <p className="np-micro np-dossier-meta font-mono">
-                  {page?.title ? `Page: ${snippet(page.title, 64)}` : 'No page nexus'}
+                  <span className="opacity-60 font-sans">Page: </span>
+                  {page?.title ? snippet(page.title, 48) : 'No page nexus'}
                   <span className="np-dossier-meta__sep">|</span>
+                  <span className="opacity-60 font-sans">Caller ID: </span>
                   {selectedNumber
-                    ? `Caller ID: ${formatPhone(selectedNumber)}`
-                    : <span className="text-amber-400">CALLER ID: MISSING IN SETTINGS</span>}
+                    ? formatPhone(selectedNumber)
+                    : <span className="text-amber-400">MISSING</span>}
                 </p>
               </motion.section>
 
@@ -522,7 +545,7 @@ function App() {
                     className="np-card"
                   >
                     <div className="np-section-head">
-                      <h3 className="np-title">Uplinks</h3>
+                      <div className="np-kicker font-mono">01 // UPLINKS</div>
                       <div className="np-section-head__actions">
                         {call.state === 'error' && (
                           <button
@@ -673,8 +696,8 @@ function App() {
                     className="np-card"
                   >
                     <div className="np-section-head">
-                      <h3 className="np-title">Intelligence</h3>
-                      <span className="np-micro">{notes.length} log{notes.length === 1 ? '' : 's'}</span>
+                      <div className="np-kicker font-mono">02 // INTELLIGENCE</div>
+                      <span className="np-micro font-mono">{notes.length} log{notes.length === 1 ? '' : 's'}</span>
                     </div>
                     <div className="np-note-composer">
                       <textarea
@@ -700,12 +723,12 @@ function App() {
 
                     <div className="np-note-list">
                       {notes.map((note) => (
-                        <div key={note.id} className="np-note-entry">
+                        <div key={note.id} className="np-note-entry font-mono border-white/5 bg-zinc-900/40">
                           <div className="np-note-meta">
-                            <span className="np-note-source">{note.source === 'ai' ? 'Forensic AI' : 'Field Agent'}</span>
-                            <span className="np-note-date">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span className="np-note-source text-zinc-500 uppercase tracking-widest text-[9px]">{note.source === 'ai' ? 'AI_FORENSIC' : 'USER_RECON'}</span>
+                            <span className="np-note-date opacity-40">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
-                          <p className="np-note-text">{note.text}</p>
+                          <p className="np-note-text leading-relaxed text-zinc-300">{note.text}</p>
                         </div>
                       ))}
                       {notes.length === 0 && <p className="np-micro text-center pt-2">No logs captured for this session.</p>}
@@ -719,8 +742,8 @@ function App() {
                     className="np-card"
                   >
                     <div className="np-section-head">
-                      <h3 className="np-title">Contacts</h3>
-                      <span className="np-micro">{allContacts.length} total</span>
+                      <div className="np-kicker font-mono">03 // NETWORK</div>
+                      <span className="np-micro font-mono">{allContacts.length} total</span>
                     </div>
                     <div className="np-contact-list">
                       {visibleContacts.map((c) => (
