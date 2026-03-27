@@ -217,10 +217,12 @@ function CallBars() {
 
 function ActiveCallFooter({ 
   state, 
+  onAnswer,
   onHangup, 
   onDigits 
 }: { 
   state: ExtensionState; 
+  onAnswer: () => void;
   onHangup: () => void;
   onDigits: (d: string) => void;
 }) {
@@ -250,56 +252,79 @@ function ActiveCallFooter({
       </div>
 
       <div className="np-call-footer__actions">
-        <div className="relative">
-          <button 
-            className="np-call-footer__btn np-call-footer__btn--dialpad" 
-            onClick={() => setShowDialpad(!showDialpad)}
-          >
-            <Grid3X3 size={16} />
-          </button>
-          
-          <AnimatePresence>
-            {showDialpad && (
-              <motion.div
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                className="np-dialpad-panel"
+        {state.call.state === 'incoming' ? (
+          <>
+            <button
+              className="np-call-footer__btn np-call-footer__btn--answer"
+              onClick={onAnswer}
+              aria-label="Answer incoming call"
+              title="Answer"
+            >
+              <Phone size={16} />
+            </button>
+            <button
+              className="np-call-footer__btn np-call-footer__btn--hangup"
+              onClick={onHangup}
+              aria-label="Decline incoming call"
+              title="Decline"
+            >
+              <Phone size={18} style={{ transform: 'rotate(135deg)' }} />
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="relative">
+              <button 
+                className="np-call-footer__btn np-call-footer__btn--dialpad" 
+                onClick={() => setShowDialpad(!showDialpad)}
               >
-                {[
-                      { digit: '1', letters: '' },
-                      { digit: '2', letters: 'ABC' },
-                      { digit: '3', letters: 'DEF' },
-                      { digit: '4', letters: 'GHI' },
-                      { digit: '5', letters: 'JKL' },
-                      { digit: '6', letters: 'MNO' },
-                      { digit: '7', letters: 'PQRS' },
-                      { digit: '8', letters: 'TUV' },
-                      { digit: '9', letters: 'WXYZ' },
-                      { digit: '*', letters: '' },
-                      { digit: '0', letters: '+' },
-                      { digit: '#', letters: '' },
-                    ].map(item => (
-                      <button
-                        key={item.digit}
-                        onClick={() => onDigits(item.digit)}
-                        className="np-dialpad-key"
-                      >
-                        <span className="np-dialpad-digit">{item.digit}</span>
-                        {item.letters && <span className="np-dialpad-letters">{item.letters}</span>}
-                      </button>
-                    ))}
+                <Grid3X3 size={16} />
+              </button>
+              
+              <AnimatePresence>
+                {showDialpad && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="np-dialpad-panel"
+                  >
+                    {[
+                          { digit: '1', letters: '' },
+                          { digit: '2', letters: 'ABC' },
+                          { digit: '3', letters: 'DEF' },
+                          { digit: '4', letters: 'GHI' },
+                          { digit: '5', letters: 'JKL' },
+                          { digit: '6', letters: 'MNO' },
+                          { digit: '7', letters: 'PQRS' },
+                          { digit: '8', letters: 'TUV' },
+                          { digit: '9', letters: 'WXYZ' },
+                          { digit: '*', letters: '' },
+                          { digit: '0', letters: '+' },
+                          { digit: '#', letters: '' },
+                        ].map(item => (
+                          <button
+                            key={item.digit}
+                            onClick={() => onDigits(item.digit)}
+                            className="np-dialpad-key"
+                          >
+                            <span className="np-dialpad-digit">{item.digit}</span>
+                            {item.letters && <span className="np-dialpad-letters">{item.letters}</span>}
+                          </button>
+                        ))}
                   </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+                )}
+              </AnimatePresence>
+            </div>
 
-        <button 
-          className="np-call-footer__btn np-call-footer__btn--hangup" 
-          onClick={onHangup}
-        >
-          <Phone size={18} style={{ transform: 'rotate(135deg)' }} />
-        </button>
+            <button 
+              className="np-call-footer__btn np-call-footer__btn--hangup" 
+              onClick={onHangup}
+            >
+              <Phone size={18} style={{ transform: 'rotate(135deg)' }} />
+            </button>
+          </>
+        )}
       </div>
     </motion.div>
   )
@@ -942,6 +967,7 @@ function App() {
         {callIsLive && (
           <ActiveCallFooter 
             state={state} 
+            onAnswer={answerCall}
             onHangup={hangupCall} 
             onDigits={sendDigits}
           />
