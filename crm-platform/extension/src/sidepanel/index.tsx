@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock } from 'lucide-react'
+import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio } from 'lucide-react'
 import {
   defaultCallState,
   formatElapsed,
@@ -182,6 +182,115 @@ function accountPhone(account: MatchAccount | null) {
   ) || ''
 }
 
+function useCallDuration(startedAt: string | null) {
+  const [seconds, setSeconds] = useState(0)
+  useEffect(() => {
+    if (!startedAt) {
+      setSeconds(0)
+      return
+    }
+    const start = new Date(startedAt).getTime()
+    const update = () => {
+      setSeconds(Math.floor((Date.now() - start) / 1000))
+    }
+    update()
+    const i = setInterval(update, 1000)
+    return () => clearInterval(i)
+  }, [startedAt])
+  return seconds
+}
+
+function CallBars() {
+  return (
+    <div className="np-call-bars">
+      {[...Array(5)].map((_, i) => (
+        <motion.div
+          key={i}
+          className="np-call-bar"
+          animate={{ height: [2, 14, 2], opacity: [0.3, 0.8, 0.3] }}
+          transition={{ repeat: Infinity, duration: 1.2, delay: i * 0.15, ease: 'easeInOut' }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function ActiveCallFooter({ 
+  state, 
+  onHangup, 
+  onDigits 
+}: { 
+  state: ExtensionState; 
+  onHangup: () => void;
+  onDigits: (d: string) => void;
+}) {
+  const duration = useCallDuration(state.call.startedAt)
+  const [showDialpad, setShowDialpad] = useState(false)
+  const name = state.match?.contact?.name || state.match?.account?.name || state.call.incomingFrom || "Active Session"
+  const meta = state.match?.account?.name && state.match.contact ? `via ${state.match.account.name}` : state.call.incomingFrom ? "Incoming Call" : "Voice Uplink"
+
+  return (
+    <motion.div
+      className="np-call-footer"
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      exit={{ y: 80, opacity: 0 }}
+      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+    >
+      <div className="np-call-footer__identity">
+        <CallBars />
+        <div className="np-call-footer__copy">
+          <p className="np-call-footer__name">{name}</p>
+          <p className="np-call-footer__meta font-mono">{meta}</p>
+        </div>
+      </div>
+
+      <div className="np-call-footer__stats">
+        <span className="np-call-footer__duration font-mono">{formatElapsed(duration)}</span>
+      </div>
+
+      <div className="np-call-footer__actions">
+        <div className="relative">
+          <button 
+            className="np-call-footer__btn np-call-footer__btn--dialpad" 
+            onClick={() => setShowDialpad(!showDialpad)}
+          >
+            <Grid3X3 size={16} />
+          </button>
+          
+          <AnimatePresence>
+            {showDialpad && (
+              <motion.div
+                initial={{ opacity: 0, y: -10, scale: 0.95 }}
+                animate={{ opacity: 1, y: -210, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                className="absolute right-0 bg-zinc-950/90 backdrop-blur-xl border border-white/10 rounded-xl p-3 grid grid-cols-3 gap-1 shadow-2xl w-40"
+              >
+                {['1','2','3','4','5','6','7','8','9','*','0','#'].map(d => (
+                  <button
+                    key={d}
+                    onClick={() => onDigits(d)}
+                    className="h-10 text-xs font-mono rounded-lg hover:bg-white/10 flex items-center justify-center border border-white/5"
+                  >
+                    {d}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <button 
+          className="np-call-footer__btn np-call-footer__btn--hangup" 
+          onClick={onHangup}
+        >
+          <Phone size={18} style={{ transform: 'rotate(135deg)' }} />
+        </button>
+      </div>
+    </motion.div>
+  )
+}
+
 function primaryPhone(
   account: MatchAccount | null,
   contact: MatchContact | null,
@@ -305,6 +414,11 @@ function App() {
     if (response?.state) setState(response.state)
   }
 
+  const sendDigits = async (digits: string) => {
+    const response = await sendMessage('CALL_DIGITS', { digits })
+    if (response?.state) setState(response.state)
+  }
+
   const saveNote = async (payload: { note: string; contactId?: string; accountId?: string }) => {
     const response = await sendMessage('SAVE_NOTE', payload)
     if (response?.state) setState(response.state)
@@ -385,20 +499,8 @@ function App() {
       ''
   ) || null
   
-  const callLabel =
-    call.state === 'incoming'
-      ? `Incoming from ${call.incomingDisplay || call.incomingFrom || 'unknown'}`
-      : call.state === 'connected'
-        ? 'Live call'
-        : call.state === 'dialing'
-          ? 'Dialing'
-          : call.state === 'initializing'
-            ? 'Connecting calls'
-            : call.deviceReady
-              ? 'Ready to call'
-              : 'Connecting calls'
   const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
-  const showCallButton = Boolean(selectedNumber && dialTarget && !callIsLive)
+  const showCallButton = Boolean(selectedNumber && dialTarget)
 
   // Branded Loading Splash
   const isSyncing = busy === 'auto-capture' || (auth && !match && busy !== 'capture' && busy !== 'sync-profile') || busy === 'initial-sync'
@@ -546,23 +648,6 @@ function App() {
                   >
                     <div className="np-section-head">
                       <div className="np-kicker font-mono">01 // UPLINKS</div>
-                      <div className="np-section-head__actions">
-                        {call.state === 'error' && (
-                          <button
-                            className="np-button np-button--sm np-button--ghost"
-                            onClick={() => void runAction('recover-calls', recoverCalls)}
-                            disabled={busy === 'recover-calls'}
-                          >
-                            {busy === 'recover-calls' ? 'Recovering...' : 'Recover Calls'}
-                          </button>
-                        )}
-                        {callIsLive && (
-                          <div className="np-pulse-tag">
-                            <span className="np-pulse-dot" />
-                            {callLabel}
-                          </div>
-                        )}
-                      </div>
                     </div>
 
                     <div className="np-action-grid">
@@ -572,7 +657,7 @@ function App() {
                           if (!outboundTarget) return
                           void runAction('dial', () => dialCall(outboundTarget, contact?.id, account?.id))
                         }}
-                        disabled={busy === 'dial' || !showCallButton}
+                        disabled={busy === 'dial'}
                       >
                         <div className="np-uplink-primary__row">
                           <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -755,7 +840,7 @@ function App() {
                               <div className="np-micro">{c.title || 'Executive'}</div>
                             </div>
                           </div>
-                          {contactPhone(c) && !callIsLive && (
+                          {contactPhone(c) && (
                             <button
                               className="np-button np-button--sm np-button--ghost"
                               onClick={() => void runAction('dial', () => dialCall(contactPhone(c), c.id, c.accountId || undefined))}
@@ -804,6 +889,16 @@ function App() {
           </button>
         </div>
       </div>
+
+      <AnimatePresence>
+        {callIsLive && (
+          <ActiveCallFooter 
+            state={state} 
+            onHangup={hangupCall} 
+            onDigits={sendDigits}
+          />
+        )}
+      </AnimatePresence>
     </div>
   )
 }
