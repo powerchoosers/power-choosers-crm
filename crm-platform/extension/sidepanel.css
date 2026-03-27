@@ -235,6 +235,22 @@ a {
 
 .np-card--hero {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0%, rgba(255, 255, 255, 0.01) 100%), var(--np-surface);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.np-hero-identity-link:hover .np-card--hero {
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.np-hero-identity-link {
+  display: block;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
 }
 
 .np-card--error {
@@ -313,7 +329,7 @@ a {
 .np-entity-mark__img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .np-entity-mark__initials {
@@ -515,6 +531,7 @@ a {
 }
 
 .np-uplink-icon--phone {
+  position: relative;
   width: 26px;
   height: 26px;
   color: rgba(255, 255, 255, 0.9);
