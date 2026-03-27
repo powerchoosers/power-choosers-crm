@@ -1,6 +1,6 @@
 # Nodal Point Browser Extension Worklog
 
-Last updated: 2026-03-26
+Last updated: 2026-03-27
 
 This file is a plain-English record of the Nodal Point browser extension work done so far.
 It is meant to help Lewis and future work sessions understand what exists, what changed, and
@@ -41,6 +41,7 @@ Added API routes in the CRM app so the extension can use the logged-in session a
 - `src/pages/api/extension/match.js`
 - `src/pages/api/extension/refresh.js`
 - `src/pages/api/extension/account-contacts.js`
+- `src/pages/api/extension/org-contacts.js`
 
 These routes let the extension:
 
@@ -49,6 +50,7 @@ These routes let the extension:
 - match the active page to CRM data
 - load account contacts for the matched company
 - refresh auth when the token expires
+- merge cached Apollo search data with CRM contacts for the extension network view
 
 ### Twilio call flow
 
@@ -78,11 +80,21 @@ The extension now captures the current page and tries to match it to the CRM usi
 - detected phone numbers
 - matched account contacts
 
+Recent matching changes made this stricter:
+
+- domain match now takes priority over fuzzy company-name guesses
+- exact company-name matches are preferred over weak partial matches
+- weak guesses are no longer allowed to override a better domain result
+- `google.com` is blocked from ingest
+- `nodalpoint.io` is blocked from capture/ingest so the extension does not overwrite its own CRM context when Lewis switches between windows
+
 It also:
 
 - keeps the company context updated when you switch tabs
 - does that without ending an active call
 - shows a small page-edge badge when an account is matched
+- lets the page-edge badge stay rounded and draggable from the 6-dot handle
+- opens the side panel first when ingest starts, then shows a Nodal loading state before content appears
 
 ### Minimal dossier UI
 
@@ -97,6 +109,14 @@ Changes made:
 - kept only the actions that matter for the current state
 - added a compact contacts list for matched accounts
 - added a manual dial input only when the page does not expose a phone number
+
+The extension also got a minimal organization network view:
+
+- a `CRM | Apollo` toggle in the network section
+- a search box that filters the visible people
+- a read-only first version that uses cached `apollo_searches` data
+- Apollo-only contacts are labeled separately from CRM-linked contacts
+- contact cards use the same CRM-style avatar/identity pattern instead of a separate extension-only visual language
 
 ### Icon and toolbar behavior
 
@@ -182,6 +202,19 @@ Removed an incorrect CSS filter that was making the badge icon look like a solid
 
 Added detailed `[Twilio Offscreen]` console logging to the offscreen document. This allows us to see exactly where the Twilio SDK is hanging (Token, Registration, or Signaling) by inspecting the offscreen document's console in `chrome://extensions`.
 
+### Extension network contact lookup
+
+Added a new extension route:
+
+- `src/pages/api/extension/org-contacts.js`
+
+It reads the saved Apollo cache, resolves CRM-linked people, and returns two buckets:
+
+- contacts already in CRM
+- Apollo-only contacts that have not been mapped into CRM yet
+
+The side panel uses this first-pass route so Lewis can search contacts without leaving the extension.
+
 ## Current Behavior
 
 What should happen now:
@@ -215,6 +248,7 @@ Recent checks that passed:
 - `npm run build:extension`
 - `node --check src/pages/api/extension/bootstrap.js`
 - `node --check src/pages/api/extension/account-contacts.js`
+- `node --check src/pages/api/extension/org-contacts.js`
 
 ## What Still Matters
 
@@ -234,5 +268,7 @@ The extension now does the core job:
 - keep calls alive in the background
 - use the admin’s selected Twilio line from settings
 - stay much closer to the Nodal Point dossier style
+- let Lewis search CRM and Apollo cached contacts directly in the side panel
+- keep the extension from hijacking the CRM context when switching to Nodal Point tabs
 
 The next work should focus on polishing the UI and tightening the call flow, not rebuilding the core plumbing.
