@@ -66,6 +66,7 @@ export type MatchContact = {
   accountName: string | null
   accountDomain: string | null
   name: string
+  photoUrl: string | null
   email: string | null
   title: string | null
   phone: string | null
@@ -146,6 +147,7 @@ export type ChatEntry = {
 export type ExtensionState = {
   auth: ExtensionAuth | null
   page: PageSnapshot | null
+  pageStatus: 'idle' | 'capturing' | 'matched' | 'unmatched' | 'ingesting'
   match: MatchResult | null
   accountContacts: MatchContact[]
   call: CallState
@@ -184,6 +186,7 @@ export function defaultState(): ExtensionState {
   return {
     auth: null,
     page: null,
+    pageStatus: 'idle',
     match: null,
     accountContacts: [],
     call: defaultCallState(),
@@ -279,6 +282,50 @@ export function extractEmailCandidates(text: string | null | undefined): string[
   const regex = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi
   const matches = source.match(regex) ?? []
   return unique(matches.map((item) => item.toLowerCase().trim()).filter(Boolean))
+}
+
+function cleanUrl(value: unknown): string {
+  return trimText(value)
+}
+
+function resolveNestedPhotoUrl(record: Record<string, unknown>): string {
+  const directKeys = [
+    'photoUrl',
+    'photo_url',
+    'avatarUrl',
+    'avatar_url',
+    'profilePhotoUrl',
+    'profile_photo_url',
+    'hostedPhotoUrl',
+    'hosted_photo_url',
+    'imageUrl',
+    'image_url',
+  ]
+
+  for (const key of directKeys) {
+    const url = cleanUrl(record[key])
+    if (url) return url
+  }
+
+  const nestedKeys = ['metadata', 'general', 'contact', 'original_apollo_data']
+  for (const key of nestedKeys) {
+    const nested = record[key]
+    if (nested && typeof nested === 'object') {
+      const url = resolveNestedPhotoUrl(nested as Record<string, unknown>)
+      if (url) return url
+    }
+  }
+
+  return ''
+}
+
+export function resolveContactPhotoUrl(...sources: unknown[]): string {
+  for (const source of sources) {
+    if (!source || typeof source !== 'object') continue
+    const url = resolveNestedPhotoUrl(source as Record<string, unknown>)
+    if (url) return url
+  }
+  return ''
 }
 
 export function tokenizeSearchText(value: string | null | undefined, maxTokens = 8): string[] {

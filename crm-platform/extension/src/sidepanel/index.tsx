@@ -496,7 +496,7 @@ function App() {
 
   if (!state) return null
 
-  const { auth, page, match, call, accountContacts, notes } = state
+  const { auth, page, pageStatus, match, call, accountContacts, notes } = state
   const account = match?.account
   const contact = match?.contact
   const hasMatchedAccount = Boolean(account?.id)
@@ -552,21 +552,36 @@ function App() {
   
   const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
   const showCallButton = Boolean(selectedNumber && dialTarget)
+  const loadingMode = pageStatus === 'ingesting'
+    ? 'ingest'
+    : pageStatus === 'capturing'
+      ? 'capture'
+      : !pageStatus || pageStatus === 'idle'
+        ? 'startup'
+        : null
   const syncTitle =
-    busy === 'ingest'
+    loadingMode === 'ingest'
       ? 'Ingesting account...'
-      : busy === 'capture'
+      : loadingMode === 'capture'
         ? 'Scanning page...'
         : 'Identifying session context...'
   const syncBody =
-    busy === 'ingest'
+    loadingMode === 'ingest'
       ? 'Creating the account in CRM and enriching it with Apollo.'
-      : busy === 'capture'
+      : loadingMode === 'capture'
         ? 'Reading the active tab before matching it to CRM.'
-        : 'Identifying session context...'
+        : 'Loading the Nodal Point command deck...'
 
   // Branded Loading Splash
-  const isSyncing = busy === 'auto-capture' || busy === 'initial-sync' || busy === 'capture' || busy === 'ingest' || busy === 'sync-profile'
+  const isSyncing =
+    busy === 'auto-capture' ||
+    busy === 'initial-sync' ||
+    busy === 'capture' ||
+    busy === 'ingest' ||
+    busy === 'sync-profile' ||
+    loadingMode === 'startup' ||
+    pageStatus === 'capturing' ||
+    pageStatus === 'ingesting'
 
   let viewNode;
   if (isSyncing) {
@@ -934,7 +949,7 @@ function App() {
                 </div>
               </motion.section>
             </>
-          ) : auth ? (
+          ) : auth && pageStatus === 'unmatched' ? (
             <>
               <motion.section
                 initial={{ opacity: 0, y: 10 }}
@@ -1016,6 +1031,16 @@ function App() {
                 </div>
               </motion.section>
             </>
+          ) : auth ? (
+            <section className="np-card np-card--hero" style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <h3 className="np-hero-title">CRM Loading</h3>
+              <p className="np-copy" style={{ marginTop: 12, marginBottom: 24 }}>
+                Reading the current page and resolving the account context.
+              </p>
+              <button className="np-button np-button--primary np-button--full" onClick={loginToCrm}>
+                Open Platform Profile
+              </button>
+            </section>
           ) : (
             <section className="np-card np-card--hero" style={{ textAlign: 'center', padding: '40px 20px' }}>
               <h3 className="np-hero-title">CRM Disconnected</h3>
