@@ -720,6 +720,7 @@ STRUCTURE: Short call reference (1 sentence, natural) → Key takeaway or releva
 PERSONALIZATION: If CALL INTELLIGENCE or NOTES are provided in the context, reference something specific from the conversation. One specific detail beats three generic lines. Make it feel like you were listening.
 CALL TIMING: Use call timing cues from context. Never say "today" unless the call happened today. If it was older, use wording like "earlier this week", "a few days ago", or "last week" based on the provided timestamp.
 CALL QUALITY: If the transcript is mostly a gatekeeper, receptionist, or routing handoff, do not pretend you had a full substantive conversation. Use wording like "thanks for the direction" or "thanks for pointing me to the right place." Only use "good talking with you" when the transcript shows a real back-and-forth about the actual topic.
+CALL ACCURACY: If the recipient asked for something specific, such as a capabilities brief, PDF, vendor info, or manager review, state that specific request in the email. Do not replace it with vague language like "connect with your team" or "as discussed" unless the discussion is named.
 NEXT STEP: If the transcript includes a direct instruction or handoff, follow that exact next step. Do not invent a different CTA.
 NO FUTURE EMAILS: Do not write phrases like "I'll send over a brief email" or "I'll follow up with more info" unless the user explicitly asked for a later email. The body you write is the email that gets sent now, so include the information directly.
 
@@ -1246,9 +1247,9 @@ Write one email where USER CONTEXT leads and the angle is supporting context onl
         const hasTranscripts = (foundryContext?.intelligence.transcripts.length ?? 0) > 0
         const hasCallNotes = !!(context?.contextForAi && /call|spoke|talked|conversation|meeting/i.test(context.contextForAi))
         if (hasTranscripts || hasCallNotes) {
-          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference specific topics from CALL INTELLIGENCE and respect CALL TIMING CUES. Do not imply "today" unless the cue says today. Propose one concrete next step.`
+          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Use the concrete ask or handoff from CALL INTELLIGENCE, not a generic recap. If the call included a request for a PDF, capabilities brief, company info, manager review, or vendor materials, mention that plainly. Respect CALL TIMING CUES, and do not imply "today" unless the cue says today. Propose one concrete next step that matches the call.`
         } else {
-          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference our recent conversation naturally, with correct timing language. Propose one clear next step.`
+          effectiveDirective = `Write a warm 80–120 word post-call follow-up email. Reference our recent conversation naturally, with correct timing language. Use the most concrete request or next step you can infer. Propose one clear next step.`
         }
       }
     }
@@ -1257,7 +1258,7 @@ Write one email where USER CONTEXT leads and the angle is supporting context onl
       cold_followup: 'Sharpen this follow-up. Remove filler. One clear CTA. Up to 120–150 words. Output only the revised body.',
       professional: 'Tighten and clarify this email. Keep the same intent and tone. Remove redundancy. Output only the revised body.',
       followup: 'Make this follow-up clearer and more concise. Keep it polite and professional. Output only the revised body.',
-      post_call: 'Make this post-call email warmer and more specific. Reference the call naturally. One clear next step. Output only the revised body.',
+      post_call: 'Make this post-call email warmer and more specific. Reference the actual request or handoff from the call, not a generic recap. One clear next step. Output only the revised body.',
       internal: 'Make this internal email clearer and shorter. Keep the same information. Output only the revised body.',
       support: 'Make this support email clearer and more helpful. Keep empathy and accuracy. Output only the revised body.',
     }
