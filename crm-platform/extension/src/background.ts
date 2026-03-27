@@ -8,6 +8,7 @@ import {
   buildTransmissionTaskTitle,
   defaultCallState,
   defaultState,
+  extractDomain,
   extractPhoneCandidates,
   normalizeAuthPayload,
   normalizeOrigin,
@@ -40,10 +41,12 @@ type CapturedTab = {
 }
 
 type PageBadgePayload = {
+  mode: 'matched' | 'ingest'
   accountName: string
-  accountId: string
+  accountId: string | null
   domain: string | null
   contactCount: number
+  label: string
 }
 
 let state: ExtensionState = defaultState()
@@ -95,12 +98,12 @@ async function hydrateState() {
   await updateBadge()
 
   try {
-    if (state.match?.account?.id && state.page?.url) {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-      if (tab?.id && tab.url && trimText(tab.url) === trimText(state.page.url)) {
-        await syncPageBadge(tab.id, state.match)
+      if (state.page?.url) {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
+        if (tab?.id && tab.url && trimText(tab.url) === trimText(state.page.url)) {
+          await syncPageBadge(tab.id, state.match, state.page)
+        }
       }
-    }
   } catch (error) {
     console.warn('[Extension] Failed to restore page badge:', error)
   }
@@ -491,7 +494,12 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   const host = document.createElement('button')
   host.type = 'button'
   host.id = 'nodal-point-badge-host'
-  host.setAttribute('aria-label', `Open Nodal Point for ${payload.accountName}`)
+  host.setAttribute(
+    'aria-label',
+    payload.mode === 'ingest'
+      ? `Ingest ${payload.label || payload.accountName} into Nodal Point`
+      : `Open Nodal Point for ${payload.accountName}`
+  )
   host.style.all = 'unset'
   host.style.display = 'flex'
   host.style.alignItems = 'center'
@@ -516,31 +524,51 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   const icon = document.createElement('img')
   icon.src = (chrome.runtime?.getURL ? chrome.runtime.getURL('icon32.png') : '') || ''
   icon.alt = ''
-  icon.style.width = '28px'
-  icon.style.height = '28px'
+  icon.style.width = '26px'
+  icon.style.height = '26px'
   icon.style.objectFit = 'contain'
   icon.style.pointerEvents = 'none'
 
-  const section = document.createElement('div')
-  section.style.display = 'flex'
-  section.style.alignItems = 'center'
-  section.style.gap = '8px'
-  section.style.width = '0'
-  section.style.opacity = '0'
-  section.style.overflow = 'hidden'
-  section.style.transition = 'width 0.2s ease, opacity 0.2s ease, margin 0.2s ease'
+  const mark = document.createElement('div')
+  mark.style.position = 'relative'
+  mark.style.display = 'flex'
+  mark.style.alignItems = 'center'
+  mark.style.justifyContent = 'center'
 
-  const divider = document.createElement('div')
-  divider.style.width = '1px'
-  divider.style.height = '18px'
-  divider.style.background = 'rgba(255,255,255,0.2)'
+  const overlay = document.createElement('div')
+  overlay.style.position = 'absolute'
+  overlay.style.right = '-2px'
+  overlay.style.bottom = '-2px'
+  overlay.style.width = '14px'
+  overlay.style.height = '14px'
+  overlay.style.borderRadius = '999px'
+  overlay.style.display = 'flex'
+  overlay.style.alignItems = 'center'
+  overlay.style.justifyContent = 'center'
+  overlay.style.background = payload.mode === 'ingest' ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255,255,255,0.12)'
+  overlay.style.border = payload.mode === 'ingest' ? '1px solid rgba(250, 204, 21, 0.6)' : '1px solid rgba(255,255,255,0.18)'
+  overlay.style.color = payload.mode === 'ingest' ? '#facc15' : '#ffffff'
+  overlay.style.fontSize = '11px'
+  overlay.style.lineHeight = '1'
+  overlay.style.fontWeight = '700'
+  overlay.textContent = '+'
 
   const grip = document.createElement('div')
+  grip.style.position = 'absolute'
+  grip.style.right = '-2px'
+  grip.style.bottom = '-2px'
+  grip.style.width = '14px'
+  grip.style.height = '14px'
+  grip.style.borderRadius = '999px'
   grip.style.display = 'grid'
   grip.style.gridTemplateColumns = 'repeat(2, 3px)'
-  grip.style.gap = '3px'
-  
-  for (let i = 0; i < 6; i++) {
+  grip.style.gap = '2px'
+  grip.style.alignContent = 'center'
+  grip.style.justifyContent = 'center'
+  grip.style.background = 'rgba(255,255,255,0.1)'
+  grip.style.border = '1px solid rgba(255,255,255,0.18)'
+  grip.style.opacity = '0.95'
+  for (let i = 0; i < 4; i++) {
     const dot = document.createElement('div')
     dot.style.width = '3px'
     dot.style.height = '3px'
@@ -549,31 +577,28 @@ function renderPageBadge(payload: PageBadgePayload | null) {
     grip.appendChild(dot)
   }
 
-  section.appendChild(divider)
-  section.appendChild(grip)
+  mark.appendChild(icon)
+  mark.appendChild(payload.mode === 'ingest' ? overlay : grip)
 
-  host.appendChild(icon)
-  host.appendChild(section)
+  host.appendChild(mark)
 
   host.addEventListener('mouseenter', () => {
     host.style.background = '#00268a'
     host.style.paddingRight = '12px'
-    section.style.width = '20px'
-    section.style.opacity = '1'
-    section.style.marginLeft = '4px'
+    overlay.style.transform = 'scale(1.04)'
+    grip.style.transform = 'scale(1.04)'
   })
   host.addEventListener('mouseleave', () => {
     host.style.background = 'rgba(0, 47, 167, 0.96)'
     host.style.paddingRight = '12px'
-    section.style.width = '0'
-    section.style.opacity = '0'
-    section.style.marginLeft = '0'
+    overlay.style.transform = 'scale(1)'
+    grip.style.transform = 'scale(1)'
   })
 
   host.addEventListener('click', (e) => {
     e.preventDefault()
     e.stopPropagation()
-    chrome.runtime.sendMessage({ type: 'OPEN_SIDE_PANEL' }, () => {
+    chrome.runtime.sendMessage({ type: payload.mode === 'ingest' ? 'INGEST_PAGE_ACCOUNT' : 'OPEN_SIDE_PANEL' }, () => {
        void chrome.runtime.lastError
     })
   })
@@ -617,6 +642,8 @@ function normalizeMatchContact(raw: any): MatchResult['contact'] {
     mobile: trimText(raw.mobile) || null,
     workPhone: trimText(raw.workPhone) || null,
     companyPhone: trimText(raw.companyPhone) || null,
+    otherPhone: trimText(raw.otherPhone) || null,
+    directPhone: trimText(raw.directPhone) || null,
     city: trimText(raw.city) || null,
     state: trimText(raw.state) || null,
     score: Number(raw.score || raw.matchScore || 0) || 0,
@@ -671,14 +698,23 @@ async function matchPageAgainstCrm(snapshot: PageSnapshot) {
   return match
 }
 
-async function syncPageBadge(tabId: number | null | undefined, match: MatchResult | null) {
+async function syncPageBadge(tabId: number | null | undefined, match: MatchResult | null, snapshot?: PageSnapshot | null) {
   if (!tabId || !match?.account?.id) {
     try {
       if (tabId) {
         await chrome.scripting.executeScript({
           target: { tabId },
           func: renderPageBadge,
-          args: [null],
+          args: [
+            snapshot && snapshot.url ? {
+              mode: 'ingest',
+              accountName: snapshot.title || extractDomain(snapshot.url) || 'Unknown page',
+              accountId: null,
+              domain: snapshot.origin || snapshot.url || null,
+              contactCount: 0,
+              label: 'Add to CRM',
+            } : null,
+          ],
         })
       }
     } catch (error) {
@@ -693,10 +729,12 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
       func: renderPageBadge,
       args: [
         {
+          mode: 'matched',
           accountName: match.account.name,
           accountId: match.account.id,
           domain: match.account.domain || match.account.website || null,
           contactCount: Array.isArray(match.contacts) ? match.contacts.length : 0,
+          label: 'Open CRM',
         },
       ],
     })
@@ -717,8 +755,45 @@ async function captureAndMatch(windowId?: number | null) {
     draft.accountContacts = []
   })
   const match = await matchPageAgainstCrm(snapshot)
-  await syncPageBadge(tab?.id || null, match)
+  await syncPageBadge(tab?.id || null, match, snapshot)
   return { snapshot, screenshot, match }
+}
+
+async function handleIngestPageAccount(windowId?: number | null) {
+  if (!state.auth?.accessToken) {
+    throw new Error('Connect your Nodal Point session before ingesting an account.')
+  }
+
+  const { tab, snapshot } = await captureActiveTab(windowId)
+  await setState((draft) => {
+    draft.page = snapshot
+    draft.match = null
+    draft.accountContacts = []
+  })
+
+  const data = await fetchAuthedJson(
+    '/api/extension/ingest-account',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        snapshot,
+        bodyText: latestBodyText,
+        appOrigin: state.auth.appOrigin || snapshot.origin || DEFAULT_APP_ORIGIN,
+      }),
+    },
+    snapshot.origin
+  )
+
+  const match = await matchPageAgainstCrm(snapshot)
+  await syncPageBadge(tab?.id || null, match, snapshot)
+
+  return {
+    ok: true,
+    account: data?.account || null,
+    existing: Boolean(data?.existing),
+    match,
+    state: cloneState(),
+  }
 }
 
 let activeTabCaptureTimer: ReturnType<typeof setTimeout> | null = null
@@ -741,9 +816,9 @@ function scheduleActiveTabCapture(windowId?: number | null) {
       try {
         const query = windowId != null ? { active: true, windowId } : { active: true, currentWindow: true }
         const [tab] = await chrome.tabs.query(query)
-        if (!tab?.url || !isCaptureableTabUrl(tab.url)) return
+      if (!tab?.url || !isCaptureableTabUrl(tab.url)) return
         if (trimText(state.page?.url || '') === trimText(tab.url)) {
-          await syncPageBadge(tab.id || null, state.match)
+          await syncPageBadge(tab.id || null, state.match, state.page)
           return
         }
         await captureAndMatch(windowId)
@@ -1373,6 +1448,10 @@ async function handleTwilioEvent(payload: any) {
         iconUrl: chrome.runtime.getURL('icon.svg'),
         title: 'Incoming call',
         message: incomingDisplay || from || 'A call is ringing in Nodal Point.',
+        buttons: [
+          { title: 'Answer' },
+          { title: 'Open' },
+        ],
         priority: 2,
         requireInteraction: true,
       })
@@ -1577,9 +1656,18 @@ chrome.notifications.onClicked.addListener(() => {
   })
 })
 
-chrome.notifications.onButtonClicked.addListener(() => {
-  void openSidePanelForCurrentWindow().catch((error) => {
-    console.warn('[Extension] Failed to open side panel from notification button:', error)
+chrome.notifications.onButtonClicked.addListener((notificationId: string, buttonIndex: number) => {
+  void (async () => {
+    if (notificationId !== INCOMING_NOTIFICATION_ID) return
+
+    if (buttonIndex === 0) {
+      await sendExtensionMessage({ type: 'CALL_ANSWER' })
+      return
+    }
+
+    await openSidePanelForCurrentWindow()
+  })().catch((error) => {
+    console.warn('[Extension] Failed to handle notification button:', error)
   })
 })
 
@@ -1611,6 +1699,15 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           return
         case 'CAPTURE_AND_MATCH':
           sendResponse(await handlePageMatchRequest())
+          return
+        case 'INGEST_PAGE_ACCOUNT':
+          {
+            const result = await handleIngestPageAccount(sender?.tab?.windowId)
+            await handleOpenSidePanel(sender).catch((error) => {
+              console.warn('[Extension] Failed to open side panel after ingest:', error)
+            })
+            sendResponse({ ...result, opened: true })
+          }
           return
         case 'ENABLE_CALLS':
           sendResponse(await handleEnableCalls(message.payload))
