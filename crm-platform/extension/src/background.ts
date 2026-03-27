@@ -1559,6 +1559,35 @@ async function handlePhoneLookup(payload: any) {
   return { ok: true, data, state: cloneState() }
 }
 
+async function handleGetOrgContacts(payload: any) {
+  const accountId = trimText(payload?.accountId || state.match?.account?.id || '')
+  const domain = trimText(
+    payload?.domain ||
+      state.match?.account?.domain ||
+      state.match?.account?.website ||
+      state.page?.origin ||
+      state.page?.url ||
+      ''
+  )
+  const companyName = trimText(payload?.companyName || state.match?.account?.name || '')
+  const q = trimText(payload?.q || payload?.query || '')
+
+  const params = new URLSearchParams()
+  if (accountId) params.set('accountId', accountId)
+  const normalizedDomain = extractDomain(domain)
+  if (normalizedDomain) params.set('domain', normalizedDomain)
+  if (companyName) params.set('companyName', companyName)
+  if (q) params.set('q', q)
+
+  const data = await fetchAuthedJson(
+    `/api/extension/org-contacts${params.toString() ? `?${params.toString()}` : ''}`,
+    { method: 'GET' },
+    payload?.appOrigin || state.page?.origin || state.auth?.appOrigin || null
+  )
+
+  return { ok: true, data, state: cloneState() }
+}
+
 async function handleTwilioEvent(payload: any) {
   const kind = trimText(payload?.kind || payload?.status || '')
   const from = trimText(payload?.from || payload?.caller || payload?.incomingFrom || '')
@@ -1938,6 +1967,9 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           return
         case 'OPEN_RECORD':
           sendResponse(await handleOpenRecord(message.payload))
+          return
+        case 'GET_ORG_CONTACTS':
+          sendResponse(await handleGetOrgContacts(message.payload))
           return
         case 'OFFSCREEN_PING':
           sendResponse({ ok: true, state: cloneState() })

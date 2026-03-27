@@ -25,6 +25,40 @@ type MessageResponse<T> = {
   state?: ExtensionState
 } & T
 
+type OrgNetworkContact = {
+  id: string
+  crmId: string | null
+  name: string
+  firstName: string | null
+  lastName: string | null
+  title: string | null
+  email: string | null
+  linkedin: string | null
+  location: string | null
+  photoUrl: string | null
+  phone: string | null
+  mobile: string | null
+  workPhone: string | null
+  companyPhone: string | null
+  otherPhone: string | null
+  directPhone: string | null
+  phones: string[]
+  isMonitored: boolean
+  source: 'crm' | 'apollo'
+}
+
+type OrgContactsPayload = {
+  cacheKeyUsed?: string | null
+  company?: Record<string, unknown> | null
+  crmContacts?: OrgNetworkContact[]
+  apolloOnlyContacts?: OrgNetworkContact[]
+  counts?: {
+    crm?: number
+    apolloOnly?: number
+    apolloTotal?: number
+  }
+}
+
 const FORENSIC_EASE: any = [0.23, 1, 0.32, 1]
 
 function sendMessage<T = Record<string, unknown>>(type: string, payload?: unknown): Promise<MessageResponse<T>> {
@@ -189,6 +223,123 @@ function accountPhone(account: MatchAccount | null) {
       (account as any)?.phone_number ||
       ''
   ) || ''
+}
+
+function sanitizeOrgContact(raw: any): OrgNetworkContact | null {
+  if (!raw || typeof raw !== 'object') return null
+  const id = trimText(raw.id || raw.crmId || '')
+  if (!id) return null
+  const phones = Array.isArray(raw.phones)
+    ? raw.phones.map((item: unknown) => trimText(item)).filter(Boolean)
+    : []
+  return {
+    id,
+    crmId: trimText(raw.crmId || '') || null,
+    name: trimText(raw.name || 'Contact') || 'Contact',
+    firstName: trimText(raw.firstName || raw.first_name || '') || null,
+    lastName: trimText(raw.lastName || raw.last_name || '') || null,
+    title: trimText(raw.title || '') || null,
+    email: trimText(raw.email || '') || null,
+    linkedin: trimText(raw.linkedin || raw.linkedinUrl || '') || null,
+    location: trimText(raw.location || [raw.city, raw.state].filter(Boolean).join(', ')) || null,
+    photoUrl: trimText(raw.photoUrl || raw.photo_url || '') || null,
+    phone: trimText(raw.phone || '') || null,
+    mobile: trimText(raw.mobile || '') || null,
+    workPhone: trimText(raw.workPhone || '') || null,
+    companyPhone: trimText(raw.companyPhone || '') || null,
+    otherPhone: trimText(raw.otherPhone || '') || null,
+    directPhone: trimText(raw.directPhone || '') || null,
+    phones,
+    isMonitored: Boolean(raw.isMonitored),
+    source: raw.source === 'apollo' ? 'apollo' : 'crm',
+  }
+}
+
+function normalizeCrmMatchContact(raw: MatchContact): OrgNetworkContact {
+  return {
+    id: trimText(raw.id),
+    crmId: trimText(raw.id) || null,
+    name: trimText(raw.name || 'Contact') || 'Contact',
+    firstName: null,
+    lastName: null,
+    title: trimText(raw.title || '') || null,
+    email: trimText(raw.email || '') || null,
+    linkedin: null,
+    location: trimText([raw.city, raw.state].filter(Boolean).join(', ')) || null,
+    photoUrl: resolveContactPhoto(raw),
+    phone: trimText(raw.phone || '') || null,
+    mobile: trimText(raw.mobile || '') || null,
+    workPhone: trimText(raw.workPhone || '') || null,
+    companyPhone: trimText(raw.companyPhone || '') || null,
+    otherPhone: trimText(raw.otherPhone || '') || null,
+    directPhone: trimText(raw.directPhone || '') || null,
+    phones: [
+      trimText(raw.mobile || ''),
+      trimText(raw.workPhone || ''),
+      trimText(raw.phone || ''),
+      trimText(raw.companyPhone || ''),
+      trimText(raw.otherPhone || ''),
+      trimText(raw.directPhone || ''),
+    ].filter(Boolean),
+    isMonitored: true,
+    source: 'crm',
+  }
+}
+
+function mergedContacts(primary: OrgNetworkContact[], secondary: OrgNetworkContact[]) {
+  const byId = new Map<string, OrgNetworkContact>()
+  ;[...primary, ...secondary].forEach((contact) => {
+    const key = trimText(contact.crmId || contact.id || '')
+    if (!key) return
+    const existing = byId.get(key)
+    if (!existing) {
+      byId.set(key, contact)
+      return
+    }
+    byId.set(key, {
+      ...existing,
+      ...contact,
+      phones: Array.from(new Set([...(existing.phones || []), ...(contact.phones || [])])).filter(Boolean),
+      source: 'crm',
+      isMonitored: true,
+      photoUrl: contact.photoUrl || existing.photoUrl || null,
+    })
+  })
+  return Array.from(byId.values())
+}
+
+function networkPhone(contact: OrgNetworkContact | null | undefined) {
+  if (!contact) return ''
+  const fallback = Array.isArray(contact.phones) && contact.phones.length > 0 ? contact.phones[0] : ''
+  return trimText(
+    contact.phone ||
+      contact.mobile ||
+      contact.workPhone ||
+      contact.companyPhone ||
+      contact.otherPhone ||
+      contact.directPhone ||
+      fallback ||
+      ''
+  )
+}
+
+function networkMatchesQuery(contact: OrgNetworkContact, query: string) {
+  const q = trimText(query).toLowerCase()
+  if (!q) return true
+  const text = [
+    contact.name,
+    contact.firstName || '',
+    contact.lastName || '',
+    contact.title || '',
+    contact.email || '',
+    contact.linkedin || '',
+    contact.location || '',
+    ...(Array.isArray(contact.phones) ? contact.phones : []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+  return text.includes(q)
 }
 
 function useCallDuration(startedAt: string | null) {
@@ -362,6 +513,21 @@ function App() {
   const [initStuckMs, setInitStuckMs] = useState(0)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
   const [currentView, setCurrentView] = useState<'main' | 'settings'>('main')
+  const [networkView, setNetworkView] = useState<'crm' | 'apollo'>('crm')
+  const [networkQuery, setNetworkQuery] = useState('')
+  const [orgContactsLoading, setOrgContactsLoading] = useState(false)
+  const [orgContacts, setOrgContacts] = useState<{
+    cacheKeyUsed: string | null
+    crmContacts: OrgNetworkContact[]
+    apolloOnlyContacts: OrgNetworkContact[]
+    counts: { crm: number; apolloOnly: number; apolloTotal: number }
+  }>({
+    cacheKeyUsed: null,
+    crmContacts: [],
+    apolloOnlyContacts: [],
+    counts: { crm: 0, apolloOnly: 0, apolloTotal: 0 },
+  })
+  const [orgLoadedAccountId, setOrgLoadedAccountId] = useState<string | null>(null)
   const autoCaptureRan = useRef(false)
   const initStuckTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -494,6 +660,57 @@ function App() {
     chrome.tabs.create({ url: origin })
   }
 
+  const loadOrgContacts = async (options?: { query?: string; force?: boolean }) => {
+    if (!state?.auth || !state?.match?.account?.id) return
+    if (!options?.force && orgContactsLoading) return
+
+    const account = state.match.account
+    const query = trimText(options?.query ?? networkQuery)
+
+    setOrgContactsLoading(true)
+    try {
+      const response = await sendMessage<{ data: OrgContactsPayload }>('GET_ORG_CONTACTS', {
+        accountId: account.id,
+        domain: account.domain || account.website || extractDomain(state.page?.origin || state.page?.url || ''),
+        companyName: account.name,
+        q: query || undefined,
+      })
+
+      const payload = response?.data || {}
+      const crmContacts = Array.isArray(payload.crmContacts)
+        ? payload.crmContacts.map((item) => sanitizeOrgContact(item)).filter((item): item is OrgNetworkContact => Boolean(item))
+        : []
+      const apolloOnlyContacts = Array.isArray(payload.apolloOnlyContacts)
+        ? payload.apolloOnlyContacts.map((item) => sanitizeOrgContact(item)).filter((item): item is OrgNetworkContact => Boolean(item))
+        : []
+
+      setOrgContacts({
+        cacheKeyUsed: trimText(payload.cacheKeyUsed || '') || null,
+        crmContacts,
+        apolloOnlyContacts,
+        counts: {
+          crm: Number(payload.counts?.crm || crmContacts.length) || crmContacts.length,
+          apolloOnly: Number(payload.counts?.apolloOnly || apolloOnlyContacts.length) || apolloOnlyContacts.length,
+          apolloTotal: Number(payload.counts?.apolloTotal || crmContacts.length + apolloOnlyContacts.length) || (crmContacts.length + apolloOnlyContacts.length),
+        },
+      })
+      setOrgLoadedAccountId(account.id)
+    } catch (err) {
+      setError((err as Error).message || 'Failed to load org contacts')
+    } finally {
+      setOrgContactsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    const accountId = trimText(state?.match?.account?.id || '')
+    if (!state?.auth || !accountId) return
+    if (orgLoadedAccountId === accountId) return
+    setNetworkView('crm')
+    setNetworkQuery('')
+    void loadOrgContacts({ force: true, query: '' })
+  }, [state?.auth?.accessToken, state?.match?.account?.id, orgLoadedAccountId])
+
   if (!state) return null
 
   const { auth, page, pageStatus, match, call, accountContacts, notes } = state
@@ -541,7 +758,12 @@ function App() {
   const isTruncated = summaryToDisplay.length > MAX_SUMMARY && !descriptionExpanded
   const finalSummary = isTruncated ? `${summaryToDisplay.slice(0, MAX_SUMMARY).trimEnd()}…` : summaryToDisplay
   const allContacts = accountContacts.length > 0 ? accountContacts : match?.contacts || []
-  const visibleContacts = allContacts.slice(0, 5)
+  const crmContactsFromMatch = allContacts.map((contact) => normalizeCrmMatchContact(contact))
+  const mergedCrmContacts = mergedContacts(crmContactsFromMatch, orgContacts.crmContacts)
+  const filteredCrmContacts = mergedCrmContacts.filter((contact) => networkMatchesQuery(contact, networkQuery))
+  const filteredApolloContacts = orgContacts.apolloOnlyContacts.filter((contact) => networkMatchesQuery(contact, networkQuery))
+  const networkContacts = networkView === 'apollo' ? filteredApolloContacts : filteredCrmContacts
+  const visibleContacts = networkContacts.slice(0, 5)
   const accountLogoUrl = trimText(
     (account as any)?.logoUrl ||
       (account as any)?.logo_url ||
@@ -923,22 +1145,74 @@ function App() {
               >
                 <div className="np-section-head">
                   <div className="np-kicker font-mono">03 // NETWORK</div>
-                  <span className="np-micro font-mono">{allContacts.length} nodes</span>
+                  <span className="np-micro font-mono">
+                    {networkView === 'apollo' ? `${filteredApolloContacts.length} apollo` : `${filteredCrmContacts.length} crm`}
+                  </span>
                 </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <button
+                    type="button"
+                    className={`np-button-forensic ${networkView === 'crm' ? 'text-white' : 'text-zinc-500'}`}
+                    style={{ flex: 1, borderColor: networkView === 'crm' ? 'rgba(0, 47, 167, 0.5)' : undefined }}
+                    onClick={() => setNetworkView('crm')}
+                  >
+                    CRM ({filteredCrmContacts.length})
+                  </button>
+                  <button
+                    type="button"
+                    className={`np-button-forensic ${networkView === 'apollo' ? 'text-white' : 'text-zinc-500'}`}
+                    style={{ flex: 1, borderColor: networkView === 'apollo' ? 'rgba(0, 47, 167, 0.5)' : undefined }}
+                    onClick={() => setNetworkView('apollo')}
+                  >
+                    Apollo ({filteredApolloContacts.length})
+                  </button>
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                  <input
+                    className="nodal-input"
+                    placeholder={networkView === 'apollo' ? 'Search Apollo cache...' : 'Search CRM contacts...'}
+                    value={networkQuery}
+                    onChange={(e) => setNetworkQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        void loadOrgContacts({ query: networkQuery, force: true })
+                      }
+                    }}
+                    style={{ flex: 1, height: 34 }}
+                  />
+                  <button
+                    type="button"
+                    className="np-button-forensic"
+                    disabled={orgContactsLoading}
+                    onClick={() => void loadOrgContacts({ query: networkQuery, force: true })}
+                  >
+                    {orgContactsLoading ? '...' : 'Refresh'}
+                  </button>
+                </div>
+                {orgContacts.cacheKeyUsed ? (
+                  <div className="np-micro font-mono" style={{ marginBottom: 8, opacity: 0.55 }}>
+                    cache: {orgContacts.cacheKeyUsed}
+                  </div>
+                ) : null}
                 <div className="np-contact-list">
                   {visibleContacts.map((c) => (
-                    <div key={c.id} className="np-contact-entry" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <div key={`${c.crmId || c.id}-${c.source}`} className="np-contact-entry" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div className="np-contact-info" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <ContactAvatar name={c.name} photoUrl={resolveContactPhoto(c)} size={32} />
+                        <ContactAvatar name={c.name} photoUrl={c.photoUrl || null} size={32} />
                         <div className="np-contact-copy">
                           <div className="text-sm font-semibold text-white">{c.name}</div>
-                          <div className="text-[10px] text-zinc-500 uppercase">{c.title || 'Executive'}</div>
+                          <div className="text-[10px] text-zinc-500 uppercase" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span>{c.title || 'Executive'}</span>
+                            {c.source === 'apollo' ? (
+                              <span style={{ border: '1px solid rgba(0, 47, 167, 0.35)', borderRadius: 999, padding: '1px 6px', color: '#93c5fd' }}>APOLLO</span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
-                      {contactPhone(c) && (
+                      {networkPhone(c) && (
                         <button
                           className="np-button-forensic text-zinc-400 hover:text-white"
-                          onClick={() => void runAction('dial', () => dialCall(contactPhone(c) || '', c.id, c.accountId || undefined))}
+                          onClick={() => void runAction('dial', () => dialCall(networkPhone(c) || '', c.crmId || undefined, account?.id || undefined))}
                           disabled={busy === 'dial'}
                         >
                           <Phone size={14} />
@@ -946,6 +1220,11 @@ function App() {
                       )}
                     </div>
                   ))}
+                  {visibleContacts.length === 0 ? (
+                    <p className="np-micro text-center py-2 opacity-40">
+                      {networkView === 'apollo' ? 'No Apollo cached contacts found for this search.' : 'No CRM contacts found for this search.'}
+                    </p>
+                  ) : null}
                 </div>
               </motion.section>
             </>
