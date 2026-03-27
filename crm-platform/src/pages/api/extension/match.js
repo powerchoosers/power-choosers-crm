@@ -266,45 +266,55 @@ export default async function handler(req, res) {
         for (const row of accountRows) {
           const normalized = normalizeAccountRow(row)
           if (!normalized) continue
+
           const accountDomainHost = extractDomain(normalized.domain)
           const accountWebsiteHost = extractDomain(normalized.website)
-          const rowTokens = [
-            normalized.name,
-            normalized.domain,
-            normalized.industry,
-            normalized.city,
-            normalized.state,
-            normalized.website,
-          ]
+          
           let score = scoreText(normalized.name, tokens, 12)
           score += scoreText(normalized.domain, tokens, 10)
           score += scoreText(normalized.industry, tokens, 7)
           score += scoreText(normalized.city, tokens, 6)
           score += scoreText(normalized.state, tokens, 6)
-          if (domain && hostMatches(domain, normalized.domain)) score += 140
-          if (domain && hostMatches(domain, normalized.website)) score += 120
+
+          const isDomainMatch = domain && (hostMatches(domain, normalized.domain) || hostMatches(domain, normalized.website))
+          
+          if (isDomainMatch) {
+            // MASSIVE boost for exact domain/host match — this should almost always win
+            score += 500
+          }
+
+          // Exact name match boost
+          const cleanRowName = normalized.name.toLowerCase().trim()
+          const cleanCompanyGuess = companyGuess.toLowerCase().trim()
+          const cleanPageTitle = title.toLowerCase().trim()
+
+          if (cleanRowName === cleanCompanyGuess || cleanRowName === cleanPageTitle) {
+            score += 200
+          } else if (cleanRowName.includes(cleanCompanyGuess) || cleanPageTitle.includes(cleanRowName)) {
+            score += 40
+          }
+
           if (domain && accountDomainHost) {
             const domainTokens = tokenizeSearchText(domain.replace(/\./g, ' '), 4)
             score += scoreText(accountDomainHost, domainTokens, 18)
             score += scoreText(accountWebsiteHost, domainTokens, 12)
           }
-          if (phones.some((phone) => normalizeDigits(normalized.phone) === phone)) score += 90
-          if (title && scoreText(normalized.name, tokenizeSearchText(title, 6), 12) > 0) score += 18
+
+          if (phones.some((phone) => normalizeDigits(normalized.phone) === phone)) score += 150
+          
+          // Punish very short name matches that are just subsets (e.g. "Texas" matching "North Central Texas College")
+          // if we already have a better match. But for now, we rely on the 500pt domain boost.
 
           normalized.score = score
-          normalized.reason =
-            domain && hostMatches(domain, normalized.domain)
-              ? `Domain match: ${extractDomain(normalized.domain) || domain}`
-              : domain && hostMatches(domain, normalized.website)
-                ? `Website match: ${extractDomain(normalized.website) || domain}`
-                : phones.some((phone) => normalizeDigits(normalized.phone) === phone)
-                  ? `Phone match: ${normalized.phone}`
-                  : `Matched from CRM data`
+          normalized.reason = isDomainMatch
+              ? `Direct Domain Match: ${domain}`
+              : phones.some((phone) => normalizeDigits(normalized.phone) === phone)
+                ? `Phone match: ${normalized.phone}`
+                : `Matched from CRM data`
 
           accountMap.set(normalized.id, normalized)
         }
       }
-    }
 
     const accountIdsForContacts = unique(
       Array.from(accountMap.values())
