@@ -255,7 +255,7 @@ export default async function handler(req, res) {
         .from('accounts')
         .select('id, name, domain, phone, website, city, state, industry, logo_url, description, metadata')
         .or(unique(accountClauses).join(','))
-        .limit(100)
+        .limit(300)
 
       accountQuery = applyLegacyOwnershipScope(accountQuery, auth.user, auth.isAdmin)
 
@@ -279,8 +279,8 @@ export default async function handler(req, res) {
           const isDomainMatch = domain && (hostMatches(domain, normalized.domain) || hostMatches(domain, normalized.website))
           
           if (isDomainMatch) {
-            // MASSIVE boost for exact domain/host match — this should almost always win
-            score += 500
+            // ULTIMATE boost for direct domain/host match — forensic priority
+            score += 10000
           }
 
           // Exact name match boost
@@ -304,6 +304,7 @@ export default async function handler(req, res) {
           }
 
           if (phones.some((phone) => normalizeDigits(normalized.phone) === phone)) score += 150
+          if (domain && normalized.domain && normalized.domain.includes(domain)) score += 5000
           
           // Punish very short name matches that are just subsets (e.g. "Texas" matching "North Central Texas College")
           // if we already have a better match. But for now, we rely on the 500pt domain boost.

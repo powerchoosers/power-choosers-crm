@@ -1349,7 +1349,7 @@ async function handleTwilioEvent(payload: any) {
       draft.call.state = 'incoming'
       draft.call.deviceReady = true
       draft.call.activeCallSid = callSid || draft.call.activeCallSid
-      draft.call.startedAt = draft.call.startedAt || nowIso()
+      draft.call.startedAt = null
       draft.call.durationSec = 0
       draft.call.incomingFrom = from || draft.call.incomingFrom
       draft.call.incomingDisplay = incomingDisplay || from || draft.call.incomingDisplay
@@ -1388,7 +1388,7 @@ async function handleTwilioEvent(payload: any) {
       draft.call.state = 'dialing'
       draft.call.deviceReady = true
       draft.call.activeCallSid = callSid || draft.call.activeCallSid
-      draft.call.startedAt = draft.call.startedAt || nowIso()
+      draft.call.startedAt = null
       draft.call.lineStatus = 'dialing'
       draft.call.lastError = null
       draft.call.incomingFrom = from || draft.call.incomingFrom
