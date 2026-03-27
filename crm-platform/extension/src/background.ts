@@ -535,64 +535,42 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   mark.style.alignItems = 'center'
   mark.style.justifyContent = 'center'
 
-  const overlay = document.createElement('div')
-  overlay.style.position = 'absolute'
-  overlay.style.right = '-2px'
-  overlay.style.bottom = '-2px'
-  overlay.style.width = '14px'
-  overlay.style.height = '14px'
-  overlay.style.borderRadius = '999px'
-  overlay.style.display = 'flex'
-  overlay.style.alignItems = 'center'
-  overlay.style.justifyContent = 'center'
-  overlay.style.background = payload.mode === 'ingest' ? 'rgba(15, 23, 42, 0.95)' : 'rgba(255,255,255,0.12)'
-  overlay.style.border = payload.mode === 'ingest' ? '1px solid rgba(250, 204, 21, 0.6)' : '1px solid rgba(255,255,255,0.18)'
-  overlay.style.color = payload.mode === 'ingest' ? '#facc15' : '#ffffff'
-  overlay.style.fontSize = '11px'
-  overlay.style.lineHeight = '1'
-  overlay.style.fontWeight = '700'
-  overlay.textContent = '+'
-
-  const grip = document.createElement('div')
-  grip.style.position = 'absolute'
-  grip.style.right = '-2px'
-  grip.style.bottom = '-2px'
-  grip.style.width = '14px'
-  grip.style.height = '14px'
-  grip.style.borderRadius = '999px'
-  grip.style.display = 'grid'
-  grip.style.gridTemplateColumns = 'repeat(2, 3px)'
-  grip.style.gap = '2px'
-  grip.style.alignContent = 'center'
-  grip.style.justifyContent = 'center'
-  grip.style.background = 'rgba(255,255,255,0.1)'
-  grip.style.border = '1px solid rgba(255,255,255,0.18)'
-  grip.style.opacity = '0.95'
-  for (let i = 0; i < 4; i++) {
-    const dot = document.createElement('div')
-    dot.style.width = '3px'
-    dot.style.height = '3px'
-    dot.style.borderRadius = '50%'
-    dot.style.background = '#fff'
-    grip.appendChild(dot)
-  }
-
   mark.appendChild(icon)
-  mark.appendChild(payload.mode === 'ingest' ? overlay : grip)
+  if (payload.mode === 'ingest') {
+    const overlay = document.createElement('div')
+    overlay.style.position = 'absolute'
+    overlay.style.right = '-2px'
+    overlay.style.bottom = '-2px'
+    overlay.style.width = '14px'
+    overlay.style.height = '14px'
+    overlay.style.borderRadius = '999px'
+    overlay.style.display = 'flex'
+    overlay.style.alignItems = 'center'
+    overlay.style.justifyContent = 'center'
+    overlay.style.background = 'rgba(15, 23, 42, 0.95)'
+    overlay.style.border = '1px solid rgba(250, 204, 21, 0.6)'
+    overlay.style.color = '#facc15'
+    overlay.style.fontSize = '11px'
+    overlay.style.lineHeight = '1'
+    overlay.style.fontWeight = '700'
+    overlay.style.transition = 'transform 0.2s ease'
+    overlay.textContent = '+'
+    mark.appendChild(overlay)
+  }
 
   host.appendChild(mark)
 
   host.addEventListener('mouseenter', () => {
     host.style.background = '#00268a'
     host.style.paddingRight = '12px'
-    overlay.style.transform = 'scale(1.04)'
-    grip.style.transform = 'scale(1.04)'
+    const overlay = mark.querySelector('div:last-child') as HTMLElement | null
+    if (overlay) overlay.style.transform = 'scale(1.04)'
   })
   host.addEventListener('mouseleave', () => {
     host.style.background = 'rgba(0, 47, 167, 0.96)'
     host.style.paddingRight = '12px'
-    overlay.style.transform = 'scale(1)'
-    grip.style.transform = 'scale(1)'
+    const overlay = mark.querySelector('div:last-child') as HTMLElement | null
+    if (overlay) overlay.style.transform = 'scale(1)'
   })
 
   host.addEventListener('click', (e) => {
@@ -699,29 +677,28 @@ async function matchPageAgainstCrm(snapshot: PageSnapshot) {
 }
 
 async function syncPageBadge(tabId: number | null | undefined, match: MatchResult | null, snapshot?: PageSnapshot | null) {
-  if (!tabId || !match?.account?.id) {
+  if (!tabId) {
+    return
+  }
+
+  if (match?.account?.id) {
     try {
-      if (tabId) {
-        await chrome.scripting.executeScript({
-          target: { tabId },
-          func: renderPageBadge,
-          args: [
-            snapshot && snapshot.url ? {
-              mode: 'ingest',
-              accountName: snapshot.title || extractDomain(snapshot.url) || 'Unknown page',
-              accountId: null,
-              domain: snapshot.origin || snapshot.url || null,
-              contactCount: 0,
-              label: 'Add to CRM',
-            } : null,
-          ],
-        })
-      }
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: renderPageBadge,
+        args: [null],
+      })
     } catch (error) {
       console.warn('[Extension] Page badge clear failed:', error)
     }
     return
   }
+
+  if (!snapshot?.url) return
+
+  const account = match?.account
+  if (!account) return
+  const contacts = Array.isArray(match.contacts) ? match.contacts : []
 
   try {
     await chrome.scripting.executeScript({
@@ -730,10 +707,10 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
       args: [
         {
           mode: 'matched',
-          accountName: match.account.name,
-          accountId: match.account.id,
-          domain: match.account.domain || match.account.website || null,
-          contactCount: Array.isArray(match.contacts) ? match.contacts.length : 0,
+          accountName: account.name,
+          accountId: account.id,
+          domain: account.domain || account.website || null,
+          contactCount: contacts.length,
           label: 'Open CRM',
         },
       ],
