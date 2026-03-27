@@ -51,6 +51,7 @@ type PageBadgePayload = {
 }
 
 const INGEST_BLOCKED_DOMAINS = ['google.com']
+const CONTEXT_BLOCKED_DOMAINS = ['nodalpoint.io']
 
 let state: ExtensionState = defaultState()
 let latestBodyText = ''
@@ -67,6 +68,12 @@ function isBlockedIngestDomain(value: string | null | undefined) {
   const host = extractDomain(value || '')
   if (!host) return false
   return INGEST_BLOCKED_DOMAINS.some((blocked) => host === blocked || host.endsWith(`.${blocked}`))
+}
+
+function isBlockedContextDomain(value: string | null | undefined) {
+  const host = extractDomain(value || '')
+  if (!host) return false
+  return CONTEXT_BLOCKED_DOMAINS.some((blocked) => host === blocked || host.endsWith(`.${blocked}`))
 }
 
 function cloneState() {
@@ -784,6 +791,24 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
     return
   }
 
+  let tabUrl = ''
+  try {
+    const tab = await chrome.tabs.get(tabId)
+    tabUrl = trimText(tab?.url || '')
+  } catch {
+    tabUrl = ''
+  }
+  if (isBlockedContextDomain(tabUrl)) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: renderPageBadge,
+        args: [null],
+      })
+    } catch {}
+    return
+  }
+
   if (match?.account?.id) {
     const account = match.account
     const contacts = Array.isArray(match.contacts) ? match.contacts : []
@@ -851,6 +876,13 @@ async function captureAndMatch(windowId?: number | null) {
 
   try {
     const { tab, snapshot, screenshot } = await captureActiveTab(windowId)
+    if (isBlockedContextDomain(snapshot.origin || snapshot.url)) {
+      await setState((draft) => {
+        draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+      })
+      await syncPageBadge(tab?.id || null, null, snapshot)
+      throw new Error('Capture is blocked on nodalpoint.io pages to keep your existing context stable.')
+    }
     await setState((draft) => {
       draft.page = snapshot
       draft.match = null
@@ -881,6 +913,9 @@ async function handleIngestPageAccount(windowId?: number | null) {
 
   try {
     const { tab, snapshot } = await captureActiveTab(windowId)
+    if (isBlockedContextDomain(snapshot.origin || snapshot.url)) {
+      throw new Error('Ingest is disabled on nodalpoint.io pages.')
+    }
     if (isBlockedIngestDomain(snapshot.origin || snapshot.url)) {
       throw new Error('Ingest is disabled on google.com pages.')
     }
@@ -936,10 +971,6 @@ function scheduleActiveTabCapture(windowId?: number | null) {
     clearTimeout(activeTabCaptureTimer)
   }
 
-  void setState((draft) => {
-    draft.pageStatus = 'capturing'
-  })
-
   activeTabCaptureTimer = setTimeout(() => {
     void (async () => {
       await hydrateState()
@@ -949,6 +980,16 @@ function scheduleActiveTabCapture(windowId?: number | null) {
         const query = windowId != null ? { active: true, windowId } : { active: true, currentWindow: true }
         const [tab] = await chrome.tabs.query(query)
         if (!tab?.url || !isCaptureableTabUrl(tab.url)) return
+        if (isBlockedContextDomain(tab.url)) {
+          await syncPageBadge(tab.id || null, null, null)
+          await setState((draft) => {
+            draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+          })
+          return
+        }
+        await setState((draft) => {
+          draft.pageStatus = 'capturing'
+        })
         if (trimText(state.page?.url || '') === trimText(tab.url)) {
           await syncPageBadge(tab.id || null, state.match, state.page)
           await setState((draft) => {
