@@ -217,20 +217,20 @@ a {
 .np-read-more {
   background: none;
   border: none;
-  color: var(--np-blue);
-  font-size: 11px;
+  color: var(--np-muted);
+  font-size: 10px;
   font-weight: 600;
   cursor: pointer;
   padding: 0;
   margin-left: 6px;
   font-family: var(--font-sans);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.08em;
   transition: color 0.2s;
 }
 
 .np-read-more:hover {
-  color: #3b82f6;
+  color: #fff;
 }
 
 .np-card--hero {
@@ -347,7 +347,8 @@ a {
 .np-kicker {
   font-size: 10px;
   letter-spacing: 0.3em;
-  color: var(--np-blue);
+  color: var(--np-muted);
+  opacity: 0.7;
   margin-bottom: 2px;
 }
 
@@ -802,4 +803,120 @@ a {
 .np-button-forensic:hover {
   color: var(--np-blue);
   transform: scale(1.1);
+}
+
+/* Active Call Footer */
+.np-call-footer {
+  position: fixed;
+  bottom: 12px;
+  left: 12px;
+  right: 12px;
+  height: 54px;
+  background: rgba(9, 9, 11, 0.95);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 14px;
+  z-index: 100;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.np-call-footer__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.np-call-footer__copy {
+  min-width: 0;
+}
+
+.np-call-footer__name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin: 0;
+}
+
+.np-call-footer__meta {
+  font-size: 9px;
+  color: var(--np-dim);
+  text-transform: lowercase;
+  margin-top: 1px;
+}
+
+.np-call-footer__stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+}
+
+.np-call-footer__duration {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: var(--np-success);
+  letter-spacing: 0.1em;
+  min-width: 42px;
+}
+
+.np-call-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.np-call-footer__btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.np-call-footer__btn--hangup {
+  background: #f43f5e;
+  color: #fff;
+}
+
+.np-call-footer__btn--hangup:hover {
+  background: #e11d48;
+  transform: scale(1.05);
+}
+
+.np-call-footer__btn--dialpad {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--np-muted);
+}
+
+.np-call-footer__btn--dialpad:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.np-call-bars {
+  display: flex;
+  align-items: center;
+  gap: 1.5px;
+  height: 12px;
+  opacity: 0.6;
+}
+
+.np-call-bar {
+  width: 1.5px;
+  background: var(--np-success);
+  border-radius: 99px;
 }
