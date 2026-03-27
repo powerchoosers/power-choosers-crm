@@ -137,7 +137,7 @@ function collectPageTerms(snapshot, bodyText) {
     snapshot?.description,
     ...(Array.isArray(snapshot?.headings) ? snapshot.headings.slice(0, 5) : []),
     bodyText,
-    extractDomain(snapshot?.url || snapshot?.origin || '')?.replace(/\./g, ' '),
+    extractDomain(snapshot?.url || snapshot?.origin || '')?.split('.').join(' '),
   ]
 
   return tokenizeSearchText(pieces.filter(Boolean).join(' '), 12)
@@ -235,9 +235,10 @@ export default async function handler(req, res) {
 
     const accountClauses = []
     if (domain) {
-    accountClauses.push(`domain.eq.${domain}`)
-    accountClauses.push(`website.ilike.%${domain}%`)
-  }
+      accountClauses.push(`domain.eq.${domain}`)
+      accountClauses.push(`domain.ilike.%${domain}%`)
+      accountClauses.push(`website.ilike.%${domain}%`)
+    }
     for (const token of tokens.slice(0, 4)) {
       accountClauses.push(`name.ilike.%${token}%`)
       accountClauses.push(`domain.ilike.%${token}%`)
@@ -254,7 +255,7 @@ export default async function handler(req, res) {
         .from('accounts')
         .select('id, name, domain, phone, website, city, state, industry, logo_url, description, metadata')
         .or(unique(accountClauses).join(','))
-        .limit(25)
+        .limit(100)
 
       accountQuery = applyLegacyOwnershipScope(accountQuery, auth.user, auth.isAdmin)
 
