@@ -14,6 +14,7 @@ import {
   normalizeOrigin,
   normalizeTwilioPhone,
   resolveCallerId,
+  resolveContactPhotoUrl,
   trimText,
   type ExtensionState,
   type MatchResult,
@@ -614,6 +615,7 @@ function normalizeMatchContact(raw: any): MatchResult['contact'] {
     accountName: trimText(raw.accountName || raw.accounts?.name) || null,
     accountDomain: trimText(raw.accountDomain || raw.accounts?.domain) || null,
     name,
+    photoUrl: trimText(resolveContactPhotoUrl(raw, raw.metadata)) || null,
     email: trimText(raw.email) || null,
     title: trimText(raw.title) || null,
     phone: trimText(raw.phone) || null,
@@ -682,23 +684,30 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
   }
 
   if (match?.account?.id) {
+    const account = match.account
+    const contacts = Array.isArray(match.contacts) ? match.contacts : []
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
         func: renderPageBadge,
-        args: [null],
+        args: [
+          {
+            mode: 'matched',
+            accountName: account.name,
+            accountId: account.id,
+            domain: account.domain || account.website || null,
+            contactCount: contacts.length,
+            label: 'Open CRM',
+          },
+        ],
       })
     } catch (error) {
-      console.warn('[Extension] Page badge clear failed:', error)
+      console.warn('[Extension] Page badge inject failed:', error)
     }
     return
   }
 
   if (!snapshot?.url) return
-
-  const account = match?.account
-  if (!account) return
-  const contacts = Array.isArray(match.contacts) ? match.contacts : []
 
   try {
     await chrome.scripting.executeScript({
@@ -706,12 +715,12 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
       func: renderPageBadge,
       args: [
         {
-          mode: 'matched',
-          accountName: account.name,
-          accountId: account.id,
-          domain: account.domain || account.website || null,
-          contactCount: contacts.length,
-          label: 'Open CRM',
+          mode: 'ingest',
+          accountName: snapshot.title || extractDomain(snapshot.url) || 'Unknown page',
+          accountId: null,
+          domain: snapshot.origin || snapshot.url || null,
+          contactCount: 0,
+          label: 'Add to CRM',
         },
       ],
     })
@@ -725,6 +734,10 @@ async function captureAndMatch(windowId?: number | null) {
     throw new Error('Connect your Nodal Point session before capturing CRM records.')
   }
 
+  await setState((draft) => {
+    draft.pageStatus = 'capturing'
+  })
+
   const { tab, snapshot, screenshot } = await captureActiveTab(windowId)
   await setState((draft) => {
     draft.page = snapshot
@@ -732,6 +745,9 @@ async function captureAndMatch(windowId?: number | null) {
     draft.accountContacts = []
   })
   const match = await matchPageAgainstCrm(snapshot)
+  await setState((draft) => {
+    draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
+  })
   await syncPageBadge(tab?.id || null, match, snapshot)
   return { snapshot, screenshot, match }
 }
@@ -740,6 +756,10 @@ async function handleIngestPageAccount(windowId?: number | null) {
   if (!state.auth?.accessToken) {
     throw new Error('Connect your Nodal Point session before ingesting an account.')
   }
+
+  await setState((draft) => {
+    draft.pageStatus = 'ingesting'
+  })
 
   const { tab, snapshot } = await captureActiveTab(windowId)
   await setState((draft) => {
@@ -762,6 +782,9 @@ async function handleIngestPageAccount(windowId?: number | null) {
   )
 
   const match = await matchPageAgainstCrm(snapshot)
+  await setState((draft) => {
+    draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
+  })
   await syncPageBadge(tab?.id || null, match, snapshot)
 
   return {
@@ -784,6 +807,10 @@ function scheduleActiveTabCapture(windowId?: number | null) {
   if (activeTabCaptureTimer !== null) {
     clearTimeout(activeTabCaptureTimer)
   }
+
+  void setState((draft) => {
+    draft.pageStatus = 'capturing'
+  })
 
   activeTabCaptureTimer = setTimeout(() => {
     void (async () => {
@@ -1061,6 +1088,7 @@ async function handleAuthClear() {
   await setState((draft) => {
     draft.auth = null
     draft.page = null
+    draft.pageStatus = 'idle'
     draft.match = null
     draft.accountContacts = []
     draft.call = defaultCallState()
