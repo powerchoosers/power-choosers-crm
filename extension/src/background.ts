@@ -1816,6 +1816,35 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
     void handleOpenSidePanel(sender).then(sendResponse)
     return true
   }
+  // Keep ingest on the same user gesture: open panel immediately, then ingest in background.
+  if (message?.type === 'INGEST_PAGE_ACCOUNT') {
+    void (async () => {
+      let opened = false
+      try {
+        const openResult = await handleOpenSidePanel(sender)
+        opened = Boolean(openResult?.ok)
+      } catch (error) {
+        console.warn('[Extension] Failed to open side panel before ingest:', error)
+      }
+
+      try {
+        await hydrateState()
+        await setState((draft) => {
+          draft.pageStatus = 'ingesting'
+        })
+        const result = await handleIngestPageAccount(sender?.tab?.windowId)
+        sendResponse({ ...result, opened })
+      } catch (error) {
+        sendResponse({
+          ok: false,
+          opened,
+          error: trimText((error as Error)?.message || 'Ingest failed'),
+          state: cloneState(),
+        })
+      }
+    })()
+    return true
+  }
 
   void (async () => {
     await hydrateState()
@@ -1838,15 +1867,6 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           return
         case 'CAPTURE_AND_MATCH':
           sendResponse(await handlePageMatchRequest())
-          return
-        case 'INGEST_PAGE_ACCOUNT':
-          {
-            const result = await handleIngestPageAccount(sender?.tab?.windowId)
-            await handleOpenSidePanel(sender).catch((error) => {
-              console.warn('[Extension] Failed to open side panel after ingest:', error)
-            })
-            sendResponse({ ...result, opened: true })
-          }
           return
         case 'ENABLE_CALLS':
           sendResponse(await handleEnableCalls(message.payload))
