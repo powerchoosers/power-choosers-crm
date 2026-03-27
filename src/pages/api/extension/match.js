@@ -91,6 +91,23 @@ function hostMatches(pageDomain, candidateValue) {
   )
 }
 
+function normalizeCompanyName(value) {
+  const text = trimText(value).toLowerCase()
+  if (!text) return ''
+  return text
+    .replace(/&/g, ' and ')
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\b(inc|llc|ltd|lp|corp|corporation|co|company|plc|holdings?)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function isExactCompanyNameMatch(left, right) {
+  const a = normalizeCompanyName(left)
+  const b = normalizeCompanyName(right)
+  return Boolean(a && b && a === b)
+}
+
 function resolveAppOrigin(req, payloadOrigin) {
   const explicit = normalizeOrigin(payloadOrigin)
   if (explicit && !explicit.startsWith('chrome-extension://')) {
@@ -289,8 +306,11 @@ export default async function handler(req, res) {
           const cleanRowName = normalized.name.toLowerCase().trim()
           const cleanCompanyGuess = companyGuess.toLowerCase().trim()
           const cleanPageTitle = title.toLowerCase().trim()
+          const isExactNameMatch =
+            isExactCompanyNameMatch(normalized.name, companyGuess) ||
+            isExactCompanyNameMatch(normalized.name, title)
 
-          if (cleanRowName === cleanCompanyGuess || cleanRowName === cleanPageTitle) {
+          if (isExactNameMatch || cleanRowName === cleanCompanyGuess || cleanRowName === cleanPageTitle) {
             score += 500
           } else if ((cleanRowName.includes(cleanCompanyGuess) && cleanRowName.length < cleanCompanyGuess.length + 10) || 
                      (cleanCompanyGuess.includes(cleanRowName) && cleanCompanyGuess.length < cleanRowName.length + 10)) {
@@ -313,7 +333,9 @@ export default async function handler(req, res) {
 
           normalized.score = score
           normalized.reason = isDomainMatch
-              ? `Direct Domain Match: ${domain}`
+            ? `Exact domain match: ${domain}`
+            : isExactNameMatch
+              ? `Exact company name match: ${normalized.name}`
               : phones.some((phone) => normalizeDigits(normalized.phone) === phone)
                 ? `Phone match: ${normalized.phone}`
                 : `Matched from CRM data`
@@ -454,28 +476,46 @@ export default async function handler(req, res) {
     const accounts = Array.from(accountMap.values()).sort((a, b) => b.score - a.score)
     const contacts = Array.from(contactMap.values()).sort((a, b) => b.score - a.score)
     const bestAccount = accounts[0] || null
-    const bestContact = contacts[0] || null
 
-    // Final selection logic: Prioritize the highest-confidence match between account and contact data
-    let finalAccount = bestAccount
-    if (bestContact?.id && contactAccountMap.has(bestContact.id)) {
-      const contactAccount = contactAccountMap.get(bestContact.id)
-      const contactAccountScore = bestContact.score
-      const standaloneAccountScore = bestAccount?.score || 0
+    const exactDomainAccount = domain
+      ? accounts.find((account) => hostMatches(domain, account.domain) || hostMatches(domain, account.website))
+      : null
+    const exactNameAccount = accounts.find(
+      (account) =>
+        isExactCompanyNameMatch(companyGuess, account.name) || isExactCompanyNameMatch(title, account.name)
+    ) || null
 
-      // Only switch to the contact's account if its match confidence is higher than the standalone account score
-      if (contactAccount && contactAccountScore > standaloneAccountScore) {
-        finalAccount = contactAccount
+    // Hard gate: only return an account when we have a precise signal (domain/name/phone).
+    let finalAccount = exactDomainAccount || exactNameAccount || null
+    if (!finalAccount && bestAccount?.reason?.startsWith('Phone match:')) {
+      finalAccount = bestAccount
+    }
+    if (!finalAccount && !domain && bestAccount && bestAccount.score >= 140) {
+      finalAccount = bestAccount
+    }
+
+    let finalContact = null
+    if (contacts.length > 0) {
+      if (finalAccount?.id) {
+        finalContact =
+          contacts.find((contact) => contact.accountId && contact.accountId === finalAccount.id) ||
+          contacts.find((contact) => domain && hostMatches(domain, contact.accountDomain)) ||
+          null
+      } else {
+        const domainContact = contacts.find((contact) => domain && hostMatches(domain, contact.accountDomain)) || null
+        finalContact = domainContact
       }
     }
 
     let summary = 'No strong CRM match found yet.'
-    if (finalAccount && bestContact && finalAccount.id === bestContact.accountId) {
-      summary = `Matched ${bestContact.name} to ${finalAccount.name}.`
+    if (finalAccount && finalContact && finalAccount.id === finalContact.accountId) {
+      summary = `Matched ${finalContact.name} to ${finalAccount.name}.`
     } else if (finalAccount) {
       summary = `Matched the page to ${finalAccount.name}.`
-    } else if (bestContact) {
-      summary = `Matched the page to ${bestContact.name}.`
+    } else if (finalContact) {
+      summary = `Matched the page to ${finalContact.name}.`
+    } else if (domain) {
+      summary = `No exact CRM match found for ${domain}.`
     }
 
     if (phones.length > 0 && summaryParts.length > 0) {
@@ -485,7 +525,7 @@ export default async function handler(req, res) {
     res.status(200).json({
       success: true,
       account: finalAccount,
-      contact: bestContact,
+      contact: finalContact,
       accounts,
       contacts,
       summary,
