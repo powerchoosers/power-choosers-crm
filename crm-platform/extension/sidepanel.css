@@ -891,6 +891,20 @@ a {
   box-shadow: 0 0 15px rgba(244, 63, 94, 0.2);
 }
 
+.np-call-footer__btn--answer {
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #34d399;
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.18);
+}
+
+.np-call-footer__btn--answer:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: rgba(16, 185, 129, 0.5);
+  color: #6ee7b7;
+  transform: scale(1.12);
+}
+
 .np-call-footer__btn--hangup:hover {
   background: rgba(244, 63, 94, 0.25);
   border-color: rgba(244, 63, 94, 0.5);
