@@ -505,8 +505,8 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.display = 'flex'
   host.style.alignItems = 'center'
   host.style.justifyContent = 'center'
-  host.style.paddingLeft = '12px'
-  host.style.paddingRight = '12px'
+  host.style.paddingLeft = '8px'
+  host.style.paddingRight = '8px'
   host.style.height = '48px'
   host.style.marginRight = '0'
   host.style.borderTopLeftRadius = '14px'
@@ -535,7 +535,7 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   mark.style.display = 'flex'
   mark.style.alignItems = 'center'
   mark.style.justifyContent = 'center'
-  mark.style.gap = '10px'
+  mark.style.gap = '0'
   mark.style.paddingRight = '0'
   let plusOverlay: HTMLDivElement | null = null
 
@@ -589,7 +589,9 @@ function renderPageBadge(payload: PageBadgePayload | null) {
 
   host.addEventListener('mouseenter', () => {
     host.style.background = '#00268a'
-    host.style.paddingRight = '16px'
+    host.style.paddingLeft = '8px'
+    host.style.paddingRight = '8px'
+    mark.style.gap = '10px'
     grip.style.width = '20px'
     grip.style.opacity = '1'
     grip.style.marginLeft = '2px'
@@ -599,7 +601,9 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   })
   host.addEventListener('mouseleave', () => {
     host.style.background = 'rgba(0, 47, 167, 0.96)'
-    host.style.paddingRight = '12px'
+    host.style.paddingLeft = '8px'
+    host.style.paddingRight = '8px'
+    mark.style.gap = '0'
     grip.style.width = '0'
     grip.style.opacity = '0'
     grip.style.marginLeft = '0'
@@ -772,18 +776,25 @@ async function captureAndMatch(windowId?: number | null) {
     draft.pageStatus = 'capturing'
   })
 
-  const { tab, snapshot, screenshot } = await captureActiveTab(windowId)
-  await setState((draft) => {
-    draft.page = snapshot
-    draft.match = null
-    draft.accountContacts = []
-  })
-  const match = await matchPageAgainstCrm(snapshot)
-  await setState((draft) => {
-    draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
-  })
-  await syncPageBadge(tab?.id || null, match, snapshot)
-  return { snapshot, screenshot, match }
+  try {
+    const { tab, snapshot, screenshot } = await captureActiveTab(windowId)
+    await setState((draft) => {
+      draft.page = snapshot
+      draft.match = null
+      draft.accountContacts = []
+    })
+    const match = await matchPageAgainstCrm(snapshot)
+    await setState((draft) => {
+      draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
+    })
+    await syncPageBadge(tab?.id || null, match, snapshot)
+    return { snapshot, screenshot, match }
+  } catch (error) {
+    await setState((draft) => {
+      draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+    })
+    throw error
+  }
 }
 
 async function handleIngestPageAccount(windowId?: number | null) {
@@ -795,38 +806,45 @@ async function handleIngestPageAccount(windowId?: number | null) {
     draft.pageStatus = 'ingesting'
   })
 
-  const { tab, snapshot } = await captureActiveTab(windowId)
-  await setState((draft) => {
-    draft.page = snapshot
-    draft.match = null
-    draft.accountContacts = []
-  })
+  try {
+    const { tab, snapshot } = await captureActiveTab(windowId)
+    await setState((draft) => {
+      draft.page = snapshot
+      draft.match = null
+      draft.accountContacts = []
+    })
 
-  const data = await fetchAuthedJson(
-    '/api/extension/ingest-account',
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        snapshot,
-        bodyText: latestBodyText,
-        appOrigin: state.auth.appOrigin || snapshot.origin || DEFAULT_APP_ORIGIN,
-      }),
-    },
-    snapshot.origin
-  )
+    const data = await fetchAuthedJson(
+      '/api/extension/ingest-account',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          snapshot,
+          bodyText: latestBodyText,
+          appOrigin: state.auth.appOrigin || snapshot.origin || DEFAULT_APP_ORIGIN,
+        }),
+      },
+      snapshot.origin
+    )
 
-  const match = await matchPageAgainstCrm(snapshot)
-  await setState((draft) => {
-    draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
-  })
-  await syncPageBadge(tab?.id || null, match, snapshot)
+    const match = await matchPageAgainstCrm(snapshot)
+    await setState((draft) => {
+      draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
+    })
+    await syncPageBadge(tab?.id || null, match, snapshot)
 
-  return {
-    ok: true,
-    account: data?.account || null,
-    existing: Boolean(data?.existing),
-    match,
-    state: cloneState(),
+    return {
+      ok: true,
+      account: data?.account || null,
+      existing: Boolean(data?.existing),
+      match,
+      state: cloneState(),
+    }
+  } catch (error) {
+    await setState((draft) => {
+      draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+    })
+    throw error
   }
 }
 
@@ -854,14 +872,20 @@ function scheduleActiveTabCapture(windowId?: number | null) {
       try {
         const query = windowId != null ? { active: true, windowId } : { active: true, currentWindow: true }
         const [tab] = await chrome.tabs.query(query)
-      if (!tab?.url || !isCaptureableTabUrl(tab.url)) return
+        if (!tab?.url || !isCaptureableTabUrl(tab.url)) return
         if (trimText(state.page?.url || '') === trimText(tab.url)) {
           await syncPageBadge(tab.id || null, state.match, state.page)
+          await setState((draft) => {
+            draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+          })
           return
         }
         await captureAndMatch(windowId)
       } catch (error) {
         console.warn('[Extension] Auto capture after tab change failed:', error)
+        await setState((draft) => {
+          draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+        })
       }
     })()
   }, 800)
