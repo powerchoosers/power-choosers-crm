@@ -60,6 +60,10 @@ type OrgContactsPayload = {
 }
 
 const FORENSIC_EASE: any = [0.23, 1, 0.32, 1]
+const NETWORK_LABELS = {
+  crm: 'CRM',
+  apollo: 'ORG_INTELLIGENCE',
+} as const
 
 function sendMessage<T = Record<string, unknown>>(type: string, payload?: unknown): Promise<MessageResponse<T>> {
   return new Promise((resolve, reject) => {
@@ -764,6 +768,7 @@ function App() {
   const filteredApolloContacts = orgContacts.apolloOnlyContacts.filter((contact) => networkMatchesQuery(contact, networkQuery))
   const networkContacts = networkView === 'apollo' ? filteredApolloContacts : filteredCrmContacts
   const visibleContacts = networkContacts.slice(0, 5)
+  const activeNetworkLabel = NETWORK_LABELS[networkView]
   const accountLogoUrl = trimText(
     (account as any)?.logoUrl ||
       (account as any)?.logo_url ||
@@ -788,8 +793,8 @@ function App() {
         ? 'Scanning page...'
         : 'Identifying session context...'
   const syncBody =
-    loadingMode === 'ingest'
-      ? 'Creating the account in CRM and enriching it with Apollo.'
+      loadingMode === 'ingest'
+      ? 'Creating the account in CRM and enriching it with ORG_INTELLIGENCE.'
       : loadingMode === 'capture'
         ? 'Reading the active tab before matching it to CRM.'
         : 'Loading the Nodal Point command deck...'
@@ -1146,31 +1151,64 @@ function App() {
                 <div className="np-section-head">
                   <div className="np-kicker font-mono">03 // NETWORK</div>
                   <span className="np-micro font-mono">
-                    {networkView === 'apollo' ? `${filteredApolloContacts.length} apollo` : `${filteredCrmContacts.length} crm`}
+                    {networkView === 'apollo'
+                      ? `${filteredApolloContacts.length} ${activeNetworkLabel}`
+                      : `${filteredCrmContacts.length} ${activeNetworkLabel}`}
                   </span>
                 </div>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                    gap: 6,
+                    marginBottom: 10,
+                    padding: 4,
+                    border: '1px solid rgba(255,255,255,0.05)',
+                    borderRadius: 16,
+                    background: 'rgba(255,255,255,0.02)',
+                  }}
+                >
                   <button
                     type="button"
-                    className={`np-button-forensic ${networkView === 'crm' ? 'text-white' : 'text-zinc-500'}`}
-                    style={{ flex: 1, borderColor: networkView === 'crm' ? 'rgba(0, 47, 167, 0.5)' : undefined }}
+                    className={`np-button-forensic relative overflow-hidden ${networkView === 'crm' ? 'text-white' : 'text-zinc-500'}`}
+                    style={{ minHeight: 38, borderColor: networkView === 'crm' ? 'rgba(0, 47, 167, 0.35)' : 'rgba(255,255,255,0.04)' }}
                     onClick={() => setNetworkView('crm')}
                   >
-                    CRM ({filteredCrmContacts.length})
+                    {networkView === 'crm' ? (
+                      <motion.span
+                        layoutId="network-tab-pill"
+                        className="absolute inset-0 rounded-[12px] border border-[#002FA7]/35 bg-[#002FA7]/12 shadow-[0_0_0_1px_rgba(0,47,167,0.08)]"
+                        transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.7 }}
+                      />
+                    ) : null}
+                    <span className="relative z-10 flex items-center justify-between gap-3 w-full text-[10px] uppercase tracking-[0.18em]">
+                      <span>CRM</span>
+                      <span className="tabular-nums text-[9px] text-zinc-400">{filteredCrmContacts.length}</span>
+                    </span>
                   </button>
                   <button
                     type="button"
-                    className={`np-button-forensic ${networkView === 'apollo' ? 'text-white' : 'text-zinc-500'}`}
-                    style={{ flex: 1, borderColor: networkView === 'apollo' ? 'rgba(0, 47, 167, 0.5)' : undefined }}
+                    className={`np-button-forensic relative overflow-hidden ${networkView === 'apollo' ? 'text-white' : 'text-zinc-500'}`}
+                    style={{ minHeight: 38, borderColor: networkView === 'apollo' ? 'rgba(0, 47, 167, 0.35)' : 'rgba(255,255,255,0.04)' }}
                     onClick={() => setNetworkView('apollo')}
                   >
-                    Apollo ({filteredApolloContacts.length})
+                    {networkView === 'apollo' ? (
+                      <motion.span
+                        layoutId="network-tab-pill"
+                        className="absolute inset-0 rounded-[12px] border border-[#002FA7]/35 bg-[#002FA7]/12 shadow-[0_0_0_1px_rgba(0,47,167,0.08)]"
+                        transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.7 }}
+                      />
+                    ) : null}
+                    <span className="relative z-10 flex items-center justify-between gap-3 w-full text-[10px] uppercase tracking-[0.18em]">
+                      <span>ORG_INTELLIGENCE</span>
+                      <span className="tabular-nums text-[9px] text-zinc-400">{filteredApolloContacts.length}</span>
+                    </span>
                   </button>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                   <input
                     className="nodal-input"
-                    placeholder={networkView === 'apollo' ? 'Search Apollo cache...' : 'Search CRM contacts...'}
+                    placeholder={networkView === 'apollo' ? 'Search ORG_INTELLIGENCE cache...' : 'Search CRM contacts...'}
                     value={networkQuery}
                     onChange={(e) => setNetworkQuery(e.target.value)}
                     onKeyDown={(e) => {
@@ -1194,38 +1232,90 @@ function App() {
                     cache: {orgContacts.cacheKeyUsed}
                   </div>
                 ) : null}
-                <div className="np-contact-list">
-                  {visibleContacts.map((c) => (
-                    <div key={`${c.crmId || c.id}-${c.source}`} className="np-contact-entry" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                      <div className="np-contact-info" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <ContactAvatar name={c.name} photoUrl={c.photoUrl || null} size={32} />
-                        <div className="np-contact-copy">
-                          <div className="text-sm font-semibold text-white">{c.name}</div>
-                          <div className="text-[10px] text-zinc-500 uppercase" style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                            <span>{c.title || 'Executive'}</span>
-                            {c.source === 'apollo' ? (
-                              <span style={{ border: '1px solid rgba(0, 47, 167, 0.35)', borderRadius: 999, padding: '1px 6px', color: '#93c5fd' }}>APOLLO</span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-                      {networkPhone(c) && (
-                        <button
-                          className="np-button-forensic text-zinc-400 hover:text-white"
-                          onClick={() => void runAction('dial', () => dialCall(networkPhone(c) || '', c.crmId || undefined, account?.id || undefined))}
-                          disabled={busy === 'dial'}
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={networkView}
+                    initial={{ opacity: 0, x: networkView === 'apollo' ? 14 : -14 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: networkView === 'apollo' ? -14 : 14 }}
+                    transition={{ duration: 0.22, ease: FORENSIC_EASE }}
+                  >
+                    <div className="np-contact-list">
+                      {visibleContacts.map((c) => (
+                        <motion.div
+                          key={`${c.crmId || c.id}-${c.source}`}
+                          layout
+                          initial={{ opacity: 0, scale: 0.98, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.98, y: -10 }}
+                          transition={{ type: 'spring', stiffness: 400, damping: 30, layout: { duration: 0.3 } }}
+                          className="flex flex-col p-2.5 rounded-xl transition-all border border-white/5 hover:border-white/10 hover:bg-zinc-950/40 space-y-2"
+                          style={{
+                            background: c.crmId ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.02)',
+                            borderColor: c.crmId ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.04)',
+                          }}
                         >
-                          <Phone size={14} />
-                        </button>
-                      )}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                              <ContactAvatar
+                                name={c.name}
+                                photoUrl={c.photoUrl || null}
+                                size={36}
+                                className="w-9 h-9 rounded-[10px]"
+                                textClassName="text-[10px]"
+                              />
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
+                                  <span className="text-[11px] font-semibold text-zinc-200 truncate transition-colors">
+                                    {c.name}
+                                  </span>
+                                  {c.crmId ? <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" aria-label="Synced" /> : null}
+                                </div>
+                                <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
+                                  {c.title || 'Nodal Analyst'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                              <span
+                                className="text-[8px] font-mono uppercase tracking-[0.18em] rounded-full px-2 py-1"
+                                style={{
+                                  border: c.source === 'apollo' ? '1px solid rgba(0, 47, 167, 0.35)' : '1px solid rgba(34, 197, 94, 0.22)',
+                                  color: c.source === 'apollo' ? '#93c5fd' : '#86efac',
+                                  background: c.source === 'apollo' ? 'rgba(0, 47, 167, 0.08)' : 'rgba(34, 197, 94, 0.05)',
+                                }}
+                              >
+                                {c.source === 'apollo' ? 'ORG_INTELLIGENCE' : 'CRM'}
+                              </span>
+                              {networkPhone(c) ? (
+                                <button
+                                  className="np-button-forensic text-zinc-400 hover:text-white"
+                                  onClick={() => void runAction('dial', () => dialCall(networkPhone(c) || '', c.crmId || undefined, account?.id || undefined))}
+                                  disabled={busy === 'dial'}
+                                >
+                                  <Phone size={14} />
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {(c.phone || c.mobile || c.workPhone || c.companyPhone || c.otherPhone || c.directPhone) ? (
+                            <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
+                              <Phone className="w-2.5 h-2.5" />
+                              {formatPhone(networkPhone(c)) || 'No direct line'}
+                            </div>
+                          ) : null}
+                        </motion.div>
+                      ))}
+                      {visibleContacts.length === 0 ? (
+                        <p className="np-micro text-center py-2 opacity-40">
+                          {networkView === 'apollo' ? 'No ORG_INTELLIGENCE cached contacts found for this search.' : 'No CRM contacts found for this search.'}
+                        </p>
+                      ) : null}
                     </div>
-                  ))}
-                  {visibleContacts.length === 0 ? (
-                    <p className="np-micro text-center py-2 opacity-40">
-                      {networkView === 'apollo' ? 'No Apollo cached contacts found for this search.' : 'No CRM contacts found for this search.'}
-                    </p>
-                  ) : null}
-                </div>
+                  </motion.div>
+                </AnimatePresence>
               </motion.section>
             </>
           ) : auth && pageStatus === 'unmatched' ? (
@@ -1250,7 +1340,7 @@ function App() {
 
                 <div className="np-summary-box-card" style={{ marginTop: 16 }}>
                   <p className="np-copy--tight font-sans leading-relaxed text-zinc-300">
-                    Click the plus badge or ingest button to create the account in CRM and enrich it with Apollo.
+                    Click the plus badge or ingest button to create the account in CRM and enrich it with ORG_INTELLIGENCE.
                   </p>
                 </div>
 
