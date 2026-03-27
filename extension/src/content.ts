@@ -108,6 +108,14 @@ function scheduleSync() {
       sendAuthState()
     }
   })
+
+  // Listen for CRM settings changes
+  window.addEventListener('nodal-point-settings-updated', (event: any) => {
+    console.log('[Content] Settings change detected from page event:', event.detail)
+    chrome.runtime.sendMessage({ type: 'PROFILE_REFRESH' }, () => {
+      void chrome.runtime.lastError
+    })
+  })
 }
 
 if (document.readyState === 'loading') {
