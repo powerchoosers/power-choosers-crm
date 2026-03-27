@@ -224,7 +224,7 @@ function ActiveCallFooter({
   onHangup: () => void;
   onDigits: (d: string) => void;
 }) {
-  const duration = useCallDuration(state.call.startedAt)
+  useCallDuration(state.call.startedAt)
   const [showDialpad, setShowDialpad] = useState(false)
   const name = state.match?.contact?.name || state.match?.account?.name || state.call.incomingFrom || "Active Session"
   const meta = state.match?.account?.name && state.match.contact ? `via ${state.match.account.name}` : state.call.incomingFrom ? "Incoming Call" : "Voice Uplink"
@@ -246,7 +246,7 @@ function ActiveCallFooter({
       </div>
 
       <div className="np-call-footer__stats">
-        <span className="np-call-footer__duration font-mono">{formatElapsed(duration)}</span>
+        <span className="np-call-footer__duration font-mono">{formatElapsed(state.call.startedAt)}</span>
       </div>
 
       <div className="np-call-footer__actions">
@@ -261,21 +261,35 @@ function ActiveCallFooter({
           <AnimatePresence>
             {showDialpad && (
               <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                animate={{ opacity: 1, y: -210, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                className="absolute right-0 bg-zinc-950/90 backdrop-blur-xl border border-white/10 rounded-xl p-3 grid grid-cols-3 gap-1 shadow-2xl w-40"
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                className="np-dialpad-panel"
               >
-                {['1','2','3','4','5','6','7','8','9','*','0','#'].map(d => (
-                  <button
-                    key={d}
-                    onClick={() => onDigits(d)}
-                    className="h-10 text-xs font-mono rounded-lg hover:bg-white/10 flex items-center justify-center border border-white/5"
-                  >
-                    {d}
-                  </button>
-                ))}
-              </motion.div>
+                {[
+                      { digit: '1', letters: '' },
+                      { digit: '2', letters: 'ABC' },
+                      { digit: '3', letters: 'DEF' },
+                      { digit: '4', letters: 'GHI' },
+                      { digit: '5', letters: 'JKL' },
+                      { digit: '6', letters: 'MNO' },
+                      { digit: '7', letters: 'PQRS' },
+                      { digit: '8', letters: 'TUV' },
+                      { digit: '9', letters: 'WXYZ' },
+                      { digit: '*', letters: '' },
+                      { digit: '0', letters: '+' },
+                      { digit: '#', letters: '' },
+                    ].map(item => (
+                      <button
+                        key={item.digit}
+                        onClick={() => onDigits(item.digit)}
+                        className="np-dialpad-key"
+                      >
+                        <span className="np-dialpad-digit">{item.digit}</span>
+                        {item.letters && <span className="np-dialpad-letters">{item.letters}</span>}
+                      </button>
+                    ))}
+                  </motion.div>
             )}
           </AnimatePresence>
         </div>
@@ -657,7 +671,6 @@ function App() {
                           if (!outboundTarget) return
                           void runAction('dial', () => dialCall(outboundTarget, contact?.id, account?.id))
                         }}
-                        disabled={busy === 'dial'}
                       >
                         <div className="np-uplink-primary__row">
                           <div style={{ position: 'relative', flexShrink: 0 }}>
@@ -667,11 +680,9 @@ function App() {
                           <div className="min-w-0 flex-1">
                             <span className="np-uplink-primary__label">Corporate Phone</span>
                             <span className="np-uplink-primary__value">
-                              {busy === 'dial'
-                                ? 'Connecting...'
-                                : outboundTarget
-                                  ? formatPhone(outboundTarget) || outboundTarget
-                                  : 'No matched phone found'}
+                              {outboundTarget
+                                ? formatPhone(outboundTarget) || outboundTarget
+                                : 'No matched phone found'}
                             </span>
                           </div>
                           <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: 'rgba(255,255,255,0.5)', marginLeft: 'auto' }} />
@@ -729,31 +740,7 @@ function App() {
                         </div>
                       </div>
 
-                      {call.state === 'incoming' && (
-                        <button className="np-button np-button--success np-button--full" onClick={() => void runAction('answer', answerCall)}>
-                          Answer Incoming
-                        </button>
-                      )}
-
-                      {callIsLive && (
-                        <div className="np-live-controls">
-                          <div className="np-live-stats font-mono">
-                            {formatElapsed(call.startedAt)}
-                          </div>
-                          <div className="np-live-actions">
-                            <button
-                              className={`np-button np-button--sm ${call.muted ? 'np-button--amber' : 'np-button--ghost'}`}
-                              onClick={() => void muteCall(!call.muted)}
-                            >
-                              {call.muted ? 'Unmute' : 'Mute'}
-                            </button>
-                            <button className="np-button np-button--sm np-button--danger" onClick={() => void runAction('hangup', hangupCall)}>
-                              Hangup
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
 
                     {!selectedNumber ? (
                       <div className="np-alert-card">

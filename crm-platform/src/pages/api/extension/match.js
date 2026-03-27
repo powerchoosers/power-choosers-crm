@@ -289,7 +289,10 @@ export default async function handler(req, res) {
           const cleanPageTitle = title.toLowerCase().trim()
 
           if (cleanRowName === cleanCompanyGuess || cleanRowName === cleanPageTitle) {
-            score += 200
+            score += 500
+          } else if ((cleanRowName.includes(cleanCompanyGuess) && cleanRowName.length < cleanCompanyGuess.length + 10) || 
+                     (cleanCompanyGuess.includes(cleanRowName) && cleanCompanyGuess.length < cleanRowName.length + 10)) {
+            score += 150
           } else if (cleanRowName.includes(cleanCompanyGuess) || cleanPageTitle.includes(cleanRowName)) {
             score += 40
           }
@@ -315,6 +318,7 @@ export default async function handler(req, res) {
           accountMap.set(normalized.id, normalized)
         }
       }
+    }
 
     const accountIdsForContacts = unique(
       Array.from(accountMap.values())
@@ -436,11 +440,24 @@ export default async function handler(req, res) {
     const bestAccount = accounts[0] || null
     const bestContact = contacts[0] || null
 
+    // Final selection logic: Prioritize the highest-confidence match between account and contact data
+    let finalAccount = bestAccount
+    if (bestContact?.id && contactAccountMap.has(bestContact.id)) {
+      const contactAccount = contactAccountMap.get(bestContact.id)
+      const contactAccountScore = bestContact.score
+      const standaloneAccountScore = bestAccount?.score || 0
+
+      // Only switch to the contact's account if its match confidence is higher than the standalone account score
+      if (contactAccount && contactAccountScore > standaloneAccountScore) {
+        finalAccount = contactAccount
+      }
+    }
+
     let summary = 'No strong CRM match found yet.'
-    if (bestAccount && bestContact) {
-      summary = `Matched ${bestContact.name} to ${bestAccount.name}.`
-    } else if (bestAccount) {
-      summary = `Matched the page to ${bestAccount.name}.`
+    if (finalAccount && bestContact && finalAccount.id === bestContact.accountId) {
+      summary = `Matched ${bestContact.name} to ${finalAccount.name}.`
+    } else if (finalAccount) {
+      summary = `Matched the page to ${finalAccount.name}.`
     } else if (bestContact) {
       summary = `Matched the page to ${bestContact.name}.`
     }
@@ -451,7 +468,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
-      account: bestAccount,
+      account: finalAccount,
       contact: bestContact,
       accounts,
       contacts,
