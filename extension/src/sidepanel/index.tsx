@@ -227,7 +227,7 @@ function ActiveCallFooter({
   useCallDuration(state.call.startedAt)
   const [showDialpad, setShowDialpad] = useState(false)
   const name = state.match?.contact?.name || state.match?.account?.name || state.call.incomingFrom || "Active Session"
-  const meta = state.match?.account?.name && state.match.contact ? `via ${state.match.account.name}` : state.call.incomingFrom ? "Incoming Call" : "Voice Uplink"
+  const meta = state.match?.account?.name && state.match.contact ? `via ${state.match.account.name}` : (state.call.state === 'incoming' ? "Incoming Call" : "Voice Uplink")
 
   return (
     <motion.div
