@@ -50,6 +50,8 @@ type PageBadgePayload = {
   label: string
 }
 
+const INGEST_BLOCKED_DOMAINS = ['google.com']
+
 let state: ExtensionState = defaultState()
 let latestBodyText = ''
 let latestScreenshot: string | null = null
@@ -59,6 +61,12 @@ let lastTwilioRecoveryAt = 0
 
 function nowIso() {
   return new Date().toISOString()
+}
+
+function isBlockedIngestDomain(value: string | null | undefined) {
+  const host = extractDomain(value || '')
+  if (!host) return false
+  return INGEST_BLOCKED_DOMAINS.some((blocked) => host === blocked || host.endsWith(`.${blocked}`))
 }
 
 function cloneState() {
@@ -491,6 +499,17 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   root.style.right = '0'
   root.style.zIndex = '2147483647'
   root.style.pointerEvents = 'auto'
+  root.style.touchAction = 'none'
+
+  let storedTop = 120
+  try {
+    const saved = window.localStorage.getItem('__nodal_point_badge_top')
+    const parsed = Number(saved)
+    if (Number.isFinite(parsed)) {
+      storedTop = Math.max(72, Math.min(window.innerHeight - 64, parsed))
+    }
+  } catch {}
+  root.style.top = `${storedTop}px`
 
   const host = document.createElement('button')
   host.type = 'button'
@@ -520,6 +539,8 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   host.style.cursor = 'pointer'
   host.style.position = 'relative'
   host.style.overflow = 'hidden'
+  host.style.borderRadius = '14px 0 0 14px'
+  host.style.clipPath = 'inset(0 round 14px 0 0 14px)'
   host.style.transition = 'background 0.2s ease, padding 0.2s ease'
 
   const icon = document.createElement('img')
@@ -537,9 +558,15 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   mark.style.justifyContent = 'center'
   mark.style.gap = '0'
   mark.style.paddingRight = '0'
+
+  const iconWrap = document.createElement('div')
+  iconWrap.style.position = 'relative'
+  iconWrap.style.display = 'flex'
+  iconWrap.style.alignItems = 'center'
+  iconWrap.style.justifyContent = 'center'
   let plusOverlay: HTMLDivElement | null = null
 
-  mark.appendChild(icon)
+  iconWrap.appendChild(icon)
   if (payload.mode === 'ingest') {
     plusOverlay = document.createElement('div')
     plusOverlay.style.position = 'absolute'
@@ -559,8 +586,9 @@ function renderPageBadge(payload: PageBadgePayload | null) {
     plusOverlay.style.fontWeight = '700'
     plusOverlay.style.transition = 'transform 0.2s ease'
     plusOverlay.textContent = '+'
-    mark.appendChild(plusOverlay)
+    iconWrap.appendChild(plusOverlay)
   }
+  mark.appendChild(iconWrap)
 
   const grip = document.createElement('div')
   grip.style.display = 'grid'
@@ -574,7 +602,8 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   grip.style.overflow = 'hidden'
   grip.style.transition = 'width 0.2s ease, opacity 0.2s ease, margin 0.2s ease'
   grip.style.marginLeft = '0'
-  grip.style.pointerEvents = 'none'
+  grip.style.pointerEvents = 'auto'
+  grip.style.cursor = 'ns-resize'
   for (let i = 0; i < 6; i += 1) {
     const dot = document.createElement('div')
     dot.style.width = '3px'
@@ -586,6 +615,39 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   mark.appendChild(grip)
 
   host.appendChild(mark)
+
+  let isDragging = false
+  let dragStartY = 0
+  let dragStartTop = storedTop
+
+  const onDragMove = (event: MouseEvent) => {
+    if (!isDragging) return
+    event.preventDefault()
+    const delta = event.clientY - dragStartY
+    const nextTop = Math.max(72, Math.min(window.innerHeight - 64, dragStartTop + delta))
+    root.style.top = `${nextTop}px`
+  }
+  const onDragEnd = () => {
+    if (!isDragging) return
+    isDragging = false
+    try {
+      const numericTop = Number.parseInt(root.style.top.replace('px', ''), 10)
+      if (Number.isFinite(numericTop)) {
+        window.localStorage.setItem('__nodal_point_badge_top', String(numericTop))
+      }
+    } catch {}
+    window.removeEventListener('mousemove', onDragMove)
+    window.removeEventListener('mouseup', onDragEnd)
+  }
+  grip.addEventListener('mousedown', (event) => {
+    event.preventDefault()
+    event.stopPropagation()
+    isDragging = true
+    dragStartY = event.clientY
+    dragStartTop = Number.parseInt(root.style.top.replace('px', ''), 10) || storedTop
+    window.addEventListener('mousemove', onDragMove)
+    window.addEventListener('mouseup', onDragEnd)
+  })
 
   host.addEventListener('mouseenter', () => {
     host.style.background = '#00268a'
@@ -613,6 +675,7 @@ function renderPageBadge(payload: PageBadgePayload | null) {
   })
 
   host.addEventListener('click', (e) => {
+    if (isDragging) return
     e.preventDefault()
     e.stopPropagation()
     chrome.runtime.sendMessage({ type: payload.mode === 'ingest' ? 'INGEST_PAGE_ACCOUNT' : 'OPEN_SIDE_PANEL' }, () => {
@@ -746,6 +809,16 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
   }
 
   if (!snapshot?.url) return
+  if (isBlockedIngestDomain(snapshot.origin || snapshot.url)) {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        func: renderPageBadge,
+        args: [null],
+      })
+    } catch {}
+    return
+  }
 
   try {
     await chrome.scripting.executeScript({
@@ -808,6 +881,9 @@ async function handleIngestPageAccount(windowId?: number | null) {
 
   try {
     const { tab, snapshot } = await captureActiveTab(windowId)
+    if (isBlockedIngestDomain(snapshot.origin || snapshot.url)) {
+      throw new Error('Ingest is disabled on google.com pages.')
+    }
     await setState((draft) => {
       draft.page = snapshot
       draft.match = null
