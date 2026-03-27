@@ -657,44 +657,43 @@ function App() {
             </div>
           ) : null}
 
+
           {match ? (
             <>
               <motion.section 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
+                className="np-card np-card--hero"
               >
-                <div className="np-hero">
-                  <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={48} className="np-entity-mark np-entity-mark--lg" />
-                  <div className="np-hero-content">
-                    <h2 className="np-hero-name nodal-monolith-edge">{heroTitle}</h2>
-                    <div className="np-hero-meta font-mono">{heroSubtitle}</div>
+                <div className="np-hero-identity">
+                  <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={60} className="np-entity-mark np-entity-mark--large" />
+                  <div className="np-hero-copy">
+                    <div className="np-kicker font-mono">ACCOUNT DOSSIER</div>
+                    <h2 className="np-hero-title font-sans">{heroTitle}</h2>
+                    <p className="np-hero-subtitle font-sans">{heroSubtitle}</p>
                   </div>
                 </div>
 
-                <div className="np-action-grid">
-                  {showCallButton && (
-                    <button
-                      className="np-action-card np-void-card border-blue-500/20 bg-blue-500/5 group"
-                      onClick={() => void runAction('dial', () => dialCall(dialTarget, contact?.id, account?.id || undefined))}
-                      disabled={busy === 'dial'}
-                    >
-                      <div className="np-action-icon text-blue-400 group-hover:scale-110 transition-transform">
-                        <Phone size={18} />
-                      </div>
-                      <div className="np-action-label font-mono">Dial Target</div>
-                      <div className="np-action-value font-mono text-blue-200">{dialTarget}</div>
-                    </button>
-                  )}
-                  {accountLocationValue && (
-                    <div className="np-action-card np-void-card">
-                      <div className="np-action-icon text-zinc-500">
-                        <MapPin size={18} />
-                      </div>
-                      <div className="np-action-label font-mono">Location Context</div>
-                      <div className="np-action-value font-sans">{snippet(accountLocationValue, 24)}</div>
-                    </div>
-                  )}
+                {summaryToDisplay && (
+                  <div className="np-summary-box-card" style={{ marginTop: 16 }}>
+                    <p className="np-copy--tight font-sans leading-relaxed text-zinc-300">
+                      {finalSummary}
+                      {summaryToDisplay.length > MAX_SUMMARY && (
+                        <button 
+                          className="np-read-more"
+                          onClick={() => setDescriptionExpanded((prev) => !prev)}
+                        >
+                          {descriptionExpanded ? 'READ LESS' : 'READ MORE'}
+                        </button>
+                      )}
+                    </p>
+                  </div>
+                )}
+
+                <div className="np-dossier-meta font-mono" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--np-border)' }}>
+                  <span className="opacity-60 font-sans">Page context: </span>
+                  {page?.title ? snippet(page.title, 42) : 'No nexus'}
                 </div>
               </motion.section>
 
@@ -712,50 +711,109 @@ function App() {
                       target="_blank"
                       rel="noreferrer"
                       className="np-micro font-mono"
-                      style={{ textDecoration: 'underline' }}
+                      style={{ textDecoration: 'underline', color: 'var(--np-blue)' }}
                     >
-                      CURRENT_DOSSIER
+                      OPEN_CRM
                     </a>
                   )}
                 </div>
-                {summaryToDisplay ? (
-                  <div className="np-summary-box">
-                    <p className="np-copy leading-relaxed text-zinc-300">
-                      {finalSummary}
-                    </p>
-                    {isTruncated && (
-                      <button
-                        className="np-read-more font-mono"
-                        onClick={() => setDescriptionExpanded(true)}
-                      >
-                        READ_MORE
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  <p className="np-micro text-center py-4 opacity-40">No intelligence summary available.</p>
-                )}
 
-                <div className="np-uplink-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '12px' }}>
+                <div className="np-action-grid">
+                  {showCallButton && (
+                    <button
+                      className="np-uplink-primary"
+                      onClick={() => void runAction('dial', () => dialCall(dialTarget || '', contact?.id, account?.id || undefined))}
+                      disabled={busy === 'dial'}
+                    >
+                      <div className="np-uplink-primary__row">
+                        <div className="np-uplink-icon--phone">
+                          <Phone style={{ width: 22, height: 22 }} />
+                          <Star style={{ width: 8, height: 8, fill: '#eab308', color: '#eab308', position: 'absolute', top: -2, right: -2 }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span className="np-uplink-primary__label">DIAL TARGET</span>
+                          <span className="np-uplink-primary__value">{dialTarget}</span>
+                        </div>
+                        <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5 }} />
+                      </div>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    className="np-uplink-row"
+                    onClick={() => {
+                      const domain = trimText((account as any)?.website || account?.domain || '')
+                      if (!domain) return
+                      const normalized = domain.startsWith('http') ? domain : `https://${domain}`
+                      window.open(normalized, '_blank')
+                    }}
+                    disabled={!trimText((account as any)?.website || account?.domain || '')}
+                  >
+                    <div className="np-uplink-row__main">
+                      <Globe style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                      <div className="min-w-0 flex-1">
+                        <span className="np-uplink-row__kicker">DIGITAL DOMAIN</span>
+                        <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain matched'}</span>
+                      </div>
+                      <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                    </div>
+                  </button>
+
+                  {accountLocationValue && (
+                    <button
+                      type="button"
+                      className="np-uplink-row"
+                      onClick={() => {
+                        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(accountLocationValue)}`, '_blank')
+                      }}
+                    >
+                      <div className="np-uplink-row__main">
+                        <MapPin style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                        <div className="min-w-0 flex-1">
+                          <span className="np-uplink-row__kicker">LOCATION CONTEXT</span>
+                          <span className="np-uplink-row__value">{accountLocationValue}</span>
+                        </div>
+                        <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                      </div>
+                    </button>
+                  )}
+
+                  <div className="np-uplink-row np-uplink-row--static">
+                    <div className="np-uplink-row__main">
+                      <Building2 style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                      <div className="min-w-0 flex-1">
+                        <span className="np-uplink-row__kicker">ZONE IDENTIFIER</span>
+                        <span className="np-uplink-row__value" style={{ display: 'flex' }}>
+                          <span className="np-zone-chip" style={zoneStyle}>{accountZone}</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="np-uplink-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '16px' }}>
                   <button 
-                    className="np-void-card border-white/5 bg-zinc-900/40 p-3 hover:bg-zinc-800/60 transition-all group flex items-start justify-between"
-                    onClick={() => account?.id && chrome.tabs.create({ url: `${auth?.appOrigin}/network/accounts/${account.id}/telemetry` })}
+                    className="np-void-card nodal-monolith-edge transition-all group flex items-start justify-between"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px' }}
+                    onClick={() => account?.id && window.open(`${auth?.appOrigin}/network/accounts/${account.id}/telemetry`, '_blank')}
                   >
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-zinc-500">TELEMETRY</span>
-                      <span className="text-xs font-sans text-zinc-200">Protocol Link</span>
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">TELEMETRY</span>
+                      <span className="text-xs font-sans text-zinc-100">Protocol Link</span>
                     </div>
-                    <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
+                    <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
                   </button>
                   <button 
-                    className="np-void-card border-white/5 bg-zinc-900/40 p-3 hover:bg-zinc-800/60 transition-all group flex items-start justify-between"
-                    onClick={() => account?.id && chrome.tabs.create({ url: `${auth?.appOrigin}/network/accounts/${account.id}/infrastructure` })}
+                    className="np-void-card nodal-monolith-edge transition-all group flex items-start justify-between"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px' }}
+                    onClick={() => account?.id && window.open(`${auth?.appOrigin}/network/accounts/${account.id}/infrastructure`, '_blank')}
                   >
                     <div className="flex flex-col gap-1">
-                      <span className="text-[10px] font-mono text-zinc-500">INFRA</span>
-                      <span className="text-xs font-sans text-zinc-200">Grid Context</span>
+                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">INFRA</span>
+                      <span className="text-xs font-sans text-zinc-100">Grid Context</span>
                     </div>
-                    <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
+                    <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
                   </button>
                 </div>
               </motion.section>
@@ -768,41 +826,43 @@ function App() {
               >
                 <div className="np-section-head">
                   <div className="np-kicker font-mono">02 // INTELLIGENCE</div>
-                  <span className="np-micro font-mono">{notes.length} log{notes.length === 1 ? '' : 's'}</span>
+                  <span className="np-micro font-mono">{notes.length} total</span>
                 </div>
-                <div className="np-note-composer">
+
+                <div className="np-note-composer" style={{ marginBottom: 16 }}>
                   <textarea
                     className="nodal-input nodal-input--textarea"
                     placeholder="Log forensic findings..."
                     rows={3}
                     value={noteDraft}
                     onChange={(e) => setNoteDraft(e.target.value)}
+                    style={{ minHeight: '80px', marginBottom: 8 }}
                   />
                   <div className="np-composer-actions">
                     <button
-                      className="np-button np-button--primary"
+                      className="np-button np-button--primary np-button--full"
                       onClick={() => void runAction('save-note', async () => {
                         await saveNote({ note: noteDraft, contactId: contact?.id, accountId: account?.id })
                         setNoteDraft('')
                       })}
                       disabled={!noteDraft.trim() || busy === 'save-note'}
                     >
-                      {busy === 'save-note' ? 'Saving...' : 'Commit Note'}
+                      {busy === 'save-note' ? 'COMMITTING...' : 'COMMIT LOG'}
                     </button>
                   </div>
                 </div>
 
-                <div className="np-note-list">
+                <div className="np-note-list np-scroll" style={{ maxHeight: '200px' }}>
                   {notes.map((note) => (
-                    <div key={note.id} className="np-note-entry font-mono border-white/5 bg-zinc-900/40">
-                      <div className="np-note-meta">
-                        <span className="np-note-source text-zinc-500 uppercase tracking-widest text-[9px]">{note.source === 'ai' ? 'AI_FORENSIC' : 'USER_RECON'}</span>
-                        <span className="np-note-date opacity-40">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <div key={note.id} className="np-note-entry font-mono" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8, padding: 10, borderRadius: 8 }}>
+                      <div className="np-note-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span className="text-[9px] uppercase tracking-tighter" style={{ color: 'var(--np-blue)' }}>{note.source === 'ai' ? 'AI_SYS' : 'USER'}</span>
+                        <span className="text-[9px] opacity-40">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
-                      <p className="np-note-text leading-relaxed text-zinc-300">{note.text}</p>
+                      <p className="text-[11px] leading-relaxed text-zinc-300 m-0">{note.text}</p>
                     </div>
                   ))}
-                  {notes.length === 0 && <p className="np-micro text-center pt-2">No logs captured for this session.</p>}
+                  {notes.length === 0 && <p className="np-micro text-center py-2 opacity-30">No intelligence logs found.</p>}
                 </div>
               </motion.section>
 
@@ -814,35 +874,29 @@ function App() {
               >
                 <div className="np-section-head">
                   <div className="np-kicker font-mono">03 // NETWORK</div>
-                  <span className="np-micro font-mono">{allContacts.length} total</span>
+                  <span className="np-micro font-mono">{allContacts.length} nodes</span>
                 </div>
                 <div className="np-contact-list">
                   {visibleContacts.map((c) => (
-                    <div key={c.id} className="np-contact-entry">
-                      <div className="np-contact-info">
+                    <div key={c.id} className="np-contact-entry" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div className="np-contact-info" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <EntityAvatar name={c.name} imageUrl={resolveContactPhoto(c)} size={32} className="np-entity-mark np-entity-mark--sm" />
                         <div className="np-contact-copy">
-                          <div className="np-contact-name">{c.name}</div>
-                          <div className="np-micro">{c.title || 'Executive'}</div>
+                          <div className="text-sm font-semibold text-white">{c.name}</div>
+                          <div className="text-[10px] text-zinc-500 uppercase">{c.title || 'Executive'}</div>
                         </div>
                       </div>
                       {contactPhone(c) && (
                         <button
-                          className="np-button np-button--sm np-button--ghost"
-                          onClick={() => void runAction('dial', () => dialCall(contactPhone(c), c.id, c.accountId || undefined))}
+                          className="np-button-forensic text-zinc-400 hover:text-white"
+                          onClick={() => void runAction('dial', () => dialCall(contactPhone(c) || '', c.id, c.accountId || undefined))}
                           disabled={busy === 'dial'}
                         >
-                          Call
+                          <Phone size={14} />
                         </button>
                       )}
                     </div>
                   ))}
-                  {allContacts.length === 0 && <p className="np-micro text-center pt-2">No contact records found.</p>}
-                  {hasMoreContacts && (
-                    <button className="np-button np-button--xs np-button--full np-button--ghost" style={{ marginTop: 8 }}>
-                      View all {allContacts.length} contacts
-                    </button>
-                  )}
                 </div>
               </motion.section>
             </>
