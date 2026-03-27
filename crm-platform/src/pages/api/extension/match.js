@@ -61,6 +61,8 @@ function normalizeContactRow(row, score = 0, reason = 'Matched from CRM data') {
     mobile: trimText(row.mobile) || null,
     workPhone: trimText(row.workPhone) || null,
     companyPhone: trimText(row.companyPhone) || null,
+    otherPhone: trimText(row.otherPhone) || null,
+    directPhone: trimText(row.directPhone) || null,
     city: trimText(row.city) || null,
     state: trimText(row.state) || null,
     score: Number(score) || 0,
@@ -406,6 +408,9 @@ export default async function handler(req, res) {
         if (normalized.phone && phones.includes(normalizeDigits(normalized.phone).slice(-10))) score += 85
         if (normalized.mobile && phones.includes(normalizeDigits(normalized.mobile).slice(-10))) score += 80
         if (normalized.workPhone && phones.includes(normalizeDigits(normalized.workPhone).slice(-10))) score += 80
+        if (normalized.companyPhone && phones.includes(normalizeDigits(normalized.companyPhone).slice(-10))) score += 80
+        if (normalized.otherPhone && phones.includes(normalizeDigits(normalized.otherPhone).slice(-10))) score += 75
+        if (normalized.directPhone && phones.includes(normalizeDigits(normalized.directPhone).slice(-10))) score += 85
 
         normalized.score = score
         normalized.reason =
@@ -413,6 +418,16 @@ export default async function handler(req, res) {
             ? `Email match: ${normalized.email}`
             : normalized.phone && phones.includes(normalizeDigits(normalized.phone).slice(-10))
               ? `Phone match: ${normalized.phone}`
+              : normalized.mobile && phones.includes(normalizeDigits(normalized.mobile).slice(-10))
+                ? `Mobile match: ${normalized.mobile}`
+                : normalized.workPhone && phones.includes(normalizeDigits(normalized.workPhone).slice(-10))
+                  ? `Work phone match: ${normalized.workPhone}`
+                  : normalized.companyPhone && phones.includes(normalizeDigits(normalized.companyPhone).slice(-10))
+                    ? `Company phone match: ${normalized.companyPhone}`
+                    : normalized.otherPhone && phones.includes(normalizeDigits(normalized.otherPhone).slice(-10))
+                      ? `Other phone match: ${normalized.otherPhone}`
+                      : normalized.directPhone && phones.includes(normalizeDigits(normalized.directPhone).slice(-10))
+                        ? `Direct phone match: ${normalized.directPhone}`
               : domain && hostMatches(domain, normalized.accountDomain)
                 ? `Account domain match: ${extractDomain(normalized.accountDomain) || normalized.accountDomain}`
                 : `Matched from CRM data`

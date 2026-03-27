@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio } from 'lucide-react'
+import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio, Plus } from 'lucide-react'
 import {
   defaultCallState,
   formatElapsed,
@@ -121,10 +121,10 @@ function EntityAvatar({
             key={`photo-${imageUrl}`}
             src={imageUrl || ''}
             alt={name}
-            initial={{ opacity: 0, scale: 1.04, filter: 'blur(10px)' }}
+            initial={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }}
             animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
-            transition={{ duration: 0.5, ease: FORENSIC_EASE }}
+            exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
+            transition={{ duration: 0.28, ease: FORENSIC_EASE }}
             className="np-entity-mark__img"
             onError={() => setFailed(true)}
           />
@@ -168,7 +168,15 @@ function resolveContactPhoto(contact: MatchContact | null) {
 }
 
 function contactPhone(contact: MatchContact | null) {
-  return trimText(contact?.phone || contact?.mobile || contact?.workPhone || contact?.companyPhone || '') || ''
+  return trimText(
+    contact?.phone ||
+      contact?.mobile ||
+      contact?.workPhone ||
+      contact?.companyPhone ||
+      contact?.otherPhone ||
+      contact?.directPhone ||
+      ''
+  ) || ''
 }
 
 function accountPhone(account: MatchAccount | null) {
@@ -248,7 +256,9 @@ function ActiveCallFooter({
       </div>
 
       <div className="np-call-footer__stats">
-        <span className="np-call-footer__duration font-mono">{formatElapsed(state.call.startedAt)}</span>
+        <span className="np-call-footer__duration font-mono">
+          {state.call.state === 'incoming' ? 'RINGING' : formatElapsed(state.call.startedAt)}
+        </span>
       </div>
 
       <div className="np-call-footer__actions">
@@ -407,8 +417,8 @@ function App() {
     }
   }
 
-  const captureAndMatch = async () => {
-    const response = await sendMessage('CAPTURE_AND_MATCH')
+  const ingestPageAccount = async () => {
+    const response = await sendMessage('INGEST_PAGE_ACCOUNT')
     if (response?.state) setState(response.state)
   }
 
@@ -488,6 +498,7 @@ function App() {
   const { auth, page, match, call, accountContacts, notes } = state
   const account = match?.account
   const contact = match?.contact
+  const hasMatchedAccount = Boolean(account?.id)
   const pageDomain = extractDomain(page?.origin || page?.url) || null
   const selectedNumber = resolveCallerId(auth)
   const accountLocation = trimText((account as any)?.city || (account as any)?.state || (account as any)?.address || '')
@@ -530,7 +541,6 @@ function App() {
   const finalSummary = isTruncated ? `${summaryToDisplay.slice(0, MAX_SUMMARY).trimEnd()}…` : summaryToDisplay
   const allContacts = accountContacts.length > 0 ? accountContacts : match?.contacts || []
   const visibleContacts = allContacts.slice(0, 5)
-  const hasMoreContacts = allContacts.length > visibleContacts.length
   const accountLogoUrl = trimText(
     (account as any)?.logoUrl ||
       (account as any)?.logo_url ||
@@ -541,9 +551,21 @@ function App() {
   
   const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
   const showCallButton = Boolean(selectedNumber && dialTarget)
+  const syncTitle =
+    busy === 'ingest'
+      ? 'Ingesting account...'
+      : busy === 'capture'
+        ? 'Scanning page...'
+        : 'Identifying session context...'
+  const syncBody =
+    busy === 'ingest'
+      ? 'Creating the account in CRM and enriching it with Apollo.'
+      : busy === 'capture'
+        ? 'Reading the active tab before matching it to CRM.'
+        : 'Identifying session context...'
 
   // Branded Loading Splash
-  const isSyncing = busy === 'auto-capture' || (auth && !match && busy !== 'capture' && busy !== 'sync-profile') || busy === 'initial-sync'
+  const isSyncing = busy === 'auto-capture' || busy === 'initial-sync' || busy === 'capture' || busy === 'ingest' || busy === 'sync-profile'
 
   let viewNode;
   if (isSyncing) {
@@ -564,8 +586,8 @@ function App() {
              <img src="./nodalpoint-webicon.png" alt="" />
           </motion.div>
           <div className="np-sync-meta">
-            <div className="np-sync-title font-mono">QUANTUM UPLINK</div>
-            <div className="np-sync-body font-sans">Identifying session context...</div>
+            <div className="np-sync-title font-mono">{syncTitle}</div>
+            <div className="np-sync-body font-sans">{syncBody}</div>
           </div>
         </div>
       </motion.div>
@@ -683,7 +705,7 @@ function App() {
           ) : null}
 
 
-          {match ? (
+          {auth && hasMatchedAccount ? (
             <>
               <button
                 type="button"
@@ -741,7 +763,7 @@ function App() {
                 transition={{ delay: 0.2, duration: 0.4, ease: FORENSIC_EASE }}
                 className="np-card"
               >
-                <div className="np-section-head">
+                  <div className="np-section-head">
                   <div className="np-kicker font-mono">01 // UPLINKS</div>
                 </div>
 
@@ -908,6 +930,88 @@ function App() {
                       )}
                     </div>
                   ))}
+                </div>
+              </motion.section>
+            </>
+          ) : auth ? (
+            <>
+              <motion.section
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
+                className="np-card np-card--hero"
+              >
+                <div className="np-hero-identity">
+                  <EntityAvatar name={page?.title || pageDomain || 'Unmatched page'} imageUrl={null} size={60} className="np-entity-mark np-entity-mark--large" />
+                  <div className="np-hero-copy">
+                    <div className="np-kicker font-mono">UNMATCHED PAGE</div>
+                    <h2 className="np-hero-title font-sans">{page?.title || pageDomain || 'No CRM record found'}</h2>
+                    <p className="np-hero-subtitle font-sans" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {pageDomain || 'This site is not in CRM yet.'}
+                      <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                    </p>
+                  </div>
+                </div>
+
+                <div className="np-summary-box-card" style={{ marginTop: 16 }}>
+                  <p className="np-copy--tight font-sans leading-relaxed text-zinc-300">
+                    Click the plus badge or ingest button to create the account in CRM and enrich it with Apollo.
+                  </p>
+                </div>
+
+                <div className="np-dossier-meta font-mono" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--np-border)' }}>
+                  <span className="opacity-60 font-sans">Page context: </span>
+                  {page?.title ? snippet(page.title, 42) : pageDomain || 'No nexus'}
+                </div>
+              </motion.section>
+
+              <motion.section
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.4, ease: FORENSIC_EASE }}
+                className="np-card"
+              >
+                <div className="np-section-head">
+                  <div className="np-kicker font-mono">01 // UPLINKS</div>
+                </div>
+
+                <div className="np-action-grid">
+                  <button
+                    className="np-uplink-primary"
+                    onClick={() => void runAction('ingest', () => ingestPageAccount())}
+                    disabled={busy === 'ingest'}
+                  >
+                    <div className="np-uplink-primary__row">
+                      <div className="np-uplink-icon--phone">
+                        <Plus size={22} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <span className="np-uplink-primary__label">ADD TO CRM</span>
+                        <span className="np-uplink-primary__value font-mono">Ingest account from this site</span>
+                      </div>
+                      <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5, marginLeft: 'auto' }} />
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="np-uplink-row"
+                    onClick={() => {
+                      const domain = trimText(page?.url || page?.origin || '')
+                      if (!domain) return
+                      const normalized = domain.startsWith('http') ? domain : `https://${domain}`
+                      window.open(normalized, '_blank')
+                    }}
+                  >
+                    <div className="np-uplink-row__main">
+                      <Globe style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                      <div className="min-w-0 flex-1">
+                        <span className="np-uplink-row__kicker">SITE SOURCE</span>
+                        <span className="np-uplink-row__value">{pageDomain || page?.url || 'No domain matched'}</span>
+                      </div>
+                      <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
+                    </div>
+                  </button>
                 </div>
               </motion.section>
             </>

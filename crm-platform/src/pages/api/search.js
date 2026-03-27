@@ -36,6 +36,10 @@ function getMetadataPhoneCandidates(metadata) {
   push(metadata.mobile);
   push(metadata.workPhone);
   push(metadata.work_phone);
+  push(metadata.companyPhone);
+  push(metadata.company_phone);
+  push(metadata.directPhone);
+  push(metadata.direct_phone);
   push(metadata.workDirectPhone);
   push(metadata.otherPhone);
   push(metadata.other_phone);
@@ -44,12 +48,16 @@ function getMetadataPhoneCandidates(metadata) {
   push(general.phone);
   push(general.mobile);
   push(general.workPhone);
+  push(general.companyPhone);
+  push(general.directPhone);
   push(general.otherPhone);
 
   const contact = metadata.contact || {};
   push(contact.phone);
   push(contact.mobile);
   push(contact.workPhone);
+  push(contact.companyPhone);
+  push(contact.directPhone);
   push(contact.otherPhone);
 
   return candidates;
@@ -60,6 +68,8 @@ function contactMatchesPhone(contactRow, searchDigits) {
     contactRow?.mobile,
     contactRow?.workPhone,
     contactRow?.otherPhone,
+    contactRow?.companyPhone,
+    contactRow?.directPhone,
     contactRow?.phone
   ];
   const metadataCandidates = getMetadataPhoneCandidates(contactRow?.metadata || {});
@@ -150,7 +160,7 @@ export default async function handler(req, res) {
     try {
       logger.log('[Search] Querying contacts by phone fields...');
 
-      const orQuery = `mobile.eq.${searchDigits},workPhone.eq.${searchDigits},otherPhone.eq.${searchDigits},phone.eq.${searchDigits}`;
+      const orQuery = `mobile.eq.${searchDigits},workPhone.eq.${searchDigits},otherPhone.eq.${searchDigits},companyPhone.eq.${searchDigits},phone.eq.${searchDigits}`;
 
       let query = supabaseAdmin
         .from('contacts')
@@ -163,6 +173,7 @@ export default async function handler(req, res) {
           mobile, 
           workPhone, 
           otherPhone, 
+          companyPhone,
           phone, 
           metadata,
           accountId,
@@ -221,6 +232,7 @@ export default async function handler(req, res) {
             mobile, 
             workPhone, 
             otherPhone, 
+            companyPhone,
             phone, 
             metadata,
             accountId,

@@ -72,6 +72,8 @@ export type MatchContact = {
   mobile: string | null
   workPhone: string | null
   companyPhone: string | null
+  otherPhone: string | null
+  directPhone: string | null
   city: string | null
   state: string | null
   score: number
