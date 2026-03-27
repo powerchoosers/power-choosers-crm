@@ -121,10 +121,10 @@ function EntityAvatar({
             key={`photo-${imageUrl}`}
             src={imageUrl || ''}
             alt={name}
-            initial={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }}
+            initial={{ opacity: 0, scale: 1.04, filter: 'blur(10px)' }}
             animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-            exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
-            transition={{ duration: 0.28, ease: FORENSIC_EASE }}
+            exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+            transition={{ duration: 0.5, ease: FORENSIC_EASE }}
             className="np-entity-mark__img"
             onError={() => setFailed(true)}
           />
@@ -313,7 +313,7 @@ function primaryPhone(
 ) {
   const fallbackContact = accountContacts.find((item) => Boolean(contactPhone(item))) || null
   return (
-    trimText(contactPhone(contact) || contactPhone(fallbackContact) || accountPhone(account) || pagePhone || '') ||
+    trimText(contactPhone(contact) || accountPhone(account) || contactPhone(fallbackContact) || pagePhone || '') ||
     ''
   )
 }
@@ -660,42 +660,55 @@ function App() {
 
           {match ? (
             <>
-              <motion.section 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
-                className="np-card np-card--hero"
+              <button
+                type="button"
+                className="np-hero-identity-link"
+                onClick={() => account?.id && window.open(`${auth?.appOrigin}/network/accounts/${account.id}`, '_blank')}
+                title="Open Account Dossier"
               >
-                <div className="np-hero-identity">
-                  <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={60} className="np-entity-mark np-entity-mark--large" />
-                  <div className="np-hero-copy">
-                    <div className="np-kicker font-mono">ACCOUNT DOSSIER</div>
-                    <h2 className="np-hero-title font-sans">{heroTitle}</h2>
-                    <p className="np-hero-subtitle font-sans">{heroSubtitle}</p>
+                <motion.section 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
+                  className="np-card np-card--hero"
+                >
+                  <div className="np-hero-identity">
+                    <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={60} className="np-entity-mark np-entity-mark--large" />
+                    <div className="np-hero-copy">
+                      <div className="np-kicker font-mono">ACCOUNT DOSSIER</div>
+                      <h2 className="np-hero-title font-sans">{heroTitle}</h2>
+                      <p className="np-hero-subtitle font-sans" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {heroSubtitle}
+                        <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                      </p>
+                    </div>
                   </div>
-                </div>
 
-                {summaryToDisplay && (
-                  <div className="np-summary-box-card" style={{ marginTop: 16 }}>
-                    <p className="np-copy--tight font-sans leading-relaxed text-zinc-300">
-                      {finalSummary}
-                      {summaryToDisplay.length > MAX_SUMMARY && (
-                        <button 
-                          className="np-read-more"
-                          onClick={() => setDescriptionExpanded((prev) => !prev)}
-                        >
-                          {descriptionExpanded ? 'READ LESS' : 'READ MORE'}
-                        </button>
-                      )}
-                    </p>
+                  {summaryToDisplay && (
+                    <div className="np-summary-box-card" style={{ marginTop: 16 }}>
+                      <p className="np-copy--tight font-sans leading-relaxed text-zinc-300">
+                        {finalSummary}
+                        {summaryToDisplay.length > MAX_SUMMARY && (
+                          <span 
+                            className="np-read-more"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDescriptionExpanded((prev) => !prev)
+                            }}
+                          >
+                            {descriptionExpanded ? 'READ LESS' : 'READ MORE'}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="np-dossier-meta font-mono" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--np-border)' }}>
+                    <span className="opacity-60 font-sans">Page context: </span>
+                    {page?.title ? snippet(page.title, 42) : 'No nexus'}
                   </div>
-                )}
-
-                <div className="np-dossier-meta font-mono" style={{ marginTop: 16, paddingTop: 12, borderTop: '1px solid var(--np-border)' }}>
-                  <span className="opacity-60 font-sans">Page context: </span>
-                  {page?.title ? snippet(page.title, 42) : 'No nexus'}
-                </div>
-              </motion.section>
+                </motion.section>
+              </button>
 
               <motion.section 
                 initial={{ opacity: 0, y: 10 }}
@@ -705,17 +718,6 @@ function App() {
               >
                 <div className="np-section-head">
                   <div className="np-kicker font-mono">01 // UPLINKS</div>
-                  {account?.id && (
-                    <a
-                      href={`${auth?.appOrigin}/network/accounts/${account.id}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="np-micro font-mono"
-                      style={{ textDecoration: 'underline', color: 'var(--np-blue)' }}
-                    >
-                      OPEN_CRM
-                    </a>
-                  )}
                 </div>
 
                 <div className="np-action-grid">
@@ -728,13 +730,22 @@ function App() {
                       <div className="np-uplink-primary__row">
                         <div className="np-uplink-icon--phone">
                           <Phone style={{ width: 22, height: 22 }} />
-                          <Star style={{ width: 8, height: 8, fill: '#eab308', color: '#eab308', position: 'absolute', top: -2, right: -2 }} />
+                          <Star 
+                            size={8} 
+                            style={{ 
+                              fill: '#eab308', 
+                              color: '#eab308', 
+                              position: 'absolute', 
+                              top: 0, 
+                              right: 0 
+                            }} 
+                          />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <span className="np-uplink-primary__label">DIAL TARGET</span>
-                          <span className="np-uplink-primary__value">{dialTarget}</span>
+                          <span className="np-uplink-primary__label">CORPORATE PHONE</span>
+                          <span className="np-uplink-primary__value font-mono">{formatPhone(dialTarget)}</span>
                         </div>
-                        <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5 }} />
+                        <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5, marginLeft: 'auto' }} />
                       </div>
                     </button>
                   )}
@@ -756,7 +767,7 @@ function App() {
                         <span className="np-uplink-row__kicker">DIGITAL DOMAIN</span>
                         <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain matched'}</span>
                       </div>
-                      <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                      <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
                     </div>
                   </button>
 
@@ -774,7 +785,7 @@ function App() {
                           <span className="np-uplink-row__kicker">LOCATION CONTEXT</span>
                           <span className="np-uplink-row__value">{accountLocationValue}</span>
                         </div>
-                        <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                        <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
                       </div>
                     </button>
                   )}
@@ -790,31 +801,6 @@ function App() {
                       </div>
                     </div>
                   </div>
-                </div>
-
-                <div className="np-uplink-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '16px' }}>
-                  <button 
-                    className="np-void-card nodal-monolith-edge transition-all group flex items-start justify-between"
-                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px' }}
-                    onClick={() => account?.id && window.open(`${auth?.appOrigin}/network/accounts/${account.id}/telemetry`, '_blank')}
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">TELEMETRY</span>
-                      <span className="text-xs font-sans text-zinc-100">Protocol Link</span>
-                    </div>
-                    <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
-                  </button>
-                  <button 
-                    className="np-void-card nodal-monolith-edge transition-all group flex items-start justify-between"
-                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '12px' }}
-                    onClick={() => account?.id && window.open(`${auth?.appOrigin}/network/accounts/${account.id}/infrastructure`, '_blank')}
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">INFRA</span>
-                      <span className="text-xs font-sans text-zinc-100">Grid Context</span>
-                    </div>
-                    <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
-                  </button>
                 </div>
               </motion.section>
 
