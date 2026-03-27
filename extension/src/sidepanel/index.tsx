@@ -17,6 +17,7 @@ import {
 } from '../shared'
 import { mapLocationToZone, LOAD_ZONE_COLOR_MAP, ERCOT_ZONES, type ErcotZone } from '../../../src/lib/market-mapping'
 import { resolveContactPhotoUrl } from '../../../src/lib/contactAvatar'
+import { ContactAvatar } from '../contactAvatar'
 
 type MessageResponse<T> = {
   ok: boolean
@@ -913,7 +914,7 @@ function App() {
                   {visibleContacts.map((c) => (
                     <div key={c.id} className="np-contact-entry" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: '10px', padding: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <div className="np-contact-info" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <EntityAvatar name={c.name} imageUrl={resolveContactPhoto(c)} size={32} className="np-entity-mark np-entity-mark--sm" />
+                        <ContactAvatar name={c.name} photoUrl={resolveContactPhoto(c)} size={32} />
                         <div className="np-contact-copy">
                           <div className="text-sm font-semibold text-white">{c.name}</div>
                           <div className="text-[10px] text-zinc-500 uppercase">{c.title || 'Executive'}</div>
