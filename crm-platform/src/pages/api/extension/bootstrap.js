@@ -26,7 +26,7 @@ function normalizeTwilioNumbers(raw) {
       if (typeof entry === 'string') {
         const number = normalizePhoneNumber(entry)
         if (!number) return null
-        return { name: 'Primary', number }
+        return { name: 'Primary', number, selected: false }
       }
       if (typeof entry === 'object') {
         const candidate = entry
@@ -35,6 +35,7 @@ function normalizeTwilioNumbers(raw) {
         return {
           name: trimText(candidate.name ?? 'Primary') || 'Primary',
           number,
+          selected: Boolean(candidate.selected || false)
         }
       }
       return null
@@ -51,8 +52,13 @@ function normalizeProfile(row, emailFallback) {
   )
 
   const twilioNumbers = normalizeTwilioNumbers(settings.twilioNumbers || [])
+  
+  // 1. Prioritize top-level settings.selectedPhoneNumber
+  // 2. Fallback to the one marked 'selected' in the array
+  // 3. Last fallback to the first number in the array
+  const markedInArray = twilioNumbers.find(item => item.selected)?.number
   const selectedPhoneNumber = normalizePhoneNumber(
-    settings.selectedPhoneNumber || row.selected_phone_number || row.selectedPhoneNumber || twilioNumbers[0]?.number || ''
+    settings.selectedPhoneNumber || markedInArray || row.selected_phone_number || row.selectedPhoneNumber || twilioNumbers[0]?.number || ''
   ) || null
 
   return {

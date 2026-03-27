@@ -1041,16 +1041,14 @@ async function handleAutoCallBootstrap(fallbackOrigin?: string | null, callerId?
     throw new Error('Connect your Nodal Point session before enabling calls.')
   }
 
+  const activeCallerId = callerId || getCallerId()
+  
   if (
     state.call.enabled &&
     state.call.deviceReady &&
-    (
-      state.call.state === 'ready' ||
-      state.call.state === 'ended' ||
-      state.call.state === 'incoming' ||
-      state.call.state === 'connected' ||
-      state.call.state === 'dialing'
-    )
+    state.call.state === 'ready' &&
+    // No change in caller ID? Then we can safely skip.
+    activeCallerId === getCallerId()
   ) {
     return { ok: true, state: cloneState() }
   }

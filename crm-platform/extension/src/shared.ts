@@ -1,6 +1,7 @@
 export type ExtensionTwilioNumber = {
   name: string
   number: string
+  selected?: boolean
 }
 
 export type ExtensionProfile = {
@@ -389,10 +390,17 @@ export function normalizeAuthPayload(payload: any, appOrigin?: string | null): E
 }
 
 export function resolveCallerId(auth: ExtensionAuth | null): string | null {
+  // 1. Explicit top-level selection
   const selected = normalizeTwilioPhone(auth?.profile?.selectedPhoneNumber)
   if (selected) return selected
+
+  // 2. Scan array for 'selected' flag (more robust for index-based selection)
   const numbers = auth?.profile?.twilioNumbers
   if (Array.isArray(numbers) && numbers.length > 0) {
+    const marked = numbers.find((entry) => entry && entry.selected === true && normalizeTwilioPhone(entry.number))
+    if (marked) return normalizeTwilioPhone(marked.number)
+
+    // 3. Fallback to first valid number
     const first = numbers.find((entry) => entry && normalizeTwilioPhone(entry.number))
     if (first) return normalizeTwilioPhone(first.number)
   }
