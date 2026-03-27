@@ -322,9 +322,10 @@ function App() {
   const [state, setState] = useState<ExtensionState | null>(null)
   const [noteDraft, setNoteDraft] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(state?.call?.state === 'error' ? state.call.lastError : null)
   const [initStuckMs, setInitStuckMs] = useState(0)
   const [descriptionExpanded, setDescriptionExpanded] = useState(false)
+  const [currentView, setCurrentView] = useState<'main' | 'settings'>('main')
   const autoCaptureRan = useRef(false)
   const initStuckTimer = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -519,6 +520,348 @@ function App() {
   // Branded Loading Splash
   const isSyncing = busy === 'auto-capture' || (auth && !match && busy !== 'capture' && busy !== 'sync-profile') || busy === 'initial-sync'
 
+  let viewNode;
+  if (isSyncing) {
+    viewNode = (
+      <motion.div
+        key="sync-splash"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="np-sync-splash"
+      >
+        <div className="np-sync-loader">
+          <motion.div
+            animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+            className="np-sync-logo"
+          >
+             <img src="./nodalpoint-webicon.png" alt="" />
+          </motion.div>
+          <div className="np-sync-meta">
+            <div className="np-sync-title font-mono">QUANTUM UPLINK</div>
+            <div className="np-sync-body font-sans">Identifying session context...</div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  } else if (currentView === 'settings') {
+    viewNode = (
+      <motion.div
+        key="settings"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -20 }}
+        transition={{ duration: 0.3, ease: FORENSIC_EASE }}
+        className="np-scroll"
+      >
+        <div className="np-stack" style={{ padding: '20px' }}>
+          <div className="np-section-head" style={{ marginBottom: 20 }}>
+            <div className="np-kicker font-mono">00 // CONFIGURATION</div>
+            <button 
+              className="np-micro font-mono" 
+              style={{ textDecoration: 'underline', cursor: 'pointer', background: 'none', border: 'none', color: 'inherit' }}
+              onClick={() => setCurrentView('main')}
+            >
+              BACK_TO_RECON
+            </button>
+          </div>
+
+          <div className="np-card">
+            <div className="np-section-head">
+              <div className="np-kicker font-mono text-[10px]">SESSION_CONTEXT</div>
+            </div>
+            <div className="np-status-row" style={{ marginTop: 8, flexFlow: 'wrap' }}>
+              <span className={crmPill}>{crmStatus}</span>
+              <span className={callPill} title={state.call.lastError || callStatus}>{callStatus}</span>
+              {auth?.email ? (
+                <span className="np-pill" title={auth.email}>{auth.email}</span>
+              ) : (
+                <span className="np-pill np-pill--amber">OFFLINE</span>
+              )}
+            </div>
+            
+            <div style={{ marginTop: 24, borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: 16 }}>
+              <p className="np-micro" style={{ marginBottom: 12, opacity: 0.6 }}>Authenticated as:</p>
+              <p className="font-mono text-xs">{auth?.email || 'Unauthorized session'}</p>
+            </div>
+
+            <div style={{ marginTop: 20 }}>
+              <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
+                Open Platform Profile
+              </button>
+              <button className="np-button np-button--sm np-button--ghost np-button--full" style={{ marginTop: 8, color: '#fca5a5' }} onClick={() => sendMessage('AUTH_CLEAR')}>
+                Disconnect Session
+              </button>
+            </div>
+          </div>
+
+          <div className="np-card" style={{ marginTop: 12 }}>
+            <div className="np-section-head">
+              <div className="np-kicker font-mono text-[10px]">TELEMETRY</div>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <p className="np-micro" style={{ opacity: 0.5 }}>Active Origin:</p>
+              <p className="font-mono text-[10px] break-all text-zinc-400">{page?.url || 'Scanning...'}</p>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+    );
+  } else {
+    viewNode = (
+      <motion.div
+        key="content"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: 20 }}
+        transition={{ duration: 0.3, ease: FORENSIC_EASE }}
+        className="np-scroll"
+      >
+        <div className="np-stack">
+          {error ? (
+            <div className="np-card np-card--error">
+              <p className="np-title" style={{ color: '#fecaca', marginBottom: 4 }}>
+                Action failed
+              </p>
+              <p className="np-copy">{error}</p>
+            </div>
+          ) : null}
+
+          {call.state === 'error' && (call.lastError?.includes('Permission') || call.lastError?.includes('mic')) ? (
+            <div className="np-error-box np-void-card" style={{ marginBottom: 12, border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
+              <p className="np-copy" style={{ color: '#fca5a5', fontSize: '11px', marginBottom: '8px' }}>
+                {error?.includes('BLOCKED') 
+                  ? "The microphone is blocked in your browser for this extension. Please open settings and set Microphone to 'Allow'." 
+                  : "Microphone access is required to make calls."}
+              </p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  className="np-btn np-btn--primary" 
+                  style={{ flex: 1, height: '32px', fontSize: '12px' }}
+                  onClick={requestMicrophone}
+                  disabled={busy === 'mic' || !!error?.includes('BLOCKED')}
+                >
+                  {busy === 'mic' ? 'Requesting...' : 'Grant Permission'}
+                </button>
+                {!!error?.includes('BLOCKED') && (
+                  <button 
+                    className="np-btn np-btn--secondary" 
+                    style={{ flex: 1, height: '32px', fontSize: '12px' }}
+                    onClick={openExtensionSettings}
+                  >
+                    Site Settings
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {match ? (
+            <>
+              <motion.section 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
+              >
+                <div className="np-hero">
+                  <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={48} className="np-entity-mark np-entity-mark--lg" />
+                  <div className="np-hero-content">
+                    <h2 className="np-hero-name nodal-monolith-edge">{heroTitle}</h2>
+                    <div className="np-hero-meta font-mono">{heroSubtitle}</div>
+                  </div>
+                </div>
+
+                <div className="np-action-grid">
+                  {showCallButton && (
+                    <button
+                      className="np-action-card np-void-card border-blue-500/20 bg-blue-500/5 group"
+                      onClick={() => void runAction('dial', () => dialCall(dialTarget, contact?.id, account?.id || undefined))}
+                      disabled={busy === 'dial'}
+                    >
+                      <div className="np-action-icon text-blue-400 group-hover:scale-110 transition-transform">
+                        <Phone size={18} />
+                      </div>
+                      <div className="np-action-label font-mono">Dial Target</div>
+                      <div className="np-action-value font-mono text-blue-200">{dialTarget}</div>
+                    </button>
+                  )}
+                  {accountLocationValue && (
+                    <div className="np-action-card np-void-card">
+                      <div className="np-action-icon text-zinc-500">
+                        <MapPin size={18} />
+                      </div>
+                      <div className="np-action-label font-mono">Location Context</div>
+                      <div className="np-action-value font-sans">{snippet(accountLocationValue, 24)}</div>
+                    </div>
+                  )}
+                </div>
+              </motion.section>
+
+              <motion.section 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2, duration: 0.4, ease: FORENSIC_EASE }}
+                className="np-card"
+              >
+                <div className="np-section-head">
+                  <div className="np-kicker font-mono">01 // UPLINKS</div>
+                  {account?.id && (
+                    <a
+                      href={`${auth?.appOrigin}/network/accounts/${account.id}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="np-micro font-mono"
+                      style={{ textDecoration: 'underline' }}
+                    >
+                      CURRENT_DOSSIER
+                    </a>
+                  )}
+                </div>
+                {summaryToDisplay ? (
+                  <div className="np-summary-box">
+                    <p className="np-copy leading-relaxed text-zinc-300">
+                      {finalSummary}
+                    </p>
+                    {isTruncated && (
+                      <button
+                        className="np-read-more font-mono"
+                        onClick={() => setDescriptionExpanded(true)}
+                      >
+                        READ_MORE
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <p className="np-micro text-center py-4 opacity-40">No intelligence summary available.</p>
+                )}
+
+                <div className="np-uplink-grid" style={{ gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginTop: '12px' }}>
+                  <button 
+                    className="np-void-card border-white/5 bg-zinc-900/40 p-3 hover:bg-zinc-800/60 transition-all group flex items-start justify-between"
+                    onClick={() => account?.id && chrome.tabs.create({ url: `${auth?.appOrigin}/network/accounts/${account.id}/telemetry` })}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-mono text-zinc-500">TELEMETRY</span>
+                      <span className="text-xs font-sans text-zinc-200">Protocol Link</span>
+                    </div>
+                    <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
+                  </button>
+                  <button 
+                    className="np-void-card border-white/5 bg-zinc-900/40 p-3 hover:bg-zinc-800/60 transition-all group flex items-start justify-between"
+                    onClick={() => account?.id && chrome.tabs.create({ url: `${auth?.appOrigin}/network/accounts/${account.id}/infrastructure` })}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-mono text-zinc-500">INFRA</span>
+                      <span className="text-xs font-sans text-zinc-200">Grid Context</span>
+                    </div>
+                    <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
+                  </button>
+                </div>
+              </motion.section>
+
+              <motion.section 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3, duration: 0.4, ease: FORENSIC_EASE }}
+                className="np-card"
+              >
+                <div className="np-section-head">
+                  <div className="np-kicker font-mono">02 // INTELLIGENCE</div>
+                  <span className="np-micro font-mono">{notes.length} log{notes.length === 1 ? '' : 's'}</span>
+                </div>
+                <div className="np-note-composer">
+                  <textarea
+                    className="nodal-input nodal-input--textarea"
+                    placeholder="Log forensic findings..."
+                    rows={3}
+                    value={noteDraft}
+                    onChange={(e) => setNoteDraft(e.target.value)}
+                  />
+                  <div className="np-composer-actions">
+                    <button
+                      className="np-button np-button--primary"
+                      onClick={() => void runAction('save-note', async () => {
+                        await saveNote({ note: noteDraft, contactId: contact?.id, accountId: account?.id })
+                        setNoteDraft('')
+                      })}
+                      disabled={!noteDraft.trim() || busy === 'save-note'}
+                    >
+                      {busy === 'save-note' ? 'Saving...' : 'Commit Note'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="np-note-list">
+                  {notes.map((note) => (
+                    <div key={note.id} className="np-note-entry font-mono border-white/5 bg-zinc-900/40">
+                      <div className="np-note-meta">
+                        <span className="np-note-source text-zinc-500 uppercase tracking-widest text-[9px]">{note.source === 'ai' ? 'AI_FORENSIC' : 'USER_RECON'}</span>
+                        <span className="np-note-date opacity-40">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <p className="np-note-text leading-relaxed text-zinc-300">{note.text}</p>
+                    </div>
+                  ))}
+                  {notes.length === 0 && <p className="np-micro text-center pt-2">No logs captured for this session.</p>}
+                </div>
+              </motion.section>
+
+              <motion.section 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4, duration: 0.4, ease: FORENSIC_EASE }}
+                className="np-card"
+              >
+                <div className="np-section-head">
+                  <div className="np-kicker font-mono">03 // NETWORK</div>
+                  <span className="np-micro font-mono">{allContacts.length} total</span>
+                </div>
+                <div className="np-contact-list">
+                  {visibleContacts.map((c) => (
+                    <div key={c.id} className="np-contact-entry">
+                      <div className="np-contact-info">
+                        <EntityAvatar name={c.name} imageUrl={resolveContactPhoto(c)} size={32} className="np-entity-mark np-entity-mark--sm" />
+                        <div className="np-contact-copy">
+                          <div className="np-contact-name">{c.name}</div>
+                          <div className="np-micro">{c.title || 'Executive'}</div>
+                        </div>
+                      </div>
+                      {contactPhone(c) && (
+                        <button
+                          className="np-button np-button--sm np-button--ghost"
+                          onClick={() => void runAction('dial', () => dialCall(contactPhone(c), c.id, c.accountId || undefined))}
+                          disabled={busy === 'dial'}
+                        >
+                          Call
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {allContacts.length === 0 && <p className="np-micro text-center pt-2">No contact records found.</p>}
+                  {hasMoreContacts && (
+                    <button className="np-button np-button--xs np-button--full np-button--ghost" style={{ marginTop: 8 }}>
+                      View all {allContacts.length} contacts
+                    </button>
+                  )}
+                </div>
+              </motion.section>
+            </>
+          ) : (
+            <section className="np-card np-card--hero" style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <h3 className="np-hero-title">CRM Disconnected</h3>
+              <p className="np-copy" style={{ marginTop: 12, marginBottom: 24 }}>
+                Your forensic session has expired or is not yet initialized.
+              </p>
+              <button className="np-button np-button--primary np-button--full" onClick={loginToCrm}>
+                Uplink Now
+              </button>
+            </section>
+          )}
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <div className="np-shell">
       <div className="np-header">
@@ -531,336 +874,10 @@ function App() {
             <div className="np-brand-subtitle">CRM Uplink</div>
           </div>
         </div>
-        <div className="np-status-row">
-          <span className={crmPill}>{crmStatus}</span>
-          <span className={callPill} title={state.call.lastError || callStatus}>{callStatus}</span>
-          {auth?.email ? (
-            <span className="np-pill" title={auth.email}>{snippet(auth.email, 12)}</span>
-          ) : (
-            <span className="np-pill np-pill--amber">Offline</span>
-          )}
-        </div>
       </div>
 
       <AnimatePresence mode="wait">
-        {isSyncing ? (
-          <motion.div
-            key="sync-splash"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="np-sync-splash"
-          >
-            <div className="np-sync-loader">
-              <motion.div
-                animate={{ scale: [1, 1.15, 1], opacity: [0.6, 1, 0.6] }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                className="np-sync-logo"
-              >
-                 <img src="./nodalpoint-webicon.png" alt="" />
-              </motion.div>
-              <div className="np-sync-meta">
-                <div className="np-sync-title font-mono">QUANTUM UPLINK</div>
-                <div className="np-sync-body font-sans">Identifying session context...</div>
-              </div>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="content"
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.3, ease: FORENSIC_EASE }}
-            className="np-scroll"
-          >
-            <div className="np-stack">
-              {error ? (
-                <div className="np-card np-card--error">
-                  <p className="np-title" style={{ color: '#fecaca', marginBottom: 4 }}>
-                    Action failed
-                  </p>
-                  <p className="np-copy">{error}</p>
-                </div>
-              ) : null}
-
-              {call.state === 'error' && (call.lastError?.includes('Permission') || call.lastError?.includes('mic')) ? (
-                <div className="np-error-box np-void-card" style={{ marginBottom: 12, border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.05)' }}>
-                  <p className="np-copy" style={{ color: '#fca5a5', fontSize: '11px', marginBottom: '8px' }}>
-                    {error?.includes('BLOCKED') 
-                      ? "The microphone is blocked in your browser for this extension. Please open settings and set Microphone to 'Allow'." 
-                      : "Microphone access is required to make calls."}
-                  </p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      className="np-btn np-btn--primary" 
-                      style={{ flex: 1, height: '32px', fontSize: '12px' }}
-                      onClick={requestMicrophone}
-                      disabled={busy === 'mic' || !!error?.includes('BLOCKED')}
-                    >
-                      {busy === 'mic' ? 'Requesting...' : 'Grant Permission'}
-                    </button>
-                    {error?.includes('BLOCKED') && (
-                      <button 
-                        className="np-btn" 
-                        style={{ flex: 1, height: '32px', fontSize: '12px', border: '1px solid rgba(255,255,255,0.1)' }}
-                        onClick={openExtensionSettings}
-                      >
-                        Open Settings
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              <motion.section 
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
-                className="np-card np-card--hero"
-              >
-                <div className="np-hero-identity">
-                  <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={56} className="np-entity-mark np-entity-mark--large" />
-                  <div className="np-hero-copy">
-                    <div className="np-kicker font-mono">CURRENT DOSSIER</div>
-                    <h2 className="np-hero-title font-sans">{heroTitle}</h2>
-                    <p className="np-hero-subtitle font-sans">{heroSubtitle}</p>
-                  </div>
-                </div>
-
-                {summaryToDisplay && (
-                  <p className="np-copy np-copy--tight font-sans">
-                    {finalSummary}
-                    {summaryToDisplay.length > MAX_SUMMARY && (
-                      <button 
-                        className="np-read-more"
-                        onClick={() => setDescriptionExpanded((prev) => !prev)}
-                      >
-                        {descriptionExpanded ? 'Read Less' : 'Read More'}
-                      </button>
-                    )}
-                  </p>
-                )}
-
-                <p className="np-micro np-dossier-meta font-mono">
-                  <span className="opacity-60 font-sans">Page: </span>
-                  {page?.title ? snippet(page.title, 48) : 'No page nexus'}
-                  <span className="np-dossier-meta__sep">|</span>
-                  <span className="opacity-60 font-sans">Caller ID: </span>
-                  {selectedNumber
-                    ? formatPhone(selectedNumber)
-                    : <span className="text-amber-400">MISSING</span>}
-                </p>
-              </motion.section>
-
-              {auth ? (
-                <>
-                  <motion.section 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2, duration: 0.4, ease: FORENSIC_EASE }}
-                    className="np-card"
-                  >
-                    <div className="np-section-head">
-                      <div className="np-kicker font-mono">01 // UPLINKS</div>
-                    </div>
-
-                    <div className="np-action-grid">
-                      <button
-                        className="np-uplink-primary"
-                        onClick={() => {
-                          if (!outboundTarget) return
-                          void runAction('dial', () => dialCall(outboundTarget, contact?.id, account?.id))
-                        }}
-                      >
-                        <div className="np-uplink-primary__row">
-                          <div style={{ position: 'relative', flexShrink: 0 }}>
-                            <Phone style={{ width: 20, height: 20, color: 'rgba(255,255,255,0.7)' }} />
-                            <Star style={{ width: 8, height: 8, fill: '#eab308', color: '#eab308', position: 'absolute', top: -4, right: -4 }} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <span className="np-uplink-primary__label">Corporate Phone</span>
-                            <span className="np-uplink-primary__value">
-                              {outboundTarget
-                                ? formatPhone(outboundTarget) || outboundTarget
-                                : 'No matched phone found'}
-                            </span>
-                          </div>
-                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: 'rgba(255,255,255,0.5)', marginLeft: 'auto' }} />
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        className="np-uplink-row"
-                        onClick={() => {
-                          const domain = trimText((account as any)?.website || account?.domain || '')
-                          if (!domain) return
-                          const normalized = domain.startsWith('http://') || domain.startsWith('https://') ? domain : `https://${domain}`
-                          window.open(normalized, '_blank')
-                        }}
-                        disabled={!trimText((account as any)?.website || account?.domain || '')}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minWidth: 0 }}>
-                          <Globe style={{ width: 16, height: 16, color: '#71717a', flexShrink: 0 }} />
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <span className="np-uplink-row__kicker">Digital Domain</span>
-                            <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain'}</span>
-                          </div>
-                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
-                        </div>
-                      </button>
-
-                      <button
-                        type="button"
-                        className="np-uplink-row"
-                        onClick={() => {
-                          const location = accountLocationValue
-                          if (!location) return
-                          window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location)}`, '_blank')
-                        }}
-                        disabled={!accountLocationValue}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', minWidth: 0 }}>
-                          <MapPin style={{ width: 16, height: 16, color: '#71717a', flexShrink: 0 }} />
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <span className="np-uplink-row__kicker">Asset Recon (Location)</span>
-                            <span className="np-uplink-row__value">{accountLocationValue || 'No location'}</span>
-                          </div>
-                          <ArrowUpRight style={{ width: 12, height: 12, flexShrink: 0, color: '#3f3f46' }} />
-                        </div>
-                      </button>
-
-                      <div className="np-uplink-row np-uplink-row--static" style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <Building2 style={{ width: 16, height: 16, color: '#71717a', flexShrink: 0 }} />
-                        <div style={{ minWidth: 0, flex: 1 }}>
-                          <span className="np-uplink-row__kicker">Zone Identifier</span>
-                          <span className="np-uplink-row__value np-uplink-row__value--chip">
-                            <span className="np-zone-chip" style={zoneStyle}>{accountZone}</span>
-                          </span>
-                        </div>
-                      </div>
-
-                      </div>
-
-                    {!selectedNumber ? (
-                      <div className="np-alert-card">
-                        <p className="np-micro" style={{ marginBottom: 12 }}>
-                          No Caller ID selected in CRM settings.
-                        </p>
-                        <button
-                          className="np-button np-button--sm np-button--primary np-button--full"
-                          onClick={() => void runAction('sync-profile', bootstrapProfile)}
-                          disabled={busy === 'sync-profile'}
-                        >
-                          {busy === 'sync-profile' ? 'SYNCING...' : 'RE-SYNC CRM PROFILE'}
-                        </button>
-                        <button className="np-button np-button--sm np-button--ghost np-button--full" onClick={loginToCrm}>
-                          Verify in Settings
-                        </button>
-                      </div>
-                    ) : null}
-                  </motion.section>
-
-                  <motion.section 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3, duration: 0.4, ease: FORENSIC_EASE }}
-                    className="np-card"
-                  >
-                    <div className="np-section-head">
-                      <div className="np-kicker font-mono">02 // INTELLIGENCE</div>
-                      <span className="np-micro font-mono">{notes.length} log{notes.length === 1 ? '' : 's'}</span>
-                    </div>
-                    <div className="np-note-composer">
-                      <textarea
-                        className="nodal-input nodal-input--textarea"
-                        placeholder="Log forensic findings..."
-                        rows={3}
-                        value={noteDraft}
-                        onChange={(e) => setNoteDraft(e.target.value)}
-                      />
-                      <div className="np-composer-actions">
-                        <button
-                          className="np-button np-button--primary"
-                          onClick={() => void runAction('save-note', async () => {
-                            await saveNote({ note: noteDraft, contactId: contact?.id, accountId: account?.id })
-                            setNoteDraft('')
-                          })}
-                          disabled={!noteDraft.trim() || busy === 'save-note'}
-                        >
-                          {busy === 'save-note' ? 'Saving...' : 'Commit Note'}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="np-note-list">
-                      {notes.map((note) => (
-                        <div key={note.id} className="np-note-entry font-mono border-white/5 bg-zinc-900/40">
-                          <div className="np-note-meta">
-                            <span className="np-note-source text-zinc-500 uppercase tracking-widest text-[9px]">{note.source === 'ai' ? 'AI_FORENSIC' : 'USER_RECON'}</span>
-                            <span className="np-note-date opacity-40">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                          </div>
-                          <p className="np-note-text leading-relaxed text-zinc-300">{note.text}</p>
-                        </div>
-                      ))}
-                      {notes.length === 0 && <p className="np-micro text-center pt-2">No logs captured for this session.</p>}
-                    </div>
-                  </motion.section>
-
-                  <motion.section 
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.4, duration: 0.4, ease: FORENSIC_EASE }}
-                    className="np-card"
-                  >
-                    <div className="np-section-head">
-                      <div className="np-kicker font-mono">03 // NETWORK</div>
-                      <span className="np-micro font-mono">{allContacts.length} total</span>
-                    </div>
-                    <div className="np-contact-list">
-                      {visibleContacts.map((c) => (
-                        <div key={c.id} className="np-contact-entry">
-                          <div className="np-contact-info">
-                            <EntityAvatar name={c.name} imageUrl={resolveContactPhoto(c)} size={32} className="np-entity-mark np-entity-mark--sm" />
-                            <div className="np-contact-copy">
-                              <div className="np-contact-name">{c.name}</div>
-                              <div className="np-micro">{c.title || 'Executive'}</div>
-                            </div>
-                          </div>
-                          {contactPhone(c) && (
-                            <button
-                              className="np-button np-button--sm np-button--ghost"
-                              onClick={() => void runAction('dial', () => dialCall(contactPhone(c), c.id, c.accountId || undefined))}
-                              disabled={busy === 'dial'}
-                            >
-                              Call
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                      {allContacts.length === 0 && <p className="np-micro text-center pt-2">No contact records found.</p>}
-                      {hasMoreContacts && (
-                        <button className="np-button np-button--xs np-button--full np-button--ghost" style={{ marginTop: 8 }}>
-                          View all {allContacts.length} contacts
-                        </button>
-                      )}
-                    </div>
-                  </motion.section>
-                </>
-              ) : (
-                <section className="np-card np-card--hero" style={{ textAlign: 'center', padding: '40px 20px' }}>
-                  <h3 className="np-hero-title">CRM Disconnected</h3>
-                  <p className="np-copy" style={{ marginTop: 12, marginBottom: 24 }}>
-                    Your forensic session has expired or is not yet initialized.
-                  </p>
-                  <button className="np-button np-button--primary np-button--full" onClick={loginToCrm}>
-                    Uplink Now
-                  </button>
-                </section>
-              )}
-            </div>
-          </motion.div>
-        )}
+        {viewNode}
       </AnimatePresence>
 
       <div className="np-footer">
@@ -871,7 +888,11 @@ function App() {
           <button className="np-button-forensic" title="Help">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
           </button>
-          <button className="np-button-forensic" title="Settings" onClick={loginToCrm}>
+          <button 
+            className={`np-button-forensic ${currentView === 'settings' ? 'text-[#002FA7]' : ''}`} 
+            title="Settings" 
+            onClick={() => setCurrentView(currentView === 'settings' ? 'main' : 'settings')}
+          >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           </button>
         </div>
