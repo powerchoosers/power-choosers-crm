@@ -1653,6 +1653,9 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
         case 'PHONE_LOOKUP':
           sendResponse(await handlePhoneLookup(message.payload))
           return
+        case 'PROFILE_REFRESH':
+          sendResponse(await handleAuthSync(null, sender))
+          return
         case 'REQUEST_RECENT_CALLS':
           sendResponse(await handleRecentCallsRefresh())
           return

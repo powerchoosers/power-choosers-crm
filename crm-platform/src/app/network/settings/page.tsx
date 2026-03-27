@@ -341,6 +341,13 @@ export default function SettingsPage() {
       // Refresh the global profile state to update the UI immediately
       await refreshProfile()
 
+      // Signal to the browser extension that settings have changed
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('nodal-point-settings-updated', { 
+          detail: { timestamp: new Date().toISOString() } 
+        }))
+      }
+
       toast.success('Profile updated')
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to save profile'
