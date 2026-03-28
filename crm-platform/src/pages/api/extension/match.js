@@ -46,6 +46,7 @@ function normalizeAccountRow(row, score = 0, reason = 'Matched from CRM data') {
 
 function normalizeContactRow(row, score = 0, reason = 'Matched from CRM data') {
   if (!row) return null
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
   const firstName = trimText(row.firstName || row.first_name)
   const lastName = trimText(row.lastName || row.last_name)
   const name = trimText(row.name || [firstName, lastName].filter(Boolean).join(' ') || row.email || 'Unknown contact')
@@ -62,7 +63,13 @@ function normalizeContactRow(row, score = 0, reason = 'Matched from CRM data') {
     workPhone: trimText(row.workPhone) || null,
     companyPhone: trimText(row.companyPhone) || null,
     otherPhone: trimText(row.otherPhone) || null,
-    directPhone: trimText(row.directPhone) || null,
+    directPhone: trimText(
+      row.directPhone ||
+        metadata.directPhone ||
+        metadata.direct_phone ||
+        metadata.original_apollo_data?.directPhone ||
+        metadata.original_apollo_data?.direct_phone
+    ) || null,
     city: trimText(row.city) || null,
     state: trimText(row.state) || null,
     score: Number(score) || 0,
