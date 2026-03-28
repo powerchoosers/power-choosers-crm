@@ -24,6 +24,44 @@ function sanitizeText(value) {
   return text
 }
 
+function resolvePhotoUrl(...sources) {
+  const directKeys = [
+    'photoUrl',
+    'photo_url',
+    'avatarUrl',
+    'avatar_url',
+    'profilePhotoUrl',
+    'profile_photo_url',
+    'imageUrl',
+    'image_url',
+  ]
+  const nestedKeys = ['metadata', 'general', 'contact', 'original_apollo_data']
+
+  const fromRecord = (record) => {
+    if (!record || typeof record !== 'object') return ''
+
+    for (const key of directKeys) {
+      const url = sanitizeText(record?.[key])
+      if (url) return url
+    }
+
+    for (const key of nestedKeys) {
+      const nested = record?.[key]
+      if (!nested || typeof nested !== 'object') continue
+      const nestedUrl = fromRecord(nested)
+      if (nestedUrl) return nestedUrl
+    }
+
+    return ''
+  }
+
+  for (const source of sources) {
+    const url = fromRecord(source)
+    if (url) return url
+  }
+  return ''
+}
+
 function buildIdentityName(input) {
   let name = sanitizeText(input?.name)
   let firstName = sanitizeText(input?.firstName || input?.first_name)
@@ -87,13 +125,7 @@ function normalizeCrmContactRow(row) {
     email: sanitizeText(row?.email) || null,
     linkedin: sanitizeText(row?.linkedinUrl) || null,
     location: [sanitizeText(row?.city), sanitizeText(row?.state)].filter(Boolean).join(', ') || null,
-    photoUrl: sanitizeText(
-      row?.metadata?.photoUrl ||
-        row?.metadata?.photo_url ||
-        row?.metadata?.avatarUrl ||
-        row?.metadata?.avatar_url ||
-        row?.metadata?.original_apollo_data?.photoUrl
-    ) || null,
+    photoUrl: resolvePhotoUrl(row) || null,
     phone: sanitizeText(row?.phone) || null,
     mobile: sanitizeText(row?.mobile) || null,
     workPhone: sanitizeText(row?.workPhone) || null,
@@ -131,7 +163,7 @@ function normalizeApolloContactRow(raw, crmId) {
     email: sanitizeText(raw?.email) || null,
     linkedin: sanitizeText(raw?.linkedin || raw?.linkedin_url) || null,
     location: sanitizeText(raw?.location) || null,
-    photoUrl: sanitizeText(raw?.photoUrl || raw?.photo_url) || null,
+    photoUrl: resolvePhotoUrl(raw) || null,
     phone: primaryPhone,
     mobile: sanitizeText(raw?.mobile) || null,
     workPhone: sanitizeText(raw?.workPhone) || null,
