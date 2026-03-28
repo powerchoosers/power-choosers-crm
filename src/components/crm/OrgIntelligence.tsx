@@ -290,6 +290,112 @@ function buildNameKey(firstName?: unknown, lastName?: unknown): string {
   return `${first}::${last}`;
 }
 
+function normalizeLinkedinUrl(value: unknown): string {
+  const text = sanitizeContactText(value);
+  if (!text) return '';
+
+  try {
+    const parsed = new URL(text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`);
+    const hostname = parsed.hostname.replace(/^www\./i, '');
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    return `${hostname}${pathname}`.replace(/\/+$/, '').toLowerCase();
+  } catch {
+    return text
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/[?#].*$/, '')
+      .replace(/\/+$/, '');
+  }
+}
+
+function contactCacheKey(contact: ApolloContactRow): string {
+  return (
+    sanitizeContactText(contact.crmId || '') ||
+    sanitizeContactText(contact.id || '') ||
+    sanitizeContactText(contact.email || '').toLowerCase() ||
+    normalizeLinkedinUrl(contact.linkedin || '') ||
+    buildNameKey(contact.firstName, contact.lastName) ||
+    sanitizeContactText(contact.name || '').toLowerCase()
+  );
+}
+
+function mergeApolloContactRows(primary: ApolloContactRow[], secondary: ApolloContactRow[]): ApolloContactRow[] {
+  const byKey = new Map<string, ApolloContactRow>();
+  const extras: ApolloContactRow[] = [];
+
+  const addPhone = (value: unknown, seen: Set<string>, phones: PhoneEntry[], fallback?: PhoneEntry) => {
+    const number = typeof value === 'string'
+      ? value
+      : isRecord(value) && typeof value.number === 'string'
+        ? value.number
+        : typeof fallback === 'string'
+          ? fallback
+          : '';
+    const normalized = sanitizeContactText(number);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (isRecord(value) && typeof value.number === 'string') {
+      phones.push({
+        number: value.number,
+        type: typeof value.type === 'string' ? value.type : undefined,
+      });
+      return;
+    }
+    phones.push(normalized);
+  };
+
+  const mergeContact = (existing: ApolloContactRow, fresh: ApolloContactRow): ApolloContactRow => {
+    const mergedPhones: PhoneEntry[] = [];
+    const seen = new Set<string>();
+    (Array.isArray(existing.phones) ? existing.phones : []).forEach((entry) => addPhone(entry, seen, mergedPhones));
+    (Array.isArray(fresh.phones) ? fresh.phones : []).forEach((entry) => addPhone(entry, seen, mergedPhones));
+
+    return {
+      ...existing,
+      ...fresh,
+      id: sanitizeContactText(fresh.id || existing.id || ''),
+      crmId: sanitizeContactText(fresh.crmId || existing.crmId || '') || undefined,
+      name: sanitizeContactText(fresh.name || existing.name || '') || 'Contact',
+      firstName: sanitizeContactText(fresh.firstName || existing.firstName || '') || undefined,
+      lastName: sanitizeContactText(fresh.lastName || existing.lastName || '') || undefined,
+      title: sanitizeContactText(fresh.title || existing.title || '') || undefined,
+      email: sanitizeContactText(fresh.email || '') || sanitizeContactText(existing.email || '') || 'N/A',
+      photoUrl: sanitizeContactText(fresh.photoUrl || existing.photoUrl || '') || undefined,
+      location: sanitizeContactText(fresh.location || existing.location || '') || undefined,
+      linkedin: sanitizeContactText(fresh.linkedin || existing.linkedin || '') || undefined,
+      status: fresh.status === 'verified' || existing.status === 'verified'
+        ? 'verified'
+        : fresh.status || existing.status,
+      isMonitored: Boolean(fresh.isMonitored || existing.isMonitored || fresh.crmId || existing.crmId),
+      phones: mergedPhones,
+    };
+  };
+
+  const insert = (contact: ApolloContactRow) => {
+    const key = contactCacheKey(contact);
+    if (!key) {
+      extras.push(contact);
+      return;
+    }
+
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, contact);
+      return;
+    }
+
+    byKey.set(key, mergeContact(existing, contact));
+  };
+
+  primary.forEach(insert);
+  secondary.forEach(insert);
+
+  return [...extras, ...byKey.values()];
+}
+
 export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId, accountLogoUrl, accountDomain }: OrgIntelligenceProps) {
   const { user } = useAuth();
   const router = useRouter();
@@ -788,7 +894,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           empty.emailToCrmId.set(email, contact.id);
         }
 
-        const linkedin = sanitizeContactText(contact.linkedinUrl).toLowerCase();
+        const linkedin = normalizeLinkedinUrl(contact.linkedinUrl);
         if (linkedin && !empty.linkedinToCrmId.has(linkedin)) {
           empty.linkedinToCrmId.set(linkedin, contact.id);
         }
@@ -902,6 +1008,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       const contactCity = (enriched as { city?: string }).city ?? person.location?.split(',')[0]?.trim() ?? null;
       const contactState = (enriched as { state?: string }).state ?? (person.location?.includes(',') ? person.location.split(',')[1]?.trim() : null) ?? null;
       const linkedinUrl = (enriched as { linkedin?: string }).linkedin || person.linkedin || null;
+      const linkedinLookup = normalizeLinkedinUrl(linkedinUrl);
       const rawImmediatePhones: PhoneEntry[] = (enriched.phones || [])
         .map((ph: { number?: string; type?: string; type_cd?: string }) => {
           if (!ph?.number) return null;
@@ -992,12 +1099,13 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               .update(contactData)
             .eq('id', crmId);
           if (error) throw error;
-        } else if (linkedinUrl) {
+        } else if (linkedinLookup) {
+          const linkedinPattern = `%${linkedinLookup.split('linkedin.com/').pop() || linkedinLookup}%`;
           const { data: byLinkedin } = await supabase
             .from('contacts')
             .select('id')
             .eq('accountId', accountId)
-            .eq('linkedinUrl', linkedinUrl)
+            .ilike('linkedinUrl', linkedinPattern)
             .maybeSingle();
           if (byLinkedin?.id) {
             crmId = byLinkedin.id;
@@ -1027,11 +1135,12 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           }
         }
 
-        if (!crmId && contactData.email && contactData.email !== 'N/A') {
+        const contactEmail = sanitizeContactText(contactData.email);
+        if (!crmId && contactEmail && contactEmail !== 'N/A') {
           const { data: existing } = await supabase
             .from('contacts')
             .select('id')
-            .eq('email', contactData.email)
+            .ilike('email', contactEmail)
             .maybeSingle();
           if (existing?.id) {
             crmId = existing.id;
@@ -1406,7 +1515,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified'
           const emailKey = sanitizeContactText(email).toLowerCase();
           const linkedin = sanitizeContactText(contact.linkedin_url);
-          const linkedInKey = linkedin.toLowerCase();
+          const linkedInKey = normalizeLinkedinUrl(linkedin);
           const nameKey = buildNameKey(firstName, lastName);
           const crmId =
             lookups.apolloIdToCrmId.get(id) ||
@@ -1544,7 +1653,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           const status: ApolloContactRow['status'] = emailStatus === 'verified' ? 'verified' : 'unverified';
           const linkedin = sanitizeContactText(typeof c.linkedin_url === 'string' ? c.linkedin_url : typeof c.linkedin === 'string' ? c.linkedin : '');
           const emailKey = sanitizeContactText(email).toLowerCase();
-          const linkedInKey = linkedin.toLowerCase();
+          const linkedInKey = normalizeLinkedinUrl(linkedin);
           const nameKey = buildNameKey(firstName, lastName);
           const crmId =
             lookups.apolloIdToCrmId.get(id) ||
@@ -1607,29 +1716,15 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         })
         .filter((v): v is ApolloContactRow => v !== null);
 
+      const mergedCacheData = mergeApolloContactRows(previousData, mappedData);
+
       if (mappedData.length > 0) {
         setData(mappedData);
         setCurrentPage(1);
-        const key = cacheKeyFromDomainOrName(domain, companyName);
-        if (key && companySummary) {
-          const cacheKey = `apollo_cache_${key}`;
-          let existingContacts: ApolloContactRow[] = [];
-          try {
-            const cached = localStorage.getItem(cacheKey);
-            if (cached) {
-              const parsed = JSON.parse(cached);
-              existingContacts = Array.isArray(parsed?.contacts) ? parsed.contacts : [];
-            }
-          } catch (_) { }
-          const existingIds = new Set(existingContacts.map(c => c.id));
-          const newContacts = mappedData.filter(c => !existingIds.has(c.id));
-          if (newContacts.length > 0) {
-            saveToCache(companySummary, [...existingContacts, ...newContacts], {
-              searchTerm: term,
-              currentPage: 1,
-            });
-          }
-        }
+        saveToCache(companySummary, mergedCacheData, {
+          searchTerm: term,
+          currentPage: 1,
+        });
       } else {
         let crmFallback: ApolloContactRow[] = [];
 
@@ -1687,10 +1782,22 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (crmFallback.length > 0) {
           setData(crmFallback);
           setCurrentPage(1);
+          saveToCache(companySummary, mergeApolloContactRows(previousData, crmFallback), {
+            searchTerm: term,
+            currentPage: 1,
+          });
           toast.info('No live Apollo matches for this search. Showing synced CRM contacts for this account.');
         } else if (previousData.length > 0) {
+          saveToCache(companySummary, previousData, {
+            searchTerm: term,
+            currentPage: 1,
+          });
           toast.info('No additional matches from Apollo. Showing filtered list from current results.');
         } else {
+          saveToCache(companySummary, previousData, {
+            searchTerm: term,
+            currentPage: 1,
+          });
           toast.info('No people found for this search.');
         }
       }

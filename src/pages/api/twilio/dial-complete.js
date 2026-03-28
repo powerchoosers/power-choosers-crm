@@ -63,6 +63,10 @@ export default async function handler(req, res) {
 
     const { CallSid, DialCallStatus, DialCallDuration, DialCallSid } = body;
     const normalizedDialStatus = String(DialCallStatus || '').toLowerCase();
+    const parseOptionalInt = (value) => {
+      const parsed = parseInt(String(value ?? ''), 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
 
     logger.log('[DialComplete] Call completed:', {
       callSid: CallSid,
@@ -80,11 +84,36 @@ export default async function handler(req, res) {
         const host = req.headers.host || req.headers['x-forwarded-host'] || '';
         const requestUrl = new URL(req.url, `${protocol}://${host}`);
         const contactId = requestUrl.searchParams.get('contactId');
+        const contactName = requestUrl.searchParams.get('contactName');
+        const contactTitle = requestUrl.searchParams.get('contactTitle');
         const accountId = requestUrl.searchParams.get('accountId');
+        const accountName = requestUrl.searchParams.get('accountName');
         const agentId = requestUrl.searchParams.get('agentId');
         const agentEmail = requestUrl.searchParams.get('agentEmail');
         const targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
         const businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone');
+        const powerDialSessionId = requestUrl.searchParams.get('powerDialSessionId');
+        const powerDialBatchId = requestUrl.searchParams.get('powerDialBatchId');
+        const powerDialBatchIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchIndex'));
+        const powerDialBatchSize = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchSize'));
+        const powerDialTargetIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetIndex'));
+        const powerDialTargetCount = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetCount'));
+        const powerDialSourceLabel = requestUrl.searchParams.get('powerDialSourceLabel');
+        const powerDialSelectedCount = parseOptionalInt(requestUrl.searchParams.get('powerDialSelectedCount'));
+        const powerDialDialableCount = parseOptionalInt(requestUrl.searchParams.get('powerDialDialableCount'));
+        const isPowerDialBatch = Boolean(powerDialSessionId || powerDialBatchId || powerDialTargetCount != null);
+
+        let resolvedTargetPhone = targetPhoneFromQuery || body.DialedNumber || body.Called || body.To || body.From || '';
+
+        if ((!resolvedTargetPhone || String(resolvedTargetPhone).startsWith('client:') || String(resolvedTargetPhone).startsWith('AP')) && DialCallSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
+          try {
+            const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+            const childCall = await client.calls(DialCallSid).fetch();
+            resolvedTargetPhone = childCall?.to || childCall?.from || resolvedTargetPhone;
+          } catch (fetchErr) {
+            logger.warn('[DialComplete] Failed to resolve child call phone:', fetchErr?.message || fetchErr);
+          }
+        }
 
         const { upsertCallInSupabase } = await import('../calls.js');
         await upsertCallInSupabase({
@@ -92,11 +121,23 @@ export default async function handler(req, res) {
           status: 'completed',
           duration: parseInt(DialCallDuration || '0', 10),
           contactId: contactId || null,
+          contactName: contactName || null,
+          contactTitle: contactTitle || null,
           accountId: accountId || null,
+          accountName: accountName || null,
           agentId: agentId || null,
           agentEmail: agentEmail || null,
-          targetPhone: targetPhoneFromQuery || body.To || '',
+          targetPhone: resolvedTargetPhone || '',
           businessPhone: businessPhoneFromQuery || undefined,
+          powerDialSessionId: powerDialSessionId || null,
+          powerDialBatchId: powerDialBatchId || null,
+          powerDialBatchIndex,
+          powerDialBatchSize,
+          powerDialTargetIndex,
+          powerDialTargetCount,
+          powerDialSourceLabel: powerDialSourceLabel || null,
+          powerDialSelectedCount,
+          powerDialDialableCount,
           source: 'dial-complete'
         }).catch(err => {
           logger.error('[DialComplete] Supabase log failed:', err?.message);
@@ -109,8 +150,8 @@ export default async function handler(req, res) {
 
     // Create TwiML response that ENDS the call without retry
     const twiml = new VoiceResponse();
-    const shouldPlayVoicemail = ['no-answer', 'busy'].includes(normalizedDialStatus);
     let voicemailGreeting = null;
+    const shouldPlayVoicemail = !isPowerDialBatch && ['no-answer', 'busy'].includes(normalizedDialStatus);
 
     if (shouldPlayVoicemail) {
       try {

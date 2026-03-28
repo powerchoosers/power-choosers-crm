@@ -28,7 +28,13 @@ async function ensureVoicemailBucket() {
     return bucket
   }
 
-  if (bucketError?.status && bucketError.status !== 404) {
+  const bucketMissing = bucketError && (
+    bucketError.status === 404 ||
+    bucketError.status === 400 ||
+    /bucket not found/i.test(bucketError.message || '')
+  )
+
+  if (bucketError && !bucketMissing) {
     throw new Error(`Unable to inspect voicemail bucket: ${bucketError.message}`)
   }
 
@@ -39,6 +45,27 @@ async function ensureVoicemailBucket() {
   })
 
   if (error) {
+    if (/already exists/i.test(error.message || '')) {
+      const { data: existingBucket, error: refetchError } = await supabaseAdmin.storage.getBucket(VOICEMAIL_BUCKET)
+      if (refetchError) {
+        throw new Error(`Unable to verify voicemail bucket after create: ${refetchError.message}`)
+      }
+
+      if (existingBucket && !existingBucket.public) {
+        const { error: updateError } = await supabaseAdmin.storage.updateBucket(VOICEMAIL_BUCKET, {
+          public: true,
+          fileSizeLimit: 15 * 1024 * 1024,
+          allowedMimeTypes: ['audio/wav', 'audio/x-wav', 'audio/wave'],
+        })
+
+        if (updateError) {
+          throw new Error(`Unable to make voicemail bucket public: ${updateError.message}`)
+        }
+      }
+
+      return existingBucket
+    }
+
     throw new Error(`Unable to create voicemail bucket: ${error.message}`)
   }
 
