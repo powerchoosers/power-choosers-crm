@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio, Plus, ShieldCheck } from 'lucide-react'
+import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio, Plus, ShieldCheck, Linkedin, Loader2 } from 'lucide-react'
 import {
   defaultCallState,
   formatElapsed,
@@ -28,6 +28,7 @@ type MessageResponse<T> = {
 type OrgNetworkContact = {
   id: string
   crmId: string | null
+  apolloPersonId?: string | null
   name: string
   firstName: string | null
   lastName: string | null
@@ -59,11 +60,27 @@ type OrgContactsPayload = {
   }
 }
 
+type RevealState = {
+  revealingEmail: boolean
+  revealingPhone: boolean
+  phoneTimedOut: boolean
+  phoneWarned: boolean
+}
+
+type RevealOrgContactPayload = {
+  contact?: OrgNetworkContact
+  apolloPersonId?: string | null
+  pendingPhone?: boolean
+}
+
 const FORENSIC_EASE: any = [0.23, 1, 0.32, 1]
 const NETWORK_LABELS = {
   crm: 'CRM',
   apollo: 'ORG_INTELLIGENCE',
 } as const
+const PHONE_REVEAL_WARNING_MS = 60_000
+const PHONE_REVEAL_TIMEOUT_MS = 120_000
+const PHONE_REVEAL_POLL_INTERVAL_MS = 10_000
 
 function sendMessage<T = Record<string, unknown>>(type: string, payload?: unknown): Promise<MessageResponse<T>> {
   return new Promise((resolve, reject) => {
@@ -91,6 +108,13 @@ function snippet(value: string | null | undefined, max = 180) {
   if (!text) return ''
   if (text.length <= max) return text
   return `${text.slice(0, max).trimEnd()}…`
+}
+
+function normalizeExternalUrl(value: string | null | undefined) {
+  const text = trimText(value || '')
+  if (!text) return ''
+  if (/^https?:\/\//i.test(text)) return text
+  return `https://${text.replace(/^\/+/, '')}`
 }
 
 function formatCrmStatus(state: ExtensionState | null) {
@@ -234,11 +258,16 @@ function sanitizeOrgContact(raw: any): OrgNetworkContact | null {
   const id = trimText(raw.id || raw.crmId || '')
   if (!id) return null
   const phones = Array.isArray(raw.phones)
-    ? raw.phones.map((item: unknown) => trimText(item)).filter(Boolean)
+    ? raw.phones
+        .map((item: any) => trimText(typeof item === 'string' ? item : item?.number || item?.raw_number || item?.sanitized_number || ''))
+        .filter(Boolean)
     : []
+  const apolloPersonId = trimText(raw.apolloPersonId || raw.apollo_person_id || raw?.metadata?.apollo_person_id || '')
+  const source = raw.source === 'apollo' ? 'apollo' : 'crm'
   return {
     id,
     crmId: trimText(raw.crmId || '') || null,
+    apolloPersonId: apolloPersonId || (source === 'apollo' ? id : null),
     name: trimText(raw.name || 'Contact') || 'Contact',
     firstName: trimText(raw.firstName || raw.first_name || '') || null,
     lastName: trimText(raw.lastName || raw.last_name || '') || null,
@@ -255,7 +284,7 @@ function sanitizeOrgContact(raw: any): OrgNetworkContact | null {
     directPhone: trimText(raw.directPhone || '') || null,
     phones,
     isMonitored: Boolean(raw.isMonitored),
-    source: raw.source === 'apollo' ? 'apollo' : 'crm',
+    source,
   }
 }
 
@@ -263,6 +292,7 @@ function normalizeCrmMatchContact(raw: MatchContact): OrgNetworkContact {
   return {
     id: trimText(raw.id),
     crmId: trimText(raw.id) || null,
+    apolloPersonId: trimText((raw as any)?.metadata?.apollo_person_id || '') || null,
     name: trimText(raw.name || 'Contact') || 'Contact',
     firstName: null,
     lastName: null,
@@ -303,6 +333,7 @@ function mergedContacts(primary: OrgNetworkContact[], secondary: OrgNetworkConta
     byId.set(key, {
       ...existing,
       ...contact,
+      apolloPersonId: trimText(contact.apolloPersonId || existing.apolloPersonId || '') || null,
       phones: Array.from(new Set([...(existing.phones || []), ...(contact.phones || [])])).filter(Boolean),
       source: 'crm',
       isMonitored: true,
@@ -312,19 +343,34 @@ function mergedContacts(primary: OrgNetworkContact[], secondary: OrgNetworkConta
   return Array.from(byId.values())
 }
 
+type NetworkPhoneEntry = { number: string; label: string }
+
+function networkPhoneEntries(contact: OrgNetworkContact | null | undefined): NetworkPhoneEntry[] {
+  if (!contact) return []
+  const entries: NetworkPhoneEntry[] = []
+  const seen = new Set<string>()
+
+  const add = (value: string | null | undefined, label: string) => {
+    const number = trimText(value || '')
+    if (!number) return
+    if (seen.has(number)) return
+    seen.add(number)
+    entries.push({ number, label })
+  }
+
+  add(contact.mobile, 'MOBILE')
+  add(contact.workPhone, 'WORK')
+  add(contact.phone, 'PHONE')
+  add(contact.companyPhone, 'COMPANY')
+  add(contact.otherPhone, 'OTHER')
+  add(contact.directPhone, 'DIRECT')
+  ;(Array.isArray(contact.phones) ? contact.phones : []).forEach((num, idx) => add(num, idx === 0 ? 'PHONE' : `PHONE ${idx + 1}`))
+
+  return entries
+}
+
 function networkPhone(contact: OrgNetworkContact | null | undefined) {
-  if (!contact) return ''
-  const fallback = Array.isArray(contact.phones) && contact.phones.length > 0 ? contact.phones[0] : ''
-  return trimText(
-    contact.phone ||
-      contact.mobile ||
-      contact.workPhone ||
-      contact.companyPhone ||
-      contact.otherPhone ||
-      contact.directPhone ||
-      fallback ||
-      ''
-  )
+  return networkPhoneEntries(contact)[0]?.number || ''
 }
 
 function networkMatchesQuery(contact: OrgNetworkContact, query: string) {
@@ -338,6 +384,7 @@ function networkMatchesQuery(contact: OrgNetworkContact, query: string) {
     contact.email || '',
     contact.linkedin || '',
     contact.location || '',
+    contact.apolloPersonId || '',
     ...(Array.isArray(contact.phones) ? contact.phones : []),
   ]
     .filter(Boolean)
@@ -532,8 +579,11 @@ function App() {
     counts: { crm: 0, apolloOnly: 0, apolloTotal: 0 },
   })
   const [orgLoadedAccountId, setOrgLoadedAccountId] = useState<string | null>(null)
+  const [revealStates, setRevealStates] = useState<Record<string, RevealState>>({})
   const autoCaptureRan = useRef(false)
   const initStuckTimer = useRef<ReturnType<typeof setInterval> | null>(null)
+  const revealPhoneTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const revealPhoneWarningTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
   const loadState = async () => {
     const response = await sendMessage<{ state: ExtensionState }>('GET_STATE')
@@ -541,6 +591,117 @@ function App() {
       setState(response.state)
     }
   }
+
+  const contactRevealKey = (contact: OrgNetworkContact) => trimText(contact.apolloPersonId || contact.crmId || contact.id || '')
+
+  const patchRevealState = (key: string, patch: Partial<RevealState>) => {
+    if (!key) return
+    setRevealStates((prev) => {
+      const current = prev[key] || {
+        revealingEmail: false,
+        revealingPhone: false,
+        phoneTimedOut: false,
+        phoneWarned: false,
+      }
+      return {
+        ...prev,
+        [key]: { ...current, ...patch },
+      }
+    })
+  }
+
+  const clearPhoneRevealTimeout = (key: string) => {
+    const timer = revealPhoneTimeouts.current[key]
+    if (!timer) return
+    clearTimeout(timer)
+    delete revealPhoneTimeouts.current[key]
+  }
+
+  const clearPhoneRevealWarningTimeout = (key: string) => {
+    const timer = revealPhoneWarningTimeouts.current[key]
+    if (!timer) return
+    clearTimeout(timer)
+    delete revealPhoneWarningTimeouts.current[key]
+  }
+
+  const clearPhoneRevealTimers = (key: string) => {
+    clearPhoneRevealTimeout(key)
+    clearPhoneRevealWarningTimeout(key)
+  }
+
+  const upsertRevealedContact = (rawContact: OrgNetworkContact | null | undefined, previousContact?: OrgNetworkContact) => {
+    const nextContact = sanitizeOrgContact(rawContact)
+    if (!nextContact) return
+
+    const previousApolloId = trimText(previousContact?.apolloPersonId || previousContact?.id || '')
+    const nextApolloId = trimText(nextContact.apolloPersonId || '')
+    const previousCrmId = trimText(previousContact?.crmId || '')
+    const nextCrmId = trimText(nextContact.crmId || '')
+
+    setOrgContacts((prev) => {
+      const removeApollo = (candidate: OrgNetworkContact) => {
+        const candidateId = trimText(candidate.id || '')
+        const candidateApollo = trimText(candidate.apolloPersonId || '')
+        const candidateCrm = trimText(candidate.crmId || '')
+
+        if (previousApolloId && (candidateId === previousApolloId || candidateApollo === previousApolloId)) return false
+        if (nextApolloId && (candidateId === nextApolloId || candidateApollo === nextApolloId)) return false
+        if (previousCrmId && candidateCrm === previousCrmId) return false
+        if (nextCrmId && candidateCrm === nextCrmId) return false
+        return true
+      }
+
+      const apolloOnlyContacts = prev.apolloOnlyContacts.filter(removeApollo)
+      const existing = [...prev.crmContacts].find((item) => {
+        if (nextCrmId && trimText(item.crmId || '') === nextCrmId) return true
+        if (nextApolloId && trimText(item.apolloPersonId || '') === nextApolloId) return true
+        if (nextApolloId && trimText(item.id || '') === nextApolloId) return true
+        return false
+      })
+
+      const merged = existing
+        ? {
+            ...existing,
+            ...nextContact,
+            apolloPersonId: trimText(nextContact.apolloPersonId || existing.apolloPersonId || '') || null,
+            phones: Array.from(new Set([...(existing.phones || []), ...(nextContact.phones || [])])).filter(Boolean),
+            source: 'crm' as const,
+            isMonitored: true,
+          }
+        : {
+            ...nextContact,
+            source: 'crm' as const,
+            isMonitored: true,
+          }
+
+      const crmContacts = [...prev.crmContacts.filter((item) => {
+        const itemCrm = trimText(item.crmId || '')
+        const itemApollo = trimText(item.apolloPersonId || '')
+        const itemId = trimText(item.id || '')
+        if (nextCrmId && itemCrm === nextCrmId) return false
+        if (nextApolloId && (itemApollo === nextApolloId || itemId === nextApolloId)) return false
+        return true
+      }), merged]
+
+      return {
+        ...prev,
+        crmContacts,
+        apolloOnlyContacts,
+        counts: {
+          crm: crmContacts.length,
+          apolloOnly: apolloOnlyContacts.length,
+          apolloTotal: crmContacts.length + apolloOnlyContacts.length,
+        },
+      }
+    })
+  }
+
+  useEffect(() => {
+    return () => {
+      Object.keys(revealPhoneTimeouts.current).forEach((key) => clearPhoneRevealTimeout(key))
+      Object.keys(revealPhoneWarningTimeouts.current).forEach((key) => clearPhoneRevealWarningTimeout(key))
+    }
+  }, [])
 
   useEffect(() => {
     void loadState().catch(() => {})
@@ -703,6 +864,117 @@ function App() {
       setError((err as Error).message || 'Failed to load org contacts')
     } finally {
       setOrgContactsLoading(false)
+    }
+  }
+
+  const startPhoneRevealPolling = (contact: OrgNetworkContact, apolloPersonId: string) => {
+    const key = contactRevealKey(contact)
+    if (!key || !apolloPersonId) return
+
+    clearPhoneRevealTimers(key)
+
+    revealPhoneWarningTimeouts.current[key] = setTimeout(() => {
+      patchRevealState(key, { phoneWarned: true })
+    }, PHONE_REVEAL_WARNING_MS)
+
+    revealPhoneTimeouts.current[key] = setTimeout(() => {
+      patchRevealState(key, {
+        revealingPhone: false,
+        revealingEmail: false,
+        phoneTimedOut: true,
+        phoneWarned: true,
+      })
+      clearPhoneRevealTimers(key)
+    }, PHONE_REVEAL_TIMEOUT_MS)
+
+    const poll = async () => {
+      try {
+        const response = await sendMessage<{ data: RevealOrgContactPayload }>('POLL_ORG_CONTACT_PHONES', {
+          personId: apolloPersonId,
+          accountId: state?.match?.account?.id || null,
+          person: contact,
+        })
+
+        const payload = response?.data || {}
+        if (payload?.contact) {
+          upsertRevealedContact(payload.contact, contact)
+          patchRevealState(key, {
+            revealingPhone: false,
+            revealingEmail: false,
+            phoneTimedOut: false,
+            phoneWarned: false,
+          })
+          clearPhoneRevealTimers(key)
+          return
+        }
+      } catch {
+        // keep polling until timeout window elapses
+      }
+
+      if (!revealPhoneTimeouts.current[key]) return
+      window.setTimeout(poll, PHONE_REVEAL_POLL_INTERVAL_MS)
+    }
+
+    window.setTimeout(poll, PHONE_REVEAL_POLL_INTERVAL_MS)
+  }
+
+  const revealOrgContact = async (contact: OrgNetworkContact, mode: 'email' | 'phone') => {
+    if (!state?.match?.account?.id) {
+      throw new Error('No account context was found for this reveal.')
+    }
+
+    const key = contactRevealKey(contact)
+    if (!key) {
+      throw new Error('Contact id is missing and cannot be revealed.')
+    }
+
+    const revealPhone = mode === 'phone'
+    patchRevealState(key, {
+      revealingEmail: true,
+      revealingPhone: revealPhone,
+      phoneTimedOut: false,
+      phoneWarned: false,
+    })
+
+    if (!revealPhone) {
+      clearPhoneRevealTimers(key)
+    }
+
+    try {
+      const response = await sendMessage<{ data: RevealOrgContactPayload }>('REVEAL_ORG_CONTACT', {
+        accountId: state.match.account.id,
+        person: contact,
+        revealEmails: true,
+        revealPhones: revealPhone,
+      })
+
+      const payload = response?.data || {}
+      if (payload?.contact) {
+        upsertRevealedContact(payload.contact, contact)
+      }
+
+      if (revealPhone && payload?.pendingPhone) {
+        const personId = trimText(payload.apolloPersonId || contact.apolloPersonId || contact.id || '')
+        if (personId) {
+          startPhoneRevealPolling(contact, personId)
+          return
+        }
+      }
+
+      patchRevealState(key, {
+        revealingEmail: false,
+        revealingPhone: false,
+        phoneTimedOut: false,
+        phoneWarned: false,
+      })
+      clearPhoneRevealTimers(key)
+    } catch (error) {
+      patchRevealState(key, {
+        revealingEmail: false,
+        revealingPhone: false,
+      })
+      clearPhoneRevealTimers(key)
+      throw error
     }
   }
 
@@ -1225,6 +1497,20 @@ function App() {
                   >
                     <div className="np-network-list">
                       {visibleContacts.map((c) => (
+                        (() => {
+                          const revealKey = contactRevealKey(c)
+                          const revealState = revealStates[revealKey] || {
+                            revealingEmail: false,
+                            revealingPhone: false,
+                            phoneTimedOut: false,
+                            phoneWarned: false,
+                          }
+                          const phoneEntries = networkPhoneEntries(c)
+                          const displayPhone = networkPhone(c)
+                          const canReveal = Boolean(trimText(c.apolloPersonId || (c.source === 'apollo' ? c.id : '')))
+                          const isMonitored = Boolean(c.crmId || c.isMonitored)
+                          const linkedinUrl = normalizeExternalUrl(c.linkedin)
+                          return (
                         <motion.div
                           key={`${c.crmId || c.id}-${c.source}`}
                           layout
@@ -1232,7 +1518,7 @@ function App() {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.98, y: -10 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 30, layout: { duration: 0.3 } }}
-                          className={`np-network-card ${c.crmId ? 'np-network-card--crm' : 'np-network-card--apollo'}`}
+                          className="np-network-card"
                         >
                           <div className="np-network-card__top">
                             <div className="np-network-card__identity">
@@ -1244,7 +1530,7 @@ function App() {
                               <div className="np-network-card__copy">
                                 <div className="np-network-card__name-row">
                                   <span className="np-network-card__name">{c.name}</span>
-                                  {c.crmId ? <ShieldCheck size={12} color="#22c55e" aria-label="Synced" /> : null}
+                                  {isMonitored ? <ShieldCheck size={12} color="#22c55e" aria-label="Synced" /> : null}
                                 </div>
                                 <span className="np-network-card__title">
                                   {c.title || 'Nodal Analyst'}
@@ -1253,16 +1539,21 @@ function App() {
                             </div>
 
                             <div className="np-network-card__actions">
-                              <span
-                                className={`np-network-card__source ${c.source === 'apollo' ? 'np-network-card__source--apollo' : 'np-network-card__source--crm'}`}
-                              >
-                                {c.source === 'apollo' ? 'ORG_INTELLIGENCE' : 'CRM'}
-                              </span>
-                              {networkPhone(c) ? (
+                              {isMonitored && linkedinUrl ? (
+                                <button
+                                  className="np-button-forensic np-network-card__icon-btn"
+                                  onClick={() => window.open(linkedinUrl, '_blank')}
+                                  title="Open LinkedIn"
+                                >
+                                  <Linkedin size={13} />
+                                </button>
+                              ) : null}
+                              {isMonitored && displayPhone ? (
                                 <button
                                   className="np-button-forensic np-network-card__dial"
-                                  onClick={() => void runAction('dial', () => dialCall(networkPhone(c) || '', c.crmId || undefined, account?.id || undefined))}
+                                  onClick={() => void runAction('dial', () => dialCall(displayPhone, c.crmId || undefined, account?.id || undefined))}
                                   disabled={busy === 'dial'}
+                                  title="Call contact"
                                 >
                                   <Phone size={14} />
                                 </button>
@@ -1270,13 +1561,122 @@ function App() {
                             </div>
                           </div>
 
-                          {(c.phone || c.mobile || c.workPhone || c.companyPhone || c.otherPhone || c.directPhone) ? (
-                            <div className="np-network-card__phone">
-                              <Phone className="np-network-card__phone-icon" />
-                              <span>{formatPhone(networkPhone(c)) || 'No direct line'}</span>
+                          {isMonitored ? (
+                            <div className="np-network-card__detail-wrap">
+                              <div className="np-network-card__detail-grid">
+                                {c.email ? (
+                                  <button
+                                    type="button"
+                                    className="np-network-card__detail"
+                                    onClick={() => window.open(`mailto:${c.email}`, '_blank')}
+                                    title="Email contact"
+                                  >
+                                    <Globe className="np-network-card__detail-icon" />
+                                    <div className="np-network-card__detail-copy">
+                                      <span className="np-network-card__detail-value">{c.email}</span>
+                                      <span className="np-network-card__detail-label">EMAIL</span>
+                                    </div>
+                                  </button>
+                                ) : canReveal ? (
+                                  <button
+                                    type="button"
+                                    className="np-network-card__reveal"
+                                    disabled={revealState.revealingEmail || revealState.revealingPhone}
+                                    onClick={() => void runAction(`reveal-email-${revealKey}`, () => revealOrgContact(c, 'email'))}
+                                  >
+                                    {revealState.revealingEmail ? <Loader2 size={13} className="np-spin" /> : <Globe size={13} />}
+                                    <span>{revealState.revealingEmail ? 'Revealing email...' : 'Reveal email'}</span>
+                                  </button>
+                                ) : (
+                                  <div className="np-network-card__detail np-network-card__detail--muted">
+                                    <Globe className="np-network-card__detail-icon" />
+                                    <div className="np-network-card__detail-copy">
+                                      <span className="np-network-card__detail-value">No email on file</span>
+                                      <span className="np-network-card__detail-label">EMAIL</span>
+                                    </div>
+                                  </div>
+                                )}
+
+                                {phoneEntries.length > 0 ? (
+                                  <div className="np-network-card__phone-stack">
+                                    {phoneEntries.map((entry) => (
+                                      <button
+                                        key={`${revealKey}-${entry.number}`}
+                                        type="button"
+                                        className="np-network-card__phone-item"
+                                        onClick={() => void runAction('dial', () => dialCall(entry.number, c.crmId || undefined, account?.id || undefined))}
+                                        title={`Call ${entry.number}`}
+                                      >
+                                        <div className="np-network-card__phone-item-main">
+                                          <Phone className="np-network-card__detail-icon" />
+                                          <span className="np-network-card__detail-value">{formatPhone(entry.number) || entry.number}</span>
+                                        </div>
+                                        <span className="np-network-card__phone-item-label">{entry.label}</span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                ) : canReveal ? (
+                                  <button
+                                    type="button"
+                                    className="np-network-card__reveal"
+                                    disabled={revealState.revealingPhone || revealState.revealingEmail}
+                                    onClick={() => void runAction(`reveal-phone-${revealKey}`, () => revealOrgContact(c, 'phone'))}
+                                  >
+                                    {revealState.revealingPhone ? <Loader2 size={13} className="np-spin" /> : <Phone size={13} />}
+                                    <span>{revealState.revealingPhone ? 'Revealing phone...' : 'Reveal phone + email'}</span>
+                                  </button>
+                                ) : (
+                                  <div className="np-network-card__detail np-network-card__detail--muted">
+                                    <Phone className="np-network-card__detail-icon" />
+                                    <div className="np-network-card__detail-copy">
+                                      <span className="np-network-card__detail-value">No phone on file</span>
+                                      <span className="np-network-card__detail-label">PHONE</span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              {c.location ? (
+                                <div className="np-network-card__location">
+                                  <MapPin className="np-network-card__location-icon" />
+                                  <span>{c.location}</span>
+                                </div>
+                              ) : null}
+                            </div>
+                          ) : (
+                            <div className="np-network-card__detail-grid">
+                              <button
+                                type="button"
+                                className="np-network-card__reveal"
+                                disabled={!canReveal || revealState.revealingEmail || revealState.revealingPhone}
+                                onClick={() => void runAction(`reveal-email-${revealKey}`, () => revealOrgContact(c, 'email'))}
+                                title="Reveal email (fast)"
+                              >
+                                {revealState.revealingEmail ? <Loader2 size={13} className="np-spin" /> : <Globe size={13} />}
+                                <span>{revealState.revealingEmail ? 'Revealing email...' : 'Reveal email'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="np-network-card__reveal"
+                                disabled={!canReveal || revealState.revealingPhone || revealState.revealingEmail}
+                                onClick={() => void runAction(`reveal-phone-${revealKey}`, () => revealOrgContact(c, 'phone'))}
+                                title="Reveal phone + email (full reveal)"
+                              >
+                                {revealState.revealingPhone ? <Loader2 size={13} className="np-spin" /> : <Phone size={13} />}
+                                <span>{revealState.revealingPhone ? 'Revealing phone...' : 'Reveal phone + email'}</span>
+                              </button>
+                            </div>
+                          )}
+
+                          {(revealState.phoneTimedOut || (revealState.phoneWarned && revealState.revealingPhone)) ? (
+                            <div className="np-network-card__warning">
+                              {revealState.phoneTimedOut
+                                ? 'Phone reveal returned no data after 120 seconds.'
+                                : 'Phone reveal still pending after 60 seconds; continuing to poll.'}
                             </div>
                           ) : null}
                         </motion.div>
+                          )
+                        })()
                       ))}
                       {visibleContacts.length === 0 ? (
                         <p className="np-micro text-center py-2 opacity-40">
