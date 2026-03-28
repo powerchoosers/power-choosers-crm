@@ -606,10 +606,12 @@ function App() {
   })
   const [orgLoadedAccountId, setOrgLoadedAccountId] = useState<string | null>(null)
   const [revealStates, setRevealStates] = useState<Record<string, RevealState>>({})
+  const [scrollTargetKey, setScrollTargetKey] = useState<string | null>(null)
   const autoCaptureRan = useRef(false)
   const initStuckTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const revealPhoneTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const revealPhoneWarningTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const contactCardRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
   const loadState = async () => {
     const response = await sendMessage<{ state: ExtensionState }>('GET_STATE')
@@ -619,6 +621,15 @@ function App() {
   }
 
   const contactRevealKey = (contact: OrgNetworkContact) => trimText(contact.apolloPersonId || contact.crmId || contact.id || '')
+
+  const setContactCardRef = (key: string) => (node: HTMLDivElement | null) => {
+    if (!key) return
+    if (node) {
+      contactCardRefs.current[key] = node
+      return
+    }
+    delete contactCardRefs.current[key]
+  }
 
   const patchRevealState = (key: string, patch: Partial<RevealState>) => {
     if (!key) return
@@ -728,6 +739,24 @@ function App() {
       Object.keys(revealPhoneWarningTimeouts.current).forEach((key) => clearPhoneRevealWarningTimeout(key))
     }
   }, [])
+
+  useEffect(() => {
+    if (!scrollTargetKey || networkView !== 'crm') return
+
+    const card = contactCardRefs.current[scrollTargetKey]
+    if (!card) return
+
+    const raf = window.requestAnimationFrame(() => {
+      card.scrollIntoView({
+        behavior: 'smooth',
+        block: 'center',
+        inline: 'nearest',
+      })
+      setScrollTargetKey((current) => (current === scrollTargetKey ? null : current))
+    })
+
+    return () => window.cancelAnimationFrame(raf)
+  }, [scrollTargetKey, networkView, orgContacts.crmContacts, orgContacts.apolloOnlyContacts, networkQuery])
 
   useEffect(() => {
     void loadState().catch(() => {})
@@ -978,6 +1007,11 @@ function App() {
       if (payload?.contact) {
         upsertRevealedContact(payload.contact, contact)
       }
+
+      const targetKey = trimText(payload?.contact?.apolloPersonId || payload?.contact?.crmId || payload?.contact?.id || contactRevealKey(contact))
+      setNetworkView('crm')
+      setNetworkQuery('')
+      setScrollTargetKey(targetKey || null)
 
       if (revealPhone && payload?.pendingPhone) {
         const personId = trimText(payload.apolloPersonId || contact.apolloPersonId || contact.id || '')
@@ -1549,6 +1583,8 @@ function App() {
                           return (
                         <motion.div
                           key={`${c.crmId || c.id}-${c.source}`}
+                          ref={setContactCardRef(revealKey)}
+                          data-contact-reveal-key={revealKey}
                           layout
                           initial={{ opacity: 0, scale: 0.98, y: 10 }}
                           animate={{ opacity: 1, scale: 1, y: 0 }}

@@ -259,7 +259,7 @@ export default async function handler(req, res) {
 
     let contactsQuery = supabaseAdmin
       .from('contacts')
-      .select('id, accountId, firstName, lastName, name, email, title, linkedinUrl, phone, mobile, workPhone, companyPhone, otherPhone, directPhone, city, state, metadata')
+      .select('id, accountId, firstName, lastName, name, email, title, linkedinUrl, phone, mobile, workPhone, companyPhone, otherPhone, city, state, metadata')
       .limit(1000)
 
     if (accountId) {
