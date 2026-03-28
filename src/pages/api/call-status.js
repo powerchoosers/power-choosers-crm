@@ -121,28 +121,28 @@ export default async function handler(req, res) {
     }
 
     // Auth: Require user via Supabase
-    const { email: userEmail } = await requireUser(req);
-    if (!userEmail) {
+    const auth = await requireUser(req);
+    if (!auth.email) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const isAdmin = userEmail === 'l.patterson@nodalpoint.io';
+    const isAdmin = auth.isAdmin;
 
     const result = {};
 
     // Check phone numbers
     for (const phone of phoneList) {
-      result[phone] = await hasCallsForPhone(phone, userEmail, isAdmin);
+      result[phone] = await hasCallsForPhone(phone, auth.email, isAdmin);
     }
 
     // Check account IDs
     for (const accountId of accountIdList) {
-      result[accountId] = await hasCallsForAccount(accountId, userEmail, isAdmin);
+      result[accountId] = await hasCallsForAccount(accountId, auth.email, isAdmin);
     }
 
     // Check contact IDs
     for (const contactId of contactIdList) {
-      result[contactId] = await hasCallsForContact(contactId, userEmail, isAdmin);
+      result[contactId] = await hasCallsForContact(contactId, auth.email, isAdmin);
     }
 
     res.status(200).json(result);
@@ -152,4 +152,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Internal server error' });
   }
 }
-
