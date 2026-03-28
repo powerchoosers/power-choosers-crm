@@ -113,6 +113,8 @@ function snippet(value: string | null | undefined, max = 180) {
 function normalizeExternalUrl(value: string | null | undefined) {
   const text = trimText(value || '')
   if (!text) return ''
+  const lowered = text.toLowerCase()
+  if (lowered === 'n/a' || lowered === 'null' || lowered === 'undefined') return ''
   if (/^https?:\/\//i.test(text)) return text
   return `https://${text.replace(/^\/+/, '')}`
 }
@@ -148,6 +150,28 @@ function entityInitials(value: string | null | undefined) {
   if (parts.length === 0) return '--'
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase()
+}
+
+function buildIdentityName(input: { name?: string | null; firstName?: string | null; lastName?: string | null }) {
+  let name = trimText(input?.name || '')
+  let firstName = trimText(input?.firstName || '')
+  let lastName = trimText(input?.lastName || '')
+
+  if ((!firstName || !lastName) && name) {
+    const parts = name.split(/\s+/).filter(Boolean)
+    if (!firstName && parts.length > 0) firstName = parts[0]
+    if (!lastName && parts.length > 1) lastName = parts.slice(1).join(' ')
+  }
+
+  if (!name) {
+    name = [firstName, lastName].filter(Boolean).join(' ').trim()
+  }
+
+  return {
+    name,
+    firstName,
+    lastName,
+  }
 }
 
 function EntityAvatar({
@@ -353,6 +377,8 @@ function networkPhoneEntries(contact: OrgNetworkContact | null | undefined): Net
   const add = (value: string | null | undefined, label: string) => {
     const number = trimText(value || '')
     if (!number) return
+    const lowered = number.toLowerCase()
+    if (lowered === 'n/a' || lowered === 'null' || lowered === 'undefined') return
     if (seen.has(number)) return
     seen.add(number)
     entries.push({ number, label })
@@ -1510,6 +1536,16 @@ function App() {
                           const canReveal = Boolean(trimText(c.apolloPersonId || (c.source === 'apollo' ? c.id : '')))
                           const isMonitored = Boolean(c.crmId || c.isMonitored)
                           const linkedinUrl = normalizeExternalUrl(c.linkedin)
+                          const emailValue = trimText(c.email || '')
+                          const hasEmail = Boolean(emailValue && !['n/a', 'null', 'undefined'].includes(emailValue.toLowerCase()))
+                          const identity = buildIdentityName({
+                            name: c.name,
+                            firstName: c.firstName,
+                            lastName: c.lastName,
+                          })
+                          const contactFullName = identity.name || 'Contact'
+                          const compactName = `${identity.firstName || contactFullName} ${identity.lastName ? `${identity.lastName.charAt(0)}.` : ''}`.trim()
+                          const displayName = isMonitored ? contactFullName : compactName
                           return (
                         <motion.div
                           key={`${c.crmId || c.id}-${c.source}`}
@@ -1529,7 +1565,7 @@ function App() {
                               />
                               <div className="np-network-card__copy">
                                 <div className="np-network-card__name-row">
-                                  <span className="np-network-card__name">{c.name}</span>
+                                  <span className="np-network-card__name">{displayName}</span>
                                   {isMonitored ? <ShieldCheck size={12} color="#22c55e" aria-label="Synced" /> : null}
                                 </div>
                                 <span className="np-network-card__title">
@@ -1564,16 +1600,16 @@ function App() {
                           {isMonitored ? (
                             <div className="np-network-card__detail-wrap">
                               <div className="np-network-card__detail-grid">
-                                {c.email ? (
+                                {hasEmail ? (
                                   <button
                                     type="button"
                                     className="np-network-card__detail"
-                                    onClick={() => window.open(`mailto:${c.email}`, '_blank')}
+                                    onClick={() => window.open(`mailto:${emailValue}`, '_blank')}
                                     title="Email contact"
                                   >
                                     <Globe className="np-network-card__detail-icon" />
                                     <div className="np-network-card__detail-copy">
-                                      <span className="np-network-card__detail-value">{c.email}</span>
+                                      <span className="np-network-card__detail-value">{emailValue}</span>
                                       <span className="np-network-card__detail-label">EMAIL</span>
                                     </div>
                                   </button>
