@@ -54,6 +54,25 @@ function normalizeLinkedin(value) {
   return sanitizeText(value).replace(/\/+$/, '')
 }
 
+function normalizeLinkedinLookup(value) {
+  const text = sanitizeText(value)
+  if (!text) return ''
+
+  try {
+    const parsed = new URL(text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`)
+    const hostname = parsed.hostname.replace(/^www\./i, '')
+    const pathname = parsed.pathname.replace(/\/+$/, '')
+    return `${hostname}${pathname}`.replace(/\/+$/, '').toLowerCase()
+  } catch {
+    return text
+      .toLowerCase()
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/[?#].*$/, '')
+      .replace(/\/+$/, '')
+  }
+}
+
 function parseLocation(value) {
   const text = sanitizeText(value)
   if (!text) return { city: '', state: '' }
@@ -499,7 +518,7 @@ async function findExistingContact({ personId, email, linkedinUrl, firstName, la
       .from('contacts')
       .select(contactSelect)
       .eq('accountId', accountId)
-      .eq('email', email)
+      .ilike('email', email)
       .maybeSingle()
     if (data) return data
   }
@@ -508,16 +527,18 @@ async function findExistingContact({ personId, email, linkedinUrl, firstName, la
     const { data } = await supabaseAdmin
       .from('contacts')
       .select(contactSelect)
-      .eq('email', email)
+      .ilike('email', email)
       .maybeSingle()
     if (data) return data
   }
 
   if (linkedinUrl) {
+    const linkedinLookup = normalizeLinkedinLookup(linkedinUrl)
+    const linkedinPattern = linkedinLookup ? `%${linkedinLookup.split('linkedin.com/').pop() || linkedinLookup}%` : ''
     let query = supabaseAdmin
       .from('contacts')
       .select(contactSelect)
-      .eq('linkedinUrl', linkedinUrl)
+      .ilike('linkedinUrl', linkedinPattern || linkedinLookup || linkedinUrl)
 
     if (accountId) query = query.eq('accountId', accountId)
     const { data } = await query.maybeSingle()

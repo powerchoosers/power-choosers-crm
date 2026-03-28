@@ -34,6 +34,40 @@ function parseNumberList(value) {
         .filter(Boolean);
 }
 
+function parsePowerDialTargets(value) {
+    if (!value) return [];
+
+    let parsed = value;
+    if (typeof value === 'string') {
+        try {
+            parsed = JSON.parse(value);
+        } catch (_) {
+            return [];
+        }
+    }
+
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((target, index) => {
+        if (!target || typeof target !== 'object') return null;
+        const phoneNumber = normalizePhoneNumber(target.phoneNumber || target.phone || target.number || target.to || '');
+        if (!phoneNumber) return null;
+
+        return {
+            index,
+            phoneNumber,
+            contactId: target.contactId || target.id || '',
+            accountId: target.accountId || '',
+            contactName: target.contactName || target.name || '',
+            accountName: target.accountName || '',
+            title: target.title || '',
+            photoUrl: target.photoUrl || '',
+            logoUrl: target.logoUrl || '',
+            domain: target.domain || '',
+        };
+    }).filter(Boolean);
+}
+
 async function getTwilioIncomingNumbersList() {
     const now = Date.now();
     if (inboundNumbersCacheUpdatedAt && now - inboundNumbersCacheUpdatedAt < INCOMING_NUMBERS_CACHE_TTL && inboundNumbersCache.length) {
@@ -214,11 +248,20 @@ export default async function handler(req, res) {
         const customTargetNumber = src.targetNumber || src.target || '';
         const customCallerId = src.callerId || '';
         const rawMetadata = src.metadata || '';
+        const powerDialSessionId = src.powerDialSessionId != null ? src.powerDialSessionId : '';
+        const powerDialBatchId = src.powerDialBatchId != null ? src.powerDialBatchId : '';
+        const powerDialBatchIndex = src.powerDialBatchIndex != null ? src.powerDialBatchIndex : '';
+        const powerDialBatchSize = src.powerDialBatchSize != null ? src.powerDialBatchSize : '';
+        const powerDialSourceLabel = src.powerDialSourceLabel != null ? src.powerDialSourceLabel : '';
+        const powerDialSelectedCount = src.powerDialSelectedCount != null ? src.powerDialSelectedCount : '';
+        const powerDialDialableCount = src.powerDialDialableCount != null ? src.powerDialDialableCount : '';
+        const rawPowerDialTargets = src.powerDialTargets || '';
 
         logger.log('[Voice] Custom params:', {
             targetNumber: customTargetNumber,
             callerId: customCallerId,
-            hasMetadata: !!rawMetadata
+            hasMetadata: !!rawMetadata,
+            hasPowerDialTargets: !!rawPowerDialTargets
         });
 
         // ================================================================
@@ -261,6 +304,9 @@ export default async function handler(req, res) {
         } catch (e) {
             logger.warn('[Voice] Failed to parse metadata:', e?.message);
         }
+
+        const powerDialTargets = parsePowerDialTargets(rawPowerDialTargets);
+        const isPowerDialBatch = powerDialTargets.length > 0;
 
         const contactId = meta.contactId || '';
         const accountId = meta.accountId || '';
@@ -318,12 +364,21 @@ export default async function handler(req, res) {
             : (host ? `${proto}://${host}` : 'https://www.nodalpoint.io');
 
         const callbackParams = new URLSearchParams();
-        if (contactId) callbackParams.append('contactId', contactId);
-        if (accountId) callbackParams.append('accountId', accountId);
         if (agentId) callbackParams.append('agentId', agentId);
         if (agentEmail) callbackParams.append('agentEmail', agentEmail);
-        if (targetPhone) callbackParams.append('targetPhone', targetPhone);
-        if (businessNumber) callbackParams.append('businessPhone', businessNumber);
+        if (powerDialSessionId) callbackParams.append('powerDialSessionId', powerDialSessionId);
+        if (powerDialBatchId) callbackParams.append('powerDialBatchId', powerDialBatchId);
+        if (powerDialBatchIndex !== '') callbackParams.append('powerDialBatchIndex', String(powerDialBatchIndex));
+        if (powerDialBatchSize !== '') callbackParams.append('powerDialBatchSize', String(powerDialBatchSize));
+        if (powerDialSourceLabel) callbackParams.append('powerDialSourceLabel', powerDialSourceLabel);
+        if (powerDialSelectedCount !== '') callbackParams.append('powerDialSelectedCount', String(powerDialSelectedCount));
+        if (powerDialDialableCount !== '') callbackParams.append('powerDialDialableCount', String(powerDialDialableCount));
+        if (!isPowerDialBatch) {
+            if (contactId) callbackParams.append('contactId', contactId);
+            if (accountId) callbackParams.append('accountId', accountId);
+            if (targetPhone) callbackParams.append('targetPhone', targetPhone);
+            if (businessNumber) callbackParams.append('businessPhone', businessNumber);
+        }
         const cbq = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
         // ================================================================
@@ -360,6 +415,46 @@ export default async function handler(req, res) {
             if (RawFrom && RawFrom !== businessNumber) {
                 client.parameter({ name: 'originalCaller', value: RawFrom });
             }
+
+        } else if (isPowerDialBatch && To) {
+            // ---- OUTBOUND BROWSER → Power dial batch (simulring 3 numbers) ----
+            logger.log(`[Voice] POWER DIAL: Dialing ${powerDialTargets.length} numbers for batch ${powerDialBatchId || 'unknown'} with callerId ${callerIdForDial}`);
+
+            const dial = twiml.dial({
+                callerId: callerIdForDial,
+                timeout: 30,
+                answerOnBridge: true,
+                action: `${base}/api/twilio/dial-complete${cbq}`,
+                record: 'record-from-answer-dual',
+                recordingStatusCallback: `${base}/api/twilio/recording${cbq}`,
+                recordingStatusCallbackMethod: 'POST'
+            });
+
+            powerDialTargets.forEach((target, index) => {
+                const targetParams = new URLSearchParams(callbackParams);
+                if (target.contactId) targetParams.append('contactId', target.contactId);
+                if (target.accountId) targetParams.append('accountId', target.accountId);
+                if (target.contactName) targetParams.append('contactName', target.contactName);
+                if (target.accountName) targetParams.append('accountName', target.accountName);
+                if (target.phoneNumber) targetParams.append('targetPhone', target.phoneNumber);
+                if (target.title) targetParams.append('contactTitle', target.title);
+                if (target.logoUrl) targetParams.append('logoUrl', target.logoUrl);
+                if (target.domain) targetParams.append('domain', target.domain);
+                targetParams.append('powerDialTargetIndex', String(index));
+                targetParams.append('powerDialTargetCount', String(powerDialTargets.length));
+                if (powerDialSessionId) targetParams.append('powerDialSessionId', powerDialSessionId);
+                if (powerDialBatchId) targetParams.append('powerDialBatchId', powerDialBatchId);
+                if (powerDialBatchIndex !== '') targetParams.append('powerDialBatchIndex', String(powerDialBatchIndex));
+                if (powerDialBatchSize !== '') targetParams.append('powerDialBatchSize', String(powerDialBatchSize));
+                if (powerDialSourceLabel) targetParams.append('powerDialSourceLabel', powerDialSourceLabel);
+                if (powerDialSelectedCount !== '') targetParams.append('powerDialSelectedCount', String(powerDialSelectedCount));
+                if (powerDialDialableCount !== '') targetParams.append('powerDialDialableCount', String(powerDialDialableCount));
+
+                dial.number({
+                    statusCallback: `${base}/api/twilio/dial-status?${targetParams.toString()}`,
+                    statusCallbackEvent: 'initiated ringing answered completed'
+                }, target.phoneNumber);
+            });
 
         } else if (To) {
             // ---- OUTBOUND BROWSER → Dial the target phone number ----

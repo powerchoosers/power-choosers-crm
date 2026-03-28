@@ -1,18 +1,28 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Radar, GitMerge, Sparkles, Trash2, X } from 'lucide-react';
+import { Radar, GitMerge, Sparkles, Trash2, X, PhoneCall } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 interface BulkActionDeckProps {
   selectedCount: number;
   totalAvailable: number;
+  selectionLabel?: string;
   onClear: () => void;
   onAction: (action: string) => void;
   onSelectCount?: (count: number) => void;
+  onPowerDial?: () => void;
 }
 
-export default function BulkActionDeck({ selectedCount, totalAvailable, onClear, onAction, onSelectCount }: BulkActionDeckProps) {
+export default function BulkActionDeck({
+  selectedCount,
+  totalAvailable,
+  selectionLabel = 'NODE',
+  onClear,
+  onAction,
+  onSelectCount,
+  onPowerDial,
+}: BulkActionDeckProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(selectedCount.toString());
   const inputRef = useRef<HTMLInputElement>(null);
@@ -72,7 +82,7 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
                 </motion.button>
               )}
               <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">
-                {selectedCount === 1 ? 'NODE' : 'NODES'} SELECTED
+                {selectedCount === 1 ? selectionLabel : `${selectionLabel}S`} SELECTED
               </span>
             </div>
             <button 
@@ -86,6 +96,16 @@ export default function BulkActionDeck({ selectedCount, totalAvailable, onClear,
 
           {/* 2. THE TACTICAL ACTIONS */}
           <div className="flex items-center gap-2">
+            {onPowerDial && (
+              <button
+                type="button"
+                onClick={onPowerDial}
+                className="group inline-flex items-center gap-2 rounded-xl border border-[#002FA7]/25 bg-[#002FA7]/10 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-[#9ab4ff] transition-all hover:bg-[#002FA7]/20 hover:text-white"
+              >
+                <PhoneCall className="w-4 h-4" />
+                POWER_DIAL
+              </button>
+            )}
             <ActionButton icon={<Radar className="w-4 h-4" />} label="ADD_TO_TARGET" onClick={() => onAction('list')} />
             <ActionButton icon={<GitMerge className="w-4 h-4" />} label="INITIATE_PROTOCOL" onClick={() => onAction('sequence')} />
             <ActionButton icon={<Sparkles className="w-4 h-4" />} label="ENRICH_DATA" onClick={() => onAction('enrich')} />
