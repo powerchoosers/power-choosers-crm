@@ -5,6 +5,11 @@ import { upsertCallInSupabase } from '../calls.js';
 
 export default async function handler(req, res) {
   try {
+    const parseOptionalInt = (value) => {
+      const parsed = parseInt(String(value ?? ''), 10);
+      return Number.isFinite(parsed) ? parsed : null;
+    };
+
     // --- Parse body (Twilio posts x-www-form-urlencoded) ---
     const ct = (req.headers['content-type'] || '').toLowerCase();
     let body = req.body;
@@ -35,17 +40,30 @@ export default async function handler(req, res) {
     }
 
     // --- Extract CRM context from query params (passed by voice.js) ---
-    let contactId = '', accountId = '', agentId = '', agentEmail = '', targetPhoneFromQuery = '', businessPhoneFromQuery = '';
+    let contactId = '', contactName = '', contactTitle = '', accountId = '', accountName = '', agentId = '', agentEmail = '', targetPhoneFromQuery = '', businessPhoneFromQuery = '';
+    let powerDialSessionId = '', powerDialBatchId = '', powerDialBatchIndex = null, powerDialBatchSize = null, powerDialTargetIndex = null, powerDialTargetCount = null, powerDialSourceLabel = '', powerDialSelectedCount = null, powerDialDialableCount = null;
     try {
       const protocol = req.headers['x-forwarded-proto'] || 'https';
       const host = req.headers.host || req.headers['x-forwarded-host'] || '';
       const requestUrl = new URL(req.url, `${protocol}://${host}`);
       contactId = requestUrl.searchParams.get('contactId') || '';
+      contactName = requestUrl.searchParams.get('contactName') || '';
+      contactTitle = requestUrl.searchParams.get('contactTitle') || '';
       accountId = requestUrl.searchParams.get('accountId') || '';
+      accountName = requestUrl.searchParams.get('accountName') || '';
       agentId = requestUrl.searchParams.get('agentId') || '';
       agentEmail = requestUrl.searchParams.get('agentEmail') || '';
       targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone') || '';
       businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone') || '';
+      powerDialSessionId = requestUrl.searchParams.get('powerDialSessionId') || '';
+      powerDialBatchId = requestUrl.searchParams.get('powerDialBatchId') || '';
+      powerDialBatchIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchIndex'));
+      powerDialBatchSize = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchSize'));
+      powerDialTargetIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetIndex'));
+      powerDialTargetCount = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetCount'));
+      powerDialSourceLabel = requestUrl.searchParams.get('powerDialSourceLabel') || '';
+      powerDialSelectedCount = parseOptionalInt(requestUrl.searchParams.get('powerDialSelectedCount'));
+      powerDialDialableCount = parseOptionalInt(requestUrl.searchParams.get('powerDialDialableCount'));
     } catch (_) { }
 
     // --- Parse event details ---
@@ -116,11 +134,23 @@ export default async function handler(req, res) {
           status: event || 'initiated',
           duration: resolvedDuration,
           contactId: contactId || null,
+          contactName: contactName || null,
+          contactTitle: contactTitle || null,
           accountId: accountId || null,
+          accountName: accountName || null,
           agentId: agentId || null,
           agentEmail: agentEmail || null,
           targetPhone: targetPhoneFromQuery || resolvedTo || '',
           businessPhone: businessPhoneFromQuery || undefined,
+          powerDialSessionId: powerDialSessionId || null,
+          powerDialBatchId: powerDialBatchId || null,
+          powerDialBatchIndex,
+          powerDialBatchSize,
+          powerDialTargetIndex,
+          powerDialTargetCount,
+          powerDialSourceLabel: powerDialSourceLabel || null,
+          powerDialSelectedCount,
+          powerDialDialableCount,
           source: 'dial-status-v3'
         };
 
@@ -176,6 +206,16 @@ export default async function handler(req, res) {
             if (accountId) callbackParams.append('accountId', accountId);
             if (agentId) callbackParams.append('agentId', agentId);
             if (agentEmail) callbackParams.append('agentEmail', agentEmail);
+            if (contactName) callbackParams.append('contactName', contactName);
+            if (contactTitle) callbackParams.append('contactTitle', contactTitle);
+            if (accountName) callbackParams.append('accountName', accountName);
+            if (powerDialSessionId) callbackParams.append('powerDialSessionId', powerDialSessionId);
+            if (powerDialBatchId) callbackParams.append('powerDialBatchId', powerDialBatchId);
+            if (powerDialBatchIndex != null) callbackParams.append('powerDialBatchIndex', String(powerDialBatchIndex));
+            if (powerDialBatchSize != null) callbackParams.append('powerDialBatchSize', String(powerDialBatchSize));
+            if (powerDialSourceLabel) callbackParams.append('powerDialSourceLabel', powerDialSourceLabel);
+            if (powerDialSelectedCount != null) callbackParams.append('powerDialSelectedCount', String(powerDialSelectedCount));
+            if (powerDialDialableCount != null) callbackParams.append('powerDialDialableCount', String(powerDialDialableCount));
             if (targetPhoneFromQuery) callbackParams.append('targetPhone', targetPhoneFromQuery);
             if (businessPhoneFromQuery) callbackParams.append('businessPhone', businessPhoneFromQuery);
             const cbq = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
