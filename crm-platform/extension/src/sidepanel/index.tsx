@@ -43,6 +43,7 @@ type OrgNetworkContact = {
   companyPhone: string | null
   otherPhone: string | null
   directPhone: string | null
+  primaryPhoneField?: string | null
   phones: string[]
   isMonitored: boolean
   source: 'crm' | 'apollo'
@@ -256,16 +257,40 @@ function resolveContactPhoto(contact: MatchContact | null) {
   ) || null
 }
 
-function contactPhone(contact: MatchContact | null) {
-  return trimText(
-    contact?.phone ||
-      contact?.mobile ||
-      contact?.workPhone ||
-      contact?.companyPhone ||
-      contact?.otherPhone ||
-      contact?.directPhone ||
-      ''
-  ) || ''
+function contactPhone(contact: MatchContact | OrgNetworkContact | null | undefined) {
+  if (!contact) return ''
+
+  const primaryField = trimText((contact as any)?.primaryPhoneField || '').toLowerCase()
+  const primaryCandidates = primaryField === 'workdirectphone' || primaryField === 'workphone'
+    ? ['workPhone']
+    : primaryField === 'companyphone'
+      ? ['companyPhone']
+      : primaryField === 'otherphone'
+        ? ['otherPhone']
+        : primaryField === 'directphone'
+          ? ['directPhone']
+          : primaryField === 'phone'
+            ? ['phone']
+            : primaryField === 'mobile'
+              ? ['mobile']
+              : []
+
+  const orderedFields = [
+    ...primaryCandidates,
+    'mobile',
+    'workPhone',
+    'phone',
+    'companyPhone',
+    'otherPhone',
+    'directPhone',
+  ]
+
+  for (const field of orderedFields) {
+    const value = trimText((contact as any)?.[field] || '')
+    if (value) return value
+  }
+
+  return ''
 }
 
 function accountPhone(account: MatchAccount | null) {
@@ -308,6 +333,7 @@ function sanitizeOrgContact(raw: any): OrgNetworkContact | null {
     companyPhone: trimText(raw.companyPhone || '') || null,
     otherPhone: trimText(raw.otherPhone || '') || null,
     directPhone: trimText(raw.directPhone || '') || null,
+    primaryPhoneField: trimText(raw.primaryPhoneField || '') || null,
     phones,
     isMonitored: Boolean(raw.isMonitored),
     source,
@@ -324,8 +350,8 @@ function normalizeCrmMatchContact(raw: MatchContact): OrgNetworkContact {
     lastName: null,
     title: trimText(raw.title || '') || null,
     email: trimText(raw.email || '') || null,
-    linkedin: null,
-    location: trimText([raw.city, raw.state].filter(Boolean).join(', ')) || null,
+    linkedin: trimText(raw.linkedinUrl || (raw as any).linkedin || '') || null,
+    location: trimText((raw as any).location || [raw.city, raw.state].filter(Boolean).join(', ')) || null,
     photoUrl: resolveContactPhoto(raw),
     phone: trimText(raw.phone || '') || null,
     mobile: trimText(raw.mobile || '') || null,
@@ -333,6 +359,7 @@ function normalizeCrmMatchContact(raw: MatchContact): OrgNetworkContact {
     companyPhone: trimText(raw.companyPhone || '') || null,
     otherPhone: trimText(raw.otherPhone || '') || null,
     directPhone: trimText(raw.directPhone || '') || null,
+    primaryPhoneField: trimText((raw as any)?.primaryPhoneField || (raw as any)?.metadata?.primaryPhoneField || '') || null,
     phones: [
       trimText(raw.mobile || ''),
       trimText(raw.workPhone || ''),
@@ -373,6 +400,36 @@ type NetworkPhoneEntry = { number: string; label: string }
 
 function networkPhoneEntries(contact: OrgNetworkContact | null | undefined): NetworkPhoneEntry[] {
   if (!contact) return []
+  const fields = [
+    { id: 'mobile', label: 'MOBILE', value: contact.mobile },
+    { id: 'workPhone', label: 'WORK', value: contact.workPhone },
+    { id: 'phone', label: 'PHONE', value: contact.phone },
+    { id: 'companyPhone', label: 'COMPANY', value: contact.companyPhone },
+    { id: 'otherPhone', label: 'OTHER', value: contact.otherPhone },
+    { id: 'directPhone', label: 'DIRECT', value: contact.directPhone },
+  ]
+
+  const primaryField = trimText(contact.primaryPhoneField || '').toLowerCase()
+  const primaryAliases =
+    primaryField === 'workdirectphone' || primaryField === 'workphone'
+      ? new Set(['workphone', 'workdirectphone'])
+      : primaryField === 'companyphone'
+        ? new Set(['companyphone'])
+        : primaryField === 'otherphone'
+          ? new Set(['otherphone'])
+          : primaryField === 'directphone'
+            ? new Set(['directphone'])
+            : primaryField === 'phone'
+              ? new Set(['phone'])
+              : primaryField === 'mobile'
+                ? new Set(['mobile'])
+                : new Set<string>()
+
+  const ordered = [
+    ...fields.filter((field) => primaryAliases.has(field.id.toLowerCase())),
+    ...fields.filter((field) => !primaryAliases.has(field.id.toLowerCase())),
+  ]
+
   const entries: NetworkPhoneEntry[] = []
   const seen = new Set<string>()
 
@@ -386,15 +443,75 @@ function networkPhoneEntries(contact: OrgNetworkContact | null | undefined): Net
     entries.push({ number, label })
   }
 
-  add(contact.mobile, 'MOBILE')
-  add(contact.workPhone, 'WORK')
-  add(contact.phone, 'PHONE')
-  add(contact.companyPhone, 'COMPANY')
-  add(contact.otherPhone, 'OTHER')
-  add(contact.directPhone, 'DIRECT')
+  ordered.forEach((field) => add(field.value, field.label))
   ;(Array.isArray(contact.phones) ? contact.phones : []).forEach((num, idx) => add(num, idx === 0 ? 'PHONE' : `PHONE ${idx + 1}`))
 
   return entries
+}
+
+type ContactUplinkEntry = {
+  id: string
+  label: string
+  number: string
+  icon: RevealIcon
+}
+
+function contactUplinkEntries(contact: MatchContact | OrgNetworkContact | null | undefined): ContactUplinkEntry[] {
+  if (!contact) return []
+
+  const fields = [
+    { id: 'mobile', label: 'Mobile', number: contact.mobile, icon: Smartphone },
+    { id: 'workPhone', label: 'Work Direct', number: contact.workPhone, icon: Landmark },
+    { id: 'phone', label: 'Phone', number: contact.phone, icon: Phone },
+    { id: 'companyPhone', label: 'Company', number: contact.companyPhone, icon: Building2 },
+    { id: 'otherPhone', label: 'Other', number: contact.otherPhone, icon: Phone },
+    { id: 'directPhone', label: 'Direct', number: contact.directPhone, icon: Landmark },
+  ]
+
+  const primaryField = trimText(contact.primaryPhoneField || '').toLowerCase()
+  const primaryAliases =
+    primaryField === 'workdirectphone' || primaryField === 'workphone'
+      ? new Set(['workphone', 'workdirectphone'])
+      : primaryField === 'companyphone'
+        ? new Set(['companyphone'])
+        : primaryField === 'otherphone'
+          ? new Set(['otherphone'])
+          : primaryField === 'directphone'
+            ? new Set(['directphone'])
+            : primaryField === 'phone'
+              ? new Set(['phone'])
+              : primaryField === 'mobile'
+                ? new Set(['mobile'])
+                : new Set<string>()
+
+  const ordered = [
+    ...fields.filter((field) => primaryAliases.has(field.id.toLowerCase())),
+    ...fields.filter((field) => !primaryAliases.has(field.id.toLowerCase())),
+  ]
+
+  const seen = new Set<string>()
+  const entries: ContactUplinkEntry[] = []
+  ordered.forEach((field) => {
+    const number = trimText(field.number || '')
+    const lowered = number.toLowerCase()
+    if (!number || lowered === 'n/a' || lowered === 'null' || lowered === 'undefined' || seen.has(number)) return
+    seen.add(number)
+    entries.push({ ...field, number })
+  })
+
+  return entries
+}
+
+function contactPrimaryPhone(contact: MatchContact | OrgNetworkContact | null | undefined) {
+  return contactUplinkEntries(contact)[0]?.number || ''
+}
+
+function contactLinkedinUrl(contact: MatchContact | OrgNetworkContact | null | undefined) {
+  return normalizeExternalUrl((contact as any)?.linkedinUrl || (contact as any)?.linkedin || '')
+}
+
+function contactLocationValue(contact: MatchContact | OrgNetworkContact | null | undefined) {
+  return trimText((contact as any)?.location || [ (contact as any)?.city, (contact as any)?.state ].filter(Boolean).join(', ') || '') || ''
 }
 
 function networkPhone(contact: OrgNetworkContact | null | undefined) {
@@ -1117,6 +1234,8 @@ function App() {
   const callStatus = formatCallStatus(state)
   const crmPill = `np-pill font-mono ${auth ? 'np-pill--blue' : 'np-pill--amber'}`
   const callPill = `np-pill font-mono ${call.state === 'error' ? 'np-pill--red' : call.deviceReady ? 'np-pill--blue' : 'np-pill--amber'}`
+  const isLinkedInPage = Boolean(pageDomain && pageDomain.includes('linkedin.com'))
+  const isContactHero = Boolean(contact?.id && isLinkedInPage)
 
   const heroTitle = (account as any)?.name || (contact as any)?.name || page?.title || 'No record identified'
   const heroSubtitle = account
@@ -1128,6 +1247,15 @@ function App() {
         pageDomain ||
         'Contact matched from page capture.'
       : pageDomain || 'Identify a session to start the match.'
+  const contactHeroTitle = trimText(contact?.name || '') || heroTitle
+  const contactHeroSubtitle =
+    [trimText((contact as any)?.title || ''), trimText((contact as any)?.accountName || (account as any)?.name || '')]
+      .filter(Boolean)
+      .join(' | ') || pageDomain || 'Contact matched from page capture.'
+  const contactHeroLocation = contactLocationValue(contact)
+  const contactHeroLinkedinUrl = contactLinkedinUrl(contact)
+  const contactHeroPhoneEntries = contactUplinkEntries(contact)
+  const contactHeroPrimaryPhone = contactPrimaryPhone(contact)
 
   const rawSummary = account?.description || match?.summary || ''
   const isBoilerplate = rawSummary.toLowerCase().startsWith('matched the page to')
@@ -1324,13 +1452,17 @@ function App() {
           ) : null}
 
 
-          {auth && hasMatchedAccount ? (
+          {auth && (hasMatchedAccount || isContactHero) ? (
             <>
               <button
                 type="button"
                 className="np-hero-identity-link"
-                onClick={() => account?.id && window.open(`${auth?.appOrigin}/network/accounts/${account.id}`, '_blank')}
-                title="Open Account Dossier"
+                onClick={() =>
+                  isContactHero
+                    ? contact?.id && window.open(`${auth?.appOrigin}/network/contacts/${contact.id}`, '_blank')
+                    : account?.id && window.open(`${auth?.appOrigin}/network/accounts/${account.id}`, '_blank')
+                }
+                title={isContactHero ? 'Open Contact Dossier' : 'Open Account Dossier'}
               >
                 <motion.section 
                   initial={{ opacity: 0, y: 10 }}
@@ -1338,17 +1470,68 @@ function App() {
                   transition={{ delay: 0.1, duration: 0.4, ease: FORENSIC_EASE }}
                   className="np-card np-card--hero"
                 >
-                  <div className="np-hero-identity">
-                    <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={60} className="np-entity-mark np-entity-mark--large" />
-                    <div className="np-hero-copy">
-                      <div className="np-kicker font-mono">ACCOUNT DOSSIER</div>
-                      <h2 className="np-hero-title font-sans">{heroTitle}</h2>
-                      <p className="np-hero-subtitle font-sans" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {heroSubtitle}
-                        <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
-                      </p>
+                  {isContactHero ? (
+                    <div className="np-hero-identity">
+                      <ContactAvatar
+                        name={contactHeroTitle}
+                        photoUrl={(contact as any)?.photoUrl || null}
+                        size={60}
+                        className="np-entity-mark np-entity-mark--large"
+                      />
+                      <div className="np-hero-copy">
+                        <div className="np-kicker font-mono">CONTACT DOSSIER</div>
+                        <h2 className="np-hero-title font-sans">{contactHeroTitle}</h2>
+                        <p className="np-hero-subtitle font-sans" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {contactHeroSubtitle}
+                          <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                        </p>
+                        <div className="np-status-row" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+                          {contactHeroLinkedinUrl ? (
+                            <button
+                              type="button"
+                              className="np-pill"
+                              style={{ cursor: 'pointer', gap: 6 }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                window.open(contactHeroLinkedinUrl, '_blank')
+                              }}
+                              title="Open LinkedIn"
+                            >
+                              <Linkedin size={11} />
+                              <span>LinkedIn</span>
+                            </button>
+                          ) : null}
+                          {contactHeroLocation ? (
+                            <button
+                              type="button"
+                              className="np-pill"
+                              style={{ cursor: 'pointer', gap: 6 }}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contactHeroLocation)}`, '_blank')
+                              }}
+                              title="Open location"
+                            >
+                              <MapPin size={11} />
+                              <span>{contactHeroLocation}</span>
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="np-hero-identity">
+                      <EntityAvatar name={heroTitle} imageUrl={accountLogoUrl} size={60} className="np-entity-mark np-entity-mark--large" />
+                      <div className="np-hero-copy">
+                        <div className="np-kicker font-mono">ACCOUNT DOSSIER</div>
+                        <h2 className="np-hero-title font-sans">{heroTitle}</h2>
+                        <p className="np-hero-subtitle font-sans" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {heroSubtitle}
+                          <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3 }} />
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
                   {summaryToDisplay && (
                     <div className="np-summary-box-card" style={{ marginTop: 16 }}>
@@ -1382,91 +1565,199 @@ function App() {
                 transition={{ delay: 0.2, duration: 0.4, ease: FORENSIC_EASE }}
                 className="np-card"
               >
-                  <div className="np-section-head">
+                <div className="np-section-head">
                   <div className="np-kicker font-mono">01 // UPLINKS</div>
                 </div>
 
                 <div className="np-action-grid">
-                  {showCallButton && (
-                    <button
-                      className="np-uplink-primary"
-                      onClick={() => void runAction('dial', () => dialCall(dialTarget || '', contact?.id, account?.id || undefined))}
-                      disabled={busy === 'dial'}
-                    >
-                      <div className="np-uplink-primary__row">
-                        <div className="np-uplink-icon--phone">
-                          <Phone style={{ width: 22, height: 22 }} />
-                          <Star 
-                            size={8} 
-                            style={{ 
-                              fill: '#eab308', 
-                              color: '#eab308', 
-                              position: 'absolute', 
-                              top: 0, 
-                              right: 0 
-                            }} 
-                          />
+                  {isContactHero ? (
+                    <>
+                      {contactHeroPrimaryPhone && (
+                        <button
+                          type="button"
+                          className="np-uplink-primary"
+                          onClick={() => void runAction('dial', () => dialCall(contactHeroPrimaryPhone, contact?.id, contact?.accountId || account?.id || undefined))}
+                          disabled={busy === 'dial'}
+                        >
+                          <div className="np-uplink-primary__row">
+                            <div className="np-uplink-icon--phone">
+                              <Phone style={{ width: 22, height: 22 }} />
+                              <Star
+                                size={8}
+                                style={{
+                                  fill: '#eab308',
+                                  color: '#eab308',
+                                  position: 'absolute',
+                                  top: 0,
+                                  right: 0,
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="np-uplink-primary__label">PRIMARY NUMBER</span>
+                              <span className="np-uplink-primary__value font-mono">{formatPhone(contactHeroPrimaryPhone)}</span>
+                            </div>
+                            <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5, marginLeft: 'auto' }} />
+                          </div>
+                        </button>
+                      )}
+
+                      {contactHeroPhoneEntries.slice(1).map((entry) => (
+                        <button
+                          key={`${contact?.id || 'contact'}-${entry.id}-${entry.number}`}
+                          type="button"
+                          className="np-uplink-row"
+                          onClick={() => void runAction('dial', () => dialCall(entry.number, contact?.id, contact?.accountId || account?.id || undefined))}
+                        >
+                          <div className="np-uplink-row__main">
+                            <entry.icon style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                            <div className="min-w-0 flex-1">
+                              <span className="np-uplink-row__kicker">{entry.label}</span>
+                              <span className="np-uplink-row__value">{formatPhone(entry.number) || entry.number}</span>
+                            </div>
+                            <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
+                          </div>
+                        </button>
+                      ))}
+
+                      {contact?.email ? (
+                        <button
+                          type="button"
+                          className="np-uplink-row"
+                          onClick={() => window.open(`mailto:${encodeURIComponent(contact.email || '')}`, '_blank')}
+                          disabled={!trimText(contact.email || '')}
+                        >
+                          <div className="np-uplink-row__main">
+                            <Mail style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                            <div className="min-w-0 flex-1">
+                              <span className="np-uplink-row__kicker">ELECTRONIC MAIL</span>
+                              <span className="np-uplink-row__value">{trimText(contact.email || '') || 'No email on file'}</span>
+                            </div>
+                            <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
+                          </div>
+                        </button>
+                      ) : null}
+
+                      {contactHeroLinkedinUrl ? (
+                        <button
+                          type="button"
+                          className="np-uplink-row"
+                          onClick={() => window.open(contactHeroLinkedinUrl, '_blank')}
+                        >
+                          <div className="np-uplink-row__main">
+                            <Linkedin style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                            <div className="min-w-0 flex-1">
+                              <span className="np-uplink-row__kicker">LINKEDIN</span>
+                              <span className="np-uplink-row__value">{contactHeroLinkedinUrl}</span>
+                            </div>
+                            <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
+                          </div>
+                        </button>
+                      ) : null}
+
+                      {contactHeroLocation ? (
+                        <button
+                          type="button"
+                          className="np-uplink-row"
+                          onClick={() => {
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(contactHeroLocation)}`, '_blank')
+                          }}
+                        >
+                          <div className="np-uplink-row__main">
+                            <MapPin style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                            <div className="min-w-0 flex-1">
+                              <span className="np-uplink-row__kicker">LOCATION CONTEXT</span>
+                              <span className="np-uplink-row__value">{contactHeroLocation}</span>
+                            </div>
+                            <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
+                          </div>
+                        </button>
+                      ) : null}
+                    </>
+                  ) : (
+                    <>
+                      {showCallButton && (
+                        <button
+                          className="np-uplink-primary"
+                          onClick={() => void runAction('dial', () => dialCall(dialTarget || '', contact?.id, account?.id || undefined))}
+                          disabled={busy === 'dial'}
+                        >
+                          <div className="np-uplink-primary__row">
+                            <div className="np-uplink-icon--phone">
+                              <Phone style={{ width: 22, height: 22 }} />
+                              <Star
+                                size={8}
+                                style={{
+                                  fill: '#eab308',
+                                  color: '#eab308',
+                                  position: 'absolute',
+                                  top: 0,
+                                  right: 0,
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <span className="np-uplink-primary__label">CORPORATE PHONE</span>
+                              <span className="np-uplink-primary__value font-mono">{formatPhone(dialTarget)}</span>
+                            </div>
+                            <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5, marginLeft: 'auto' }} />
+                          </div>
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        className="np-uplink-row"
+                        onClick={() => {
+                          const domain = trimText((account as any)?.website || account?.domain || '')
+                          if (!domain) return
+                          const normalized = domain.startsWith('http') ? domain : `https://${domain}`
+                          window.open(normalized, '_blank')
+                        }}
+                        disabled={!trimText((account as any)?.website || account?.domain || '')}
+                      >
+                        <div className="np-uplink-row__main">
+                          <Globe style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                          <div className="min-w-0 flex-1">
+                            <span className="np-uplink-row__kicker">DIGITAL DOMAIN</span>
+                            <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain matched'}</span>
+                          </div>
+                          <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="np-uplink-primary__label">CORPORATE PHONE</span>
-                          <span className="np-uplink-primary__value font-mono">{formatPhone(dialTarget)}</span>
+                      </button>
+
+                      {accountLocationValue && (
+                        <button
+                          type="button"
+                          className="np-uplink-row"
+                          onClick={() => {
+                            window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(accountLocationValue)}`, '_blank')
+                          }}
+                        >
+                          <div className="np-uplink-row__main">
+                            <MapPin style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                            <div className="min-w-0 flex-1">
+                              <span className="np-uplink-row__kicker">LOCATION CONTEXT</span>
+                              <span className="np-uplink-row__value">{accountLocationValue}</span>
+                            </div>
+                            <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
+                          </div>
+                        </button>
+                      )}
+
+                      <div className="np-uplink-row np-uplink-row--static">
+                        <div className="np-uplink-row__main">
+                          <Building2 style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
+                          <div className="min-w-0 flex-1">
+                            <span className="np-uplink-row__kicker">ZONE IDENTIFIER</span>
+                            <span className="np-uplink-row__value" style={{ display: 'flex' }}>
+                              <span className="np-zone-chip" style={zoneStyle}>{accountZone}</span>
+                            </span>
+                          </div>
                         </div>
-                        <ArrowUpRight style={{ width: 14, height: 14, opacity: 0.5, marginLeft: 'auto' }} />
                       </div>
-                    </button>
+                    </>
                   )}
-
-                  <button
-                    type="button"
-                    className="np-uplink-row"
-                    onClick={() => {
-                      const domain = trimText((account as any)?.website || account?.domain || '')
-                      if (!domain) return
-                      const normalized = domain.startsWith('http') ? domain : `https://${domain}`
-                      window.open(normalized, '_blank')
-                    }}
-                    disabled={!trimText((account as any)?.website || account?.domain || '')}
-                  >
-                    <div className="np-uplink-row__main">
-                      <Globe style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
-                      <div className="min-w-0 flex-1">
-                        <span className="np-uplink-row__kicker">DIGITAL DOMAIN</span>
-                        <span className="np-uplink-row__value">{trimText((account as any)?.website || account?.domain || '') || 'No domain matched'}</span>
-                      </div>
-                      <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
-                    </div>
-                  </button>
-
-                  {accountLocationValue && (
-                    <button
-                      type="button"
-                      className="np-uplink-row"
-                      onClick={() => {
-                        window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(accountLocationValue)}`, '_blank')
-                      }}
-                    >
-                      <div className="np-uplink-row__main">
-                        <MapPin style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
-                        <div className="min-w-0 flex-1">
-                          <span className="np-uplink-row__kicker">LOCATION CONTEXT</span>
-                          <span className="np-uplink-row__value">{accountLocationValue}</span>
-                        </div>
-                        <ArrowUpRight style={{ width: 12, height: 12, opacity: 0.3, marginLeft: 'auto' }} />
-                      </div>
-                    </button>
-                  )}
-
-                  <div className="np-uplink-row np-uplink-row--static">
-                    <div className="np-uplink-row__main">
-                      <Building2 style={{ width: 16, height: 16, color: 'var(--np-dim)', marginTop: 2 }} />
-                      <div className="min-w-0 flex-1">
-                        <span className="np-uplink-row__kicker">ZONE IDENTIFIER</span>
-                        <span className="np-uplink-row__value" style={{ display: 'flex' }}>
-                          <span className="np-zone-chip" style={zoneStyle}>{accountZone}</span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </motion.section>
 
