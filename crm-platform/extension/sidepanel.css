@@ -1260,10 +1260,11 @@ a {
 }
 
 .np-network-card__reveal {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
+  gap: 8px;
   width: 100%;
   border: 1px solid rgba(0, 47, 167, 0.22);
   border-radius: 12px;
@@ -1276,6 +1277,7 @@ a {
   text-transform: uppercase;
   cursor: pointer;
   transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  overflow: hidden;
 }
 
 .np-network-card__reveal:hover:not(:disabled) {
@@ -1284,9 +1286,78 @@ a {
   transform: translateY(-1px);
 }
 
+.np-network-card__reveal--active {
+  border-color: rgba(0, 47, 167, 0.4);
+  background: rgba(0, 47, 167, 0.14);
+}
+
 .np-network-card__reveal:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+
+.np-network-card__reveal-inner {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+
+.np-network-card__reveal-copy {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.np-network-card__reveal-mask {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: #93c5fd;
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.16s ease;
+}
+
+.np-network-card__reveal-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: #8ba6ff;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.np-network-card__reveal:hover:not(:disabled) .np-network-card__reveal-mask {
+  opacity: 0;
+}
+
+.np-network-card__reveal:hover:not(:disabled) .np-network-card__reveal-label {
+  opacity: 1;
+}
+
+.np-network-card__reveal-state {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #8ba6ff;
 }
 
 .np-network-card__phone-stack {
