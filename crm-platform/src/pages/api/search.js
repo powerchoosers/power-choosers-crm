@@ -240,7 +240,7 @@ export default async function handler(req, res) {
             state,
             accounts ( name, domain, logo_url, metadata, industry )
           `)
-          .or('mobile.not.is.null,workPhone.not.is.null,otherPhone.not.is.null,phone.not.is.null')
+          .or('mobile.not.is.null,workPhone.not.is.null,otherPhone.not.is.null,companyPhone.not.is.null,phone.not.is.null')
           .limit(2000);
 
         fallbackQuery = applyLegacyOwnershipScope(fallbackQuery, user, isAdmin);
