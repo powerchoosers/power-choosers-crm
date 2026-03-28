@@ -13,14 +13,16 @@ import {
   RotateCcw,
   UserCog,
   Users,
+  ArrowLeft,
+  Activity,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useAgentProgress } from '@/hooks/useAgentProgress'
-import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import type { TwilioNumberRecord } from '@/types/agents'
 
 function formatCount(value?: number | null) {
@@ -162,7 +164,7 @@ export default function AgentDetailPage() {
 
   if (authLoading || reportQuery.isLoading) {
     return (
-      <div className="flex flex-col h-[60vh] items-center justify-center space-y-4 animate-in fade-in duration-500">
+      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
         <LoadingOrb label="Loading Agent Progress..." />
       </div>
     )
@@ -170,7 +172,7 @@ export default function AgentDetailPage() {
 
   if (reportQuery.isError) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] px-4">
+      <div className="flex items-center justify-center min-h-[calc(100vh-8rem)] px-4">
         <div className="nodal-glass rounded-3xl border border-red-500/20 bg-red-500/[0.03] p-8 max-w-2xl w-full">
           <div className="text-[10px] uppercase tracking-[0.3em] text-red-400/80 font-mono">Load Failed</div>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">Agent progress could not be loaded</h1>
@@ -198,355 +200,326 @@ export default function AgentDetailPage() {
 
   if (!agent) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] px-4">
-        <div className="nodal-glass rounded-3xl border border-white/5 p-8 max-w-xl w-full">
-          <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Not Found</div>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-white">Agent not found</h1>
-          <p className="mt-2 text-zinc-400">
-            There is no agent row for <span className="font-mono text-zinc-200">{agentId || 'this id'}</span>.
-          </p>
-          <Button
-            onClick={() => router.push('/network/agents')}
-            className="mt-6 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white"
-          >
-            Back to Agents
-          </Button>
-        </div>
+      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center gap-4 animate-in fade-in duration-500 px-4">
+        <div className="font-mono text-zinc-500">AGENT NOT FOUND</div>
+        <Button onClick={() => router.push('/network/agents')}>Return to Agents</Button>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-      <CollapsiblePageHeader
-        backHref="/network/agents"
-        title={
-          <div className="flex flex-col gap-2 min-w-0">
-            <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-4xl font-semibold tracking-tight text-white truncate">
-                {agent.displayName}
-              </h1>
-              <Badge className={cn('border uppercase tracking-[0.2em] text-[10px] font-mono', kindTone(agent.kind))}>
-                {kindLabel(agent.kind)}
-              </Badge>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {agent.status ? (
-                <Badge className={cn('border uppercase tracking-[0.2em] text-[10px] font-mono', statusTone(agent.status))}>
-                  {agent.status}
-                </Badge>
-              ) : null}
-              {agent.role ? (
-                <Badge className="border border-white/10 bg-white/5 text-zinc-300 uppercase tracking-[0.2em] text-[10px] font-mono">
-                  {agent.role}
-                </Badge>
-              ) : null}
-              {agent.territory ? (
-                <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                  {agent.territory}
-                </Badge>
-              ) : null}
-            </div>
-          </div>
-        }
-        description={
-          <div className="text-zinc-500 mt-1">
-            <span className="font-mono text-zinc-400">Owner key:</span>{' '}
-            <span className="font-mono text-zinc-300">{agent.key}</span>
-            {'  '}·{'  '}
-            Refreshed {report?.generatedAt ? formatDistanceToNow(new Date(report.generatedAt), { addSuffix: true }) : 'moments ago'}
-          </div>
-        }
-      />
+    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
 
-      <div className="grid gap-6 xl:grid-cols-12">
-        <section className="xl:col-span-8 nodal-void-card overflow-hidden border border-white/5 relative">
-          <div className="absolute top-0 right-0 w-72 h-72 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
-          <div className="p-6 md:p-8 border-b border-white/5">
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col xl:flex-row xl:items-start xl:justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Owner Record</div>
-                  <div className="mt-3 flex items-start gap-4">
-                    <div className="w-16 h-16 rounded-2xl nodal-glass border border-white/5 flex items-center justify-center shrink-0">
-                      <UserCog className="w-8 h-8 text-zinc-300" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-4xl md:text-5xl font-semibold tracking-tight text-white break-words">
-                        {agent.displayName}
-                      </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {agent.email ? (
-                          <Badge className="border border-white/10 bg-white/5 text-zinc-300 uppercase tracking-[0.2em] text-[10px] font-mono">
-                            {agent.email}
-                          </Badge>
-                        ) : null}
-                        {agent.assignedEmailAddress && agent.assignedEmailAddress !== agent.email ? (
-                          <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                            {agent.assignedEmailAddress}
-                          </Badge>
-                        ) : null}
-                        {agent.title ? (
-                          <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                            {agent.title}
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+        {/* Dossier Header */}
+        <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 nodal-recessed relative z-10">
+          <div className="flex items-center justify-between gap-6">
+            <div className="flex-1 min-w-0 flex items-center gap-3">
+              <button
+                onClick={() => router.push('/network/agents')}
+                className="flex-none icon-button-forensic w-10 h-10 flex items-center justify-center -ml-2"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
 
-                <div className="shrink-0 w-full max-w-sm nodal-glass rounded-2xl border border-white/5 p-4">
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Live Snapshot</div>
-                  <div className="mt-4 grid grid-cols-2 gap-3">
-                    <MetricCard label="Accounts" value={formatCount(agent.accountCount)} icon={<Building2 className="h-4 w-4" />} />
-                    <MetricCard label="Contacts" value={formatCount(agent.contactCount)} icon={<Users className="h-4 w-4" />} />
-                    <MetricCard label="Calls" value={formatCount(agent.callCount)} icon={<Phone className="h-4 w-4" />} />
-                    <MetricCard label="Emails" value={formatCount(agent.emailCount)} icon={<Mail className="h-4 w-4" />} />
-                    <MetricCard
-                      label="Bills"
-                      value={formatCount(agent.billCount)}
-                      icon={<FileText className="h-4 w-4" />}
-                      detail={`${formatCount(agent.invoiceCount)} invoices + ${formatCount(agent.usageCount)} usage docs`}
-                    />
-                    <MetricCard
-                      label="Lines"
-                      value={formatCount(agent.activeNumbers)}
-                      icon={<Hash className="h-4 w-4" />}
-                      detail="Twilio assigned"
-                    />
-                  </div>
-                  <div className="mt-4 rounded-xl border border-white/5 bg-black/20 p-4">
-                    <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">
-                      <Clock className="h-3.5 w-3.5" />
-                      Last Activity
-                    </div>
-                    <div className="mt-2 text-sm text-zinc-100 font-medium">{formatActivity(agent.lastActivityAt)}</div>
-                    <div className="mt-1 text-xs text-zinc-500">
-                      Generated {report?.generatedAt ? formatExactDate(report.generatedAt) : 'moments ago'}
-                    </div>
-                  </div>
+              <div className="flex-1 min-w-0 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl nodal-glass border border-white/5 flex items-center justify-center shrink-0">
+                  <UserCog className="w-6 h-6 text-zinc-300" />
                 </div>
-              </div>
-
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Email</div>
-                  {agent.assignedEmailAddress || agent.email ? (
-                    <a
-                      href={`mailto:${agent.assignedEmailAddress || agent.email || ''}`}
-                      className="mt-2 block text-zinc-100 font-medium break-all hover:text-white transition-colors"
-                    >
-                      {agent.assignedEmailAddress || agent.email}
-                    </a>
-                  ) : (
-                    <div className="mt-2 text-zinc-500">No email assigned</div>
-                  )}
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Primary Line</div>
-                  {agent.assignedPhoneNumber ? (
-                    <a
-                      href={`tel:${agent.assignedPhoneNumber}`}
-                      className="mt-2 block text-zinc-100 font-medium font-mono tabular-nums break-all hover:text-white transition-colors"
-                    >
-                      {agent.assignedPhoneNumber}
-                    </a>
-                  ) : (
-                    <div className="mt-2 text-zinc-500">No Twilio line assigned</div>
-                  )}
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                  <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Owner Key</div>
-                  <div className="mt-2 text-zinc-100 font-medium font-mono break-all">{agent.key}</div>
-                  <div className="mt-1 text-xs text-zinc-500">
-                    {agent.userId ? `User ID ${agent.userId}` : 'No linked user id'}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 p-6 md:p-8">
-            <MetricCard
-              label="Accounts Owned"
-              value={formatCount(agent.accountCount)}
-              icon={<Building2 className="h-4 w-4" />}
-              detail="Companies under this owner"
-            />
-            <MetricCard
-              label="People Owned"
-              value={formatCount(agent.contactCount)}
-              icon={<Users className="h-4 w-4" />}
-              detail="Contacts mapped to this owner"
-            />
-            <MetricCard
-              label="Calls Logged"
-              value={formatCount(agent.callCount)}
-              icon={<Phone className="h-4 w-4" />}
-              detail={agent.lastCallAt ? `Last call ${formatActivity(agent.lastCallAt)}` : 'No calls yet'}
-            />
-            <MetricCard
-              label="Emails Sent"
-              value={formatCount(agent.emailCount)}
-              icon={<Mail className="h-4 w-4" />}
-              detail={agent.lastEmailAt ? `Last email ${formatActivity(agent.lastEmailAt)}` : 'No emails yet'}
-            />
-            <MetricCard
-              label="Bills Ingested"
-              value={formatCount(agent.billCount)}
-              icon={<FileText className="h-4 w-4" />}
-              detail={agent.lastBillAt ? `Last bill ${formatActivity(agent.lastBillAt)}` : 'No bill intake yet'}
-            />
-            <MetricCard
-              label="Twilio Lines"
-              value={formatCount(agent.activeNumbers)}
-              icon={<Hash className="h-4 w-4" />}
-              detail="Active numbers assigned"
-            />
-          </div>
-        </section>
-
-        <aside className="xl:col-span-4 space-y-6">
-          <div className="nodal-glass rounded-2xl border border-white/5 p-5">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Twilio Lines</div>
-            <div className="mt-4 space-y-3">
-              {twilioLines.length > 0 ? (
-                twilioLines.map((line, index) => (
-                  <div key={`${line.number}-${index}`} className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-sm font-medium text-zinc-100">
-                          {line.name?.trim() || `Line ${index + 1}`}
-                        </div>
-                        <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums break-all">
-                          {line.number}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        {line.selected ? (
-                          <Badge className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                            Primary
-                          </Badge>
-                        ) : null}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="rounded-2xl border border-white/5 bg-black/20 p-4 text-zinc-500">
-                  No Twilio numbers are assigned to this owner.
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="nodal-glass rounded-2xl border border-white/5 p-5">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Ownership Trail</div>
-            <div className="mt-4 space-y-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">Owner Type</div>
-                <div className="mt-2">
-                  <Badge className={cn('border uppercase tracking-[0.2em] text-[10px] font-mono', kindTone(agent.kind))}>
-                    {kindLabel(agent.kind)}
-                  </Badge>
-                </div>
-              </div>
-
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">Aliases</div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {ownerAliases.length > 0 ? (
-                    ownerAliases.map((alias) => (
-                      <Badge
-                        key={alias}
-                        className="border border-white/10 bg-white/5 text-zinc-400 font-mono text-[10px] uppercase tracking-[0.2em]"
-                      >
-                        {alias}
+                
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <div className="flex items-center gap-3 mb-1">
+                    <h1 className="text-2xl font-semibold tracking-tighter text-white">
+                      <ForensicDataPoint
+                        value={agent.displayName ?? ''}
+                        copyValue={agent.displayName ?? undefined}
+                        valueClassName="text-2xl font-semibold tracking-tighter text-white"
+                        inline
+                        compact
+                      />
+                    </h1>
+                    
+                    <Badge className={cn('border uppercase tracking-[0.2em] text-[10px] font-mono', kindTone(agent.kind))}>
+                      {kindLabel(agent.kind)}
+                    </Badge>
+                    
+                    {agent.status ? (
+                      <Badge className={cn('border uppercase tracking-[0.2em] text-[10px] font-mono', statusTone(agent.status))}>
+                        {agent.status}
                       </Badge>
-                    ))
-                  ) : (
-                    <span className="text-zinc-500">No alternate keys found.</span>
+                    ) : null}
+
+                    {agent.role ? (
+                      <Badge className="border border-white/10 bg-white/5 text-zinc-300 uppercase tracking-[0.2em] text-[10px] font-mono">
+                        {agent.role}
+                      </Badge>
+                    ) : null}
+
+                    {agent.territory ? (
+                      <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
+                        {agent.territory}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  
+                  <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mb-2 w-full">
+                    <div className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                      <Hash className="w-3 h-3 text-white shrink-0" />
+                      <span className="text-[10px] font-mono">{agent.key}</span>
+                    </div>
+                    {agent.userId && (
+                       <>
+                         <span className="w-1 h-1 rounded-full bg-zinc-800" />
+                         <div className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                           <UserCog className="w-3 h-3 text-white shrink-0" />
+                           <span className="text-[10px] font-mono">UID: {agent.userId}</span>
+                         </div>
+                       </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex-none shrink-0 text-right">
+              <div className="flex flex-col items-end gap-1">
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Dossier Status</div>
+                <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full animate-pulse bg-green-500" />
+                    <span className="text-xs font-mono uppercase tracking-widest text-green-500">
+                        ACTIVE_INTELLIGENCE
+                    </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Panels */}
+        <div className="flex-1 flex overflow-hidden relative z-10 group/dossier">
+          <div className="grid grid-cols-12 w-full h-full">
+
+            {/* Left Panel: Identity & Physics */}
+            <div className="col-span-3 h-full overflow-y-auto p-6 border-r border-white/5 np-scroll bg-black/10">
+              <div className="space-y-6 animate-in fade-in slide-in-from-left-4 duration-700">
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4">01 // Identity</div>
+                
+                <div className="nodal-void-card border-white/10 p-6 relative overflow-hidden shadow-lg space-y-6">
+                    <div>
+                        <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Display Name</div>
+                        <div className="text-xl font-semibold tracking-tighter text-white">
+                            <ForensicDataPoint value={agent.displayName || '--'} valueClassName="text-xl font-semibold tracking-tighter text-white" inline />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                        <div>
+                            <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Owner Key</div>
+                            <div className="text-sm font-mono tracking-tighter text-zinc-300 break-all">
+                                <ForensicDataPoint value={agent.key || '--'} valueClassName="text-sm font-mono tabular-nums text-zinc-300" inline />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5">
+                        <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Owner Type</div>
+                        <Badge className={cn('border uppercase tracking-[0.2em] text-[10px] font-mono mt-1', kindTone(agent.kind))}>
+                            {kindLabel(agent.kind)}
+                        </Badge>
+                    </div>
+
+                    <div className="pt-4 border-t border-white/5">
+                        <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Aliases</div>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                            {ownerAliases.length > 0 ? (
+                            ownerAliases.map((alias) => (
+                                <Badge
+                                key={alias}
+                                className="border border-white/10 bg-white/5 text-zinc-400 font-mono text-[10px] uppercase tracking-[0.2em]"
+                                >
+                                {alias}
+                                </Badge>
+                            ))
+                            ) : (
+                            <span className="text-zinc-500 text-xs font-mono">No alternate keys</span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4 mt-8">Contact Physics</div>
+                <div className="nodal-void-card border-white/10 p-6 relative overflow-hidden shadow-lg space-y-6">
+                    <div>
+                        <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Email Identity</div>
+                        {agent.assignedEmailAddress || agent.email ? (
+                        <a
+                            href={`mailto:${agent.assignedEmailAddress || agent.email || ''}`}
+                            className="mt-2 block text-zinc-100 font-medium break-all hover:text-white transition-colors"
+                        >
+                            {agent.assignedEmailAddress || agent.email}
+                        </a>
+                        ) : (
+                        <div className="mt-2 text-zinc-500 text-xs font-mono">NO_EMAIL_ASSIGNED</div>
+                        )}
+                    </div>
+                    
+                    <div className="pt-4 border-t border-white/5">
+                        <div className="text-zinc-500 text-[10px] font-mono uppercase tracking-[0.2em] mb-2">Primary Line</div>
+                        {agent.assignedPhoneNumber ? (
+                        <a
+                            href={`tel:${agent.assignedPhoneNumber}`}
+                            className="mt-2 block text-zinc-100 font-medium font-mono tabular-nums break-all hover:text-white transition-colors"
+                        >
+                            {agent.assignedPhoneNumber}
+                        </a>
+                        ) : (
+                        <div className="mt-2 text-zinc-500 text-xs font-mono">NO_PRIMARY_LINE</div>
+                        )}
+                    </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Panel: Telemetry & Log */}
+            <div className="col-span-6 h-full overflow-y-auto p-6 border-r border-white/5 np-scroll">
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">02 // Telemetry</div>
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                    SYNCED: {report?.generatedAt ? formatExactDate(report.generatedAt).toUpperCase() : 'MOMENTS AGO'}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                    <MetricCard label="Accounts Owned" value={formatCount(agent.accountCount)} icon={<Building2 className="h-4 w-4" />} />
+                    <MetricCard label="People Owned" value={formatCount(agent.contactCount)} icon={<Users className="h-4 w-4" />} />
+                    <MetricCard label="Twilio Lines" value={formatCount(agent.activeNumbers)} icon={<Hash className="h-4 w-4" />} />
+                </div>
+
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4 mt-8">Activity Ledger</div>
+                <div className="nodal-void-card border-white/10 p-6 relative overflow-hidden shadow-2xl flex flex-col font-mono">
+                  <div className="flex items-center justify-between mb-6 border-b border-white/10 pb-4 relative z-10">
+                      <div className="flex items-center gap-2">
+                          <Activity className="w-3.5 h-3.5 text-zinc-400" />
+                          <h3 className="text-xs font-mono uppercase tracking-[0.3em] text-zinc-400">
+                              FORENSIC_ENGAGEMENT_STREAM
+                          </h3>
+                      </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 gap-6">
+                      <div className="flex items-start justify-between">
+                          <div>
+                              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500">Last Telemetry Active</div>
+                              <div className="mt-2 text-zinc-100 font-medium">
+                                  {agent.lastActivityAt ? formatActivity(agent.lastActivityAt) : 'No recent telemetry'}
+                              </div>
+                              <div className="mt-1 text-xs text-zinc-500">Tasks, calls, emails, and intake combined.</div>
+                          </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/5 flex items-start justify-between">
+                          <div>
+                              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">Outbound Calls</div>
+                              <div className="text-zinc-300">
+                                  {agent.lastCallAt ? `Last active ${formatActivity(agent.lastCallAt)}` : 'No calls logged'}
+                              </div>
+                          </div>
+                          <Badge className="border border-white/10 bg-white/5 text-zinc-400 font-mono">
+                              {formatCount(agent.callCount)}
+                          </Badge>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/5 flex items-start justify-between">
+                          <div>
+                              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">Email Transmission</div>
+                              <div className="text-zinc-300">
+                                  {agent.lastEmailAt ? `Last active ${formatActivity(agent.lastEmailAt)}` : 'No emails logged'}
+                              </div>
+                          </div>
+                          <Badge className="border border-white/10 bg-white/5 text-zinc-400 font-mono">
+                              {formatCount(agent.emailCount)}
+                          </Badge>
+                      </div>
+                  </div>
+                </div>
+
+                <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] mb-4 mt-8">Intake Metrics</div>
+                <div className="nodal-void-card border-white/10 p-6 relative overflow-hidden shadow-2xl flex flex-col font-mono">
+                  <div className="grid grid-cols-3 gap-6">
+                      <div>
+                          <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">Total Intake</div>
+                          <div className="text-3xl font-mono text-zinc-100">{formatCount(agent.billCount)}</div>
+                          <div className="text-xs text-zinc-500 mt-1">Processed</div>
+                      </div>
+                      <div>
+                          <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">Invoices</div>
+                          <div className="text-3xl font-mono text-zinc-100">{formatCount(agent.invoiceCount)}</div>
+                          <div className="text-xs text-zinc-500 mt-1">Parsed</div>
+                      </div>
+                      <div>
+                          <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">Usage Data</div>
+                          <div className="text-3xl font-mono text-zinc-100">{formatCount(agent.usageCount)}</div>
+                          <div className="text-xs text-zinc-500 mt-1">Meter arrays</div>
+                      </div>
+                  </div>
+                  {agent.lastBillAt && (
+                      <div className="mt-6 pt-4 border-t border-white/5">
+                          <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 mb-1">Last Intake Event</div>
+                          <div className="text-zinc-300">{formatExactDate(agent.lastBillAt)}</div>
+                      </div>
                   )}
                 </div>
               </div>
             </div>
-          </div>
-        </aside>
-      </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section className="nodal-void-card overflow-hidden border border-white/5">
-          <div className="px-5 py-4 border-b border-white/5">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Bill Intake</div>
-            <div className="mt-1 text-sm text-zinc-400">
-              Bills are counted from the accounts this owner controls until documents carry a direct owner field.
-            </div>
-          </div>
-          <div className="p-5 space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              <MetricCard label="Total" value={formatCount(agent.billCount)} icon={<FileText className="h-4 w-4" />} />
-              <MetricCard label="Invoices" value={formatCount(agent.invoiceCount)} icon={<FileText className="h-4 w-4" />} />
-              <MetricCard label="Usage Data" value={formatCount(agent.usageCount)} icon={<FileText className="h-4 w-4" />} />
-            </div>
-            <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-              <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">Last Bill Ingested</div>
-              <div className="mt-2 text-zinc-100 font-medium">
-                {agent.lastBillAt ? formatActivity(agent.lastBillAt) : 'No bills ingested yet'}
-              </div>
-              <div className="mt-1 text-xs text-zinc-500">
-                {agent.lastBillAt ? formatExactDate(agent.lastBillAt) : 'Waiting for bill ingestion'}
-              </div>
-            </div>
-          </div>
-        </section>
+            {/* Right Panel: Infrastructure */}
+            <div className="col-span-3 h-full overflow-y-auto p-6 np-scroll">
+              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-700">
+                <div className="flex items-center justify-between mb-4">
+                    <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em]">03 // Infrastructure</span>
+                </div>
 
-        <section className="nodal-void-card overflow-hidden border border-white/5">
-          <div className="px-5 py-4 border-b border-white/5">
-            <div className="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-mono">Activity Ledger</div>
-            <div className="mt-1 text-sm text-zinc-400">
-              Recent touch points by channel.
+                <div className="nodal-void-card border-white/10 relative overflow-hidden shadow-lg p-0">
+                  <div className="px-5 py-4 border-b border-white/5 relative z-10">
+                    <h3 className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-400">Twilio Network</h3>
+                  </div>
+                  <div className="p-5 space-y-4">
+                    {twilioLines.length > 0 ? (
+                      twilioLines.map((line, index) => (
+                        <div key={`${line.number}-${index}`} className="rounded-xl border border-white/5 bg-black/20 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="text-sm font-medium text-zinc-100">
+                                {line.name?.trim() || `Line ${index + 1}`}
+                              </div>
+                              <div className="mt-1 text-xs font-mono text-zinc-500 tabular-nums break-all">
+                                {line.number}
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              {line.selected ? (
+                                <Badge className="border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 uppercase tracking-[0.2em] text-[10px] font-mono">
+                                  Primary
+                                </Badge>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-[10px] font-mono text-zinc-500 border border-white/5 rounded-xl p-4 text-center">
+                        NO_ACTIVE_LINES_FOUND
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
-          <div className="p-5 space-y-3">
-            <div className="rounded-2xl border border-white/5 bg-black/20 p-4 flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">Last Call</div>
-                <div className="mt-2 text-zinc-100 font-medium">
-                  {agent.lastCallAt ? formatActivity(agent.lastCallAt) : 'No calls logged'}
-                </div>
-              </div>
-              <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                {formatCount(agent.callCount)}
-              </Badge>
-            </div>
-            <div className="rounded-2xl border border-white/5 bg-black/20 p-4 flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">Last Email</div>
-                <div className="mt-2 text-zinc-100 font-medium">
-                  {agent.lastEmailAt ? formatActivity(agent.lastEmailAt) : 'No emails logged'}
-                </div>
-              </div>
-              <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                {formatCount(agent.emailCount)}
-              </Badge>
-            </div>
-            <div className="rounded-2xl border border-white/5 bg-black/20 p-4 flex items-start justify-between gap-4">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.25em] text-zinc-500 font-mono">Last Activity</div>
-                <div className="mt-2 text-zinc-100 font-medium">
-                  {agent.lastActivityAt ? formatActivity(agent.lastActivityAt) : 'No activity recorded'}
-                </div>
-                <div className="mt-1 text-xs text-zinc-500">
-                  Includes tasks, calls, emails, and bills.
-                </div>
-              </div>
-              <Badge className="border border-white/10 bg-white/5 text-zinc-400 uppercase tracking-[0.2em] text-[10px] font-mono">
-                {formatCount(agent.taskCount)}
-              </Badge>
-            </div>
-          </div>
-        </section>
+        </div>
       </div>
     </div>
   )
