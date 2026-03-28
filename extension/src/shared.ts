@@ -69,12 +69,14 @@ export type MatchContact = {
   photoUrl: string | null
   email: string | null
   title: string | null
+  linkedinUrl?: string | null
   phone: string | null
   mobile: string | null
   workPhone: string | null
   companyPhone: string | null
   otherPhone: string | null
   directPhone: string | null
+  primaryPhoneField?: string | null
   city: string | null
   state: string | null
   score: number

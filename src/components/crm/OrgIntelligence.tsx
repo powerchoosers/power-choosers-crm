@@ -451,15 +451,41 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         return null;
       };
 
-      for (const key of keysToCheck) {
-        const cached = readLocalCache(`apollo_cache_${key}`);
-        if (cached) {
-          applyCachedData(cached);
-          return;
-        }
-      }
+      const keyPriority = (key: string) => {
+        if (accountId && key === `ACCOUNT_${accountId}`) return 3;
+        if (domainKey && key.toLowerCase() === domainKey.toLowerCase()) return 2;
+        if (companyName && key.toLowerCase() === companyName.toLowerCase()) return 1;
+        return 0;
+      };
 
-      // 1. Try Supabase first (Persistent Cloud Cache) with prioritized keys
+      const localCandidates = keysToCheck
+        .map((key) => {
+          const cached = readLocalCache(`apollo_cache_${key}`);
+          if (!cached) return null;
+          return {
+            key,
+            source: 'local' as const,
+            cache: cached,
+            timestamp: cached.timestamp || 0,
+            priority: keyPriority(key),
+          };
+        })
+        .filter((candidate): candidate is {
+          key: string;
+          source: 'local';
+          cache: ApolloSearchCache;
+          timestamp: number;
+          priority: number;
+        } => Boolean(candidate));
+
+      let supabaseCandidates: Array<{
+        key: string;
+        source: 'supabase';
+        cache: ApolloSearchCache;
+        timestamp: number;
+        priority: number;
+      }> = [];
+
       try {
         const { data: supabaseItems, error } = await supabase
           .from('apollo_searches')
@@ -467,27 +493,40 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           .in('key', keysToCheck);
 
         if (supabaseItems && supabaseItems.length > 0) {
-          // Prioritize ACCOUNT_ key, then domain key, then others
-          let bestMatch = supabaseItems.find(item => item.key === `ACCOUNT_${accountId}`);
-          if (!bestMatch && domainKey) bestMatch = supabaseItems.find(item => item.key === domainKey);
-          if (!bestMatch) bestMatch = supabaseItems[0];
-
-          if (bestMatch && bestMatch.data) {
-            const cacheData = bestMatch.data as ApolloSearchCache;
-            applyCachedData(cacheData);
-
-            // Save back to local storage for speed
-            if (domainKey) {
-              localStorage.setItem(`apollo_cache_${domainKey}`, JSON.stringify({
-                ...cacheData,
-                timestamp: cacheData.timestamp || new Date(bestMatch.created_at).getTime()
-              }));
-            }
-            return;
-          }
+          supabaseCandidates = supabaseItems
+            .filter((item) => item && item.data)
+            .map((item) => {
+              const cacheData = item.data as ApolloSearchCache;
+              const timestamp = typeof cacheData.timestamp === 'number'
+                ? cacheData.timestamp
+                : new Date(item.created_at).getTime() || 0;
+              return {
+                key: item.key,
+                source: 'supabase' as const,
+                cache: cacheData,
+                timestamp,
+                priority: keyPriority(item.key),
+              };
+            });
         }
       } catch (err) {
         console.warn('Supabase cache fetch failed:', err);
+      }
+
+      const bestCandidate = [...supabaseCandidates, ...localCandidates].sort((a, b) => {
+        if (b.timestamp !== a.timestamp) return b.timestamp - a.timestamp;
+        return b.priority - a.priority;
+      })[0];
+
+      if (bestCandidate?.cache) {
+        applyCachedData(bestCandidate.cache);
+
+        // Keep the freshest copy in the browser for quick reloads.
+        localStorage.setItem(`apollo_cache_${bestCandidate.key}`, JSON.stringify(bestCandidate.cache));
+        if (bestCandidate.source === 'supabase' && domainKey && bestCandidate.key !== domainKey) {
+          localStorage.setItem(`apollo_cache_${domainKey}`, JSON.stringify(bestCandidate.cache));
+        }
+        return;
       }
 
       if (cancelled || cacheLoadVersionRef.current !== loadVersion) return;

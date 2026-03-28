@@ -7,6 +7,67 @@
 import { cors, fetchWithRetry, getApiKey, APOLLO_BASE_URL, formatLocation, requireApolloAuth } from './_utils.js';
 import { supabaseAdmin } from '@/lib/supabase';
 
+function sanitizeText(value) {
+  if (typeof value !== 'string') return ''
+  const text = value.trim()
+  if (!text) return ''
+  const lowered = text.toLowerCase()
+  if (lowered === 'null' || lowered === 'undefined' || lowered === 'n/a') return ''
+  return text
+}
+
+function buildNameKey(firstName, lastName) {
+  const first = sanitizeText(firstName).toLowerCase()
+  const last = sanitizeText(lastName).toLowerCase()
+  if (!first || !last) return ''
+  return `${first}::${last}`
+}
+
+function contactCacheKey(contact) {
+  return (
+    sanitizeText(contact?.id || '') ||
+    sanitizeText(contact?.crmId || '') ||
+    sanitizeText(contact?.apolloPersonId || contact?.apollo_person_id || '') ||
+    sanitizeText(contact?.email || '').toLowerCase() ||
+    sanitizeText(contact?.linkedin || contact?.linkedinUrl || '').toLowerCase() ||
+    buildNameKey(contact?.firstName, contact?.lastName) ||
+    sanitizeText(contact?.name || '').toLowerCase()
+  )
+}
+
+function mergeApolloContact(existing, fresh) {
+  const pick = (...values) => {
+    for (const value of values) {
+      const text = sanitizeText(value)
+      if (text) return text
+    }
+    return ''
+  }
+
+  return {
+    ...(existing && typeof existing === 'object' ? existing : {}),
+    ...(fresh && typeof fresh === 'object' ? fresh : {}),
+    id: pick(fresh?.id, existing?.id),
+    crmId: pick(fresh?.crmId, existing?.crmId) || null,
+    apolloPersonId: pick(fresh?.apolloPersonId, fresh?.apollo_person_id, existing?.apolloPersonId, existing?.apollo_person_id) || null,
+    name: pick(fresh?.name, existing?.name) || 'Contact',
+    firstName: pick(fresh?.firstName, existing?.firstName) || '',
+    lastName: pick(fresh?.lastName, existing?.lastName) || '',
+    title: pick(fresh?.title, existing?.title) || '',
+    email: pick(fresh?.email, existing?.email) || 'N/A',
+    photoUrl: pick(fresh?.photoUrl, fresh?.photo_url, existing?.photoUrl, existing?.photo_url) || '',
+    location: pick(fresh?.location, existing?.location) || '',
+    linkedin: pick(fresh?.linkedin, existing?.linkedin) || '',
+    status: sanitizeText(fresh?.status || '') === 'verified' || sanitizeText(existing?.status || '') === 'verified'
+      ? 'verified'
+      : pick(fresh?.status, existing?.status) || 'unverified',
+    isMonitored: Boolean(fresh?.isMonitored || existing?.isMonitored || fresh?.crmId || existing?.crmId),
+    phones: Array.isArray(fresh?.phones) && fresh.phones.length > 0
+      ? fresh.phones
+      : Array.isArray(existing?.phones) ? existing.phones : [],
+  }
+}
+
 export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
@@ -206,16 +267,45 @@ export default async function handler(req, res) {
       if (companyName && !keys.includes(companyName)) keys.push(companyName);
 
       if (keys.length > 0 && supabaseAdmin) {
+        const { data: existingRowsRaw } = await supabaseAdmin
+          .from('apollo_searches')
+          .select('key, data')
+          .in('key', keys);
+        const existingRows = Array.isArray(existingRowsRaw) ? existingRowsRaw : [];
+        const existingData = existingRows
+          .map((row) => (row?.data && typeof row.data === 'object' ? row.data : null))
+          .filter(Boolean);
+        const existingContacts = existingData.flatMap((data) => (Array.isArray(data.contacts) ? data.contacts : []));
+
+        const mergedContactsByKey = new Map();
+        const insertContact = (contact) => {
+          const key = contactCacheKey(contact);
+          if (!key) return;
+          const current = mergedContactsByKey.get(key);
+          mergedContactsByKey.set(key, current ? mergeApolloContact(current, contact) : contact);
+        };
+
+        existingContacts.forEach(insertContact);
+        contactsForCache.forEach(insertContact);
+
+        const mergedContactsForCache = Array.from(mergedContactsByKey.values());
+        const existingCompany = existingData.find((data) => data.company && typeof data.company === 'object')?.company || null;
+        const cacheData = {
+          company: existingCompany || companySummary,
+          contacts: mergedContactsForCache,
+          timestamp: Date.now(),
+          source: 'search-people',
+          stale: mergedContactsForCache.length === 0,
+          stale_until: mergedContactsForCache.length === 0
+            ? new Date(Date.now() + 15 * 60 * 1000).toISOString()
+            : null
+        };
+
         let shouldWriteCache = true;
 
         // Guardrail: never overwrite a non-empty cached contact set with an empty result.
         if (contactsForCache.length === 0) {
-          const { data: existingRows } = await supabaseAdmin
-            .from('apollo_searches')
-            .select('key, data')
-            .in('key', keys);
-
-          const hasExistingNonEmpty = (existingRows || []).some((row) => {
+          const hasExistingNonEmpty = existingRows.some((row) => {
             const existingContacts = row?.data?.contacts;
             return Array.isArray(existingContacts) && existingContacts.length > 0;
           });
@@ -263,6 +353,4 @@ export default async function handler(req, res) {
     }));
   }
 }
-
-
 

@@ -131,6 +131,7 @@ function normalizeCrmContactRow(row) {
     workPhone: sanitizeText(row?.workPhone) || null,
     companyPhone: sanitizeText(row?.companyPhone) || null,
     otherPhone: sanitizeText(row?.otherPhone) || null,
+    primaryPhoneField: sanitizeText(row?.primaryPhoneField || row?.metadata?.primaryPhoneField) || null,
     directPhone: sanitizeText(row?.directPhone) || null,
     phones: unique([
       sanitizeText(row?.mobile),
@@ -155,7 +156,7 @@ function normalizeApolloContactRow(raw, crmId) {
 
   return {
     id: apolloId,
-    crmId: crmId || null,
+    crmId: sanitizeText(raw?.crmId || crmId || '') || null,
     name: identity.name || 'Contact',
     firstName: identity.firstName || null,
     lastName: identity.lastName || null,
@@ -169,6 +170,7 @@ function normalizeApolloContactRow(raw, crmId) {
     workPhone: sanitizeText(raw?.workPhone) || null,
     companyPhone: sanitizeText(raw?.companyPhone) || null,
     otherPhone: sanitizeText(raw?.otherPhone) || null,
+    primaryPhoneField: sanitizeText(raw?.primaryPhoneField || raw?.metadata?.primaryPhoneField) || null,
     directPhone: sanitizeText(raw?.directPhone) || null,
     phones,
     isMonitored: Boolean(crmId),
@@ -259,7 +261,7 @@ export default async function handler(req, res) {
 
     let contactsQuery = supabaseAdmin
       .from('contacts')
-      .select('id, accountId, firstName, lastName, name, email, title, linkedinUrl, phone, mobile, workPhone, companyPhone, otherPhone, city, state, metadata')
+      .select('id, accountId, firstName, lastName, name, email, title, linkedinUrl, phone, mobile, workPhone, companyPhone, otherPhone, primaryPhoneField, city, state, metadata')
       .limit(1000)
 
     if (accountId) {

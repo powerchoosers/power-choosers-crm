@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { normalizeVoicemailGreeting, type VoicemailGreeting } from '@/lib/voicemail'
 
 export type UserProfile = {
   email: string | null
@@ -20,6 +21,7 @@ export type UserProfile = {
   twilioNumbers: Array<{ name: string; number: string }> | null
   selectedPhoneNumber: string | null
   bridgeToMobile: boolean | null
+  voicemailGreeting: VoicemailGreeting | null
 }
 
 interface AuthContextType {
@@ -48,7 +50,8 @@ const AuthContext = createContext<AuthContextType>({
     hostedPhotoUrl: null,
     twilioNumbers: null,
     selectedPhoneNumber: null,
-    bridgeToMobile: null
+    bridgeToMobile: null,
+    voicemailGreeting: null
   },
   refreshProfile: async () => { },
 })
@@ -71,7 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     hostedPhotoUrl: null,
     twilioNumbers: null,
     selectedPhoneNumber: null,
-    bridgeToMobile: null
+    bridgeToMobile: null,
+    voicemailGreeting: null
   })
   const router = useRouter()
 
@@ -155,7 +159,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hostedPhotoUrl: data.hosted_photo_url || null,
         twilioNumbers: settings.twilioNumbers || [],
         selectedPhoneNumber: settings.selectedPhoneNumber || null,
-        bridgeToMobile: settings.bridgeToMobile || false
+        bridgeToMobile: settings.bridgeToMobile || false,
+        voicemailGreeting: normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
       })
 
       // If user has Zoho/External avatar but no hosted URL, host it and save (for email signature)
@@ -212,7 +217,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         hostedPhotoUrl: null,
         twilioNumbers: [],
         selectedPhoneNumber: null,
-        bridgeToMobile: false
+        bridgeToMobile: false,
+        voicemailGreeting: null
       })
       setLoading(false)
     }
@@ -235,7 +241,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hostedPhotoUrl: null,
           twilioNumbers: null,
           selectedPhoneNumber: null,
-          bridgeToMobile: null
+          bridgeToMobile: null,
+          voicemailGreeting: null
         })
         document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
         setLoading(false)
@@ -277,7 +284,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hostedPhotoUrl: null,
           twilioNumbers: [],
           selectedPhoneNumber: null,
-          bridgeToMobile: false
+          bridgeToMobile: false,
+          voicemailGreeting: null
         })
         setLoading(false)
 
@@ -344,7 +352,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 hostedPhotoUrl: data.hosted_photo_url || null,
                 twilioNumbers: settings.twilioNumbers || [],
                 selectedPhoneNumber: settings.selectedPhoneNumber || null,
-                bridgeToMobile: settings.bridgeToMobile || false
+                bridgeToMobile: settings.bridgeToMobile || false,
+                voicemailGreeting: normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
               })
             } else {
               // Hardcode l.patterson@nodalpoint.io as admin
@@ -364,6 +373,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   twilioNumbers: [],
                   selectedPhoneNumber: null,
                   bridgeToMobile: false,
+                  voicemailGreeting: null,
                   website: null
                 }
               }
@@ -384,7 +394,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 hostedPhotoUrl: null,
                 twilioNumbers: [],
                 selectedPhoneNumber: null,
-                bridgeToMobile: false
+                bridgeToMobile: false,
+                voicemailGreeting: null
               })
             }
           }
@@ -431,7 +442,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hostedPhotoUrl: null,
           twilioNumbers: null,
           selectedPhoneNumber: null,
-          bridgeToMobile: null
+          bridgeToMobile: null,
+          voicemailGreeting: null
         })
         // Clear session cookie
         document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
