@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useMarketPulse } from './useMarketPulse'
 import { useEffect } from 'react'
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 export interface DashboardMetrics {
   liabilityKWh: number // Annual volume protected (sum of annualUsage in kWh)
@@ -23,6 +24,7 @@ export function useDashboardMetrics() {
   const { user, role, loading } = useAuth()
   const { data: marketPulse } = useMarketPulse()
   const queryClient = useQueryClient()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   useEffect(() => {
     if (!user) return
@@ -48,7 +50,7 @@ export function useDashboardMetrics() {
   }, [user, queryClient])
 
   return useQuery<DashboardMetrics>({
-    queryKey: ['dashboard-metrics', user?.email, role],
+    queryKey: ['dashboard-metrics', user?.id ?? user?.email ?? 'guest', role],
     queryFn: async () => {
       if (loading || !user) {
         return {
@@ -68,8 +70,8 @@ export function useDashboardMetrics() {
           .select('annual_usage')
           .in('status', ['CUSTOMER'])
 
-        if (role !== 'admin' && user?.email) {
-          liabilityQuery = liabilityQuery.eq('ownerId', user.email)
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          liabilityQuery = liabilityQuery.in('ownerId', ownerScopeValues)
         }
 
         const { data: accountsData, error: accountsError } = await liabilityQuery
@@ -103,8 +105,8 @@ export function useDashboardMetrics() {
           .lte('contract_end_date', futureISO)
           .not('contract_end_date', 'is', null)
 
-        if (role !== 'admin' && user?.email) {
-          positionsQuery = positionsQuery.eq('ownerId', user.email)
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          positionsQuery = positionsQuery.in('ownerId', ownerScopeValues)
         }
 
         const { count: openPositions = 0, error: positionsError } = await positionsQuery
@@ -143,8 +145,12 @@ export function useDashboardMetrics() {
           .not('from', 'ilike', '%lemwarm%')
           .not('from', 'ilike', '%warmup%')
 
-        if (role !== 'admin' && user?.email) {
-          emailsQuery = emailsQuery.eq('metadata->>ownerId', user.email.toLowerCase())
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          const emailConditions = ownerScopeValues.flatMap((owner) => [
+            `ownerId.eq.${owner}`,
+            `metadata->>ownerId.eq.${owner}`,
+          ])
+          emailsQuery = emailsQuery.or(emailConditions.join(','))
         }
 
         const { count: emailsCount = 0, error: emailsError } = await emailsQuery
@@ -159,11 +165,11 @@ export function useDashboardMetrics() {
 
         const operationalVelocity = (callsCount || 0) + (emailsCount || 0)
 
-        // 4. DAILY_BILLS_INGESTED: Count documents with document_type 'INVOICE' between 8 AM and 5 PM
+        // 4. DAILY_BILLS_INGESTED: Count documents with document_type 'INVOICE' or 'USAGE_DATA' between 8 AM and 5 PM
         const { count: billsCount = 0, error: billsError } = await supabase
           .from('documents')
           .select('id', { count: 'exact', head: true })
-          .eq('document_type', 'INVOICE')
+          .in('document_type', ['INVOICE', 'USAGE_DATA'])
           .gte('created_at', startTimeISO)
           .lte('created_at', endTimeISO)
 

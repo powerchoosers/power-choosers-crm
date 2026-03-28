@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useMarketPulse } from './useMarketPulse';
 import { useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 export type LogEntryAction =
     | 'EMAIL_DISPATCHED'
@@ -32,6 +33,7 @@ function chunk<T>(arr: T[], size: number): T[][] {
 export function useForensicLog() {
     const { user, role } = useAuth();
     const { data: marketPulse } = useMarketPulse();
+    const ownerScopeValues = buildOwnerScopeValues(user)
 
     // 1. Fetch recent signals (Apollo News)
     const { data: signals } = useQuery({
@@ -89,8 +91,8 @@ export function useForensicLog() {
 
             // 1. Get all valid contact emails first
             let contactQuery = supabase.from('contacts').select('email')
-            if (role !== 'admin' && role !== 'dev') {
-                contactQuery = contactQuery.eq('ownerId', user.email)
+            if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+                contactQuery = contactQuery.in('ownerId', ownerScopeValues)
             }
             const { data: contactList } = await contactQuery
             const validAddresses = (contactList?.map(c => c.email).filter(Boolean) || []) as string[]

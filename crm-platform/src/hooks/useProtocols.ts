@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 export interface Protocol {
   id: string
@@ -34,9 +35,10 @@ const PAGE_SIZE = 50
 export function useProtocols(searchQuery?: string) {
   const { user, role, loading } = useAuth()
   const queryClient = useQueryClient()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   const protocolsQuery = useInfiniteQuery({
-    queryKey: ['protocols', user?.email, role, searchQuery],
+    queryKey: ['protocols', user?.id ?? user?.email ?? 'guest', role, searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -46,8 +48,8 @@ export function useProtocols(searchQuery?: string) {
           .from('sequences')
           .select('*', { count: 'exact' })
 
-        if (role !== 'admin' && user.email) {
-          query = query.eq('ownerId', user.email)
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues)
         }
 
         if (searchQuery) {
@@ -169,17 +171,18 @@ export function useProtocols(searchQuery?: string) {
 
 export function useProtocolsCount(searchQuery?: string) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['protocols-count', user?.email, role, searchQuery],
+    queryKey: ['protocols-count', user?.id ?? user?.email ?? 'guest', role, searchQuery],
     queryFn: async () => {
-      if (loading || !user || !user.email) return 0
+      if (loading || !user) return 0
 
       try {
         let query = supabase.from('sequences').select('id', { count: 'exact', head: true })
 
-        if (role !== 'admin') {
-          query = query.eq('ownerId', user.email)
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues)
         }
 
         if (searchQuery) {
@@ -204,16 +207,17 @@ export function useProtocolsCount(searchQuery?: string) {
         return 0
       }
     },
-    enabled: !loading && !!user && !!user?.email,
+    enabled: !loading && !!user,
     staleTime: 1000 * 60 * 5,
   })
 }
 
 export function useSearchProtocols(queryTerm: string) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['protocols-search', queryTerm, user?.email, role],
+    queryKey: ['protocols-search', queryTerm, user?.id ?? user?.email ?? 'guest', role],
     queryFn: async () => {
       if (!queryTerm || queryTerm.length < 2) return []
       if (loading || !user) return []
@@ -221,8 +225,8 @@ export function useSearchProtocols(queryTerm: string) {
       try {
         let query = supabase.from('sequences').select('*')
 
-        if (role !== 'admin' && user.email) {
-          query = query.eq('ownerId', user.email)
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues)
         }
 
         query = query.or(`name.ilike.%${queryTerm}%,description.ilike.%${queryTerm}%`)

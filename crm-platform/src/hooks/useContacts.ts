@@ -2,12 +2,14 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 export interface Contact {
   id: string
   name: string
   firstName?: string
   lastName?: string
+  ownerId?: string | null
   email: string
   phone: string
   company: string
@@ -123,6 +125,7 @@ export interface ContactFilters {
 type ContactMetadata = {
   company?: string
   companyName?: string
+  ownerId?: string
   domain?: string
   city?: string
   state?: string
@@ -216,6 +219,7 @@ function getFirstServiceAddressAddress(serviceAddresses: unknown[] | null | unde
 type ContactRow = {
   id: string
   name?: string | null
+  ownerId?: string | null
   firstName?: string | null
   first_name?: string | null
   firstname?: string | null
@@ -374,6 +378,7 @@ export function useAccountContacts(accountId: string) {
           workDirectPhone: row.workPhone || '',
           otherPhone: row.otherPhone || '',
           companyPhone: row.companyPhone || '',
+          ownerId: row.ownerId || null,
           primaryPhoneField: normalizePrimaryPhoneField(row.primaryPhoneField),
           additionalPhones: extractAdditionalPhones(metadata),
           avatarUrl: resolveContactPhotoUrl(row, metadata),
@@ -392,9 +397,10 @@ export function useAccountContacts(accountId: string) {
 
 export function useSearchContacts(queryTerm: string) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['contacts-search', queryTerm, user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['contacts-search', queryTerm, user?.id ?? user?.email ?? 'guest', role ?? 'unknown'],
     queryFn: async () => {
       if (!queryTerm || queryTerm.length < 2) return []
       if (loading || !user) return []
@@ -405,8 +411,8 @@ export function useSearchContacts(queryTerm: string) {
           .select('*, accounts!contacts_accountId_fkey(name, domain, logo_url)');
 
         // Admin and dev see all contacts; others filtered by ownerId
-        if (role !== 'admin' && role !== 'dev' && user?.email) {
-          query = query.eq('ownerId', user.email);
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues);
         }
 
         // Search across multiple columns
@@ -440,6 +446,7 @@ export function useSearchContacts(queryTerm: string) {
           return {
             id: item.id,
             name: fullName,
+            ownerId: item.ownerId || metadata?.ownerId || null,
             email: item.email || '',
             avatarUrl: resolveContactPhotoUrl(item, metadata),
             company: account?.name || '',
@@ -459,9 +466,10 @@ export function useSearchContacts(queryTerm: string) {
 
 export function useContacts(searchQuery?: string, filters?: ContactFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useInfiniteQuery({
-    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
+    queryKey: ['contacts', CONTACTS_QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -494,8 +502,8 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         }
 
         // Admin and dev see all contacts; others filtered by ownerId
-        if (role !== 'admin' && role !== 'dev' && user?.email) {
-          query = query.eq('ownerId', user.email);
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues);
         }
 
         if (searchQuery) {
@@ -582,6 +590,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             name: fullName,
             firstName: fName as string,
             lastName: lName as string,
+            ownerId: item.ownerId || metadata?.ownerId || null,
             avatarUrl: resolveContactPhotoUrl(item, metadata),
             email: item.email || metadata?.email || metadata?.general?.email || metadata?.contact?.email || '',
             phone: item.phone || item.mobile || item.workPhone || item.otherPhone || metadata?.mobile || metadata?.workDirectPhone || metadata?.otherPhone || metadata?.general?.phone || metadata?.contact?.phone || '',
@@ -627,9 +636,10 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
 export function useContactsCount(searchQuery?: string, filters?: ContactFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
+    queryKey: ['contacts-count', CONTACTS_QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     queryFn: async () => {
       if (!enabled || loading) return 0
       if (!user) return 0
@@ -662,8 +672,8 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       }
 
       // Admin and dev see all contacts; others filtered by ownerId
-      if (role !== 'admin' && role !== 'dev' && user.email) {
-        query = query.eq('ownerId', user.email)
+      if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+        query = query.in('ownerId', ownerScopeValues)
       }
 
       if (searchQuery) {
@@ -706,7 +716,7 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
       }
       return count || 0
     },
-    enabled: enabled && !loading && !!user && !!user?.email,
+    enabled: enabled && !loading && !!user,
     staleTime: 1000 * 60 * 5,
   })
 }

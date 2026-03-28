@@ -8,6 +8,13 @@ export interface OwnerDirectoryEntry {
   email: string | null
   firstName: string | null
   lastName: string | null
+  aliases?: string[]
+}
+
+export interface TwilioNumberRecord {
+  name: string | null
+  number: string
+  selected?: boolean | null
 }
 
 export interface AgentProgressTotals {
@@ -28,6 +35,7 @@ export interface AgentProgressRow extends OwnerDirectoryEntry {
   role: string | null
   assignedPhoneNumber: string | null
   assignedEmailAddress: string | null
+  twilioNumbers: TwilioNumberRecord[]
   accountCount: number
   contactCount: number
   callCount: number
@@ -44,7 +52,6 @@ export interface AgentProgressRow extends OwnerDirectoryEntry {
   activeNumbers: number
   goals: Record<string, unknown> | null
   performance: Record<string, unknown> | null
-  aliases: string[]
 }
 
 export interface AgentProgressReport {

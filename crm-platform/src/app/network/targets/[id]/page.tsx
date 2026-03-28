@@ -36,6 +36,7 @@ import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, useDeleteContacts, Contact } from '@/hooks/useContacts'
 import { useAccounts, useAccountsCount, useDeleteAccounts, Account } from '@/hooks/useAccounts'
 import { useTarget } from '@/hooks/useTargets'
+import { useOwnerDirectory } from '@/hooks/useOwnerDirectory'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { useDebounce } from '@/hooks/useDebounce'
@@ -114,6 +115,7 @@ export default function TargetDetailPage() {
   }, [debouncedSearch, setSearch])
 
   const { data: target, isLoading: targetLoading } = useTarget(id)
+  const { getOwner } = useOwnerDirectory()
 
   const isPeopleList = target?.kind === 'people' || target?.kind === 'person' || target?.kind === 'contact' || target?.kind === 'contacts'
   const isAccountList = target?.kind === 'account' || target?.kind === 'accounts' || target?.kind === 'company' || target?.kind === 'companies'
@@ -188,11 +190,11 @@ export default function TargetDetailPage() {
   )
 
   const initialPeopleOrder = useMemo(() => [
-    'select', 'name', 'title', 'company', 'industry', 'location', 'phone', 'status', 'actions'
+    'select', 'name', 'title', 'company', 'owner', 'industry', 'location', 'phone', 'status', 'actions'
   ], [])
 
   const initialAccountOrder = useMemo(() => [
-    'select', 'name', 'industry', 'location', 'companyPhone', 'status', 'actions'
+    'select', 'name', 'industry', 'location', 'owner', 'companyPhone', 'status', 'actions'
   ], [])
 
   const [peopleColumnOrder, setPeopleColumnOrder] = useTableColumnOrder('targets_people', initialPeopleOrder)
@@ -425,10 +427,10 @@ export default function TargetDetailPage() {
       filterFn: () => true, // Server-side filtered
       cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('title')}</div>,
     },
-    {
-      accessorKey: 'company',
-      header: 'Company',
-      cell: ({ row }) => {
+      {
+        accessorKey: 'company',
+        header: 'Company',
+        cell: ({ row }) => {
         const contact = row.original
         return (
           <Link
@@ -447,6 +449,20 @@ export default function TargetDetailPage() {
               {contact.company}
             </span>
           </Link>
+        )
+      }
+    },
+    {
+      id: 'owner',
+      header: 'Owner',
+      cell: ({ row }) => {
+        const owner = getOwner(row.original.ownerId)
+        return (
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-zinc-300 font-medium whitespace-nowrap">
+              {owner?.displayName || 'Unassigned'}
+            </span>
+          </div>
         )
       }
     },
@@ -508,7 +524,7 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pageIndex, pageSize, isPeopleList])
+  ], [pageIndex, pageSize, isPeopleList, getOwner])
 
   // Column definitions for Accounts
   const accountColumns = useMemo<ColumnDef<Account>[]>(() => [
@@ -615,16 +631,30 @@ export default function TargetDetailPage() {
       filterFn: () => true, // Server-side filtered
       cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('industry')}</div>,
     },
-    {
-      accessorKey: 'location',
-      header: 'Location',
-      filterFn: () => true, // Server-side filtered
-      cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('location')}</div>,
-    },
-    {
-      accessorKey: 'companyPhone',
-      header: 'Phone',
-      cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('companyPhone')}</div>,
+      {
+        accessorKey: 'location',
+        header: 'Location',
+        filterFn: () => true, // Server-side filtered
+        cell: ({ row }) => <div className="text-zinc-400 whitespace-nowrap">{row.getValue('location')}</div>,
+      },
+      {
+        id: 'owner',
+        header: 'Owner',
+        cell: ({ row }) => {
+          const owner = getOwner(row.original.ownerId)
+          return (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-zinc-300 font-medium whitespace-nowrap">
+                {owner?.displayName || 'Unassigned'}
+              </span>
+            </div>
+          )
+        }
+      },
+      {
+        accessorKey: 'companyPhone',
+        header: 'Phone',
+        cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('companyPhone')}</div>,
     },
     {
       id: 'status',
@@ -672,7 +702,7 @@ export default function TargetDetailPage() {
         )
       }
     }
-  ], [pageIndex, pageSize, router])
+  ], [pageIndex, pageSize, router, getOwner])
 
   const tableColumns = useMemo(() => isPeopleList ? peopleColumns : accountColumns, [isPeopleList, peopleColumns, accountColumns])
 
