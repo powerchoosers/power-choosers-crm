@@ -100,9 +100,9 @@ export default function BulkActionDeck({
               <button
                 type="button"
                 onClick={onPowerDial}
-                className="group inline-flex items-center gap-2 rounded-xl border border-[#002FA7]/25 bg-[#002FA7]/10 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-[#9ab4ff] transition-all hover:bg-[#002FA7]/20 hover:text-white"
+                className="group inline-flex items-center gap-2 rounded-xl border border-[#002FA7]/25 bg-[#002FA7]/12 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-white transition-all hover:bg-[#002FA7]/20"
               >
-                <PhoneCall className="w-4 h-4" />
+                <PhoneCall className="w-4 h-4 text-zinc-100" />
                 POWER_DIAL
               </button>
             )}
@@ -116,12 +116,10 @@ export default function BulkActionDeck({
           
           <button 
             onClick={() => onAction('delete')}
-            className="group p-2 icon-button-forensic relative"
+            className="group inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-zinc-300 transition-all hover:bg-red-500/10 hover:text-red-100 hover:border-red-500/25"
           >
-            <Trash2 className="w-5 h-5 group-hover:text-red-500 transition-colors" />
-            <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-[9px] font-mono text-red-500 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-              PURGE_PROTOCOL
-            </span>
+            <Trash2 className="w-4 h-4 text-zinc-400 transition-colors group-hover:text-red-300" />
+            PURGE_PROTOCOL
           </button>
 
         </div>
@@ -133,17 +131,15 @@ export default function BulkActionDeck({
 
 function ActionButton({ icon, label, onClick }: { icon: React.ReactNode, label: string, onClick: () => void }) {
   return (
-    <button 
+    <button
+      type="button"
       onClick={onClick}
-      className="group relative p-2.5 icon-button-forensic flex items-center justify-center"
+      className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-zinc-300 transition-all hover:bg-white/[0.06] hover:text-white"
     >
-      <div className="w-5 h-5 flex items-center justify-center">
+      <span className="flex h-4 w-4 items-center justify-center text-zinc-400">
         {icon}
-      </div>
-      {/* Tooltip */}
-      <span className="absolute -top-10 left-1/2 -translate-x-1/2 w-max bg-black border border-white/10 px-2 py-1 text-[9px] font-mono text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
-        {label}
       </span>
+      <span>{label}</span>
     </button>
   );
 }
