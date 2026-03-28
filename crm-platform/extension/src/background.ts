@@ -1588,6 +1588,74 @@ async function handleGetOrgContacts(payload: any) {
   return { ok: true, data, state: cloneState() }
 }
 
+async function handleRevealOrgContact(payload: any) {
+  const person = payload?.person && typeof payload.person === 'object' ? payload.person : null
+  if (!person) throw new Error('No org contact was provided for reveal.')
+
+  const accountId = trimText(payload?.accountId || state.match?.account?.id || '')
+  const revealEmails = payload?.revealEmails !== false
+  const revealPhones = payload?.revealPhones === true
+
+  const data = await fetchAuthedJson(
+    '/api/extension/reveal-contact',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        person,
+        accountId: accountId || null,
+        revealEmails,
+        revealPhones,
+      }),
+    },
+    payload?.appOrigin || state.page?.origin || state.auth?.appOrigin || null
+  )
+
+  return { ok: true, data, state: cloneState() }
+}
+
+async function handlePollOrgContactPhones(payload: any) {
+  const personId = trimText(payload?.personId || '')
+  if (!personId) throw new Error('Missing Apollo person id for phone polling.')
+
+  const person = payload?.person && typeof payload.person === 'object' ? payload.person : null
+  const accountId = trimText(payload?.accountId || state.match?.account?.id || '')
+
+  const poll = await fetchAuthedJson(
+    `/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`,
+    { method: 'GET' },
+    payload?.appOrigin || state.page?.origin || state.auth?.appOrigin || null
+  )
+
+  if (!poll?.ready || !Array.isArray(poll?.phones) || poll.phones.length === 0) {
+    return { ok: true, data: { ready: false }, state: cloneState() }
+  }
+
+  const sync = await fetchAuthedJson(
+    '/api/extension/reveal-contact',
+    {
+      method: 'POST',
+      body: JSON.stringify({
+        person: person || { id: personId },
+        accountId: accountId || null,
+        syncPhonesOnly: true,
+        phones: poll.phones,
+      }),
+    },
+    payload?.appOrigin || state.page?.origin || state.auth?.appOrigin || null
+  )
+
+  return {
+    ok: true,
+    data: {
+      ready: true,
+      phones: poll.phones,
+      contact: sync?.contact || null,
+      apolloPersonId: personId,
+    },
+    state: cloneState(),
+  }
+}
+
 async function handleTwilioEvent(payload: any) {
   const kind = trimText(payload?.kind || payload?.status || '')
   const from = trimText(payload?.from || payload?.caller || payload?.incomingFrom || '')
@@ -1970,6 +2038,12 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           return
         case 'GET_ORG_CONTACTS':
           sendResponse(await handleGetOrgContacts(message.payload))
+          return
+        case 'REVEAL_ORG_CONTACT':
+          sendResponse(await handleRevealOrgContact(message.payload))
+          return
+        case 'POLL_ORG_CONTACT_PHONES':
+          sendResponse(await handlePollOrgContactPhones(message.payload))
           return
         case 'OFFSCREEN_PING':
           sendResponse({ ok: true, state: cloneState() })

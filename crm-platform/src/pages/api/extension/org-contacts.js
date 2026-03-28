@@ -114,12 +114,15 @@ function normalizeCrmContactRow(row) {
 }
 
 function normalizeApolloContactRow(raw, crmId) {
+  const apolloId = sanitizeText(raw?.id || raw?.contactId || raw?.person_id)
+  if (!apolloId) return null
+
   const identity = buildIdentityName(raw || {})
   const phones = normalizeApolloPhones(raw?.phones || raw?.phone_numbers || [])
   const primaryPhone = sanitizeText(raw?.phone || raw?.mobile || phones[0]) || null
 
   return {
-    id: sanitizeText(raw?.id || raw?.contactId || raw?.person_id || `apollo_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
+    id: apolloId,
     crmId: crmId || null,
     name: identity.name || 'Contact',
     firstName: identity.firstName || null,
@@ -290,6 +293,7 @@ export default async function handler(req, res) {
 
         return normalizeApolloContactRow(raw, crmId)
       })
+      .filter((contact) => Boolean(contact))
       .filter((contact) => matchesQuery(contact, query))
 
     const apolloOnlyContacts = apolloMapped
