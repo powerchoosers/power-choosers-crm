@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { type Deal, type DealStage, type CreateDealInput, type UpdateDealInput } from '@/types/deals'
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 const PAGE_SIZE = 50
 const QUERY_BUSTER = 'v1'
@@ -18,9 +19,10 @@ interface DealsFilters {
 // ---------------------------------------------------------------------------
 export function useDeals(filters?: DealsFilters) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useInfiniteQuery({
-    queryKey: ['deals', QUERY_BUSTER, user?.email, role, filters],
+    queryKey: ['deals', QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role, filters],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       if (loading || !user) return { deals: [], nextCursor: null }
@@ -29,8 +31,8 @@ export function useDeals(filters?: DealsFilters) {
         .from('deals')
         .select('*, signature_requests(id, status, created_at, updated_at, expires_at)')
 
-      if (role !== 'admin' && user.email) {
-        query = query.eq('ownerId', user.email)
+      if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+        query = query.in('ownerId', ownerScopeValues)
       }
 
       if (filters?.stage && filters.stage !== 'ALL') {
@@ -88,9 +90,10 @@ export function useDeals(filters?: DealsFilters) {
 
 export function useDealsCount(filters?: DealsFilters) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['deals-count', QUERY_BUSTER, user?.email, role, filters],
+    queryKey: ['deals-count', QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role, filters],
     queryFn: async () => {
       if (loading || !user) return 0
 
@@ -98,8 +101,8 @@ export function useDealsCount(filters?: DealsFilters) {
         .from('deals')
         .select('*', { count: 'exact', head: true })
 
-      if (role !== 'admin' && user.email) {
-        query = query.eq('ownerId', user.email)
+      if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+        query = query.in('ownerId', ownerScopeValues)
       }
 
       if (filters?.stage && filters.stage !== 'ALL') {

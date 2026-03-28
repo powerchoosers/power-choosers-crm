@@ -22,6 +22,7 @@ import {
   Activity,
   FileText,
   Settings,
+  UserCog,
   LogOut,
   Plus,
   Zap,
@@ -84,6 +85,7 @@ const navigationStructure = [
   {
     group: "System",
     items: [
+      { name: 'Agents', href: '/network/agents', icon: UserCog, roles: ['admin', 'dev'] },
       { name: 'Settings', href: '/network/settings', icon: Settings }
     ]
   }
@@ -230,7 +232,7 @@ export function Sidebar() {
               )}
             </AnimatePresence>
 
-            {group.items.map((item: any) => {
+            {group.items.filter((item: any) => !item.roles || item.roles.includes(role || '')).map((item: any) => {
               const isActive = pathname === item.href
 
               const content = (

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { millDecimal } from '@/lib/mills'
 import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 export interface Account {
   id: string
@@ -126,9 +127,10 @@ function resolveAccountLoadZone(data: any): ErcotZone {
 
 export function useSearchAccounts(queryTerm: string) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['accounts-search', queryTerm, user?.email ?? 'guest', role ?? 'unknown'],
+    queryKey: ['accounts-search', queryTerm, user?.id ?? user?.email ?? 'guest', role ?? 'unknown'],
     queryFn: async () => {
       if (!queryTerm || queryTerm.length < 2) return []
       if (loading || !user) return []
@@ -137,8 +139,8 @@ export function useSearchAccounts(queryTerm: string) {
         let query = supabase.from('accounts').select('*');
 
         // Admin and dev see all accounts; others filtered by ownerId
-        if (role !== 'admin' && role !== 'dev' && user?.email) {
-          query = query.eq('ownerId', user.email);
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues);
         }
 
         query = query.or(`name.ilike.%${queryTerm}%,domain.ilike.%${queryTerm}%,industry.ilike.%${queryTerm}%`);
@@ -175,9 +177,10 @@ export function useSearchAccounts(queryTerm: string) {
 
 export function useAccounts(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useInfiniteQuery({
-    queryKey: ['accounts', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
+    queryKey: ['accounts', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -208,8 +211,8 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         }
 
         // Apply ownership filter for non-admin users
-        if (role !== 'admin' && user?.email) {
-          query = query.eq('ownerId', user.email);
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues);
         }
 
         if (searchQuery) {
@@ -462,9 +465,10 @@ export function useAccountBillIntelligence(accountId: string | undefined) {
 
 export function useAccountsCount(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['accounts-count', user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
+    queryKey: ['accounts-count', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
     queryFn: async () => {
       if (!enabled || loading) return 0
       if (!user) return 0
@@ -491,8 +495,8 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       }
 
       // Admin and dev see all accounts; others filtered by ownerId
-      if (role !== 'admin' && role !== 'dev' && user.email) {
-        query = query.eq('ownerId', user.email)
+      if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+        query = query.in('ownerId', ownerScopeValues)
       }
 
       if (searchQuery) {
@@ -531,7 +535,7 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
 
       return count || 0
     },
-    enabled: enabled && !loading && !!user && !!user?.email,
+    enabled: enabled && !loading && !!user,
     staleTime: 1000 * 60 * 5,
   })
 }

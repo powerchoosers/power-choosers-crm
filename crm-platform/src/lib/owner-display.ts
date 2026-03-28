@@ -5,6 +5,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export interface OwnerIndex {
   byId: Map<string, UserIdentityRecord>
   byEmail: Map<string, UserIdentityRecord>
+  byLocalPart: Map<string, UserIdentityRecord>
 }
 
 export function normalizeEmail(value?: string | null) {
@@ -14,6 +15,19 @@ export function normalizeEmail(value?: string | null) {
   const angleMatch = raw.match(/<\s*([^>]+)\s*>/)
   const candidate = (angleMatch?.[1] || raw).trim().toLowerCase()
   return EMAIL_REGEX.test(candidate) ? candidate : ''
+}
+
+function humanizeLabel(value?: string | null) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+
+  return raw
+    .replace(/[._-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ')
 }
 
 export function normalizeOwnerKey(value?: string | null) {
@@ -35,6 +49,7 @@ export function isUnassignedOwner(value?: string | null) {
 export function buildOwnerIndex(users: UserIdentityRecord[]) {
   const byId = new Map<string, UserIdentityRecord>()
   const byEmail = new Map<string, UserIdentityRecord>()
+  const byLocalPart = new Map<string, UserIdentityRecord>()
 
   for (const user of users || []) {
     if (user.id) {
@@ -44,10 +59,14 @@ export function buildOwnerIndex(users: UserIdentityRecord[]) {
     const email = normalizeEmail(user.email)
     if (email) {
       byEmail.set(email, user)
+      const localPart = email.split('@')[0]?.trim()
+      if (localPart && !byLocalPart.has(localPart)) {
+        byLocalPart.set(localPart, user)
+      }
     }
   }
 
-  return { byId, byEmail } satisfies OwnerIndex
+  return { byId, byEmail, byLocalPart } satisfies OwnerIndex
 }
 
 export function resolveOwnerUser(value: string | null | undefined, index: OwnerIndex) {
@@ -60,6 +79,11 @@ export function resolveOwnerUser(value: string | null | undefined, index: OwnerI
   const email = normalizeEmail(normalized)
   if (email) {
     return index.byEmail.get(email) ?? null
+  }
+
+  const localPart = normalized.split('@')[0]?.trim().toLowerCase()
+  if (localPart) {
+    return index.byLocalPart.get(localPart) ?? null
   }
 
   return null
@@ -77,7 +101,11 @@ export function formatOwnerDisplayName(user?: UserIdentityRecord | null, fallbac
   if (full) return full
 
   const email = normalizeEmail(user.email)
-  if (email) return email
+  if (email) {
+    const localPart = email.split('@')[0] || ''
+    const humanized = humanizeLabel(localPart)
+    return humanized || email
+  }
 
   const rawFallback = String(fallback || '').trim()
   return rawFallback || user.id || 'Unassigned'
@@ -130,5 +158,6 @@ export function buildOwnerDirectoryEntry(
     email: email || null,
     firstName: user?.first_name ?? user?.firstName ?? null,
     lastName: user?.last_name ?? user?.lastName ?? null,
+    aliases: [],
   }
 }

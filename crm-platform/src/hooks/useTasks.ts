@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryClie
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
+import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 export interface Task {
   id: string
@@ -93,9 +94,10 @@ function insertTaskIntoPendingCaches(queryClient: QueryClient, task: Task) {
 export function useTasks(searchQuery?: string) {
   const { user, role, loading } = useAuth()
   const queryClient = useQueryClient()
+  const ownerScopeValues = buildOwnerScopeValues(user)
 
   const tasksQuery = useInfiniteQuery({
-    queryKey: ['tasks', user?.email, role, searchQuery],
+    queryKey: ['tasks', user?.id ?? user?.email ?? 'guest', role, searchQuery],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
@@ -113,8 +115,8 @@ export function useTasks(searchQuery?: string) {
             )
           `, { count: 'exact' })
 
-        if (role !== 'admin' && user.email) {
-          query = query.eq('ownerId', user.email)
+        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+          query = query.in('ownerId', ownerScopeValues)
         }
 
         if (searchQuery) {

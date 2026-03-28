@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useAccounts, useAccountsCount, useDeleteAccounts, useCreateAccount, Account } from '@/hooks/useAccounts'
+import { useOwnerDirectory } from '@/hooks/useOwnerDirectory'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -78,6 +79,7 @@ export default function AccountsPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const { getOwner } = useOwnerDirectory()
   const scrollKey = (pathname ?? '/network/accounts') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
 
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
@@ -160,6 +162,7 @@ export default function AccountsPage() {
     'name',
     'industry',
     'location',
+    'owner',
     'companyPhone',
     'status',
     'targetLists',
@@ -458,6 +461,20 @@ export default function AccountsPage() {
         cell: ({ row }) => <div className="text-zinc-400">{row.getValue('location')}</div>,
       },
       {
+        id: 'owner',
+        header: 'Owner',
+        cell: ({ row }) => {
+          const owner = getOwner(row.original.ownerId)
+          return (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-zinc-300 font-medium whitespace-nowrap">
+                {owner?.displayName || 'Unassigned'}
+              </span>
+            </div>
+          )
+        },
+      },
+      {
         accessorKey: 'companyPhone',
         header: 'Phone',
         cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums">{row.getValue('companyPhone')}</div>,
@@ -577,7 +594,7 @@ export default function AccountsPage() {
         },
       },
     ]
-  }, [pageIndex, deletingAccountIds])
+  }, [pageIndex, deletingAccountIds, getOwner])
 
   const table = useReactTable({
     data: accounts,
