@@ -1154,45 +1154,190 @@ a {
 .np-network-card__actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex: 0 0 auto;
 }
 
-.np-network-card__source {
+.np-network-card__icon-btn {
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 2px 7px;
-  border-radius: 999px;
+  border-radius: 10px;
   border: 1px solid var(--np-border);
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 8px;
-  line-height: 1;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.np-network-card__source--apollo {
-  color: #93c5fd;
-  border-color: rgba(0, 47, 167, 0.35);
-  background: rgba(0, 47, 167, 0.08);
-}
-
-.np-network-card__source--crm {
-  color: #86efac;
-  border-color: rgba(34, 197, 94, 0.22);
-  background: rgba(34, 197, 94, 0.05);
+  color: var(--np-muted);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .np-network-card__dial {
+  width: 26px;
+  height: 26px;
+  border-radius: 10px;
+  border: 1px solid var(--np-border);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--np-muted);
 }
 
-.np-network-card__phone {
+.np-network-card__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  align-items: start;
+}
+
+.np-network-card__detail-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.np-network-card__detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.24);
+  padding: 8px 9px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.np-network-card__detail:hover {
+  border-color: rgba(0, 47, 167, 0.26);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.np-network-card__detail--muted {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.np-network-card__detail--muted:hover {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.24);
+  transform: none;
+}
+
+.np-network-card__detail-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.np-network-card__detail-value {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--np-text);
+}
+
+.np-network-card__detail-label {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--np-dim);
+}
+
+.np-network-card__detail-icon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--np-dim);
+}
+
+.np-network-card__reveal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  border: 1px solid rgba(0, 47, 167, 0.22);
+  border-radius: 12px;
+  background: rgba(0, 47, 167, 0.1);
+  color: #dbeafe;
+  padding: 8px 9px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.np-network-card__reveal:hover:not(:disabled) {
+  border-color: rgba(0, 47, 167, 0.5);
+  background: rgba(0, 47, 167, 0.18);
+  transform: translateY(-1px);
+}
+
+.np-network-card__reveal:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.np-network-card__phone-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.np-network-card__phone-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.24);
+  padding: 8px 9px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.np-network-card__phone-item:hover {
+  border-color: rgba(0, 47, 167, 0.26);
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateY(-1px);
+}
+
+.np-network-card__phone-item-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.np-network-card__phone-item-label {
+  padding-left: 22px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--np-dim);
+}
+
+.np-network-card__location {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+  padding-top: 1px;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 9px;
   letter-spacing: 0.16em;
@@ -1200,9 +1345,28 @@ a {
   color: var(--np-muted);
 }
 
-.np-network-card__phone-icon {
-  width: 10px;
-  height: 10px;
+.np-network-card__location > span {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.np-network-card__location-icon {
+  width: 11px;
+  height: 11px;
   flex: 0 0 auto;
   color: var(--np-dim);
+}
+
+.np-network-card__warning {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #f59e0b;
+}
+
+.np-spin {
+  animation: np-contact-spin 0.9s linear infinite;
 }
