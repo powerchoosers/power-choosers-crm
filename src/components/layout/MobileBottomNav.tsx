@@ -19,9 +19,12 @@ import {
   Activity,
   Map,
   X,
+  UserCog,
+  ShieldCheck,
 } from 'lucide-react'
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useAuth } from '@/context/AuthContext'
 
 const primaryNav = [
   { name: 'Dashboard', href: '/network', icon: LayoutGrid, exact: true },
@@ -40,12 +43,15 @@ const moreNav = [
   { name: 'Telemetry', href: '/network/telemetry', icon: Activity },
   { name: 'Vault', href: '/network/vault', icon: FileText },
   { name: 'Infra', href: '/network/infrastructure', icon: Map },
+  { name: 'Admin', href: '/network/admin', icon: ShieldCheck, roles: ['admin', 'dev'] },
+  { name: 'Agents', href: '/network/agents', icon: UserCog, roles: ['admin', 'dev'] },
   { name: 'Settings', href: '/network/settings', icon: Settings },
 ]
 
 export function MobileBottomNav() {
   const pathname = usePathname()
   const [isMoreOpen, setIsMoreOpen] = useState(false)
+  const { role } = useAuth()
 
   const isActive = (href: string, exact = false) => {
     if (exact) return pathname === href
@@ -89,7 +95,7 @@ export function MobileBottomNav() {
 
               {/* Grid of nav items */}
               <div className="grid grid-cols-5 gap-1 px-3 pb-5">
-                {moreNav.map((item) => {
+                {moreNav.filter((item) => !item.roles || item.roles.includes(role || '')).map((item) => {
                   const active = isActive(item.href)
                   return (
                     <Link
