@@ -34,6 +34,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, useDeleteContacts, useCreateContact, Contact } from '@/hooks/useContacts'
+import { useOwnerDirectory } from '@/hooks/useOwnerDirectory'
 import { TargetListBadges } from '@/components/ui/TargetListBadges'
 import { useContactLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
 import { Button } from '@/components/ui/button'
@@ -80,6 +81,7 @@ export default function PeoplePage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
+  const { getOwner } = useOwnerDirectory()
   const scrollKey = (pathname ?? '/network/people') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
 
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
@@ -163,6 +165,7 @@ export default function PeoplePage() {
     'name',
     'title',
     'company',
+    'owner',
     'industry',
     'location',
     'phone',
@@ -389,6 +392,20 @@ export default function PeoplePage() {
         },
       },
       {
+        id: 'owner',
+        header: 'Owner',
+        cell: ({ row }) => {
+          const owner = getOwner(row.original.ownerId)
+          return (
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-zinc-300 font-medium whitespace-nowrap">
+                {owner?.displayName || 'Unassigned'}
+              </span>
+            </div>
+          )
+        },
+      },
+      {
         accessorKey: 'phone',
         header: 'Phone',
         cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums">{row.getValue('phone')}</div>,
@@ -547,7 +564,7 @@ export default function PeoplePage() {
         },
       },
     ]
-  }, [router, pageIndex])
+  }, [router, pageIndex, getOwner])
 
   const onPaginationChange = useCallback(
     (updaterOrValue: PaginationState | ((old: PaginationState) => PaginationState)) => {
