@@ -73,6 +73,8 @@ type RevealOrgContactPayload = {
   pendingPhone?: boolean
 }
 
+type RevealIcon = React.ComponentType<{ className?: string; size?: number }>
+
 const FORENSIC_EASE: any = [0.23, 1, 0.32, 1]
 const NETWORK_LABELS = {
   crm: 'CRM',
@@ -417,6 +419,48 @@ function networkMatchesQuery(contact: OrgNetworkContact, query: string) {
     .join(' ')
     .toLowerCase()
   return text.includes(q)
+}
+
+function NetworkRevealButton({
+  icon: Icon,
+  revealing,
+  disabled,
+  onClick,
+  title,
+}: {
+  icon: RevealIcon
+  revealing: boolean
+  disabled?: boolean
+  onClick: () => void
+  title?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      disabled={disabled}
+      className={`np-network-card__reveal ${revealing ? 'np-network-card__reveal--active' : ''}`}
+    >
+      <div className="np-network-card__reveal-inner">
+        {revealing ? (
+          <>
+            <Loader2 size={13} className="np-spin shrink-0" />
+            <span className="np-network-card__reveal-state">Revealing</span>
+          </>
+        ) : (
+          <>
+            <Icon size={13} className="shrink-0 text-zinc-400" />
+            <div className="np-network-card__reveal-copy">
+              <span className="np-network-card__reveal-mask">•••••••••</span>
+              <span className="np-network-card__reveal-label">REVEAL</span>
+            </div>
+          </>
+        )}
+      </div>
+    </button>
+  )
 }
 
 function useCallDuration(startedAt: string | null) {
@@ -1542,11 +1586,6 @@ function App() {
                     {orgContactsLoading ? '...' : 'Refresh'}
                   </button>
                 </div>
-                {orgContacts.cacheKeyUsed ? (
-                  <div className="np-micro font-mono" style={{ marginBottom: 8, opacity: 0.55 }}>
-                    cache: {orgContacts.cacheKeyUsed}
-                  </div>
-                ) : null}
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={networkView}
@@ -1650,15 +1689,13 @@ function App() {
                                     </div>
                                   </button>
                                 ) : canReveal ? (
-                                  <button
-                                    type="button"
-                                    className="np-network-card__reveal"
+                                  <NetworkRevealButton
+                                    icon={Globe}
+                                    revealing={revealState.revealingEmail}
                                     disabled={revealState.revealingEmail || revealState.revealingPhone}
                                     onClick={() => void runAction(`reveal-email-${revealKey}`, () => revealOrgContact(c, 'email'))}
-                                  >
-                                    {revealState.revealingEmail ? <Loader2 size={13} className="np-spin" /> : <Globe size={13} />}
-                                    <span>{revealState.revealingEmail ? 'Revealing email...' : 'Reveal email'}</span>
-                                  </button>
+                                    title="Reveal email"
+                                  />
                                 ) : (
                                   <div className="np-network-card__detail np-network-card__detail--muted">
                                     <Globe className="np-network-card__detail-icon" />
@@ -1688,15 +1725,13 @@ function App() {
                                     ))}
                                   </div>
                                 ) : canReveal ? (
-                                  <button
-                                    type="button"
-                                    className="np-network-card__reveal"
+                                  <NetworkRevealButton
+                                    icon={Phone}
+                                    revealing={revealState.revealingPhone}
                                     disabled={revealState.revealingPhone || revealState.revealingEmail}
                                     onClick={() => void runAction(`reveal-phone-${revealKey}`, () => revealOrgContact(c, 'phone'))}
-                                  >
-                                    {revealState.revealingPhone ? <Loader2 size={13} className="np-spin" /> : <Phone size={13} />}
-                                    <span>{revealState.revealingPhone ? 'Revealing phone...' : 'Reveal phone + email'}</span>
-                                  </button>
+                                    title="Reveal phone"
+                                  />
                                 ) : (
                                   <div className="np-network-card__detail np-network-card__detail--muted">
                                     <Phone className="np-network-card__detail-icon" />
@@ -1716,26 +1751,20 @@ function App() {
                             </div>
                           ) : (
                             <div className="np-network-card__detail-grid">
-                              <button
-                                type="button"
-                                className="np-network-card__reveal"
+                              <NetworkRevealButton
+                                icon={Globe}
+                                revealing={revealState.revealingEmail}
                                 disabled={!canReveal || revealState.revealingEmail || revealState.revealingPhone}
                                 onClick={() => void runAction(`reveal-email-${revealKey}`, () => revealOrgContact(c, 'email'))}
                                 title="Reveal email (fast)"
-                              >
-                                {revealState.revealingEmail ? <Loader2 size={13} className="np-spin" /> : <Globe size={13} />}
-                                <span>{revealState.revealingEmail ? 'Revealing email...' : 'Reveal email'}</span>
-                              </button>
-                              <button
-                                type="button"
-                                className="np-network-card__reveal"
+                              />
+                              <NetworkRevealButton
+                                icon={Phone}
+                                revealing={revealState.revealingPhone}
                                 disabled={!canReveal || revealState.revealingPhone || revealState.revealingEmail}
                                 onClick={() => void runAction(`reveal-phone-${revealKey}`, () => revealOrgContact(c, 'phone'))}
                                 title="Reveal phone + email (full reveal)"
-                              >
-                                {revealState.revealingPhone ? <Loader2 size={13} className="np-spin" /> : <Phone size={13} />}
-                                <span>{revealState.revealingPhone ? 'Revealing phone...' : 'Reveal phone + email'}</span>
-                              </button>
+                              />
                             </div>
                           )}
 
