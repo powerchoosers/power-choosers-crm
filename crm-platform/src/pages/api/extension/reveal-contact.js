@@ -11,6 +11,45 @@ function sanitizeText(value) {
   return text
 }
 
+function resolvePhotoUrl(...sources) {
+  const directKeys = [
+    'photoUrl',
+    'photo_url',
+    'avatarUrl',
+    'avatar_url',
+    'profilePhotoUrl',
+    'profile_photo_url',
+    'imageUrl',
+    'image_url',
+  ]
+  const nestedKeys = ['metadata', 'general', 'contact', 'original_apollo_data']
+
+  const fromRecord = (record) => {
+    if (!record || typeof record !== 'object') return ''
+
+    for (const key of directKeys) {
+      const url = sanitizeText(record?.[key])
+      if (url) return url
+    }
+
+    for (const key of nestedKeys) {
+      const nested = record?.[key]
+      if (!nested || typeof nested !== 'object') continue
+      const nestedUrl = fromRecord(nested)
+      if (nestedUrl) return nestedUrl
+    }
+
+    return ''
+  }
+
+  for (const source of sources) {
+    const url = fromRecord(source)
+    if (url) return url
+  }
+
+  return ''
+}
+
 function normalizeLinkedin(value) {
   return sanitizeText(value).replace(/\/+$/, '')
 }
@@ -154,11 +193,7 @@ function normalizeContactRow(row) {
     email: sanitizeText(row?.email) || null,
     linkedin: sanitizeText(row?.linkedinUrl) || null,
     location: [sanitizeText(row?.city), sanitizeText(row?.state)].filter(Boolean).join(', ') || null,
-    photoUrl: sanitizeText(
-      metadata?.photoUrl ||
-      metadata?.photo_url ||
-      metadata?.original_apollo_data?.photoUrl
-    ) || null,
+    photoUrl: resolvePhotoUrl(metadata) || null,
     phone: sanitizeText(row?.phone) || null,
     mobile: sanitizeText(row?.mobile) || null,
     workPhone: sanitizeText(row?.workPhone) || null,
@@ -331,7 +366,6 @@ export default async function handler(req, res) {
     const email = sanitizeText(enriched?.email || person?.email) || ''
     const linkedinUrl = normalizeLinkedin(enriched?.linkedin || person?.linkedin) || ''
     const title = sanitizeText(enriched?.jobTitle || person?.title) || ''
-    const photoUrl = sanitizeText(enriched?.photoUrl || person?.photoUrl || person?.photo_url) || ''
 
     const fallbackLocation = parseLocation(person?.location)
     const city = sanitizeText(enriched?.city || fallbackLocation.city) || ''
@@ -348,6 +382,7 @@ export default async function handler(req, res) {
 
     const ownerId = sanitizeText(existing?.ownerId || auth.id || auth.user?.email) || null
     const existingMetadata = existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}
+    const photoUrl = resolvePhotoUrl(enriched, person, existingMetadata) || ''
     const { patch: phonePatch, extras: overflowPhones } = assignPhones(normalizedPhones)
     const now = new Date().toISOString()
 
@@ -373,6 +408,8 @@ export default async function handler(req, res) {
         original_apollo_data: enriched || existingMetadata?.original_apollo_data || null,
         photoUrl: photoUrl || existingMetadata?.photoUrl || existingMetadata?.photo_url || null,
         photo_url: photoUrl || existingMetadata?.photo_url || existingMetadata?.photoUrl || null,
+        avatarUrl: photoUrl || existingMetadata?.avatarUrl || existingMetadata?.avatar_url || null,
+        avatar_url: photoUrl || existingMetadata?.avatar_url || existingMetadata?.avatarUrl || null,
       },
       updatedAt: now,
     }
@@ -425,4 +462,3 @@ export default async function handler(req, res) {
     })
   }
 }
-

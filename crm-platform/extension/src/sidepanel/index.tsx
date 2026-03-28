@@ -299,7 +299,7 @@ function sanitizeOrgContact(raw: any): OrgNetworkContact | null {
     email: trimText(raw.email || '') || null,
     linkedin: trimText(raw.linkedin || raw.linkedinUrl || '') || null,
     location: trimText(raw.location || [raw.city, raw.state].filter(Boolean).join(', ')) || null,
-    photoUrl: trimText(raw.photoUrl || raw.photo_url || '') || null,
+    photoUrl: trimText(resolveContactPhotoUrl(raw, raw?.metadata || null) || '') || null,
     phone: trimText(raw.phone || '') || null,
     mobile: trimText(raw.mobile || '') || null,
     workPhone: trimText(raw.workPhone || '') || null,
