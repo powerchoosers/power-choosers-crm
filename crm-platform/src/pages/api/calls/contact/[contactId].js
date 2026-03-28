@@ -8,9 +8,6 @@ function normalizePhone(phone) {
   return String(phone).replace(/\D/g, '').slice(-10);
 }
 
-
-const ADMIN_EMAIL = 'l.patterson@nodalpoint.io';
-
 // Derive outcome from call status and duration
 function deriveOutcome(call) {
   const status = (call.status || '').toLowerCase();
@@ -75,12 +72,12 @@ export default async function handler(req, res) {
     }
 
     // AuthN: require a valid session via Supabase
-    const { email: userEmail, user } = await requireUser(req);
-    if (!userEmail) {
+    const auth = await requireUser(req);
+    if (!auth.email) {
       res.status(401).json({ error: 'Unauthorized' });
       return;
     }
-    const isAdmin = userEmail === ADMIN_EMAIL;
+    const { user, isAdmin } = auth;
 
     const { contactId } = req.query;
     if (!contactId) {
@@ -161,4 +158,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: 'Internal server error', message: error.message });
   }
 }
-

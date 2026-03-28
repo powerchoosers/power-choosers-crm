@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { ZohoMailService } from './zoho-service.js';
-import { isUserAdmin } from '@/lib/supabase';
+import { resolveUserRole } from '@/lib/auth/roles';
 
 // preference type → suppression reason label
 const REASON_MAP = {
@@ -31,11 +31,11 @@ async function resolveAlertRecipientsForUnsubscribe(targetEmail) {
   try {
     const { data: users } = await supabaseAdmin
       .from('users')
-      .select('email');
+      .select('email, settings');
 
     (users || []).forEach((u) => {
       const email = normalizeToPrimaryLoginEmail(u?.email);
-      if (email && isUserAdmin(email)) recipients.add(email);
+      if (email && resolveUserRole(u?.settings, email) === 'admin') recipients.add(email);
     });
   } catch (error) {
     logger.warn('[Unsubscribe] Failed to resolve admin recipients:', error?.message || error);

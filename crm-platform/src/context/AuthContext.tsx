@@ -5,6 +5,7 @@ import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { normalizeVoicemailGreeting, type VoicemailGreeting } from '@/lib/voicemail'
+import { resolveUserRole } from '@/lib/auth/roles'
 
 export type UserProfile = {
   email: string | null
@@ -107,6 +108,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { firstName, lastName, fullName }
   }, [titleize])
 
+  const resolveEffectiveRole = useCallback((settings: Record<string, unknown> | null | undefined, email: string) => {
+    return resolveUserRole(settings, email)
+  }, [])
+
   const refreshProfile = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     const currentUser = session?.user || user
@@ -126,9 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (data) {
       const settings = (data.settings as Record<string, any>) || {}
-      // Hardcode l.patterson@nodalpoint.io as admin
-      const isAdmin = emailLower === 'l.patterson@nodalpoint.io'
-      setRole(isAdmin ? 'admin' : (settings.role || 'employee'))
+      setRole(resolveEffectiveRole(settings, emailLower))
 
       const firstName = data.first_name || null
       const lastName = data.last_name || null
@@ -319,9 +322,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (data) {
               const settings = (data.settings as Record<string, any>) || {}
-              // Hardcode l.patterson@nodalpoint.io as admin
-              const isAdmin = emailLower === 'l.patterson@nodalpoint.io'
-              setRole(isAdmin ? 'admin' : (settings.role || 'employee'))
+              setRole(resolveEffectiveRole(settings, emailLower))
 
               const firstName = data.first_name || null
               const lastName = data.last_name || null
@@ -356,9 +357,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 voicemailGreeting: normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
               })
             } else {
-              // Hardcode l.patterson@nodalpoint.io as admin
-              const isAdmin = emailLower === 'l.patterson@nodalpoint.io'
-              setRole(isAdmin ? 'admin' : 'employee')
+              const resolvedRole = resolveEffectiveRole(null, emailLower)
+              setRole(resolvedRole)
               const inferred = inferNameFromString(user.user_metadata?.full_name) || inferNameFromEmail(emailLower)
               const derivedName = inferred?.fullName || user.user_metadata?.full_name?.trim() || null
 
@@ -369,7 +369,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 last_name: inferred?.lastName || null,
                 bio: null,
                 settings: {
-                  role: isAdmin ? 'admin' : 'employee',
+                  role: resolvedRole,
                   twilioNumbers: [],
                   selectedPhoneNumber: null,
                   bridgeToMobile: false,

@@ -23,6 +23,7 @@ import {
   FileText,
   Settings,
   UserCog,
+  ShieldCheck,
   LogOut,
   Plus,
   Zap,
@@ -85,6 +86,7 @@ const navigationStructure = [
   {
     group: "System",
     items: [
+      { name: 'Admin', href: '/network/admin', icon: ShieldCheck, roles: ['admin', 'dev'] },
       { name: 'Agents', href: '/network/agents', icon: UserCog, roles: ['admin', 'dev'] },
       { name: 'Settings', href: '/network/settings', icon: Settings }
     ]
