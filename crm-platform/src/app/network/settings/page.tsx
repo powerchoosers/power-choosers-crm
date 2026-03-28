@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUIStore } from '@/store/uiStore'
 import type { VoicemailGreeting } from '@/lib/voicemail'
+import { NodalAudioScrubber } from '@/components/audio/NodalAudioScrubber'
 
 type VoicemailRecorderState = {
   audioContext: AudioContext
@@ -123,6 +124,7 @@ export default function SettingsPage() {
   const recorderRef = useRef<VoicemailRecorderState | null>(null)
   const voicemailTimerRef = useRef<number | null>(null)
   const voicemailPreviewUrlRef = useRef<string | null>(null)
+  const voicemailPlaybackSrc = voicemailPreviewUrl || voicemailGreeting?.publicUrl || null
 
   // UI Store Sound Settings
   const { 
@@ -1134,18 +1136,19 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 flex items-center gap-2">
                             <Volume2 className="w-3.5 h-3.5 text-zinc-400" />
-                            Playback
+                            Voicemail Playback
                           </p>
                           <Badge variant="outline" className="border-white/10 text-[9px] font-mono uppercase tracking-widest text-zinc-500">
-                            Public WAV
+                            {voicemailPreviewUrl ? 'Draft Preview' : voicemailGreeting ? 'Live WAV' : 'Public WAV'}
                           </Badge>
                         </div>
 
-                        {voicemailPreviewUrl || voicemailGreeting?.publicUrl ? (
-                          <audio
-                            controls
-                            src={voicemailPreviewUrl || voicemailGreeting?.publicUrl || ''}
-                            className="w-full rounded-xl border border-white/5 bg-zinc-950/90"
+                        {voicemailPlaybackSrc ? (
+                          <NodalAudioScrubber
+                            src={voicemailPlaybackSrc}
+                            durationHint={voicemailPreviewUrl ? voicemailRecordingSeconds : undefined}
+                            onClear={voicemailPreviewUrl ? discardVoicemailDraft : undefined}
+                            clearLabel="Discard draft"
                           />
                         ) : (
                           <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-4 py-5">

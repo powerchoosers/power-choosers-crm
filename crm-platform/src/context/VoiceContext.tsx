@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import { formatToE164 } from '@/lib/utils'
 import { usePathname } from 'next/navigation'
 import { IncomingCallToast } from '@/components/calls/IncomingCallToast'
+import type { PowerDialTarget } from '@/lib/powerDialer'
 
 interface VoiceMetadata {
   name?: string
@@ -29,13 +30,35 @@ interface VoiceMetadata {
   isAccountOnly?: boolean
   contactId?: string
   accountId?: string
+  powerDialSessionId?: string
+  powerDialBatchId?: string
+  powerDialBatchIndex?: number
+  powerDialBatchSize?: number
+  powerDialSourceLabel?: string
+  powerDialSelectedCount?: number
+  powerDialDialableCount?: number
+  powerDialTargetCount?: number
+}
+
+interface ConnectParams {
+  To: string
+  From?: string
+  metadata?: VoiceMetadata
+  powerDialTargets?: PowerDialTarget[]
+  powerDialSessionId?: string
+  powerDialBatchId?: string
+  powerDialBatchIndex?: number
+  powerDialBatchSize?: number
+  powerDialSourceLabel?: string | null
+  powerDialSelectedCount?: number
+  powerDialDialableCount?: number
 }
 
 interface VoiceContextType {
   device: Device | null
   currentCall: Call | null
   isReady: boolean
-  connect: (params: { To: string; From?: string; metadata?: VoiceMetadata }) => Promise<void>
+  connect: (params: ConnectParams) => Promise<boolean>
   disconnect: () => void
   sendDigits: (digits: string) => void
   mute: (isMuted: boolean) => void
@@ -663,7 +686,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [initDevice, setActive, setStatus, user, isCallSessionProtected])
 
-  const connect = useCallback(async (params: { To: string; From?: string; metadata?: VoiceMetadata }) => {
+  const connect = useCallback(async (params: ConnectParams) => {
     const callInProgress = isCallSessionProtected()
     const deviceDestroyed = !!device && device.state === 'destroyed'
     const deviceUsable = !!device && !deviceDestroyed && (isReady || callInProgress)
@@ -683,7 +706,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             duration: 6000,
           })
         }
-        return
+        return false
       }
       // Permission granted; (re-)initialize device so it can find the microphone
       initDevice()
@@ -691,22 +714,52 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         description: 'Try your call again in a moment.',
         duration: 5000,
       })
-      return
+      return false
     }
 
+    const powerDialTargets = Array.isArray(params.powerDialTargets)
+      ? params.powerDialTargets.filter((target): target is PowerDialTarget => !!target && !!target.phoneNumber)
+      : []
+    const isPowerDial = powerDialTargets.length > 0
+
     const toE164 = formatToE164(params.To)
+    const fallbackTarget = isPowerDial
+      ? formatToE164(powerDialTargets[0]?.phoneNumber || '')
+      : ''
+    const targetNumber = fallbackTarget || toE164
     const fromE164 = params.From ? formatToE164(params.From) : ''
 
-    if (!toE164) {
+    if (!targetNumber) {
       toast.error('Invalid destination number')
-      return
+      return false
     }
 
     try {
-      console.log(`[Voice] Connecting call Target: ${toE164}, CallerId: ${fromE164}`)
+      console.log(`[Voice] Connecting ${isPowerDial ? 'power dial batch' : 'call'} Target: ${targetNumber}, CallerId: ${fromE164}`)
 
       // Resolve metadata for outbound call if not provided
-      const meta = params.metadata || await resolvePhoneMeta(toE164)
+      const resolvedMeta = params.metadata || await resolvePhoneMeta(targetNumber)
+      const meta: VoiceMetadata = { ...(resolvedMeta || {}) }
+
+      if (isPowerDial) {
+        const lead = powerDialTargets[0]
+        meta.name = meta.name || lead?.name || 'Power Dial'
+        meta.account = meta.account || lead?.accountName || params.powerDialSourceLabel || 'Power Dial'
+        meta.photoUrl = meta.photoUrl || lead?.photoUrl || undefined
+        meta.logoUrl = meta.logoUrl || lead?.logoUrl || undefined
+        meta.domain = meta.domain || lead?.domain || undefined
+        meta.contactId = meta.contactId || lead?.contactId || undefined
+        meta.accountId = meta.accountId || lead?.accountId || undefined
+        meta.powerDialSessionId = params.powerDialSessionId || meta.powerDialSessionId
+        meta.powerDialBatchId = params.powerDialBatchId || meta.powerDialBatchId
+        meta.powerDialBatchIndex = params.powerDialBatchIndex ?? meta.powerDialBatchIndex
+        meta.powerDialBatchSize = params.powerDialBatchSize ?? meta.powerDialBatchSize
+        meta.powerDialSourceLabel = params.powerDialSourceLabel || meta.powerDialSourceLabel
+        meta.powerDialSelectedCount = params.powerDialSelectedCount ?? meta.powerDialSelectedCount
+        meta.powerDialDialableCount = params.powerDialDialableCount ?? meta.powerDialDialableCount
+        meta.powerDialTargetCount = powerDialTargets.length
+      }
+
       setMetadata(meta)
 
       // Ported from legacy phone.js: Set audio devices before connecting
@@ -747,19 +800,40 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       }
 
       const connectParams: Record<string, string> = {
-        targetNumber: toE164,
+        targetNumber,
         callerId: fromE164,
       }
 
       const agentData = { agentId: user?.id, agentEmail: user?.email };
-
-      if (params.metadata) {
-        connectParams.metadata = JSON.stringify({ ...params.metadata, ...agentData })
-      } else if (meta) {
-        connectParams.metadata = JSON.stringify({ ...meta, ...agentData })
-      } else {
-        connectParams.metadata = JSON.stringify(agentData)
+      const supplementalMetadata = {
+        ...(meta || {}),
+        ...agentData,
+        ...(isPowerDial
+          ? {
+              powerDialSessionId: params.powerDialSessionId || meta.powerDialSessionId,
+              powerDialBatchId: params.powerDialBatchId || meta.powerDialBatchId,
+              powerDialBatchIndex: params.powerDialBatchIndex ?? meta.powerDialBatchIndex,
+              powerDialBatchSize: params.powerDialBatchSize ?? meta.powerDialBatchSize,
+              powerDialSourceLabel: params.powerDialSourceLabel || meta.powerDialSourceLabel,
+              powerDialSelectedCount: params.powerDialSelectedCount ?? meta.powerDialSelectedCount,
+              powerDialDialableCount: params.powerDialDialableCount ?? meta.powerDialDialableCount,
+              powerDialTargetCount: powerDialTargets.length,
+            }
+          : {})
       }
+
+      if (isPowerDial) {
+        connectParams.powerDialTargets = JSON.stringify(powerDialTargets)
+        if (params.powerDialSessionId) connectParams.powerDialSessionId = params.powerDialSessionId
+        if (params.powerDialBatchId) connectParams.powerDialBatchId = params.powerDialBatchId
+        if (params.powerDialBatchIndex != null) connectParams.powerDialBatchIndex = String(params.powerDialBatchIndex)
+        if (params.powerDialBatchSize != null) connectParams.powerDialBatchSize = String(params.powerDialBatchSize)
+        if (params.powerDialSourceLabel) connectParams.powerDialSourceLabel = params.powerDialSourceLabel
+        if (params.powerDialSelectedCount != null) connectParams.powerDialSelectedCount = String(params.powerDialSelectedCount)
+        if (params.powerDialDialableCount != null) connectParams.powerDialDialableCount = String(params.powerDialDialableCount)
+      }
+
+      connectParams.metadata = JSON.stringify(supplementalMetadata)
 
       const call = await device.connect({
         params: connectParams
@@ -832,14 +906,16 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setCallHealth('good')
       })
 
+      return true
     } catch (error: any) {
       console.error('[Voice] Connect failed:', error)
       toast.error('Could not initiate call', {
         description: error?.message || 'Check your internet connection and Twilio configuration.'
       })
       setStatus('error')
+      return false
     }
-  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, isCallSessionProtected])
+  }, [device, isReady, initDevice, requestMicrophonePermission, resolvePhoneMeta, setActive, setStatus, setCallHealth, isCallSessionProtected, user])
 
   const disconnect = useCallback(() => {
     if (currentCall) {

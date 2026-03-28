@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter, useParams, usePathname, useSearchParams } from 'next/navigation'
 import {
   flexRender,
@@ -69,6 +69,9 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { buildPowerDialTargets } from '@/lib/powerDialer'
+import { usePowerDialerStore } from '@/store/powerDialerStore'
 
 const PAGE_SIZE = 50
 
@@ -152,6 +155,7 @@ export default function TargetDetailPage() {
 
   const totalRecords = (isPeopleList ? contactCount.data : isAccountList ? accountCount.data : 0) || 0
   const pageCount = Math.ceil(totalRecords / pageSize)
+  const openPowerDialer = usePowerDialerStore((state) => state.openPowerDialer)
 
   // Entity IDs for the last-touch hooks
   const contactIds = useMemo(() =>
@@ -222,20 +226,77 @@ export default function TargetDetailPage() {
   }
 
   const selectedCount = Object.keys(rowSelection).length
+  const pendingSelectCountRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    const targetCount = pendingSelectCountRef.current
+    if (targetCount == null) return
+    if (data.length < targetCount) return
+
+    pendingSelectCountRef.current = null
+    const newSelection: RowSelectionState = {}
+    data.slice(0, targetCount).forEach((row: any) => {
+      newSelection[row.id] = true
+    })
+    setRowSelection(newSelection)
+  }, [data])
 
   const handleSelectCount = async (count: number) => {
-    const newSelection: RowSelectionState = {}
-    for (let i = 0; i < count; i++) {
-      newSelection[i] = true
+    const normalizedCount = Math.max(0, Math.min(count, totalRecords || count))
+
+    if (normalizedCount > data.length && query.hasNextPage && !query.isFetchingNextPage) {
+      pendingSelectCountRef.current = normalizedCount
+      const pagesToFetch = Math.ceil((normalizedCount - data.length) / pageSize)
+      for (let i = 0; i < pagesToFetch; i++) {
+        await query.fetchNextPage()
+      }
+      return
     }
+
+    const newSelection: RowSelectionState = {}
+    data.slice(0, normalizedCount).forEach((row: any) => {
+      newSelection[row.id] = true
+    })
     setRowSelection(newSelection)
+  }
+
+  const selectedEntities = useMemo(() => {
+    const selectedIds = new Set(Object.keys(rowSelection))
+    return data.filter((row: any) => selectedIds.has(row.id))
+  }, [data, rowSelection])
+
+  const handlePowerDial = () => {
+    if (!isPeopleList) return
+
+    const selectedContacts = selectedEntities as Contact[]
+    const dialTargets = buildPowerDialTargets(selectedContacts)
+    const skipped = Math.max(0, selectedContacts.length - dialTargets.length)
+
+    if (dialTargets.length === 0) {
+      toast.error('No dialable contacts found', {
+        description: 'The selected contacts do not have usable phone numbers.',
+      })
+      return
+    }
+
+    if (skipped > 0) {
+      toast.info(`${skipped} contact${skipped === 1 ? '' : 's'} skipped`, {
+        description: 'Those records do not have a dialable phone number.',
+      })
+    }
+
+    openPowerDialer({
+      contacts: selectedContacts,
+      selectedCount: selectedContacts.length,
+      sourceLabel: target?.name || id,
+    })
   }
 
   const handleBulkAction = async (action: string) => {
     if (action === 'delete') {
       setIsDestructModalOpen(true)
     } else {
-      console.log(`Executing ${action} for ${selectedCount} nodes`)
+      console.log(`Executing ${action} for ${selectedCount} ${isPeopleList ? 'contacts' : 'accounts'}`)
       // Implement other actions as needed
     }
   }
@@ -810,9 +871,11 @@ export default function TargetDetailPage() {
       <BulkActionDeck
         selectedCount={selectedCount}
         totalAvailable={totalRecords}
+        selectionLabel={isPeopleList ? 'CONTACT' : 'ACCOUNT'}
         onClear={() => setRowSelection({})}
         onAction={handleBulkAction}
         onSelectCount={handleSelectCount}
+        onPowerDial={isPeopleList ? handlePowerDial : undefined}
       />
 
       <DestructModal
