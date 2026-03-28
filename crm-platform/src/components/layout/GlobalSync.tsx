@@ -73,7 +73,7 @@ function isCrmRoute(pathname: string | null) {
 export function GlobalSync() {
   const pathname = usePathname()
   const onCrmRoute = isCrmRoute(pathname)
-  const { user, loading } = useAuth()
+  const { user, loading, role } = useAuth()
   const { performSync } = useZohoSync()
   const queryClient = useQueryClient()
   const ownerScopeRef = useRef<string[]>([])
@@ -119,7 +119,7 @@ export function GlobalSync() {
           const scope = ownerScopeRef.current.length > 0
             ? ownerScopeRef.current
             : [String(user.email || '').toLowerCase()]
-          const isOwner = scope.includes(ownerEmail) || user.email === 'l.patterson@nodalpoint.io'
+          const isOwner = scope.includes(ownerEmail) || role === 'admin'
 
           const invalidateDeals = () => {
             queryClient.invalidateQueries({ queryKey: ['deals'] })

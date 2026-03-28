@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { resolveUserRole, isBootstrapAdminEmail } from '@/lib/auth/roles'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -29,8 +30,6 @@ export const supabaseAdmin = createClient(
   supabaseServiceKey || supabaseAnonKey!
 )
 
-const ADMIN_EMAILS = ['l.patterson@nodalpoint.io', 'admin@nodalpoint.io'];
-
 /**
  * Helper to require a valid Supabase user in API routes
  * Used for server-side auth validation
@@ -53,6 +52,7 @@ export async function requireUser(req: any) {
         email: 'dev@nodalpoint.io',
         user: { id: 'dev-bypass-uid', email: 'dev@nodalpoint.io' } as any,
         id: 'dev-bypass-uid',
+        role: 'admin',
         isAdmin: true
       };
     }
@@ -78,12 +78,32 @@ export async function requireUser(req: any) {
       return { email: null, user: null, isAdmin: false };
     }
 
-    const isAdmin = user.email ? ADMIN_EMAILS.includes(user.email.toLowerCase()) : false;
+    const emailLower = user.email?.toLowerCase().trim() || null;
+    let role = resolveUserRole(null, emailLower);
+
+    if (emailLower) {
+      try {
+        const { data: profile } = await supabaseAdmin
+          .from('users')
+          .select('settings')
+          .eq('email', emailLower)
+          .maybeSingle();
+
+        if (profile) {
+          role = resolveUserRole(profile.settings as Record<string, unknown> | null | undefined, emailLower);
+        }
+      } catch (profileError) {
+        console.warn('[requireUser] Failed to resolve stored role:', profileError);
+      }
+    }
+
+    const isAdmin = role === 'admin';
 
     return {
       email: user.email,
       user: user,
       id: user.id,
+      role,
       isAdmin
     };
   } catch (err) {
@@ -95,5 +115,5 @@ export async function requireUser(req: any) {
  * Check if a user ID is an admin
  */
 export function isUserAdmin(email: string) {
-  return email ? ADMIN_EMAILS.includes(email.toLowerCase()) : false;
+  return isBootstrapAdminEmail(email);
 }
