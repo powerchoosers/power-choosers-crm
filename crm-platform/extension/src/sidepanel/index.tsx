@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio, Plus } from 'lucide-react'
+import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio, Plus, ShieldCheck } from 'lucide-react'
 import {
   defaultCallState,
   formatElapsed,
@@ -1156,53 +1156,36 @@ function App() {
                       : `${filteredCrmContacts.length} ${activeNetworkLabel}`}
                   </span>
                 </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                    gap: 6,
-                    marginBottom: 10,
-                    padding: 4,
-                    border: '1px solid rgba(255,255,255,0.05)',
-                    borderRadius: 16,
-                    background: 'rgba(255,255,255,0.02)',
-                  }}
-                >
+                <div className="np-network-switch">
                   <button
                     type="button"
-                    className={`np-button-forensic relative overflow-hidden ${networkView === 'crm' ? 'text-white' : 'text-zinc-500'}`}
-                    style={{ minHeight: 38, borderColor: networkView === 'crm' ? 'rgba(0, 47, 167, 0.35)' : 'rgba(255,255,255,0.04)' }}
+                    className={`np-network-tab ${networkView === 'crm' ? 'np-network-tab--active' : ''}`}
                     onClick={() => setNetworkView('crm')}
                   >
                     {networkView === 'crm' ? (
                       <motion.span
                         layoutId="network-tab-pill"
-                        className="absolute inset-0 rounded-[12px] border border-[#002FA7]/35 bg-[#002FA7]/12 shadow-[0_0_0_1px_rgba(0,47,167,0.08)]"
+                        className="np-network-tab__pill"
                         transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.7 }}
                       />
                     ) : null}
-                    <span className="relative z-10 flex items-center justify-between gap-3 w-full text-[10px] uppercase tracking-[0.18em]">
-                      <span>CRM</span>
-                      <span className="tabular-nums text-[9px] text-zinc-400">{filteredCrmContacts.length}</span>
-                    </span>
+                    <span className="np-network-tab__label">CRM</span>
+                    <span className="np-network-tab__count">{filteredCrmContacts.length}</span>
                   </button>
                   <button
                     type="button"
-                    className={`np-button-forensic relative overflow-hidden ${networkView === 'apollo' ? 'text-white' : 'text-zinc-500'}`}
-                    style={{ minHeight: 38, borderColor: networkView === 'apollo' ? 'rgba(0, 47, 167, 0.35)' : 'rgba(255,255,255,0.04)' }}
+                    className={`np-network-tab ${networkView === 'apollo' ? 'np-network-tab--active' : ''}`}
                     onClick={() => setNetworkView('apollo')}
                   >
                     {networkView === 'apollo' ? (
                       <motion.span
                         layoutId="network-tab-pill"
-                        className="absolute inset-0 rounded-[12px] border border-[#002FA7]/35 bg-[#002FA7]/12 shadow-[0_0_0_1px_rgba(0,47,167,0.08)]"
+                        className="np-network-tab__pill"
                         transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.7 }}
                       />
                     ) : null}
-                    <span className="relative z-10 flex items-center justify-between gap-3 w-full text-[10px] uppercase tracking-[0.18em]">
-                      <span>ORG_INTELLIGENCE</span>
-                      <span className="tabular-nums text-[9px] text-zinc-400">{filteredApolloContacts.length}</span>
-                    </span>
+                    <span className="np-network-tab__label">ORG_INTELLIGENCE</span>
+                    <span className="np-network-tab__count">{filteredApolloContacts.length}</span>
                   </button>
                 </div>
                 <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
@@ -1240,7 +1223,7 @@ function App() {
                     exit={{ opacity: 0, x: networkView === 'apollo' ? -14 : 14 }}
                     transition={{ duration: 0.22, ease: FORENSIC_EASE }}
                   >
-                    <div className="np-contact-list">
+                    <div className="np-network-list">
                       {visibleContacts.map((c) => (
                         <motion.div
                           key={`${c.crmId || c.id}-${c.source}`}
@@ -1249,48 +1232,35 @@ function App() {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.98, y: -10 }}
                           transition={{ type: 'spring', stiffness: 400, damping: 30, layout: { duration: 0.3 } }}
-                          className="flex flex-col p-2.5 rounded-xl transition-all border border-white/5 hover:border-white/10 hover:bg-zinc-950/40 space-y-2"
-                          style={{
-                            background: c.crmId ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.02)',
-                            borderColor: c.crmId ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.04)',
-                          }}
+                          className={`np-network-card ${c.crmId ? 'np-network-card--crm' : 'np-network-card--apollo'}`}
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                          <div className="np-network-card__top">
+                            <div className="np-network-card__identity">
                               <ContactAvatar
                                 name={c.name}
                                 photoUrl={c.photoUrl || null}
                                 size={36}
-                                className="w-9 h-9 rounded-[10px]"
-                                textClassName="text-[10px]"
                               />
-                              <div className="flex flex-col min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <span className="text-[11px] font-semibold text-zinc-200 truncate transition-colors">
-                                    {c.name}
-                                  </span>
-                                  {c.crmId ? <ShieldCheck className="w-3 h-3 text-green-500 shrink-0" aria-label="Synced" /> : null}
+                              <div className="np-network-card__copy">
+                                <div className="np-network-card__name-row">
+                                  <span className="np-network-card__name">{c.name}</span>
+                                  {c.crmId ? <ShieldCheck size={12} color="#22c55e" aria-label="Synced" /> : null}
                                 </div>
-                                <span className="text-[9px] font-mono text-zinc-500 truncate uppercase tracking-tighter">
+                                <span className="np-network-card__title">
                                   {c.title || 'Nodal Analyst'}
                                 </span>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1.5">
+                            <div className="np-network-card__actions">
                               <span
-                                className="text-[8px] font-mono uppercase tracking-[0.18em] rounded-full px-2 py-1"
-                                style={{
-                                  border: c.source === 'apollo' ? '1px solid rgba(0, 47, 167, 0.35)' : '1px solid rgba(34, 197, 94, 0.22)',
-                                  color: c.source === 'apollo' ? '#93c5fd' : '#86efac',
-                                  background: c.source === 'apollo' ? 'rgba(0, 47, 167, 0.08)' : 'rgba(34, 197, 94, 0.05)',
-                                }}
+                                className={`np-network-card__source ${c.source === 'apollo' ? 'np-network-card__source--apollo' : 'np-network-card__source--crm'}`}
                               >
                                 {c.source === 'apollo' ? 'ORG_INTELLIGENCE' : 'CRM'}
                               </span>
                               {networkPhone(c) ? (
                                 <button
-                                  className="np-button-forensic text-zinc-400 hover:text-white"
+                                  className="np-button-forensic np-network-card__dial"
                                   onClick={() => void runAction('dial', () => dialCall(networkPhone(c) || '', c.crmId || undefined, account?.id || undefined))}
                                   disabled={busy === 'dial'}
                                 >
@@ -1301,9 +1271,9 @@ function App() {
                           </div>
 
                           {(c.phone || c.mobile || c.workPhone || c.companyPhone || c.otherPhone || c.directPhone) ? (
-                            <div className="flex items-center gap-1.5 text-[9px] font-mono text-zinc-500 uppercase tracking-tighter">
-                              <Phone className="w-2.5 h-2.5" />
-                              {formatPhone(networkPhone(c)) || 'No direct line'}
+                            <div className="np-network-card__phone">
+                              <Phone className="np-network-card__phone-icon" />
+                              <span>{formatPhone(networkPhone(c)) || 'No direct line'}</span>
                             </div>
                           ) : null}
                         </motion.div>
