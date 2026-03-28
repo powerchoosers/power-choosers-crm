@@ -56,13 +56,26 @@ function normalizeContactRow(row, score = 0, reason = 'Matched from CRM data') {
     accountName: trimText(row.accountName || row.accounts?.name) || null,
     accountDomain: trimText(row.accountDomain || row.accounts?.domain) || null,
     name,
+    photoUrl: trimText(
+      row.photoUrl ||
+        row.photo_url ||
+        row.avatarUrl ||
+        row.avatar_url ||
+        metadata.photoUrl ||
+        metadata.photo_url ||
+        metadata.avatarUrl ||
+        metadata.avatar_url ||
+        ''
+    ) || null,
     email: trimText(row.email) || null,
     title: trimText(row.title) || null,
+    linkedinUrl: trimText(row.linkedinUrl || row.linkedin_url || metadata.linkedinUrl || metadata.linkedin_url || '') || null,
     phone: trimText(row.phone) || null,
     mobile: trimText(row.mobile) || null,
     workPhone: trimText(row.workPhone) || null,
     companyPhone: trimText(row.companyPhone) || null,
     otherPhone: trimText(row.otherPhone) || null,
+    primaryPhoneField: trimText(row.primaryPhoneField || metadata.primaryPhoneField || '') || null,
     directPhone: trimText(
       row.directPhone ||
         metadata.directPhone ||
@@ -74,6 +87,23 @@ function normalizeContactRow(row, score = 0, reason = 'Matched from CRM data') {
     state: trimText(row.state) || null,
     score: Number(score) || 0,
     reason: trimText(reason) || 'Matched from CRM data',
+  }
+}
+
+function normalizeLinkedinUrl(value) {
+  const text = trimText(value).toLowerCase()
+  if (!text) return ''
+  try {
+    const parsed = new URL(text.includes('://') ? text : `https://${text.replace(/^\/+/, '')}`)
+    const hostname = parsed.hostname.replace(/^www\./, '')
+    const pathname = parsed.pathname.replace(/\/+$/, '')
+    return `${hostname}${pathname}`.replace(/\/+$/, '')
+  } catch {
+    return text
+      .replace(/^https?:\/\//, '')
+      .replace(/^www\./, '')
+      .replace(/[?#].*$/, '')
+      .replace(/\/+$/, '')
   }
 }
 
@@ -206,6 +236,10 @@ export default async function handler(req, res) {
     const tokens = collectPageTerms(snapshot, body.bodyText || '')
     const title = trimText(snapshot.title || '')
     const companyGuess = trimText(inferNameParts(title).fullName || title || '')
+    const pageLinkedinUrl = normalizeLinkedinUrl(snapshot.url || snapshot.origin || '')
+    const pageLinkedinSlug = pageLinkedinUrl.includes('linkedin.com/')
+      ? pageLinkedinUrl.split('linkedin.com/').pop()
+      : ''
 
     const accountMap = new Map()
     const contactMap = new Map()
@@ -370,6 +404,9 @@ export default async function handler(req, res) {
       contactClauses.push(`city.ilike.%${token}%`)
       contactClauses.push(`state.ilike.%${token}%`)
     }
+    if (pageLinkedinSlug) {
+      contactClauses.push(`linkedinUrl.ilike.%${pageLinkedinSlug}%`)
+    }
 
     let contactQuery = supabaseAdmin
       .from('contacts')
@@ -380,10 +417,12 @@ export default async function handler(req, res) {
         lastName,
         name,
         email,
+        linkedinUrl,
         phone,
         mobile,
         workPhone,
         companyPhone,
+        primaryPhoneField,
         title,
         city,
         state,
@@ -421,6 +460,15 @@ export default async function handler(req, res) {
         const normalized = normalizeContactRow(row)
         if (!normalized) continue
         const contactAccountDomainHost = extractDomain(normalized.accountDomain)
+        const normalizedLinkedin = normalizeLinkedinUrl(normalized.linkedinUrl)
+        const normalizedLinkedinSlug = normalizedLinkedin.includes('linkedin.com/')
+          ? normalizedLinkedin.split('linkedin.com/').pop()
+          : ''
+        const isLinkedinMatch =
+          Boolean(pageLinkedinSlug && normalizedLinkedinSlug) &&
+          (pageLinkedinSlug === normalizedLinkedinSlug ||
+            normalizedLinkedin.includes(pageLinkedinSlug) ||
+            pageLinkedinSlug.includes(normalizedLinkedinSlug))
 
         let score = 0
         score += scoreText(normalized.name, tokens, 12)
@@ -440,10 +488,13 @@ export default async function handler(req, res) {
         if (normalized.companyPhone && phones.includes(normalizeDigits(normalized.companyPhone).slice(-10))) score += 80
         if (normalized.otherPhone && phones.includes(normalizeDigits(normalized.otherPhone).slice(-10))) score += 75
         if (normalized.directPhone && phones.includes(normalizeDigits(normalized.directPhone).slice(-10))) score += 85
+        if (isLinkedinMatch) score += 10000
 
         normalized.score = score
         normalized.reason =
-          normalized.email && emails.includes(normalized.email.toLowerCase())
+          isLinkedinMatch
+            ? `LinkedIn URL match: ${normalized.linkedinUrl}`
+            : normalized.email && emails.includes(normalized.email.toLowerCase())
             ? `Email match: ${normalized.email}`
             : normalized.phone && phones.includes(normalizeDigits(normalized.phone).slice(-10))
               ? `Phone match: ${normalized.phone}`
@@ -491,6 +542,21 @@ export default async function handler(req, res) {
       (account) =>
         isExactCompanyNameMatch(companyGuess, account.name) || isExactCompanyNameMatch(title, account.name)
     ) || null
+    const exactLinkedinContact = pageLinkedinSlug
+      ? contacts.find((contact) => {
+          const linkedin = normalizeLinkedinUrl(contact.linkedinUrl)
+          const linkedinSlug = linkedin.includes('linkedin.com/')
+            ? linkedin.split('linkedin.com/').pop()
+            : ''
+          return Boolean(
+            linkedin &&
+              linkedinSlug &&
+              (linkedinSlug === pageLinkedinSlug ||
+                linkedin.includes(pageLinkedinSlug) ||
+                pageLinkedinSlug.includes(linkedinSlug))
+          )
+        })
+      : null
 
     // Hard gate: only return an account when we have a precise signal (domain/name/phone).
     let finalAccount = exactDomainAccount || exactNameAccount || null
@@ -502,7 +568,9 @@ export default async function handler(req, res) {
     }
 
     let finalContact = null
-    if (contacts.length > 0) {
+    if (exactLinkedinContact) {
+      finalContact = exactLinkedinContact
+    } else if (contacts.length > 0) {
       if (finalAccount?.id) {
         finalContact =
           contacts.find((contact) => contact.accountId && contact.accountId === finalAccount.id) ||
@@ -512,6 +580,20 @@ export default async function handler(req, res) {
         const domainContact = contacts.find((contact) => domain && hostMatches(domain, contact.accountDomain)) || null
         finalContact = domainContact
       }
+    }
+
+    if (!finalAccount && finalContact?.accountId && finalContact.accountName) {
+      finalAccount =
+        accountMap.get(finalContact.accountId) ||
+        normalizeAccountRow(
+          {
+            id: finalContact.accountId,
+            name: finalContact.accountName,
+            domain: finalContact.accountDomain,
+          },
+          Math.max(75, Number(finalContact.score || 0) - 10),
+          `Matched through ${finalContact.name}`
+        )
     }
 
     let summary = 'No strong CRM match found yet.'

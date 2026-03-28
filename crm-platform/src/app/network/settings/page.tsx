@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu, Mic, Square, Loader2, Volume2 } from 'lucide-react'
 import { useSyncStore } from '@/store/syncStore'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
@@ -19,6 +19,75 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUIStore } from '@/store/uiStore'
+import type { VoicemailGreeting } from '@/lib/voicemail'
+
+type VoicemailRecorderState = {
+  audioContext: AudioContext
+  source: MediaStreamAudioSourceNode
+  processor: ScriptProcessorNode
+  zeroGain: GainNode
+  stream: MediaStream
+  chunks: Float32Array[]
+  sampleRate: number
+}
+
+function mergeFloat32Chunks(chunks: Float32Array[]) {
+  const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0)
+  const result = new Float32Array(totalLength)
+  let offset = 0
+
+  chunks.forEach((chunk) => {
+    result.set(chunk, offset)
+    offset += chunk.length
+  })
+
+  return result
+}
+
+function encodeWavBlob(samples: Float32Array, sampleRate: number) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2)
+  const view = new DataView(buffer)
+
+  const writeString = (offset: number, value: string) => {
+    for (let i = 0; i < value.length; i += 1) {
+      view.setUint8(offset + i, value.charCodeAt(i))
+    }
+  }
+
+  const clamp = (value: number) => Math.max(-1, Math.min(1, value))
+
+  writeString(0, 'RIFF')
+  view.setUint32(4, 36 + samples.length * 2, true)
+  writeString(8, 'WAVE')
+  writeString(12, 'fmt ')
+  view.setUint32(16, 16, true)
+  view.setUint16(20, 1, true)
+  view.setUint16(22, 1, true)
+  view.setUint32(24, sampleRate, true)
+  view.setUint32(28, sampleRate * 2, true)
+  view.setUint16(32, 2, true)
+  view.setUint16(34, 16, true)
+  writeString(36, 'data')
+  view.setUint32(40, samples.length * 2, true)
+
+  let offset = 44
+  for (let i = 0; i < samples.length; i += 1) {
+    const sample = clamp(samples[i])
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+    offset += 2
+  }
+
+  return new Blob([buffer], { type: 'audio/wav' })
+}
+
+function blobToDataUrl(blob: Blob) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error || new Error('Failed to read audio blob'))
+    reader.readAsDataURL(blob)
+  })
+}
 
 export default function SettingsPage() {
   const { user, profile, role, refreshProfile } = useAuth()
@@ -44,6 +113,16 @@ export default function SettingsPage() {
   const [newNumber, setNewNumber] = useState('')
   const [newNumberName, setNewNumberName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [voicemailGreeting, setVoicemailGreeting] = useState<VoicemailGreeting | null>(null)
+  const [voicemailPreviewUrl, setVoicemailPreviewUrl] = useState<string | null>(null)
+  const [isRecordingVoicemail, setIsRecordingVoicemail] = useState(false)
+  const [voicemailRecordingSeconds, setVoicemailRecordingSeconds] = useState(0)
+  const [isSavingVoicemail, setIsSavingVoicemail] = useState(false)
+  const [voicemailError, setVoicemailError] = useState<string | null>(null)
+  const [pendingVoicemailBlob, setPendingVoicemailBlob] = useState<Blob | null>(null)
+  const recorderRef = useRef<VoicemailRecorderState | null>(null)
+  const voicemailTimerRef = useRef<number | null>(null)
+  const voicemailPreviewUrlRef = useRef<string | null>(null)
 
   // UI Store Sound Settings
   const { 
@@ -105,6 +184,54 @@ export default function SettingsPage() {
   useEffect(() => {
     fetchConnections()
   }, [user])
+
+  useEffect(() => {
+    if (voicemailTimerRef.current !== null) {
+      window.clearInterval(voicemailTimerRef.current)
+      voicemailTimerRef.current = null
+    }
+
+    if (!isRecordingVoicemail) {
+      return
+    }
+
+    voicemailTimerRef.current = window.setInterval(() => {
+      setVoicemailRecordingSeconds((value) => value + 1)
+    }, 1000)
+
+    return () => {
+      if (voicemailTimerRef.current !== null) {
+        window.clearInterval(voicemailTimerRef.current)
+        voicemailTimerRef.current = null
+      }
+    }
+  }, [isRecordingVoicemail])
+
+  useEffect(() => {
+    voicemailPreviewUrlRef.current = voicemailPreviewUrl
+  }, [voicemailPreviewUrl])
+
+  useEffect(() => {
+    return () => {
+      if (voicemailTimerRef.current !== null) {
+        window.clearInterval(voicemailTimerRef.current)
+        voicemailTimerRef.current = null
+      }
+
+      if (recorderRef.current) {
+        recorderRef.current.processor.disconnect()
+        recorderRef.current.source.disconnect()
+        recorderRef.current.zeroGain.disconnect()
+        recorderRef.current.stream.getTracks().forEach((track) => track.stop())
+        recorderRef.current.audioContext.close().catch(() => { })
+        recorderRef.current = null
+      }
+
+      if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(voicemailPreviewUrlRef.current)
+      }
+    }
+  }, [])
 
   // Handle OAuth Callback
   useEffect(() => {
@@ -232,6 +359,229 @@ export default function SettingsPage() {
     setNewNumber(formatted)
   }
 
+  const releaseVoicemailRecorder = () => {
+    const recorder = recorderRef.current
+    if (!recorder) return
+
+    recorder.processor.onaudioprocess = null
+    recorder.processor.disconnect()
+    recorder.source.disconnect()
+    recorder.zeroGain.disconnect()
+    recorder.stream.getTracks().forEach((track) => track.stop())
+    recorder.audioContext.close().catch(() => { })
+    recorderRef.current = null
+  }
+
+  const startVoicemailRecording = async () => {
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      toast.error('Your browser cannot record audio')
+      return
+    }
+
+    if (isRecordingVoicemail) return
+
+    try {
+      setVoicemailError(null)
+      setPendingVoicemailBlob(null)
+
+      if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(voicemailPreviewUrlRef.current)
+      }
+      setVoicemailPreviewUrl(null)
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const AudioCtor = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtor) {
+        stream.getTracks().forEach((track) => track.stop())
+        throw new Error('Audio recording is not supported in this browser.')
+      }
+
+      const audioContext: AudioContext = new AudioCtor()
+      await audioContext.resume()
+
+      const source = audioContext.createMediaStreamSource(stream)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+      const zeroGain = audioContext.createGain()
+      const chunks: Float32Array[] = []
+
+      zeroGain.gain.value = 0
+
+      processor.onaudioprocess = (event) => {
+        const input = event.inputBuffer.getChannelData(0)
+        chunks.push(new Float32Array(input))
+      }
+
+      source.connect(processor)
+      processor.connect(zeroGain)
+      zeroGain.connect(audioContext.destination)
+
+      recorderRef.current = {
+        audioContext,
+        source,
+        processor,
+        zeroGain,
+        stream,
+        chunks,
+        sampleRate: audioContext.sampleRate,
+      }
+
+      setVoicemailRecordingSeconds(0)
+      setIsRecordingVoicemail(true)
+      toast.info('Recording voicemail greeting')
+    } catch (error: any) {
+      setIsRecordingVoicemail(false)
+      setVoicemailError(error?.message || 'Unable to start recording')
+      toast.error(error?.message || 'Unable to start recording')
+      releaseVoicemailRecorder()
+    }
+  }
+
+  const stopVoicemailRecording = () => {
+    const recorder = recorderRef.current
+    if (!recorder) {
+      setIsRecordingVoicemail(false)
+      return
+    }
+
+    const samples = mergeFloat32Chunks(recorder.chunks)
+    const sampleRate = recorder.sampleRate
+    const durationSeconds = Math.max(1, Math.round(samples.length / sampleRate))
+
+    releaseVoicemailRecorder()
+    setIsRecordingVoicemail(false)
+    setVoicemailRecordingSeconds(durationSeconds)
+
+    if (!samples.length) {
+      setVoicemailRecordingSeconds(0)
+      setVoicemailError('No audio was captured. Try again.')
+      toast.error('No audio was captured. Try again.')
+      return
+    }
+
+    const wavBlob = encodeWavBlob(samples, sampleRate)
+    const previewUrl = URL.createObjectURL(wavBlob)
+
+    if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(voicemailPreviewUrlRef.current)
+    }
+
+    setPendingVoicemailBlob(wavBlob)
+    setVoicemailPreviewUrl(previewUrl)
+    setVoicemailError(null)
+    toast.success('Voicemail draft ready')
+  }
+
+  const discardVoicemailDraft = () => {
+    if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(voicemailPreviewUrlRef.current)
+    }
+
+    setPendingVoicemailBlob(null)
+    setVoicemailPreviewUrl(null)
+    setVoicemailRecordingSeconds(0)
+    setVoicemailError(null)
+  }
+
+  const formatVoicemailDuration = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60)
+    const remainingSeconds = seconds % 60
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`
+  }
+
+  const saveVoicemailGreeting = async () => {
+    if (!user?.email) {
+      toast.error('You must be logged in to save voicemail')
+      return
+    }
+
+    if (!pendingVoicemailBlob) {
+      toast.error('Record a voicemail greeting first')
+      return
+    }
+
+    setIsSavingVoicemail(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const audioDataUrl = await blobToDataUrl(pendingVoicemailBlob)
+
+      const response = await fetch('/api/settings/voicemail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          audioDataUrl,
+          fileName: 'greeting.wav',
+          selectedPhoneNumber,
+          source: 'settings-page'
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error || 'Failed to save voicemail')
+      }
+
+      const payload = await response.json()
+      const nextGreeting = payload?.voicemailGreeting || null
+
+      if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(voicemailPreviewUrlRef.current)
+      }
+
+      setVoicemailGreeting(nextGreeting)
+      setPendingVoicemailBlob(null)
+      setVoicemailPreviewUrl(null)
+      setVoicemailError(null)
+      await refreshProfile()
+      toast.success('Voicemail saved')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save voicemail')
+    } finally {
+      setIsSavingVoicemail(false)
+    }
+  }
+
+  const deleteVoicemailGreeting = async () => {
+    if (!voicemailGreeting) return
+
+    const confirmed = window.confirm('Remove your saved voicemail greeting?')
+    if (!confirmed) return
+
+    setIsSavingVoicemail(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const response = await fetch('/api/settings/voicemail', {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error || 'Failed to remove voicemail')
+      }
+
+      if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(voicemailPreviewUrlRef.current)
+      }
+
+      setVoicemailGreeting(null)
+      setPendingVoicemailBlob(null)
+      setVoicemailPreviewUrl(null)
+      setVoicemailRecordingSeconds(0)
+      setVoicemailError(null)
+      await refreshProfile()
+      toast.success('Voicemail removed')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to remove voicemail')
+    } finally {
+      setIsSavingVoicemail(false)
+    }
+  }
+
   // Sync with profile
   useEffect(() => {
     // 1. Name Resolution
@@ -262,6 +612,7 @@ export default function SettingsPage() {
     setSelectedIdx(idx)
     setSelectedPhoneNumber(profile.selectedPhoneNumber || (twilioList.length > 0 ? twilioList[0].number : null))
     setBridgeToMobile(profile.bridgeToMobile || false)
+    setVoicemailGreeting(profile.voicemailGreeting || null)
   }, [profile, user?.user_metadata?.full_name])
 
   const computedName = useMemo(() => {
@@ -327,6 +678,7 @@ export default function SettingsPage() {
             })),
             selectedPhoneNumber: selectedIdx !== null ? twilioNumbers[selectedIdx]?.number : selectedPhoneNumber,
             bridgeToMobile: bridgeToMobile,
+            voicemailGreeting: voicemailGreeting,
             role: role || 'employee', // Preserve role
             website: website.trim() || null,
             city: city.trim() || null,
@@ -702,6 +1054,166 @@ export default function SettingsPage() {
                         <Plus className="w-4 h-4 mr-2" />
                         Add Number
                       </Button>
+                    </div>
+                  </div>
+
+                  <Separator className="bg-white/5" />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
+                          <Mic className="w-4 h-4 text-zinc-400" />
+                          Voicemail Greeting
+                        </h4>
+                        <p className="text-xs text-zinc-500">
+                          Callers hear this after your selected number rings out.
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="border-white/10 bg-white/[0.02] text-[9px] font-mono uppercase tracking-widest text-zinc-400">
+                        {selectedPhoneNumber ? `Line ${selectedPhoneNumber}` : 'No line selected'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                      <div className="rounded-2xl bg-black/30 border border-white/5 p-4 space-y-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500">Recording State</p>
+                            <p className="text-sm text-zinc-200 mt-1">
+                              {isRecordingVoicemail
+                                ? 'Recording now'
+                                : pendingVoicemailBlob
+                                  ? 'Draft ready to save'
+                                  : voicemailGreeting
+                                    ? 'Saved and live'
+                                    : 'No greeting saved'}
+                            </p>
+                          </div>
+                          <div className="font-mono text-xs text-zinc-400 tabular-nums">
+                            {formatVoicemailDuration(voicemailRecordingSeconds)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-end gap-2 h-12">
+                          {[18, 28, 12, 24, 16].map((baseHeight, idx) => (
+                            <motion.div
+                              key={idx}
+                              className={cn(
+                                'w-2 rounded-full origin-bottom',
+                                isRecordingVoicemail ? 'bg-[#002FA7]' : 'bg-white/10'
+                              )}
+                              style={{ height: `${baseHeight}px` }}
+                              initial={false}
+                              animate={{
+                                scaleY: isRecordingVoicemail ? [0.55, 1.15, 0.7, 1.05, 0.6] : 0.7
+                              }}
+                              transition={{
+                                duration: isRecordingVoicemail ? 0.75 + idx * 0.05 : 0.2,
+                                repeat: isRecordingVoicemail ? Infinity : 0,
+                                repeatType: 'mirror',
+                                delay: idx * 0.08,
+                                ease: [0.23, 1, 0.32, 1]
+                              }}
+                            />
+                          ))}
+                        </div>
+
+                        {voicemailError && (
+                          <p className="text-xs text-red-400 font-mono tracking-wide">{voicemailError}</p>
+                        )}
+
+                        {voicemailGreeting?.updatedAt && (
+                          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.18em]">
+                            Last saved {new Date(voicemailGreeting.updatedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 flex items-center gap-2">
+                            <Volume2 className="w-3.5 h-3.5 text-zinc-400" />
+                            Playback
+                          </p>
+                          <Badge variant="outline" className="border-white/10 text-[9px] font-mono uppercase tracking-widest text-zinc-500">
+                            Public WAV
+                          </Badge>
+                        </div>
+
+                        {voicemailPreviewUrl || voicemailGreeting?.publicUrl ? (
+                          <audio
+                            controls
+                            src={voicemailPreviewUrl || voicemailGreeting?.publicUrl || ''}
+                            className="w-full rounded-xl border border-white/5 bg-zinc-950/90"
+                          />
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-4 py-5">
+                            <p className="text-sm text-zinc-400">No voicemail greeting saved yet.</p>
+                          </div>
+                        )}
+
+                        <p className="text-[10px] text-zinc-500 leading-relaxed">
+                          Supabase Storage serves the file publicly so Twilio can play it the moment your line rolls over.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        type="button"
+                        onClick={isRecordingVoicemail ? stopVoicemailRecording : startVoicemailRecording}
+                        className={cn(
+                          'font-mono uppercase tracking-widest text-[10px] h-10',
+                          isRecordingVoicemail
+                            ? 'bg-rose-500 hover:bg-rose-400 text-white'
+                            : 'bg-white text-zinc-950 hover:bg-zinc-200'
+                        )}
+                      >
+                        {isRecordingVoicemail ? (
+                          <Square className="w-4 h-4 mr-2" />
+                        ) : (
+                          <Mic className="w-4 h-4 mr-2" />
+                        )}
+                        {isRecordingVoicemail ? 'Stop Recording' : pendingVoicemailBlob ? 'Record Again' : 'Record Greeting'}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        onClick={saveVoicemailGreeting}
+                        disabled={!pendingVoicemailBlob || isSavingVoicemail || isRecordingVoicemail}
+                        className="bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-mono uppercase tracking-widest text-[10px] h-10"
+                      >
+                        {isSavingVoicemail ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                        )}
+                        Save Greeting
+                      </Button>
+
+                      {pendingVoicemailBlob && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={discardVoicemailDraft}
+                          className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 font-mono uppercase tracking-widest text-[10px] h-10"
+                        >
+                          Discard Draft
+                        </Button>
+                      )}
+
+                      {voicemailGreeting && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={deleteVoicemailGreeting}
+                          disabled={isSavingVoicemail}
+                          className="border-white/10 text-zinc-400 hover:text-red-300 hover:bg-red-500/10 font-mono uppercase tracking-widest text-[10px] h-10"
+                        >
+                          Remove Saved Greeting
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -3,6 +3,8 @@
 
 import twilio from 'twilio';
 import logger from '../_logger.js';
+import { supabaseAdmin } from '../../../lib/supabase.ts';
+import { getVoicemailGreeting, resolveUserForBusinessNumber } from '../../../lib/voicemail.ts';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
@@ -60,6 +62,7 @@ export default async function handler(req, res) {
     }
 
     const { CallSid, DialCallStatus, DialCallDuration, DialCallSid } = body;
+    const normalizedDialStatus = String(DialCallStatus || '').toLowerCase();
 
     logger.log('[DialComplete] Call completed:', {
       callSid: CallSid,
@@ -106,35 +109,63 @@ export default async function handler(req, res) {
 
     // Create TwiML response that ENDS the call without retry
     const twiml = new VoiceResponse();
+    const shouldPlayVoicemail = ['no-answer', 'busy'].includes(normalizedDialStatus);
+    let voicemailGreeting = null;
+
+    if (shouldPlayVoicemail) {
+      try {
+        const candidateNumber = businessPhoneFromQuery || targetPhoneFromQuery || body.To || body.From || '';
+        const { data: users, error } = await supabaseAdmin
+          .from('users')
+          .select('id, email, settings')
+          .limit(1000);
+
+        if (error) {
+          logger.warn('[DialComplete] Failed to load users for voicemail lookup:', error.message);
+        } else {
+          const matchedUser = resolveUserForBusinessNumber(users, candidateNumber);
+          voicemailGreeting = getVoicemailGreeting(matchedUser?.settings || {});
+          logger.log('[DialComplete] Voicemail lookup:', {
+            candidateNumber,
+            matchedEmail: matchedUser?.email || null,
+            hasGreeting: !!voicemailGreeting?.publicUrl
+          });
+        }
+      } catch (lookupError) {
+        logger.warn('[DialComplete] Voicemail lookup error:', lookupError?.message || lookupError);
+      }
+    }
 
     // Different responses based on dial outcome
     // We strictly use <Hangup/> to ensure call ends cleanly without system messages
-    switch (DialCallStatus) {
-      case 'completed':
-      case 'answered':
-        twiml.hangup();
-        break;
+    if (shouldPlayVoicemail) {
+      if (voicemailGreeting?.publicUrl) {
+        logger.log('[DialComplete] Playing voicemail greeting for unanswered call')
+        twiml.play(voicemailGreeting.publicUrl)
+        twiml.hangup()
+      } else {
+        logger.log('[DialComplete] No voicemail greeting found, using fallback unavailable message')
+        twiml.say('The person you called is unavailable. Please try again later.')
+        twiml.hangup()
+      }
+    } else {
+      switch (DialCallStatus) {
+        case 'completed':
+        case 'answered':
+          twiml.hangup();
+          break;
 
-      case 'busy':
-        twiml.say('The number you called is busy.');
-        twiml.hangup();
-        break;
+        case 'failed':
+          twiml.say('Call failed.');
+          twiml.hangup();
+          break;
 
-      case 'no-answer':
-        twiml.say('No answer.');
-        twiml.hangup();
-        break;
-
-      case 'failed':
-        twiml.say('Call failed.');
-        twiml.hangup();
-        break;
-
-      default:
-        // For unknown statuses or cancellations, just hang up silently
-        logger.log('[DialComplete] Unhandled status:', DialCallStatus);
-        twiml.hangup();
-        break;
+        default:
+          // For unknown statuses or cancellations, just hang up silently
+          logger.log('[DialComplete] Unhandled status:', DialCallStatus);
+          twiml.hangup();
+          break;
+      }
     }
 
     const xml = twiml.toString();

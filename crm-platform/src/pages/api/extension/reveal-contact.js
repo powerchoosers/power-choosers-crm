@@ -122,6 +122,7 @@ function assignPhones(entries) {
   const patch = {}
   const extras = []
   const slots = { mobile: false, work: false, other: false }
+  let primaryPhoneField = ''
 
   entries.forEach((entry) => {
     const type = sanitizeText(entry?.type).toLowerCase()
@@ -130,6 +131,7 @@ function assignPhones(entries) {
       if (!slots.mobile) {
         patch.mobile = entry.number
         patch.phone = entry.number
+        if (!primaryPhoneField) primaryPhoneField = 'mobile'
         slots.mobile = true
       } else {
         extras.push(entry)
@@ -140,6 +142,7 @@ function assignPhones(entries) {
     if (type.includes('direct') || type.includes('work')) {
       if (!slots.work) {
         patch.workPhone = entry.number
+        if (!primaryPhoneField) primaryPhoneField = 'workDirectPhone'
         slots.work = true
       } else {
         extras.push(entry)
@@ -149,6 +152,7 @@ function assignPhones(entries) {
 
     if (!slots.other) {
       patch.otherPhone = entry.number
+      if (!primaryPhoneField) primaryPhoneField = 'otherPhone'
       slots.other = true
     } else {
       extras.push(entry)
@@ -157,12 +161,274 @@ function assignPhones(entries) {
 
   if (!patch.mobile && entries[0]?.number) {
     patch.mobile = entries[0].number
+    if (!primaryPhoneField) primaryPhoneField = 'mobile'
   }
   if (!patch.phone) {
     patch.phone = patch.mobile || entries[0]?.number || patch.workPhone || patch.otherPhone || ''
+    if (!primaryPhoneField) {
+      primaryPhoneField = patch.mobile ? 'mobile' : patch.workPhone ? 'workDirectPhone' : patch.otherPhone ? 'otherPhone' : ''
+    }
+  }
+  if (primaryPhoneField) {
+    patch.primaryPhoneField = primaryPhoneField
   }
 
   return { patch, extras }
+}
+
+function buildCompanySummary(accountRow, fallbackCompany = null) {
+  const fallback = fallbackCompany && typeof fallbackCompany === 'object' ? fallbackCompany : {}
+  return {
+    id: sanitizeText(accountRow?.id || fallback.id || '') || '',
+    name: sanitizeText(accountRow?.name || fallback.name || '') || '',
+    domain: sanitizeText(accountRow?.domain || accountRow?.website || fallback.domain || '') || '',
+    description: sanitizeText(accountRow?.description || fallback.description || '') || '',
+    employees: accountRow?.employees ?? fallback.employees ?? null,
+    industry: sanitizeText(accountRow?.industry || fallback.industry || '') || '',
+    city: sanitizeText(accountRow?.city || fallback.city || '') || '',
+    state: sanitizeText(accountRow?.state || fallback.state || '') || '',
+    country: sanitizeText(accountRow?.country || fallback.country || '') || '',
+    address: sanitizeText(accountRow?.address || fallback.address || '') || '',
+    logoUrl: sanitizeText(accountRow?.logo_url || fallback.logoUrl || '') || null,
+    linkedin: sanitizeText(accountRow?.linkedin_url || fallback.linkedin || '') || '',
+    companyPhone: sanitizeText(accountRow?.phone || fallback.companyPhone || '') || '',
+    zip: sanitizeText(accountRow?.zip || fallback.zip || '') || '',
+    revenue: sanitizeText(accountRow?.revenue || fallback.revenue || '') || '',
+  }
+}
+
+function buildApolloCacheContact({
+  personId,
+  crmId,
+  person,
+  enriched,
+  normalizedPhones,
+  existingContact,
+  existingMetadata,
+}) {
+  const enrichedIdentity = buildIdentityName({
+    firstName: enriched?.firstName,
+    lastName: enriched?.lastName,
+    name: enriched?.fullName || enriched?.name,
+  })
+  const personIdentity = buildIdentityName({
+    firstName: person?.firstName || person?.first_name,
+    lastName: person?.lastName || person?.last_name,
+    name: person?.name,
+  })
+  const resolvedIdentity = {
+    name: enrichedIdentity.name || personIdentity.name || existingContact?.name || 'Contact',
+    firstName: enrichedIdentity.firstName || personIdentity.firstName || existingContact?.firstName || '',
+    lastName: enrichedIdentity.lastName || personIdentity.lastName || existingContact?.lastName || '',
+  }
+  const fallbackLocation = parseLocation(person?.location)
+  const location = sanitizeText(
+    enriched?.location ||
+      [sanitizeText(enriched?.city || person?.city || fallbackLocation.city), sanitizeText(enriched?.state || person?.state || fallbackLocation.state), sanitizeText(enriched?.country || person?.country || '')]
+        .filter(Boolean)
+        .join(', ')
+  ) || ''
+  const email = sanitizeText(enriched?.email || person?.email || existingContact?.email || '') || ''
+  const linkedinUrl = normalizeLinkedin(enriched?.linkedin || person?.linkedin || existingContact?.linkedin || '')
+  const title = sanitizeText(enriched?.jobTitle || person?.title || existingContact?.title || '') || ''
+  const photoUrl = resolvePhotoUrl(enriched, person, existingMetadata, existingContact) || ''
+  const phones = Array.isArray(normalizedPhones) ? normalizedPhones : []
+  const firstPhoneType = sanitizeText(phones[0]?.type || '').toLowerCase()
+  const inferredPrimaryPhoneField =
+    firstPhoneType.includes('mobile')
+      ? 'mobile'
+      : firstPhoneType.includes('direct') || firstPhoneType.includes('work')
+        ? 'workDirectPhone'
+        : firstPhoneType.includes('other')
+          ? 'otherPhone'
+          : ''
+  const primaryPhoneField = sanitizeText(existingContact?.primaryPhoneField || inferredPrimaryPhoneField) || null
+
+  return {
+    id: personId,
+    apolloPersonId: personId,
+    crmId: crmId || null,
+    name: resolvedIdentity.name,
+    firstName: resolvedIdentity.firstName || null,
+    lastName: resolvedIdentity.lastName || null,
+    title: title || null,
+    email: email || null,
+    status: email ? 'verified' : (sanitizeText(existingContact?.status || '') || 'unverified'),
+    isMonitored: Boolean(crmId || existingContact?.crmId || existingContact?.isMonitored),
+    location: location || null,
+    linkedin: linkedinUrl || null,
+    photoUrl: photoUrl || null,
+    phone: phones[0]?.number || sanitizeText(existingContact?.phone || '') || null,
+    mobile: phones.find((entry) => (entry?.type || '').toLowerCase().includes('mobile'))?.number || sanitizeText(existingContact?.mobile || '') || null,
+    workPhone: phones.find((entry) => (entry?.type || '').toLowerCase().includes('direct') || (entry?.type || '').toLowerCase().includes('work'))?.number || sanitizeText(existingContact?.workPhone || '') || null,
+    companyPhone: sanitizeText(existingContact?.companyPhone || '') || null,
+    otherPhone: sanitizeText(existingContact?.otherPhone || '') || null,
+    directPhone: sanitizeText(existingContact?.directPhone || '') || null,
+    primaryPhoneField,
+    phones,
+    source: crmId || existingContact?.crmId ? 'crm' : 'apollo',
+    metadata: {
+      ...(existingMetadata && typeof existingMetadata === 'object' ? existingMetadata : {}),
+      apollo_person_id: personId,
+      source: 'Apollo Organizational Intelligence',
+      photoUrl: photoUrl || null,
+      photo_url: photoUrl || null,
+      avatarUrl: photoUrl || null,
+      avatar_url: photoUrl || null,
+      apollo_revealed_phones: phones,
+      primaryPhoneField,
+    },
+  }
+}
+
+function contactCacheKey(contact) {
+  const nameKey = buildNameKey(contact?.firstName, contact?.lastName)
+  return (
+    sanitizeText(contact?.id || '') ||
+    sanitizeText(contact?.crmId || '') ||
+    sanitizeText(contact?.apolloPersonId || contact?.apollo_person_id || '') ||
+    sanitizeText(contact?.email || '').toLowerCase() ||
+    sanitizeText(contact?.linkedin || contact?.linkedinUrl || '').toLowerCase() ||
+    nameKey ||
+    sanitizeText(contact?.name || '').toLowerCase()
+  )
+}
+
+function mergePhoneEntries(primary, secondary) {
+  const out = []
+  const seen = new Set()
+
+  const add = (entry) => {
+    if (!entry) return
+    const number = typeof entry === 'string'
+      ? formatPhoneForContact(entry)
+      : formatPhoneForContact(entry?.number || entry?.sanitized_number || entry?.raw_number || '')
+    if (!number) return
+    const type = typeof entry === 'string' ? '' : sanitizeText(entry?.type || entry?.type_cd || '').toLowerCase()
+    const key = `${number}|${type}`
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push(typeof entry === 'string' ? { number, type } : { number, type })
+  }
+
+  ;[...(Array.isArray(primary) ? primary : []), ...(Array.isArray(secondary) ? secondary : [])].forEach(add)
+  return out
+}
+
+function mergeApolloCacheContact(existing, next) {
+  const mergedPhones = mergePhoneEntries(next?.phones || [], existing?.phones || [])
+  const mergedPhoto = resolvePhotoUrl(next, existing) || sanitizeText(next?.photoUrl || existing?.photoUrl || '') || ''
+  const mergedStatus = sanitizeText(next?.status || '') === 'verified' || sanitizeText(existing?.status || '') === 'verified'
+    ? 'verified'
+    : sanitizeText(next?.status || existing?.status || '') || 'unverified'
+
+  return {
+    ...(existing && typeof existing === 'object' ? existing : {}),
+    ...(next && typeof next === 'object' ? next : {}),
+    id: sanitizeText(next?.id || existing?.id || ''),
+    crmId: sanitizeText(next?.crmId || existing?.crmId || '') || null,
+    apolloPersonId: sanitizeText(next?.apolloPersonId || next?.apollo_person_id || existing?.apolloPersonId || existing?.apollo_person_id || '') || null,
+    name: sanitizeText(next?.name || existing?.name || '') || 'Contact',
+    firstName: sanitizeText(next?.firstName || existing?.firstName || '') || '',
+    lastName: sanitizeText(next?.lastName || existing?.lastName || '') || '',
+    title: sanitizeText(next?.title || existing?.title || '') || '',
+    email: sanitizeText(next?.email || existing?.email || '') || 'N/A',
+    linkedin: sanitizeText(next?.linkedin || existing?.linkedin || '') || '',
+    location: sanitizeText(next?.location || existing?.location || '') || '',
+    photoUrl: mergedPhoto || '',
+    phone: sanitizeText(next?.phone || existing?.phone || '') || '',
+    mobile: sanitizeText(next?.mobile || existing?.mobile || '') || '',
+    workPhone: sanitizeText(next?.workPhone || existing?.workPhone || '') || '',
+    companyPhone: sanitizeText(next?.companyPhone || existing?.companyPhone || '') || '',
+    otherPhone: sanitizeText(next?.otherPhone || existing?.otherPhone || '') || '',
+    directPhone: sanitizeText(next?.directPhone || existing?.directPhone || '') || '',
+    phones: mergedPhones,
+    status: mergedStatus,
+    isMonitored: Boolean(next?.isMonitored || existing?.isMonitored || next?.crmId || existing?.crmId),
+    source: next?.source || existing?.source || ((next?.crmId || existing?.crmId) ? 'crm' : 'apollo'),
+  }
+}
+
+function mergeApolloCacheContacts(existingContacts, nextContact) {
+  const byKey = new Map()
+  const extras = []
+
+  const insert = (contact) => {
+    const key = contactCacheKey(contact)
+    if (!key) {
+      extras.push(contact)
+      return
+    }
+
+    const current = byKey.get(key)
+    if (!current) {
+      byKey.set(key, contact)
+      return
+    }
+
+    byKey.set(key, mergeApolloCacheContact(current, contact))
+  }
+
+  ;(Array.isArray(existingContacts) ? existingContacts : []).forEach(insert)
+  if (nextContact) insert(nextContact)
+
+  return [...extras, ...byKey.values()]
+}
+
+async function persistApolloSearchCache({
+  accountId,
+  accountRow,
+  existingRows,
+  cacheContact,
+}) {
+  if (!supabaseAdmin) return
+
+  const existing = Array.isArray(existingRows) ? existingRows.filter((row) => row && typeof row === 'object') : []
+  const existingData = existing
+    .map((row) => row.data && typeof row.data === 'object' ? row.data : null)
+    .filter(Boolean)
+
+  const bestExisting = existingData.find((data) => data.company && typeof data.company === 'object') || null
+  const company = buildCompanySummary(accountRow, bestExisting?.company || null)
+  const companyDomain = sanitizeText(company.domain || '') || extractDomain(accountRow?.domain || accountRow?.website || '')
+  const companyName = sanitizeText(company.name || accountRow?.name || '') || ''
+  const keys = []
+
+  if (accountId) keys.push(`ACCOUNT_${accountId}`)
+  if (companyDomain && !keys.includes(companyDomain)) keys.push(companyDomain)
+  if (companyName && !keys.includes(companyName)) keys.push(companyName)
+
+  if (keys.length === 0) return
+
+  const existingContacts = existingData.flatMap((data) => Array.isArray(data.contacts) ? data.contacts : [])
+  const contacts = mergeApolloCacheContacts(existingContacts, cacheContact)
+  const timestamp = Date.now()
+  const searchTerm = typeof bestExisting?.searchTerm === 'string' ? bestExisting.searchTerm : undefined
+  const currentPage = typeof bestExisting?.currentPage === 'number' ? bestExisting.currentPage : 1
+  const cacheData = {
+    company: bestExisting?.company && typeof bestExisting.company === 'object' ? bestExisting.company : company,
+    contacts,
+    timestamp,
+    searchTerm,
+    currentPage,
+    source: 'extension-reveal',
+    stale: contacts.length === 0,
+    stale_until: contacts.length === 0 ? new Date(Date.now() + 15 * 60 * 1000).toISOString() : null,
+  }
+
+  const rows = keys.map((key) => ({
+    key,
+    data: cacheData,
+    updated_at: new Date().toISOString(),
+  }))
+
+  const { error } = await supabaseAdmin
+    .from('apollo_searches')
+    .upsert(rows, { onConflict: 'key' })
+
+  if (error) {
+    throw error
+  }
 }
 
 function normalizeContactRow(row) {
@@ -200,6 +466,7 @@ function normalizeContactRow(row) {
     companyPhone: sanitizeText(row?.companyPhone) || null,
     otherPhone: sanitizeText(row?.otherPhone) || null,
     directPhone: sanitizeText(row?.directPhone) || null,
+    primaryPhoneField: sanitizeText(row?.primaryPhoneField || metadata?.primaryPhoneField) || null,
     phones,
     isMonitored: true,
     source: 'crm',
@@ -216,11 +483,12 @@ function buildApiOrigin(req) {
 
 async function findExistingContact({ personId, email, linkedinUrl, firstName, lastName, accountId }) {
   if (!supabaseAdmin) return null
+  const contactSelect = 'id, accountId, ownerId, name, firstName, lastName, email, title, linkedinUrl, phone, mobile, workPhone, companyPhone, otherPhone, primaryPhoneField, city, state, metadata'
 
   if (personId) {
     const { data } = await supabaseAdmin
       .from('contacts')
-      .select('id, accountId, ownerId, metadata')
+      .select(contactSelect)
       .eq('metadata->>apollo_person_id', personId)
       .maybeSingle()
     if (data) return data
@@ -229,7 +497,7 @@ async function findExistingContact({ personId, email, linkedinUrl, firstName, la
   if (email && accountId) {
     const { data } = await supabaseAdmin
       .from('contacts')
-      .select('id, accountId, ownerId, metadata')
+      .select(contactSelect)
       .eq('accountId', accountId)
       .eq('email', email)
       .maybeSingle()
@@ -239,7 +507,7 @@ async function findExistingContact({ personId, email, linkedinUrl, firstName, la
   if (email) {
     const { data } = await supabaseAdmin
       .from('contacts')
-      .select('id, accountId, ownerId, metadata')
+      .select(contactSelect)
       .eq('email', email)
       .maybeSingle()
     if (data) return data
@@ -248,7 +516,7 @@ async function findExistingContact({ personId, email, linkedinUrl, firstName, la
   if (linkedinUrl) {
     let query = supabaseAdmin
       .from('contacts')
-      .select('id, accountId, ownerId, metadata')
+      .select(contactSelect)
       .eq('linkedinUrl', linkedinUrl)
 
     if (accountId) query = query.eq('accountId', accountId)
@@ -259,7 +527,7 @@ async function findExistingContact({ personId, email, linkedinUrl, firstName, la
   if (accountId && firstName && lastName) {
     const { data } = await supabaseAdmin
       .from('contacts')
-      .select('id, accountId, ownerId, metadata')
+      .select(contactSelect)
       .eq('accountId', accountId)
       .eq('firstName', firstName)
       .eq('lastName', lastName)
@@ -308,6 +576,15 @@ export default async function handler(req, res) {
       lastName: person?.lastName || person?.last_name,
       name: person?.name,
     })
+    let accountRow = null
+    if (accountId) {
+      const { data } = await supabaseAdmin
+        .from('accounts')
+        .select('id, name, domain, website, description, logo_url, city, state, country, employees, revenue, industry, phone, linkedin_url, address, zip')
+        .eq('id', accountId)
+        .maybeSingle()
+      accountRow = data || null
+    }
 
     let enriched = null
     let normalizedPhones = []
@@ -437,7 +714,7 @@ export default async function handler(req, res) {
 
     const { data: updatedContact, error: readError } = await supabaseAdmin
       .from('contacts')
-      .select('id, accountId, firstName, lastName, name, email, title, linkedinUrl, phone, mobile, workPhone, companyPhone, otherPhone, city, state, metadata')
+      .select('id, accountId, firstName, lastName, name, email, title, linkedinUrl, phone, mobile, workPhone, companyPhone, otherPhone, primaryPhoneField, city, state, metadata')
       .eq('id', contactId)
       .maybeSingle()
 
@@ -447,6 +724,46 @@ export default async function handler(req, res) {
 
     const normalizedContact = normalizeContactRow(updatedContact)
     const pendingPhone = !syncPhonesOnly && revealPhones && normalizedPhones.length === 0
+
+    let existingCacheRows = []
+    try {
+      const cacheCompany = buildCompanySummary(accountRow, null)
+      const cacheKeys = []
+      if (accountId) cacheKeys.push(`ACCOUNT_${accountId}`)
+      if (cacheCompany.domain) cacheKeys.push(cacheCompany.domain)
+      if (cacheCompany.name) cacheKeys.push(cacheCompany.name)
+
+      if (cacheKeys.length > 0) {
+        const { data } = await supabaseAdmin
+          .from('apollo_searches')
+          .select('key, data')
+          .in('key', cacheKeys)
+        existingCacheRows = Array.isArray(data) ? data : []
+      }
+    } catch (cacheLookupError) {
+      console.warn('[Extension Reveal Contact] Apollo cache lookup failed:', cacheLookupError?.message || cacheLookupError)
+    }
+
+    const apolloCacheContact = buildApolloCacheContact({
+      personId,
+      crmId: normalizedContact.id,
+      person,
+      enriched,
+      normalizedPhones,
+      existingContact: normalizedContact,
+      existingMetadata,
+    })
+
+    try {
+      await persistApolloSearchCache({
+        accountId,
+        accountRow,
+        existingRows: existingCacheRows,
+        cacheContact: apolloCacheContact,
+      })
+    } catch (cachePersistError) {
+      console.warn('[Extension Reveal Contact] Failed to persist Apollo cache:', cachePersistError?.message || cachePersistError)
+    }
 
     res.status(200).json({
       success: true,

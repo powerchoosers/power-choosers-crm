@@ -188,6 +188,8 @@ Use MCP Supabase tools for:
 Rules:
 - Do not store secrets, keys, or raw credentials in this file.
 - Prefer MCP access over guessing database structure from app code alone.
+- Before saving data into Supabase, or when building/editing any page, form, or API work that depends on database-backed fields, relationships, or record layouts, check the Supabase MCP first so you are working from the live table shape instead of assumptions.
+- This includes features that only read database data, like pages that list related calls, contacts, accounts, tasks, or other linked records. Validate the actual table and field names in MCP before writing the edit.
 - Use `apply_migration` for DDL changes like creating or altering tables.
 - Use raw SQL execution for data checks or non-DDL queries.
 - If a database change is risky, inspect schema and advisors first.
