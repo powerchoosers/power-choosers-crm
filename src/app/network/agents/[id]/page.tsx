@@ -144,11 +144,14 @@ export default function AgentDetailPage() {
 
     for (const alias of agent?.aliases || []) {
       const value = String(alias || '').trim()
-      if (value) values.add(value)
+      // Filter out raw UUID codes from the aliases list
+      if (value && value !== agent?.userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+        values.add(value)
+      }
     }
 
     return Array.from(values)
-  }, [agent?.aliases, agent?.key])
+  }, [agent?.aliases, agent?.key, agent?.userId])
 
   if (!authLoading && !isPrivileged) {
     return (
@@ -208,7 +211,7 @@ export default function AgentDetailPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col h-[calc(100vh-8rem)] animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
 
@@ -224,8 +227,16 @@ export default function AgentDetailPage() {
               </button>
 
               <div className="flex-1 min-w-0 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl nodal-glass border border-white/5 flex items-center justify-center shrink-0">
-                  <UserCog className="w-6 h-6 text-zinc-300" />
+                <div className="w-14 h-14 rounded-xl nodal-glass border border-white/5 flex items-center justify-center shrink-0 overflow-hidden bg-zinc-900">
+                  {agent.photoUrl ? (
+                    <img
+                      src={agent.photoUrl}
+                      alt={agent.displayName}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <UserCog className="w-6 h-6 text-zinc-300" />
+                  )}
                 </div>
                 
                 <div className="flex-1 min-w-0 flex flex-col">
@@ -263,20 +274,9 @@ export default function AgentDetailPage() {
                     ) : null}
                   </div>
                   
-                  <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono mb-2 w-full">
-                    <div className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
-                      <Hash className="w-3 h-3 text-white shrink-0" />
-                      <span className="text-[10px] font-mono">{agent.key}</span>
-                    </div>
-                    {agent.userId && (
-                       <>
-                         <span className="w-1 h-1 rounded-full bg-zinc-800" />
-                         <div className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
-                           <UserCog className="w-3 h-3 text-white shrink-0" />
-                           <span className="text-[10px] font-mono">UID: {agent.userId}</span>
-                         </div>
-                       </>
-                    )}
+                  <div className="flex items-center gap-1.5 uppercase tracking-widest text-zinc-400">
+                    <Hash className="w-3 h-3 text-white shrink-0" />
+                    <span className="text-[10px] font-mono">{agent.key}</span>
                   </div>
                 </div>
               </div>

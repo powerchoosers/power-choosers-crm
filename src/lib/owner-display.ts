@@ -159,6 +159,7 @@ export function buildOwnerDirectoryEntry(
     email: email || null,
     firstName: user?.first_name ?? user?.firstName ?? null,
     lastName: user?.last_name ?? user?.lastName ?? null,
+    photoUrl: user?.hosted_photo_url ?? user?.photo_url ?? null,
     aliases: [],
   }
 }
