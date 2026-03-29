@@ -166,20 +166,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         voicemailGreeting: normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
       })
 
-      // If user has Zoho/External avatar but no hosted URL, host it and save (for email signature)
-      const photoURL = currentUser.user_metadata?.avatar_url
-      const isExternalPhoto = photoURL && !photoURL.includes('imgur.com')
-      if (isExternalPhoto && !data.hosted_photo_url) {
-        fetch('/api/upload/host-avatar', {
+      // If user has no hosted URL, fetch it natively from Zoho contacts sync.
+      if (!data.hosted_photo_url) {
+        fetch('/api/auth/zoho/sync-avatar', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: photoURL }),
+          body: JSON.stringify({ email: emailLower }),
         })
           .then((res) => res.json())
           .then((payload) => {
-            const imageUrl = payload?.imageUrl ?? payload?.url
-            if (imageUrl) {
-              supabase.from('users').update({ hosted_photo_url: imageUrl, updated_at: new Date().toISOString() }).eq('email', emailLower).then(() => refreshProfile())
+            if (payload?.success) {
+              refreshProfile()
             }
           })
           .catch(() => { })
