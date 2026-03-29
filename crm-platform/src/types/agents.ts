@@ -8,6 +8,7 @@ export interface OwnerDirectoryEntry {
   email: string | null
   firstName: string | null
   lastName: string | null
+  photoUrl: string | null
   aliases?: string[]
 }
 
@@ -29,6 +30,7 @@ export interface AgentProgressTotals {
 }
 
 export interface AgentProgressRow extends OwnerDirectoryEntry {
+  photoUrl: string | null
   title: string | null
   territory: string | null
   status: string | null

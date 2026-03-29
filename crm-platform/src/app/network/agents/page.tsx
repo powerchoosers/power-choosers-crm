@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
+import { UserCog } from 'lucide-react'
 
 function formatCount(value?: number | null) {
   return new Intl.NumberFormat('en-US').format(value || 0)
@@ -174,15 +175,24 @@ export default function AgentsPage() {
                 </TableRow>
               ) : visibleAgents.length > 0 ? (
                 visibleAgents.map((agent) => (
-                  <TableRow key={agent.key} className="border-white/5 hover:bg-white/[0.02]">
+                   <TableRow key={agent.key} className="border-white/5 hover:bg-white/[0.02]">
                     <TableCell className="py-4">
-                      <Link href={`/network/agents/${encodeURIComponent(agent.key)}`} className="flex flex-col min-w-0">
-                        <span className="font-medium text-zinc-100 whitespace-nowrap">{agent.displayName}</span>
-                        {agent.email ? (
-                          <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[220px]">
-                            {agent.email}
-                          </span>
-                        ) : null}
+                      <Link href={`/network/agents/${encodeURIComponent(agent.key)}`} className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-lg nodal-glass border border-white/5 flex items-center justify-center shrink-0 overflow-hidden bg-zinc-900">
+                          {agent.photoUrl ? (
+                            <img src={agent.photoUrl} alt={agent.displayName} className="w-full h-full object-cover" />
+                          ) : (
+                            <UserCog className="w-4 h-4 text-zinc-400" />
+                          )}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-medium text-zinc-100 whitespace-nowrap">{agent.displayName}</span>
+                          {agent.email ? (
+                            <span className="text-[10px] font-mono text-zinc-500 truncate max-w-[220px]">
+                              {agent.email}
+                            </span>
+                          ) : null}
+                        </div>
                       </Link>
                     </TableCell>
                     <TableCell className="text-zinc-300 whitespace-nowrap">{agent.title || '—'}</TableCell>

@@ -22,6 +22,8 @@ type UserRow = {
   last_name?: string | null
   job_title?: string | null
   phone?: string | null
+  photo_url?: string | null
+  hosted_photo_url?: string | null
   settings?: Record<string, unknown> | null
   created_at?: string | null
   updated_at?: string | null
@@ -197,7 +199,7 @@ async function loadAdminProgressData(): Promise<AdminProgressData> {
   ] = await Promise.all([
     supabaseAdmin
       .from('users')
-      .select('id, email, first_name, last_name, job_title, phone, settings, created_at, updated_at')
+      .select('id, email, first_name, last_name, job_title, phone, photo_url, hosted_photo_url, settings, created_at, updated_at')
       .order('updated_at', { ascending: false, nullsFirst: false }),
     supabaseAdmin
       .from('accounts')
@@ -247,6 +249,7 @@ async function loadAdminProgressData(): Promise<AdminProgressData> {
 function createAccumulator(entry: OwnerDirectoryEntry): OwnerAccumulator {
   return {
     ...entry,
+    photoUrl: entry.photoUrl,
     aliasesSet: new Set(entry.aliases || []),
     title: null,
     territory: null,
@@ -283,6 +286,7 @@ function finalizeAccumulator(acc: OwnerAccumulator): AgentProgressRow {
     email: acc.email,
     firstName: acc.firstName,
     lastName: acc.lastName,
+    photoUrl: acc.photoUrl,
     aliases: Array.from(acc.aliasesSet),
     title: acc.title,
     territory: acc.territory,
