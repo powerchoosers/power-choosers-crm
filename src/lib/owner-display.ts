@@ -78,7 +78,8 @@ export function resolveOwnerUser(value: string | null | undefined, index: OwnerI
 
   const email = normalizeEmail(normalized)
   if (email) {
-    return index.byEmail.get(email) ?? null
+    const exactMatch = index.byEmail.get(email)
+    if (exactMatch) return exactMatch
   }
 
   const localPart = normalized.split('@')[0]?.trim().toLowerCase()
