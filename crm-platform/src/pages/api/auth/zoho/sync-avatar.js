@@ -44,19 +44,36 @@ export default async function handler(req, res) {
             return;
         }
 
-        // 2. Fetch Zoho Thumbnail
-        const photoResp = await fetch('https://contacts.zoho.com/file?fs=thumb', {
+        // 2. Fetch Zoho UserInfo (OIDC endpoint for master profile)
+        const userInfoResp = await fetch('https://accounts.zoho.com/oauth/v2/userinfo', {
             headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
         });
         
+        if (!userInfoResp.ok) {
+            throw new Error(`Failed to fetch userinfo from Zoho API: ${userInfoResp.status}`);
+        }
+
+        const userInfo = await userInfoResp.json();
+        const pictureUrl = userInfo.picture;
+
+        if (!pictureUrl) {
+            throw new Error(`No picture URL found in Zoho profile for ${email}`);
+        }
+
+        // Fetch the actual image blob using the authenticated picture URL
+        const photoResp = await fetch(pictureUrl, {
+            headers: { 'Authorization': `Zoho-oauthtoken ${accessToken}` }
+        });
+
         if (!photoResp.ok) {
-            throw new Error(`Failed to fetch photo from Zoho API: ${photoResp.status}`);
+            throw new Error(`Failed to download profile picture: ${photoResp.status}`);
         }
 
         // Validate not empty
         const buffer = Buffer.from(await photoResp.arrayBuffer());
-        if (buffer.length < 100) {
-            throw new Error(`Photo response too small to be valid (${buffer.length} bytes)`);
+        if (buffer.length < 5000) {
+            // Usually the default silhouette is around 2.8KB from contacts, but OIDC might just not return one
+            logger.warn(`[ZohoAvatarSync] Image size is suspiciously small (${buffer.length} bytes), might be a placeholder.`, 'zoho-avatar');
         }
 
         const base64Image = buffer.toString('base64');
