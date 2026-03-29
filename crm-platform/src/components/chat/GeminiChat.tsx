@@ -1350,10 +1350,10 @@ export function GeminiChatPanel() {
     return (hasFailed && hasSuccess) || !!hasFallbackReason
   }, [diagnostics])
 
-  // Host Google Avatar if needed
+  // Host Zoho/Google Avatar if needed
   useEffect(() => {
     const hostAvatar = async () => {
-      const photoURL = user?.user_metadata?.avatar_url || profile?.hostedPhotoUrl
+      const photoURL = profile?.hostedPhotoUrl || user?.user_metadata?.avatar_url
       if (!photoURL) {
         setIsAvatarLoading(false)
         return
