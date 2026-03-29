@@ -97,7 +97,7 @@ export function Sidebar() {
   const { setRightPanelMode } = useUIStore()
   const pathname = usePathname()
   const router = useRouter()
-  const { user, role } = useAuth()
+  const { user, role, profile } = useAuth()
   const [isHovered, setIsHovered] = useState(false)
   const [mounted, setMounted] = useState(false)
 
@@ -369,7 +369,15 @@ export function Sidebar() {
               mass: 0.8
             }}
           >
-            {user?.user_metadata?.avatar_url ? (
+            {profile?.hostedPhotoUrl ? (
+              <Image
+                src={profile.hostedPhotoUrl}
+                alt="User"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : user?.user_metadata?.avatar_url ? (
               <Image
                 src={user.user_metadata.avatar_url}
                 alt="User"
