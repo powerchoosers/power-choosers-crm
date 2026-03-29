@@ -1,6 +1,6 @@
 /**
  * Power Choosers CRM - Avatar Hosting Handler
- * Fetches an external avatar URL (Zoho, Google, etc.) and hosts it on Imgur for stability.
+ * Fetches an external avatar URL (e.g. from an integration) and hosts it on Imgur for stability.
  */
 
 import { cors } from '../_cors.js';
@@ -28,8 +28,8 @@ export default async function handler(req, res) {
     }
 
     try {
-        const { url, googlePhotoURL } = req.body || {};
-        const photoURL = url || googlePhotoURL; // Support both for backward compatibility
+        const { url } = req.body || {};
+        const photoURL = url; 
 
         if (!photoURL) {
             res.writeHead(400, { 'Content-Type': 'application/json' });
