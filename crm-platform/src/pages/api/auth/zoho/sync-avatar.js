@@ -1,6 +1,6 @@
 import { cors } from '../../_cors.js';
 import logger from '../../_logger.js';
-import { getValidAccessTokenForUser } from '../email/zoho-token-manager.js';
+import { getValidAccessTokenForUser } from '../../email/zoho-token-manager.js';
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseTokenAdmin = createClient(
