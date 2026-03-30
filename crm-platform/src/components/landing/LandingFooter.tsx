@@ -7,7 +7,7 @@ const NAV_GROUPS = [
     links: [
       { label: 'Bill Debugger', href: '/bill-debugger' },
       { label: 'Book a Briefing', href: '/book' },
-      { label: 'Sign In', href: '/network' },
+      { label: 'Sign In', href: '/portal' },
     ],
   },
   {
