@@ -151,7 +151,9 @@ export default async function handler(req, res) {
     // Create TwiML response that ENDS the call without retry
     const twiml = new VoiceResponse();
     let voicemailGreeting = null;
-    const shouldPlayVoicemail = !isPowerDialBatch && ['no-answer', 'busy'].includes(normalizedDialStatus);
+    // When the browser client rejects the call, Twilio commonly reports `canceled`.
+    // We treat that the same as no-answer/busy so declined inbound calls still get voicemail.
+    const shouldPlayVoicemail = !isPowerDialBatch && ['no-answer', 'busy', 'canceled', 'failed'].includes(normalizedDialStatus);
 
     if (shouldPlayVoicemail) {
       try {
