@@ -244,6 +244,101 @@ export default async function handler(req, res) {
     const accountMap = new Map()
     const contactMap = new Map()
     const summaryParts = []
+    const contactSelect = `
+        id,
+        accountId,
+        firstName,
+        lastName,
+        name,
+        email,
+        linkedinUrl,
+        phone,
+        mobile,
+        workPhone,
+        companyPhone,
+        primaryPhoneField,
+        title,
+        city,
+        state,
+        metadata,
+        accounts (
+          id,
+          name,
+          domain,
+          phone,
+          website,
+          city,
+          state,
+          industry,
+          logo_url,
+          description
+        )
+      `
+    let directLinkedinContact = null
+
+    if (pageLinkedinUrl) {
+      const directLinkedinLookup = pageLinkedinUrl.includes('linkedin.com/')
+        ? pageLinkedinUrl.split('linkedin.com/').pop() || pageLinkedinSlug
+        : pageLinkedinSlug
+      const directLinkedinPattern = `%${directLinkedinLookup || pageLinkedinUrl}%`
+
+      try {
+        let directLinkedinQuery = supabaseAdmin
+          .from('contacts')
+          .select(contactSelect)
+          .ilike('linkedinUrl', directLinkedinPattern)
+          .order('updatedAt', { ascending: false })
+          .limit(25)
+
+        directLinkedinQuery = applyLegacyOwnershipScope(directLinkedinQuery, auth.user, auth.isAdmin)
+
+        const { data: directLinkedinRows, error: directLinkedinError } = await directLinkedinQuery
+        if (directLinkedinError) {
+          console.warn('[Extension Match] LinkedIn contact lookup failed:', directLinkedinError.message)
+        } else if (Array.isArray(directLinkedinRows)) {
+          for (const row of directLinkedinRows) {
+            const normalized = normalizeContactRow(row, 10000, `LinkedIn URL match: ${row?.linkedinUrl || pageLinkedinUrl}`)
+            if (!normalized) continue
+
+            const normalizedLinkedin = normalizeLinkedinUrl(normalized.linkedinUrl)
+            const normalizedLinkedinSlug = normalizedLinkedin.includes('linkedin.com/')
+              ? normalizedLinkedin.split('linkedin.com/').pop()
+              : ''
+            const isExactLinkedinMatch =
+              Boolean(directLinkedinLookup && normalizedLinkedinSlug) &&
+              (directLinkedinLookup === normalizedLinkedinSlug ||
+                normalizedLinkedin.includes(directLinkedinLookup) ||
+                directLinkedinLookup.includes(normalizedLinkedinSlug))
+
+            if (!isExactLinkedinMatch) continue
+
+            normalized.score = Math.max(Number(normalized.score || 0), 10000)
+            normalized.reason = `LinkedIn URL match: ${normalized.linkedinUrl}`
+            contactMap.set(normalized.id, normalized)
+            directLinkedinContact = normalized
+
+            if (normalized.accountId && normalized.accountName && !accountMap.has(normalized.accountId)) {
+              accountMap.set(
+                normalized.accountId,
+                normalizeAccountRow(
+                  {
+                    id: normalized.accountId,
+                    name: normalized.accountName,
+                    domain: normalized.accountDomain,
+                  },
+                  Math.max(85, normalized.score - 10),
+                  `Matched through ${normalized.name}`
+                )
+              )
+            }
+
+            break
+          }
+        }
+      } catch (error) {
+        console.warn('[Extension Match] Direct LinkedIn lookup failed:', error)
+      }
+    }
 
     for (const phone of phones.slice(0, 3)) {
       try {
@@ -542,7 +637,7 @@ export default async function handler(req, res) {
       (account) =>
         isExactCompanyNameMatch(companyGuess, account.name) || isExactCompanyNameMatch(title, account.name)
     ) || null
-    const exactLinkedinContact = pageLinkedinSlug
+    const exactLinkedinContact = directLinkedinContact || (pageLinkedinSlug
       ? contacts.find((contact) => {
           const linkedin = normalizeLinkedinUrl(contact.linkedinUrl)
           const linkedinSlug = linkedin.includes('linkedin.com/')
@@ -556,7 +651,7 @@ export default async function handler(req, res) {
                 pageLinkedinSlug.includes(linkedinSlug))
           )
         })
-      : null
+      : null)
 
     // Hard gate: only return an account when we have a precise signal (domain/name/phone).
     let finalAccount = exactDomainAccount || exactNameAccount || null
@@ -570,6 +665,19 @@ export default async function handler(req, res) {
     let finalContact = null
     if (exactLinkedinContact) {
       finalContact = exactLinkedinContact
+      if (exactLinkedinContact.accountId && exactLinkedinContact.accountName) {
+        finalAccount =
+          accountMap.get(exactLinkedinContact.accountId) ||
+          normalizeAccountRow(
+            {
+              id: exactLinkedinContact.accountId,
+              name: exactLinkedinContact.accountName,
+              domain: exactLinkedinContact.accountDomain,
+            },
+            Math.max(80, Number(exactLinkedinContact.score || 0) - 10),
+            `Matched through ${exactLinkedinContact.name}`
+          )
+      }
     } else if (contacts.length > 0) {
       if (finalAccount?.id) {
         finalContact =
@@ -597,12 +705,14 @@ export default async function handler(req, res) {
     }
 
     let summary = 'No strong CRM match found yet.'
-    if (finalAccount && finalContact && finalAccount.id === finalContact.accountId) {
+    if (finalContact && finalAccount && finalAccount.id === finalContact.accountId) {
       summary = `Matched ${finalContact.name} to ${finalAccount.name}.`
+    } else if (finalContact) {
+      summary = finalContact.accountName
+        ? `Matched ${finalContact.name} at ${finalContact.accountName}.`
+        : `Matched the page to ${finalContact.name}.`
     } else if (finalAccount) {
       summary = `Matched the page to ${finalAccount.name}.`
-    } else if (finalContact) {
-      summary = `Matched the page to ${finalContact.name}.`
     } else if (domain) {
       summary = `No exact CRM match found for ${domain}.`
     }
