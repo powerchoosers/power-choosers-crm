@@ -138,6 +138,7 @@
       "icon": "public/favicon.ico",
       "signAndEditExecutable": false
     },
+    "afterPack": "scripts/after-pack.mjs",
     "mac": {
       "target": [
         "dmg"
