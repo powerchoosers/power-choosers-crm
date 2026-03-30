@@ -1808,6 +1808,7 @@ Output rules:
       return `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(n)} kWh`;
     };
 
+    /* Grounded CRM auto-routing disabled.
     const respondGrounded = (content, diagnostics) => {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(
@@ -1953,10 +1954,10 @@ Output rules:
       const isExpirationQuery = /(expir|expire|expires|expiration)\b/.test(lower) && !!parseYear(p);
       const isContractQuery = /(contract|position maturity|strike price|annual usage|supplier|current supplier|current rate)\b/.test(lower);
       const isDirectContractQuestion = isContractQuery && /(what is|when does|show me|get|find)\b/.test(lower);
-      const looksLikeDirectNameQuery = /^[a-z0-9][a-z0-9\s&.'-]{1,80}\??$/i.test(p) && !/(\bwho\b|\bwhat\b|\bwhy\b|\bhow\b|\bwhen\b)/i.test(p);
-      const isInstructionLike = /(\breturn\b|\bonly\b|\bsummarize\b|\bexplain\b|\bdraft\b|\bwrite\b|\bcompose\b|\bgenerate\b|\btranslate\b|\bdefine\b|\bcalculate\b|\bsolve\b)/.test(lower);
       const hasSearchVerb = /(\bfind\b|\bsearch\b|\blook up\b|\bdo you see\b|\bcheck\b)/.test(lower);
-      const isSearchQuery = hasSearchVerb || isDirectContractQuestion || (looksLikeDirectNameQuery && !isInstructionLike);
+      // Keep grounded search for explicit lookup language. Plain statements and
+      // short test inputs should flow to the model instead of auto-searching CRM.
+      const isSearchQuery = hasSearchVerb || isDirectContractQuestion;
       const isLocationQuery = /(location|city|state|located in)\b/.test(lower);
 
       if (!isExpirationQuery && !isContractQuery && !isSearchQuery && !isLocationQuery) return false;
@@ -2328,7 +2329,8 @@ Output rules:
       return false;
     };
 
-    if (!jsonMode && await maybeHandleGroundedCrmRequest()) return;
+    // Grounded CRM auto-routing is disabled. The chat now goes straight to the model.
+    */
 
     const buildSystemPrompt = () => {
       return `
@@ -2348,7 +2350,7 @@ Output rules:
         - ALWAYS address them by their first name (${firstName}) in your initial greeting or when appropriate.
         - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
-        - WEB_MODE: ${webEnabled ? 'CRM_PLUS_WEB (internet assist enabled)' : 'CRM_ONLY (internet assist disabled)'}
+        - WEB_MODE: ${webEnabled ? 'WEB_ASSIST_ENABLED' : 'WEB_ASSIST_DISABLED'}
 
         FORENSIC_INTELLIGENCE_PROTOCOL:
         - Your mission is to provide strategic sales intelligence. Move beyond simple data retrieval.
@@ -2418,10 +2420,9 @@ Output rules:
         - Accuracy is the ONLY priority for CRM data. If you are 99% sure but haven't run a tool, you are 0% sure. RUN THE TOOL.
         - If tools return no result, do not stop at "not found." Offer 2-3 immediate next actions and include a \`flight_check\` JSON block with actionable steps.
 
-        HYBRID_SEARCH_AWARENESS:
-        - The \`list_accounts\` and \`list_contacts\` tools use a tiered Hybrid Search (Exact Match > Starts With > FTS > Semantic).
-        - If you search for "Camp Fire" and it's in the DB, it WILL appear at the top.
-        - If the user asks "can you see it?", they are likely testing the search. RUN THE SEARCH TOOL.
+        CRM_LOOKUP_GUIDANCE:
+        - Use CRM search tools only when the user clearly asks for a lookup or record-specific answer.
+        - Do not turn tests, small talk, or general questions into CRM searches.
 
         INDUSTRY_INTELLIGENCE:
         - "Manufacturing" is a broad sector. If the user asks for "Manufacturing" or "Manufacturers", you MUST search for these related industries:
@@ -2453,8 +2454,8 @@ Output rules:
         WEB_SEARCH_RESTRICTION:
         - YOU ARE NOT A GENERAL SEARCH ENGINE.
         - ${webEnabled
-          ? 'Internet assist is ON. CRM checks still come first, but if CRM is empty on a public-facing company/person question, pivot to web research instead of ending with "not in CRM".'
-          : 'Internet assist is OFF. Stay in CRM-only mode unless a grounded phone discovery route is already running.'}
+          ? 'Internet assist is ON. Use public web research when it helps answer a public-facing question.'
+          : 'Internet assist is OFF. Stay in CRM-only mode.'}
         - When web search is used, prefer official company domains and disclose the source in plain language.
         - Do NOT search the web for a CRM-only/private field like contract end date, bill amount, or internal note and then present it as fact if the CRM has nothing.
         - If the user asks about a record you can't find and it is a public-facing fact, continue with web research instead of guessing. If it is a private CRM field, ask for the next actionable detail.

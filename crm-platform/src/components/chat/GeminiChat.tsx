@@ -2181,9 +2181,9 @@ SELECT * FROM hybrid_search_accounts(
                     ? 'text-[#002FA7] border-[#002FA7]/40 bg-[#002FA7]/10'
                     : 'text-zinc-500 border-white/10 bg-white/5'
                 )}
-                title={internetAssistEnabled ? 'Search CRM first, then web' : 'CRM-only mode'}
+                title={internetAssistEnabled ? 'Use public web when needed' : 'Model only, no web lookups'}
               >
-                {internetAssistEnabled ? 'CRM+WEB' : 'CRM ONLY'}
+                {internetAssistEnabled ? 'WEB ASSIST' : 'MODEL ONLY'}
               </button>
               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
               <span className="text-[10px] font-sans text-emerald-500/80 uppercase tracking-tighter leading-none">

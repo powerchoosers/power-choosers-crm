@@ -20,6 +20,9 @@
 # extension build output
 /extension/dist/
 
+# electron build output
+/release/
+
 # production
 /build
 
