@@ -112,7 +112,7 @@ export function LandingSections() {
       .then(r => r.ok ? r.json() : null)
       .then(data => { const p = data?.prices?.south; if (p != null && mounted) setLivePrice(p) })
       .catch(() => { })
-    return () => { mounted = false }
+      return () => { mounted = false }
   }, [])
 
   useEffect(() => {
@@ -145,32 +145,57 @@ export function LandingSections() {
   return (
     <>
       {/* INTELLIGENCE COVERAGE TICKER */}
-      <div className="bg-white border-y border-zinc-100 py-6 overflow-hidden relative">
-        {/* Fade edges */}
-        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
-
-        <div
-          className="will-change-transform"
-          style={{ transform: `translate3d(${tickerParallax}px, 0, 0)` }}
-        >
-          <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
-            {tickerItemsLoop.map((item, i) => (
-              <div key={`primary-${i}`} className="flex items-center shrink-0">
-                <div className="flex items-baseline gap-1.5 px-6 py-1 rounded-lg ticker-chip">
-                  <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
-                    {item.label}
-                  </span>
-                  <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
-                    {item.sub}
-                  </span>
-                </div>
-                <span className="text-zinc-200 text-xs select-none">·</span>
+      <div className="bg-white border-y border-zinc-100 overflow-hidden relative">
+        <div className="max-w-7xl mx-auto px-6 pt-4 pb-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-6">
+            <div className="flex items-start gap-4 min-w-0 md:flex-1 md:pr-6">
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.38em] mb-1">
+                  Market Map
+                </p>
+                <p className="text-sm text-zinc-700 leading-snug max-w-3xl">
+                  TDSPs handle delivery. REPs set supply. That split is where most of the bill complexity hides.
+                </p>
               </div>
-            ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 md:justify-end md:shrink-0 md:pl-2">
+              <span className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 whitespace-nowrap">
+                TDSP = delivery
+              </span>
+              <span className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-[#002FA7]/10 text-[#002FA7] whitespace-nowrap">
+                REP = supply
+              </span>
+            </div>
           </div>
         </div>
 
+        <div className="relative border-t border-zinc-100 py-5 overflow-hidden">
+          {/* Fade edges */}
+          <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+
+          <div
+            className="will-change-transform"
+            style={{ transform: `translate3d(${tickerParallax}px, 0, 0)` }}
+          >
+            <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 72s linear infinite' }}>
+              {tickerItemsLoop.map((item, i) => (
+                <div key={`primary-${i}`} className="flex items-center shrink-0">
+                  <div className="flex items-baseline gap-1.5 px-6 py-1 rounded-lg ticker-chip">
+                    <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
+                      {item.label}
+                    </span>
+                    <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
+                      {item.sub}
+                    </span>
+                  </div>
+                  <span className="text-zinc-200 text-xs select-none">·</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* ACT 2: THE REALITY (The Problem) */}
