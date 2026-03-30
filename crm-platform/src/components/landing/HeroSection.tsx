@@ -12,32 +12,32 @@ export function HeroSection() {
     >
       <div className="max-w-5xl mx-auto text-center z-10">
         <h1 className="text-5xl md:text-8xl font-semibold tracking-tighter leading-tight mb-8 text-zinc-900 break-words">
-          <span className="word-reveal" style={{ animationDelay: '0ms' }}>The</span>
+          <span className="word-reveal" style={{ animationDelay: '0ms' }}>Texas</span>
           {' '}
-          <span className="word-reveal" style={{ animationDelay: '40ms' }}>Texas</span>
+          <span className="word-reveal" style={{ animationDelay: '40ms' }}>electricity</span>
           {' '}
-          <span className="word-reveal" style={{ animationDelay: '80ms' }}>Grid</span>
-          {' '}
-          <span className="word-reveal" style={{ animationDelay: '120ms' }}>is</span>
+          <span className="word-reveal" style={{ animationDelay: '80ms' }}>bills</span>
           <br />
-          <span className="word-reveal" style={{ animationDelay: '160ms' }}>Designed</span>
+          <span className="word-reveal" style={{ animationDelay: '120ms' }}>hide</span>
           {' '}
-          <span className="word-reveal" style={{ animationDelay: '200ms' }}>to</span>
+          <span className="word-reveal" style={{ animationDelay: '160ms' }}>the</span>
           {' '}
-          <span className="word-reveal" style={{ animationDelay: '240ms' }}>Confuse.</span>
+          <span className="word-reveal" style={{ animationDelay: '200ms' }}>real</span>
+          {' '}
+          <span className="word-reveal" style={{ animationDelay: '240ms' }}>cost.</span>
         </h1>
         <p className="text-xl md:text-2xl text-zinc-600 font-light tracking-tight mb-12 max-w-2xl mx-auto">
-          We view complexity as a design flaw. We fixed it.
+          We turn delivery charges, supplier rates, and contract risk into a clear report for controllers, CFOs, and facilities teams.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/bill-debugger"
-            className="animate-subtle-pulse inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group whitespace-nowrap"
-          >
-            <span>[ Debug My Bill ]</span>
-            <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-            </svg>
+          className="animate-subtle-pulse inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group whitespace-nowrap"
+        >
+          <span>Review My Bill</span>
+          <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+          </svg>
           </Link>
           <Link
             href="/book"

@@ -1,9 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
-import { Activity, Layers, Users, ArrowRight, ShieldCheck, Lock, Zap, Database, Quote } from 'lucide-react'
+import { Activity, ArrowRight } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 
 const TICKER_ITEMS = [
@@ -23,7 +22,41 @@ const TICKER_ITEMS = [
   { label: '100+ TARIFF STRUCTURES', sub: 'MAPPED' },
   { label: 'DEMAND RATCHET', sub: 'DECODED' },
   { label: 'SCARCITY ADDER', sub: 'TRACKED' },
-  { label: '4CP EXPOSURE', sub: 'ISOLATED' },
+  { label: 'PEAK DEMAND RISK', sub: 'TRACKED' },
+]
+
+const REPORT_SUMMARY = [
+  { label: 'Annual spend', value: '$84,620', note: 'sample bill' },
+  { label: 'Contract end', value: 'Nov 23, 2026', note: 'notice window' },
+  { label: 'Delivery cost', value: '38%', note: 'structure' },
+  { label: 'Supply rate', value: '8.6¢', note: 'market' },
+]
+
+const REPORT_FINDINGS = [
+  { label: 'Proposed delivery', value: '$1,280', detail: '17% above baseline' },
+  { label: 'Cycle phase', value: 'Q4 2026', detail: 'Renegotiate before notice date' },
+  { label: 'Termination date', value: 'Nov 23, 2026', detail: 'Renegotiate before leverage fades' },
+  { label: 'Peak demand risk', value: 'Medium', detail: 'Peak demand review needed' },
+  { label: 'Demand ratchet', value: '80% FLOOR', detail: 'Minimum billing penalty active' },
+]
+
+const REPORT_META = ['Sample bill', 'March billing cycle', 'Texas / ERCOT', '1-page readout']
+
+const BILL_OWNER_ROLES = ['Controller', 'CFO', 'Facilities', 'COO']
+
+const REPORT_MEETING_ITEMS = [
+  {
+    label: 'Confirms the number',
+    detail: 'The owner sees the same signal you see, with no back-and-forth.',
+  },
+  {
+    label: 'Opens the services conversation',
+    detail: 'The call shifts from explaining the bill to talking scope and fit.',
+  },
+  {
+    label: 'Moves to the next step',
+    detail: 'Proposal, renewal, or follow-up gets booked while the room is warm.',
+  },
 ]
 
 export function LandingSections() {
@@ -206,7 +239,7 @@ export function LandingSections() {
               Complexity is a Tax.
             </h2>
             <p className="text-lg text-zinc-700 leading-relaxed mb-8 reveal-on-scroll delay-100">
-              ERCOT scarcity adders, 4CP peaks, and volatility are features of the market design, not bugs.
+              ERCOT scarcity charges, peak demand spikes, and volatility are features of the market design, not bugs.
               Suppliers bury these in &quot;pass-through&quot; fees.
             </p>
             <p className="text-xl font-medium text-zinc-900 reveal-on-scroll delay-200 border-l-2 border-[#002FA7] pl-4">
@@ -245,6 +278,64 @@ export function LandingSections() {
         </div>
       </section>
 
+      {/* WHY IT MATTERS */}
+      <section className="py-24 bg-[#F5F5F7] border-t border-zinc-100 relative">
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="max-w-4xl mb-14 reveal-on-scroll">
+            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">WHY IT MATTERS</p>
+            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">The numbers get expensive fast.</h2>
+            <p className="text-lg text-zinc-600 leading-relaxed mt-5 max-w-2xl">
+              In Texas commercial energy, small leaks do not stay small. One bad read on the bill becomes real money.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-10 md:justify-items-center">
+            <div className="reveal-on-scroll flex flex-col items-center text-center">
+              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 font-mono tabular-nums">
+                $<span className="counter metric-counter" data-target="25" data-suffix="B+">0</span>
+              </div>
+              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2">
+                Texas commercial energy spend
+              </div>
+              <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest">
+                Annually · Source: EIA
+              </div>
+            </div>
+
+            <div ref={livePriceRef} className="reveal-on-scroll delay-100 flex flex-col items-center text-center">
+              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 font-mono tabular-nums">
+                ${livePrice == null ? (
+                  <span className="animate-pulse text-zinc-300">--</span>
+                ) : (
+                  <span className="metric-live-value">{displayPrice.toFixed(2)}</span>
+                )}
+              </div>
+              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2">
+                ERCOT LZ_South spot price
+              </div>
+              <div className="flex items-center justify-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest">
+                  Live signal · /MWh
+                </div>
+              </div>
+            </div>
+
+            <div className="reveal-on-scroll delay-200 flex flex-col items-center text-center">
+              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 font-mono tabular-nums">
+                <span className="counter metric-counter" data-target="40" data-suffix="%">0</span>
+              </div>
+              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2">
+                Of your bill that isn't usage
+              </div>
+              <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest">
+                Demand charges · buried in delivery
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* FORENSIC PROTOCOL: HOW IT WORKS */}
       <section className="bg-white flex items-center justify-center px-6 py-24 border-t border-zinc-100">
         <div className="max-w-5xl w-full mx-auto">
@@ -267,7 +358,7 @@ export function LandingSections() {
                 </div>
               </div>
               <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SUBMIT</p>
-              <p className="text-zinc-600 text-sm leading-relaxed font-medium">Upload your energy bill or PDF. Takes 30 seconds.</p>
+              <p className="text-zinc-600 text-sm leading-relaxed font-medium">Upload your bill or PDF. Takes 30 seconds.</p>
             </div>
 
             {/* Step 02 */}
@@ -279,7 +370,7 @@ export function LandingSections() {
                 </div>
               </div>
               <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">ISOLATE</p>
-              <p className="text-zinc-600 text-sm leading-relaxed font-medium">Cost leakage isolated from supplier markup.</p>
+              <p className="text-zinc-600 text-sm leading-relaxed font-medium">We separate delivery, supply, and contract risk.</p>
             </div>
 
             {/* Step 03 */}
@@ -291,292 +382,262 @@ export function LandingSections() {
                 </div>
               </div>
               <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SIGNAL</p>
-              <p className="text-zinc-600 text-sm leading-relaxed font-medium">Forensic report delivered. No noise.</p>
-            </div>
-
-          </div>
-
-        </div>
-      </section>
-
-      {/* ACT 3: THE PHILOSOPHY (The Code) */}
-      <section className="flex items-center justify-center px-6 py-24 bg-[#F5F5F7]">
-        <div className="max-w-7xl mx-auto w-full">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="reveal-on-scroll group">
-              <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center mb-6 text-zinc-900 group-hover:bg-[#002FA7] group-hover:text-white transition-colors duration-300">
-                <Activity className="w-6 h-6" />
-              </div>
-              <h3 className="text-2xl font-semibold tracking-tight mb-4 text-zinc-900">Signal Over Noise</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                We reject 99% of contracts to find the one true signal. We filter out the market hysteria to find the mathematical optimum.
-              </p>
-            </div>
-            <div className="reveal-on-scroll delay-100 group">
-              <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center mb-6 text-zinc-900 group-hover:bg-[#002FA7] group-hover:text-white transition-colors duration-300">
-                <Layers className="w-6 h-6" />
-              </div>
-              <h3 className="text-2xl font-semibold tracking-tight mb-4 text-zinc-900">Deep Simplicity</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                We engineer the complexity out of the grid so you don&apos;t feel it. Your bill becomes a dashboard, not a puzzle.
-              </p>
-            </div>
-            <div className="reveal-on-scroll delay-200 group">
-              <div className="w-12 h-12 bg-zinc-100 rounded-xl flex items-center justify-center mb-6 text-zinc-900 group-hover:bg-[#002FA7] group-hover:text-white transition-colors duration-300">
-                <Users className="w-6 h-6" />
-              </div>
-              <h3 className="text-2xl font-semibold tracking-tight mb-4 text-zinc-900">Human Intersection</h3>
-              <p className="text-zinc-500 leading-relaxed">
-                Technology alone is not enough. We provide experts leading experts. Algorithms find the price; humans define the strategy.
-              </p>
+              <p className="text-zinc-600 text-sm leading-relaxed font-medium">You get a clear report and a next move.</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ACT 4: THE PRODUCTS (The Tools) */}
-      <section className="bg-[#F5F5F7] flex flex-col px-6 py-20 md:py-24 relative overflow-hidden">
-        <div className="absolute top-1/2 left-1/4 w-[800px] h-[800px] bg-[#002FA7]/15 rounded-full blur-[120px] -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
-        <div className="absolute bottom-0 right-0 w-[600px] h-[600px] bg-blue-400/20 rounded-full blur-[100px] translate-x-1/3 translate-y-1/3 pointer-events-none" />
-        <div className="max-w-7xl mx-auto w-full z-10 relative">
-          <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter mb-20 text-center reveal-on-scroll text-zinc-900">
-            The Product Suite.
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="glass-card p-10 rounded-3xl reveal-on-scroll hover:shadow-2xl transition-shadow duration-300">
-              <div className="text-xs font-mono text-[#002FA7] mb-4 tracking-widest uppercase">Diagnostic Tool</div>
-              <h3 className="text-3xl font-semibold tracking-tight mb-4 text-zinc-900">True Cost Revealer</h3>
-              <p className="text-zinc-500 mb-8">
-                Exposing hidden TDU charges and &quot;pass-through&quot; leaks. We simulate your bill against 100+ supplier tariffs.
-              </p>
-              <div className="w-full mb-6 overflow-hidden rounded-xl border border-white/50">
-                <Image src="/images/graph-scattered.jpg" alt="True Cost Revealer Visualization" width={400} height={225} className="w-full h-auto" />
-              </div>
-              <div className="pt-5 border-t border-zinc-200/60">
-                <Link href="/bill-debugger" className="inline-flex items-center gap-2 text-[#002FA7] font-mono text-[10px] uppercase tracking-widest hover:gap-3 transition-all duration-200">
-                  Run Analysis <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-            <div className="glass-card p-10 rounded-3xl reveal-on-scroll delay-100 hover:shadow-2xl transition-shadow duration-300">
-              <div className="text-xs font-mono text-[#002FA7] mb-4 tracking-widest uppercase">Strategic Core</div>
-              <h3 className="text-3xl font-semibold tracking-tight mb-4 text-zinc-900">Future-Proof Engine</h3>
-              <p className="text-zinc-500 mb-8">
-                The 2026 Market Navigator. We forecast capacity markets and hedge against regulatory shifts before they happen.
-              </p>
-              <div className="w-full mb-6 overflow-hidden rounded-xl border border-white/50">
-                <Image src="/images/line-graph.jpg" alt="Future-Proof Engine Visualization" width={400} height={225} className="w-full h-auto" />
-              </div>
-              <div className="pt-5 border-t border-zinc-200/60">
-                <Link href="/market-outlook" className="inline-flex items-center gap-2 text-[#002FA7] font-mono text-[10px] uppercase tracking-widest hover:gap-3 transition-all duration-200">
-                  View Market Outlook <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
-            <div className="glass-card p-10 rounded-3xl reveal-on-scroll delay-200 hover:shadow-2xl transition-shadow duration-300">
-              <div className="text-xs font-mono text-[#002FA7] mb-4 tracking-widest uppercase">Management OS</div>
-              <h3 className="text-3xl font-semibold tracking-tight mb-4 text-zinc-900">Energy Minimalism</h3>
-              <p className="text-zinc-500 mb-8">
-                Multi-site management unified into a single stream of truth. One dashboard. Zero noise.
-              </p>
-              <div className="w-full mb-6 overflow-hidden rounded-xl border border-white/50">
-                <Image src="/images/centralization.jpg" alt="Energy Minimalism Visualization" width={400} height={225} className="w-full h-auto" />
-              </div>
-              <div className="pt-5 border-t border-zinc-200/60">
-                <Link href="/book" className="inline-flex items-center gap-2 text-[#002FA7] font-mono text-[10px] uppercase tracking-widest hover:gap-3 transition-all duration-200">
-                  Book a Briefing <ArrowRight className="w-3 h-3" />
-                </Link>
-              </div>
-            </div>
+      {/* PROOF */}
+      <section className="relative isolate overflow-hidden bg-[#FCFCFD] px-6 py-24 border-t border-zinc-100">
+        <div aria-hidden className="absolute inset-0 bg-white/90 pointer-events-none" />
+        <div className="max-w-7xl mx-auto relative z-10">
+          <div className="max-w-2xl mb-14 reveal-on-scroll">
+            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">PROOF</p>
+            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">What the first report proves.</h2>
+            <p className="text-lg text-zinc-600 leading-relaxed mt-5">
+              Not another dashboard. A one-page readout the people who own the bill can scan in seconds.
+            </p>
           </div>
-        </div>
-      </section>
 
-      {/* SECTION 5: THE MARKET (The Stakes) */}
-      <section className="py-32 bg-[#F5F5F7] border-t border-black/5 relative">
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 text-center">
-
-            {/* Stat 1: TX commercial spend */}
-            <div className="metric-signal-card p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll flex flex-col items-center justify-center">
-              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center font-mono tabular-nums">
-                $<span className="counter metric-counter" data-target="25" data-suffix="B+">0</span>
-              </div>
-              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Texas commercial energy spend</div>
-              <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">Annually · Source: EIA</div>
-            </div>
-
-            {/* Stat 2: Live ERCOT price */}
-            <div ref={livePriceRef} className="metric-signal-card metric-live-card p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-100 flex flex-col items-center justify-center">
-              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center font-mono tabular-nums">
-                ${livePrice == null ? (
-                  <span className="animate-pulse text-zinc-300">--</span>
-                ) : (
-                  <span className="metric-live-value">{displayPrice.toFixed(2)}</span>
-                )}
-              </div>
-              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">ERCOT LZ_South spot price</div>
-              <div className="flex items-center justify-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest">Live signal · /MWh</div>
-              </div>
-            </div>
-
-            {/* Stat 3: Demand charge share */}
-            <div className="metric-signal-card p-8 rounded-3xl hover:bg-white/50 transition-colors duration-500 reveal-on-scroll delay-200 flex flex-col items-center justify-center">
-              <div className="text-6xl md:text-8xl font-bold tracking-tighter text-[#002FA7] mb-4 drop-shadow-sm w-full text-center font-mono tabular-nums">
-                <span className="counter metric-counter" data-target="40" data-suffix="%">0</span>
-              </div>
-              <div className="text-sm font-bold text-zinc-900 uppercase tracking-widest mb-2 text-center">Of your bill that isn't usage</div>
-              <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest text-center">Demand charges · buried in delivery</div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* TRUST STRIP */}
-      <section className="py-12 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #e8eef8 0%, #dde6f5 40%, #e4eaf6 70%, #edf1fa 100%)' }}>
-        {/* Frosted glass inner card */}
-        <div className="max-w-5xl mx-auto px-6 relative z-10">
-          <div className="bg-white/40 backdrop-blur-sm border border-[#002FA7]/10 rounded-2xl px-8 py-6 shadow-sm shadow-[#002FA7]/5">
-            <div className="flex flex-col sm:flex-nowrap sm:flex-row items-start sm:items-center justify-center gap-y-5 sm:gap-y-0 sm:gap-x-10">
-              {[
-                { icon: Lock, label: 'AES-256 Encrypted', sub: 'Data in transit & at rest' },
-                { icon: ShieldCheck, label: 'SOC 2 Infrastructure', sub: 'Enterprise-grade security' },
-                { icon: Zap, label: 'Texas ERCOT Specialist', sub: '100+ tariff structures mapped' },
-                { icon: Database, label: 'TLS Secured', sub: 'End-to-end encryption' },
-              ].map(({ icon: Icon, label, sub }) => (
-                <div key={label} className="flex items-center gap-3 sm:shrink-0">
-                  <div className="w-9 h-9 rounded-xl bg-[#002FA7] flex items-center justify-center shrink-0">
-                    <Icon className="w-4 h-4 text-white" />
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
+            <div className="reveal-on-scroll">
+              <div className="overflow-hidden rounded-[2rem] border border-zinc-200 bg-white shadow-[0_30px_70px_-40px_rgba(0,0,0,0.35)]">
+                <div className="border-b border-zinc-100 bg-[linear-gradient(180deg,#ffffff,#fafafa)] px-6 py-5 flex items-start justify-between gap-4">
                   <div>
-                    <div className="font-mono text-[10px] text-zinc-700 uppercase tracking-widest font-semibold leading-tight">{label}</div>
-                    <div className="font-mono text-[9px] text-zinc-400 uppercase tracking-widest leading-tight mt-0.5">{sub}</div>
+                    <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.32em] mb-1">Sample report</p>
+                    <h3 className="text-2xl font-semibold tracking-tight text-zinc-900">Electricity Bill Readout</h3>
+                    <p className="text-sm text-zinc-500 mt-1">For controllers, CFOs, facilities managers, and COOs</p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {REPORT_META.map((item) => (
+                        <span
+                          key={item}
+                          className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-white border border-zinc-100 text-zinc-500 whitespace-nowrap"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="shrink-0 rounded-2xl border border-[#002FA7]/20 bg-[#002FA7]/10 px-4 py-3 text-right shadow-sm">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#002FA7]">Status</p>
+                    <p className="text-lg font-semibold text-[#002FA7] mt-1">2 risks flagged</p>
+                    <p className="text-xs text-[#002FA7]/70 mt-1">delivery and contract</p>
                   </div>
                 </div>
-              ))}
+
+                <div className="grid gap-4 bg-[linear-gradient(180deg,#ffffff,#fbfbfd)] p-5 md:p-6 xl:grid-cols-[0.95fr_1.05fr]">
+                  <div className="h-full">
+                    <div className="h-full rounded-[1.5rem] border border-[#002FA7]/12 bg-[#002FA7]/5 p-5 md:p-6 shadow-[0_12px_28px_-24px_rgba(0,47,167,0.35)] flex flex-col">
+                      <div className="flex flex-col gap-6">
+                        <div className="max-w-sm">
+                          <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">Annual spend</p>
+                          <p className="mt-3 text-4xl md:text-[3.5rem] font-semibold tracking-tight text-zinc-900 font-mono">$84,620</p>
+                          <p className="mt-2 text-sm text-zinc-600">The yearly bill tied to the current structure. Built for a fast executive read.</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/70 bg-white/85 p-4">
+                          <p className="mt-2 text-base md:text-lg font-semibold text-zinc-900 leading-tight">Cycle phase and term alert</p>
+                          <p className="mt-1 text-xs text-zinc-500">2 data points need review</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        {REPORT_SUMMARY.slice(1).map((item) => (
+                          <div
+                            key={item.label}
+                            className={`rounded-xl border border-white/70 bg-white/80 px-4 py-3.5 flex flex-col justify-start ${
+                              item.label === 'Contract end' ? 'sm:col-span-2' : ''
+                            }`}
+                          >
+                            <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-zinc-400 leading-none">
+                              {item.label}
+                            </p>
+                            <p className="mt-2.5 text-[1.55rem] font-semibold leading-none tracking-tight text-zinc-900 whitespace-nowrap font-mono">
+                              {item.value}
+                            </p>
+                            <p className="mt-2 font-mono text-[8px] uppercase tracking-[0.18em] text-[#002FA7] leading-none">
+                              {item.note}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-4 rounded-2xl border border-white/70 bg-white/80 p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-zinc-400">Renewal / Delivery / Supply</p>
+                          </div>
+                        </div>
+                        <div className="mt-3 h-3 overflow-hidden rounded-full bg-zinc-100">
+                          <div className="flex h-full w-full">
+                            <div className="h-full w-[38%] bg-[#002FA7]" />
+                            <div className="h-full w-[57%] bg-[#002FA7]/55" />
+                            <div className="h-full w-[5%] bg-[#002FA7]/20" />
+                          </div>
+                        </div>
+                        <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
+                          <div><span className="block text-sm font-semibold tracking-tight text-zinc-900 font-mono">38%</span>DELIVERY</div>
+                          <div><span className="block text-sm font-semibold tracking-tight text-zinc-900 font-mono">57%</span>SUPPLY</div>
+                          <div><span className="block text-sm font-semibold tracking-tight text-zinc-900 font-mono">5%</span>TAX/FEES</div>
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                  <div className="h-full">
+                    <div className="h-full rounded-[1.5rem] border border-[#002FA7]/15 bg-[#002FA7]/5 p-5 md:p-6 shadow-[0_12px_28px_-24px_rgba(0,47,167,0.25)] flex flex-col">
+                      <div className="flex items-start justify-between gap-4">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">Recommended next move</p>
+                        <span className="shrink-0 rounded-full border border-[#002FA7]/10 bg-white/80 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">
+                          Priority
+                        </span>
+                      </div>
+                      <p className="mt-3 text-[1.7rem] font-semibold tracking-tight text-zinc-900 leading-[1.05]">
+                        Mitigate delivery charges
+                      </p>
+                      <p className="mt-1 text-[15px] font-normal leading-6 tracking-normal text-zinc-600">
+                        Check them before the renewal window closes.
+                      </p>
+                      <div className="mt-5 rounded-2xl border border-white/70 bg-white/75 relative p-4 shadow-sm overflow-hidden">
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#002FA7]" />
+                        <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#002FA7] mb-1.5 pl-1.5">The Objective</p>
+                        <p className="text-sm font-medium leading-relaxed text-zinc-900 pl-1.5">
+                          Use the meeting to confirm the number and decide the next move.
+                        </p>
+                      </div>
+                      <div className="mt-5 space-y-2 flex-1">
+                        {REPORT_FINDINGS.map((item) => (
+                          <div key={item.label} className="rounded-xl border border-white/70 bg-white/75 p-3">
+                            <div className="flex items-center justify-between gap-4">
+                              <p className="text-sm font-semibold text-zinc-900 whitespace-nowrap">{item.label}</p>
+                              <p className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-[#002FA7] whitespace-nowrap text-right">{item.value}</p>
+                            </div>
+                            <p className="mt-1 text-xs leading-relaxed text-zinc-500 pr-4">{item.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-zinc-100 bg-[#F8F8FA] px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-semibold text-zinc-900">Primary Takeaway</p>
+                  <Link href="/bill-debugger" className="inline-flex items-center gap-2 font-bold font-mono text-[10px] text-[#002FA7] uppercase tracking-widest hover:gap-3 transition-all duration-200">
+                    Review my bill <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            <div className="reveal-on-scroll delay-100 pt-2">
+              <div className="space-y-5">
+                <div className="border-l-2 border-[#002FA7]/20 pl-4">
+                  <p className="font-semibold text-zinc-900 text-base">Delivery charges separated</p>
+                  <p className="text-zinc-500 text-sm leading-relaxed mt-1">
+                    The bill stops reading like a wall of line items and starts reading like a cost story.
+                  </p>
+                </div>
+                <div className="border-l-2 border-[#002FA7]/20 pl-4">
+                  <p className="font-semibold text-zinc-900 text-base">Supplier pricing mapped</p>
+                  <p className="text-zinc-500 text-sm leading-relaxed mt-1">
+                    We line up the tariff structure against what you are actually being charged.
+                  </p>
+                </div>
+                <div className="border-l-2 border-[#002FA7]/20 pl-4">
+                  <p className="font-semibold text-zinc-900 text-base">Contract risk flagged</p>
+                  <p className="text-zinc-500 text-sm leading-relaxed mt-1">
+                    You see the issue before the money goes out.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-10 space-y-8">
+                <div>
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">Built for bill owners</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {BILL_OWNER_ROLES.map((role) => (
+                      <span key={role} className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 whitespace-nowrap">
+                        {role}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-4 text-sm leading-relaxed text-zinc-600">
+                    If you approve the spend, explain the number, or sign the renewal, this report gives you the next move in plain English.
+                  </p>
+                </div>
+
+                <div className="h-px w-full bg-zinc-100" />
+
+                <div>
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">What it removes</p>
+                  <div className="mt-4 space-y-3">
+                    {['Line-item hunting', 'Supplier back-and-forth', 'A meeting to explain the bill'].map((item) => (
+                      <div key={item} className="flex items-center gap-3 text-sm text-zinc-700">
+                        <span className="font-mono text-zinc-400">—</span>
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="h-px w-full bg-zinc-100" />
+
+                <div>
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">What the meeting does</p>
+                  <div className="mt-4 space-y-4">
+                    {REPORT_MEETING_ITEMS.map((item) => (
+                      <div key={item.label}>
+                        <p className="text-sm font-semibold text-zinc-900">{item.label}</p>
+                        <p className="mt-1 text-sm leading-relaxed text-zinc-500">{item.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="h-px w-full bg-zinc-100" />
+
+                <div>
+                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">The Forensic Standard</p>
+                  <p className="mt-4 text-sm leading-relaxed text-zinc-600 italic border-l border-zinc-200 pl-4">
+                    "Precision over presentation. We map 100+ retail tariff structures and real-time ERCOT telemetry to expose structural cost leakage. No opinions—just the math."
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section className="bg-white px-6 pt-16 pb-8 border-t border-zinc-100">
-        <div className="max-w-5xl mx-auto">
-          <div className="mb-8 reveal-on-scroll">
-            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">FAQ</p>
-            <h2 className="text-5xl md:text-6xl font-semibold tracking-tighter text-zinc-900">Common questions.</h2>
-          </div>
-          <div className="divide-y divide-zinc-100">
-
-            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
-              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
-                What is a demand charge — and why do most businesses miss it?
-              </p>
-              <p className="text-zinc-500 text-sm leading-relaxed">
-                Demand charges are billed on your single highest 15-minute peak in the month — not your total usage. A 3-second spike can inflate your bill by 30–40%. Most businesses never see it because it's buried in delivery line items. We surface it immediately.
-              </p>
-            </div>
-
-            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
-              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
-                What if I'm already locked into a contract?
-              </p>
-              <p className="text-zinc-500 text-sm leading-relaxed">
-                Most contracts have renegotiation windows or switch clauses the supplier won't volunteer. We identify them. Even mid-contract, we find recoverable margin — on the delivery side, the demand structure, or the rate class.
-              </p>
-            </div>
-
-            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
-              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
-                How long does the analysis take?
-              </p>
-              <p className="text-zinc-500 text-sm leading-relaxed">
-                Upload your bill. Forensic report in under 60 seconds. No forms, no intake calls, no waiting. The signal is either there or it isn't — we tell you immediately.
-              </p>
-            </div>
-
-            <div className="py-6 grid grid-cols-1 md:grid-cols-[2fr_3fr] gap-4 reveal-on-scroll">
-              <p className="font-semibold text-zinc-900 text-lg tracking-tight leading-snug">
-                Do you cover all Texas suppliers?
-              </p>
-              <p className="text-zinc-500 text-sm leading-relaxed">
-                Yes. We've mapped 100+ ERCOT supplier tariff structures across all load zones. TXU, Reliant, Direct Energy, Constellation, and all major REPs operating in the South, Houston, North, and West zones.
-              </p>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* WHAT OPERATORS SAY */}
-      {/* TODO: Replace placeholder quotes with real client testimonials before launch */}
-      <section className="bg-[#F5F5F7] px-6 py-20 border-t border-zinc-100">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-12 reveal-on-scroll">
-            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">SIGNAL_FROM_THE_FIELD</p>
-            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">What operators say.</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-            <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll flex flex-col">
-              <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
-              <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
-                &ldquo;We had $47,000 sitting in demand charges we never knew about. Our supplier wasn&apos;t going to tell us. Nodal Point caught it in minutes, no phone tag, nothing.&rdquo;
-              </p>
-              <div className="border-t border-zinc-100 pt-5">
-                <div className="font-semibold text-zinc-900 text-sm tracking-tight">Operations Director</div>
-                <div className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">North Texas Manufacturing</div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll delay-100 flex flex-col">
-              <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
-              <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
-                &ldquo;I didn&apos;t fully understand 4CP exposure before this. Turns out we were wide open mid-contract and had zero visibility into it. Now we actually know what we&apos;re looking at.&rdquo;
-              </p>
-              <div className="border-t border-zinc-100 pt-5">
-                <div className="font-semibold text-zinc-900 text-sm tracking-tight">VP of Facilities</div>
-                <div className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Dallas Commercial Real Estate</div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-8 border border-zinc-200/60 reveal-on-scroll delay-200 flex flex-col">
-              <Quote className="w-5 h-5 text-[#002FA7] mb-5 shrink-0" />
-              <p className="text-zinc-700 leading-relaxed flex-1 mb-6">
-                &ldquo;We&apos;ve used a few energy advisors over the years. Nobody came close to this. You upload the bill and within a minute you actually understand what you&apos;re paying for. That was genuinely new for us.&rdquo;
-              </p>
-              <div className="border-t border-zinc-100 pt-5">
-                <div className="font-semibold text-zinc-900 text-sm tracking-tight">CFO</div>
-                <div className="font-mono text-[10px] text-zinc-400 uppercase tracking-widest mt-0.5">Multi-Site Logistics Group, ERCOT</div>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </section>
-
-      {/* SECTION 6: FINAL CTA (The Impulse) */}
-      <section className="py-40 bg-white flex flex-col items-center justify-center text-center relative overflow-hidden">
+      {/* FINAL CTA */}
+      <section className="py-32 bg-[#F5F5F7] border-t border-zinc-100 relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 max-w-2xl px-6 reveal-on-scroll">
+        <div className="relative z-10 max-w-2xl px-6 mx-auto text-center reveal-on-scroll">
+          <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">FINAL STEP</p>
           <h2 className="text-5xl md:text-7xl font-bold tracking-tighter text-black mb-8 leading-[1.1]">
-            Stop paying for the noise.
+            Ready to see the bill clearly?
           </h2>
           <p className="text-xl text-zinc-700 font-medium mb-10 max-w-lg mx-auto">
-            The market is complex. Your strategy should be simple. Upload your bill. See the signal.
+            Upload your bill. We&apos;ll show the signal, the risk, and the next move.
           </p>
-          <a
-            href="/bill-debugger"
-            className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl"
-          >
-            <Activity className="w-5 h-5" />
-            <span>Run Forensic Analysis</span>
-          </a>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <a
+              href="/bill-debugger"
+              className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl"
+            >
+              <Activity className="w-5 h-5" />
+              <span>Review my bill</span>
+            </a>
+            <Link
+              href="/book"
+              className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-400 bg-white/70 text-zinc-700 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 whitespace-nowrap shadow-sm"
+            >
+              <span>Book a Briefing</span>
+            </Link>
+          </div>
         </div>
       </section>
+
 
       <LandingFooter />
     </>

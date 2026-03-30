@@ -50,7 +50,7 @@ export function LandingHeader() {
               className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40"
             >
               <Activity className="w-4 h-4" />
-              <span>Run Analysis</span>
+              <span>Review My Bill</span>
             </a>
             <button
               type="button"
@@ -92,7 +92,7 @@ export function LandingHeader() {
               className="flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-lg font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex"
             >
               <Activity className="w-5 h-5" />
-              <span>Run Analysis</span>
+              <span>Review My Bill</span>
             </a>
           </div>
         </div>
