@@ -28,7 +28,7 @@ export function CookieBanner() {
     <div className="fixed bottom-0 left-0 right-0 z-[200] p-4 md:p-6 pointer-events-none">
       <div className="max-w-5xl mx-auto pointer-events-auto bg-white border border-zinc-200 rounded-2xl shadow-2xl px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-8">
         <div className="flex-1 min-w-0">
-          <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.25em] mb-1">SIGNAL_POLICY</p>
+          <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.25em] mb-1">COOKIE NOTICE</p>
           <p className="text-sm text-zinc-600 leading-relaxed">
             We use cookies to analyze site traffic and improve our platform. No data is shared for advertising. Read our{' '}
             <Link href="/privacy" className="text-[#002FA7] underline underline-offset-2 hover:text-blue-800 transition-colors">

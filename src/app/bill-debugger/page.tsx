@@ -19,7 +19,9 @@ type ExtractedData = {
     provider_name: string
     billing_period: string
     total_usage_kwh: string
+    actual_demand_kw?: string
     billed_demand_kw: string
+    power_factor_pct?: string
     delivery_charges?: string | number
     energy_charges?: string | number
     taxes_and_fees?: string | number
@@ -32,8 +34,9 @@ type ExtractedData = {
     peak_demand?: string | number // Use as source of truth for calculations
     energy_rate_per_kwh?: string | number
     delivery_rate_per_kwh?: string | number
+    demand_floor_kw?: string | number
 
-    // Forensic Analysis
+    // Analysis summary
     analysis?: {
         zone: string;
         territory: string;
@@ -41,6 +44,25 @@ type ExtractedData = {
         facilitySize: 'large' | 'small';
         allInRateCents: string;
         demandPercentOfBill: string;
+        deliverySharePct?: string;
+        supplySharePct?: string;
+        taxesSharePct?: string;
+        actualDemandKW?: string;
+        billedDemandKW?: string;
+        powerFactorPct?: string;
+        demandGapKW?: string;
+        billSplit?: {
+            supply: number;
+            delivery: number;
+            taxes: number;
+            total: number;
+        }
+        demandProfile?: {
+            actualDemandKW: number;
+            billedDemandKW: number;
+            powerFactorPct: number;
+            demandGapKW: number;
+        }
         feedback: any;
         marketContext: any;
     }
@@ -50,8 +72,8 @@ type ViewState = 'trust' | 'upload' | 'analyzing' | 'preview' | 'email' | 'repor
 
 export default function BillDebuggerPage() {
     const router = useRouter()
-    const [view, setView] = useState<ViewState>('trust')
-    const [footerText, setFooterText] = useState('Waiting for context...')
+    const [view, setView] = useState<ViewState>('upload')
+    const [footerText, setFooterText] = useState('Waiting for upload')
     const [isProcessing, setIsProcessing] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
 
@@ -65,7 +87,7 @@ export default function BillDebuggerPage() {
         if (isProcessing) return
 
         setIsProcessing(true)
-        setFooterText('PROCESSING DATA STREAM...')
+        setFooterText('Processing bill...')
         setErrorMsg('')
 
         // 1. Transition to analyzing immediately
@@ -82,7 +104,7 @@ export default function BillDebuggerPage() {
                 reader.readAsDataURL(file)
             })
 
-            // Persist file data for later usage (Data Locker / Email Attachment)
+            // Persist file data for later usage
             setEncodedFile({
                 base64: base64Data,
                 name: file.name,
@@ -111,7 +133,7 @@ export default function BillDebuggerPage() {
                 throw new Error(result.error || result.message || 'Failed to analyze bill')
             }
 
-            // 4. Store Data - Robust Normalize
+            // 4. Store data - normalize the response
             const data = result.data || result;
 
             setExtractedData({
@@ -125,21 +147,24 @@ export default function BillDebuggerPage() {
 
                 total_usage_kwh: (data.usagekWh || data.totalUsage || data.total_usage_kwh || data.baseUsage)?.toLocaleString() || '0',
 
-                // TXU specific: Actual kW/kVA / Billed kW/kVA
-                billed_demand_kw: (data.peakDemand || data.billedDemand || data.actualDemand || 0).toLocaleString(),
-                peak_demand: data.peakDemand || data.billedDemand || data.actualDemand || 0,
+                // TXU / Oncor specific: actual demand, billed demand, and power factor
+                actual_demand_kw: (data.actualDemand || data.actualDemandKw || data.actual_demand || data.actual_demand_kw || data.meteredDemand || data.metered_demand || data.ncpDemand || data.peakDemand || 0).toLocaleString(),
+                billed_demand_kw: (data.billedDemand || data.billedDemandKw || data.billed_demand || data.billed_demand_kw || data.billingDemand || data.peakDemand || data.actualDemand || 0).toLocaleString(),
+                peak_demand: data.actualDemand || data.actualDemandKw || data.actual_demand || data.actual_demand_kw || data.meteredDemand || data.metered_demand || data.ncpDemand || data.peakDemand || data.billedDemand || 0,
+                power_factor_pct: data.powerFactor || data.powerFactorPct || data.power_factor || data.power_factor_pct || data.powerFactorPercent,
 
-                delivery_charges: data.deliveryChargeTotal || data.totalDistributionCharges || data.deliveryCharges || data.distributionCharges,
-                energy_charges: data.energyChargeTotal || data.totalCommercialCharges || data.energyCharges || data.supplyCharges,
-                taxes_and_fees: data.taxesAndFees || data.salesTax,
-                total_amount_due: data.totalAmountDue || data.currentCharges || data.totalAmount,
+                delivery_charges: data.deliveryChargeTotal || data.delivery_charge_total || data.totalDistributionCharges || data.total_distribution_charges || data.deliveryCharges || data.delivery_charges || data.distributionCharges || data.distribution_charges,
+                energy_charges: data.energyChargeTotal || data.energy_charge_total || data.totalCommercialCharges || data.total_commercial_charges || data.energyCharges || data.energy_charges || data.supplyCharges || data.supply_charges,
+                taxes_and_fees: data.taxesAndFees || data.taxes_and_fees || data.salesTax || data.sales_tax,
+                total_amount_due: data.totalAmountDue || data.total_amount_due || data.currentCharges || data.current_charges || data.totalAmount || data.total_amount,
 
-                contract_end_date: data.contractEndDate,
-                retail_plan_name: data.retailPlanName || data.product,
-                energy_rate_per_kwh: data.energyRatePerKWh,
-                delivery_rate_per_kwh: data.deliveryRatePerKWh,
+                contract_end_date: data.contractEndDate || data.contract_end_date,
+                retail_plan_name: data.retailPlanName || data.retail_plan_name || data.product,
+                energy_rate_per_kwh: data.energyRatePerKWh || data.energy_rate_per_kwh,
+                delivery_rate_per_kwh: data.deliveryRatePerKWh || data.delivery_rate_per_kwh,
+                demand_floor_kw: data.demandFloorKW || data.demandFloorKw || data.demand_floor_kw || data.ratchetFloorKW || data.ratchetFloorKw || data.ratchetDemand,
 
-                // Attach Forensic Analysis
+                // Attach analysis summary
                 analysis: data.analysis
             })
         } catch (err: unknown) {
@@ -155,7 +180,7 @@ export default function BillDebuggerPage() {
         setUserEmail(email)
         setView('report')
 
-        // Fire-and-forget notification protocol
+        // Fire-and-forget notification
         try {
             fetch('/api/email/analysis-notification', {
                 method: 'POST',
@@ -167,25 +192,25 @@ export default function BillDebuggerPage() {
                     fileName: encodedFile?.name
                 })
             }).then(res => {
-                if (!res.ok) console.warn('[Protocol] Notification uplink failed:', res.status);
+                if (!res.ok) console.warn('[Notification] Request failed:', res.status);
             }).catch(err => {
-                console.error('[Protocol] Network error in notification uplink:', err);
+                console.error('[Notification] Network error:', err);
             });
         } catch (e) {
-            console.error('[Protocol] Error initializing notification sequence:', e);
+            console.error('[Notification] Error sending notification:', e);
         }
     }
 
     // Dynamic Footer Logic
     useEffect(() => {
         switch (view) {
-            case 'trust': setFooterText('System Ready'); break;
-            case 'upload': setFooterText('Awaiting Document Stream'); break;
-            case 'analyzing': setFooterText('Analyzing Volatility Markers...'); break;
-            case 'preview': setFooterText('Signal Detected'); break;
-            case 'email': setFooterText('Verification Required'); break;
-            case 'report': setFooterText('Forensic Analysis Complete'); break;
-            case 'error': setFooterText('System Failure'); break;
+            case 'trust': setFooterText('Review ready'); break;
+            case 'upload': setFooterText('Waiting for upload'); break;
+            case 'analyzing': setFooterText('Review in progress'); break;
+            case 'preview': setFooterText('Delivery and demand reviewed'); break;
+            case 'email': setFooterText('Verification required'); break;
+            case 'report': setFooterText('Report ready'); break;
+            case 'error': setFooterText('Review failed'); break;
         }
     }, [view])
 
@@ -228,7 +253,13 @@ export default function BillDebuggerPage() {
                         )}
 
                         {view === 'upload' && (
-                            <UploadZone key="upload" onUpload={handleUpload} isAnalyzing={isProcessing} />
+                            <div key="upload" className="w-full flex flex-col items-center">
+                                <UploadZone
+                                    onUpload={handleUpload}
+                                    isAnalyzing={isProcessing}
+                                    onShowTrust={() => setView('trust')}
+                                />
+                            </div>
                         )}
 
                         {view === 'analyzing' && (
@@ -279,9 +310,9 @@ export default function BillDebuggerPage() {
                                     }}
                                     className="px-8 py-3 bg-zinc-900 text-white rounded-xl hover:bg-zinc-800 transition-colors"
                                 >
-                                    Try Again
-                                </button>
-                            </motion.div>
+                                    Try again
+                                    </button>
+                                </motion.div>
                         )}
 
                     </AnimatePresence>

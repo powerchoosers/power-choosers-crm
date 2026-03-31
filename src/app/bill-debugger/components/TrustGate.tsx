@@ -18,12 +18,12 @@ export function TrustGate({ onNext }: TrustGateProps) {
                 className="mb-16"
             >
                 <h1 className="text-4xl md:text-6xl font-thin tracking-tight mb-6 text-zinc-900">
-                    Your Energy Bill Has <span className="font-normal text-[#002FA7]">Hidden Costs</span>.<br />
-                    Let's Find Them.
+                    Before you upload, here's <span className="font-normal text-[#002FA7]">how we handle your bill</span>.<br />
+                    Keep it simple.
                 </h1>
                 <p className="text-xl text-zinc-600 font-light max-w-2xl mx-auto leading-relaxed">
-                    Your utility provider buries extra charges in the fine print.
-                    We pull out exactly what you're paying for—and why.
+                    We review the file you send, separate the charges, and show you the parts that matter.
+                    No supplier calls. No changes to your account during the review.
                 </p>
             </motion.div>
 
@@ -38,9 +38,9 @@ export function TrustGate({ onNext }: TrustGateProps) {
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
                         <Lock className="w-6 h-6" />
                     </div>
-                    <h3 className="font-semibold text-zinc-900 tracking-tight">Forensic Isolation</h3>
+                    <h3 className="font-semibold text-zinc-900 tracking-tight">Read-only review</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        Read-only analysis protocol. Nodal Point operates in a zero-touch environment. We do not interface with suppliers or modify account structures during the diagnostic phase.
+                        We only analyze the bill you upload. We do not contact your supplier or change your account.
                     </p>
                 </div>
 
@@ -48,9 +48,9 @@ export function TrustGate({ onNext }: TrustGateProps) {
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
                         <FileX className="w-6 h-6" />
                     </div>
-                    <h3 className="font-semibold text-zinc-900 tracking-tight">Ephemeral Logic</h3>
+                    <h3 className="font-semibold text-zinc-900 tracking-tight">Private handling</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        Inactive session data is purged after 72 hours. If a Forensic Audit is initiated, your load profile is encrypted and moved to your private Evidence Locker for architectural review.
+                        Your file is used for the review and follow-up, then handled through the same secure process as the rest of the report.
                     </p>
                 </div>
 
@@ -58,9 +58,9 @@ export function TrustGate({ onNext }: TrustGateProps) {
                     <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center text-[#002FA7]">
                         <ShieldCheck className="w-6 h-6" />
                     </div>
-                    <h3 className="font-semibold text-zinc-900 tracking-tight">Cryptographic Vault</h3>
+                    <h3 className="font-semibold text-zinc-900 tracking-tight">Secure storage</h3>
                     <p className="text-sm text-zinc-500 leading-relaxed font-medium">
-                        Advanced encryption standards for data at rest and in transit. Your load profile remains isolated within our hardened SOC-2 infrastructure.
+                        The file is protected in transit and at rest, so the review stays private.
                     </p>
                 </div>
             </motion.div>
@@ -76,15 +76,15 @@ export function TrustGate({ onNext }: TrustGateProps) {
                     onClick={onNext}
                     className="group relative px-8 py-4 bg-[#002FA7] text-white rounded-full font-medium text-lg hover:bg-[#002FA7]/90 transition-all duration-300 shadow-lg hover:shadow-xl hover:shadow-[#002FA7]/20 flex items-center gap-2"
                 >
-                    See My Analysis
+                    Continue to Upload
                     <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                 </button>
 
                 <p className="text-sm text-zinc-400">
-                    Takes less than 60 seconds • No commitment required
+                    Usually under 60 seconds • No commitment required
                 </p>
                 <p className="text-xs text-zinc-500 max-w-sm text-center leading-relaxed">
-                    Upload your bill → AI extracts demand charges, delivery costs, and ratchet exposure → You receive a forensic breakdown. No human required.
+                    Upload your bill. We pull out demand charges, delivery costs, and contract dates, then show you the main issue.
                 </p>
             </motion.div>
 

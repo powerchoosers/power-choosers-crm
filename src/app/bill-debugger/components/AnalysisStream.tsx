@@ -6,12 +6,12 @@ interface AnalysisStreamProps {
 }
 
 const MESSAGES = [
-    "Initiating handshake...",
-    "Parsing Load Profile...",
-    "Checking against ERCOT Scarcity Pricing Adders...",
-    "Detecting Volatility Markers...",
-    "Calculating shadow price variance...",
-    "Analysis Complete."
+    "Starting review...",
+    "Reading bill details...",
+    "Checking utility charges...",
+    "Looking for demand spikes...",
+    "Summarizing the findings...",
+    "Review complete."
 ]
 
 export function AnalysisStream({ onComplete }: AnalysisStreamProps) {
@@ -62,7 +62,7 @@ export function AnalysisStream({ onComplete }: AnalysisStreamProps) {
             <div className="font-mono text-left w-full">
                 <div className="flex items-center gap-3 mb-8">
                     <div className="w-3 h-3 bg-[#002FA7] rounded-full animate-pulse"></div>
-                    <span className="text-sm tracking-widest uppercase text-zinc-400">System Active</span>
+                    <span className="text-sm tracking-widest uppercase text-zinc-400">Review active</span>
                 </div>
 
                 <div className="space-y-4 text-lg md:text-xl border-l-2 border-zinc-200 pl-6 h-64 overflow-hidden flex flex-col justify-end">

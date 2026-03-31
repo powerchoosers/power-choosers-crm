@@ -1,279 +1,392 @@
 import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Truck, Activity, ArrowRight, Info, Map as MapIcon, Globe, Calendar, AlertCircle } from 'lucide-react'
+import { Zap, Truck, Activity, Info, Calendar, AlertCircle, PieChart, Warehouse } from 'lucide-react'
 import { generateFeedback } from '../utils/feedbackLogic'
 import { FeedbackBadge } from './FeedbackBadge'
 import { NextStepsCard } from './NextStepsCard'
-import { ForensicMap } from './ForensicMap'
 
 interface ExtractedData {
-    customer_name: string
+    customer_name?: string
     provider_name: string
     billing_period: string
     total_usage_kwh: string
+    actual_demand_kw?: string
     billed_demand_kw: string
+    power_factor_pct?: string | number
+    demand_floor_kw?: string | number
     delivery_charges?: string | number
     energy_charges?: string | number
     taxes_and_fees?: string | number
     total_amount_due?: string | number
     service_address?: string
 
-    // New Fields
     contract_end_date?: string
     retail_plan_name?: string
     peak_demand?: string | number
     energy_rate_per_kwh?: string | number
     delivery_rate_per_kwh?: string | number
 
-    // Forensic Analysis
     analysis?: {
-        zone: string;
-        territory: string;
-        isFacilityLarge: boolean;
-        facilitySize: 'large' | 'small';
-        allInRateCents: string;
-        demandPercentOfBill: string;
-        feedback: any;
-        marketContext: any;
+        zone: string
+        territory: string
+        isFacilityLarge: boolean
+        facilitySize: 'large' | 'small'
+        allInRateCents: string
+        demandPercentOfBill: string
+        deliverySharePct?: string
+        supplySharePct?: string
+        taxesSharePct?: string
+        actualDemandKW?: string
+        billedDemandKW?: string
+        powerFactorPct?: string
+        demandGapKW?: string
+        billSplit?: {
+            supply: number
+            delivery: number
+            taxes: number
+            total: number
+        }
+        demandProfile?: {
+            actualDemandKW: number
+            billedDemandKW: number
+            powerFactorPct: number
+            demandGapKW: number
+        }
+        feedback?: any
+        marketContext?: any
     }
 }
 
 interface FullReportProps {
-    data: ExtractedData;
-    email?: string;
+    data: ExtractedData
+    email?: string
+}
+
+function parseCurrency(value: string | number | undefined) {
+    if (value === undefined || value === null) return 0
+    const num = parseFloat(String(value).replace(/[$,]/g, ''))
+    return isNaN(num) ? 0 : num
+}
+
+function parseNumber(value: string | number | undefined) {
+    if (value === undefined || value === null) return 0
+    const num = parseFloat(String(value).replace(/[,%\s]/g, ''))
+    return isNaN(num) ? 0 : num
+}
+
+function parsePercent(value: string | number | undefined) {
+    const num = parseNumber(value)
+    if (!num) return 0
+    return num <= 1.5 ? num * 100 : num
+}
+
+function formatMoney(value: number) {
+    return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
 export function FullReport({ data, email }: FullReportProps) {
+    const usage = parseNumber(data.total_usage_kwh)
+    const actualDemand = Math.max(
+        parseNumber(data.actual_demand_kw),
+        parseNumber(data.analysis?.actualDemandKW),
+        parseNumber(data.peak_demand)
+    )
+    const billedDemand = Math.max(
+        parseNumber(data.billed_demand_kw),
+        parseNumber(data.analysis?.billedDemandKW),
+        parseNumber(data.demand_floor_kw),
+        actualDemand
+    )
+    const powerFactor = parsePercent(data.power_factor_pct ?? data.analysis?.powerFactorPct)
 
-    // Clean Numbers for Logic
-    const usage = parseFloat(String(data.total_usage_kwh).replace(/,/g, '')) || 0
-    // Use peak_demand if available (number or string), else billed_demand_kw string
-    const peakRaw = data.peak_demand !== undefined ? data.peak_demand : data.billed_demand_kw
-    const peak = parseFloat(String(peakRaw).replace(/,/g, '')) || 0
+    const totalBill = parseCurrency(data.total_amount_due)
+    const energyCharges = parseCurrency(data.energy_charges ?? data.analysis?.billSplit?.supply)
+    const deliveryCharges = parseCurrency(data.delivery_charges ?? data.analysis?.billSplit?.delivery)
+    const taxesCharges = parseCurrency(data.taxes_and_fees ?? data.analysis?.billSplit?.taxes)
+    const structureTotal = energyCharges + deliveryCharges + taxesCharges
 
-    const totalBillRaw = parseFloat(String(data.total_amount_due).replace(/[$,]/g, '')) || 0
-    const energyChargesRaw = parseFloat(String(data.energy_charges).replace(/[$,]/g, '')) || 0
-    const deliveryChargesRaw = parseFloat(String(data.delivery_charges).replace(/[$,]/g, '')) || 0
+    const supplyShare = structureTotal > 0 ? (energyCharges / structureTotal) * 100 : parsePercent(data.analysis?.supplySharePct)
+    const deliveryShare = structureTotal > 0 ? (deliveryCharges / structureTotal) * 100 : parsePercent(data.analysis?.deliverySharePct)
+    const taxesShare = structureTotal > 0 ? (taxesCharges / structureTotal) * 100 : parsePercent(data.analysis?.taxesSharePct)
 
-    // Robust formatting helper
-    const formatCurrency = (val: string | number | undefined, estimate: number) => {
-        if (!val) return estimate.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-        if (typeof val === 'number') return val.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-        const num = parseFloat(String(val).replace(/[$,]/g, ''))
-        if (isNaN(num)) return estimate.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-        return num.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-    }
+    const totalDemandGap = billedDemand > actualDemand ? billedDemand - actualDemand : 0
 
-    // Use Backend Feedback if available, fallback to frontend generation
     const feedback = useMemo(() => {
-        if (data.analysis?.feedback) return data.analysis.feedback;
+        if (data.analysis?.feedback) return data.analysis.feedback
 
         return generateFeedback({
-            allInRate: totalBillRaw > 0 && usage > 0 ? totalBillRaw / usage : 0,
-            energyComponent: energyChargesRaw > 0 && usage > 0 ? energyChargesRaw / usage : 0,
-            deliveryComponent: deliveryChargesRaw > 0 && usage > 0 ? deliveryChargesRaw / usage : 0,
-            peakDemandKW: peak,
+            allInRate: totalBill > 0 && usage > 0 ? totalBill / usage : 0,
+            energyComponent: energyCharges > 0 && usage > 0 ? energyCharges / usage : 0,
+            deliveryComponent: deliveryCharges > 0 && usage > 0 ? deliveryCharges / usage : 0,
+            peakDemandKW: actualDemand || billedDemand,
+            actualDemandKW: actualDemand || undefined,
+            billedDemandKW: billedDemand || undefined,
+            powerFactorPct: powerFactor || undefined,
+            deliverySharePct: deliveryShare || undefined,
+            supplySharePct: supplyShare || undefined,
             totalUsage: usage,
-            totalBill: totalBillRaw,
+            totalBill,
             billingPeriod: data.billing_period,
-            provider: data.provider_name
+            provider: data.provider_name,
+            productType: data.retail_plan_name,
+            contractEndDate: data.contract_end_date
         }, "Oncor")
-    }, [data.analysis, totalBillRaw, usage, energyChargesRaw, deliveryChargesRaw, peak, data.billing_period, data.provider_name])
+    }, [actualDemand, billedDemand, data.analysis?.feedback, data.billing_period, data.contract_end_date, data.provider_name, data.retail_plan_name, deliveryCharges, deliveryShare, energyCharges, powerFactor, supplyShare, totalBill, usage])
 
-    // Fallback/Extracted estimates
-    const estEnergy = usage * 0.045
-    const estDelivery = usage * 0.038
-    const estDemand = peak * 12
-
-    const energyCost = formatCurrency(data.energy_charges, estEnergy)
-    const deliveryCost = formatCurrency(data.delivery_charges, estDelivery)
-    const demandCost = formatCurrency(0, estDemand)
-    const totalCost = formatCurrency(data.total_amount_due, totalBillRaw || (estEnergy + estDelivery))
+    const summaryText = feedback.description || 'The bill is being driven by delivery and demand, not just the supply rate.'
+    const siteLabel = 'Logistics warehouse'
 
     return (
-        <div className="w-full max-w-5xl mx-auto px-4 pb-20">
-
-            {/* Header */}
+        <div className="w-full max-w-6xl mx-auto px-4 pb-20">
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="text-center mb-16"
+                className="mb-12"
             >
-                <div className="flex flex-col items-center gap-4 mb-4">
-                    <FeedbackBadge
-                        status={feedback.status}
-                        title={feedback.title}
-                        isLarge={feedback.facilitySize === 'large'}
-                    />
-                    {data.analysis && (
-                        <div className="flex items-center gap-3 text-[10px] md:text-xs font-mono tracking-widest text-[#002FA7] uppercase opacity-80">
-                            <span>ZONE: {data.analysis.zone}</span>
-                            <span>/</span>
-                            <span>TDU: {data.analysis.territory}</span>
-                        </div>
-                    )}
-                </div>
-                <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mb-2">
-                    Forensic Analysis Complete
-                </h1>
-                <div className="text-xl text-[#002FA7] font-medium mb-8 uppercase tracking-tight">
-                    {data.customer_name}
-                </div>
+                <div className="flex flex-col lg:flex-row gap-8 items-start">
+                    <div className="flex-1">
+                        <FeedbackBadge
+                            status={feedback.status}
+                            title={feedback.title}
+                            isLarge={feedback.facilitySize === 'large'}
+                        />
 
-                {data.analysis && (
-                    <div className="mb-10 max-w-4xl mx-auto rounded-3xl overflow-hidden h-[300px] border border-zinc-200 shadow-xl relative group bg-white/80 backdrop-blur-md">
-                        <ForensicMap address={data.service_address} zoneLabel={`ZONE: ${data.analysis.zone}`} />
-                    </div>
-                )}
+                        <div className="mt-5 flex items-center gap-2 text-[10px] md:text-xs font-mono tracking-widest text-[#002FA7] uppercase opacity-80">
+                            <Warehouse className="w-4 h-4" />
+                            <span>{siteLabel}</span>
+                        </div>
 
-                <p className="text-zinc-500 max-w-2xl mx-auto text-lg leading-relaxed mb-6">
-                    {feedback.description}
-                </p>
-                <div className="flex flex-wrap justify-center items-center gap-2 mb-6">
-                    <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-1 text-sm text-zinc-500">
-                        <span className="font-medium text-zinc-900">{data.provider_name}</span>
-                        <span>•</span>
-                        <span>{data.billing_period}</span>
+                        <h1 className="text-3xl md:text-5xl font-light text-zinc-900 mt-4 mb-4">
+                            Review complete
+                        </h1>
+
+                        <p className="text-zinc-600 max-w-3xl text-lg leading-relaxed mb-6">
+                            {summaryText}
+                        </p>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-1.5 text-sm text-zinc-600 border border-zinc-200">
+                                <span className="font-medium text-zinc-900">{data.provider_name}</span>
+                                <span>•</span>
+                                <span>{data.billing_period}</span>
+                            </div>
+                            {data.contract_end_date ? (
+                                <div className="inline-flex items-center gap-2 bg-amber-50 rounded-full px-4 py-1.5 text-sm text-amber-700 border border-amber-100">
+                                    <Calendar className="w-3.5 h-3.5" />
+                                    <span className="font-medium uppercase tracking-tighter">Contract ends {data.contract_end_date}</span>
+                                </div>
+                            ) : (
+                                <div className="inline-flex items-center gap-2 bg-zinc-50 rounded-full px-4 py-1.5 text-sm text-zinc-400 border border-zinc-100">
+                                    <AlertCircle className="w-3.5 h-3.5" />
+                                    <span className="font-medium uppercase tracking-tighter">Contract date not found</span>
+                                </div>
+                            )}
+                            <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-4 py-1.5 text-sm text-blue-700 border border-blue-100">
+                                <span className="font-medium uppercase tracking-tighter">{formatMoney(totalBill)} total</span>
+                            </div>
+                        </div>
                     </div>
-                    {data.contract_end_date ? (
-                        <div className="inline-flex items-center gap-2 bg-amber-50 rounded-full px-4 py-1 text-sm text-amber-700 border border-amber-100 shadow-sm">
-                            <Calendar className="w-3.5 h-3.5" />
-                            <span className="font-medium uppercase tracking-tighter">Contract Ends: {data.contract_end_date}</span>
+
+                    <div className="w-full lg:w-[360px]">
+                        <div className="glass-card p-6 md:p-7 h-full">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <div className="text-xs font-mono uppercase tracking-widest text-zinc-400 mb-1">Demand snapshot</div>
+                                    <div className="text-lg font-semibold text-zinc-900">Peak and billing demand</div>
+                                </div>
+                                <Activity className="w-5 h-5 text-[#002FA7]" />
+                            </div>
+
+                            <div className="text-4xl font-semibold text-zinc-900 tracking-tight mb-2">
+                                {actualDemand > 0 ? `${actualDemand.toLocaleString()} kW` : 'N/A'}
+                            </div>
+                            <div className="text-sm text-zinc-500 mb-5">
+                                Actual peak demand. The bill is using {billedDemand > 0 ? `${billedDemand.toLocaleString()} kW` : 'a higher demand figure'} for delivery math.
+                            </div>
+
+                            <div className="rounded-2xl border border-zinc-200 bg-white/70 p-4 mb-4">
+                                <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Power factor</div>
+                                <div className="text-2xl font-mono font-semibold text-zinc-900">
+                                    {powerFactor > 0 ? `${powerFactor.toFixed(1)}%` : 'Not shown'}
+                                </div>
+                                <div className="text-xs text-zinc-500 mt-2">
+                                    {powerFactor > 0 ? 'Below Oncor’s 95% adjustment line.' : 'No PF figure was visible on the bill.'}
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-zinc-200 bg-white/70 p-4">
+                                <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Billing gap</div>
+                                <div className="text-2xl font-mono font-semibold text-zinc-900">
+                                    {totalDemandGap > 0 ? `${totalDemandGap.toLocaleString()} kW` : 'N/A'}
+                                </div>
+                                <div className="text-xs text-zinc-500 mt-2">
+                                    {totalDemandGap > 0
+                                        ? 'That gap is why the delivery side can stay higher than the current month suggests.'
+                                        : 'No demand gap was visible in the extracted data.'}
+                                </div>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="inline-flex items-center gap-2 bg-zinc-50 rounded-full px-4 py-1 text-sm text-zinc-400 border border-zinc-100 opacity-60">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            <span className="font-medium uppercase tracking-tighter">Contract Date: Not Detected</span>
-                        </div>
-                    )}
-                    {data.retail_plan_name && (
-                        <div className="inline-flex items-center gap-2 bg-blue-50 rounded-full px-4 py-1 text-sm text-blue-700 border border-blue-100">
-                            <span className="font-medium uppercase tracking-tighter">{data.retail_plan_name}</span>
-                        </div>
-                    )}
+                    </div>
                 </div>
             </motion.div>
 
-            {/* Charge Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20 text-left">
-
-                {/* Card 1: Energy */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 text-left">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
+                    transition={{ delay: 0.08 }}
                     className="glass-card p-8 flex flex-col justify-between"
                 >
-                    <div className="relative z-10">
+                    <div>
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-zinc-400">Energy</h3>
+                            <h3 className="text-sm font-mono uppercase tracking-widest text-zinc-400">Supply</h3>
                             <Zap className="w-5 h-5 text-[#002FA7]" />
                         </div>
                         <div className="text-4xl font-semibold text-zinc-900 mb-2">
-                            {data.total_usage_kwh} <span className="text-lg text-zinc-400">kWh</span>
+                            {formatMoney(energyCharges)}
+                        </div>
+                        <div className="text-sm text-zinc-500">
+                            Fixed-price energy for the month.
                         </div>
                     </div>
 
-                    <div className="border-t border-zinc-100 pt-4 mt-8 relative z-10">
+                    <div className="border-t border-zinc-100 pt-4 mt-8">
                         <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-zinc-500">Supply Cost</span>
-                            <span className="text-zinc-900 font-mono font-medium">{energyCost}</span>
-                        </div>
-                        <div className="text-xs text-zinc-400 mt-2">
-                            Effective Rate: <span className="text-zinc-600">
-                                {energyChargesRaw > 0 ? (energyChargesRaw / usage).toLocaleString('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 3 }) : 'N/A'} / kWh
+                            <span className="text-zinc-500">Effective rate</span>
+                            <span className="text-zinc-900 font-mono font-medium">
+                                {usage > 0 ? `${((energyCharges / usage) * 100).toFixed(2)}¢/kWh` : 'N/A'}
                             </span>
                         </div>
-                        {data.analysis && (
-                            <div className="mt-4 p-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                                <div className="text-[10px] text-zinc-400 uppercase tracking-wider mb-1">ERCOT Load Zone Benchmark</div>
-                                <div className="flex justify-between items-end">
-                                    <span className="text-xs text-zinc-500">Market Rate (LZ_{data.analysis.zone}):</span>
-                                    <span className="text-xs text-[#002FA7] font-mono font-medium">{(data.analysis.marketContext.largeEnergyComponent * 100).toFixed(2)}¢</span>
-                                </div>
-                                <div className="text-[9px] text-zinc-400 mt-1 italic">
-                                    Compare against median regional contracts.
-                                </div>
-                            </div>
-                        )}
+                        <div className="text-xs text-zinc-400 mt-2">
+                            Supply is predictable. It is not the part of this bill that needs the most attention.
+                        </div>
                     </div>
                 </motion.div>
 
-                {/* Card 2: Delivery */}
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.2 }}
+                    transition={{ delay: 0.16 }}
                     className="glass-card p-8 flex flex-col justify-between"
                 >
-                    <div className="relative z-10">
+                    <div>
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-sm font-mono uppercase tracking-widest text-zinc-400">Delivery</h3>
                             <Truck className="w-5 h-5 text-[#002FA7]" />
                         </div>
                         <div className="text-4xl font-semibold text-zinc-900 mb-2">
-                            {deliveryCost}
+                            {formatMoney(deliveryCharges)}
+                        </div>
+                        <div className="text-sm text-zinc-500">
+                            Utility delivery and demand-related charges.
+                        </div>
+                    </div>
+
+                    <div className="border-t border-zinc-100 pt-4 mt-8">
+                        <div className="flex justify-between items-center text-sm mb-2">
+                            <span className="text-zinc-500">Share of bill</span>
+                            <span className="text-zinc-900 font-mono font-medium">
+                                {deliveryShare.toFixed(1)}%
+                            </span>
+                        </div>
+                        <div className="text-xs text-zinc-400 mt-2">
+                            Delivery is roughly equal to supply in the extracted sections, so the utility side is doing a lot of the damage.
+                        </div>
+                    </div>
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.24 }}
+                    className="glass-card p-8 shadow-xl shadow-[#002FA7]/5 flex flex-col justify-between relative overflow-hidden"
+                >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#002FA7]/10 blur-3xl rounded-full pointer-events-none z-0" />
+
+                    <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-sm font-mono uppercase tracking-widest text-[#002FA7]">Demand</h3>
+                            <Activity className="w-5 h-5 text-[#002FA7]" />
+                        </div>
+                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
+                            {actualDemand > 0 ? `${actualDemand.toLocaleString()} kW` : 'N/A'}
+                        </div>
+                        <div className="text-sm text-zinc-500">
+                            {billedDemand > 0
+                                ? `Billed at ${billedDemand.toLocaleString()} kW with ${powerFactor > 0 ? `${powerFactor.toFixed(1)}% PF` : 'no PF shown'}`
+                                : 'Billing demand not clearly extracted'}
                         </div>
                     </div>
 
                     <div className="border-t border-zinc-100 pt-4 mt-8 relative z-10">
                         <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-zinc-500">TDU Charges</span>
-                            <span className="text-zinc-900 font-mono font-medium">{deliveryCost}</span>
+                            <span className="text-zinc-500">Demand gap</span>
+                            <span className="text-[#002FA7] font-mono font-semibold">
+                                {totalDemandGap > 0 ? `${totalDemandGap.toLocaleString()} kW` : 'N/A'}
+                            </span>
                         </div>
-                        <div className="text-xs text-zinc-400 mt-2 italic">
-                            {feedback.facilitySize === 'small'
-                                ? 'High fixed charge impact due to small load.'
-                                : `Includes ${data.analysis?.territory || 'regulated'} utility tariffs.`}
+                        <div className="text-xs text-zinc-400 mt-2 flex gap-2 items-start">
+                            <Info className="w-3 h-3 mt-0.5 shrink-0 text-zinc-300" />
+                            <span>
+                                Oncor can adjust billing demand when power factor falls below 95%, and the utility can still hold the bill up after a higher historical peak.
+                            </span>
                         </div>
                     </div>
                 </motion.div>
-
-                {/* Card 3: Demand */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="glass-card p-8 shadow-xl shadow-[#002FA7]/5 flex flex-col justify-between relative overflow-hidden"
-                >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#002FA7]/10 blur-3xl rounded-full pointer-events-none z-0"></div>
-
-                    <div className="relative z-10">
-                        <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-sm font-mono uppercase tracking-widest text-[#002FA7]">Peak Demand</h3>
-                            <Activity className="w-5 h-5 text-[#002FA7]" />
-                        </div>
-                        <div className="text-4xl font-semibold text-zinc-900 mb-2">
-                            {feedback.missingPeak ? "N/A" : <>{peak.toLocaleString()} <span className="text-lg text-zinc-400">kW</span></>}
-                        </div>
-                    </div>
-
-                    <div className="border-t border-zinc-100 pt-4 mt-8 relative z-10">
-                        {feedback.facilitySize === 'large' ? (
-                            <>
-                                <div className="flex justify-between items-center text-sm mb-1">
-                                    <span className="text-zinc-500">Ratchet Impact</span>
-                                    <span className="text-[#002FA7] font-mono font-semibold">{data.analysis ? (parseFloat(data.analysis.demandPercentOfBill) > 0 ? `${data.analysis.demandPercentOfBill}%` : 'Extracted') : 'Modeling...'}</span>
-                                </div>
-                                <div className="text-xs text-zinc-400 mt-2 flex gap-2 items-start">
-                                    <Info className="w-3 h-3 mt-0.5 shrink-0 text-zinc-300" />
-                                    <span>
-                                        Ratchet locks 80% cost floor for 11 months.
-                                        Est. yearly penalty: <span className="text-[#002FA7] font-medium">{(peak * (data.analysis?.marketContext?.largeDemandCharge || 10.88) * 12 * 0.8).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })}</span>
-                                    </span>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="text-xs text-zinc-400 mt-2 italic">
-                                Small facility (&lt; 10kW). No demand ratchet detected in this tier.
-                            </div>
-                        )}
-                    </div>
-                </motion.div>
-
             </div>
 
-            {/* Forensic Recommendations List */}
+            <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="glass-card p-8 md:p-10 mb-20 text-left"
+            >
+                <div className="flex items-center justify-between gap-4 mb-5">
+                    <div>
+                        <div className="text-xs font-mono uppercase tracking-widest text-zinc-400 mb-1">Bill sections</div>
+                        <div className="text-lg font-semibold text-zinc-900">Supply vs delivery vs taxes</div>
+                    </div>
+                    <PieChart className="w-5 h-5 text-[#002FA7]" />
+                </div>
+
+                <div className="h-3 rounded-full overflow-hidden bg-zinc-100 flex">
+                    <div
+                        className="bg-[#002FA7]"
+                        style={{ width: `${Math.max(0, Math.min(100, supplyShare))}%` }}
+                    />
+                    <div
+                        className="bg-zinc-300"
+                        style={{ width: `${Math.max(0, Math.min(100, deliveryShare))}%` }}
+                    />
+                    <div
+                        className="bg-zinc-200"
+                        style={{ width: `${Math.max(0, Math.min(100, taxesShare))}%` }}
+                    />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Supply</div>
+                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(energyCharges)}</div>
+                        <div className="text-xs text-zinc-500 mt-2">{supplyShare.toFixed(1)}% of extracted sections</div>
+                    </div>
+                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Delivery</div>
+                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(deliveryCharges)}</div>
+                        <div className="text-xs text-zinc-500 mt-2">{deliveryShare.toFixed(1)}% of extracted sections</div>
+                    </div>
+                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
+                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Taxes & fees</div>
+                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(taxesCharges)}</div>
+                        <div className="text-xs text-zinc-500 mt-2">{taxesShare.toFixed(1)}% of extracted sections</div>
+                    </div>
+                </div>
+
+                <div className="mt-6 p-4 rounded-2xl border border-blue-100 bg-blue-50/70 text-sm text-zinc-700 leading-relaxed">
+                    The main story here is not the fixed supply price. The bill is being shaped by delivery charges, demand rules, and a power factor that sits below Oncor’s 95% adjustment line.
+                </div>
+            </motion.div>
+
             <motion.div
                 initial={{ opacity: 0 }}
                 whileInView={{ opacity: 1 }}
@@ -282,7 +395,36 @@ export function FullReport({ data, email }: FullReportProps) {
                 className="mb-20 glass-card p-10 shadow-xl"
             >
                 <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
-                    Forensic Recommendations
+                    What the bill is telling us
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                        'Supply is fixed-price and predictable, so it is not the first problem to solve.',
+                        `Delivery is ${deliveryShare.toFixed(1)}% of the extracted sections, which means the utility side is doing most of the damage.`,
+                        totalDemandGap > 0
+                            ? `Billing demand is still above the current peak by ${totalDemandGap.toLocaleString()} kW.`
+                            : 'The extracted bill did not show a clear billing gap, so the demand floor needs a second look.',
+                        powerFactor > 0
+                            ? `Power factor is ${powerFactor.toFixed(1)}%, which is below Oncor’s 95% adjustment line.`
+                            : 'The bill did not show a power factor figure, so that lever still needs verification.'
+                    ].map((item, i) => (
+                        <div key={i} className="flex items-start gap-4 p-5 bg-white/50 backdrop-blur-sm rounded-2xl border border-zinc-200">
+                            <div className="mt-1.5 w-2 h-2 rounded-full shrink-0 bg-[#002FA7]" />
+                            <p className="text-zinc-700 text-sm md:text-base leading-snug">{item}</p>
+                        </div>
+                    ))}
+                </div>
+            </motion.div>
+
+            <motion.div
+                initial={{ opacity: 0 }}
+                whileInView={{ opacity: 1 }}
+                viewport={{ once: true }}
+                transition={{ delay: 0.1 }}
+                className="mb-20 glass-card p-10 shadow-xl"
+            >
+                <h3 className="text-lg font-semibold text-zinc-900 mb-6 flex items-center gap-2">
+                    Recommended next steps
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {feedback.actionItems.map((item: string, i: number) => (
@@ -294,9 +436,7 @@ export function FullReport({ data, email }: FullReportProps) {
                 </div>
             </motion.div>
 
-            {/* Next Steps CTA */}
             <NextStepsCard email={email} />
-
         </div>
     )
 }

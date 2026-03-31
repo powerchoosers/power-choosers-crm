@@ -24,8 +24,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
-  title: 'Nodal Point | Commercial Energy Forensics & Audit',
-  description: 'We do not guess; we measure. Nodal Point reverse-engineers supplier tariffs to eliminate hidden cost leakage and structural waste in your energy contract.',
+  title: 'Nodal Point | Commercial Energy Bill Review',
+  description: 'Review electricity bills, contract terms, and market risk for Texas businesses. Nodal Point shows the biggest cost drivers and the next step.',
   icons: {
     icon: '/images/nodalpoint-webicon.png',
     apple: '/images/nodalpoint-webicon.png',
@@ -34,22 +34,22 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Nodal Point',
-    title: 'Nodal Point | Commercial Energy Forensics & Audit',
-    description: 'Reverse-engineer your supplier tariffs. Eliminate hidden cost leakage in your Texas energy contract. No guessing. No noise.',
+    title: 'Nodal Point | Commercial Energy Bill Review',
+    description: 'Review electricity bills, contract terms, and market risk for Texas businesses. No guesswork. No noise.',
     url: BASE_URL,
     images: [
       {
         url: '/images/og-card.jpg',
         width: 1200,
         height: 630,
-        alt: 'Nodal Point — Commercial Energy Forensics',
+        alt: 'Nodal Point — Commercial Energy Bill Review',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nodal Point | Commercial Energy Forensics & Audit',
-    description: 'Reverse-engineer your supplier tariffs. Eliminate hidden cost leakage. No noise.',
+    title: 'Nodal Point | Commercial Energy Bill Review',
+    description: 'Review electricity bills, contract terms, and market risk for Texas businesses. No guesswork. No noise.',
     images: ['/images/og-card.jpg'],
   },
   alternates: {},
@@ -62,7 +62,7 @@ const SCHEMA_ORG = {
   url: BASE_URL,
   logo: `${BASE_URL}/images/nodalpoint.png`,
   description:
-    'Commercial energy forensics and audit platform for businesses in the ERCOT market. We reverse-engineer supplier tariffs to expose hidden cost leakage.',
+    'Commercial energy bill review platform for businesses in the ERCOT market. We help Texas companies understand the main cost drivers and what to do next.',
   sameAs: ['https://www.linkedin.com/company/nodal-point/'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -83,7 +83,7 @@ const SCHEMA_ORG = {
     'commercial energy tariffs',
     'demand charges',
     '4CP peaks',
-    'energy forensics',
+    'energy bill review',
     'scarcity adders',
   ],
 }

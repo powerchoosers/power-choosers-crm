@@ -1,13 +1,14 @@
 import React, { useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { UploadCloud, FileText, Loader2 } from 'lucide-react'
+import { UploadCloud, Loader2 } from 'lucide-react'
 
 interface UploadZoneProps {
     onUpload: (files: FileList | null) => void
     isAnalyzing: boolean
+    onShowTrust?: () => void
 }
 
-export function UploadZone({ onUpload, isAnalyzing }: UploadZoneProps) {
+export function UploadZone({ onUpload, isAnalyzing, onShowTrust }: UploadZoneProps) {
     const fileInputRef = useRef<HTMLInputElement>(null)
     const [isDragging, setIsDragging] = useState(false)
 
@@ -39,11 +40,11 @@ export function UploadZone({ onUpload, isAnalyzing }: UploadZoneProps) {
                     className="mb-10"
                 >
                     <h2 className="text-3xl md:text-5xl font-light text-zinc-900 mb-4">
-                        Drop Your Invoice
+                        Upload your bill
                     </h2>
                     <p className="text-lg text-zinc-500 font-light">
-                        Upload a recent bill (PDF, image, or photo). <br className="hidden md:block" />
-                        We'll analyze it in under 60 seconds.
+                        Upload a recent bill or PDF. <br className="hidden md:block" />
+                        We&apos;ll review it in under 60 seconds.
                     </p>
                 </motion.div>
             )}
@@ -82,7 +83,7 @@ export function UploadZone({ onUpload, isAnalyzing }: UploadZoneProps) {
                             <UploadCloud className="w-6 h-6" />
                         </div>
                         <p className={`text-lg font-medium transition-colors ${isDragging ? 'text-[#002FA7]' : 'text-zinc-700'}`}>
-                            {isDragging ? 'Ready to analyze...' : 'Drop here or click to browse'}
+                            {isDragging ? 'Ready to review...' : 'Drop here or click to browse'}
                         </p>
                         <p className="text-xs text-zinc-400 mt-2 uppercase tracking-wide">
                             PDF, PNG, JPG, HEIC • MAX 10MB
@@ -91,22 +92,32 @@ export function UploadZone({ onUpload, isAnalyzing }: UploadZoneProps) {
                 )}
 
                 {/* Analyzing State */}
-                {isAnalyzing && (
-                    <div className="flex flex-col items-center z-10">
-                        <div className="relative">
-                            <div className="absolute inset-0 bg-[#002FA7]/20 blur-lg rounded-full animate-pulse"></div>
-                            <Loader2 className="w-10 h-10 text-[#002FA7] animate-spin relative z-10" />
+            {isAnalyzing && (
+                <div className="flex flex-col items-center z-10">
+                    <div className="relative">
+                        <div className="absolute inset-0 bg-[#002FA7]/20 blur-lg rounded-full animate-pulse"></div>
+                        <Loader2 className="w-10 h-10 text-[#002FA7] animate-spin relative z-10" />
                         </div>
                         <p className="mt-6 text-lg font-medium text-zinc-800 animate-pulse">
-                            Analyzing Your Bill...
+                            Reviewing your bill...
                         </p>
                         <p className="text-sm text-zinc-400 mt-2">
-                            Extracting usage data and line items
+                            Reading usage data and line items
                         </p>
                     </div>
                 )}
 
             </motion.div>
+
+            {!isAnalyzing && onShowTrust && (
+                <button
+                    type="button"
+                    onClick={onShowTrust}
+                    className="mt-6 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-400 hover:text-[#002FA7] transition-colors"
+                >
+                    Read security notes first
+                </button>
+            )}
 
         </div>
     )

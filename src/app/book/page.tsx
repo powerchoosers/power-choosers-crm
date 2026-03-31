@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { PageReveal } from '@/components/motion/PageReveal';
 
 export const metadata: Metadata = {
-    title: 'Nodal Point | Book a Briefing',
-    description: 'Schedule a 30-minute forensic energy briefing with a Nodal Point strategist. We pull your bill apart live and show you exactly where you are exposed.',
+    title: 'Nodal Point | Schedule a Review',
+    description: 'Schedule a 30-minute review with the Nodal Point team. We will walk through your bill live and show the biggest cost drivers.',
     alternates: { canonical: 'https://nodalpoint.io/book' },
 };
 
@@ -46,7 +46,7 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
                 </Link>
 
                 <div className="ml-auto">
-                    <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest hidden sm:block">NODAL_ACCESS_v1.0.4</span>
+                    <span className="font-mono text-[10px] text-zinc-600 uppercase tracking-widest hidden sm:block">SCHEDULE A REVIEW</span>
                 </div>
             </header>
 
@@ -65,20 +65,20 @@ export default async function BookingPage({ searchParams }: BookingPageProps) {
 
             {/* Footer — hidden on mobile to reclaim space */}
             <footer className="hidden sm:flex flex-none h-11 border-t border-white/5 bg-black/40 backdrop-blur-md items-center justify-between px-6 z-40">
-                <div className="flex items-center gap-6">
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                        <span>Identity_Resolved: {email ? 'SECURE' : 'ANONYMOUS'}</span>
+                        <span>Email on file: {email ? 'yes' : 'no'}</span>
                     </div>
                     <div className="h-4 w-[1px] bg-white/5 hidden md:block" />
                     <div className="hidden md:flex items-center gap-4 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-                        <span>Uplink_Node: stable</span>
-                        <span>Protocol: Signal_Transmission</span>
+                        <span>Connection: stable</span>
+                        <span>Booking flow</span>
                     </div>
                 </div>
                 <div className="text-[10px] font-mono text-zinc-700 uppercase tracking-widest space-x-4">
-                    <span>Nodal_Ref // V2.1</span>
-                    <span className="hidden sm:inline">System_Clock: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
+                    <span>Nodal Point // Booking</span>
+                    <span className="hidden sm:inline">Current time: {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZoneName: 'short' })}</span>
                 </div>
             </footer>
         </div>
