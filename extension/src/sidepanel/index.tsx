@@ -935,6 +935,21 @@ function App() {
   }, [])
 
   useEffect(() => {
+    if (!state?.auth?.accessToken) {
+      autoCaptureRan.current = false
+      return
+    }
+    if (autoCaptureRan.current) return
+
+    autoCaptureRan.current = true
+    const timer = window.setTimeout(() => {
+      void sendMessage('CAPTURE_AND_MATCH').catch(() => {})
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [state?.auth?.accessToken])
+
+  useEffect(() => {
     const callState = state?.call?.state
     const isStuck = callState === 'initializing'
     
