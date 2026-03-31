@@ -1272,10 +1272,16 @@ function App() {
   const contactHeroPhoneEntries = contactUplinkEntries(contact)
   const contactHeroPrimaryPhone = contactPrimaryPhone(contact)
 
-  const rawSummary = account?.description || match?.summary || ''
+  const rawSummary = isContactHero ? match?.summary || '' : account?.description || match?.summary || ''
   const isBoilerplate = rawSummary.toLowerCase().startsWith('matched the page to')
-  const heroSummary = isBoilerplate && account?.description ? account.description : rawSummary
-  const summaryToDisplay = isBoilerplate && !account?.description ? '' : heroSummary
+  const heroSummary = isContactHero
+    ? isBoilerplate
+      ? ''
+      : rawSummary
+    : isBoilerplate && account?.description
+      ? account.description
+      : rawSummary
+  const summaryToDisplay = isContactHero ? heroSummary : isBoilerplate && !account?.description ? '' : heroSummary
   
   const MAX_SUMMARY = 120
   const isTruncated = summaryToDisplay.length > MAX_SUMMARY && !descriptionExpanded

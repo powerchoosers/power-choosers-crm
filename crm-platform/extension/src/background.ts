@@ -741,6 +741,10 @@ function normalizeMatchContact(raw: any): MatchResult['contact'] {
   }
 }
 
+function hasMatchedRecord(match: MatchResult | null | undefined) {
+  return Boolean(match?.contact?.id || match?.account?.id)
+}
+
 async function matchPageAgainstCrm(snapshot: PageSnapshot) {
   if (!state.auth?.accessToken) {
     throw new Error('Connect your Nodal Point session before matching a page.')
@@ -777,7 +781,7 @@ async function matchPageAgainstCrm(snapshot: PageSnapshot) {
   })
 
   try {
-    await loadAccountContacts(match.account?.id || null, snapshot.origin)
+    await loadAccountContacts(match.account?.id || match.contact?.accountId || null, snapshot.origin)
   } catch (error) {
     console.warn('[Extension] Account contacts load failed:', error)
     await setState((draft) => {
@@ -811,9 +815,11 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
     return
   }
 
-  if (match?.account?.id) {
-    const account = match.account
-    const contacts = Array.isArray(match.contacts) ? match.contacts : []
+  const matchedContact = match?.contact?.id ? match.contact : null
+  const matchedAccount = match?.account?.id ? match.account : null
+
+  if (matchedContact || matchedAccount) {
+    const contacts = Array.isArray(match?.contacts) ? match.contacts : []
     try {
       await chrome.scripting.executeScript({
         target: { tabId },
@@ -821,10 +827,10 @@ async function syncPageBadge(tabId: number | null | undefined, match: MatchResul
         args: [
           {
             mode: 'matched',
-            accountName: account.name,
-            accountId: account.id,
-            domain: account.domain || account.website || null,
-            contactCount: contacts.length,
+            accountName: matchedContact?.name || matchedAccount?.name || 'Open CRM',
+            accountId: matchedContact?.id || matchedAccount?.id || null,
+            domain: matchedAccount?.domain || matchedAccount?.website || matchedContact?.accountDomain || null,
+            contactCount: matchedContact ? Math.max(1, contacts.length) : contacts.length,
             label: 'Open CRM',
           },
         ],
@@ -880,7 +886,7 @@ async function captureAndMatch(windowId?: number | null) {
     const { tab, snapshot, screenshot } = await captureActiveTab(windowId)
     if (isBlockedContextDomain(snapshot.origin || snapshot.url)) {
       await setState((draft) => {
-        draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+        draft.pageStatus = hasMatchedRecord(state.match) ? 'matched' : 'idle'
       })
       await syncPageBadge(tab?.id || null, null, snapshot)
       throw new Error('Capture is blocked on nodalpoint.io pages to keep your existing context stable.')
@@ -892,13 +898,13 @@ async function captureAndMatch(windowId?: number | null) {
     })
     const match = await matchPageAgainstCrm(snapshot)
     await setState((draft) => {
-      draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
+      draft.pageStatus = hasMatchedRecord(match) ? 'matched' : 'unmatched'
     })
     await syncPageBadge(tab?.id || null, match, snapshot)
     return { snapshot, screenshot, match }
   } catch (error) {
     await setState((draft) => {
-      draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+      draft.pageStatus = hasMatchedRecord(state.match) ? 'matched' : 'idle'
     })
     throw error
   }
@@ -942,7 +948,7 @@ async function handleIngestPageAccount(windowId?: number | null) {
 
     const match = await matchPageAgainstCrm(snapshot)
     await setState((draft) => {
-      draft.pageStatus = match?.account?.id ? 'matched' : 'unmatched'
+      draft.pageStatus = hasMatchedRecord(match) ? 'matched' : 'unmatched'
     })
     await syncPageBadge(tab?.id || null, match, snapshot)
 
@@ -955,7 +961,7 @@ async function handleIngestPageAccount(windowId?: number | null) {
     }
   } catch (error) {
     await setState((draft) => {
-      draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+      draft.pageStatus = hasMatchedRecord(state.match) ? 'matched' : 'idle'
     })
     throw error
   }
@@ -985,25 +991,18 @@ function scheduleActiveTabCapture(windowId?: number | null) {
         if (isBlockedContextDomain(tab.url)) {
           await syncPageBadge(tab.id || null, null, null)
           await setState((draft) => {
-            draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+            draft.pageStatus = hasMatchedRecord(state.match) ? 'matched' : 'idle'
           })
           return
         }
         await setState((draft) => {
           draft.pageStatus = 'capturing'
         })
-        if (trimText(state.page?.url || '') === trimText(tab.url)) {
-          await syncPageBadge(tab.id || null, state.match, state.page)
-          await setState((draft) => {
-            draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
-          })
-          return
-        }
         await captureAndMatch(windowId)
       } catch (error) {
         console.warn('[Extension] Auto capture after tab change failed:', error)
         await setState((draft) => {
-          draft.pageStatus = state.match?.account?.id ? 'matched' : 'idle'
+          draft.pageStatus = hasMatchedRecord(state.match) ? 'matched' : 'idle'
         })
       }
     })()
@@ -1024,7 +1023,7 @@ async function saveTransmissionNote(payload: any) {
   }
 
   const contactId = trimText(payload?.contactId || state.match?.contact?.id) || ''
-  const accountId = trimText(payload?.accountId || state.match?.account?.id) || ''
+  const accountId = trimText(payload?.accountId || state.match?.account?.id || state.match?.contact?.accountId || '') || ''
   const title = buildTransmissionTaskTitle(state.page, state.match)
   const description = buildTransmissionNoteBody({
     note,
@@ -1237,8 +1236,9 @@ async function handleAuthSync(payload: any, sender: any) {
   }
 
   try {
-    if (state.match?.account?.id) {
-      await loadAccountContacts(state.match.account.id, appOrigin)
+    const matchedAccountId = trimText(state.match?.account?.id || state.match?.contact?.accountId || '')
+    if (matchedAccountId) {
+      await loadAccountContacts(matchedAccountId, appOrigin)
     }
   } catch (error) {
     console.warn('[Extension] Account contacts refresh failed:', error)
@@ -1457,7 +1457,7 @@ async function handleDialCall(payload: any) {
       callerId,
       metadata: {
         contactId: payload?.contactId || state.match?.contact?.id || null,
-        accountId: payload?.accountId || state.match?.account?.id || null,
+        accountId: payload?.accountId || state.match?.account?.id || state.match?.contact?.accountId || null,
         page: state.page
           ? { title: state.page.title, url: state.page.url, origin: state.page.origin }
           : null,
@@ -1562,7 +1562,7 @@ async function handlePhoneLookup(payload: any) {
 }
 
 async function handleGetOrgContacts(payload: any) {
-  const accountId = trimText(payload?.accountId || state.match?.account?.id || '')
+  const accountId = trimText(payload?.accountId || state.match?.account?.id || state.match?.contact?.accountId || '')
   const domain = trimText(
     payload?.domain ||
       state.match?.account?.domain ||
@@ -1594,7 +1594,7 @@ async function handleRevealOrgContact(payload: any) {
   const person = payload?.person && typeof payload.person === 'object' ? payload.person : null
   if (!person) throw new Error('No org contact was provided for reveal.')
 
-  const accountId = trimText(payload?.accountId || state.match?.account?.id || '')
+  const accountId = trimText(payload?.accountId || state.match?.account?.id || state.match?.contact?.accountId || '')
   const revealEmails = payload?.revealEmails !== false
   const revealPhones = payload?.revealPhones === true
 
@@ -1620,7 +1620,7 @@ async function handlePollOrgContactPhones(payload: any) {
   if (!personId) throw new Error('Missing Apollo person id for phone polling.')
 
   const person = payload?.person && typeof payload.person === 'object' ? payload.person : null
-  const accountId = trimText(payload?.accountId || state.match?.account?.id || '')
+  const accountId = trimText(payload?.accountId || state.match?.account?.id || state.match?.contact?.accountId || '')
 
   const poll = await fetchAuthedJson(
     `/api/apollo/phone-retrieve?personId=${encodeURIComponent(personId)}`,
@@ -1860,6 +1860,7 @@ async function handleOpenSidePanel(sender?: any) {
       
       if (windowId) {
         chrome.windows.update(windowId, { focused: true }).catch(() => {})
+        scheduleActiveTabCapture(windowId)
       }
       return { ok: true, state: cloneState() }
     }
@@ -1870,6 +1871,7 @@ async function handleOpenSidePanel(sender?: any) {
          console.warn('[Extension] sidePanel.open (windowId) failed:', error)
       })
       chrome.windows.update(windowId, { focused: true }).catch(() => {})
+      scheduleActiveTabCapture(windowId)
       return { ok: true, state: cloneState() }
     }
 
