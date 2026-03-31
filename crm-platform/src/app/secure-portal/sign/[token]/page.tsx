@@ -2,7 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import SignatureClient from '@/app/secure-portal/sign/[token]/SignatureClient';
 
 export const metadata = {
-    title: 'Secure Document Execution | Nodal Point',
+    title: 'Nodal Point | Secure Document Signing',
 };
 
 export default async function SecureSignPage({ params }: { params: Promise<{ token: string }> }) {
@@ -62,9 +62,9 @@ export default async function SecureSignPage({ params }: { params: Promise<{ tok
                 <div className="h-12 w-12 rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-500 flex items-center justify-center mb-6">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>
                 </div>
-                <h1 className="text-xl text-zinc-200 uppercase tracking-widest mb-2">Document Executed</h1>
+                <h1 className="text-xl text-zinc-200 uppercase tracking-widest mb-2">Document Signed</h1>
                 <p className="text-sm text-zinc-500 max-w-md">
-                    This document has already been fully executed and a forensic copy has been emailed to {request.contact?.email}.
+                    This document has already been signed and a copy has been emailed to {request.contact?.email}.
                 </p>
             </div>
         );

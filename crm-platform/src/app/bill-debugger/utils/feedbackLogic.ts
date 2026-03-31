@@ -9,6 +9,11 @@ export interface BillAnalysis {
     energyComponent?: number;    // $/kWh
     deliveryComponent?: number;  // $/kWh
     peakDemandKW: number;
+    actualDemandKW?: number;
+    billedDemandKW?: number;
+    powerFactorPct?: number;
+    deliverySharePct?: number;
+    supplySharePct?: number;
     totalUsage: number;
     totalBill: number;
     billingPeriod: string;
@@ -76,6 +81,22 @@ export function generateFeedback(
     const effectiveRate = analysis.allInRate > 0 ? analysis.allInRate : derivedRate;
 
     const variance = effectiveRate - marketAvg;
+    const actualDemand = analysis.actualDemandKW ?? analysis.peakDemandKW;
+    const billedDemand = analysis.billedDemandKW ?? actualDemand;
+    const powerFactor = analysis.powerFactorPct ?? 0;
+    const deliveryShare = analysis.deliverySharePct ?? (
+        analysis.totalBill > 0 && analysis.deliveryComponent !== undefined
+            ? ((analysis.deliveryComponent * analysis.totalUsage) / analysis.totalBill) * 100
+            : 0
+    );
+    const supplyShare = analysis.supplySharePct ?? (
+        analysis.totalBill > 0 && analysis.energyComponent !== undefined
+            ? ((analysis.energyComponent * analysis.totalUsage) / analysis.totalBill) * 100
+            : 0
+    );
+    const hasDemandGap = actualDemand > 0 && billedDemand > actualDemand * 1.03;
+    const hasPowerFactorIssue = powerFactor > 0 && powerFactor < 95;
+    const hasDeliveryPressure = deliveryShare >= 45;
 
     // 4. Generate Status
     let status: FeedbackStatus = "yellow";
@@ -109,25 +130,36 @@ export function generateFeedback(
     const marketCent = (marketAvg * 100).toFixed(2);
 
     if (status === "green") {
-        title = isFacilityLarge ? "You're Positioned Well" : "You're Locked in Well";
-        description = `Your effective rate of ${rateCent}¢/kWh is ${pctVariance}% ${isBelow ? "below" : "near"} the regional benchmark of ${marketCent}¢/kWh. ${missingPeak ? "However, missing peak demand data obscures potential volatility risks." : "Your contract appears competitive."}`;
+        title = isFacilityLarge ? "Supply looks steady" : "Pricing looks steady";
+        description = isFacilityLarge
+            ? `Your effective rate of ${rateCent}¢/kWh is ${pctVariance}% ${isBelow ? "below" : "near"} the regional benchmark of ${marketCent}¢/kWh. Delivery is ${deliveryShare.toFixed(1)}% of the bill, and power factor is ${powerFactor > 0 ? `${powerFactor.toFixed(1)}%` : "not shown"}.`
+            : `Your effective rate of ${rateCent}¢/kWh is ${pctVariance}% ${isBelow ? "below" : "near"} the regional benchmark of ${marketCent}¢/kWh.`;
     } else if (status === "yellow") {
         title = isFacilityLarge
-            ? "Rate is Market. Demand is the Opportunity."
+            ? "Rate is in range. Delivery needs a look."
             : "Rate is competitive for your size.";
 
         description = isFacilityLarge
-            ? `You are paying market rates (${rateCent}¢/kWh). The real leverage point is likely your Peak Demand, which drives ~30% of delivery costs.`
+            ? `The supply rate is fixed and predictable, but delivery is ${deliveryShare.toFixed(1)}% of the bill. ${hasDemandGap ? `The bill is charging on ${billedDemand.toFixed(0)} kW even though the current peak is ${actualDemand.toFixed(0)} kW.` : "That usually means the utility is pricing your peak shape, not just your usage."} ${hasPowerFactorIssue ? `Power factor is ${powerFactor.toFixed(1)}%, so the delivery side can still be lifted a bit.` : ""}`.trim()
             : `At ${rateCent}¢/kWh, you are within the normal range for small facilities. Focus on renewal timing to avoid post-term spikes.`;
     } else { // Red
         const isFixed = analysis.productType?.toLowerCase().includes('fixed');
 
         title = isFacilityLarge
-            ? "Above-Market Rate Detected"
-            : (isFixed ? "Competitive Pricing Opportunity" : "Likely Expired or Post-Term");
+            ? "Delivery and demand are pushing this bill up"
+            : (isFixed ? "Competitive pricing opportunity" : "Likely expired or post-term");
 
         description = isFacilityLarge
-            ? `Your rate of ${rateCent}¢/kWh is ${pctVariance}% above the benchmark. This indicates either an older contract or inefficient demand management.`
+            ? [
+                "This looks like a logistics warehouse, not a simple usage problem.",
+                `The fixed-price supply side is about ${supplyShare.toFixed(1)}% of the bill, while delivery is ${deliveryShare.toFixed(1)}%.`,
+                hasDemandGap
+                    ? `The bill is charging on ${billedDemand.toFixed(0)} kW even though the current peak is ${actualDemand.toFixed(0)} kW.`
+                    : "Oncor-style delivery billing can still stay high when the site has a larger historical peak.",
+                hasPowerFactorIssue
+                    ? `Power factor is ${powerFactor.toFixed(1)}%, below the 95% level where Oncor can adjust billing demand.`
+                    : ""
+            ].filter(Boolean).join(" ")
             : (isFixed
                 ? `You are on a Fixed Price plan at ${rateCent}¢/kWh, which is significantly above the market average of ${marketCent}¢/kWh. Resetting your rate could yield major savings.`
                 : `You are paying ${rateCent}¢/kWh, which is significantly above the market average of ${marketCent}¢/kWh. You may be on a month-to-month penalty rate.`);
@@ -137,18 +169,21 @@ export function generateFeedback(
     const actionItems: string[] = [];
 
     if (status === "green") {
-        actionItems.push("Set renewal reminder 90 days before expiration");
-        if (isFacilityLarge) actionItems.push("Monitor peak demand during summer months");
+        actionItems.push("Set a renewal reminder 90 days before the contract ends");
+        if (isFacilityLarge) actionItems.push("Keep HVAC and charging equipment from hitting the same 15-minute window");
     } else if (status === "yellow") {
-        actionItems.push("Review contract end date");
+        actionItems.push("Review the supply versus delivery split");
         if (isFacilityLarge) {
-            actionItems.push("Quantify potential load shifting (after 9PM)");
-            actionItems.push("Investigate demand response programs");
+            actionItems.push("Spread forklift charging and HVAC start-up across the hour");
+            actionItems.push("Check whether power factor correction would remove the billing uplift");
         }
     } else { // Red
-        actionItems.push("URGENT: Check contract status for expiration");
-        actionItems.push("Request competitive quotes immediately");
-        if (isFacilityLarge) actionItems.push("Analyze load profile for peak spikes");
+        actionItems.push("Request a bill review that separates supply from delivery");
+        actionItems.push("Ask for quotes that show the demand assumption in writing");
+        if (isFacilityLarge) {
+            actionItems.push("Reduce the 15-minute peak by staggering heavy loads");
+            if (hasPowerFactorIssue) actionItems.push("Check whether power factor correction can bring the billable demand down");
+        }
     }
 
     // 7. Contract Lifecycle Analysis (v2.2.3)

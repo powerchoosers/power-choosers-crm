@@ -24,18 +24,17 @@ export function NextStepsCard({ email }: NextStepsCardProps) {
                 <div className="flex justify-center mb-8">
                     <div className="px-4 py-1.5 rounded-full bg-blue-50 text-[#002FA7] font-mono text-[10px] uppercase tracking-[0.3em] font-bold border border-blue-100 flex items-center gap-2">
                         <div className="w-1.5 h-1.5 bg-[#002FA7] rounded-full animate-pulse" />
-                        Next Phase: Vector Optimization
+                        Next step
                     </div>
                 </div>
 
                 <h2 className="text-4xl md:text-6xl font-bold mb-8 tracking-tighter text-zinc-900 leading-[0.95] max-w-2xl mx-auto">
-                    Stop paying for <br />
-                    <span className="text-[#002FA7]">the background noise.</span>
+                    Want us to walk through <br />
+                    <span className="text-[#002FA7]">the report with you?</span>
                 </h2>
 
                 <p className="text-zinc-500 mb-12 max-w-2xl mx-auto text-xl font-medium leading-relaxed">
-                    The grid is a high-frequency puzzle designed to obfuscate.
-                    Our forensic analysts isolate the true signal to eliminate waste.
+                    If the report shows a real issue, we&apos;ll walk through the bill, answer questions, and decide whether a quote or renewal review makes sense.
                 </p>
 
                 <div className="flex flex-col items-center gap-8">
@@ -44,22 +43,22 @@ export function NextStepsCard({ email }: NextStepsCardProps) {
                         className="group px-12 py-6 bg-black text-white rounded-full font-bold text-xl hover:scale-105 transition-all flex items-center gap-4 shadow-[#000]/20 shadow-2xl hover:shadow-black/30 active:scale-95"
                     >
                         <Calendar className="w-6 h-6" />
-                        Run Strategic Review
+                        Book a Briefing
                         <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                     </Link>
 
                     <div className="flex flex-col md:flex-row items-center gap-4 md:gap-12 text-[10px] uppercase tracking-[0.2em] text-zinc-400 font-mono font-bold">
                         <div className="flex items-center gap-2">
                             <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                            <span>Official Nodal Protocol</span>
+                            <span>Private call</span>
                         </div>
                         <span className="hidden md:block opacity-30">•</span>
                         <div className="flex items-center gap-2">
                             <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
-                            <span>Live Analysts Online</span>
+                            <span>Usually 30 minutes</span>
                         </div>
                         <span className="hidden md:block opacity-30">•</span>
-                        <span>09:00 - 17:00 CST</span>
+                        <span>No commitment required</span>
                     </div>
                 </div>
             </div>

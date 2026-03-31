@@ -1,14 +1,20 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { Activity, ShieldAlert, Zap } from 'lucide-react'
+import { Activity, ArrowRight } from 'lucide-react'
 import { LandingHeader } from '@/components/landing/LandingHeader'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 
+const SECTIONS = [
+  { id: 'overview', label: '1. Review the bill' },
+  { id: 'compare', label: '2. Compare the numbers' },
+  { id: 'result', label: '3. See the next step' },
+] as const
+
 export default function TechnicalDocs() {
-  const [activeSection, setActiveSection] = useState('abstract')
+  const [activeSection, setActiveSection] = useState('overview')
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -19,7 +25,7 @@ export default function TechnicalDocs() {
           }
         })
       },
-      { rootMargin: '-20% 0px -50% 0px' }
+      { rootMargin: '-20% 0px -55% 0px' }
     )
 
     const sections = document.querySelectorAll('section[id]')
@@ -30,28 +36,19 @@ export default function TechnicalDocs() {
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id)
-    if (element) {
-      const headerOffset = 100
-      const elementPosition = element.getBoundingClientRect().top
-      const offsetPosition = elementPosition + window.scrollY - headerOffset
-
-      window.scrollTo({
-        top: offsetPosition,
-        behavior: 'smooth',
-      })
-    }
+    if (!element) return
+    const headerOffset = 100
+    const offsetPosition = element.getBoundingClientRect().top + window.scrollY - headerOffset
+    window.scrollTo({ top: offsetPosition, behavior: 'smooth' })
   }
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] text-zinc-900 font-sans selection:bg-[#002FA7] selection:text-white">
-
       <LandingHeader />
 
-      {/* BACKGROUND TEXTURE: The "Digital Grain" */}
       <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" />
 
       <main className="max-w-7xl mx-auto px-4 md:px-8 flex flex-col md:grid md:grid-cols-12 gap-8 md:gap-12 pt-32 md:pt-40 relative z-10 w-full">
-        {/* Sidebar Navigation (Desktop) */}
         <aside className="hidden md:block col-span-3 sticky top-40 h-fit self-start">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
@@ -59,198 +56,140 @@ export default function TechnicalDocs() {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="space-y-8"
           >
-            <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">Documentation</h4>
+            <h4 className="text-xs font-mono text-zinc-400 uppercase tracking-widest mb-6">How it works</h4>
             <ul className="space-y-4 text-sm font-medium text-zinc-600">
-              <li
-                onClick={() => scrollToSection('abstract')}
-                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'abstract' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-              >
-                1.0 System Architecture
-              </li>
-              <li
-                onClick={() => scrollToSection('ratchet')}
-                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'ratchet' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-              >
-                2.0 The Ratchet Vulnerability
-              </li>
-              <li
-                onClick={() => scrollToSection('4cp')}
-                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === '4cp' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-              >
-                3.0 4CP Mitigation
-              </li>
-              <li
-                onClick={() => scrollToSection('algorithm')}
-                className={`pl-4 cursor-pointer border-l-2 transition-all ${activeSection === 'algorithm' ? 'text-[#002FA7] border-[#002FA7]' : 'hover:text-black border-transparent hover:border-zinc-300'}`}
-              >
-                4.0 Ingestion Protocol
-              </li>
+              {SECTIONS.map((section) => (
+                <li
+                  key={section.id}
+                  onClick={() => scrollToSection(section.id)}
+                  className={`pl-4 cursor-pointer border-l-2 transition-all ${
+                    activeSection === section.id
+                      ? 'text-[#002FA7] border-[#002FA7]'
+                      : 'hover:text-black border-transparent hover:border-zinc-300'
+                  }`}
+                >
+                  {section.label}
+                </li>
+              ))}
             </ul>
           </motion.div>
         </aside>
 
-        {/* MAIN CONTENT */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
-          animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
+          initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
+          animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
           className="col-span-12 md:col-span-9 space-y-24 pb-40 w-full"
         >
-
-          {/* Header */}
-          <section id="abstract" className="scroll-mt-32">
+          <section id="overview" className="scroll-mt-32">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
             >
+              <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">HOW IT WORKS</p>
               <h1 className="text-4xl md:text-7xl font-bold tracking-tighter mb-6 break-words">
-                Forensic Analysis <br/> <span className="text-zinc-400">Methodology v1.0</span>
+                Simple review.
+                <br />
+                <span className="text-zinc-400">Clear next step.</span>
               </h1>
               <p className="text-lg md:text-xl text-zinc-600 max-w-2xl leading-relaxed">
-                We do not guess. We measure. This document outlines the mathematical framework used by Nodal Point to identify and eliminate structural waste in commercial energy profiles.
+                We read the bill, compare it to the contract and market, and turn the result into a short summary a business leader can use.
               </p>
             </motion.div>
+          </section>
 
-            <div className="mt-12 p-4 md:p-8 bg-white rounded-2xl border border-zinc-200 shadow-sm">
-              <h3 className="text-sm font-mono text-zinc-400 uppercase tracking-widest mb-4">System Architecture</h3>
-              <p className="text-lg text-zinc-800 leading-relaxed">
-                The Texas energy market is not a commodity market; it is a volatility market. Standard brokerage treats electricity like a fixed-rate subscription. This is a fundamental error.
+          <section id="compare" className="scroll-mt-32">
+            <div className="mb-8">
+              <span className="text-[#002FA7] font-mono text-xs tracking-widest uppercase mb-2 block">What we compare</span>
+              <h2 className="text-3xl font-bold">The bill, the contract, and the market</h2>
+            </div>
+            <div className="bg-white p-4 md:p-8 rounded-2xl border border-zinc-200 shadow-sm w-full space-y-4">
+              <p className="text-zinc-600 leading-relaxed">
+                The main goal is simple: find the largest cost driver first.
               </p>
-              <p className="text-lg text-zinc-800 leading-relaxed mt-4">
-                Nodal Point treats your load profile as a dynamic data set. We engineer against the three primary vectors of cost leakage: <strong className="text-black">4CP Capacity Tags</strong>, <strong className="text-black">Demand Ratchet Penalties</strong>, and <strong className="text-black">Scarcity Pricing Adders</strong>.
-              </p>
+              <ul className="space-y-3 text-zinc-700">
+                <li className="flex gap-3">
+                  <span className="font-mono text-[#002FA7]">01</span>
+                  <span>We separate supply, delivery, and demand charges so the bill is easier to read.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="font-mono text-[#002FA7]">02</span>
+                  <span>We compare those charges against the contract terms that created them.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="font-mono text-[#002FA7]">03</span>
+                  <span>We check the market context so you know whether the bill is normal, high, or worth a deeper look.</span>
+                </li>
+              </ul>
             </div>
           </section>
 
-          {/* Section 2: Ratchet */}
-          <section id="ratchet" className="scroll-mt-32">
+          <section id="result" className="border-t border-zinc-200 pt-12 scroll-mt-32">
             <div className="mb-8">
-              <span className="text-[#002FA7] font-mono text-xs tracking-widest uppercase mb-2 block">Vector 1</span>
-              <h2 className="text-3xl font-bold">The Ratchet Vulnerability</h2>
+              <span className="font-mono text-[#002FA7] text-xs tracking-widest uppercase mb-2 block">What you get</span>
+              <h2 className="text-3xl font-bold">A short readout and a clear next move</h2>
             </div>
-            <div className="bg-white p-4 md:p-8 rounded-2xl border border-zinc-200 shadow-sm w-full">
-              <div className="flex items-start gap-4 mb-6">
-                <ShieldAlert className="w-6 h-6 text-red-500 flex-shrink-0 mt-1" />
-                <div>
-                  <h3 className="font-bold text-lg mb-2">The &ldquo;Ghost Capacity&rdquo; Problem</h3>
-                  <p className="text-zinc-600 leading-relaxed text-sm">
-                    Most commercial tariffs include an <strong className="text-black">80% Demand Ratchet</strong>.
-                    If your facility spikes to <span className="font-mono bg-zinc-100 px-1 rounded text-sm">1,000 kW</span> for just one 15-minute interval,
-                    your billed demand floor is set at <span className="font-mono bg-zinc-100 px-1 rounded text-sm">800 kW</span> for the next 11 months.
-                  </p>
-                </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-5 bg-white border border-zinc-200 rounded-xl">
+                <p className="text-sm font-semibold text-zinc-900 mb-2">Plain-English summary</p>
+                <p className="text-zinc-600 text-sm leading-relaxed">
+                  We show the main issue without making you decode a page of jargon.
+                </p>
               </div>
-
-              <div className="font-mono text-xs md:text-sm bg-[#1e1e1e] text-zinc-300 p-4 md:p-6 rounded-lg overflow-x-auto shadow-inner w-full">
-                <p className="text-zinc-500 mb-2">{"// Calculating Phantom Load Cost"}</p>
-                <div className="space-y-1 whitespace-pre-wrap break-words">
-                  <p>const <span className="text-yellow-400">Actual_Load</span> = 500; <span className="text-zinc-500">{"// kW (What you used)"}</span></p>
-                  <p>const <span className="text-red-400">Billed_Load</span> = 800; <span className="text-zinc-500">{"// kW (Ratchet Floor)"}</span></p>
-                  <p>const <span className="text-[#002FA7]">Wasted_Spend</span> = (Billed_Load - Actual_Load) * Demand_Rate;</p>
-                </div>
-              </div>
-
-              <div className="mt-6 pt-6 border-t border-zinc-100">
-                <h4 className="text-sm font-bold text-[#002FA7] mb-2">THE NODAL FIX</h4>
-                <p className="text-zinc-600 text-sm">
-                  We analyze the delta between Metered_Demand and Billed_Demand. If the variance exceeds 15%, we trigger a load-shedding protocol to reset the ratchet.
+              <div className="p-5 bg-white border border-zinc-200 rounded-xl">
+                <p className="text-sm font-semibold text-zinc-900 mb-2">Recommended next step</p>
+                <p className="text-zinc-600 text-sm leading-relaxed">
+                  If there is a meaningful issue, we point you to the most useful follow-up: review, briefing, or contract check.
                 </p>
               </div>
             </div>
           </section>
 
-          {/* 4CP Section */}
-          <section id="4cp" className="border-t border-zinc-200 pt-12 scroll-mt-32">
-            <div className="flex items-baseline gap-4 mb-6">
-              <span className="font-mono text-[#002FA7]">3.0</span>
-              <h2 className="text-3xl font-bold">4CP Coincident Peaks</h2>
+          <section className="border-t border-zinc-200 pt-12 scroll-mt-32">
+            <div className="mb-8">
+              <span className="font-mono text-[#002FA7] text-xs tracking-widest uppercase mb-2 block">Best use</span>
+              <h2 className="text-3xl font-bold">Built for people who need the answer fast</h2>
             </div>
-            <p className="text-xl text-zinc-600 leading-relaxed mb-8">
-              Your transmission costs are not based on volume. They are based on your presence on the grid during the
-              <span className="text-black font-semibold"> four most critical 15-minute intervals of the year</span>.
-            </p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              {['June', 'July', 'August', 'September'].map((month) => (
-                <div key={month} className="p-4 bg-white border border-zinc-200 rounded-xl text-center group hover:border-[#002FA7] transition-colors">
-                  <span className="block text-xs font-mono text-zinc-400 uppercase mb-1">Interval Scan</span>
-                  <span className="block text-lg font-bold text-black group-hover:text-[#002FA7] transition-colors">{month}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="bg-blue-50/50 p-6 rounded-xl border border-blue-100">
-              <h4 className="text-sm font-bold text-[#002FA7] mb-2 flex items-center gap-2">
-                <Zap className="w-4 h-4" />
-                PREDICTIVE CURTAILMENT
-              </h4>
-              <p className="text-zinc-700">
-                Our predictive engine monitors grid reserve margins. We signal your facility to curtail load during these probable intervals, effectively deleting your transmission liability for the next calendar year.
-              </p>
-            </div>
-          </section>
-
-          {/* Algorithm Section */}
-          <section id="algorithm" className="border-t border-zinc-200 pt-12 scroll-mt-32">
-            <div className="flex items-baseline gap-4 mb-6">
-              <span className="font-mono text-[#002FA7]">4.0</span>
-              <h2 className="text-3xl font-bold">The Ingestion Protocol</h2>
-            </div>
-
-            <div className="bg-[#1e1e1e] rounded-2xl overflow-hidden shadow-2xl w-full">
+            <div className="bg-[#1e1e1e] rounded-2xl overflow-hidden shadow-2xl w-full text-white">
               <div className="bg-[#2d2d2d] px-4 py-2 flex items-center gap-2 border-b border-white/5">
                 <div className="flex gap-1.5">
-                  <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
-                  <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
-                  <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
+                  <div className="w-3 h-3 rounded-full bg-red-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
+                  <div className="w-3 h-3 rounded-full bg-green-500/80" />
                 </div>
-                <span className="text-xs font-mono text-zinc-400 ml-2">nodal_logic_core.ts</span>
+                <span className="text-xs font-mono text-zinc-400 ml-2">review-summary.txt</span>
               </div>
-              <div className="p-6 md:p-8 font-mono text-xs md:text-sm text-zinc-300 overflow-x-auto">
-                <div className="space-y-4">
-                  <div>
-                    <span className="text-zinc-500">{"// Nodal Point Logic Flow"}</span>
-                  </div>
-
-                  <div>
-                    <span className="text-purple-400">IF</span> (Real_Time_Price <span className="text-blue-400">&gt;</span> <span className="text-green-400">$2,000/MWh</span>) <span className="text-purple-400">AND</span> (Grid_Reserves <span className="text-blue-400">&lt;</span> <span className="text-green-400">3,000 MW</span>):<br/>
-                    &nbsp;&nbsp;<span className="text-red-400">TRIGGER:</span> Economic_Load_Shed<br/>
-                    &nbsp;&nbsp;<span className="text-yellow-400">STATUS:</span> Active_Avoidance
-                  </div>
-
-                  <div>
-                    <span className="text-purple-400">ELSE IF</span> (Current_Demand <span className="text-blue-400">&gt;</span> <span className="text-green-400">80%_Historical_Peak</span>):<br/>
-                    &nbsp;&nbsp;<span className="text-red-400">TRIGGER:</span> Ratchet_Warning<br/>
-                    &nbsp;&nbsp;<span className="text-yellow-400">ACTION:</span> Peak_Shaving
-                  </div>
-
-                  <div>
-                    <span className="text-purple-400">ELSE</span>:<br/>
-                    &nbsp;&nbsp;<span className="text-yellow-400">STATUS:</span> Market_Float<br/>
-                    &nbsp;&nbsp;<span className="text-green-400">ACTION:</span> Optimize_Baseload
-                  </div>
-                </div>
+              <div className="p-6 md:p-8 space-y-4">
+                <div className="text-xs font-mono text-zinc-400 uppercase tracking-widest">Output</div>
+                <p className="text-zinc-300 leading-relaxed">
+                  1. What changed on the bill.
+                </p>
+                <p className="text-zinc-300 leading-relaxed">
+                  2. Why it matters to the business.
+                </p>
+                <p className="text-zinc-300 leading-relaxed">
+                  3. What to do next.
+                </p>
               </div>
             </div>
           </section>
 
-          {/* CTA Section */}
           <section className="border-t border-zinc-200 pt-20 pb-20 text-center">
             <h3 className="text-3xl md:text-5xl font-bold tracking-tighter mb-8">
-              You have seen the math.<br/>Now see your data.
+              You have the outline.
+              <br />
+              <span className="text-[#002FA7]">Now review the bill.</span>
             </h3>
             <a href="/bill-debugger" className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl">
               <Activity className="w-5 h-5" />
-              <span>Run Forensic Analysis</span>
+              <span>Review My Bill</span>
             </a>
           </section>
-
         </motion.div>
       </main>
 
       <LandingFooter />
-
     </div>
   )
 }

@@ -7,9 +7,10 @@ import { Activity, Menu, X, Lock } from 'lucide-react'
 import { useScrollEffect } from '@/hooks/useScrollEffect'
 
 const MENU_ITEMS = [
-  { label: 'The Philosophy', href: '/philosophy' },
-  { label: 'The Methodology', href: '/technical-docs' },
+  { label: 'Philosophy', href: '/philosophy' },
+  { label: 'How it works', href: '/technical-docs' },
   { label: 'Market Data', href: '/market-data' },
+  { label: 'Market Outlook', href: '/market-outlook' },
   { label: 'Contact', href: '/contact' },
 ] as const
 
@@ -38,13 +39,13 @@ export function LandingHeader() {
             </span>
           </Link>
           <div className="flex items-center gap-6">
-            <Link
+            <a
               href="/portal"
-              className="hidden md:flex items-center gap-1.5 border border-black/15 text-black/70 hover:text-black hover:border-black/30 px-4 py-2 rounded-full font-mono text-[10px] uppercase tracking-widest transition-all duration-200 hover:bg-black/[0.03]"
+              className="hidden md:flex items-center gap-2 border border-black/15 text-black/80 hover:text-black hover:border-black/30 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 hover:bg-black/[0.03]"
             >
-              <Lock className="w-3 h-3" />
-              Sign In
-            </Link>
+              <Lock className="w-4 h-4" />
+              <span>Sign In</span>
+            </a>
             <a
               href="/bill-debugger"
               className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40"
@@ -87,6 +88,15 @@ export function LandingHeader() {
             </a>
           ))}
           <div className={`mt-8 md:hidden transition-all duration-500 delay-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+            <a
+              href="/portal"
+              className="flex items-center gap-2 border border-black/15 text-black/80 hover:text-black hover:border-black/30 px-5 py-2.5 rounded-full text-lg font-medium transition-all duration-200 hover:bg-black/[0.03] inline-flex"
+            >
+              <Lock className="w-5 h-5" />
+              <span>Sign In</span>
+            </a>
+          </div>
+          <div className={`transition-all duration-500 delay-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
             <a
               href="/bill-debugger"
               className="flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-lg font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex"

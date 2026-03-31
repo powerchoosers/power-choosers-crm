@@ -57,7 +57,7 @@ function LoginContent() {
             </div>
             <CardTitle className="text-2xl font-bold tracking-tight text-white">Nodal Point CRM</CardTitle>
             <CardDescription className="text-zinc-400">
-              Securely access your market intelligence
+              Sign in to your client portal
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-4">
@@ -78,7 +78,7 @@ function LoginContent() {
               </Button>
 
               <p className="text-center text-xs text-zinc-500">
-                Only authorized Nodal Point identities can access this network.
+                Only authorized clients can access this portal.
               </p>
             </div>
 

@@ -26,38 +26,36 @@ const TICKER_ITEMS = [
 ]
 
 const REPORT_SUMMARY = [
-  { label: 'Annual spend', value: '$84,620', note: 'sample bill' },
-  { label: 'Contract end', value: 'Nov 23, 2026', note: 'notice window' },
-  { label: 'Delivery cost', value: '38%', note: 'structure' },
-  { label: 'Supply rate', value: '8.6¢', note: 'market' },
+  { label: 'Current bill', value: '$3,735.44', note: 'anonymized logistics warehouse' },
+  { label: 'Usage', value: '20,250 kWh', note: 'one billing period' },
+  { label: 'Demand', value: '120 / 125 kW', note: 'actual / billed' },
+  { label: 'Power factor', value: '91.6%', note: 'below 95% line' },
 ]
 
 const REPORT_FINDINGS = [
-  { label: 'Proposed delivery', value: '$1,280', detail: '17% above baseline' },
-  { label: 'Cycle phase', value: 'Q4 2026', detail: 'Renegotiate before notice date' },
-  { label: 'Termination date', value: 'Nov 23, 2026', detail: 'Renegotiate before leverage fades' },
-  { label: 'Peak demand risk', value: 'Medium', detail: 'Peak demand review needed' },
-  { label: 'Demand ratchet', value: '80% FLOOR', detail: 'Minimum billing penalty active' },
+  { label: 'Main issue', value: 'Delivery + demand', detail: 'Not the supply price' },
+  { label: 'Supply share', value: '48.8%', detail: 'fixed-price energy' },
+  { label: 'Delivery share', value: '49.5%', detail: 'utility side' },
+  { label: 'Demand gap', value: '5 kW', detail: '125 billed vs 120 current' },
 ]
 
-const REPORT_META = ['Sample bill', 'March billing cycle', 'Texas / ERCOT', '1-page readout']
+const REPORT_META = ['Anonymized logistics account', 'Real bill', 'Texas / Oncor', 'Actual review']
+
+const BILL_HEADER_BARS = [66, 44]
+
+const BILL_QUICK_STATS = [
+  { label: 'Usage', value: '20,250 kWh' },
+  { label: 'Demand', value: '120 / 125 kW' },
+  { label: 'Power factor', value: '91.6%' },
+]
+
+const BILL_LINE_ITEMS = [
+  { label: 'Base usage', detail: '20,250 kWh @ $0.0808412', amount: '$1,637.03' },
+  { label: 'Distribution system charge', detail: '125 kW billed', amount: '$767.64' },
+  { label: 'Transmission recovery factor', detail: '125 kW billed', amount: '$639.37' },
+]
 
 const BILL_OWNER_ROLES = ['Controller', 'CFO', 'Facilities', 'COO']
-
-const REPORT_MEETING_ITEMS = [
-  {
-    label: 'Confirms the number',
-    detail: 'The owner sees the same signal you see, with no back-and-forth.',
-  },
-  {
-    label: 'Opens the services conversation',
-    detail: 'The call shifts from explaining the bill to talking scope and fit.',
-  },
-  {
-    label: 'Moves to the next step',
-    detail: 'Proposal, renewal, or follow-up gets booked while the room is warm.',
-  },
-]
 
 export function LandingSections() {
   const observerRef = useRef<IntersectionObserver | null>(null)
@@ -316,7 +314,7 @@ export function LandingSections() {
               <div className="flex items-center justify-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <div className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest">
-                  Live signal · /MWh
+                  Live ERCOT price · /MWh
                 </div>
               </div>
             </div>
@@ -342,7 +340,7 @@ export function LandingSections() {
 
           {/* Header */}
           <div className="mb-16 reveal-on-scroll">
-            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">FORENSIC_PROTOCOL</p>
+            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">HOW_IT_WORKS</p>
             <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">Three steps. No noise.</h2>
           </div>
 
@@ -357,7 +355,7 @@ export function LandingSections() {
                   <div className="signal-connector-dot" style={{ animationDelay: '0s' }} />
                 </div>
               </div>
-              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SUBMIT</p>
+              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">UPLOAD</p>
               <p className="text-zinc-600 text-sm leading-relaxed font-medium">Upload your bill or PDF. Takes 30 seconds.</p>
             </div>
 
@@ -369,7 +367,7 @@ export function LandingSections() {
                   <div className="signal-connector-dot" style={{ animationDelay: '4s' }} />
                 </div>
               </div>
-              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">ISOLATE</p>
+              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">COMPARE</p>
               <p className="text-zinc-600 text-sm leading-relaxed font-medium">We separate delivery, supply, and contract risk.</p>
             </div>
 
@@ -381,7 +379,7 @@ export function LandingSections() {
                   <div className="signal-connector-dot" style={{ animationDelay: '8s' }} />
                 </div>
               </div>
-              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">SIGNAL</p>
+              <p className="font-mono text-[10px] text-zinc-400 uppercase tracking-[0.25em] font-bold mb-3">DECIDE</p>
               <p className="text-zinc-600 text-sm leading-relaxed font-medium">You get a clear report and a next move.</p>
             </div>
           </div>
@@ -389,219 +387,173 @@ export function LandingSections() {
       </section>
 
       {/* PROOF */}
-      <section className="relative isolate overflow-hidden bg-[#FCFCFD] px-6 py-24 border-t border-zinc-100">
+      <section className="relative isolate overflow-hidden bg-[#FCFCFD] px-6 py-12 border-t border-zinc-100">
         <div aria-hidden className="absolute inset-0 bg-white/90 pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="max-w-2xl mb-14 reveal-on-scroll">
+          <div className="max-w-2xl mb-6 reveal-on-scroll">
             <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">PROOF</p>
-            <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">What the first report proves.</h2>
-            <p className="text-lg text-zinc-600 leading-relaxed mt-5">
-              Not another dashboard. A one-page readout the people who own the bill can scan in seconds.
+            <h2 className="text-3xl md:text-4xl font-semibold tracking-tighter text-zinc-900">Real proof from a logistics account.</h2>
+            <p className="text-base md:text-lg text-zinc-600 leading-relaxed mt-3">
+              An anonymized review from a live bill. The company name is hidden, but the numbers are real.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1.12fr_0.88fr] gap-6 items-start">
             <div className="reveal-on-scroll">
               <div className="overflow-hidden rounded-[2rem] border border-zinc-200 bg-white shadow-[0_30px_70px_-40px_rgba(0,0,0,0.35)]">
-                <div className="border-b border-zinc-100 bg-[linear-gradient(180deg,#ffffff,#fafafa)] px-6 py-5 flex items-start justify-between gap-4">
+                <div className="border-b border-zinc-100 bg-[linear-gradient(180deg,#ffffff,#fafafa)] px-5 py-4 flex items-start justify-between gap-4">
                   <div>
                     <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.32em] mb-1">Sample report</p>
-                    <h3 className="text-2xl font-semibold tracking-tight text-zinc-900">Electricity Bill Readout</h3>
-                    <p className="text-sm text-zinc-500 mt-1">For controllers, CFOs, facilities managers, and COOs</p>
+                    <h3 className="text-2xl font-semibold tracking-tight text-zinc-900">Anonymized logistics warehouse</h3>
+                    <p className="text-sm text-zinc-500 mt-1">A real bill review showing what the customer actually pays for.</p>
+                  </div>
+                  <div className="shrink-0 rounded-2xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-right shadow-sm">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-400">Status</p>
+                    <p className="text-base font-semibold text-zinc-900 mt-1">Issue found</p>
+                    <p className="text-[11px] text-zinc-500 mt-1">Delivery + demand</p>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 bg-[linear-gradient(180deg,#ffffff,#fbfbfd)] p-4 md:p-5 xl:grid-cols-[1.02fr_0.98fr]">
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      {REPORT_SUMMARY.map((item) => (
+                        <div key={item.label} className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
+                          <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-zinc-400">{item.label}</p>
+                          <p className="mt-2 text-base md:text-lg font-semibold tracking-tight text-zinc-900">{item.value}</p>
+                          <p className="mt-1 text-xs text-zinc-500">{item.note}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-zinc-200 bg-zinc-50 p-4">
+                      <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">What the review found</p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {REPORT_FINDINGS.map((item) => (
+                          <div key={item.label} className="rounded-2xl border border-zinc-200 bg-white px-3 py-3">
+                            <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-zinc-400">{item.label}</p>
+                            <p className="mt-2 text-sm font-semibold text-zinc-900">{item.value}</p>
+                            <p className="mt-1 text-xs text-zinc-500">{item.detail}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.5rem] border border-zinc-200 bg-white p-4">
+                    <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">Why it matters</p>
+                    <p className="mt-2 text-lg md:text-xl font-semibold tracking-tight text-zinc-900 leading-[1.1]">
+                      Delivery and demand are the bill levers.
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-zinc-600">
+                      The fixed-price supply side is stable. The account is paying more because delivery charges are almost as large as supply, billed demand is above the current peak, and power factor sits below 95%.
+                    </p>
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {REPORT_META.map((item) => (
-                        <span
-                          key={item}
-                          className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-white border border-zinc-100 text-zinc-500 whitespace-nowrap"
-                        >
-                          {item}
+                      {BILL_OWNER_ROLES.map((role) => (
+                        <span key={role} className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 whitespace-nowrap">
+                          {role}
                         </span>
                       ))}
                     </div>
-                  </div>
-                  <div className="shrink-0 rounded-2xl border border-[#002FA7]/20 bg-[#002FA7]/10 px-4 py-3 text-right shadow-sm">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-[#002FA7]">Status</p>
-                    <p className="text-lg font-semibold text-[#002FA7] mt-1">2 risks flagged</p>
-                    <p className="text-xs text-[#002FA7]/70 mt-1">delivery and contract</p>
+                    <p className="mt-4 text-sm leading-relaxed text-zinc-500">
+                      A controller or CFO can read this in seconds: bill total, usage, demand, and the reason the bill is high.
+                    </p>
                   </div>
                 </div>
 
-                <div className="grid gap-4 bg-[linear-gradient(180deg,#ffffff,#fbfbfd)] p-5 md:p-6 xl:grid-cols-[0.95fr_1.05fr]">
-                  <div className="h-full">
-                    <div className="h-full rounded-[1.5rem] border border-[#002FA7]/12 bg-[#002FA7]/5 p-5 md:p-6 shadow-[0_12px_28px_-24px_rgba(0,47,167,0.35)] flex flex-col">
-                      <div className="flex flex-col gap-6">
-                        <div className="max-w-sm">
-                          <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">Annual spend</p>
-                          <p className="mt-3 text-4xl md:text-[3.5rem] font-semibold tracking-tight text-zinc-900 font-mono">$84,620</p>
-                          <p className="mt-2 text-sm text-zinc-600">The yearly bill tied to the current structure. Built for a fast executive read.</p>
-                        </div>
-                        <div className="rounded-2xl border border-white/70 bg-white/85 p-4">
-                          <p className="mt-2 text-base md:text-lg font-semibold text-zinc-900 leading-tight">Cycle phase and term alert</p>
-                          <p className="mt-1 text-xs text-zinc-500">2 data points need review</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                        {REPORT_SUMMARY.slice(1).map((item) => (
-                          <div
-                            key={item.label}
-                            className={`rounded-xl border border-white/70 bg-white/80 px-4 py-3.5 flex flex-col justify-start ${
-                              item.label === 'Contract end' ? 'sm:col-span-2' : ''
-                            }`}
-                          >
-                            <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-zinc-400 leading-none">
-                              {item.label}
-                            </p>
-                            <p className="mt-2.5 text-[1.55rem] font-semibold leading-none tracking-tight text-zinc-900 whitespace-nowrap font-mono">
-                              {item.value}
-                            </p>
-                            <p className="mt-2 font-mono text-[8px] uppercase tracking-[0.18em] text-[#002FA7] leading-none">
-                              {item.note}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="mt-4 rounded-2xl border border-white/70 bg-white/80 p-4">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-zinc-400">Renewal / Delivery / Supply</p>
-                          </div>
-                        </div>
-                        <div className="mt-3 h-3 overflow-hidden rounded-full bg-zinc-100">
-                          <div className="flex h-full w-full">
-                            <div className="h-full w-[38%] bg-[#002FA7]" />
-                            <div className="h-full w-[57%] bg-[#002FA7]/55" />
-                            <div className="h-full w-[5%] bg-[#002FA7]/20" />
-                          </div>
-                        </div>
-                        <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-[0.18em] text-zinc-400">
-                          <div><span className="block text-sm font-semibold tracking-tight text-zinc-900 font-mono">38%</span>DELIVERY</div>
-                          <div><span className="block text-sm font-semibold tracking-tight text-zinc-900 font-mono">57%</span>SUPPLY</div>
-                          <div><span className="block text-sm font-semibold tracking-tight text-zinc-900 font-mono">5%</span>TAX/FEES</div>
-                        </div>
-                      </div>
-
-                    </div>
-                  </div>
-
-                  <div className="h-full">
-                    <div className="h-full rounded-[1.5rem] border border-[#002FA7]/15 bg-[#002FA7]/5 p-5 md:p-6 shadow-[0_12px_28px_-24px_rgba(0,47,167,0.25)] flex flex-col">
-                      <div className="flex items-start justify-between gap-4">
-                        <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">Recommended next move</p>
-                        <span className="shrink-0 rounded-full border border-[#002FA7]/10 bg-white/80 px-3 py-1 font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">
-                          Priority
-                        </span>
-                      </div>
-                      <p className="mt-3 text-[1.7rem] font-semibold tracking-tight text-zinc-900 leading-[1.05]">
-                        Mitigate delivery charges
-                      </p>
-                      <p className="mt-1 text-[15px] font-normal leading-6 tracking-normal text-zinc-600">
-                        Check them before the renewal window closes.
-                      </p>
-                      <div className="mt-5 rounded-2xl border border-white/70 bg-white/75 relative p-4 shadow-sm overflow-hidden">
-                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#002FA7]" />
-                        <p className="font-mono text-[9px] uppercase tracking-[0.25em] text-[#002FA7] mb-1.5 pl-1.5">The Objective</p>
-                        <p className="text-sm font-medium leading-relaxed text-zinc-900 pl-1.5">
-                          Use the meeting to confirm the number and decide the next move.
-                        </p>
-                      </div>
-                      <div className="mt-5 space-y-2 flex-1">
-                        {REPORT_FINDINGS.map((item) => (
-                          <div key={item.label} className="rounded-xl border border-white/70 bg-white/75 p-3">
-                            <div className="flex items-center justify-between gap-4">
-                              <p className="text-sm font-semibold text-zinc-900 whitespace-nowrap">{item.label}</p>
-                              <p className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-[#002FA7] whitespace-nowrap text-right">{item.value}</p>
-                            </div>
-                            <p className="mt-1 text-xs leading-relaxed text-zinc-500 pr-4">{item.detail}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border-t border-zinc-100 bg-[#F8F8FA] px-5 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm font-semibold text-zinc-900">Primary Takeaway</p>
+                <div className="border-t border-zinc-100 bg-[#F8F8FA] px-5 py-2.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm font-semibold text-zinc-900">Main takeaway</p>
                   <Link href="/bill-debugger" className="inline-flex items-center gap-2 font-bold font-mono text-[10px] text-[#002FA7] uppercase tracking-widest hover:gap-3 transition-all duration-200">
-                    Review my bill <ArrowRight className="w-3 h-3" />
+                    Review My Bill <ArrowRight className="w-3 h-3" />
                   </Link>
                 </div>
               </div>
             </div>
 
-            <div className="reveal-on-scroll delay-100 pt-2">
-              <div className="space-y-5">
-                <div className="border-l-2 border-[#002FA7]/20 pl-4">
-                  <p className="font-semibold text-zinc-900 text-base">Delivery charges separated</p>
-                  <p className="text-zinc-500 text-sm leading-relaxed mt-1">
-                    The bill stops reading like a wall of line items and starts reading like a cost story.
-                  </p>
-                </div>
-                <div className="border-l-2 border-[#002FA7]/20 pl-4">
-                  <p className="font-semibold text-zinc-900 text-base">Supplier pricing mapped</p>
-                  <p className="text-zinc-500 text-sm leading-relaxed mt-1">
-                    We line up the tariff structure against what you are actually being charged.
-                  </p>
-                </div>
-                <div className="border-l-2 border-[#002FA7]/20 pl-4">
-                  <p className="font-semibold text-zinc-900 text-base">Contract risk flagged</p>
-                  <p className="text-zinc-500 text-sm leading-relaxed mt-1">
-                    You see the issue before the money goes out.
-                  </p>
-                </div>
+            <div className="reveal-on-scroll delay-100 pt-2 h-full flex flex-col">
+              <div className="flex flex-wrap justify-center gap-2 mb-4 text-center">
+                {REPORT_META.map((item) => (
+                  <span key={item} className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 whitespace-nowrap">
+                    {item}
+                  </span>
+                ))}
               </div>
-
-              <div className="mt-10 space-y-8">
-                <div>
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">Built for bill owners</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {BILL_OWNER_ROLES.map((role) => (
-                      <span key={role} className="font-mono text-[9px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-500 whitespace-nowrap">
-                        {role}
-                      </span>
-                    ))}
+              <div className="overflow-hidden rounded-[2rem] border border-zinc-200 bg-white shadow-[0_30px_70px_-40px_rgba(0,0,0,0.35)] flex-1 flex flex-col">
+                <div className="border-b border-zinc-100 bg-[linear-gradient(180deg,#ffffff,#fafafa)] px-5 py-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.32em] mb-1">Anonymized source bill</p>
+                      <h3 className="text-xl font-semibold tracking-tight text-zinc-900">Logistics warehouse</h3>
+                      <p className="text-sm text-zinc-500 mt-1">Sensitive header details are hidden. Line items stay visible.</p>
+                      <div className="mt-3 space-y-2">
+                        {BILL_HEADER_BARS.map((width, index) => (
+                          <div
+                            key={`redaction-${index}`}
+                            className="h-3 rounded-full bg-zinc-200/80"
+                            style={{ width: `${width}%` }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="shrink-0 rounded-2xl border border-zinc-200 bg-zinc-50 px-3.5 py-2.5 text-right shadow-sm">
+                      <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-400">Current charges</p>
+                      <p className="text-base font-semibold text-zinc-900 mt-1">$3,735.44</p>
+                      <p className="text-[11px] text-zinc-500 mt-1">Invoice total</p>
+                    </div>
                   </div>
-                  <p className="mt-4 text-sm leading-relaxed text-zinc-600">
-                    If you approve the spend, explain the number, or sign the renewal, this report gives you the next move in plain English.
-                  </p>
-                </div>
 
-                <div className="h-px w-full bg-zinc-100" />
-
-                <div>
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">What it removes</p>
-                  <div className="mt-4 space-y-3">
-                    {['Line-item hunting', 'Supplier back-and-forth', 'A meeting to explain the bill'].map((item) => (
-                      <div key={item} className="flex items-center gap-3 text-sm text-zinc-700">
-                        <span className="font-mono text-zinc-400">—</span>
-                        <span>{item}</span>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    {BILL_QUICK_STATS.map((item) => (
+                      <div key={item.label} className="rounded-2xl border border-zinc-200 bg-white px-3 py-2.5">
+                        <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-zinc-400">{item.label}</p>
+                        <p className="mt-2 text-sm font-semibold text-zinc-900">{item.value}</p>
                       </div>
                     ))}
                   </div>
-                </div>
 
-                <div className="h-px w-full bg-zinc-100" />
-
-                <div>
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">What the meeting does</p>
-                  <div className="mt-4 space-y-4">
-                    {REPORT_MEETING_ITEMS.map((item) => (
-                      <div key={item.label}>
-                        <p className="text-sm font-semibold text-zinc-900">{item.label}</p>
-                        <p className="mt-1 text-sm leading-relaxed text-zinc-500">{item.detail}</p>
-                      </div>
-                    ))}
+                  <div className="mt-4 space-y-2">
+                    <div className="h-3 rounded-full bg-zinc-200/80 overflow-hidden flex">
+                      <div className="h-full bg-[#002FA7]" style={{ width: '48.8%' }} />
+                      <div className="h-full bg-zinc-900/70" style={{ width: '49.5%' }} />
+                      <div className="h-full bg-zinc-300" style={{ width: '1.7%' }} />
+                    </div>
+                    <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.24em] text-zinc-400">
+                      <span>Supply 48.8%</span>
+                      <span>Delivery 49.5%</span>
+                      <span>Other 1.7%</span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="h-px w-full bg-zinc-100" />
+                <div className="bg-[linear-gradient(180deg,#ffffff,#fbfbfd)] p-4 flex-1 flex flex-col gap-4">
+                  <div className="rounded-[1.25rem] border border-zinc-200 bg-zinc-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">Top line items</p>
+                      <p className="text-sm font-semibold text-zinc-900">$3,044.04</p>
+                    </div>
 
-                <div>
-                  <p className="font-mono text-[10px] font-bold uppercase tracking-[0.28em] text-[#002FA7]">The Forensic Standard</p>
-                  <p className="mt-4 text-sm leading-relaxed text-zinc-600 italic border-l border-zinc-200 pl-4">
-                    "Precision over presentation. We map 100+ retail tariff structures and real-time ERCOT telemetry to expose structural cost leakage. No opinions—just the math."
-                  </p>
+                    <div className="mt-3 space-y-2">
+                      {BILL_LINE_ITEMS.map((row) => (
+                        <div key={row.label} className="flex items-start justify-between gap-4 border-b border-zinc-200/70 pb-2 last:border-0 last:pb-0">
+                          <div>
+                            <p className="text-sm font-medium text-zinc-900">{row.label}</p>
+                            <p className="text-[11px] text-zinc-500 mt-0.5">{row.detail}</p>
+                          </div>
+                          <p className="text-sm font-semibold text-zinc-900 whitespace-nowrap">{row.amount}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-[1.25rem] border border-[#002FA7]/15 bg-[#002FA7]/5 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-[#002FA7]">Current charges</p>
+                      <p className="text-xl font-semibold tracking-tight text-zinc-900">$3,735.44</p>
+                    </div>
+                    <p className="mt-2 text-sm leading-relaxed text-zinc-600">
+                      The client sees the total and the main drivers without reading the full invoice.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -618,7 +570,7 @@ export function LandingSections() {
             Ready to see the bill clearly?
           </h2>
           <p className="text-xl text-zinc-700 font-medium mb-10 max-w-lg mx-auto">
-            Upload your bill. We&apos;ll show the signal, the risk, and the next move.
+            Upload your bill. We&apos;ll show the issue, the risk, and the next move.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a
@@ -626,7 +578,7 @@ export function LandingSections() {
               className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl"
             >
               <Activity className="w-5 h-5" />
-              <span>Review my bill</span>
+              <span>Review My Bill</span>
             </a>
             <Link
               href="/book"

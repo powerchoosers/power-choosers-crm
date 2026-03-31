@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nodal Point // Transmission Status</title>
+    <title>Nodal Point // Meeting Status</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background-color: #050505; color: #fff; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
@@ -26,7 +26,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 </head>
 <body>
     <div class="container">
-        <div class="signal">● PROTOCOL_FAULT</div>
+        <div class="signal">● MEETING_ERROR</div>
         <h1>${message}</h1>
         <p>${detail}</p>
     </div>
@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nodal Point // Transmission Status</title>
+    <title>Nodal Point // Meeting Status</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background-color: #050505; color: #fff; font-family: monospace; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
@@ -49,9 +49,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 </head>
 <body>
     <div class="container">
-        <div class="signal">● PROTOCOL_SYNCED</div>
-        <h1>Session Declined</h1>
-        <p>Your response has been registered. You may securely close this window.</p>
+        <div class="signal">● RESPONSE_SAVED</div>
+        <h1>Response saved.</h1>
+        <p>Your response has been registered. You may close this window.</p>
     </div>
 </body>
 </html>`;
@@ -67,7 +67,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Nodal Point // Session Confirmed</title>
+    <title>Nodal Point // Meeting Confirmed</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         * { box-sizing: border-box; }
@@ -93,12 +93,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 </head>
 <body>
     <div class="container">
-        <div class="signal">● PROTOCOL_SYNCED</div>
-        <h1>Session Confirmed</h1>
-        <p class="sub">Your confirmation has been registered in the secure ledger.</p>
+        <div class="signal">● MEETING_CONFIRMED</div>
+        <h1>Meeting confirmed.</h1>
+        <p class="sub">Your response has been saved.</p>
 
         <div class="event-block">
-            <div class="event-label">Event</div>
+            <div class="event-label">Meeting</div>
             <div class="event-value">${eventTitle}</div>
             <div class="event-label">Date</div>
             <div class="event-value">${eventDate}</div>
@@ -109,30 +109,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         <div class="cal-label">// Add to your calendar</div>
         <div class="btn-group">
             <a class="btn btn-primary" href="${icsDataUri}" download="nodal-point-invite.ics">
-                ↓ DOWNLOAD CALENDAR FILE (.ICS)
+                Download calendar file (.ICS)
             </a>
             <a class="btn btn-outline" href="${googleCalUrl}" target="_blank" rel="noopener noreferrer">
-                OPEN IN GOOGLE CALENDAR
+                Open in Google Calendar
             </a>
             <a class="btn btn-outline" href="${outlookUrl}" target="_blank" rel="noopener noreferrer">
-                OPEN IN OUTLOOK
+                Open in Outlook
             </a>
         </div>
 
         <hr class="divider" />
-        <p class="close-note">You may securely close this window after adding to your calendar.</p>
+        <p class="close-note">You can close this window after adding the event to your calendar.</p>
     </div>
 </body>
 </html>`;
 
     if (!action || !task || !email) {
-        res.status(400).send(renderErrorHtml('Invalid Parameters', 'The transmission link is malformed or incomplete.'));
+        res.status(400).send(renderErrorHtml('Invalid Parameters', 'The link is missing information or was copied incorrectly.'));
         return;
     }
 
     const actionStr = String(action).toUpperCase();
     if (actionStr !== 'ACCEPT' && actionStr !== 'DECLINE') {
-        res.status(400).send(renderErrorHtml('Invalid Action', 'Only ACCEPT and DECLINE actions are permitted.'));
+        res.status(400).send(renderErrorHtml('Invalid Action', 'Use the original accept or decline link from the invitation.'));
         return;
     }
 
@@ -147,9 +147,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .single();
 
         if (taskError || !taskData) {
-            res.status(404).send(renderErrorHtml('Task Not Found', 'The requested session could not be located in the secure ledger.'));
+            res.status(404).send(renderErrorHtml('Task Not Found', 'We could not find that meeting.'));
             return;
         }
+
+        const taskMetadata = (taskData.metadata || {}) as Record<string, any>;
+        const meetingSummary = String(taskMetadata.manualIntro || 'Meeting with Nodal Point to review your bill and next steps.').trim();
 
         // 2. Update RSVP status
         const updatedMetadata = { ...(taskData.metadata || {}), rsvpStatus };
@@ -164,7 +167,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         // 3. Fire RSVP notification for CRM toast + badge
         if (taskData.ownerId) {
-            const notifTitle = actionStr === 'ACCEPT' ? 'Session Confirmed' : 'Session Declined';
+            const notifTitle = actionStr === 'ACCEPT' ? 'Meeting Confirmed' : 'Meeting Declined';
             const notifMessage = `${email} has ${actionStr === 'ACCEPT' ? 'accepted' : 'declined'} the calendar invite.`;
             await supabaseAdmin.from('notifications').insert({
                 id: crypto.randomUUID(),
@@ -238,7 +241,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'END:VTIMEZONE'
         ].join('\r\n');
 
-        const cleanDesc = (taskData.description || '').replace(/\r?\n/g, '\\n');
+        const cleanDesc = meetingSummary.replace(/\r?\n/g, '\\n');
 
         const icsContent = [
             'BEGIN:VCALENDAR',
@@ -249,11 +252,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             'METHOD:REQUEST',
             vtimezone,
             'BEGIN:VEVENT',
-            `SUMMARY:${taskData.title || 'Energy Briefing'}`,
+            `SUMMARY:${taskData.title || 'Meeting with Nodal Point'}`,
             `DESCRIPTION:${cleanDesc}`,
             `DTSTART;TZID=America/Chicago:${dtStart}`,
             `DTEND;TZID=America/Chicago:${dtEnd}`,
-            meetingUrl ? `LOCATION:${meetingUrl}` : 'LOCATION:Remote (Nodal Point Forensic Engine)',
+            meetingUrl ? `LOCATION:${meetingUrl}` : 'LOCATION:Remote (Nodal Point)',
             meetingUrl ? `URL:${meetingUrl}` : '',
             `UID:${taskData.id}@nodalpoint.io`,
             'CLASS:PUBLIC',
@@ -272,14 +275,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const icsDataUri = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`;
 
         // Google Calendar deep link
-        const gcTitle = encodeURIComponent(taskData.title || 'Energy Briefing');
-        const gcDesc = encodeURIComponent(taskData.description || '');
+        const gcTitle = encodeURIComponent(taskData.title || 'Meeting with Nodal Point');
+        const gcDesc = encodeURIComponent(meetingSummary);
         const gcLoc = encodeURIComponent(meetingUrl || 'Remote');
         const googleCalUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${gcTitle}&dates=${dtStartUtc.replace(/[-:]/g, '')}/${dtEndUtc.replace(/[-:]/g, '')}&details=${gcDesc}&location=${gcLoc}`;
 
         // Outlook Web deep link
-        const olTitle = encodeURIComponent(taskData.title || 'Energy Briefing');
-        const olBody = encodeURIComponent(taskData.description || '');
+        const olTitle = encodeURIComponent(taskData.title || 'Meeting with Nodal Point');
+        const olBody = encodeURIComponent(meetingSummary);
         const olLoc = encodeURIComponent(meetingUrl || 'Remote');
         const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${olTitle}&startdt=${apptDate.toISOString()}&enddt=${addHours(apptDate, 1).toISOString()}&body=${olBody}&location=${olLoc}`;
 
@@ -287,13 +290,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             icsDataUri,
             googleCalUrl,
             outlookUrl,
-            taskData.title || 'Energy Briefing',
+            taskData.title || 'Meeting with Nodal Point',
             displayDate,
             displayTime
         ));
 
     } catch (error: any) {
         console.error('[RSVP Webhook] Fatal Error:', error);
-        res.status(500).send(renderErrorHtml('System Fault', 'The synchronization engine experienced an error processing your response.'));
+        res.status(500).send(renderErrorHtml('System Fault', 'We had trouble saving your response. Please try the original link again.'));
     }
 }

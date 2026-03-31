@@ -13,7 +13,7 @@ function ForensicPreview() {
     return (
         <div className="relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
             <div className="p-5 blur-[3px] select-none pointer-events-none">
-                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">FORENSIC_DASHBOARD</p>
+                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">CLIENT_DASHBOARD</p>
                 <div className="space-y-3">
                     {[
                         { label: 'DEMAND_EXPOSURE', value: '$4,820 / mo' },
@@ -32,7 +32,7 @@ function ForensicPreview() {
             </div>
             <div className="absolute inset-0 bg-zinc-950/60 flex flex-col items-center justify-center gap-2">
                 <Lock className="w-5 h-5 text-zinc-500" />
-                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client Access Only</p>
+                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client access only</p>
             </div>
         </div>
     );
@@ -42,14 +42,14 @@ function MarketPreview() {
     return (
         <div className="relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
             <div className="p-5 blur-[3px] select-none pointer-events-none">
-                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">LIVE_MARKET_FEED</p>
+                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">LIVE_MARKET_SNAPSHOT</p>
                 <div className="space-y-3">
                     {[
                         { label: 'LZ_SOUTH', value: '$22.35', sub: '↑ 4.2%' },
                         { label: 'LZ_HOUSTON', value: '$21.80', sub: '↑ 3.8%' },
                         { label: 'SYSTEM_LOAD', value: '48.1 GW', sub: 'Live' },
                         { label: 'RESERVES', value: '19.0 GW', sub: 'Adequate' },
-                        { label: 'SCARCITY_PROB', value: '0.0%', sub: 'Signal' },
+                        { label: 'SCARCITY_PROB', value: '0.0%', sub: 'Trend' },
                     ].map(row => (
                         <div key={row.label} className="flex justify-between items-center border-b border-white/5 pb-2">
                             <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-wider">{row.label}</span>
@@ -63,7 +63,7 @@ function MarketPreview() {
             </div>
             <div className="absolute inset-0 bg-zinc-950/60 flex flex-col items-center justify-center gap-2">
                 <Lock className="w-5 h-5 text-zinc-500" />
-                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client Access Only</p>
+                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client access only</p>
             </div>
         </div>
     );
@@ -73,7 +73,7 @@ function ContractPreview() {
     return (
         <div className="relative rounded-2xl overflow-hidden border border-white/5 bg-zinc-900">
             <div className="p-5 blur-[3px] select-none pointer-events-none">
-                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">CONTRACT_MONITOR</p>
+                <p className="font-mono text-[9px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">CONTRACT_SUMMARY</p>
                 <div className="space-y-3">
                     {[
                         { label: 'ACTIVE CONTRACT', value: 'Constellation Energy', alert: false },
@@ -91,7 +91,7 @@ function ContractPreview() {
             </div>
             <div className="absolute inset-0 bg-zinc-950/60 flex flex-col items-center justify-center gap-2">
                 <Lock className="w-5 h-5 text-zinc-500" />
-                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client Access Only</p>
+                <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-widest">Client access only</p>
             </div>
         </div>
     );
@@ -153,7 +153,7 @@ export default function PortalContent() {
 
             if (error) {
                 if (error.message.toLowerCase().includes('signups not allowed') || error.status === 422) {
-                    setErrorMsg('This email isn\'t registered as a Nodal Point client. To get access, book a briefing or run a free analysis below.');
+                    setErrorMsg('This email isn\'t registered as a Nodal Point client. To get access, book a briefing or review your bill below.');
                 } else {
                     setErrorMsg(error.message);
                 }
@@ -199,10 +199,10 @@ export default function PortalContent() {
                     <div className="w-full max-w-sm mx-auto lg:mx-0">
                         <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-4">CLIENT_PORTAL</p>
                         <h1 className="text-4xl font-bold tracking-tighter text-white mb-3 leading-tight">
-                            Your energy intelligence dashboard.
+                            Your client dashboard.
                         </h1>
                         <p className="text-zinc-400 text-sm leading-relaxed mb-10">
-                            Sign in with your credentials. Client access is by engagement only.
+                            Sign in with your credentials. Access is by invitation only.
                         </p>
 
                         {status === 'sent' ? (
@@ -270,7 +270,7 @@ export default function PortalContent() {
                                         <span className="font-mono text-sm">Authenticating...</span>
                                     ) : (
                                         <>
-                                            <span className="font-mono text-sm uppercase tracking-wider">Access Portal</span>
+                                            <span className="font-mono text-sm uppercase tracking-wider">Sign In</span>
                                             <ArrowRight className="w-4 h-4" />
                                         </>
                                     )}
@@ -352,7 +352,7 @@ export default function PortalContent() {
                                 <div className="flex items-center gap-3">
                                     <Activity className="w-4 h-4 text-white" />
                                     <div>
-                                        <p className="text-sm font-semibold">Run a Free Analysis</p>
+                                        <p className="text-sm font-semibold">Review My Bill</p>
                                         <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Upload your bill · 60 seconds</p>
                                     </div>
                                 </div>
@@ -378,7 +378,7 @@ export default function PortalContent() {
                     <div className="hidden lg:flex flex-col gap-4">
                         <div className="flex items-center gap-2 mb-2">
                             <div className="w-1.5 h-1.5 rounded-full bg-zinc-700" />
-                            <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest">What clients see</p>
+                            <p className="font-mono text-[9px] text-zinc-600 uppercase tracking-widest">What you see inside</p>
                         </div>
                         <ForensicPreview />
                         <div className="grid grid-cols-2 gap-4">

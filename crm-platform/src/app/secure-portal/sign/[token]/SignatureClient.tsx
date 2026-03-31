@@ -212,7 +212,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
     const handleDownload = () => {
         window.open(`/api/signatures/download?token=${token}`, '_blank')
-        toast.success('Generating review copy with forensic watermark...')
+        toast.success('Generating review copy...')
     }
 
     const skipToNextField = () => {
@@ -255,7 +255,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     animate={{ y: 0, opacity: 1 }}
                     className="text-3xl text-zinc-50 uppercase tracking-[0.3em] font-light mb-4"
                 >
-                    Document Secured
+                    Document signed
                 </motion.h1>
                 <motion.div
                     initial={{ y: 20, opacity: 0 }}
@@ -263,10 +263,10 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                     className="max-w-md p-6 border border-white/5 bg-white/[0.02] rounded-lg space-y-4"
                 >
                     <p className="text-sm text-zinc-400 font-sans leading-relaxed">
-                        The {kindConfig.documentLabel.toLowerCase()} has been cryptographically sealed with a forensic audit trail. A final copy is being dispatched to you and our compliance team.
+                        The {kindConfig.documentLabel.toLowerCase()} has been signed and a final copy is being sent to you and our team.
                     </p>
                     <div className="pt-4 border-t border-white/5 flex flex-col items-center gap-2">
-                        <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Nodal Point forensic systems</span>
+                        <span className="text-[10px] text-zinc-600 uppercase tracking-widest">Nodal Point secure delivery</span>
                         <div className="h-1px w-12 bg-[#002FA7]/30" />
                     </div>
                 </motion.div>
@@ -282,7 +282,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
             <header className="border-b border-white/5 bg-zinc-950 px-4 md:px-6 py-3 md:py-0 md:h-16 flex items-center justify-between z-50 shrink-0 gap-3">
                 <div className="flex flex-col min-w-0 flex-1">
                     <h1 className="text-xs font-mono uppercase tracking-[0.2em] text-white font-bold">
-                        Forensic Document Review
+                    Secure Document Review
                     </h1>
                     <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5 truncate">
                         ID: {request.id.substring(0, 12)} · {request.document?.name}
@@ -292,12 +292,12 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                 <div className="flex items-center shrink-0">
                     <div className="flex items-center gap-2 px-2.5 py-1.5 rounded border border-emerald-500/20 bg-emerald-500/5 text-emerald-500/70 font-mono text-[9px] uppercase tracking-widest">
                         <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                        <span className="hidden sm:inline">256-Bit Encrypted Session</span>
+                        <span className="hidden sm:inline">Protected session</span>
                     </div>
                 </div>
             </header>
 
-            {/* Main Body: Two Column Forensic Layout */}
+            {/* Main Body: Two Column Layout */}
             <div className="flex-1 flex flex-col md:flex-row md:overflow-hidden">
 
                 {/* Left: Document Viewport */}
@@ -354,7 +354,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                                     loading={
                                         <div className="flex flex-col items-center justify-center p-20 gap-4">
                                             <Loader2 className="w-8 h-8 animate-spin text-[#002FA7]" />
-                                            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Decrypting Document Payload</div>
+                                            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Loading document</div>
                                         </div>
                                     }
                                 >
@@ -428,13 +428,13 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center text-zinc-700 font-mono gap-4 uppercase tracking-widest text-xs">
                                 <FileText className="w-12 h-12 opacity-20" />
-                                <span>Payload Unavailable</span>
+                                <span>Document unavailable</span>
                             </div>
                         )}
                     </div>
                 </main>
 
-                {/* Right: Forensic Console (The Action Panel) */}
+                {/* Right: Action Panel */}
                 <aside className="w-full md:w-[384px] shrink-0 border-t md:border-t-0 md:border-l border-white/5 bg-zinc-950 flex flex-col z-40 shadow-2xl md:overflow-y-auto">
                     <div className="p-6 flex-1 md:overflow-y-auto np-scroll space-y-8">
 
@@ -529,12 +529,12 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             </div>
                         )}
 
-                        {/* Signature Instrument */}
+                        {/* Signature */}
                         <div ref={sigPadScrollRef} className="space-y-4 pt-4 border-t border-white/5">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <PenTool className="w-4 h-4 text-zinc-600" />
-                                    <h2 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Sign Instrument</h2>
+                                    <h2 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Signature</h2>
                                 </div>
                                 <button onClick={handleClear} className="text-[9px] font-mono uppercase text-rose-500/70 hover:text-rose-400 transition-colors">
                                     Reset
@@ -589,7 +589,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             </div>
 
                             <p className="text-[9px] text-zinc-600 font-mono leading-relaxed uppercase tracking-tighter opacity-60">
-                                Executing this instrument binds you to the terms under universal forensic e-signature standards.
+                                Signing this document confirms the terms shown above.
                             </p>
                         </div>
                     </div>
@@ -604,7 +604,7 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
                             {isSubmitting ? (
                                 <>
                                     <Loader2 className="w-4 h-4 animate-spin" />
-                                    <span>Sealing forensic record...</span>
+                                    <span>Saving signed copy...</span>
                                 </>
                             ) : (
                                 <>

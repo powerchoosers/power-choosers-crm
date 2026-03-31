@@ -48,7 +48,7 @@ export function HeroSection() {
         </div>
       </div>
       {/* BREATHING ORB: Ambient signal presence */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" aria-hidden>
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-0" aria-hidden>
         <div
           className="hero-breathe-orb w-[700px] h-[700px] rounded-full"
           style={{ background: 'radial-gradient(circle, rgba(0,47,167,0.20) 0%, transparent 65%)' }}

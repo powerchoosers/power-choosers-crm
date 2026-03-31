@@ -190,7 +190,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Send to Visitor
         await zohoService.sendEmail({
             to: email,
-            subject: `Signal Detected: ${companyInfo.name} // Forensic Snapshot`,
+            subject: `Your bill review is ready for ${companyInfo.name}`,
             html: customerHtml,
             from: ALIAS_EMAIL,
             fromName: 'Nodal Point',

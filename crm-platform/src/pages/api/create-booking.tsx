@@ -217,7 +217,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Step 5: Send confirmation to Customer
       if (source !== 'guide-download' && emailLower) {
-        const customerSubject = "Forensic Briefing Confirmed // Nodal Point";
+        const customerSubject = "Your meeting is confirmed // Nodal Point";
         const customerHtml = await render(
           <BookingConfirmation
             contactName={contactNameTrimmed}
@@ -234,7 +234,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           subject: customerSubject,
           html: customerHtml,
           from: 'signal@nodalpoint.io',
-          fromName: 'Nodal Point Security',
+          fromName: 'Nodal Point',
           userEmail: ADMIN_EMAIL
         });
         logger.log(`[Create Booking] Sent confirmation email to ${emailLower}`);

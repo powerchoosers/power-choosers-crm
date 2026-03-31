@@ -24,7 +24,7 @@ const OPTIONS: { value: UnsubscribeType; label: string; description: string; ico
   },
   {
     value: 'spike_only',
-    label: 'Energy alerts only',
+    label: 'Important updates only',
     description: 'Only reach out when market conditions or contract timing make it worth my attention.',
     icon: <Zap className="w-5 h-5 text-zinc-400" />,
   },
@@ -37,7 +37,7 @@ function ConfirmedView({ type, email }: { type: UnsubscribeType; email: string }
       sub: `${email} will not receive further outreach from Nodal Point.`,
     },
     pause_90: {
-      headline: 'Signal paused for 90 days.',
+      headline: 'Emails paused for 90 days.',
       sub: `We'll stand down until ${new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`,
     },
     spike_only: {
@@ -209,7 +209,7 @@ function UnsubscribeContent() {
         transition={{ duration: 0.7, delay: 0.2, ease: [0.23, 1, 0.32, 1] }}
         className="mt-8 text-xs text-zinc-700 text-center max-w-xs"
       >
-        Nodal Point · Energy Intelligence · Fort Worth, TX<br />
+        Nodal Point · Commercial Energy · Fort Worth, TX<br />
         Your preference will be applied within minutes.
       </motion.p>
     </div>

@@ -22,7 +22,7 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
     return (
         <Html>
             <Head />
-            <Preview>Signal Detected: {company} // Forensic Snapshot</Preview>
+            <Preview>Bill review ready: {company}</Preview>
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
@@ -34,35 +34,35 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                                 style={{ width: "32px", height: "32px", display: "block", marginRight: "12px" }}
                             />
                             <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>FORENSICS</span>
+                                NODAL POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>FORENSICS</span>
                             </Text>
                         </div>
                     </Section>
 
                     <Text style={headerLabel}>
-                        ● SIGNAL_DETECTED
+                        ● REVIEW_READY
                     </Text>
                     <Text style={mainHeading}>
-                        Analysis Complete.
+                        Your bill review is ready.
                     </Text>
 
                     {/* Body */}
                     <Text style={bodyText}>
                         {name},<br /><br />
-                        Our forensic engine has processed the energy profile for <strong style={{ color: "#fff" }}>{company}</strong>. We detected structural inefficiencies exposing your ledger to unnecessary volatility.
+                        We reviewed the bill for <strong style={{ color: "#fff" }}>{company}</strong> and pulled out the main cost drivers.
                     </Text>
 
                     <Text style={bodyText}>
-                        Based on the data extracted from your utility bills, your facility in {stats.location.split(',')[0]} has been assigned a Health Grade of <strong>{stats.grade}</strong>.
+                        Based on the bill data, your facility in {stats.location.split(',')[0]} received an initial rating of <strong>{stats.grade}</strong>.
                     </Text>
 
                     {/* Data Card */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// DIAGNOSTIC_OUTPUT</Text>
+                        <Text style={cardLabel}>// REVIEW_SUMMARY</Text>
 
                         <div style={gridContainer}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>HEALTH_GRADE</Text>
+                                <Text style={itemLabel}>REVIEW_GRADE</Text>
                                 <Text style={{
                                     color: stats.grade.includes('A') ? "#00CC88" : stats.grade.includes('B') ? "#FFCC00" : "#FF4444",
                                     fontSize: "20px",
@@ -72,11 +72,11 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                                 }}>{stats.grade}</Text>
                             </div>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>EST_VARIANCE</Text>
+                                <Text style={itemLabel}>ESTIMATED_VARIANCE</Text>
                                 <Text style={{ color: "#00CC88", fontSize: "20px", fontWeight: "bold", margin: "5px 0 0", fontFamily: "monospace" }}>{stats.savings}</Text>
                             </div>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>RISK</Text>
+                                <Text style={itemLabel}>RISK_LEVEL</Text>
                                 <Text style={{ color: stats.risk === 'HIGH' ? "#FF4444" : "#fff", fontSize: "20px", fontWeight: "bold", margin: "5px 0 0", fontFamily: "monospace" }}>{stats.risk}</Text>
                             </div>
                         </div>
@@ -114,7 +114,7 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
 
                     {/* Enrichment Context */}
                     <Text style={extraContext}>
-                        We also noted your facility in {stats.location.split(',')[0]} operates in a {stats.zone} current experiencing reserve capacity tightness.
+                        We also noted that your facility in {stats.location.split(',')[0]} is in a zone with tighter reserve capacity right now.
                     </Text>
 
                     <Section style={{ textAlign: 'center', marginTop: '40px' }}>
@@ -122,12 +122,12 @@ export default function CustomerDiagnostic({ name, company, stats, reportLink }:
                             href={reportLink}
                             style={button}
                         >
-                            Schedule Forensic Briefing
+                            Book a review
                         </Button>
                     </Section>
 
                     <Text style={footer}>
-                        Nodal Point // Signal Over Noise<br />
+                        Nodal Point // Energy review<br />
                         Fort Worth, TX
                     </Text>
 

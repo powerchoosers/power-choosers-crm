@@ -14,7 +14,7 @@ const SECTIONS = [
     title: 'Acceptance of Terms',
     content: (
       <>
-        <p>By accessing nodalpoint.io or using any Nodal Point service — including the Bill Debugger, forensic analysis reports, or consultation services — you agree to be bound by these Terms of Service.</p>
+        <p>By accessing nodalpoint.io or using any Nodal Point service — including the Bill Debugger, reports, or consultation services — you agree to these Terms of Service.</p>
         <p>If you do not agree to these terms, do not use the platform. These terms apply to all visitors, users, and clients.</p>
       </>
     ),
@@ -25,13 +25,13 @@ const SECTIONS = [
     title: 'Description of Services',
     content: (
       <>
-        <p>Nodal Point provides commercial energy forensics and advisory services, including:</p>
+        <p>Nodal Point provides commercial energy bill review and advisory services, including:</p>
         <ul>
-          <li><strong>Bill Debugger</strong> — an automated tool that analyzes your energy bill against supplier tariffs to identify cost leakage.</li>
-          <li><strong>Forensic Analysis Reports</strong> — detailed written analysis of your energy load profile, demand charges, and contract structure.</li>
-          <li><strong>Advisory Consultations</strong> — direct engagement with Nodal Point analysts to develop an energy cost reduction strategy.</li>
+          <li><strong>Bill Debugger</strong> — an automated tool that reviews your energy bill against market and utility data to identify cost issues.</li>
+          <li><strong>Reports</strong> — written analysis of your load profile, demand charges, and contract structure.</li>
+          <li><strong>Consultations</strong> — direct discussions with Nodal Point analysts about the findings and next steps.</li>
         </ul>
-        <p>All analysis is based solely on information you provide. We are an advisory and analytical service — we do not act as your energy supplier, utility provider, or legal representative.</p>
+        <p>All analysis is based on the information you provide. We are an advisory and analytical service, not your energy supplier, utility provider, or legal representative.</p>
       </>
     ),
   },
@@ -42,8 +42,8 @@ const SECTIONS = [
     content: (
       <>
         <p>The analysis, reports, and recommendations provided by Nodal Point are informational in nature. Nothing in our services constitutes financial, legal, tax, or investment advice.</p>
-        <p>Energy market conditions are complex and subject to change. Historical performance of tariff structures does not guarantee future outcomes. You are responsible for independently verifying any recommendations before making energy procurement decisions.</p>
-        <p>We strongly recommend consulting qualified legal and financial advisors before signing any energy contract.</p>
+        <p>Energy markets change, and past results do not guarantee future outcomes. You are responsible for verifying any recommendation before making a procurement decision.</p>
+        <p>We recommend working with qualified legal and financial advisors whenever you need that kind of guidance.</p>
       </>
     ),
   },
@@ -70,9 +70,9 @@ const SECTIONS = [
     title: 'Accuracy of Analysis',
     content: (
       <>
-        <p>Our tariff simulation engine is built on current ERCOT market data and supplier rate schedules. We maintain a 99.9% uptime and accuracy standard for our data sources.</p>
-        <p>However, the accuracy of your specific analysis depends on the quality and completeness of the data you submit. Nodal Point is not liable for errors in analysis resulting from incomplete, illegible, or inaccurate bills or usage data provided by you or your utility.</p>
-        <p>Tariff structures and utility rates change. Analysis reflects conditions at the time of generation and may not account for subsequent regulatory or market changes.</p>
+        <p>We use current market data and utility rate schedules where available. We try to keep the information accurate, but we cannot guarantee a specific result or savings amount.</p>
+        <p>Your analysis depends on the quality and completeness of the bill and usage data you provide. If the input is incomplete or inaccurate, the results may be too.</p>
+        <p>Market conditions and utility rates can change after a report is generated.</p>
       </>
     ),
   },
@@ -82,8 +82,8 @@ const SECTIONS = [
     title: 'Intellectual Property',
     content: (
       <>
-        <p>All content on nodalpoint.io — including the forensic methodology, analysis framework, software, design, and written content — is the intellectual property of Nodal Point and protected by applicable copyright and trade secret law.</p>
-        <p>Your forensic reports are licensed to you for personal and internal business use only. You may not redistribute, resell, or publish them without written consent from Nodal Point.</p>
+        <p>All content on nodalpoint.io — including the review method, software, design, and written content — is the intellectual property of Nodal Point and protected by applicable copyright and trade secret law.</p>
+        <p>Your reports are licensed to you for personal and internal business use only. You may not redistribute, resell, or publish them without written consent from Nodal Point.</p>
         <p>You retain full ownership of any data you submit to the platform.</p>
       </>
     ),
@@ -101,7 +101,7 @@ const SECTIONS = [
           <li>Losses resulting from market changes after analysis delivery.</li>
           <li>Service interruptions, data loss, or security incidents outside our reasonable control.</li>
         </ul>
-        <p>Our total liability to you for any claim arising from use of the platform shall not exceed the fees paid by you to Nodal Point in the three months preceding the claim.</p>
+        <p>Our total liability for any claim arising from use of the platform will not exceed the fees you paid to Nodal Point in the three months before the claim.</p>
       </>
     ),
   },
@@ -112,7 +112,7 @@ const SECTIONS = [
     content: (
       <>
         <p>We reserve the right to suspend or terminate access to the platform at any time for violations of these terms, suspected fraudulent activity, or for any other reason at our discretion.</p>
-        <p>You may terminate your engagement with Nodal Point at any time by emailing <a href="mailto:signal@nodalpoint.io">signal@nodalpoint.io</a>. Upon termination, your data will be deleted in accordance with our Privacy Policy.</p>
+        <p>You may end your engagement with Nodal Point at any time by emailing <a href="mailto:signal@nodalpoint.io">signal@nodalpoint.io</a>. We will delete your data as described in the Privacy Policy.</p>
       </>
     ),
   },
@@ -157,7 +157,7 @@ export default function TermsOfService() {
             Terms of Service
           </h1>
           <p className="text-zinc-500 text-lg leading-relaxed max-w-2xl">
-            These terms define the relationship between Nodal Point and the businesses that use our forensic energy analysis platform. Plain language where possible. No surprises.
+            These terms explain how the platform works, what you can expect from us, and what we expect from you. Plain language where possible.
           </p>
           <div className="mt-6 flex flex-wrap gap-6 text-sm font-mono text-zinc-400">
             <span>Effective: March 2026</span>

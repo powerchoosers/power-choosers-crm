@@ -159,12 +159,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 }
                 const sequenceCount = metadata?.sequence || 0;
                 
-                // Format description for both plain text and HTML
-                const cleanDesc = (description || '').replace(/\r?\n/g, '\\n');
-                const htmlDescription = metadata?.htmlDescription || description || '';
-                const cleanHtml = htmlDescription.replace(/\r?\n/g, '<br/>');
+                // Keep the customer-facing invite plain. Internal task notes stay in the CRM.
+                const customerIntro = manualIntro?.trim() || `A meeting has been scheduled for ${contactName}. We will review the bill and the main next steps for ${targetCompanyName}.`;
+                const cleanDesc = customerIntro.replace(/\r?\n/g, '\\n');
+                const cleanHtml = customerIntro.replace(/\r?\n/g, '<br/>');
 
-                const apptLoc = url ? url : 'Remote (Nodal Point Forensic Engine)';
+                const apptLoc = url ? url : 'Remote (Nodal Point)';
 
                 // Timezone structure enforcing CST/CDT rules
                 const vtimezone = [
@@ -195,7 +195,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     'METHOD:REQUEST',
                     vtimezone,
                     'BEGIN:VEVENT',
-                    `SUMMARY:Energy Briefing: ${contactName}`,
+                    `SUMMARY:Meeting with Nodal Point: ${contactName}`,
                     `DESCRIPTION:${cleanDesc}`,
                     `X-ALT-DESC;FMTTYPE=text/html:<!DOCTYPE HTML><HTML><BODY>${cleanHtml}</BODY></HTML>`,
                     `DTSTART;TZID=America/Chicago:${format(chicagoDate, "yyyyMMdd'T'HHmmss")}`,
@@ -252,7 +252,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         appointmentTime={apptTimeStr}
                         description={description}
                         manualIntro={manualIntro}
-                        operationalVector={(metadata?.taskType || 'Meeting').toUpperCase()}
+                        operationalVector={metadata?.taskType || 'Meeting'}
                         taskId={task.id}
                         prospectEmail={contact.email}
                         sender={sender}
@@ -264,7 +264,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 await zohoService.sendEmail({
                     to: contact.email,
                     fromName: sender.name,
-                    subject: `Energy Briefing: ${contactName}`,
+                    subject: `Meeting invitation: ${contactName}`,
                     html: emailHtml,
                     userEmail: userEmail,
                     uploadedAttachments: uploadedAttachments
@@ -280,9 +280,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         accountId: trueAccountId || null,
                         from: userEmail,
                         to: JSON.stringify([contact.email]),
-                        subject: `Energy Briefing: ${contactName}`,
+                        subject: `Meeting invitation: ${contactName}`,
                         html: emailHtml,
-                        text: description || '',
+                        text: customerIntro,
                         status: 'sent',
                         type: 'sent',
                         timestamp: sentAt,
@@ -293,7 +293,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         metadata: {
                             calendarInvite: true,
                             taskId: task.id,
-                            inviteContext: metadata?.inviteContext || 'forensic_diagnostic'
+                            inviteContext: metadata?.inviteContext || 'customer_meeting'
                         }
                     });
                 } catch (logErr: any) {

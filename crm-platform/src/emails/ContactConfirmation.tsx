@@ -11,7 +11,7 @@ export default function ContactConfirmation({ name }: ContactConfirmationProps) 
   return (
     <Html>
       <Head />
-      <Preview>Signal received. We'll be in touch shortly — Nodal Point</Preview>
+      <Preview>Thanks for reaching out — Nodal Point</Preview>
       <Body style={main}>
         <Container style={container}>
           {/* Header */}
@@ -23,12 +23,12 @@ export default function ContactConfirmation({ name }: ContactConfirmationProps) 
                 style={{ width: "32px", height: "32px", display: "block", marginRight: "12px" }}
               />
               <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
+                NODAL POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
               </Text>
             </div>
           </Section>
 
-          <Text style={headerLabel}>● SIGNAL_RECEIVED</Text>
+          <Text style={headerLabel}>● MESSAGE_RECEIVED</Text>
           <Text style={mainHeading}>We got your message.</Text>
 
           <Text style={bodyText}>
@@ -52,7 +52,7 @@ export default function ContactConfirmation({ name }: ContactConfirmationProps) 
             <Hr style={hr} />
             <div style={stepRow}>
               <Text style={stepNumber}>03</Text>
-              <Text style={stepText}>If there's a fit, we schedule a forensic briefing and show you the numbers.</Text>
+              <Text style={stepText}>If there&apos;s a fit, we schedule a review and show you the numbers.</Text>
             </div>
           </Section>
 
@@ -64,7 +64,7 @@ export default function ContactConfirmation({ name }: ContactConfirmationProps) 
           </Text>
 
           <Text style={footer}>
-            Nodal Point // Forensic Energy Intelligence<br />
+            Nodal Point // Energy support<br />
             Fort Worth, TX · nodalpoint.io
           </Text>
         </Container>

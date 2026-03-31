@@ -35,7 +35,7 @@ export default function BriefingReminder({
     return (
         <Html>
             <Head />
-            <Preview>Briefing Reminder — 1 Hour // {contactName}</Preview>
+            <Preview>Reminder: your meeting starts in 1 hour // {contactName}</Preview>
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
@@ -49,26 +49,26 @@ export default function BriefingReminder({
                                 style={{ display: "block", marginRight: "12px" }}
                             />
                             <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
+                                NODAL POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
                             </Text>
                         </div>
                     </Section>
 
-                    <Text style={headerLabel}>● REMINDER_SIGNAL // T-MINUS 60</Text>
+                    <Text style={headerLabel}>● REMINDER // 60 MINUTES</Text>
 
                     <Section style={{ marginBottom: "24px" }}>
-                        <Text style={mainHeading}>Your briefing starts in 1 hour.</Text>
+                        <Text style={mainHeading}>Your meeting starts in 1 hour.</Text>
                     </Section>
 
                     <Text style={bodyText}>
-                        {contactName}, this is a reminder that your energy briefing with {sender.name} is scheduled to begin in approximately one hour.
+                        {contactName}, this is a reminder that your meeting with {sender.name} is scheduled to begin in about one hour.
                     </Text>
 
                     {/* Join button for Video Call — top of email, prominent */}
                     {isVideoCall && meetingUrl && (
                         <Section style={{ marginBottom: "28px", textAlign: "center" as const }}>
                             <Link href={meetingUrl} style={joinButton}>
-                                ▶ JOIN VIDEO BRIEFING
+                                ▶ JOIN MEETING
                             </Link>
                             <Text style={{ color: "#555", fontSize: "10px", fontFamily: "monospace", margin: "10px 0 0", letterSpacing: "1px" }}>
                                 {meetingUrl}
@@ -78,7 +78,7 @@ export default function BriefingReminder({
 
                     {/* Details card */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// {companyName.toUpperCase()} // SESSION_DETAILS</Text>
+                        <Text style={cardLabel}>// {companyName.toUpperCase()} // MEETING_DETAILS</Text>
 
                         <div style={gridRow}>
                             <div style={gridItem}>
@@ -95,12 +95,12 @@ export default function BriefingReminder({
 
                         <div style={gridRow}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>ORGANIZATION</Text>
+                                <Text style={itemLabel}>COMPANY</Text>
                                 <Text style={itemValue}>{companyName}</Text>
                             </div>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>FORMAT</Text>
-                                <Text style={itemValue}>{taskType.toUpperCase()}</Text>
+                                <Text style={itemLabel}>MEETING TYPE</Text>
+                                <Text style={itemValue}>{taskType}</Text>
                             </div>
                         </div>
                     </Section>
@@ -115,7 +115,7 @@ export default function BriefingReminder({
                                     <Link href={`tel:${contactPreferredPhone}`} style={{ color: "#fff", fontWeight: "bold" }}>
                                         {contactPreferredPhone}
                                     </Link>
-                                    {' '}— please ensure that line is available.
+                                    {' '}— please make sure that line is available.
                                 </>
                             ) : (
                                 <>{sender.name} will reach out at the scheduled time.</>

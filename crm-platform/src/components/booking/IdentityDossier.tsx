@@ -107,7 +107,7 @@ export default function IdentityDossier({
                 <div className="flex items-center gap-2 mb-2">
                     <div className={`w-2 h-2 rounded-full ${loading ? 'bg-amber-500 animate-pulse' : isManualEntry ? 'bg-amber-500' : 'bg-emerald-500'}`} />
                     <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
-                        {loading ? 'RESOLVING_IDENTITY_VECTOR...' : isManualEntry ? 'CONTACT_DETAILS' : 'IDENTITY_VERIFIED'}
+                        {loading ? 'LOOKING_UP_CONTACT...' : isManualEntry ? 'ENTER_CONTACT_DETAILS' : 'CONTACT_FOUND'}
                     </span>
                 </div>
 
@@ -150,7 +150,7 @@ export default function IdentityDossier({
                 </div>
             </div>
 
-            {/* Forensic Grid or Silent Manual Entry Form */}
+            {/* Contact details or manual entry form */}
             <div className="space-y-3">
                 {isManualEntry ? (
                     <motion.div
@@ -181,7 +181,7 @@ export default function IdentityDossier({
                             />
                         </div>
                         <div>
-                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Title</label>
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Job title</label>
                             <input
                                 type="text"
                                 value={manualFields.title}
@@ -191,7 +191,7 @@ export default function IdentityDossier({
                             />
                         </div>
                         <div>
-                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Phone</label>
+                            <label className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest block mb-1.5">Phone number</label>
                             <input
                                 type="tel"
                                 value={manualFields.phone}
@@ -216,11 +216,11 @@ export default function IdentityDossier({
                                     />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Organization</p>
+                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Company</p>
                                     {loading ? (
                                         <div className="h-4 w-28 bg-white/5 rounded animate-pulse mt-0.5" />
                                     ) : (
-                                        <p className="text-white text-base font-medium">{data?.company || 'Nodal Point (Legacy)'}</p>
+                                        <p className="text-white text-base font-medium">{data?.company || 'Unknown company'}</p>
                                     )}
                                 </div>
                             </div>
@@ -234,11 +234,11 @@ export default function IdentityDossier({
                                     <User className="w-4 h-4 text-zinc-400" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Role Designation</p>
+                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Job title</p>
                                     {loading ? (
                                         <div className="h-4 w-32 bg-white/5 rounded animate-pulse mt-0.5" />
                                     ) : (
-                                        <p className="text-zinc-200 text-sm font-medium">{data?.title || 'Professional Entity'}</p>
+                                        <p className="text-zinc-200 text-sm font-medium">{data?.title || 'Professional'}</p>
                                     )}
                                 </div>
                             </div>
@@ -252,11 +252,11 @@ export default function IdentityDossier({
                                     <MapPin className="w-4 h-4 text-zinc-400" />
                                 </div>
                                 <div>
-                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Geo-Location</p>
+                                    <p className="text-[9px] font-mono text-zinc-500 uppercase mb-0.5 tracking-widest font-bold">Location</p>
                                     {loading ? (
                                         <div className="h-4 w-20 bg-white/5 rounded animate-pulse mt-0.5" />
                                     ) : (
-                                        <p className="text-zinc-200 text-sm font-medium">{data?.location || 'Operational Area'}</p>
+                                        <p className="text-zinc-200 text-sm font-medium">{data?.location || 'Not provided'}</p>
                                     )}
                                 </div>
                             </div>
@@ -277,7 +277,7 @@ export default function IdentityDossier({
                                         className="flex-1 flex items-center justify-center gap-2 p-3 rounded-xl bg-white/5 border border-white/5 text-zinc-400 hover:text-white hover:bg-white/10 transition-all font-mono text-[10px] uppercase tracking-tighter"
                                     >
                                         <Linkedin className="w-3 h-3" />
-                                        Linkedin_Profile
+                                        LinkedIn profile
                                     </a>
                                 )}
                                 {data?.phone && (
@@ -324,12 +324,12 @@ export default function IdentityDossier({
                             {isBooking ? (
                                 <>
                                     <Loader2 className="w-5 h-5 animate-spin" />
-                                    Initializing Protocol...
+                                    Scheduling...
                                 </>
                             ) : (
                                 <>
                                     <ShieldCheck className="w-5 h-5" />
-                                    {isValid ? 'Confirm Booking Protocol' : 'Select Date & Time'}
+                                    {isValid ? 'Confirm booking' : 'Select date and time'}
                                 </>
                             )}
                         </span>

@@ -65,7 +65,7 @@ export default function TacticalCalendar({
                         {format(currentMonth, 'MMMM yyyy')}
                     </h2>
                     <p className="text-xs font-mono text-zinc-500 mt-1 uppercase tracking-widest">
-                        // TIME_ZONE: CST (UTC-06:00)
+                        // TIMES SHOWN IN CENTRAL TIME (CT)
                     </p>
                 </div>
                 <div className="flex gap-2">
@@ -139,7 +139,7 @@ export default function TacticalCalendar({
                     <>
                         <div className="text-[10px] font-mono text-zinc-500 uppercase mb-3 flex items-center gap-2">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                            Available Vectors // {format(selectedDate, 'MMM dd')}
+                            Available times // {format(selectedDate, 'MMM dd')}
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             {timeSlots.map((time) => (
@@ -165,7 +165,7 @@ export default function TacticalCalendar({
                     </>
                 ) : (
                     <div className="h-full min-h-[300px] flex items-center justify-center text-zinc-600 font-mono text-[10px] border border-dashed border-white/5 rounded-2xl bg-white/[0.01]">
-                        [ SELECT_DATE_TO_INITIALIZE_STREAM ]
+                        Select a date to see available times.
                     </div>
                 )}
             </div>

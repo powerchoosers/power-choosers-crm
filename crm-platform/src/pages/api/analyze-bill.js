@@ -44,13 +44,17 @@ export default async function analyzeBillHandler(req, res) {
       - serviceAddress (Full street, city, state, zip of the facility location)
       - billingPeriod (start and end dates as YYYY-MM-DD)
       - totalAmountDue ($)
+      - currentCharges ($) - the final amount due at the bottom of the bill, usually labeled "Current Charges". If the bill uses that label instead of totalAmountDue, return it here too.
       - dueDate (YYYY-MM-DD)
       - contractEndDate (MM/YYYY or YYYY-MM-DD. Look for varied phrasing like "valid through the meter date on or following...", "contract expires...", "ends...", "valid through...". If not found, return null.)
       - retailPlanName (e.g., "Fixed Price", "Index")
       - providerName (The Retail Electric Provider / REP - e.g., Reliant, TXU, Gexa, Direct Energy)
       
       - totalUsage (kWh) - Look for "Total Usage", "Base Usage", or the sum of meter reads.
-      - peakDemand (kW) - Look for "Actual kW/kVA", "Billed kW/kVA", or "NCP Demand". If both actual and billed exist, prefer BILLED.
+      - actualDemand (kW) - the highest measured 15-minute demand on the bill, usually shown as "Actual kW/kVA", "Metered kW", or "NCP Demand".
+      - billedDemand (kW) - the kW used for billing on the delivery side, usually shown as "Billed kW/kVA", "Billing kW", ratchet floor, or the kW used in delivery line items. If the bill shows both actual and billed demand, capture both.
+      - peakDemand (kW) - if you only find one demand number, put it here as a fallback.
+      - powerFactor (percentage) - the power factor shown on the bill, if present.
       
       - energyChargeTotal ($) - Look for "Total Commercial Charges" or the sum of energy-specific line items.
       - deliveryChargeTotal ($) - IMPORTANT: Look for "Total Distribution Charges" or the sum of all delivery/TDU/Distribution line items.
@@ -74,6 +78,14 @@ export default async function analyzeBillHandler(req, res) {
       return isNaN(num) ? 0 : num;
     };
 
+    const parsePercent = (val) => {
+      if (val === null || val === undefined) return 0;
+      const cleaned = String(val).replace(/[%\s,]/g, '');
+      const num = parseFloat(cleaned);
+      if (isNaN(num)) return 0;
+      return num <= 1.5 ? num * 100 : num;
+    };
+
     // Function to process the AI results with forensic logic
     const processResults = (parsed) => {
       // 1. Geographic Intelligence
@@ -84,15 +96,50 @@ export default async function analyzeBillHandler(req, res) {
 
       // 2. Metrics & Classification
       const usage = parseNum(parsed.totalUsage);
-      const totalAmount = parseNum(parsed.totalAmountDue);
-      const peakDemand = parseNum(parsed.peakDemand);
+      const totalAmount = parseNum(
+        parsed.totalAmountDue ??
+        parsed.total_amount_due ??
+        parsed.currentCharges ??
+        parsed.current_charges ??
+        parsed.currentChargesAmount ??
+        parsed.current_charges_amount ??
+        parsed.totalCharges
+      );
+      const actualDemand = parseNum(
+        parsed.actualDemand ??
+        parsed.actualDemandKw ??
+        parsed.meteredDemand ??
+        parsed.ncpDemand ??
+        parsed.peakDemand
+      );
+      const billedDemand = parseNum(
+        parsed.billedDemand ??
+        parsed.billedDemandKw ??
+        parsed.billingDemand ??
+        parsed.peakDemand ??
+        actualDemand
+      );
+      const peakDemand = actualDemand > 0 ? actualDemand : billedDemand;
       const energyCharges = parseNum(parsed.energyChargeTotal);
       const deliveryCharges = parseNum(parsed.deliveryChargeTotal);
+      const taxesAndFees = parseNum(parsed.taxesAndFees ?? parsed.salesTax);
       const demandCharges = parseNum(parsed.demandRatchetCharge);
+      const powerFactor = parsePercent(parsed.powerFactor ?? parsed.powerFactorPct ?? parsed.powerFactorPercent);
+      const supplySharePct = totalAmount > 0 && energyCharges > 0 ? (energyCharges / totalAmount) * 100 : 0;
+      const deliverySharePct = totalAmount > 0 && deliveryCharges > 0 ? (deliveryCharges / totalAmount) * 100 : 0;
+      const taxesSharePct = totalAmount > 0 && taxesAndFees > 0 ? (taxesAndFees / totalAmount) * 100 : 0;
+      const demandGapKw = billedDemand > actualDemand ? billedDemand - actualDemand : 0;
 
-      console.log(`[Bill Debugger] Normalized Metrics:`, { usage, peakDemand, totalAmount, deliveryCharges });
+      console.log(`[Bill Debugger] Normalized Metrics:`, {
+        usage,
+        actualDemand,
+        billedDemand,
+        totalAmount,
+        deliveryCharges,
+        powerFactor
+      });
 
-      const isFacilityLarge = peakDemand > market.demandMeteredThreshold || usage > 20000;
+      const isFacilityLarge = Math.max(actualDemand, billedDemand) > market.demandMeteredThreshold || usage > 20000;
       const allInRate = usage > 0 ? totalAmount / usage : 0;
       const demandPercentOfBill = totalAmount > 0 ? (demandCharges / totalAmount) * 100 : 0;
 
@@ -102,6 +149,11 @@ export default async function analyzeBillHandler(req, res) {
         energyComponent: usage > 0 ? energyCharges / usage : 0,
         deliveryComponent: usage > 0 ? deliveryCharges / usage : 0,
         peakDemandKW: peakDemand,
+        actualDemandKW: actualDemand,
+        billedDemandKW: billedDemand,
+        powerFactorPct: powerFactor,
+        deliverySharePct,
+        supplySharePct,
         totalUsage: usage,
         totalBill: totalAmount,
         billingPeriod: parsed.billingPeriod || '',
@@ -122,8 +174,27 @@ export default async function analyzeBillHandler(req, res) {
           facilitySize: isFacilityLarge ? 'large' : 'small',
           allInRateCents: (allInRate * 100).toFixed(2),
           demandPercentOfBill: demandPercentOfBill.toFixed(1),
+          deliverySharePct: deliverySharePct.toFixed(1),
+          supplySharePct: supplySharePct.toFixed(1),
+          taxesSharePct: taxesSharePct.toFixed(1),
+          actualDemandKW: actualDemand.toFixed(0),
+          billedDemandKW: billedDemand.toFixed(0),
+          powerFactorPct: powerFactor ? powerFactor.toFixed(1) : '',
+          demandGapKW: demandGapKw.toFixed(0),
           feedback,
-          marketContext: market
+          marketContext: market,
+          billSplit: {
+            supply: energyCharges,
+            delivery: deliveryCharges,
+            taxes: taxesAndFees,
+            total: totalAmount
+          },
+          demandProfile: {
+            actualDemandKW: actualDemand,
+            billedDemandKW: billedDemand,
+            powerFactorPct: powerFactor,
+            demandGapKW: demandGapKw
+          }
         }
       };
     };
