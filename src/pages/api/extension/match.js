@@ -107,6 +107,24 @@ function normalizeLinkedinUrl(value) {
   }
 }
 
+function extractLinkedinSlug(value) {
+  const normalized = normalizeLinkedinUrl(value)
+  if (!normalized || !normalized.includes('linkedin.com/')) return ''
+
+  const pathPart = normalized.split('linkedin.com/').pop() || ''
+  const segments = pathPart
+    .split('/')
+    .map((segment) => trimText(segment).toLowerCase())
+    .filter(Boolean)
+
+  if (segments.length === 0) return ''
+  const root = segments[0]
+  if (['in', 'company', 'school', 'pub'].includes(root) && segments[1]) {
+    return `${root}/${segments[1]}`
+  }
+  return segments.slice(0, 2).join('/')
+}
+
 function scoreText(haystack, tokens, weight = 8) {
   const text = trimText(haystack).toLowerCase()
   if (!text || !Array.isArray(tokens) || tokens.length === 0) return 0
@@ -237,9 +255,11 @@ export default async function handler(req, res) {
     const title = trimText(snapshot.title || '')
     const companyGuess = trimText(inferNameParts(title).fullName || title || '')
     const pageLinkedinUrl = normalizeLinkedinUrl(snapshot.url || snapshot.origin || '')
-    const pageLinkedinSlug = pageLinkedinUrl.includes('linkedin.com/')
+    const pageLinkedinSlugRaw = pageLinkedinUrl.includes('linkedin.com/')
       ? pageLinkedinUrl.split('linkedin.com/').pop()
       : ''
+    const pageLinkedinSlug = extractLinkedinSlug(pageLinkedinUrl) || extractLinkedinSlug(pageLinkedinSlugRaw)
+    const isLinkedinPersonPage = pageLinkedinSlug.startsWith('in/')
 
     const accountMap = new Map()
     const contactMap = new Map()
@@ -277,9 +297,7 @@ export default async function handler(req, res) {
     let directLinkedinContact = null
 
     if (pageLinkedinUrl) {
-      const directLinkedinLookup = pageLinkedinUrl.includes('linkedin.com/')
-        ? pageLinkedinUrl.split('linkedin.com/').pop() || pageLinkedinSlug
-        : pageLinkedinSlug
+      const directLinkedinLookup = pageLinkedinSlug || pageLinkedinSlugRaw || pageLinkedinUrl
       const directLinkedinPattern = `%${directLinkedinLookup || pageLinkedinUrl}%`
 
       try {
@@ -301,14 +319,12 @@ export default async function handler(req, res) {
             if (!normalized) continue
 
             const normalizedLinkedin = normalizeLinkedinUrl(normalized.linkedinUrl)
-            const normalizedLinkedinSlug = normalizedLinkedin.includes('linkedin.com/')
-              ? normalizedLinkedin.split('linkedin.com/').pop()
-              : ''
+            const normalizedLinkedinSlug = extractLinkedinSlug(normalizedLinkedin)
             const isExactLinkedinMatch =
-              Boolean(directLinkedinLookup && normalizedLinkedinSlug) &&
-              (directLinkedinLookup === normalizedLinkedinSlug ||
-                normalizedLinkedin.includes(directLinkedinLookup) ||
-                directLinkedinLookup.includes(normalizedLinkedinSlug))
+              Boolean(pageLinkedinSlug && normalizedLinkedinSlug) &&
+              (pageLinkedinSlug === normalizedLinkedinSlug ||
+                normalizedLinkedin.includes(pageLinkedinSlug) ||
+                pageLinkedinSlug.includes(normalizedLinkedinSlug))
 
             if (!isExactLinkedinMatch) continue
 
@@ -541,7 +557,7 @@ export default async function handler(req, res) {
       contactQuery = contactQuery.or(unique(contactClauses).join(','))
     }
 
-    if (accountIdsForContacts.length > 0) {
+    if (accountIdsForContacts.length > 0 && !isLinkedinPersonPage) {
       contactQuery = contactQuery.in('accountId', accountIdsForContacts)
     }
 
@@ -556,9 +572,7 @@ export default async function handler(req, res) {
         if (!normalized) continue
         const contactAccountDomainHost = extractDomain(normalized.accountDomain)
         const normalizedLinkedin = normalizeLinkedinUrl(normalized.linkedinUrl)
-        const normalizedLinkedinSlug = normalizedLinkedin.includes('linkedin.com/')
-          ? normalizedLinkedin.split('linkedin.com/').pop()
-          : ''
+        const normalizedLinkedinSlug = extractLinkedinSlug(normalizedLinkedin)
         const isLinkedinMatch =
           Boolean(pageLinkedinSlug && normalizedLinkedinSlug) &&
           (pageLinkedinSlug === normalizedLinkedinSlug ||
@@ -640,9 +654,7 @@ export default async function handler(req, res) {
     const exactLinkedinContact = directLinkedinContact || (pageLinkedinSlug
       ? contacts.find((contact) => {
           const linkedin = normalizeLinkedinUrl(contact.linkedinUrl)
-          const linkedinSlug = linkedin.includes('linkedin.com/')
-            ? linkedin.split('linkedin.com/').pop()
-            : ''
+          const linkedinSlug = extractLinkedinSlug(linkedin)
           return Boolean(
             linkedin &&
               linkedinSlug &&
@@ -702,6 +714,10 @@ export default async function handler(req, res) {
           Math.max(75, Number(finalContact.score || 0) - 10),
           `Matched through ${finalContact.name}`
         )
+    }
+
+    if (isLinkedinPersonPage && !finalContact) {
+      finalAccount = null
     }
 
     let summary = 'No strong CRM match found yet.'
