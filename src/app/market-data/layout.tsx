@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Nodal Point | Market Data',
-  description: 'Live ERCOT grid intelligence. Track demand charges, 4CP exposure, and wholesale price signals for commercial facilities in Texas.',
+  description: 'Live ERCOT market data and plain-English guidance for Texas business electricity costs.',
   alternates: { canonical: 'https://nodalpoint.io/market-data' },
 }
 

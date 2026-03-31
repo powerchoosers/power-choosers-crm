@@ -21,7 +21,7 @@ export default function BookingConfirmation({
     return (
         <Html>
             <Head />
-            <Preview>Forensic Briefing Confirmed: {date} @ {time}</Preview>
+            <Preview>Meeting confirmed: {date} @ {time}</Preview>
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
@@ -33,31 +33,31 @@ export default function BookingConfirmation({
                                 style={{ width: "32px", height: "32px", display: "block", marginRight: "12px" }}
                             />
                             <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
+                                NODAL POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
                             </Text>
                         </div>
                     </Section>
 
                     <Text style={headerLabel}>
-                        ● CONFIRMATION_NOTICE
+                        ● CONFIRMATION
                     </Text>
                     <Text style={mainHeading}>
-                        Briefing Confirmed.
+                        Your meeting is confirmed.
                     </Text>
 
                     {/* Body */}
                     <Text style={bodyText}>
                         {contactName},<br /><br />
-                        {manualIntro || `Your forensic briefing has been scheduled. We will contact you at the designated time to review your energy infrastructure and market exposure.`}
+                        {manualIntro || `Your meeting has been scheduled. We will contact you at the time below to review your bill and answer questions.`}
                     </Text>
 
                     {/* Data Card */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// APPOINTMENT_DETAILS</Text>
+                        <Text style={cardLabel}>// MEETING_DETAILS</Text>
 
                         <div style={gridContainer}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>ORGANIZATION</Text>
+                                <Text style={itemLabel}>COMPANY</Text>
                                 <Text style={{ color: "#fff", fontSize: "16px", fontWeight: "bold", margin: "5px 0 0", fontFamily: "monospace" }}>{companyName}</Text>
                             </div>
                         </div>
@@ -66,28 +66,29 @@ export default function BookingConfirmation({
 
                         <div style={gridContainer}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>SCHEDULED_TIME</Text>
+                                <Text style={itemLabel}>DATE</Text>
                                 <Text style={{ color: "#00CC88", fontSize: "20px", fontWeight: "bold", margin: "5px 0 0", fontFamily: "monospace" }}>{date}</Text>
-                                <Text style={{ color: "#00CC88", fontSize: "16px", fontWeight: "normal", margin: "2px 0 0", fontFamily: "monospace" }}>@ {time}</Text>
+                                <Text style={{ color: "#00CC88", fontSize: "10px", fontWeight: "bold", margin: "10px 0 0", fontFamily: "monospace", letterSpacing: "1px" }}>TIME</Text>
+                                <Text style={{ color: "#00CC88", fontSize: "16px", fontWeight: "normal", margin: "2px 0 0", fontFamily: "monospace" }}>{time}</Text>
                             </div>
                         </div>
 
                     </Section>
 
                     <Text style={extraContext}>
-                        Please have your recent utility invoices available for cross-verification during the briefing if possible.
+                        Please have your latest utility bill available if you want us to review the numbers live.
                     </Text>
 
                     {meetingLink && (
                         <Section style={{ textAlign: 'center', marginTop: '40px' }}>
                             <Link href={meetingLink} style={link}>
-                                Access Video Briefing Room
+                                Join the meeting
                             </Link>
                         </Section>
                     )}
 
                     <Text style={footer}>
-                        Nodal Point // Forensic Energy Intelligence<br />
+                        Nodal Point // Energy review<br />
                         Fort Worth, TX
                     </Text>
 

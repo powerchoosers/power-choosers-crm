@@ -31,7 +31,7 @@ export default function ForensicInvite({
     appointmentTime,
     description,
     manualIntro,
-    operationalVector = 'VIDEO_MEETING',
+    operationalVector = 'Meeting',
     taskId,
     prospectEmail,
     baseUrl = 'https://nodalpoint.io',
@@ -41,7 +41,7 @@ export default function ForensicInvite({
     return (
         <Html>
             <Head />
-            <Preview>Briefing Invitation // {contactName}</Preview>
+            <Preview>Meeting invitation // {contactName}</Preview>
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
@@ -55,28 +55,28 @@ export default function ForensicInvite({
                                 style={{ display: "block", marginRight: "12px" }}
                             />
                             <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
+                                NODAL POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#002FA7" }}>ADVISORY</span>
                             </Text>
                         </div>
                     </Section>
 
                     <Text style={headerLabel}>
-                        ● INVITATION_NOTICE
+                        ● INVITE
                     </Text>
                     <Section style={{ marginBottom: "24px" }}>
                         <Text style={mainHeading}>
-                            Briefing for {contactName}.
+                            Meeting details for {contactName}.
                         </Text>
                     </Section>
 
                     {/* Briefing Payload */}
                     <Text style={bodyText}>
-                        {manualIntro || description || `A briefing has been scheduled for ${contactName}. This session will review market exposure and energy management protocols for ${companyName}.`}
+                        {manualIntro || `A meeting has been scheduled for ${contactName}. We will review the bill and the main next steps for ${companyName}.`}
                     </Text>
 
                     {/* Data Grid */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// {companyName.toUpperCase()} // BRIEFING_DETAILS</Text>
+                        <Text style={cardLabel}>// {companyName.toUpperCase()} // MEETING_DETAILS</Text>
 
                         <div style={gridRow}>
                             <div style={gridItem}>
@@ -93,11 +93,11 @@ export default function ForensicInvite({
 
                         <div style={gridRow}>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>ORGANIZATION</Text>
+                                <Text style={itemLabel}>COMPANY</Text>
                                 <Text style={itemValue}>{companyName}</Text>
                             </div>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>MEETING_TYPE</Text>
+                                <Text style={itemLabel}>MEETING TYPE</Text>
                                 <Text style={itemValue}>{operationalVector}</Text>
                             </div>
                         </div>
@@ -105,9 +105,9 @@ export default function ForensicInvite({
                         {meetingUrl && (
                             <>
                                 <Hr style={hr} />
-                                <Text style={itemLabel}>VIDEO_LINK</Text>
+                                <Text style={itemLabel}>VIDEO LINK</Text>
                                 <Link href={meetingUrl} style={meetingLinkStyle}>
-                                    ▶ JOIN VIDEO BRIEFING
+                                    ▶ JOIN MEETING
                                 </Link>
                             </>
                         )}
@@ -116,20 +116,20 @@ export default function ForensicInvite({
                     {/* RSVP Protocol */}
                     {taskId && prospectEmail && (
                         <Section style={rsvpContainer}>
-                            <Text style={cardLabel}>// RESPONSE_REQUESTED</Text>
+                            <Text style={cardLabel}>// PLEASE_RESPOND</Text>
                             <div style={{ display: 'inline-block' }}>
                                 <Link
                                     href={`${baseUrl}/api/public/rsvp?action=accept&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
                                     style={buttonConfirm}
                                 >
-                                    [ ACCEPT INVITE ]
+                                    Accept invitation
                                 </Link>
                                 <span style={{ display: 'inline-block', width: '16px' }}></span>
                                 <Link
                                     href={`${baseUrl}/api/public/rsvp?action=decline&task=${taskId}&email=${encodeURIComponent(prospectEmail)}`}
                                     style={buttonReject}
                                 >
-                                    [ DECLINE INVITE ]
+                                    Decline invitation
                                 </Link>
                             </div>
                         </Section>
@@ -171,7 +171,7 @@ export default function ForensicInvite({
                                         {sender.email}
                                     </Link>
                                     <Text style={locationText}>
-                                        {sender.city.toUpperCase()}, {sender.state.toUpperCase()} // NODAL_POINT
+                                        {sender.city.toUpperCase()}, {sender.state.toUpperCase()} // NODAL POINT
                                     </Text>
                                 </div>
                             </div>

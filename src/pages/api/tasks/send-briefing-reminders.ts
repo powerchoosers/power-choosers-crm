@@ -155,7 +155,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                         await zohoService.sendEmail({
                             to: contact.email,
                             fromName: sender.name,
-                            subject: `Reminder: Your Energy Briefing in 1 Hour — ${apptTimeStr}`,
+                            subject: `Reminder: your meeting starts in 1 hour — ${apptTimeStr}`,
                             html: emailHtml,
                             userEmail: task.ownerId,
                             uploadedAttachments: [],
@@ -171,7 +171,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                                 accountId: accountId || null,
                                 from: task.ownerId,
                                 to: JSON.stringify([contact.email]),
-                                subject: `Reminder: Your Energy Briefing in 1 Hour — ${apptTimeStr}`,
+                                subject: `Reminder: your meeting starts in 1 hour — ${apptTimeStr}`,
                                 html: emailHtml,
                                 text: '',
                                 status: 'sent',
@@ -189,8 +189,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                     // UI notification for agent (both 60 min and 15 min)
                     const label = mins === 60 ? '1 hour' : '15 minutes';
                     const notifTitle = mins === 60
-                        ? `Briefing in 1 Hour — ${contactName}`
-                        : `Briefing in 15 Minutes — ${contactName}`;
+                        ? `Meeting in 1 Hour — ${contactName}`
+                        : `Meeting in 15 Minutes — ${contactName}`;
                     const notifMessage = `${taskType} with ${contactName} at ${companyName} starts at ${apptTimeStr}.`;
 
                     await supabaseAdmin.from('notifications').insert({

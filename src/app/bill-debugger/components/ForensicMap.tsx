@@ -33,11 +33,11 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                 if (data.found && data.lat != null && data.lng != null) {
                     setCoordinates({ lat: data.lat, lng: data.lng });
                 } else {
-                    setError('Location targeting failed');
+                    setError('Location not found');
                 }
             } catch (err) {
                 console.error('Geocoding error:', err);
-                setError('Signal interference');
+                setError('Map unavailable');
             } finally {
                 setIsLoading(false);
             }
@@ -93,7 +93,7 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                         className="absolute inset-0 z-20 bg-white/60 backdrop-blur-sm flex flex-col items-center justify-center p-4"
                     >
                         <Loader2 className="w-6 h-6 text-[#002FA7] animate-spin mb-2" />
-                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest animate-pulse">Scanning Satellite Uplink...</span>
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest animate-pulse">Loading map...</span>
                     </motion.div>
                 )}
 
@@ -182,8 +182,8 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                             <div className="bg-white/95 backdrop-blur-md p-3 min-w-[200px] rounded-xl shadow-2xl border border-zinc-200">
                                 <div className="flex justify-between items-start mb-2">
                                     <div>
-                                        <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest leading-none">POI_Identity</div>
-                                        <div className="text-xs font-mono font-bold text-zinc-900 mt-1 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
+                                <div className="text-[10px] font-mono text-[#002FA7] uppercase tracking-widest leading-none">Nearby business</div>
+                                <div className="text-xs font-mono font-bold text-zinc-900 mt-1 leading-tight uppercase line-clamp-2">{selectedPOI.name}</div>
                                     </div>
                                     <button
                                         onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
@@ -198,7 +198,7 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
                                     onClick={() => handleCopyNamed(selectedPOI.name, selectedPOI.id)}
                                     className="w-full h-9 rounded-lg bg-[#002FA7] text-white border border-blue-600 hover:brightness-110 transition-all flex items-center justify-center gap-2 text-[10px] font-mono uppercase tracking-widest shadow-md shadow-blue-500/20"
                                 >
-                                    {copiedId === selectedPOI.id ? 'Copied' : 'Copy Business Name'}
+                                    {copiedId === selectedPOI.id ? 'Copied' : 'Copy name'}
                                 </button>
                             </div>
                         </Popup>
@@ -212,7 +212,7 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-2">
                 <div className="px-3 py-1.5 bg-white/90 backdrop-blur-md rounded-lg border border-zinc-200 shadow-sm flex items-center gap-2">
                     <Satellite className="w-3.5 h-3.5 text-[#002FA7]" />
-                    <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Active_Uplink</span>
+                    <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Map active</span>
                 </div>
                 {zoneLabel && (
                     <div className="px-3 py-1.5 bg-zinc-900/90 backdrop-blur-md rounded-lg border border-white/10 shadow-sm flex items-center gap-2">
@@ -225,7 +225,7 @@ export function ForensicMap({ address, zoneLabel }: ForensicMapProps) {
             <div className="absolute bottom-4 right-4 z-10">
                 <div className="px-3 py-1.5 bg-white/80 backdrop-blur-md rounded-lg border border-zinc-200/50 shadow-sm flex items-center gap-2">
                     <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-tight">Geo-Spatial Verification: Active</span>
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-tight">Location check: active</span>
                 </div>
             </div>
         </div>

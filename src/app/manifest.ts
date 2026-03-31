@@ -4,8 +4,8 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: 'Nodal Point CRM',
     short_name: 'Nodal Point',
-    description: 'The forensic engine for the Texas energy market.',
-    start_url: '/network',
+    description: 'Commercial energy bill review for Texas businesses.',
+    start_url: '/',
     display: 'standalone',
     background_color: '#09090b',
     theme_color: '#09090b',

@@ -6,10 +6,8 @@ import IdentityDossier from './IdentityDossier';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { ShieldCheck } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 export default function BookingInterface({ email }: { email: string }) {
-    const router = useRouter();
     const [localEmail, setLocalEmail] = useState(email);
     const [emailInput, setEmailInput] = useState('');
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -42,15 +40,10 @@ export default function BookingInterface({ email }: { email: string }) {
             }
 
             setIsSuccess(true);
-            toast.success('Protocol Initiated: Briefing Scheduled.');
-
-            setTimeout(() => {
-                router.push('/philosophy');
-            }, 3000);
-
+            toast.success('Booking confirmed.');
         } catch (error) {
             console.error(error);
-            toast.error('Protocol Failure: System Error.');
+            toast.error('We could not schedule that time.');
         } finally {
             setIsBooking(false);
         }
@@ -62,21 +55,21 @@ export default function BookingInterface({ email }: { email: string }) {
                 <div className="w-24 h-24 rounded-full bg-emerald-500/10 flex items-center justify-center mb-6 animate-pulse">
                     <ShieldCheck className="w-12 h-12 text-emerald-500" />
                 </div>
-                <h2 className="text-3xl font-mono font-bold text-white mb-2 tracking-tight">PROTOCOL_ESTABLISHED</h2>
+                <h2 className="text-3xl font-mono font-bold text-white mb-2 tracking-tight">MEETING_SCHEDULED</h2>
                 <p className="text-zinc-500 font-mono text-sm uppercase tracking-widest mb-8">
-                    Your forensic briefing has been secured.
+                    Your meeting has been scheduled.
                 </p>
                 <div className="p-4 bg-white/5 border border-white/10 rounded-xl max-w-md w-full">
                     <div className="flex justify-between text-sm py-2 border-b border-white/5">
-                        <span className="text-zinc-500">VECTOR_TARGET</span>
+                        <span className="text-zinc-500">COMPANY</span>
                         <span className="text-white font-mono">{identityData?.company || 'N/A'}</span>
                     </div>
                     <div className="flex justify-between text-sm py-2 border-b border-white/5">
-                        <span className="text-zinc-500">TIME_WINDOW</span>
+                        <span className="text-zinc-500">DATE</span>
                         <span className="text-white font-mono">{selectedDate ? format(selectedDate, 'MMM dd') : ''} @ {selectedTime}</span>
                     </div>
                     <div className="flex justify-between text-sm py-2 pt-4">
-                        <span className="text-emerald-500 animate-pulse">● SIGNAL_LOCKED</span>
+                        <span className="text-emerald-500 animate-pulse">● SCHEDULED</span>
                     </div>
                 </div>
             </div>
@@ -91,15 +84,15 @@ export default function BookingInterface({ email }: { email: string }) {
                     <div className="flex items-center gap-2 mb-6">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
-                            FORENSIC_BRIEFING // ACCESS
+                            SCHEDULE_A_REVIEW // ACCESS
                         </span>
                     </div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Book a Briefing</h2>
+                    <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Schedule a review</h2>
                     <p className="text-zinc-500 text-sm mb-4 leading-relaxed">
-                        A 30-minute call with a Nodal Point strategist. We pull your bill apart live and show you exactly where you&apos;re exposed — demand charges, ratchet clauses, 4CP risk — before you commit to anything.
+                        A 30-minute call with the Nodal Point team. We&apos;ll review your bill live and point out the biggest cost drivers before you commit to anything.
                     </p>
                     <div className="flex flex-col gap-1.5 mb-8">
-                        {['No sales pitch. No script. Engineers only.', 'You see the numbers before we discuss next steps.', 'Cancellable up to 2 hours before.'].map(line => (
+                        {['No sales script. We keep it practical.', 'You see the numbers before we discuss next steps.', 'You can cancel up to 2 hours before.'].map(line => (
                             <div key={line} className="flex items-center gap-2 text-xs text-zinc-500">
                                 <div className="w-1 h-1 rounded-full bg-[#002FA7] shrink-0" />
                                 <span>{line}</span>
@@ -121,7 +114,7 @@ export default function BookingInterface({ email }: { email: string }) {
                             disabled={!emailInput}
                             className="w-full bg-white text-black rounded-xl py-3.5 font-bold uppercase tracking-wide hover:bg-zinc-200 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                         >
-                            Initialize Briefing
+                            Continue
                         </button>
                     </div>
                 </div>
