@@ -16,11 +16,11 @@ const SECTIONS = [
       <>
         <p>When you use the Bill Debugger or contact us, we may collect:</p>
         <ul>
-          <li><strong>Email address</strong> — required to deliver your analysis and follow up.</li>
-          <li><strong>Energy bill files</strong> — PDFs or images you upload for forensic analysis. These are processed in a read-only, zero-touch environment and never shared with suppliers or third parties.</li>
-          <li><strong>Usage data</strong> — anonymous page visits and interaction signals used to improve the product. No cross-site tracking.</li>
+          <li><strong>Email address</strong> — used to send your report and follow up with you.</li>
+          <li><strong>Energy bill files</strong> — PDFs or images you upload so we can review the account and charges.</li>
+          <li><strong>Usage data</strong> — basic page and product activity that helps us keep the site working and improve it.</li>
         </ul>
-        <p>We do not collect payment information, social security numbers, or any government-issued identifiers.</p>
+        <p>We do not collect payment card numbers, social security numbers, or government IDs.</p>
       </>
     ),
   },
@@ -30,27 +30,27 @@ const SECTIONS = [
     title: 'How We Use It',
     content: (
       <>
-        <p>Your data is used exclusively to:</p>
+        <p>Your data is used to:</p>
         <ul>
-          <li>Run forensic analysis on your energy profile and deliver a report.</li>
-          <li>Contact you with your results and, if relevant, a follow-up consultation offer.</li>
-          <li>Improve the accuracy of our tariff simulation engine.</li>
+          <li>Review your bill and generate a report.</li>
+          <li>Send the report to you and respond to your questions.</li>
+          <li>Improve the product and fix problems.</li>
         </ul>
-        <p>We do not sell your data. We do not use it for advertising. We do not share it with energy suppliers or brokers without your explicit consent.</p>
+        <p>We do not sell your data or use it for advertising. We do not share it with suppliers or brokers unless you ask us to.</p>
       </>
     ),
   },
   {
     id: 'retention',
     number: '03',
-    title: 'Data Retention',
+    title: 'How Long We Keep It',
     content: (
       <>
-        <p>Bill Debugger sessions operate on an ephemeral logic model:</p>
+        <p>We keep data only as long as we need it:</p>
         <ul>
-          <li><strong>Inactive sessions:</strong> All uploaded files and session data are automatically deleted after 72 hours if no audit is initiated.</li>
-          <li><strong>Active audits:</strong> If you proceed with a full engagement, your encrypted load profile is moved to a private Evidence Locker and retained for the duration of the analysis period.</li>
-          <li><strong>Email addresses:</strong> Retained until you request deletion.</li>
+          <li><strong>Bill sessions:</strong> Uploaded files and session data are deleted after 72 hours if you do not continue with us.</li>
+          <li><strong>Active clients:</strong> If you become a client, we may keep related records for the length of the engagement and for our business records.</li>
+          <li><strong>Email addresses:</strong> Kept until you ask us to delete them.</li>
         </ul>
         <p>To request deletion of your data at any time, email us at <a href="mailto:signal@nodalpoint.io">signal@nodalpoint.io</a>.</p>
       </>
@@ -62,8 +62,8 @@ const SECTIONS = [
     title: 'Security',
     content: (
       <>
-        <p>All data is encrypted in transit (TLS) and at rest (AES-256) within SOC 2 compliant infrastructure. We use Supabase for database storage and Zoho Mail for transactional email — both operate under industry-standard security practices.</p>
-        <p>No system is perfectly secure. If you discover a vulnerability, please report it to <a href="mailto:signal@nodalpoint.io">signal@nodalpoint.io</a> and we will respond within 48 hours.</p>
+        <p>We use encrypted connections and store data in controlled systems. Access is limited to people who need it to do their job.</p>
+        <p>No system is perfectly secure. If you think something is wrong, email <a href="mailto:signal@nodalpoint.io">signal@nodalpoint.io</a> and we will review it within 48 hours.</p>
       </>
     ),
   },
@@ -80,7 +80,7 @@ const SECTIONS = [
           <li><strong>Google (Gemini API)</strong> — AI-assisted analysis processing.</li>
           <li><strong>Vercel</strong> — application hosting and edge delivery.</li>
         </ul>
-        <p>Each provider operates under their own privacy policy and data processing agreements. We do not permit these providers to use your data for their own purposes.</p>
+        <p>Each provider has its own privacy policy and data processing terms. We do not let them use your data for their own purposes.</p>
       </>
     ),
   },
@@ -120,7 +120,7 @@ export default function PrivacyPolicy() {
             Privacy Policy
           </h1>
           <p className="text-zinc-500 text-lg leading-relaxed max-w-2xl">
-            We built Nodal Point on a forensics model — your data should be as protected as the evidence in an audit. This policy explains exactly what we collect, why, and how it stays safe.
+            We built Nodal Point so businesses can review energy bills without guessing. This policy explains what we collect, why we collect it, and how you can control it.
           </p>
           <div className="mt-6 flex flex-wrap gap-6 text-sm font-mono text-zinc-400">
             <span>Effective: March 2026</span>

@@ -5,7 +5,7 @@ const NAV_GROUPS = [
   {
     label: 'Platform',
     links: [
-      { label: 'Bill Debugger', href: '/bill-debugger' },
+      { label: 'Review My Bill', href: '/bill-debugger' },
       { label: 'Book a Briefing', href: '/book' },
       { label: 'Sign In', href: '/portal' },
     ],
@@ -13,9 +13,10 @@ const NAV_GROUPS = [
   {
     label: 'Company',
     links: [
-      { label: 'The Philosophy', href: '/philosophy' },
-      { label: 'The Methodology', href: '/technical-docs' },
+      { label: 'Philosophy', href: '/philosophy' },
+      { label: 'How it works', href: '/technical-docs' },
       { label: 'Market Data', href: '/market-data' },
+      { label: 'Market Outlook', href: '/market-outlook' },
       { label: 'Contact', href: '/contact' },
     ],
   },
@@ -48,7 +49,7 @@ export function LandingFooter() {
               />
             </div>
             <p className="text-sm text-zinc-500 leading-relaxed mb-6 max-w-[200px]">
-              Forensic energy audit platform for commercial businesses in the ERCOT market.
+              Commercial energy bill review platform for Texas businesses.
             </p>
             {/* LinkedIn */}
             <a

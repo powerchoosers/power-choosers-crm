@@ -27,7 +27,7 @@ export default function ForensicCancel({
     return (
         <Html>
             <Head />
-            <Preview>Briefing Canceled // {contactName}</Preview>
+            <Preview>Meeting canceled // {contactName}</Preview>
             <Body style={main}>
                 <Container style={container}>
                     {/* Header */}
@@ -41,27 +41,27 @@ export default function ForensicCancel({
                                 style={{ display: "block", marginRight: "12px" }}
                             />
                             <Text style={{ fontSize: "16px", fontWeight: "bold", fontFamily: "monospace", margin: 0, letterSpacing: "-0.5px", color: "#ffffff" }}>
-                                NODAL_POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#ef4444" }}>ADVISORY</span>
+                                NODAL POINT <span style={{ color: "#444" }}>//</span> <span style={{ color: "#ef4444" }}>ADVISORY</span>
                             </Text>
                         </div>
                     </Section>
 
                     <Text style={headerLabel}>
-                        ● SESSION_CANCELED
+                        ● MEETING_CANCELED
                     </Text>
                     <Section style={{ marginBottom: "24px" }}>
                         <Text style={mainHeading}>
-                            Briefing Canceled.
+                            Meeting canceled.
                         </Text>
                     </Section>
 
                     <Text style={bodyText}>
-                        The scheduled briefing with {contactName} has been canceled. Please remove this event from your calendar. A new session can be arranged at your convenience.
+                        The meeting with {contactName} has been canceled. Please remove it from your calendar. We can set up a new time when you&apos;re ready.
                     </Text>
 
                     {/* Data Grid */}
                     <Section style={dataCard}>
-                        <Text style={cardLabel}>// {companyName.toUpperCase()} // CANCELED_SESSION</Text>
+                        <Text style={cardLabel}>// {companyName.toUpperCase()} // CANCELED_MEETING</Text>
 
                         <div style={gridRow}>
                             <div style={gridItem}>
@@ -82,14 +82,14 @@ export default function ForensicCancel({
                                 <Text style={{ ...itemValue, color: "#ef4444" }}>CANCELED</Text>
                             </div>
                             <div style={gridItem}>
-                                <Text style={itemLabel}>ORGANIZATION</Text>
+                                <Text style={itemLabel}>COMPANY</Text>
                                 <Text style={itemValue}>{companyName}</Text>
                             </div>
                         </div>
                     </Section>
 
                     <Text style={bodyText}>
-                        Your calendar attachment will remove this event automatically. If it does not, please remove it manually.
+                        Your calendar file should remove this event automatically. If it does not, please delete it manually.
                     </Text>
 
                     <Hr style={{ borderColor: "#1a1a1a", margin: "40px 0" }} />
@@ -123,7 +123,7 @@ export default function ForensicCancel({
                                         {sender.email}
                                     </Link>
                                     <Text style={locationText}>
-                                        {sender.city.toUpperCase()}, {sender.state.toUpperCase()} // NODAL_POINT
+                                        {sender.city.toUpperCase()}, {sender.state.toUpperCase()} // NODAL POINT
                                     </Text>
                                 </div>
                             </div>

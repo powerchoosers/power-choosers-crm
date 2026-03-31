@@ -48,8 +48,8 @@ export function EmailGate({ onUnlock }: EmailGateProps) {
                         >
                             <CheckCircle className="w-20 h-20 mb-6" />
                         </motion.div>
-                        <p className="text-2xl font-bold tracking-tight">Access Granted</p>
-                        <p className="text-blue-200 mt-2 font-mono text-xs uppercase tracking-widest">Decrypting Forensic Data...</p>
+                        <p className="text-2xl font-bold tracking-tight">Report ready</p>
+                        <p className="text-blue-200 mt-2 font-mono text-xs uppercase tracking-widest">Sending your full report...</p>
                     </motion.div>
                 )}
 
@@ -58,18 +58,17 @@ export function EmailGate({ onUnlock }: EmailGateProps) {
                         <ShieldCheck className="w-8 h-8" />
                     </div>
                     <h2 className="text-3xl md:text-4xl font-bold text-zinc-900 mb-4 tracking-tighter">
-                        Unlock Forensic Data
+                        Send the full report
                     </h2>
                     <p className="text-zinc-500 text-lg leading-relaxed font-medium">
-                        Verification required to decrypt market volatility benchmarks.
-                        Enter your work email for secure access.
+                        Enter your work email and we&apos;ll send the full report to your inbox.
                     </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="text-left">
                         <label className="text-xs font-mono font-bold uppercase text-[#002FA7] ml-2 mb-2 block tracking-widest">
-                            // Identity_Vector
+                            Work email
                         </label>
                         <input
                             type="email"
@@ -91,7 +90,7 @@ export function EmailGate({ onUnlock }: EmailGateProps) {
                             <Loader2 className="w-6 h-6 animate-spin" />
                         ) : (
                             <>
-                                Initialize Decryption
+                                Send the report
                                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
                             </>
                         )}
@@ -101,10 +100,10 @@ export function EmailGate({ onUnlock }: EmailGateProps) {
                 <div className="mt-10 flex items-center justify-center gap-4 text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-400">
                     <span className="flex items-center gap-1">
                         <div className="w-1 h-1 bg-emerald-500 rounded-full"></div>
-                        SOC-2 SECURE
+                        Private review
                     </span>
                     <span>•</span>
-                    <span>AUTO-DELETE ACTIVE</span>
+                    <span>No spam</span>
                 </div>
 
             </motion.div>
