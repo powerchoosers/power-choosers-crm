@@ -1918,9 +1918,10 @@ chrome.tabs.onActivated.addListener((activeInfo: TabActiveInfo) => {
 })
 
 chrome.tabs.onUpdated.addListener((_tabId: number, changeInfo: TabChangeInfo, tab: CapturedTab) => {
-  if (changeInfo.status !== 'complete') return
   if (!tab?.active) return
-  if (!isCaptureableTabUrl(tab.url)) return
+  const nextUrl = trimText(changeInfo.url || tab.url || '')
+  if (!isCaptureableTabUrl(nextUrl)) return
+  if (changeInfo.status !== 'complete' && !changeInfo.url) return
   scheduleActiveTabCapture(tab.windowId)
 })
 
