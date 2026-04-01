@@ -295,7 +295,7 @@ export default async function handler(req, res) {
         city,
         state,
         metadata,
-        accounts (
+        accounts!contacts_accountId_fkey (
           id,
           name,
           domain,
@@ -641,7 +641,7 @@ export default async function handler(req, res) {
         city,
         state,
         metadata,
-        accounts (
+        accounts!contacts_accountId_fkey (
           id,
           name,
           domain,
