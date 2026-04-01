@@ -4,6 +4,9 @@ type SessionProbe = Record<string, unknown>
 
 let lastSignature = ''
 let hasSyncedSession = false
+let lastPageSignature = ''
+let pageChangeTimer: number | null = null
+let pageNavigationHooksInstalled = false
 
 function isCandidateKey(key: string) {
   return key.startsWith('sb-') && key.includes('auth-token')
@@ -50,6 +53,76 @@ function buildSignature(session: SessionProbe | null): string {
   const userId = trimText(session.userId ?? user?.id)
   const expiresAt = trimText(session.expires_at ?? session.expiresAt)
   return [accessToken, refreshToken, email, userId, expiresAt].join('|')
+}
+
+function buildPageSignature(): string {
+  return [window.location.origin, window.location.pathname, window.location.search, window.location.hash, document.title].join('|')
+}
+
+function sendPageContext() {
+  const signature = buildPageSignature()
+  if (signature === lastPageSignature) return
+  lastPageSignature = signature
+
+  chrome.runtime.sendMessage(
+    {
+      type: 'PAGE_CONTEXT_CHANGED',
+      payload: {
+        appOrigin: window.location.origin,
+        title: document.title,
+        url: window.location.href,
+      },
+    },
+    () => {
+      void chrome.runtime.lastError
+    }
+  )
+}
+
+function schedulePageContextSend() {
+  if (pageChangeTimer !== null) {
+    window.clearTimeout(pageChangeTimer)
+  }
+
+  pageChangeTimer = window.setTimeout(() => {
+    pageChangeTimer = null
+    sendPageContext()
+  }, 650)
+}
+
+function installPageNavigationHooks() {
+  if (pageNavigationHooksInstalled) return
+  pageNavigationHooksInstalled = true
+
+  const notify = () => {
+    schedulePageContextSend()
+  }
+
+  const patchHistoryMethod = (method: 'pushState' | 'replaceState') => {
+    const original = window.history[method]
+    const patched = function patchedHistoryMethod(this: History, ...args: Parameters<History[typeof method]>) {
+      const result = original.apply(this, args)
+      window.dispatchEvent(new Event('nodal-point-locationchange'))
+      return result
+    }
+
+    ;(patched as any).__nodalPointPatched = true
+    window.history[method] = patched as History[typeof method]
+  }
+
+  try {
+    const pushState = window.history.pushState as any
+    if (!pushState.__nodalPointPatched) patchHistoryMethod('pushState')
+
+    const replaceState = window.history.replaceState as any
+    if (!replaceState.__nodalPointPatched) patchHistoryMethod('replaceState')
+  } catch {
+    // Ignore history patch failures and rely on popstate/hashchange.
+  }
+
+  window.addEventListener('popstate', notify)
+  window.addEventListener('hashchange', notify)
+  window.addEventListener('nodal-point-locationchange', notify)
 }
 
 function sendAuthState() {
@@ -100,6 +173,7 @@ function sendAuthState() {
 }
 
 function scheduleSync() {
+  installPageNavigationHooks()
   sendAuthState()
   window.setInterval(sendAuthState, 5000)
   window.addEventListener('storage', sendAuthState)
