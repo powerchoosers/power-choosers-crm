@@ -10,6 +10,7 @@ const supabaseAdmin = createClient(
 
 // Canonical app URL — used by pg_cron calls that don't have a host context
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://nodalpoint.io';
+const DEFAULT_CRON_SECRET = 'nodal-cron-2026';
 
 /**
  * POST /api/email/zoho-refresh-all
@@ -33,9 +34,9 @@ export default async function handler(req, res) {
     // Lightweight auth: pg_cron passes a shared cron secret as a header.
     // Set CRON_SECRET env var in Vercel to match the value in the pg_cron job.
     // Skip check in dev so local testing works easily.
-    const cronSecret = process.env.CRON_SECRET;
-    const callerSecret = req.headers['x-cron-secret'];
-    if (process.env.NODE_ENV !== 'development' && cronSecret && callerSecret !== cronSecret) {
+    const cronSecret = process.env.CRON_SECRET || DEFAULT_CRON_SECRET;
+    const callerSecret = req.headers['x-cron-secret'] || req.headers['authorization']?.replace('Bearer ', '');
+    if (process.env.NODE_ENV !== 'development' && callerSecret !== cronSecret) {
         logger.warn('[ZohoRefreshAll] Unauthorized call blocked');
         return res.status(401).json({ error: 'Unauthorized' });
     }

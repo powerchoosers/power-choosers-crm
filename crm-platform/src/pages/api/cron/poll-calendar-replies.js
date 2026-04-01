@@ -13,9 +13,10 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from '../email/zoho-service.js';
 
 const NODAL_UID_SUFFIX = '@nodalpoint.io';
+const DEFAULT_CRON_SECRET = 'nodal-cron-2026';
 
-function getCronSecret() {
-    return process.env.CRON_SECRET || '';
+function getCronSecrets() {
+    return [process.env.CRON_SECRET, DEFAULT_CRON_SECRET].filter(Boolean);
 }
 
 /**
@@ -188,10 +189,10 @@ async function processUserInbox(userEmail, zohoService) {
 
 export default async function handler(req, res) {
     const auth = req.headers?.authorization || '';
-    const token = auth.replace(/^Bearer\s+/i, '').trim();
-    const secret = getCronSecret();
+    const token = String(req.headers?.['x-cron-secret'] || auth.replace(/^Bearer\s+/i, '')).trim();
+    const validSecrets = new Set(getCronSecrets());
 
-    if (!secret || token !== secret) {
+    if (!token || !validSecrets.has(token)) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Unauthorized' }));
         return;

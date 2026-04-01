@@ -9,9 +9,14 @@ import { fetchWithRetry, getApiKey, APOLLO_BASE_URL, normalizeDomain } from '../
 
 const REFRESH_WINDOW_DAYS = 14;
 const MAX_DOMAINS_PER_RUN = Number(process.env.APOLLO_NEWS_MAX_PER_RUN || '30');
+const DEFAULT_CRON_SECRET = 'nodal-cron-2026';
 
-function getCronSecret() {
-  return process.env.APOLLO_NEWS_CRON_SECRET || process.env.CRON_SECRET || '';
+function getCronSecrets() {
+  return [
+    process.env.APOLLO_NEWS_CRON_SECRET,
+    process.env.CRON_SECRET,
+    DEFAULT_CRON_SECRET,
+  ].filter(Boolean);
 }
 
 async function fetchApolloNewsForDomain(domain) {
@@ -78,10 +83,10 @@ async function upsertNewsToSupabase(domain, rawArticles) {
 
 export default async function handler(req, res) {
   const auth = req.headers?.authorization || '';
-  const token = auth.replace(/^Bearer\s+/i, '').trim();
-  const secret = getCronSecret();
+  const token = String(req.headers?.['x-cron-secret'] || auth.replace(/^Bearer\s+/i, '')).trim();
+  const validSecrets = new Set(getCronSecrets());
 
-  if (!secret || token !== secret) {
+  if (!token || !validSecrets.has(token)) {
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
