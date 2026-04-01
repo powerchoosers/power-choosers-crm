@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import logger from '../../_logger.js';
+import { isInternalEmailViewReferer } from '../_tracking.js';
 
 export default async function handler(req, res) {
   try {
@@ -251,19 +252,4 @@ function maskIp(ip) {
   return ip.substring(0, 10) + '***';
 }
 
-/**
- * True when tracking request came from our internal email detail page.
- * This prevents internal preview clicks from counting as recipient engagement.
- * @param {string} referer
- * @returns {boolean}
- */
-function isInternalEmailViewReferer(referer) {
-  if (!referer) return false;
-  try {
-    const parsed = new URL(referer);
-    return parsed.pathname.startsWith('/network/emails');
-  } catch {
-    return false;
-  }
-}
 

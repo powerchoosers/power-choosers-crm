@@ -3,6 +3,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase';
 import logger from '../../_logger.js';
+import { isInternalEmailViewReferer } from '../_tracking.js';
 
 // 1x1 transparent PNG (43 bytes)
 const PIXEL = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
@@ -326,20 +327,4 @@ function maskIp(ip) {
   }
 
   return ip.substring(0, 10) + '***';
-}
-
-/**
- * True when tracking request came from our internal email detail page.
- * This prevents Lewis and team internal previews from counting as recipient engagement.
- * @param {string} referer
- * @returns {boolean}
- */
-function isInternalEmailViewReferer(referer) {
-  if (!referer) return false;
-  try {
-    const parsed = new URL(referer);
-    return parsed.pathname.startsWith('/network/emails');
-  } catch {
-    return false;
-  }
 }
