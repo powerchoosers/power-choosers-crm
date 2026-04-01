@@ -125,6 +125,20 @@ function extractLinkedinSlug(value) {
   return segments.slice(0, 2).join('/')
 }
 
+function contactLinkedinCandidates(row) {
+  if (!row || typeof row !== 'object') return []
+  const metadata = row.metadata && typeof row.metadata === 'object' ? row.metadata : {}
+  const raw = unique([
+    row.linkedinUrl,
+    row.linkedin_url,
+    metadata.linkedinUrl,
+    metadata.linkedin_url,
+    metadata.original_apollo_data?.linkedin,
+    metadata.original_apollo_data?.linkedin_url,
+  ])
+  return raw.map((value) => normalizeLinkedinUrl(value)).filter(Boolean)
+}
+
 function scoreText(haystack, tokens, weight = 8) {
   const text = trimText(haystack).toLowerCase()
   if (!text || !Array.isArray(tokens) || tokens.length === 0) return 0
@@ -299,14 +313,19 @@ export default async function handler(req, res) {
     if (pageLinkedinUrl) {
       const directLinkedinLookup = pageLinkedinSlug || pageLinkedinSlugRaw || pageLinkedinUrl
       const directLinkedinPattern = `%${directLinkedinLookup || pageLinkedinUrl}%`
+      const directLinkedinClauses = unique([
+        `linkedinUrl.ilike.${directLinkedinPattern}`,
+        `metadata->>linkedinUrl.ilike.${directLinkedinPattern}`,
+        `metadata->>linkedin_url.ilike.${directLinkedinPattern}`,
+        `metadata->original_apollo_data->>linkedin.ilike.${directLinkedinPattern}`,
+      ])
 
       try {
         let directLinkedinQuery = supabaseAdmin
           .from('contacts')
           .select(contactSelect)
-          .ilike('linkedinUrl', directLinkedinPattern)
-          .order('updatedAt', { ascending: false })
-          .limit(25)
+          .or(directLinkedinClauses.join(','))
+          .limit(80)
 
         directLinkedinQuery = applyLegacyOwnershipScope(directLinkedinQuery, auth.user, auth.isAdmin)
 
@@ -318,7 +337,11 @@ export default async function handler(req, res) {
             const normalized = normalizeContactRow(row, 10000, `LinkedIn URL match: ${row?.linkedinUrl || pageLinkedinUrl}`)
             if (!normalized) continue
 
-            const normalizedLinkedin = normalizeLinkedinUrl(normalized.linkedinUrl)
+            const candidateLinkedins = contactLinkedinCandidates(row)
+            const normalizedLinkedin =
+              normalizeLinkedinUrl(normalized.linkedinUrl) ||
+              candidateLinkedins[0] ||
+              ''
             const normalizedLinkedinSlug = extractLinkedinSlug(normalizedLinkedin)
             const isExactLinkedinMatch =
               Boolean(pageLinkedinSlug && normalizedLinkedinSlug) &&
@@ -328,6 +351,9 @@ export default async function handler(req, res) {
 
             if (!isExactLinkedinMatch) continue
 
+            if (!normalized.linkedinUrl && normalizedLinkedin) {
+              normalized.linkedinUrl = normalizedLinkedin
+            }
             normalized.score = Math.max(Number(normalized.score || 0), 10000)
             normalized.reason = `LinkedIn URL match: ${normalized.linkedinUrl}`
             contactMap.set(normalized.id, normalized)
@@ -353,6 +379,78 @@ export default async function handler(req, res) {
         }
       } catch (error) {
         console.warn('[Extension Match] Direct LinkedIn lookup failed:', error)
+      }
+    }
+
+    if (isLinkedinPersonPage && !directLinkedinContact) {
+      const inferred = inferNameParts(title)
+      const inferredFirst = trimText(inferred?.firstName || '')
+      const inferredLast = trimText(inferred?.lastName || '')
+      const inferredFull = trimText(inferred?.fullName || `${inferredFirst} ${inferredLast}`)
+
+      if (inferredFirst && inferredLast) {
+        try {
+          let nameFallbackQuery = supabaseAdmin
+            .from('contacts')
+            .select(contactSelect)
+            .ilike('firstName', inferredFirst)
+            .ilike('lastName', inferredLast)
+            .limit(25)
+
+          nameFallbackQuery = applyLegacyOwnershipScope(nameFallbackQuery, auth.user, auth.isAdmin)
+
+          const { data: nameFallbackRows, error: nameFallbackError } = await nameFallbackQuery
+          if (nameFallbackError) {
+            console.warn('[Extension Match] LinkedIn name fallback failed:', nameFallbackError.message)
+          } else if (Array.isArray(nameFallbackRows)) {
+            for (const row of nameFallbackRows) {
+              const normalized = normalizeContactRow(
+                row,
+                9500,
+                `LinkedIn name fallback: ${inferredFull || `${inferredFirst} ${inferredLast}`}`
+              )
+              if (!normalized) continue
+
+              const normalizedName = trimText(normalized.name).toLowerCase()
+              const targetName = trimText(inferredFull || `${inferredFirst} ${inferredLast}`).toLowerCase()
+              if (
+                targetName &&
+                normalizedName &&
+                !normalizedName.includes(targetName) &&
+                !targetName.includes(normalizedName)
+              ) {
+                continue
+              }
+
+              const candidateLinkedins = contactLinkedinCandidates(row)
+              if (!normalized.linkedinUrl && candidateLinkedins[0]) {
+                normalized.linkedinUrl = candidateLinkedins[0]
+              }
+
+              normalized.score = Math.max(Number(normalized.score || 0), 9500)
+              contactMap.set(normalized.id, normalized)
+              directLinkedinContact = normalized
+
+              if (normalized.accountId && normalized.accountName && !accountMap.has(normalized.accountId)) {
+                accountMap.set(
+                  normalized.accountId,
+                  normalizeAccountRow(
+                    {
+                      id: normalized.accountId,
+                      name: normalized.accountName,
+                      domain: normalized.accountDomain,
+                    },
+                    Math.max(85, normalized.score - 10),
+                    `Matched through ${normalized.name}`
+                  )
+                )
+              }
+              break
+            }
+          }
+        } catch (error) {
+          console.warn('[Extension Match] LinkedIn name fallback error:', error)
+        }
       }
     }
 
@@ -405,20 +503,22 @@ export default async function handler(req, res) {
     }
 
     const accountClauses = []
-    if (domain) {
-      accountClauses.push(`domain.eq.${domain}`)
-      accountClauses.push(`domain.ilike.%${domain}%`)
-      accountClauses.push(`website.ilike.%${domain}%`)
-    }
-    for (const token of tokens.slice(0, 4)) {
-      accountClauses.push(`name.ilike.%${token}%`)
-      accountClauses.push(`domain.ilike.%${token}%`)
-      accountClauses.push(`industry.ilike.%${token}%`)
-      accountClauses.push(`city.ilike.%${token}%`)
-      accountClauses.push(`state.ilike.%${token}%`)
-    }
-    if (companyGuess && companyGuess.length >= 3) {
-      accountClauses.push(`name.ilike.%${companyGuess.split(' ')[0]}%`)
+    if (!isLinkedinPersonPage) {
+      if (domain) {
+        accountClauses.push(`domain.eq.${domain}`)
+        accountClauses.push(`domain.ilike.%${domain}%`)
+        accountClauses.push(`website.ilike.%${domain}%`)
+      }
+      for (const token of tokens.slice(0, 4)) {
+        accountClauses.push(`name.ilike.%${token}%`)
+        accountClauses.push(`domain.ilike.%${token}%`)
+        accountClauses.push(`industry.ilike.%${token}%`)
+        accountClauses.push(`city.ilike.%${token}%`)
+        accountClauses.push(`state.ilike.%${token}%`)
+      }
+      if (companyGuess && companyGuess.length >= 3) {
+        accountClauses.push(`name.ilike.%${companyGuess.split(' ')[0]}%`)
+      }
     }
 
     if (accountClauses.length > 0) {
@@ -517,6 +617,9 @@ export default async function handler(req, res) {
     }
     if (pageLinkedinSlug) {
       contactClauses.push(`linkedinUrl.ilike.%${pageLinkedinSlug}%`)
+      contactClauses.push(`metadata->>linkedinUrl.ilike.%${pageLinkedinSlug}%`)
+      contactClauses.push(`metadata->>linkedin_url.ilike.%${pageLinkedinSlug}%`)
+      contactClauses.push(`metadata->original_apollo_data->>linkedin.ilike.%${pageLinkedinSlug}%`)
     }
 
     let contactQuery = supabaseAdmin
@@ -754,3 +857,10 @@ export default async function handler(req, res) {
     })
   }
 }
+
+
+
+
+
+
+
