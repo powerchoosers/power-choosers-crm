@@ -1236,6 +1236,12 @@ async function handleAuthSync(payload: any, sender: any) {
   }
 
   try {
+    scheduleActiveTabCapture(sender?.tab?.windowId || null)
+  } catch (error) {
+    console.warn('[Extension] Scheduled capture after auth sync failed:', error)
+  }
+
+  try {
     const matchedAccountId = trimText(state.match?.account?.id || state.match?.contact?.accountId || '')
     if (matchedAccountId) {
       await loadAccountContacts(matchedAccountId, appOrigin)
@@ -2004,6 +2010,14 @@ chrome.runtime.onMessage.addListener((message: any, sender: any, sendResponse: (
           return
         case 'AUTH_SYNC':
           sendResponse(await handleAuthSync(message.payload, sender))
+          return
+        case 'PAGE_CONTEXT_CHANGED':
+          if (sender?.tab?.windowId != null) {
+            scheduleActiveTabCapture(sender.tab.windowId)
+          } else {
+            scheduleActiveTabCapture()
+          }
+          sendResponse({ ok: true, state: cloneState() })
           return
         case 'AUTH_CLEAR':
           sendResponse(await handleAuthClear())
