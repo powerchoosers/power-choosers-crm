@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Nodal Point | Duncanville ISD Energy Brief</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap');
+:root{--bg:#05070b;--panel:rgba(255,255,255,.05);--panel2:rgba(255,255,255,.03);--line:rgba(255,255,255,.09);--text:#edf2f7;--muted:#9ca3af;--soft:#d6dbe4;--blue:#002fa7;--lime:#c1e333;--blueSoft:rgba(0,47,167,.2)}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%;background:radial-gradient(circle at 100% 0%,rgba(0,47,167,.28),transparent 32%),radial-gradient(circle at 0% 100%,rgba(193,227,51,.09),transparent 26%),linear-gradient(180deg,#05070b 0%,#070b12 100%);color:var(--text);font-family:"IBM Plex Sans","Segoe UI",Arial,sans-serif;-webkit-print-color-adjust:exact;print-color-adjust:exact}@page{size:Letter;margin:0}body{display:block}.page{width:8.5in;height:11in;position:relative;overflow:hidden;break-after:page;page-break-after:always}.page:last-child{break-after:auto;page-break-after:auto}.sheet{position:relative;height:100%;padding:.42in .42in .36in .56in;background:linear-gradient(180deg,rgba(12,18,32,.98),rgba(6,8,12,.98));border-left:.22in solid var(--lime)}.sheet:before{content:"";position:absolute;inset:.12in .12in auto auto;width:1.78in;height:.09in;border-radius:999px;background:linear-gradient(90deg,var(--lime),rgba(193,227,51,.12));opacity:.85}.topbar{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 0 .14in;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:12px;min-width:0}.logo{width:.56in;height:.56in;border-radius:.16in;overflow:hidden;background:#fff;border:1px solid rgba(255,255,255,.18);box-shadow:0 10px 24px rgba(0,0,0,.3);flex:0 0 auto}.logo img{width:100%;height:100%;object-fit:cover;display:block}.eyebrow{font-family:"IBM Plex Mono",Consolas,monospace;font-size:9px;letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin-bottom:.05in}.brand h2{margin:0;font-size:.18in;line-height:1.05;letter-spacing:.12em;text-transform:uppercase;color:#fff}.brand p{margin:.06in 0 0;font-size:.095in;line-height:1.45;color:var(--muted);max-width:5.7in}.meta{font-family:"IBM Plex Mono",Consolas,monospace;color:var(--muted);font-size:9px;line-height:1.425;text-align:right;white-space:nowrap}.meta strong{display:block;color:#fff;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.02in}.lime{color:var(--lime)}.title{position:relative;z-index:1;display:flex;align-items:end;justify-content:space-between;gap:18px;margin-top:.2in}.title h1{margin:0;max-width:5.9in;font-size:.34in;line-height:1.03;letter-spacing:-.05em;color:#fff}.title .tag{font-family:"IBM Plex Mono",Consolas,monospace;font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}.hero{position:relative;z-index:1;display:grid;gap:.14in;margin-top:.16in}.hero.one{grid-template-columns:1.16fr .84fr}.hero.two{grid-template-columns:.96fr 1.04fr}.panel{border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--panel),var(--panel2));padding:.17in;box-shadow:0 18px 42px rgba(0,0,0,.24)}.section{font-family:"IBM Plex Mono",Consolas,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 .08in}.lead{margin:.11in 0 0;font-size:.13in;line-height:1.6;color:#d9dee7}.lead strong{color:#fff}.callout{margin-top:.14in;border-left:4px solid var(--blue);background:linear-gradient(180deg,rgba(0,47,167,.22),rgba(0,47,167,.12));border-radius:14px;padding:.1in .14in .12in .12in;color:#ecf3ff}.callout p{margin:0;font-size:.1in;line-height:1.6;color:#eef3ff}.facts{display:grid;grid-template-columns:1fr 1fr;gap:.08in}.fact{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.025);padding:.1in;min-height:.94in}.fact .label{font-family:"IBM Plex Mono",Consolas,monospace;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:.06in}.fact .value{font-size:.13in;font-weight:700;line-height:1.35;color:#fff}.fact .note{margin-top:.05in;font-size:.09in;line-height:1.45;color:var(--soft)}.chart{margin-top:.1in;border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.015));padding:.1in}.chart-label{display:flex;justify-content:space-between;gap:10px;margin-bottom:.08in;font-family:"IBM Plex Mono",Consolas,monospace;text-transform:uppercase;letter-spacing:.16em;font-size:8px;color:var(--muted)}.chart-note{margin-top:.05in;font-size:.09in;line-height:1.42;color:#cfd7e4}.lower{display:grid;gap:.14in;margin-top:.12in}.lower.two{grid-template-columns:1fr 1fr}.bullets{margin:.08in 0 0;padding:0;list-style:none;display:grid;gap:.06in}.bullets li{position:relative;padding-left:.16in;color:#d9dee7;font-size:.1in;line-height:1.42}.bullets li:before{content:"";position:absolute;left:0;top:.065in;width:.06in;height:.06in;border-radius:999px;background:var(--lime);box-shadow:0 0 0 4px rgba(193,227,51,.12)}.bullets strong{color:#fff}.stack{display:grid;gap:.08in}.row{display:flex;gap:.12in;align-items:flex-start;padding:.1in 0;border-top:1px solid rgba(255,255,255,.06)}.row:first-child{border-top:0;padding-top:0}.num{flex:0 0 .32in;height:.32in;border-radius:.1in;display:grid;place-items:center;background:linear-gradient(180deg,rgba(0,47,167,.3),rgba(0,47,167,.12));color:#fff;border:1px solid rgba(0,47,167,.18);font-family:"IBM Plex Mono",Consolas,monospace;font-size:.09in;letter-spacing:.08em}.copy strong{display:block;color:#fff;font-size:.1in;margin-bottom:.02in}.copy span{display:block;color:var(--soft);font-size:.09in;line-height:1.45}.quote{margin-top:.12in;border:1px solid rgba(193,227,51,.18);border-left:4px solid var(--lime);border-radius:16px;background:linear-gradient(180deg,rgba(193,227,51,.1),rgba(255,255,255,.015));padding:.14in}.quote p{margin:0;font-size:.1in;line-height:1.428;color:#eff8c4}.quote .small{margin-top:.05in;color:var(--muted);font-family:"IBM Plex Mono",Consolas,monospace;font-size:8px;letter-spacing:.14em;text-transform:uppercase}.visual{border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.025)),radial-gradient(circle at 70% 0%,rgba(193,227,51,.12),transparent 38%),radial-gradient(circle at 0% 100%,rgba(0,47,167,.22),transparent 34%);padding:.14in;min-height:2.95in;position:relative;overflow:hidden}.visual:after{content:"";position:absolute;inset:auto -18% -10% auto;width:2.4in;height:2.4in;border-radius:999px;background:radial-gradient(circle,rgba(193,227,51,.16),transparent 70%)}.caption{margin-top:.1in;display:flex;justify-content:space-between;gap:12px;font-family:"IBM Plex Mono",Consolas,monospace;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}.intro{border:1px solid var(--line);border-radius:20px;background:linear-gradient(180deg,var(--panel),var(--panel2));padding:.18in}.intro h2{margin:0;font-size:.26in;line-height:1.03;letter-spacing:-.05em;color:#fff;max-width:4.9in;display:grid;gap:0}.intro h2 span{display:block}.intro p{margin:.12in 0 0;font-size:.12in;line-height:1.62;color:#d8dfe9;max-width:46ch}.signal{margin-top:.11in;border-left:4px solid var(--blue);background:rgba(0,47,167,.16);border-radius:14px;padding:.11in .13in;color:#edf3ff;font-size:.095in;line-height:1.42}.dual{display:grid;grid-template-columns:1fr 1fr;gap:.14in;margin-top:.12in}.footerbox{margin-top:.1in;border:1px solid rgba(255,255,255,.08);border-radius:18px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.015));padding:.1in}.footerbox .head{margin:0 0 .07in;font-family:"IBM Plex Mono",Consolas,monospace;font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}.footergrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.08in}.step{border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.02);padding:.08in .09in;min-height:.58in}.step strong{display:block;color:#fff;font-size:.1in;margin-bottom:.02in}.step span{display:block;color:var(--soft);font-size:.09in;line-height:1.42}.pagefooter{position:absolute;left:.56in;right:.42in;bottom:.2in;display:flex;justify-content:space-between;gap:16px;border-top:1px solid var(--line);padding-top:.08in;color:var(--muted);font-family:"IBM Plex Mono",Consolas,monospace;font-size:8px;letter-spacing:.14em;text-transform:uppercase}.pagefooter .right{text-align:right}svg{display:block;width:100%;height:auto}
+.gallery{display:grid;grid-template-columns:1.18fr .82fr;gap:.12in;margin-top:.16in}.gallery-stack{display:grid;gap:.12in}.photo{margin:0;border:1px solid var(--line);border-radius:20px;overflow:hidden;background:rgba(255,255,255,.03);position:relative}.photo img{display:block;width:100%;height:100%;object-fit:cover}.photo.hero{height:4.08in}.photo.small{height:1.98in}.photo figcaption{position:absolute;left:.12in;bottom:.1in;padding:.05in .08in;border-radius:999px;background:rgba(5,7,11,.72);border:1px solid rgba(255,255,255,.1);font-family:"IBM Plex Mono",Consolas,monospace;font-size:8px;letter-spacing:.16em;text-transform:uppercase;color:#fff}.summary{margin-top:.14in;border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--panel),var(--panel2));padding:.12in}.summary-lead{margin:0 0 .08in;font-size:.1in;line-height:1.58;color:#d9dee7}.summary-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.08in}.summary-card{border:1px solid rgba(255,255,255,.07);border-radius:14px;background:rgba(255,255,255,.02);padding:.09in .1in;min-height:.72in}.summary-card strong{display:block;color:#fff;font-size:.095in;margin-bottom:.02in}.summary-card span{display:block;color:var(--soft);font-size:.085in;line-height:1.42}.ratchet-strip{position:absolute;left:.12in;right:.12in;bottom:.08in;border:1px solid rgba(255,255,255,.06);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.025),rgba(255,255,255,.012));padding:.06in .06in .05in;box-shadow:0 10px 24px rgba(0,0,0,.18)}.ratchet-strip svg{display:block;width:100%;height:.8in}.pagefooter.page3{bottom:.18in}.pagefooter.page3 .right{white-space:nowrap}.intro h2 span{display:block}</style>
+</head>
+<body>
+<section class="page">
+  <div class="sheet">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo"><img src="../images/nodalpoint-webicon.png" alt="Nodal Point" /></div>
+        <div>
+          <div class="eyebrow">Nodal Point // Call Brief</div>
+          <h2>Duncanville ISD energy memo</h2>
+          <p>Prepared from the March 31, 2026 call with Marqeis Scott in Purchasing.</p>
+        </div>
+      </div>
+      <div class="meta"><strong>District contact</strong>Marqeis Scott<br />Purchasing, Duncanville ISD<br /><span class="lime">Current supplier: Reliant</span></div>
+    </header>
+
+    <div class="title"><div><div class="tag">Board-ready summary</div><h1>The renewal date is not the risk. Summer peak demand is.</h1></div><div class="tag">Page 1 of 3</div></div>
+
+    <section class="hero one">
+      <div class="panel">
+        <div class="section">What the call told us</div>
+        <p class="lead">Marqeis said the district is still under contract and is <strong>not planning to move immediately</strong>. That is the right answer for procurement. It is not the right answer for bill visibility. The district should use the window now to understand whether there is a <strong>demand ratchet</strong>, a peak-demand rider, or summer load behavior that could carry cost forward even before the contract ends.</p>
+        <div class="callout"><p><strong>Key point.</strong> We are not asking Duncanville ISD to switch contracts today. We are asking for the latest bill and enough detail to see whether the current structure is already creating unnecessary pressure on the budget.</p></div>
+        <div class="quote"><p>Districts usually start looking 6 to 8 months before expiration. That is the right time to compare options. It is also the right time to verify what the bill is doing right now.</p><div class="small">Timing cue from the call</div></div>
+      </div>
+
+      <aside class="panel">
+        <div class="section">Account facts</div>
+        <div class="facts">
+          <div class="fact"><div class="label">Contact</div><div class="value">Marqeis Scott</div><div class="note">Purchasing for Duncanville ISD.</div></div>
+          <div class="fact"><div class="label">Current supplier</div><div class="value">Reliant</div><div class="note">District is still mid-contract.</div></div>
+          <div class="fact"><div class="label">Planning window</div><div class="value">6 to 8 months</div><div class="note">That is when they start shopping.</div></div>
+          <div class="fact"><div class="label">Risk to verify</div><div class="value">Demand ratchet</div><div class="note">One hot summer peak can set a higher billing floor for the rest of the year.</div></div>
+        </div>
+        <div class="chart">
+          <div class="chart-label"><span>Potential demand shape</span><span>Summer is the pressure point</span></div>
+          <svg viewBox="0 0 420 170" role="img" aria-label="Demand curve illustration">
+            <rect x="1" y="1" width="418" height="168" rx="16" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.08)" />
+            <g stroke="rgba(255,255,255,0.08)" stroke-width="1"><line x1="36" y1="136" x2="388" y2="136" /><line x1="36" y1="104" x2="388" y2="104" /><line x1="36" y1="72" x2="388" y2="72" /><line x1="36" y1="40" x2="388" y2="40" /></g>
+            <polyline fill="none" stroke="#c1e333" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" points="42,128 78,126 117,112 147,103 164,73 188,82 219,93 228,52 253,50 287,48 305,95 335,85 357,77 388,63" />
+            <circle cx="253" cy="50" r="7" fill="#002fa7" /><circle cx="335" cy="85" r="5" fill="#fff" opacity=".55" />
+            <text x="48" y="151" fill="#9ca3af" font-size="10" font-family="IBM Plex Mono, monospace">JAN</text>
+            <text x="117" y="151" fill="#9ca3af" font-size="10" font-family="IBM Plex Mono, monospace">APR</text>
+            <text x="184" y="151" fill="#9ca3af" font-size="10" font-family="IBM Plex Mono, monospace">JUN</text>
+            <text x="252" y="151" fill="#9ca3af" font-size="10" font-family="IBM Plex Mono, monospace">JUL</text>
+            <text x="319" y="151" fill="#9ca3af" font-size="10" font-family="IBM Plex Mono, monospace">AUG</text>
+          </svg>
+          <div class="chart-note">Plain English: one summer spike can set a higher billing floor, so later months can cost more even when usage drops.</div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="lower two">
+      <article class="panel">
+        <div class="section">Why waiting is risky</div>
+        <div class="stack">
+          <div class="row"><div class="num">01</div><div class="copy"><strong>Contract timing does not erase billing risk.</strong><span>The district can stay inside its current agreement and still carry a costly peak-demand pattern on the bill.</span></div></div>
+          <div class="row"><div class="num">02</div><div class="copy"><strong>Demand ratchet, in plain English.</strong><span>One hot summer peak can set the billing floor. After that, the district can keep paying against that higher number even when usage drops.</span></div></div>
+          <div class="row"><div class="num">03</div><div class="copy"><strong>Summer load is still the trigger.</strong><span>Cooling several campuses at once can push peak demand up even when day-to-day usage looks stable.</span></div></div>
+        </div>
+      </article>
+      <article class="panel">
+        <div class="section">What to send now</div>
+        <ul class="bullets">
+          <li>A recent <strong>Reliant invoice</strong> or bill PDF.</li>
+          <li>Any page that shows <strong>contract end</strong> or renewal language.</li>
+          <li>Any note on <strong>campus cooling load</strong> or summer schedule changes.</li>
+          <li>If available, a meter list so we can check for <strong>peak-demand exposure</strong>.</li>
+        </ul>
+        <div class="callout" style="margin-top:.13in"><p><strong>Best next move.</strong> Send the latest bill first. If the bill is clean, great. If it is not, the district will know early enough to plan instead of reacting.</p></div>
+      </article>
+    </section>
+
+    <div class="pagefooter"><div>Prepared from March 31, 2026 call notes</div><div class="right">Nodal Point // Duncanville ISD // page 1</div></div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="sheet">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo"><img src="../images/nodalpoint-webicon.png" alt="Nodal Point" /></div>
+        <div>
+          <div class="eyebrow">Nodal Point // Energy Architecture</div>
+          <h2>HVAC + building controls for Duncanville ISD</h2>
+          <p>District-wide comfort, lower waste, and cleaner operating decisions.</p>
+        </div>
+      </div>
+      <div class="meta"><strong>Audience</strong>Purchasing, chief of staff,<br />and superintendent review<br /><span class="lime">Board-ready summary</span></div>
+    </header>
+
+    <div class="title"><div><div class="tag">Operational brief</div><h1>Controls and HVAC are where the easy savings usually live.</h1></div><div class="tag">Page 2 of 3</div></div>
+
+    <section class="hero two">
+      <div class="visual">
+        <svg viewBox="0 0 540 360" role="img" aria-label="District controls schematic">
+          <rect x="1" y="1" width="538" height="358" rx="26" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" />
+          <rect x="28" y="30" width="246" height="86" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" />
+          <rect x="28" y="132" width="246" height="86" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" />
+          <rect x="28" y="234" width="246" height="86" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" />
+          <rect x="310" y="60" width="148" height="240" rx="20" fill="rgba(0,47,167,0.18)" stroke="rgba(0,47,167,0.34)" />
+          <rect x="340" y="92" width="58" height="38" rx="10" fill="#07111f" stroke="rgba(255,255,255,0.08)" />
+          <rect x="330" y="150" width="92" height="14" rx="7" fill="#c1e333" opacity=".92" /><rect x="330" y="176" width="92" height="14" rx="7" fill="#002fa7" opacity=".82" /><rect x="330" y="202" width="92" height="14" rx="7" fill="rgba(255,255,255,0.2)" /><rect x="330" y="228" width="58" height="14" rx="7" fill="rgba(255,255,255,0.2)" /><rect x="330" y="254" width="72" height="14" rx="7" fill="rgba(255,255,255,0.18)" />
+          <line x1="264" y1="73" x2="310" y2="112" stroke="rgba(193,227,51,0.7)" stroke-width="3" stroke-linecap="round" /><line x1="264" y1="175" x2="310" y2="168" stroke="rgba(255,255,255,0.5)" stroke-width="3" stroke-linecap="round" /><line x1="264" y1="277" x2="310" y2="232" stroke="rgba(0,47,167,0.8)" stroke-width="3" stroke-linecap="round" />
+          <circle cx="264" cy="73" r="9" fill="#c1e333" /><circle cx="264" cy="175" r="9" fill="#fff" opacity=".72" /><circle cx="264" cy="277" r="9" fill="#002fa7" />
+          <text x="46" y="56" fill="#fff" font-size="18" font-family="IBM Plex Sans, sans-serif" font-weight="700">Campus control</text>
+          <text x="46" y="78" fill="#aab1bf" font-size="11" font-family="IBM Plex Mono, monospace" letter-spacing=".16em">SCHEDULES + SETPOINTS</text>
+          <text x="46" y="158" fill="#fff" font-size="18" font-family="IBM Plex Sans, sans-serif" font-weight="700">Fault detection</text>
+          <text x="46" y="180" fill="#aab1bf" font-size="11" font-family="IBM Plex Mono, monospace" letter-spacing=".16em">ALARMS + DIAGNOSIS</text>
+          <text x="46" y="260" fill="#fff" font-size="18" font-family="IBM Plex Sans, sans-serif" font-weight="700">Open protocols</text>
+          <text x="46" y="282" fill="#aab1bf" font-size="11" font-family="IBM Plex Mono, monospace" letter-spacing=".16em">BACNET + MODBUS</text>
+        </svg>
+        <div class="caption"><span>District-wide visibility</span><span>Reduce waste without losing comfort</span></div>
+        <div class="ratchet-strip">
+          <svg viewBox="0 0 520 122" role="img" aria-label="Demand ratchet impact across the year">
+            <rect x="1" y="1" width="518" height="120" rx="14" fill="rgba(255,255,255,0.02)" stroke="rgba(255,255,255,0.06)" />
+          <text x="22" y="18" fill="#aab1bf" font-size="10" font-family="IBM Plex Mono, monospace" letter-spacing=".16em">DEMAND RATCHET</text>
+          <text x="498" y="18" fill="#cfd7e4" font-size="8" font-family="IBM Plex Mono, monospace" letter-spacing=".12em" text-anchor="end">ONE SUMMER SPIKE CAN SET THE FLOOR</text>
+          <line x1="24" y1="84" x2="494" y2="84" stroke="rgba(255,255,255,0.09)" stroke-width="1" />
+          <line x1="24" y1="59" x2="494" y2="59" stroke="rgba(255,255,255,0.05)" stroke-width="1" stroke-dasharray="4 6" />
+          <rect x="56" y="61" width="66" height="23" rx="10" fill="rgba(0,47,167,0.72)" />
+          <rect x="224" y="16" width="64" height="68" rx="10" fill="rgba(193,227,51,0.92)" />
+          <rect x="386" y="37" width="58" height="47" rx="10" fill="rgba(255,149,0,0.86)" />
+          <rect x="446" y="37" width="42" height="47" rx="10" fill="rgba(255,149,0,0.62)" />
+          <path d="M288 36 C324 36 352 37 386 37 L488 37" fill="none" stroke="rgba(255,149,0,0.9)" stroke-width="3" stroke-linecap="round" />
+          <path d="M288 36 C324 36 352 37 386 37" fill="none" stroke="rgba(255,149,0,0.42)" stroke-width="10" stroke-linecap="round" opacity=".42" />
+          <text x="56" y="103" fill="#cfd7e4" font-size="10" font-family="IBM Plex Mono, monospace" letter-spacing=".14em">NORMAL</text>
+          <text x="215" y="103" fill="#cfd7e4" font-size="10" font-family="IBM Plex Mono, monospace" letter-spacing=".14em">SUMMER PEAK</text>
+          <text x="388" y="103" fill="#cfd7e4" font-size="10" font-family="IBM Plex Mono, monospace" letter-spacing=".14em">REST OF YEAR</text>
+          <text x="366" y="31" fill="#ffffff" font-size="9" font-family="IBM Plex Mono, monospace" letter-spacing=".12em">RATCHET FLOOR</text>
+          </svg>
+        </div>
+      </div>
+      <div class="intro">
+        <div class="eyebrow">Why this matters to a school district</div>
+        <h2><span>Comfort is mandatory.</span><span>Waste is optional.</span></h2>
+        <p>Duncanville ISD does not need a flashy pitch. It needs a practical way to reduce operating noise across campuses, keep classrooms comfortable, and give leadership a clean story they can stand behind.</p>
+        <p>Most of the early wins are not in replacement work. They are in <strong>controls, scheduling, setpoints, fault detection, and right-sized equipment decisions</strong> that lower cost while keeping the buildings stable during Texas heat.</p>
+        <div class="signal">If the district is already planning 6 to 8 months ahead on procurement, now is the time to gather the bill data and identify any HVAC or controls work that should be bundled into the next review cycle.</div>
+      </div>
+    </section>
+
+    <section class="dual">
+      <article class="panel">
+        <div class="section">Building Controls</div>
+        <p class="lead">Smart controls and building automation give Duncanville a way to manage multiple campuses with one operating view instead of chasing issues building by building.</p>
+        <ul class="bullets">
+          <li><strong>Centralized Management:</strong> One dashboard can simplify district operations and keep leadership informed.</li>
+          <li><strong>Automated Savings:</strong> Schedules, resets, and demand limiting can run every day without adding more manual work.</li>
+          <li><strong>Alarms &amp; FDD:</strong> Fault detection helps find comfort or cost problems before they turn into complaints.</li>
+          <li><strong>Open Protocols:</strong> BACnet and Modbus keep the district flexible instead of locked into one narrow system.</li>
+        </ul>
+      </article>
+      <article class="panel">
+        <div class="section">HVAC</div>
+        <p class="lead">HVAC is where comfort and cost meet. The goal is not to spend less on the buildings. The goal is to stop paying for wasted run-time, oversized equipment, and poor sequencing.</p>
+        <ul class="bullets">
+          <li><strong>Right-Sized Solutions:</strong> Load analysis helps match equipment to the actual building need.</li>
+          <li><strong>Operational Efficiency:</strong> Better sequences and retro-commissioning cut out avoidable waste.</li>
+          <li><strong>Indoor Air Quality:</strong> Filtration and ventilation upgrades can improve conditions without excess energy use.</li>
+          <li><strong>Lifecycle Value:</strong> Lower operating expense and better control usually extend asset life.</li>
+        </ul>
+      </article>
+    </section>
+
+    <section class="footerbox">
+      <div class="head">Simple next steps for Duncanville ISD</div>
+      <div class="footergrid">
+        <div class="step"><strong>1. Send the latest bill</strong><span>Use the latest bill so we can check rate, demand, and riders.</span></div>
+        <div class="step"><strong>2. Flag the demand issue</strong><span>If a ratchet exists, we want it visible before renewal.</span></div>
+        <div class="step"><strong>3. Tie in HVAC and controls</strong><span>Use the review to spot HVAC fixes worth bundling into the next cycle.</span></div>
+      </div>
+    </section>
+
+    <div class="pagefooter"><div>Nodal Point // School district brief</div><div class="right">Prepared for Marqeis Scott // page 2</div></div>
+  </div>
+</section>
+
+<section class="page">
+  <div class="sheet">
+    <header class="topbar">
+      <div class="brand">
+        <div class="logo"><img src="../images/nodalpoint-webicon.png" alt="Nodal Point" /></div>
+        <div>
+          <div class="eyebrow">Nodal Point // Visual Summary</div>
+          <h2>Representative campus brief</h2>
+          <p>Three representative campuses, one shared operating problem.</p>
+        </div>
+      </div>
+      <div class="meta"><strong>Representative campuses</strong>Reed Middle School<br />Duncanville High School<br />Alexander Elementary</div>
+    </header>
+
+    <div class="title"><div><div class="tag">Campus sample</div><h1>Representative campuses. One shared summer pressure.</h1></div><div class="tag">Page 3 of 3</div></div>
+
+    <section class="gallery">
+      <figure class="photo hero">
+        <img src="duncanville-assets/reed-middle-school-compressed.jpg" alt="Reed Middle School" />
+        <figcaption>Reed Middle School</figcaption>
+      </figure>
+      <div class="gallery-stack">
+        <figure class="photo small">
+          <img src="duncanville-assets/duncanville-high-school-compressed.jpg" alt="Duncanville High School" />
+          <figcaption>Duncanville High School</figcaption>
+        </figure>
+        <figure class="photo small">
+          <img src="duncanville-assets/alexander-elementary-school-compressed.jpg" alt="Alexander Elementary School" />
+          <figcaption>Alexander Elementary</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="summary">
+      <p class="summary-lead">These three campuses are a representative sample from a 17-school district. The district is not one building. It is a portfolio. The reason we care about the bill now is simple: the same summer heat that affects comfort also creates peak-demand pressure across multiple campuses.</p>
+      <div class="summary-grid">
+        <div class="summary-card"><strong>What the sample shows</strong><span>Different campuses, different footprints, and different load behavior. That usually means different opportunities hiding in the controls and HVAC strategy.</span></div>
+        <div class="summary-card"><strong>What the bill can show</strong><span>If the invoice has a demand ratchet or a peak-demand rider, the district can get hit even before the contract ends.</span></div>
+        <div class="summary-card"><strong>What to do next</strong><span>Send the latest bill, verify the rate structure, then decide whether controls or HVAC work belongs in the next review cycle.</span></div>
+      </div>
+    </section>
+
+    <div class="pagefooter page3"><div>Nodal Point // Representative campus summary</div><div class="right">Prepared for Marqeis Scott // page 3</div></div>
+  </div>
+</section>
+</body>
+</html>
+
+

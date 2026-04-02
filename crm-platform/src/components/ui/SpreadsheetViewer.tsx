@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import * as XLSX from 'xlsx'
 import { Loader2 } from 'lucide-react'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 
 interface SpreadsheetViewerProps {
   url: string
@@ -261,18 +262,26 @@ export function SpreadsheetViewer({ url, filename, onLoad }: SpreadsheetViewerPr
 
                   {headers.map((_, colIdx) => {
                     const isSel = selected.has(selKey(rowIdx, colIdx))
+                    const cellValue = String(row?.[colIdx] ?? '')
                     return (
                       <div
                         key={colIdx}
                         onMouseDown={e => handleCellMouseDown(rowIdx, colIdx, e)}
                         onMouseEnter={() => handleCellMouseEnter(rowIdx, colIdx)}
-                        className={`px-3 py-1.5 border-b border-r border-white/[0.06] font-mono text-[11px] truncate cursor-cell transition-colors ${
+                        className={`px-3 py-1.5 border-b border-r border-white/[0.06] font-mono text-[11px] cursor-cell transition-colors overflow-hidden min-w-0 ${
                           isSel
                             ? 'bg-[#002FA7]/25 text-zinc-100'
                             : 'text-zinc-300 hover:bg-white/[0.03]'
                         }`}
                       >
-                        {String(row?.[colIdx] ?? '')}
+                        <ForensicDataPoint
+                          value={cellValue}
+                          copyValue={cellValue}
+                          emptyFallback=""
+                          compact
+                          compactFill
+                          className="w-full min-w-0"
+                        />
                       </div>
                     )
                   })}
