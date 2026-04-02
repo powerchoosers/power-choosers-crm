@@ -31,6 +31,10 @@
 *.pem
 .openclaw_workspace/
 
+# generated local artifacts
+/public/downloads/
+/.playwright-cli/
+
 # debug
 npm-debug.log*
 yarn-debug.log*
