@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify'
 import { Maximize2, Minimize2, Sun, Moon, Printer, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { stripTrackedEmailPreviewHtml } from '@/lib/email-preview-html'
 
 interface EmailContentProps {
   html?: string
@@ -47,40 +48,10 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
   const sanitizedHtml = React.useMemo(() => {
     if (!html) return ''
 
-    // Preliminary cleanup for common layout breakers
-    const processedHtml = html
-      .replace(/src=(["'])http:\/\//gi, 'src=$1https://')
-      .replace(/position:\s*fixed/gi, 'position: static')
-      .replace(/position:\s*absolute/gi, 'position: static')
-      .replace(/width:\s*\d+vw/gi, 'width: 100%')
-      .replace(/height:\s*\d+vh/gi, 'height: auto')
-      .replace(/<img([^>]*?)src=(["'])cid:[^"']+\2([^>]*)>/gi, '<span class="cid-placeholder">[Inline image not available in this view]</span>')
+    const origin = typeof window !== 'undefined' ? window.location.origin : undefined
+    const noTrackedHtml = stripTrackedEmailPreviewHtml(html, origin)
 
-    // Remove email tracking pixel to prevent self-open counting.
-    // Matches <img src=".../api/email/track/..." ... /> with single or double quotes.
-    const noEmailTrackingHtml = processedHtml.replace(/<img[^>]*src=(['"])[^'"]*\/api\/email\/track\/[^'"]*\1[^>]*>/gi, '')
-
-    // Also remove signature telemetry pixels — prevents expanding a contract email in the CRM
-    // from firing an "opened" event against the client's signing link.
-    const noTrackingHtml = noEmailTrackingHtml.replace(/<img[^>]*src=(['"])[^'"]*\/api\/signatures\/telemetry[^'"]*\1[^>]*>/gi, '')
-
-
-    // Unwrap click-tracked links so internal CRM preview clicks do not increase click counters.
-    // Converts href=".../api/email/click/{id}?url=<encoded>" back to href="<original>".
-    const noTrackedLinksHtml = noTrackingHtml.replace(/href=(["'])([^"']*\/api\/email\/click\/[^"']+)\1/gi, (match, quote, trackedUrl) => {
-      try {
-        const parsed = new URL(trackedUrl, window.location.origin)
-        const original = parsed.searchParams.get('url')
-        if (original) {
-          return `href=${quote}${decodeURIComponent(original)}${quote}`
-        }
-      } catch {
-        // Keep original tracked URL if parsing fails.
-      }
-      return match
-    })
-
-    return DOMPurify.sanitize(noTrackedLinksHtml, {
+    return DOMPurify.sanitize(noTrackedHtml, {
       ADD_TAGS: ['style'],
       ADD_ATTR: ['target', 'style'],
       USE_PROFILES: { html: true }

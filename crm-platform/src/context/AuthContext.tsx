@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { normalizeVoicemailGreeting, type VoicemailGreeting } from '@/lib/voicemail'
+import { getTwilioNumberEntries, getVoicemailGreeting, type TwilioNumberEntry, type VoicemailGreeting } from '@/lib/voicemail'
 import { resolveUserRole } from '@/lib/auth/roles'
 
 export type UserProfile = {
@@ -19,7 +19,7 @@ export type UserProfile = {
   city: string | null
   state: string | null
   hostedPhotoUrl: string | null
-  twilioNumbers: Array<{ name: string; number: string }> | null
+  twilioNumbers: TwilioNumberEntry[] | null
   selectedPhoneNumber: string | null
   bridgeToMobile: boolean | null
   voicemailGreeting: VoicemailGreeting | null
@@ -160,10 +160,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         city: settings.city ?? null,
         state: settings.state ?? null,
         hostedPhotoUrl: data.hosted_photo_url || null,
-        twilioNumbers: settings.twilioNumbers || [],
+        twilioNumbers: getTwilioNumberEntries(settings),
         selectedPhoneNumber: settings.selectedPhoneNumber || null,
         bridgeToMobile: settings.bridgeToMobile || false,
-        voicemailGreeting: normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
+        voicemailGreeting: getVoicemailGreeting(settings)
       })
 
       // If user has no hosted URL, fetch it natively from Zoho contacts sync.
@@ -348,10 +348,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 city: settings.city ?? null,
                 state: settings.state ?? null,
                 hostedPhotoUrl: data.hosted_photo_url || null,
-                twilioNumbers: settings.twilioNumbers || [],
+                twilioNumbers: getTwilioNumberEntries(settings),
                 selectedPhoneNumber: settings.selectedPhoneNumber || null,
                 bridgeToMobile: settings.bridgeToMobile || false,
-                voicemailGreeting: normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
+                voicemailGreeting: getVoicemailGreeting(settings)
               })
             } else {
               const resolvedRole = resolveEffectiveRole(null, emailLower)

@@ -5,9 +5,34 @@ export type VoicemailGreeting = {
   fileName: string | null
   mimeType: string | null
   updatedAt: string | null
+  twilioNumberSid: string | null
+  twilioNumber: string | null
+  twilioNumberName: string | null
 }
 
-type NumberLike = string | { number?: string | null } | null | undefined
+export type TwilioNumberEntry = {
+  name: string
+  number: string
+  sid: string | null
+  selected: boolean
+  voicemailGreeting: VoicemailGreeting | null
+}
+
+type NumberLike =
+  | string
+  | {
+    number?: string | null
+    phone?: string | null
+    sid?: string | null
+    phoneNumberSid?: string | null
+    selected?: boolean
+    name?: string | null
+    voicemailGreeting?: unknown
+    voicemail_greeting?: unknown
+    voicemail?: unknown
+  }
+  | null
+  | undefined
 
 type SettingsLike = {
   selectedPhoneNumber?: NumberLike
@@ -64,6 +89,23 @@ export function normalizeVoicemailGreeting(value: unknown): VoicemailGreeting | 
     : typeof raw.updated_at === 'string'
       ? raw.updated_at.trim()
       : ''
+  const twilioNumberSid = typeof raw.twilioNumberSid === 'string'
+    ? raw.twilioNumberSid.trim()
+    : typeof raw.twilio_number_sid === 'string'
+      ? raw.twilio_number_sid.trim()
+      : typeof raw.twilioNumberSID === 'string'
+        ? raw.twilioNumberSID.trim()
+        : ''
+  const twilioNumber = typeof raw.twilioNumber === 'string'
+    ? raw.twilioNumber.trim()
+    : typeof raw.twilio_number === 'string'
+      ? raw.twilio_number.trim()
+      : ''
+  const twilioNumberName = typeof raw.twilioNumberName === 'string'
+    ? raw.twilioNumberName.trim()
+    : typeof raw.twilio_number_name === 'string'
+      ? raw.twilio_number_name.trim()
+      : ''
   const enabledValue = raw.enabled
   const enabled = enabledValue === undefined ? true : Boolean(enabledValue)
 
@@ -76,12 +118,209 @@ export function normalizeVoicemailGreeting(value: unknown): VoicemailGreeting | 
     fileName: fileName || null,
     mimeType: mimeType || null,
     updatedAt: updatedAt || null,
+    twilioNumberSid: twilioNumberSid || null,
+    twilioNumber: twilioNumber || null,
+    twilioNumberName: twilioNumberName || null,
   }
+}
+
+export function normalizeTwilioNumberEntry(value: NumberLike): TwilioNumberEntry | null {
+  if (!value) return null
+
+  if (typeof value === 'string') {
+    const number = normalizePhoneNumber(value)
+    if (!number) return null
+    return {
+      name: 'Primary',
+      number,
+      sid: null,
+      selected: false,
+      voicemailGreeting: null,
+    }
+  }
+
+  if (typeof value !== 'object') return null
+
+  const raw = value as Record<string, any>
+  const numberRaw = typeof raw.number === 'string'
+    ? raw.number
+    : typeof raw.phone === 'string'
+      ? raw.phone
+      : typeof raw.phoneNumber === 'string'
+        ? raw.phoneNumber
+        : ''
+  const number = typeof numberRaw === 'string' ? numberRaw.trim() : ''
+  if (!number) return null
+
+  const sid = typeof raw.sid === 'string'
+    ? raw.sid.trim()
+    : typeof raw.phoneNumberSid === 'string'
+      ? raw.phoneNumberSid.trim()
+      : typeof raw.phone_number_sid === 'string'
+        ? raw.phone_number_sid.trim()
+        : null
+
+  const name = typeof raw.name === 'string' ? raw.name.trim() : 'Primary'
+  const selected = Boolean(raw.selected || false)
+  const voicemailGreeting = normalizeVoicemailGreeting(
+    raw.voicemailGreeting || raw.voicemail_greeting || raw.voicemail || null
+  )
+
+  return {
+    name: name || 'Primary',
+    number,
+    sid: sid || null,
+    selected,
+    voicemailGreeting,
+  }
+}
+
+export function normalizeTwilioNumberEntries(value: unknown): TwilioNumberEntry[] {
+  if (!Array.isArray(value)) return []
+
+  return value
+    .map((entry) => normalizeTwilioNumberEntry(entry))
+    .filter((entry): entry is TwilioNumberEntry => Boolean(entry))
+}
+
+export function getTwilioNumberEntries(settings: SettingsLike | null | undefined): TwilioNumberEntry[] {
+  if (!settings || typeof settings !== 'object') return []
+  return normalizeTwilioNumberEntries(settings.twilioNumbers)
+}
+
+export function getSelectedTwilioNumberEntry(settings: SettingsLike | null | undefined): TwilioNumberEntry | null {
+  const entries = getTwilioNumberEntries(settings)
+  if (!entries.length) return null
+
+  const selectedPhoneNumber = normalizePhoneNumber(
+    typeof settings?.selectedPhoneNumber === 'string'
+      ? settings.selectedPhoneNumber
+      : typeof settings?.selectedPhoneNumber === 'object' && settings.selectedPhoneNumber?.number
+        ? settings.selectedPhoneNumber.number
+        : ''
+  )
+
+  if (selectedPhoneNumber) {
+    const selectedByNumber = entries.find((entry) => normalizePhoneNumber(entry.number) === selectedPhoneNumber)
+    if (selectedByNumber) return selectedByNumber
+  }
+
+  const selectedByFlag = entries.find((entry) => entry.selected)
+  if (selectedByFlag) return selectedByFlag
+
+  return entries[0] || null
+}
+
+export function getTwilioNumberEntryForIdentifier(settings: SettingsLike | null | undefined, identifier: unknown): TwilioNumberEntry | null {
+  const entries = getTwilioNumberEntries(settings)
+  if (!entries.length) return null
+
+  const normalizedIdentifier = typeof identifier === 'string' ? identifier.trim() : ''
+  const identifierDigits = digitsOnly(identifier)
+
+  if (!normalizedIdentifier && !identifierDigits) {
+    return getSelectedTwilioNumberEntry(settings)
+  }
+
+  return (
+    entries.find((entry) => {
+      if (entry.sid && normalizedIdentifier && entry.sid === normalizedIdentifier) return true
+
+      const entryNormalized = normalizePhoneNumber(entry.number)
+      const normalizedInput = normalizePhoneNumber(normalizedIdentifier)
+      if (entryNormalized && normalizedInput && entryNormalized === normalizedInput) return true
+
+      const entryDigits = digitsOnly(entry.number)
+      if (identifierDigits && entryDigits === identifierDigits) return true
+
+      return false
+    }) || null
+  )
+}
+
+export function voicemailGreetingMatchesIdentifier(greeting: VoicemailGreeting | null | undefined, identifier: unknown): boolean {
+  if (!greeting) return false
+
+  const normalizedIdentifier = typeof identifier === 'string' ? identifier.trim() : ''
+  const identifierDigits = digitsOnly(identifier)
+  if (!normalizedIdentifier && !identifierDigits) return false
+
+  if (greeting.twilioNumberSid && normalizedIdentifier && greeting.twilioNumberSid === normalizedIdentifier) {
+    return true
+  }
+
+  const greetingNumber = normalizePhoneNumber(greeting.twilioNumber)
+  const identifierNumber = normalizePhoneNumber(normalizedIdentifier)
+  if (greetingNumber && identifierNumber && greetingNumber === identifierNumber) {
+    return true
+  }
+
+  if (identifierDigits) {
+    if (greetingNumber && digitsOnly(greetingNumber) === identifierDigits) return true
+    if (greeting.twilioNumber && digitsOnly(greeting.twilioNumber) === identifierDigits) return true
+  }
+
+  return false
 }
 
 export function getVoicemailGreeting(settings: SettingsLike | null | undefined): VoicemailGreeting | null {
   if (!settings || typeof settings !== 'object') return null
-  return normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
+  const selectedEntry = getSelectedTwilioNumberEntry(settings)
+  if (selectedEntry) {
+    const selectedGreeting = getVoicemailGreetingForTwilioNumber(settings, selectedEntry.sid || selectedEntry.number)
+    if (selectedGreeting) return selectedGreeting
+  }
+
+  const legacyGreeting = normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
+  if (!legacyGreeting) return null
+
+  const entries = getTwilioNumberEntries(settings)
+  if (!entries.length || entries.length === 1) {
+    return legacyGreeting
+  }
+
+  return null
+}
+
+export function getVoicemailGreetingForTwilioNumber(settings: SettingsLike | null | undefined, identifier: unknown): VoicemailGreeting | null {
+  if (!settings || typeof settings !== 'object') return getVoicemailGreeting(settings)
+
+  const matchingEntry = getTwilioNumberEntryForIdentifier(settings, identifier)
+  const entries = getTwilioNumberEntries(settings)
+  const selectedEntry = getSelectedTwilioNumberEntry(settings)
+  const selectedPhoneNumber = normalizePhoneNumber(
+    typeof settings?.selectedPhoneNumber === 'string'
+      ? settings.selectedPhoneNumber
+      : typeof settings?.selectedPhoneNumber === 'object' && settings.selectedPhoneNumber?.number
+        ? settings.selectedPhoneNumber.number
+        : ''
+  )
+  const matchingEntryNumber = normalizePhoneNumber(matchingEntry?.number)
+  const selectedEntryNumber = normalizePhoneNumber(selectedEntry?.number)
+
+  const entryGreeting = normalizeVoicemailGreeting(matchingEntry?.voicemailGreeting || null)
+  if (entryGreeting) return entryGreeting
+
+  const legacyGreeting = normalizeVoicemailGreeting(settings.voicemailGreeting || settings.voicemail || null)
+  if (!legacyGreeting) return null
+
+  if (voicemailGreetingMatchesIdentifier(legacyGreeting, identifier)) {
+    return legacyGreeting
+  }
+
+  if (matchingEntry && selectedEntryNumber && matchingEntryNumber && matchingEntryNumber === selectedEntryNumber) {
+    return legacyGreeting
+  }
+
+  if (matchingEntry && selectedPhoneNumber && matchingEntryNumber && matchingEntryNumber === selectedPhoneNumber) {
+    return legacyGreeting
+  }
+
+  if (!entries.length || entries.length === 1) {
+    return legacyGreeting
+  }
+
+  return null
 }
 
 export function extractNormalizedUserNumbers(settings: SettingsLike | null | undefined): string[] {
@@ -89,26 +328,12 @@ export function extractNormalizedUserNumbers(settings: SettingsLike | null | und
 
   const numbers: string[] = []
 
-  if (settings.selectedPhoneNumber) {
-    if (typeof settings.selectedPhoneNumber === 'string') {
-      numbers.push(settings.selectedPhoneNumber)
-    } else if (typeof settings.selectedPhoneNumber === 'object' && settings.selectedPhoneNumber.number) {
-      numbers.push(settings.selectedPhoneNumber.number)
-    }
-  }
+  const selectedEntry = getSelectedTwilioNumberEntry(settings)
+  if (selectedEntry?.number) numbers.push(selectedEntry.number)
 
-  if (Array.isArray(settings.twilioNumbers)) {
-    settings.twilioNumbers.forEach((entry) => {
-      if (!entry) return
-      if (typeof entry === 'string') {
-        numbers.push(entry)
-        return
-      }
-      if (typeof entry === 'object' && entry.number) {
-        numbers.push(entry.number)
-      }
-    })
-  }
+  getTwilioNumberEntries(settings).forEach((entry) => {
+    if (entry.number) numbers.push(entry.number)
+  })
 
   return numbers
     .map((num) => normalizePhoneNumber(num) || num)
@@ -126,7 +351,10 @@ export function resolveUserForBusinessNumber(users: any[] | null | undefined, bu
   }) || null
 }
 
-export function buildVoicemailStoragePath(userId: string) {
-  return `users/${userId}/${VOICEMAIL_FILE_NAME}`
-}
+export function buildVoicemailStoragePath(identifier: string) {
+  const safeIdentifier = String(identifier || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '')
 
+  return `twilio-numbers/${safeIdentifier || 'unknown'}/${VOICEMAIL_FILE_NAME}`
+}
