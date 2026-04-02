@@ -7,6 +7,7 @@ import { CheckCircle, ShieldCheck, PenTool, Loader2, ChevronLeft, ChevronRight, 
 import { toast } from 'sonner'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { getSignatureRequestKindConfig, inferSignatureRequestKindFromDocument, normalizeSignatureRequestKind } from '@/lib/signature-request'
+import { isInternalSignatureViewReferer } from '@/lib/signature-telemetry'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -119,6 +120,19 @@ export default function SignatureClient({ token, request, documentUrl }: Signatu
 
     // ── Telemetry ────────────────────────────────────────────────────────────
     useEffect(() => {
+        const referrer = typeof document !== 'undefined' ? document.referrer : ''
+        const currentUrl = typeof window !== 'undefined' ? window.location.href : ''
+
+        // Internal CRM previews carry crmPreview=1 on the signing URL. That keeps
+        // the open/view event out of customer telemetry even if the browser drops
+        // the original CRM referrer during the redirect.
+        if (
+            isInternalSignatureViewReferer(referrer) ||
+            isInternalSignatureViewReferer(currentUrl)
+        ) {
+            return
+        }
+
         const logView = async () => {
             try {
                 await fetch('/api/signatures/telemetry', {

@@ -371,7 +371,8 @@ function SignaturePanel({
 
   function derivedStatus(req: any) {
     if (req.status === 'completed' || req.status === 'signed') return 'signed'
-    if (req.status === 'canceled' || req.status === 'cancelled') return 'cancelled'
+    // Manual cancels are stored as `declined` in the database.
+    if (req.status === 'canceled' || req.status === 'cancelled' || req.status === 'declined') return 'cancelled'
     if (req.expires_at && new Date(req.expires_at) < new Date()) return 'expired'
     return req.status
   }
@@ -379,6 +380,7 @@ function SignaturePanel({
   const statusColor = (status: string) => {
     if (status === 'signed') return 'text-emerald-400'
     if (status === 'expired') return 'text-rose-400'
+    if (status === 'cancelled') return 'text-zinc-500'
     if (status === 'pending' || status === 'sent' || status === 'opened' || status === 'viewed') return 'text-amber-400'
     return 'text-zinc-500'
   }

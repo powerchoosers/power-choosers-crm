@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUIStore } from '@/store/uiStore'
-import type { VoicemailGreeting } from '@/lib/voicemail'
+import { getVoicemailGreetingForTwilioNumber, normalizePhoneNumber, type TwilioNumberEntry, type VoicemailGreeting } from '@/lib/voicemail'
 import { NodalAudioScrubber } from '@/components/audio/NodalAudioScrubber'
 
 type VoicemailRecorderState = {
@@ -107,7 +107,7 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
-  const [twilioNumbers, setTwilioNumbers] = useState<Array<{ name: string; number: string }>>([])
+  const [twilioNumbers, setTwilioNumbers] = useState<TwilioNumberEntry[]>([])
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [selectedPhoneNumber, setSelectedPhoneNumber] = useState<string | null>(null)
   const [bridgeToMobile, setBridgeToMobile] = useState(false)
@@ -125,6 +125,22 @@ export default function SettingsPage() {
   const voicemailTimerRef = useRef<number | null>(null)
   const voicemailPreviewUrlRef = useRef<string | null>(null)
   const voicemailPlaybackSrc = voicemailPreviewUrl || voicemailGreeting?.publicUrl || null
+
+  const resolveVoicemailGreetingForLine = (
+    identifier: string | null | undefined,
+    numbers: TwilioNumberEntry[] = twilioNumbers,
+    selectedNumberOverride: string | null = selectedPhoneNumber
+  ) => {
+    return getVoicemailGreetingForTwilioNumber(
+      {
+        selectedPhoneNumber: selectedNumberOverride,
+        twilioNumbers: numbers,
+        voicemailGreeting: profile.voicemailGreeting,
+        voicemail: profile.voicemailGreeting,
+      },
+      identifier || null
+    )
+  }
 
   // UI Store Sound Settings
   const { 
@@ -506,6 +522,7 @@ export default function SettingsPage() {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       const audioDataUrl = await blobToDataUrl(pendingVoicemailBlob)
+      const selectedEntry = selectedIdx !== null ? twilioNumbers[selectedIdx] || null : null
 
       const response = await fetch('/api/settings/voicemail', {
         method: 'POST',
@@ -516,7 +533,9 @@ export default function SettingsPage() {
         body: JSON.stringify({
           audioDataUrl,
           fileName: 'greeting.wav',
-          selectedPhoneNumber,
+          selectedPhoneNumber: selectedEntry?.number || selectedPhoneNumber,
+          twilioNumberSid: selectedEntry?.sid || null,
+          twilioNumberName: selectedEntry?.name || null,
           source: 'settings-page'
         }),
       })
@@ -528,6 +547,24 @@ export default function SettingsPage() {
 
       const payload = await response.json()
       const nextGreeting = payload?.voicemailGreeting || null
+      const nextGreetingNumber = nextGreeting?.twilioNumber || selectedEntry?.number || selectedPhoneNumber || null
+      const nextGreetingSid = nextGreeting?.twilioNumberSid || selectedEntry?.sid || null
+      const nextGreetingName = nextGreeting?.twilioNumberName || selectedEntry?.name || null
+
+      if (selectedIdx !== null) {
+        setTwilioNumbers((current) =>
+          current.map((entry, index) => {
+            if (index !== selectedIdx) return entry
+            return {
+              ...entry,
+              name: nextGreetingName || entry.name,
+              number: nextGreetingNumber || entry.number,
+              sid: nextGreetingSid || entry.sid || null,
+              voicemailGreeting: nextGreeting,
+            }
+          })
+        )
+      }
 
       if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
         URL.revokeObjectURL(voicemailPreviewUrlRef.current)
@@ -556,9 +593,17 @@ export default function SettingsPage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
+      const selectedEntry = selectedIdx !== null ? twilioNumbers[selectedIdx] || null : null
       const response = await fetch('/api/settings/voicemail', {
         method: 'DELETE',
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          selectedPhoneNumber: selectedEntry?.number || selectedPhoneNumber,
+          twilioNumberSid: selectedEntry?.sid || null,
+        }),
       })
 
       if (!response.ok) {
@@ -570,6 +615,17 @@ export default function SettingsPage() {
         URL.revokeObjectURL(voicemailPreviewUrlRef.current)
       }
 
+      if (selectedIdx !== null) {
+        setTwilioNumbers((current) =>
+          current.map((entry, index) => {
+            if (index !== selectedIdx) return entry
+            return {
+              ...entry,
+              voicemailGreeting: null,
+            }
+          })
+        )
+      }
       setVoicemailGreeting(null)
       setPendingVoicemailBlob(null)
       setVoicemailPreviewUrl(null)
@@ -603,18 +659,31 @@ export default function SettingsPage() {
     setWebsite(profile.website || '')
     setCity(profile.city || '')
     setState(profile.state || '')
-    setTwilioNumbers(profile.twilioNumbers || [])
     const twilioList = profile.twilioNumbers || []
-    
-    // Recovery logic: prioritize 'selected' flag, fall back to number matching
-    const savedIdx = twilioList.findIndex(n => (n as any).selected === true)
-    const fallbackIdx = twilioList.findIndex(n => n.number === profile.selectedPhoneNumber)
+    setTwilioNumbers(twilioList)
+
+    // Recovery logic: prioritize the explicit selected flag, then number matching.
+    const selectedPhoneNumberNormalized = normalizePhoneNumber(profile.selectedPhoneNumber || '')
+    const savedIdx = twilioList.findIndex((n) => n.selected === true)
+    const fallbackIdx = twilioList.findIndex((n) => normalizePhoneNumber(n.number) === selectedPhoneNumberNormalized)
     const idx = savedIdx !== -1 ? savedIdx : (fallbackIdx !== -1 ? fallbackIdx : (twilioList.length > 0 ? 0 : null))
-    
+
     setSelectedIdx(idx)
     setSelectedPhoneNumber(profile.selectedPhoneNumber || (twilioList.length > 0 ? twilioList[0].number : null))
     setBridgeToMobile(profile.bridgeToMobile || false)
-    setVoicemailGreeting(profile.voicemailGreeting || null)
+    const selectedEntry = idx !== null ? twilioList[idx] || null : null
+    const selectedGreeting = selectedEntry
+      ? getVoicemailGreetingForTwilioNumber(
+        {
+          selectedPhoneNumber: profile.selectedPhoneNumber,
+          twilioNumbers: twilioList,
+          voicemailGreeting: profile.voicemailGreeting,
+          voicemail: profile.voicemailGreeting,
+        },
+        selectedEntry.sid || selectedEntry.number || profile.selectedPhoneNumber || null
+      )
+      : (profile.voicemailGreeting || null)
+    setVoicemailGreeting(selectedGreeting || null)
   }, [profile, user?.user_metadata?.full_name])
 
   const computedName = useMemo(() => {
@@ -714,12 +783,13 @@ export default function SettingsPage() {
   const handleAddNumber = () => {
     if (!newNumber || !newNumberName) return
     const formatted = strictFormat(newNumber)
-    const updated = [...twilioNumbers, { name: newNumberName, number: formatted }]
+    const updated = [...twilioNumbers, { name: newNumberName, number: formatted, sid: null, selected: false, voicemailGreeting: null }]
     setTwilioNumbers(updated)
     // If it's the first number or we want to switch to new one immediately
     if (updated.length === 1 || !selectedPhoneNumber) {
       setSelectedIdx(updated.length - 1)
       setSelectedPhoneNumber(formatted)
+      setVoicemailGreeting(resolveVoicemailGreetingForLine(formatted, updated, formatted) || null)
     }
     setNewNumber('')
     setNewNumberName('')
@@ -727,14 +797,20 @@ export default function SettingsPage() {
 
   const handleDeleteNumber = (index: number) => {
     const updated = [...twilioNumbers]
-    const removed = updated.splice(index, 1)[0]
+    updated.splice(index, 1)
     setTwilioNumbers(updated)
     
     if (selectedIdx === index) {
-      setSelectedIdx(updated.length > 0 ? 0 : null)
-      setSelectedPhoneNumber(updated.length > 0 ? updated[0].number : null)
+      const nextIndex = updated.length > 0 ? Math.min(index, updated.length - 1) : null
+      setSelectedIdx(nextIndex)
+      const nextSelectedNumber = nextIndex !== null ? updated[nextIndex]?.number || null : null
+      setSelectedPhoneNumber(nextSelectedNumber)
+      setVoicemailGreeting(nextIndex !== null ? (resolveVoicemailGreetingForLine(updated[nextIndex]?.sid || updated[nextIndex]?.number || null, updated, nextSelectedNumber) || null) : null)
     } else if (selectedIdx !== null && selectedIdx > index) {
-      setSelectedIdx(selectedIdx - 1)
+      const nextIndex = selectedIdx - 1
+      setSelectedIdx(nextIndex)
+      const nextSelectedNumber = updated[nextIndex]?.number || null
+      setVoicemailGreeting(resolveVoicemailGreetingForLine(updated[nextIndex]?.sid || updated[nextIndex]?.number || null, updated, nextSelectedNumber) || null)
     }
   }
 
@@ -975,65 +1051,81 @@ export default function SettingsPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {twilioNumbers.map((num, idx) => (
-                      <div 
-                        key={idx} 
-                        onClick={() => {
-                          setSelectedIdx(idx)
-                          setSelectedPhoneNumber(num.number)
-                        }}
-                        className={cn(
-                          "flex items-center justify-between p-4 rounded-xl transition-all duration-300 cursor-pointer group relative overflow-hidden",
-                          selectedIdx === idx 
-                            ? "bg-[#002FA7]/10 border border-[#002FA7]/30 ring-1 ring-[#002FA7]/20" 
-                            : "bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.04]"
-                        )}
-                      >
-                        {selectedIdx === idx && (
-                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#002FA7]" />
-                        )}
-                        <div className="flex items-center gap-4">
-                          <div
-                            className={cn(
-                              "w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300",
-                              selectedIdx === idx
-                                ? "bg-[#002FA7] border-[#002FA7] scale-110"
-                                : "border-white/20 group-hover:border-white/40"
-                            )}
-                          >
-                            {selectedIdx === idx && <CheckCircle className="w-3.5 h-3.5 text-white" />}
-                          </div>
-                          <div>
-                            <p className={cn(
-                              "text-sm font-medium transition-colors",
-                              selectedIdx === idx ? "text-white" : "text-zinc-300"
-                            )}>
-                              {num.name}
-                            </p>
-                            <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-wide mt-0.5">
-                              {num.number}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        <div className="flex items-center gap-2">
-                          {selectedIdx === idx && (
-                            <Badge variant="outline" className="border-[#002FA7]/40 text-[9px] font-mono text-white bg-[#002FA7]/20 uppercase px-1.5 h-5 leading-none">
-                              Active Uplink
-                            </Badge>
+                    {twilioNumbers.map((num, idx) => {
+                      const lineGreeting = resolveVoicemailGreetingForLine(num.sid || num.number, twilioNumbers, num.number)
+
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => {
+                            setSelectedIdx(idx)
+                            setSelectedPhoneNumber(num.number)
+                            setVoicemailGreeting(resolveVoicemailGreetingForLine(num.sid || num.number, twilioNumbers, num.number) || null)
+                          }}
+                          className={cn(
+                            "flex items-center justify-between p-4 rounded-xl transition-all duration-300 cursor-pointer group relative overflow-hidden",
+                            selectedIdx === idx
+                              ? "bg-[#002FA7]/10 border border-[#002FA7]/30 ring-1 ring-[#002FA7]/20"
+                              : "bg-white/[0.02] border border-white/5 hover:border-white/10 hover:bg-white/[0.04]"
                           )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteNumber(idx)
-                            }}
-                            className="icon-button-forensic opacity-0 group-hover:opacity-100 h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all hover:bg-red-400/10 rounded-lg"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                        >
+                          {selectedIdx === idx && (
+                            <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#002FA7]" />
+                          )}
+                          <div className="flex items-center gap-4">
+                            <div
+                              className={cn(
+                                "w-5 h-5 rounded-full border flex items-center justify-center transition-all duration-300",
+                                selectedIdx === idx
+                                  ? "bg-[#002FA7] border-[#002FA7] scale-110"
+                                  : "border-white/20 group-hover:border-white/40"
+                              )}
+                            >
+                              {selectedIdx === idx && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                            </div>
+                            <div>
+                              <p className={cn(
+                                "text-sm font-medium transition-colors",
+                                selectedIdx === idx ? "text-white" : "text-zinc-300"
+                              )}>
+                                {num.name}
+                              </p>
+                              <p className="text-xs text-zinc-500 font-mono tabular-nums tracking-wide mt-0.5">
+                                {num.number}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "text-[9px] font-mono uppercase tracking-widest px-1.5 h-5 leading-none border",
+                                lineGreeting
+                                  ? "border-emerald-500/30 text-emerald-300 bg-emerald-500/5"
+                                  : "border-white/10 text-zinc-500 bg-white/[0.02]"
+                              )}
+                            >
+                              {lineGreeting ? 'Voicemail Saved' : 'No Voicemail'}
+                            </Badge>
+                            {selectedIdx === idx && (
+                              <Badge variant="outline" className="border-[#002FA7]/40 text-[9px] font-mono text-white bg-[#002FA7]/20 uppercase px-1.5 h-5 leading-none">
+                                Active Uplink
+                              </Badge>
+                            )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteNumber(idx)
+                              }}
+                              className="icon-button-forensic opacity-0 group-hover:opacity-100 h-8 w-8 flex items-center justify-center text-zinc-500 hover:text-red-400 transition-all hover:bg-red-400/10 rounded-lg"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    })}
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                       <Input

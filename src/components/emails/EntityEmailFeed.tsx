@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { useEntityEmails } from '@/hooks/useEntityEmails'
 import { useEmailThread } from '@/hooks/useEmailThread'
 import { useComposeStore } from '@/store/composeStore'
+import { stripTrackedEmailPreviewHtml } from '@/lib/email-preview-html'
 
 interface EntityEmailFeedProps {
     emails: string[]
@@ -249,7 +250,9 @@ export function EntityEmailFeed({
 
     const renderInlineBody = (email: Email) => {
         if (email.html) {
-            const safeHtml = DOMPurify.sanitize(email.html, {
+            const origin = typeof window !== 'undefined' ? window.location.origin : undefined
+            const sanitizedHtml = stripTrackedEmailPreviewHtml(email.html, origin)
+            const safeHtml = DOMPurify.sanitize(sanitizedHtml, {
                 USE_PROFILES: { html: true }
             })
 
