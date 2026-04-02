@@ -131,6 +131,118 @@ function normalizeMetadata(raw: any): Record<string, any> {
     return {};
 }
 
+function cleanCompanyName(input: any): string {
+    const raw = String(input || '').trim();
+    if (!raw) return 'your company';
+
+    const cleaned = raw
+        .replace(/\s+d\/b\/a\s+.+$/i, '')
+        .replace(/\s+dba\s+.+$/i, '')
+        .replace(/\s+a\/k\/a\s+.+$/i, '')
+        .replace(/\s+aka\s+.+$/i, '')
+        .replace(/,\s*(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '')
+        .replace(/\s+(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    return cleaned || raw;
+}
+
+function normalizeReplyStage(value: any): 'first_touch' | 'follow_up' | 'no_reply' | 'general' {
+    const stage = String(value || '').toLowerCase().trim();
+    if (!stage) return 'general';
+    if (/(first[-\s]?touch|forensic opener|day\s*0|day\s*1|day1|day_1|intro)/.test(stage)) return 'first_touch';
+    if (/(no[-\s]?reply|no reply|pattern[-\s]?interrupt|pattern interrupt|breakup|ghost)/.test(stage)) return 'no_reply';
+    if (/(follow[-\s]?up|opened|clicked|day\s*3|day3|day\s*7|day7|day\s*14|day14)/.test(stage)) return 'follow_up';
+    return 'general';
+}
+
+function detectReplyStage(prompt: any, draft: any): 'first_touch' | 'follow_up' | 'no_reply' | 'general' {
+    const text = `${prompt || ''}\n${draft || ''}`.toLowerCase();
+    if (/(no[-\s]?reply|no reply|pattern[-\s]?interrupt|pattern interrupt|breakup|ghost)/.test(text)) return 'no_reply';
+    if (/(first[-\s]?touch|forensic opener|day\s*0|day\s*1|day1|day_1|intro)/.test(text)) return 'first_touch';
+    if (/(follow[-\s]?up|opened|clicked|day\s*3|day3|day\s*7|day7|day\s*14|day14)/.test(text)) return 'follow_up';
+    return 'general';
+}
+
+function buildReplyStageDirective(stage: string): string {
+    const directives: Record<string, string> = {
+        first_touch: [
+            '- FIRST TOUCH: 60-90 words, 2-3 short paragraphs.',
+            '- Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations = demand spikes or delivery charges; owner/GM = leverage or timing. Use one lane only.',
+            '- Start with one concrete company, role, city, or operating fact.',
+            '- Make the payoff explicit: they get a marked-up statement showing where the leak is most likely coming from and what to check first.',
+            '- Use one direct statement CTA. Prefer "Send the latest statement and I\'ll tell you where the leak is most likely coming from."',
+            '- Subject line: 1-4 words, plain, specific, and value-led.',
+            '- Never mention LinkedIn, a profile, or how you found them.',
+        ].join('\n'),
+        follow_up: [
+            '- FOLLOW-UP: 50-80 words, 2-3 short paragraphs.',
+            '- Add one new fact or angle. Reference prior contact by topic only, never opens or clicks.',
+            '- Reinforce the concrete output: the bill lines worth checking and the likely leak area.',
+            '- Use one direct statement CTA. Prefer an affirmative sentence over a question, and keep the payoff concrete.',
+            '- Subject line: 1-4 words, specific and plain.',
+        ].join('\n'),
+        no_reply: [
+            '- NO REPLY: 35-55 words, maximum 2 sentences.',
+            '- Assume you already reached the right person. Do not ask who owns electricity review.',
+            '- Sentence 1 should state the value in plain English and name one likely leak area.',
+            '- Sentence 2 should offer to mark up the latest statement and call out the lines worth checking first.',
+            '- Subject line: 1-4 words, direct and sharp.',
+        ].join('\n'),
+        general: [
+            '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
+            '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
+            '- Use a plain subject line with 1-5 words.',
+            '- One CTA only. Prefer a statement first; use a simple yes/no only if it still names the payoff.',
+        ].join('\n')
+    };
+
+    return directives[stage] || directives.general;
+}
+
+function pickValueLane(member: any): string {
+    const title = String(member?.contact_title || '').toLowerCase();
+    const industry = String(member?.account_industry || '').toLowerCase();
+
+    if (/(cfo|controller|finance|accounting|accounts|vp finance|director finance|chief financial)/.test(title)) {
+        return 'budget variance or renewal timing';
+    }
+
+    if (/(facility|facilities|operations|plant|maintenance|logistics|warehouse|production|engineering|supply chain|operations manager|plant manager)/.test(title) || /(manufacturing|logistics|warehouse|distribution|food|cold storage|hospitality|retail|industrial)/.test(industry)) {
+        return 'demand spikes or delivery charges';
+    }
+
+    if (/(owner|ceo|president|principal|founder|general manager|gm|managing director)/.test(title)) {
+        return 'timing or leverage before renewal';
+    }
+
+    return 'delivery charges';
+}
+
+function buildContextualFallbackBody(member: any, replyStage: string, location?: string | null): string {
+    const stage = normalizeReplyStage(replyStage);
+    const firstName = String(member?.firstName || '').trim();
+    const companyName = cleanCompanyName(member?.company_name || member?.company || member?.account_name || 'your company');
+    const companyPhrase = location ? `${companyName} in ${location}` : companyName;
+    const opener = firstName ? `${firstName},\n\n` : '';
+    const valueLane = pickValueLane(member);
+
+    if (stage === 'no_reply') {
+        return `${opener}I'm probably sending this to the right person already, and the useful question is whether the leak sits in ${valueLane}.\n\nSend the latest statement and I'll mark up the lines worth checking first.`;
+    }
+
+    if (stage === 'follow_up') {
+        return `${opener}I was looking back at ${companyPhrase} and the useful question is whether the drift is coming from ${valueLane}.\n\nSend the latest statement and I'll mark up the lines worth checking first.`;
+    }
+
+    if (stage === 'first_touch') {
+        return `${opener}I was looking at ${companyPhrase} and the useful question is whether the bill leak sits in ${valueLane}.\n\nSend your latest electricity statement and I'll mark up the lines worth checking first.`;
+    }
+
+    return `${opener}I was looking at ${companyPhrase} and the useful question is whether the bill is leaking through ${valueLane}.\n\nSend your latest electricity statement and I'll mark up the lines worth checking first.`;
+}
+
 Deno.serve(async (req: Request) => {
     console.log('[DEBUG] Received request:', req.method);
 
@@ -310,10 +422,15 @@ async function handleGeneration(execution, job) {
             ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
             : null;
     const sourceTruthLine = linkedInUrl
-        ? 'SOURCE_TRUTH: LinkedIn available as a research signal only. Do NOT mention LinkedIn, say you found them on LinkedIn, or reference their LinkedIn profile in the email copy.'
+        ? 'SOURCE_TRUTH: LinkedIn is available as a research signal only. Do NOT mention LinkedIn, profiles, or how you found them in the email copy.'
         : website
             ? 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.'
             : 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
+    const replyStage = normalizeReplyStage(
+        metadata?.replyStage ||
+        metadata?.sequenceStage ||
+        detectReplyStage(metadata?.prompt || metadata?.label || metadata?.name || '', metadata?.body || metadata?.aiBody || '')
+    );
     const researchFacts = [
         member.account_description ? `Company summary: ${member.account_description}` : null,
         member.account_industry ? `Industry: ${member.account_industry}` : null,
@@ -368,11 +485,13 @@ async function handleGeneration(execution, job) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
         body: JSON.stringify({
-            prompt: `${metadata?.prompt || 'Draft a personalized follow-up'}\n\n${sourceTruthLine}`,
+            prompt: `${metadata?.prompt || 'Draft a personalized follow-up'}\n\n${buildReplyStageDirective(replyStage)}\n\n${sourceTruthLine}`,
             provider: 'openrouter',
             type: 'email',
             vectors: Array.isArray(metadata?.vectors) ? metadata.vectors : [],
             mode: 'generate_email',
+            sequenceStage: replyStage,
+            replyStage,
             contact: {
                 name: `${member.firstName} ${member.lastName}`,
                 email: member.contact_email,
@@ -417,9 +536,7 @@ async function handleGeneration(execution, job) {
     const subject = result.subject || metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point'
 
     if (!body) {
-        const firstName = String(member.firstName || '').trim();
-        const greeting = firstName ? `${firstName},\n\n` : '';
-        body = `${greeting}If you send your most recent electricity statement, I can reply with 2-3 specific cost observations worth checking.\n\nInterested?`;
+        body = buildContextualFallbackBody(member, replyStage, location);
     }
 
     if (!body.includes('NODAL_FORENSIC_SIGNATURE') && !body.includes('nodal-signature')) {
@@ -460,6 +577,7 @@ async function handleSend(execution, job) {
 
     const [member] = await sql`
     SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
+           a.name as company_name, a.city as account_city, a.state as account_state, a.industry as account_industry,
            s."ownerId" as owner_uuid, u.email as primary_owner_email,
            u.first_name as owner_first_name,
            COALESCE(
@@ -469,6 +587,7 @@ async function handleSend(execution, job) {
            ) as sequence_sender_email
     FROM sequence_members m
     JOIN contacts c ON m."targetId" = c.id
+    LEFT JOIN accounts a ON c."accountId" = a.id
     JOIN sequences s ON m."sequenceId" = s.id
     LEFT JOIN users u ON (s."ownerId" = u.id OR s."ownerId" = u.email)
     WHERE m.id = ${execution.member_id}
@@ -578,9 +697,13 @@ async function handleSend(execution, job) {
         return;
     }
 
-    const fallbackFirstName = String(member?.firstName || '').trim();
+    const replyStage = normalizeReplyStage(
+        metadata?.replyStage ||
+        metadata?.sequenceStage ||
+        detectReplyStage(metadata?.prompt || metadata?.label || metadata?.name || '', metadata?.body || metadata?.aiBody || '')
+    );
     const htmlBody = String(metadata?.body || metadata?.aiBody || '').trim() ||
-        `${fallbackFirstName ? `${fallbackFirstName},\n\n` : ''}If you send your most recent electricity statement, I can reply with 2-3 specific cost observations worth checking.\n\nInterested?`;
+        buildContextualFallbackBody(member, replyStage, member.account_city || null);
 
     const response = await fetch(`${API_BASE_URL}/api/email/zoho-send-sequence`, {
         method: 'POST',
