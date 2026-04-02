@@ -126,6 +126,20 @@ function cleanSequenceCopy(input) {
     .replace(/\bI could (?:take a look|have a look|look at it|look it over|review it)\b/gi, 'I can take a look')
     .replace(/\bI could quickly\b/gi, 'I can quickly')
     .replace(/\bI could (?:highlight|share|give|provide|point out)\b/gi, (m) => m.replace('could', 'can'))
+    .replace(/\bWould that be helpful\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
+    .replace(/\bWould that quick review be helpful\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
+    .replace(/\bWould you be open to me reviewing it\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
+    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "Send it over and I'll mark up the lines worth checking. ")
+    .replace(/\bWant me to take a look\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
+    .replace(/\bWorth a quick check\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
+    .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll mark up the lines worth checking")
+    .replace(/\bI can reply with 2-3 observations\b/gi, "I'll mark up the lines worth checking")
+    .replace(/\b2-3 specific observations\b/gi, "the lines worth checking")
+    .replace(/\bshort breakdown of what stands out\b/gi, 'what looks worth checking first')
+    .replace(/\bI review electricity statements for Nodal Point\b/gi, 'I can mark up the lines worth checking')
+    .replace(/\bMy company, Nodal Point, helps businesses understand their energy bills better\.?\s*/gi, 'I can mark up the lines worth checking. ')
+    .replace(/\bI review these bills\b/gi, 'I can mark up the lines worth checking')
+    .replace(/\b3-point readout\b/gi, 'the lines worth checking')
 
   return text;
 }
@@ -149,8 +163,68 @@ function deGenericizeFirstTouchCopy(input, strategy) {
     .replace(/many organizations in your sector see costs shift constantly in the ERCOT market/gi, 'a lot of companies in your space see those costs move with ERCOT')
     .replace(/I regularly diagnose Texas electricity bills, looking for billing errors or contract issues/gi, 'I review Texas electricity bills for billing issues and contract leaks')
     .replace(/I offer a quick check on those details/gi, 'I can take a quick look at those details')
-    .replace(/If you sent me your latest electricity statement, I could reply with a 2-3 point snapshot of what stands out/gi, 'If you send me your latest electricity statement, I can reply with a 2-3 point snapshot of what stands out')
-    .replace(/If you sent me your latest bill, I could reply with a few bullet points on what stands out/gi, 'If you send me your latest bill, I can reply with a short readout of what stands out');
+    .replace(/If you sent me your latest electricity statement, I could reply with a 2-3 point snapshot of what stands out/gi, 'If you send me your latest electricity statement, I can mark up the lines worth checking')
+    .replace(/If you sent me your latest bill, I could reply with a few bullet points on what stands out/gi, 'If you send me your latest bill, I can mark up the lines worth checking');
+}
+
+function normalizeReplyStage(value) {
+  const stage = String(value || '').toLowerCase().trim();
+  if (!stage) return 'general';
+  if (stage.includes('first') && stage.includes('touch')) return 'first_touch';
+  if (stage.includes('forensic opener') || stage.includes('day 1') || stage.includes('day1') || stage.includes('day_1') || stage.includes('intro')) {
+    return 'first_touch';
+  }
+  if (stage.includes('no reply') || stage.includes('no-reply') || stage.includes('pattern interrupt') || stage.includes('pattern-interrupt') || stage.includes('breakup') || stage.includes('ghost')) {
+    return 'no_reply';
+  }
+  if (stage.includes('follow') || stage.includes('opened') || stage.includes('clicked') || stage.includes('day 3') || stage.includes('day3') || stage.includes('day 7') || stage.includes('day7') || stage.includes('day 14') || stage.includes('day14')) {
+    return 'follow_up';
+  }
+  return 'general';
+}
+
+function detectReplyStage(prompt, draft) {
+  const text = `${prompt || ''}\n${draft || ''}`.toLowerCase();
+  if (/(pattern[-\s]?interrupt|no[-\s]?reply|breakup|ghost)/.test(text)) return 'no_reply';
+  if (/(first[-\s]?touch|forensic opener|day\s*0|day\s*1|intro)/.test(text)) return 'first_touch';
+  if (/(follow[-\s]?up|opened|clicked|day\s*3|day\s*7|day\s*14)/.test(text)) return 'follow_up';
+  return 'general';
+}
+
+function buildReplyStageDirective(stage) {
+  const directives = {
+    first_touch: [
+      '- FIRST TOUCH: 60-90 words, 2-3 short paragraphs.',
+      '- Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations = demand spikes or delivery charges; owner/GM = leverage or timing. Use one lane only.',
+      '- Start with one concrete company, role, city, or operating fact.',
+      '- Make the payoff explicit: they get a marked-up statement showing where the leak is most likely coming from and what to check first.',
+      '- Use one direct statement CTA. Prefer "Send the latest statement and I\'ll tell you where the leak is most likely coming from."',
+      '- Subject line: 1-4 words, plain, specific, and value-led.',
+      '- Never mention LinkedIn, a profile, or how the person was found.',
+    ].join('\n'),
+    follow_up: [
+      '- FOLLOW-UP: 50-80 words, 2-3 short paragraphs.',
+      '- Add one new fact or angle. Reference prior contact by topic only, never opens/clicks.',
+      '- Reinforce the concrete output: the bill lines worth checking and the likely leak area.',
+      '- Use one direct statement CTA. Prefer an affirmative sentence over a question, and keep the payoff concrete.',
+      '- Subject line: 1-4 words, specific and plain.',
+    ].join('\n'),
+    no_reply: [
+      '- NO REPLY: 35-55 words, maximum 2 sentences.',
+      '- Assume you already reached the right person. Do not ask who owns electricity review.',
+      '- Sentence 1 should state the value in plain English and name one likely leak area.',
+      '- Sentence 2 should offer to mark up the latest statement and call out the lines worth checking first.',
+      '- Subject line: 1-4 words, direct and sharp.',
+    ].join('\n'),
+    general: [
+      '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
+      '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
+      '- Use a plain subject line with 1-5 words.',
+      '- One CTA only. Prefer a statement first; use a simple yes/no only if it still names the payoff.',
+    ].join('\n')
+  };
+
+  return directives[stage] || directives.general;
 }
 
 export default async function handler(req, res) {
@@ -163,7 +237,8 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { draft, type, context, contact, prompt, provider, mode = 'generate_email', vectors = [] } = req.body;
+  const { draft, type, context, contact, prompt, provider, mode = 'generate_email', vectors = [], sequenceStage, replyStage: replyStageInput } = req.body;
+  const replyStage = normalizeReplyStage(sequenceStage || replyStageInput || detectReplyStage(prompt, draft));
 
   if (!draft && !prompt) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -256,10 +331,11 @@ export default async function handler(req, res) {
 
           RULES:
           1. Keep it under 80 words.
-          2. Preserve hard facts, names, dates, and constraints.
-          3. Make the outcome explicit: one concrete observation, one pain signal, one low-friction ask.
-          4. Remove filler, marketing fluff, and vague language.
-          5. Output ONLY the optimized prompt text. No explanations.
+          2. Preserve hard facts, names, dates, stage, and constraints.
+          3. Make the outcome explicit: one concrete observation, one pain signal, one low-friction ask, one yes/no question.
+          4. If the prompt is for a first touch, follow-up, or no-reply step, keep that stage explicit and keep the note short.
+          5. Remove filler, marketing fluff, and vague language.
+          6. Output ONLY the optimized prompt text. No explanations.
         `;
         userContent = `Original prompt:\n\n${prompt}`;
       } else if (mode === 'generate_email') {
@@ -288,15 +364,15 @@ export default async function handler(req, res) {
             - Keep it problem-based and specific (e.g., "Fort Worth industrial billing gap", "before your 2027 contract renewal", "who reviews electricity at [Company]?").
           11. JARGON TRANSLATION RULE:
             - Never use unexplained acronyms like 4CP, TDU, ESI ID, pass-through, nodal adder, or load zone shorthand in cold outreach.
-            - Always describe the two cost buckets in plain business language. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". Pick a different pairing every email — the concept stays constant, the exact words must not.
+            - Name one primary cost lane in plain business language and only add the second lane if it genuinely sharpens the diagnosis. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". The concept stays constant, the exact words must not.
             - If a technical term is necessary, define it in the same sentence in plain English.
           12. CTA RULE:
             - First touch: ask for interest with a concrete offer, not a meeting request.
-            - Offer: if they send Lewis their latest electricity statement, he will reply with a 2–3 bullet forensic snapshot.
-            - Use PRESENT conditional: "If you send your latest statement, I'll reply with 2-3 bullet points." NEVER past conditional: "if you sent it, I could reply."
-            - Preferred verb-first CTA forms: "Want me to take a look?", "Send it over and I'll reply with 2-3 observations.", "Worth a quick check?"
-            - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?" — these are indirect and passive.
-            - End with ONE low-friction yes/no question. Never ask twice.
+            - Offer: if they send Lewis their latest electricity statement, he will reply with the likely leak area and the lines worth checking first.
+            - Use PRESENT conditional or an affirmative CTA: "Send the latest statement and I'll tell you where the leak is most likely coming from." NEVER past conditional: "if you sent it, I could reply."
+            - Preferred CTA forms: "Send it over and I'll mark up the lines worth checking.", "I'll tell you where the leak is most likely coming from if you send the latest statement.", "I'll reply with the lines worth checking first if you send the latest statement."
+            - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?", "Want me to take a look?" — these are indirect and passive.
+            - Do not stack more than one question. Prefer a statement CTA when it sounds natural and make sure the statement names the payoff.
           13. VOICE RULE:
             - Use first-person peer language from Lewis ("I", "I can", "I review"), not corporate team language.
             - Avoid openers like "our firm", "we help businesses", or "at Nodal Point, we...".
@@ -337,6 +413,15 @@ export default async function handler(req, res) {
             - BANNED filler: "getting a handle on these details can help with budgeting and future planning", "small billing details can add up", "it helps when you're keeping things moving", "a quick review can show some interesting things", "reviewing historical usage helps spot hidden fees and opportunities."
             - A tight 3-sentence email beats a padded 5-sentence one. If you cannot make a specific observation, use fewer sentences.
 
+          REPLY-FIRST OVERRIDE (${replyStage}):
+          ${buildReplyStageDirective(replyStage)}
+
+          REPLY-DRIVING GENERAL RULES:
+          - Use the fewest context facts that still make the email feel manual. More detail is not better if it makes the ask harder to answer.
+          - If the draft starts sounding generic, cut a sentence instead of adding a vague one.
+          - A direct request beats a clever line. The recipient should know exactly what they get back: the bill lines worth checking, the likely leak area, or the cost area to verify.
+          - If the draft smells like a fallback, replace it with a concrete value prop instead of making it shorter. Short is fine only when the payoff is obvious.
+
           HIGH_AGENCY_IDENTITY_RESOLUTION:
           - NEVER wait for bracketed variables like {{company}} or {{industry}}.
           - You possess the target's full identity in NEURAL_CONTEXT. Use it proactively to make the email feel manual and researched.
@@ -369,8 +454,8 @@ export default async function handler(req, res) {
           }
         `;
         userContent = `STRATEGY: ${prompt}\n\nDraft/Context: ${draft || '(None)'}`;
-      } else {
-        systemInstruction = `
+    } else {
+      systemInstruction = `
           You are the Nodal Architect. You do not sell; you diagnose.
           
           CORE DIRECTIVES:
@@ -402,7 +487,7 @@ export default async function handler(req, res) {
               "body_html": "Optimized body with HTML tags.",
               "logic_reasoning": "Explanation of optimization choices and high-agency identity resolution."
             }
-        `;
+      `;
         userContent = `Draft to optimize: ${draft}`;
       }
 
