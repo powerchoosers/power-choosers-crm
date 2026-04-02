@@ -236,6 +236,8 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             // 3. Invalidate AND refetch account so dossier (meters, energy, docs, status) updates immediately
             await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
             await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
+            await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account-bill-intel' && q.queryKey[1] === accountId });
+            await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account-bill-intel' && q.queryKey[1] === accountId });
 
             // Refresh lists so Accounts and People tables show Customer/Client immediately
             await queryClient.invalidateQueries({ queryKey: ['accounts'] });
@@ -243,6 +245,8 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
             await queryClient.invalidateQueries({ queryKey: ['contact'] }); // invalidate single contact dossier
             await queryClient.invalidateQueries({ queryKey: ['targets'] });
             await queryClient.invalidateQueries({ queryKey: ['vault-documents'] });
+            // Keep the signing dropdown in sync with the analyzed document tag.
+            await queryClient.invalidateQueries({ queryKey: ['signature-documents', accountId] });
             await queryClient.invalidateQueries({ queryKey: ['deals'] });
 
             // Refresh document list again after AI (in case realtime was slow)

@@ -68,7 +68,8 @@ function closeLabel(closeDate?: string) {
 
 function getSignatureRequestStatus(reqStatus: string, expiresAt?: string | null) {
   if (reqStatus === 'completed' || reqStatus === 'signed') return 'signed'
-  if (reqStatus === 'canceled' || reqStatus === 'cancelled') return 'cancelled'
+  // The DB stores manual cancels as `declined`; show that as cancelled in the UI.
+  if (reqStatus === 'canceled' || reqStatus === 'cancelled' || reqStatus === 'declined') return 'cancelled'
 
   // Trust the expires_at set by the backend — don't compute it ourselves
   if (expiresAt && new Date(expiresAt) < new Date()) {
@@ -91,6 +92,7 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
   const router = useRouter()
   const cancelSignature = useCancelSignatureRequest()
   const [isSignaturesExpanded, setIsSignaturesExpanded] = useState(false)
+  const { setRightPanelMode, setSignatureRequestContext } = useUIStore()
   const probPct = STAGE_PROGRESS[deal.stage] ?? 0
   const closeLbl = closeLabel(deal.closeDate)
 
@@ -102,6 +104,20 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
   const latestSigStatus = latestSigRequestRaw 
     ? getSignatureRequestStatus(latestSigRequestRaw.status, latestSigRequestRaw.expires_at) 
     : null;
+
+  const handleCreateDocument = () => {
+    setSignatureRequestContext({
+      accountId: deal.accountId,
+      dealId: deal.id,
+      documentId: undefined,
+      documentName: undefined,
+      documentUrl: undefined,
+      storagePath: undefined,
+      documentType: null,
+      requestKind: 'CONTRACT',
+    })
+    setRightPanelMode('CREATE_SIGNATURE_REQUEST')
+  }
 
   return (
     <div className="w-full text-left group p-3 rounded-xl nodal-module-glass nodal-monolith-edge hover:bg-white/5 transition-colors relative overflow-hidden">
@@ -124,12 +140,15 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
             "h-1.5 w-1.5 rounded-full flex-shrink-0",
             latestSigStatus === 'signed' ? 'bg-emerald-500' :
               latestSigStatus === 'expired' ? 'bg-rose-500' :
+              latestSigStatus === 'cancelled' ? 'bg-zinc-500' :
               latestSigStatus === 'viewed' ? 'bg-[#002FA7]' :
                 'bg-amber-500 animate-pulse'
           )} />
           <span className={cn(
             "font-mono text-[8.5px] uppercase tracking-widest",
-            latestSigStatus === 'expired' ? 'text-rose-400' : 'text-zinc-400'
+            latestSigStatus === 'expired' ? 'text-rose-400' :
+              latestSigStatus === 'cancelled' ? 'text-zinc-500' :
+                'text-zinc-400'
           )}>
             {latestSigStatus}
           </span>
@@ -203,12 +222,15 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
                             "h-1.5 w-1.5 rounded-full flex-shrink-0",
                             derivedStatus === 'signed' ? 'bg-emerald-500' :
                             derivedStatus === 'expired' ? 'bg-rose-500' :
+                            derivedStatus === 'cancelled' ? 'bg-zinc-500' :
                             derivedStatus === 'viewed' ? 'bg-[#002FA7]' : 'bg-amber-500 animate-pulse'
                           )} />
                           <div>
                             <div className={cn(
                               "font-mono text-[9px] uppercase tracking-wider",
-                              derivedStatus === 'expired' ? 'text-rose-400' : 'text-zinc-300'
+                              derivedStatus === 'expired' ? 'text-rose-400' :
+                                derivedStatus === 'cancelled' ? 'text-zinc-500' :
+                                  'text-zinc-300'
                             )}>
                               {derivedStatus}
                             </div>
@@ -229,7 +251,7 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
                             }}
                             disabled={cancelSignature.isPending}
                             className="p-1 rounded hover:bg-rose-500/10 text-zinc-600 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100 disabled:opacity-50"
-                            title="Cancel Request"
+                            title="Delete Request"
                           >
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -269,13 +291,26 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
             >
               Edit Contract
             </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="hover:bg-white/5 cursor-pointer flex items-center gap-2"
+              onClick={handleCreateDocument}
+            >
+              <FileSignature className="h-3.5 w-3.5 text-zinc-400" />
+              Create Document
+            </DropdownMenuItem>
             
             {deal.signature_requests && deal.signature_requests.length > 0 && (
               <DropdownMenuItem
-                className="hover:bg-white/5 cursor-pointer"
+                className="hover:bg-white/5 cursor-pointer flex items-center gap-2"
                 onClick={() => setIsSignaturesExpanded(v => !v)}
               >
-                {isSignaturesExpanded ? 'Hide Signatures' : `Manage Signatures (${deal.signature_requests.length})`}
+                <span>{isSignaturesExpanded ? 'Hide Signatures' : 'Manage Signatures'}</span>
+                {!isSignaturesExpanded && (
+                  <span className="ml-auto inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-[#002FA7] px-1 text-[9px] font-mono font-medium text-white">
+                    {deal.signature_requests.length}
+                  </span>
+                )}
               </DropdownMenuItem>
             )}
 

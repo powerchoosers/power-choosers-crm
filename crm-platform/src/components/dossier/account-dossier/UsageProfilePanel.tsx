@@ -8,13 +8,18 @@ import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Bar, Compose
 interface UsageMonth {
     month: string;
     kwh: number;
-    billed_kw: number;
-    actual_kw: number;
-    tdsp_charges: number;
+    billed_kw: number | null;
+    actual_kw: number | null;
+    billed_demand_unit?: 'kW' | 'kVA' | 'mixed' | null;
+    actual_demand_unit?: 'kW' | 'kVA' | 'mixed' | null;
+    tdsp_charges: number | null;
     esid?: string;
     site?: string;
     site_name?: string;
     service_address?: string;
+    billing_days?: number | null;
+    power_factor?: number | null;
+    source_sheet?: string | null;
 }
 
 interface UsageProfilePanelProps {
@@ -27,14 +32,33 @@ interface UsageProfilePanelProps {
     theme?: 'default' | 'crm';
 }
 
+type DemandUnit = 'kW' | 'kVA' | 'mixed' | null;
+
 function normalizeSiteLabel(value?: string | null) {
     return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : '';
 }
 
 function getRowSiteLabel(row: UsageMonth) {
     return normalizeSiteLabel(
-        row.service_address || row.site_name || row.site || row.esid || ''
+        row.service_address || row.site_name || row.site || row.source_sheet || row.esid || ''
     );
+}
+
+function mergeDemandUnit(current?: DemandUnit, next?: DemandUnit): DemandUnit {
+    const cleanedCurrent = current || null;
+    const cleanedNext = next || null;
+    if (!cleanedNext) return cleanedCurrent;
+    if (!cleanedCurrent) return cleanedNext;
+    return cleanedCurrent === cleanedNext ? cleanedCurrent : 'mixed';
+}
+
+function formatDemandValue(value?: number | null, unit?: DemandUnit) {
+    if (value == null || Number.isNaN(Number(value))) return '—';
+    const resolvedUnit = unit || 'kW';
+    if (resolvedUnit === 'mixed') {
+      return `${Number(value).toLocaleString()} mixed`;
+    }
+    return `${Number(value).toLocaleString()} ${resolvedUnit}`;
 }
 
 export function UsageProfilePanel({ usageHistory, meters = [], theme = 'default' }: UsageProfilePanelProps) {
@@ -100,15 +124,20 @@ export function UsageProfilePanel({ usageHistory, meters = [], theme = 'default'
                     kwh: 0,
                     billed_kw: 0,
                     actual_kw: 0,
+                    billed_demand_unit: null,
+                    actual_demand_unit: null,
                     tdsp_charges: 0,
                 };
                 monthOrder.push(monthKey);
             }
 
-            monthMap[monthKey].kwh += Number(row.kwh) || 0;
-            monthMap[monthKey].billed_kw += Number(row.billed_kw) || 0;
-            monthMap[monthKey].actual_kw += Number(row.actual_kw) || 0;
-            monthMap[monthKey].tdsp_charges += Number(row.tdsp_charges) || 0;
+            const monthEntry = monthMap[monthKey]!;
+            monthEntry.kwh = (monthEntry.kwh ?? 0) + (Number(row.kwh) || 0);
+            monthEntry.billed_kw = (monthEntry.billed_kw ?? 0) + (Number(row.billed_kw) || 0);
+            monthEntry.actual_kw = (monthEntry.actual_kw ?? 0) + (Number(row.actual_kw) || 0);
+            monthEntry.tdsp_charges = (monthEntry.tdsp_charges ?? 0) + (Number(row.tdsp_charges) || 0);
+            monthEntry.billed_demand_unit = mergeDemandUnit(monthEntry.billed_demand_unit, row.billed_demand_unit);
+            monthEntry.actual_demand_unit = mergeDemandUnit(monthEntry.actual_demand_unit, row.actual_demand_unit);
         }
 
         return monthOrder.map((month) => monthMap[month]);
@@ -148,7 +177,14 @@ export function UsageProfilePanel({ usageHistory, meters = [], theme = 'default'
                                     ? entry.value.toLocaleString()
                                     : entry.name === 'TDSP Charges'
                                         ? `$${entry.value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                                        : `${entry.value.toLocaleString()} kW`}
+                                        : formatDemandValue(
+                                            entry.value,
+                                            entry.dataKey === 'billed_kw'
+                                                ? entry.payload?.billed_demand_unit
+                                                : entry.dataKey === 'actual_kw'
+                                                    ? entry.payload?.actual_demand_unit
+                                                    : null
+                                        )}
                             </span>
                         </div>
                     ))}
@@ -249,7 +285,7 @@ export function UsageProfilePanel({ usageHistory, meters = [], theme = 'default'
                                         axisLine={false}
                                         tickLine={false}
                                         tick={{ fill: axisTickColor, fontSize: 10, fontFamily: 'monospace' }}
-                                        tickFormatter={(value) => `${value} kW`}
+                                        tickFormatter={(value) => (value >= 1000 ? `${(value / 1000).toFixed(0)}k` : value)}
                                     />
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridColor} />
                                     <Tooltip content={<CustomTooltip />} />
@@ -275,8 +311,8 @@ export function UsageProfilePanel({ usageHistory, meters = [], theme = 'default'
                                             <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium">Site</th>
                                         )}
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">kWh Usage</th>
-                                        <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Billed kW</th>
-                                        <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Actual kW</th>
+                                        <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Billed Demand</th>
+                                        <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">Actual Demand</th>
                                         <th className="px-4 py-3 font-sans text-xs text-zinc-400 font-medium text-right">TDSP Charges</th>
                                     </tr>
                                 </thead>
@@ -288,8 +324,8 @@ export function UsageProfilePanel({ usageHistory, meters = [], theme = 'default'
                                                 <td className="px-4 py-3 font-mono text-sm text-zinc-300">{safeSelectedSite}</td>
                                             )}
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-300 text-right">{row.kwh?.toLocaleString() ?? '—'}</td>
-                                            <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{row.billed_kw?.toLocaleString() ?? '—'}</td>
-                                            <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{row.actual_kw?.toLocaleString() ?? '—'}</td>
+                                            <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{formatDemandValue(row.billed_kw, row.billed_demand_unit)}</td>
+                                            <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">{formatDemandValue(row.actual_kw, row.actual_demand_unit)}</td>
                                             <td className="px-4 py-3 font-mono text-sm text-zinc-400 text-right">
                                                 {row.tdsp_charges ? `$${row.tdsp_charges.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
                                             </td>

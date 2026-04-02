@@ -282,11 +282,11 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
             ownerId: data.ownerId,
             linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
             // Forensic/Asset Fields
-            loadFactor: data.metadata?.loadFactor ?? 0.45,
+            loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
             loadZone,
-            annualUsage: data.annual_usage || '',
-            electricitySupplier: data.electricity_supplier || '',
-            currentRate: data.current_rate || '',
+            annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
+            electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
+            currentRate: data.current_rate || data.metadata?.current_rate || '',
             status: data.status || 'PROSPECT',
             meters: data.metadata?.meters || [],
             mills: data.metadata?.mills || '',
@@ -390,9 +390,9 @@ export function useAccount(id: string) {
         // Forensic/Asset Fields
         loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
         loadZone,
-        annualUsage: data.annual_usage || '',
-        electricitySupplier: data.electricity_supplier || '',
-        currentRate: data.current_rate || '',
+        annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
+        electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
+        currentRate: data.current_rate || data.metadata?.current_rate || '',
         mills: data.metadata?.mills || '',
         status: data.status || 'PROSPECT',
         meters,
@@ -436,26 +436,34 @@ export function useAccountBillIntelligence(accountId: string | undefined) {
         .order('created_at', { ascending: false })
         .limit(20)
 
-      const latestBill = docs?.find(
-        d => d.metadata?.ai_extraction?.type === 'BILL'
+      const latestIntelDoc = docs?.find(
+        d => ['BILL', 'USAGE_DATA'].includes(d.metadata?.ai_extraction?.type)
       )
+      const latestIntelData = latestIntelDoc?.metadata?.ai_extraction?.data ?? null
+      const latestIntelCurrentRate = latestIntelData?.strike_price != null ? String(latestIntelData.strike_price) : null
+      const latestIntelAnnualUsage = latestIntelData?.annual_usage != null ? String(latestIntelData.annual_usage) : null
+      const electricitySupplier = acc?.electricity_supplier ?? acc?.metadata?.electricity_supplier ?? latestIntelData?.supplier ?? null
+      const currentRate = acc?.current_rate ?? acc?.metadata?.current_rate ?? latestIntelCurrentRate ?? null
+      const annualUsage = acc?.annual_usage ?? acc?.metadata?.annual_usage ?? latestIntelAnnualUsage ?? null
+      const loadFactor = acc?.load_factor ?? acc?.metadata?.loadFactor ?? null
+      const resolvedMeters = meters?.length ? meters : (acc?.metadata?.meters ?? [])
 
       return {
-        electricitySupplier: acc?.electricity_supplier ?? null as string | null,
-        currentRate: acc?.current_rate ?? null as string | null,
-        annualUsage: acc?.annual_usage ?? null as string | null,
-        loadFactor: acc?.load_factor ?? null as number | null,
-        usageHistory: (acc?.metadata?.usageHistory ?? []) as Array<{
-          month: string; kwh: number; billed_kw: number;
-          actual_kw: number; tdsp_charges: number
+        electricitySupplier: electricitySupplier as string | null,
+        currentRate: currentRate as string | null,
+        annualUsage: annualUsage as string | null,
+        loadFactor: loadFactor as number | null,
+        usageHistory: (acc?.metadata?.usageHistory ?? latestIntelData?.usage_history ?? []) as Array<{
+          month: string; kwh: number; billed_kw: number | null;
+          actual_kw: number | null; billed_demand_unit?: 'kW' | 'kVA' | null; actual_demand_unit?: 'kW' | 'kVA' | null; tdsp_charges: number | null
         }>,
-        meters: (meters ?? []) as Array<{
+        meters: (resolvedMeters as Array<{
           id: string; esid: string; service_address: string;
           rate: string; end_date: string; status: string
-        }>,
-        latestBillName: latestBill?.name ?? null as string | null,
-        latestBillDate: latestBill?.created_at ?? null as string | null,
-        latestBillData: latestBill?.metadata?.ai_extraction?.data ?? null,
+        }>),
+        latestBillName: (latestIntelDoc?.name ?? null) as string | null,
+        latestBillDate: (latestIntelDoc?.created_at ?? null) as string | null,
+        latestBillData: latestIntelData,
       }
     },
     enabled: !!accountId && !loading && !!user,

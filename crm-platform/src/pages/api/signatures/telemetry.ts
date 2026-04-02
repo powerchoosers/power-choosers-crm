@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
+import { isInternalSignatureViewReferer } from '@/lib/signature-telemetry';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
     if (req.method !== 'POST' && req.method !== 'GET') {
@@ -32,6 +33,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             return res.status(410).json({ error: 'This signing link has expired.' });
         }
 
+        const referer = String(req.headers.referer || '')
+        const isInternalCRMView = isInternalSignatureViewReferer(referer)
+
+        if (isInternalCRMView) {
+            const redirectPath = req.method === 'GET' && typeof req.query.redirect === 'string'
+                ? req.query.redirect
+                : null
+
+            if (req.method === 'GET') {
+                if (redirectPath && redirectPath.startsWith('/')) {
+                    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+                    return res.redirect(302, redirectPath);
+                }
+
+                const transparentGif = Buffer.from(
+                    'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                    'base64'
+                );
+                res.setHeader('Content-Type', 'image/gif');
+                res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+                return res.status(200).send(transparentGif);
+            }
+
+            return res.status(200).json({ success: true, logged: false, internal: true });
+        }
+
         // 3. Rate limit — max 10 telemetry events per token per 60 seconds
         // This prevents audit trail flooding by anyone holding a signing link
         const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
@@ -50,6 +77,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const forwardedFor = req.headers['x-forwarded-for'];
         const ipAddress = Array.isArray(forwardedFor) ? forwardedFor[0] : (forwardedFor || req.socket.remoteAddress || 'Unknown IP');
         const userAgent = req.headers['user-agent'] || 'Unknown Device';
+
+        const { data: recentTelemetry } = await supabaseAdmin
+            .from('signature_telemetry')
+            .select('id')
+            .eq('request_id', request.id)
+            .eq('action', action)
+            .eq('ip_address', ipAddress)
+            .eq('user_agent', userAgent)
+            .gte('created_at', oneMinuteAgo)
+            .limit(1);
+
+        if (recentTelemetry && recentTelemetry.length > 0) {
+            if (req.method === 'GET') {
+                const redirectPath = typeof req.query.redirect === 'string' ? req.query.redirect : null;
+                if (redirectPath && redirectPath.startsWith('/')) {
+                    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+                    return res.redirect(302, redirectPath);
+                }
+
+                const transparentGif = Buffer.from(
+                    'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+                    'base64'
+                );
+                res.setHeader('Content-Type', 'image/gif');
+                res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+                return res.status(200).send(transparentGif);
+            }
+
+            return res.status(200).json({ success: true, logged: false, deduped: true });
+        }
 
         // 4. Log the telemetry event
         const { error: insertError } = await supabaseAdmin

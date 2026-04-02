@@ -1,6 +1,17 @@
 import logger from '../_logger.js'
+import twilio from 'twilio'
 import { supabaseAdmin, requireUser } from '../../../lib/supabase.ts'
-import { VOICEMAIL_BUCKET, buildVoicemailStoragePath, getVoicemailGreeting, normalizeVoicemailGreeting } from '../../../lib/voicemail.ts'
+import {
+  VOICEMAIL_BUCKET,
+  buildVoicemailStoragePath,
+  getSelectedTwilioNumberEntry,
+  getTwilioNumberEntries,
+  getTwilioNumberEntryForIdentifier,
+  getVoicemailGreeting,
+  getVoicemailGreetingForTwilioNumber,
+  normalizePhoneNumber,
+  normalizeVoicemailGreeting,
+} from '../../../lib/voicemail.ts'
 
 export const config = {
   api: {
@@ -70,6 +81,115 @@ async function ensureVoicemailBucket() {
   }
 
   return data
+}
+
+const TWILIO_INCOMING_NUMBERS_CACHE_TTL = 5 * 60 * 1000
+let twilioIncomingNumbersCache = []
+let twilioIncomingNumbersCacheUpdatedAt = 0
+
+function toText(value) {
+  if (typeof value === 'string') return value.trim()
+  if (value == null) return ''
+  return String(value).trim()
+}
+
+async function getTwilioIncomingNumbers() {
+  const now = Date.now()
+  if (twilioIncomingNumbersCacheUpdatedAt && now - twilioIncomingNumbersCacheUpdatedAt < TWILIO_INCOMING_NUMBERS_CACHE_TTL && twilioIncomingNumbersCache.length) {
+    return twilioIncomingNumbersCache
+  }
+
+  const accountSid = process.env.TWILIO_ACCOUNT_SID
+  const authToken = process.env.TWILIO_AUTH_TOKEN
+  if (!accountSid || !authToken) {
+    return twilioIncomingNumbersCache
+  }
+
+  try {
+    const client = twilio(accountSid, authToken)
+    const list = await client.incomingPhoneNumbers.list({ limit: 1000 })
+    twilioIncomingNumbersCache = list
+      .map((item) => ({
+        sid: item.sid || null,
+        number: normalizePhoneNumber(item.phoneNumber) || (item.phoneNumber ? String(item.phoneNumber).trim() : null),
+        name: item.friendlyName || null,
+      }))
+      .filter((item) => Boolean(item.number))
+    twilioIncomingNumbersCacheUpdatedAt = now
+  } catch (error) {
+    logger.warn('[Voicemail] Failed to load Twilio numbers:', error?.message || error)
+  }
+
+  return twilioIncomingNumbersCache
+}
+
+async function resolveTwilioNumberDetails(identifier) {
+  const normalizedIdentifier = toText(identifier)
+  const identifierDigits = normalizedIdentifier.replace(/\D/g, '')
+  if (!normalizedIdentifier && !identifierDigits) return null
+
+  const numbers = await getTwilioIncomingNumbers()
+  return numbers.find((item) => {
+    if (item.sid && normalizedIdentifier && item.sid === normalizedIdentifier) return true
+
+    const itemNumber = toText(item.number)
+    const normalizedItemNumber = normalizePhoneNumber(itemNumber)
+    const normalizedInputNumber = normalizePhoneNumber(normalizedIdentifier)
+    if (normalizedItemNumber && normalizedInputNumber && normalizedItemNumber === normalizedInputNumber) return true
+
+    if (identifierDigits && itemNumber.replace(/\D/g, '') === identifierDigits) return true
+
+    return false
+  }) || null
+}
+
+async function resolveTargetTwilioNumber(settings, body) {
+  const selectedEntry = getSelectedTwilioNumberEntry(settings)
+  const requestedSid = toText(body?.twilioNumberSid || body?.selectedTwilioNumberSid || body?.businessPhoneSid || '')
+  const selectedPhoneValue = typeof settings?.selectedPhoneNumber === 'string'
+    ? settings.selectedPhoneNumber
+    : typeof settings?.selectedPhoneNumber === 'object' && settings.selectedPhoneNumber?.number
+      ? settings.selectedPhoneNumber.number
+      : ''
+  const requestedPhoneNumber = toText(body?.selectedPhoneNumber || body?.phoneNumber || body?.number || body?.businessPhone || selectedPhoneValue || selectedEntry?.number || '')
+
+  let entry = null
+  if (requestedSid) {
+    entry = getTwilioNumberEntryForIdentifier(settings, requestedSid)
+  }
+  if (!entry && requestedPhoneNumber) {
+    entry = getTwilioNumberEntryForIdentifier(settings, requestedPhoneNumber)
+  }
+  if (!entry && selectedEntry) {
+    entry = selectedEntry
+  }
+
+  let sid = requestedSid || entry?.sid || null
+  let number = requestedPhoneNumber || entry?.number || selectedEntry?.number || null
+  let name = toText(body?.twilioNumberName || body?.selectedTwilioNumberName || entry?.name || selectedEntry?.name || '')
+
+  if (!sid && number) {
+    const details = await resolveTwilioNumberDetails(number)
+    sid = details?.sid || null
+    if (!name) {
+      name = details?.name || ''
+    }
+  }
+
+  if (!number && entry?.number) {
+    number = entry.number
+  }
+
+  if (!name) {
+    name = entry?.name || selectedEntry?.name || 'Primary'
+  }
+
+  return {
+    entry,
+    sid: sid || null,
+    number: number || null,
+    name: name || 'Primary',
+  }
 }
 
 function decodeAudioDataUrl(audioDataUrl) {
@@ -151,7 +271,11 @@ export default async function handler(req, res) {
     const settings = (userRow.settings && typeof userRow.settings === 'object' ? userRow.settings : {}) || {}
 
     if (req.method === 'DELETE') {
-      const existingGreeting = getVoicemailGreeting(settings)
+      const body = req.body && typeof req.body === 'object' ? req.body : {}
+      const resolvedTarget = await resolveTargetTwilioNumber(settings, body)
+      const targetIdentifier = resolvedTarget.sid || resolvedTarget.number || settings.selectedPhoneNumber || null
+      const existingGreeting = getVoicemailGreetingForTwilioNumber(settings, targetIdentifier) || getVoicemailGreeting(settings)
+
       if (existingGreeting?.storagePath) {
         try {
           await supabaseAdmin.storage.from(VOICEMAIL_BUCKET).remove([existingGreeting.storagePath])
@@ -160,8 +284,34 @@ export default async function handler(req, res) {
         }
       }
 
+      const nextTwilioNumbers = getTwilioNumberEntries(settings).map((entry) => {
+        if (resolvedTarget.sid && entry.sid && entry.sid === resolvedTarget.sid) {
+          return {
+            ...entry,
+            voicemailGreeting: null,
+          }
+        }
+
+        if (resolvedTarget.number && normalizePhoneNumber(entry.number) === normalizePhoneNumber(resolvedTarget.number)) {
+          return {
+            ...entry,
+            voicemailGreeting: null,
+          }
+        }
+
+        if (!resolvedTarget.sid && !resolvedTarget.number && entry.selected) {
+          return {
+            ...entry,
+            voicemailGreeting: null,
+          }
+        }
+
+        return entry
+      })
+
       const nextSettings = {
         ...settings,
+        twilioNumbers: nextTwilioNumbers,
         voicemailGreeting: null,
       }
 
@@ -179,6 +329,9 @@ export default async function handler(req, res) {
     const body = req.body && typeof req.body === 'object' ? req.body : {}
     const audioDataUrl = body.audioDataUrl || body.audioData || ''
     const { mimeType, buffer } = decodeAudioDataUrl(audioDataUrl)
+    const resolvedTarget = await resolveTargetTwilioNumber(settings, body)
+    const targetIdentifier = resolvedTarget.sid || resolvedTarget.number || settings.selectedPhoneNumber || null
+    const existingGreeting = getVoicemailGreetingForTwilioNumber(settings, targetIdentifier)
 
     if (!buffer || !buffer.length) {
       throw new Error('Audio file is empty')
@@ -190,7 +343,7 @@ export default async function handler(req, res) {
 
     await ensureVoicemailBucket()
 
-    const storagePath = buildVoicemailStoragePath(userRow.id || auth.id || emailLower)
+    const storagePath = buildVoicemailStoragePath(resolvedTarget.sid || resolvedTarget.number || userRow.id || auth.id || emailLower)
     const { error: uploadError } = await supabaseAdmin.storage
       .from(VOICEMAIL_BUCKET)
       .upload(storagePath, buffer, {
@@ -214,10 +367,42 @@ export default async function handler(req, res) {
       fileName: 'greeting.wav',
       mimeType: 'audio/wav',
       updatedAt: new Date().toISOString(),
+      twilioNumberSid: resolvedTarget.sid || null,
+      twilioNumber: resolvedTarget.number || null,
+      twilioNumberName: resolvedTarget.name || null,
     })
+
+    const nextTwilioNumbers = getTwilioNumberEntries(settings)
+    const targetIndex = nextTwilioNumbers.findIndex((entry) => {
+      if (resolvedTarget.sid && entry.sid && entry.sid === resolvedTarget.sid) return true
+      if (resolvedTarget.number && normalizePhoneNumber(entry.number) === normalizePhoneNumber(resolvedTarget.number)) return true
+      return false
+    })
+
+    if (targetIndex === -1 && resolvedTarget.number) {
+      nextTwilioNumbers.push({
+        name: resolvedTarget.name || 'Primary',
+        number: resolvedTarget.number,
+        sid: resolvedTarget.sid || null,
+        selected: Boolean(
+          normalizePhoneNumber(settings.selectedPhoneNumber || '') &&
+          normalizePhoneNumber(settings.selectedPhoneNumber || '') === normalizePhoneNumber(resolvedTarget.number)
+        ),
+        voicemailGreeting,
+      })
+    } else if (targetIndex !== -1) {
+      nextTwilioNumbers[targetIndex] = {
+        ...nextTwilioNumbers[targetIndex],
+        name: resolvedTarget.name || nextTwilioNumbers[targetIndex].name || 'Primary',
+        number: resolvedTarget.number || nextTwilioNumbers[targetIndex].number,
+        sid: resolvedTarget.sid || nextTwilioNumbers[targetIndex].sid || null,
+        voicemailGreeting,
+      }
+    }
 
     const nextSettings = {
       ...settings,
+      twilioNumbers: nextTwilioNumbers,
       voicemailGreeting,
     }
 
@@ -226,12 +411,23 @@ export default async function handler(req, res) {
       updated_at: new Date().toISOString(),
     })
 
+    if (existingGreeting?.storagePath && existingGreeting.storagePath !== storagePath) {
+      try {
+        await supabaseAdmin.storage.from(VOICEMAIL_BUCKET).remove([existingGreeting.storagePath])
+      } catch (removeError) {
+        logger.warn('[Voicemail] Failed to clean previous voicemail audio:', removeError?.message || removeError)
+      }
+    }
+
     res.statusCode = 200
     res.setHeader('Content-Type', 'application/json')
     res.end(JSON.stringify({
       ok: true,
       voicemailGreeting,
       storagePath,
+      twilioNumberSid: voicemailGreeting.twilioNumberSid,
+      twilioNumber: voicemailGreeting.twilioNumber,
+      twilioNumberName: voicemailGreeting.twilioNumberName,
     }))
     return
   } catch (error) {

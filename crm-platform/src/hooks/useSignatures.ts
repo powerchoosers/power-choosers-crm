@@ -7,9 +7,10 @@ export function useCancelSignatureRequest() {
 
   return useMutation({
     mutationFn: async (requestId: string) => {
+      // Deleting the request is safe: linked telemetry and signed artifacts cascade.
       const { error } = await supabase
         .from('signature_requests')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .delete()
         .eq('id', requestId)
 
       if (error) throw error
@@ -21,11 +22,11 @@ export function useCancelSignatureRequest() {
       queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
       queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
       queryClient.invalidateQueries({ queryKey: ['deal'] })
-      toast.success('Signature request cancelled')
+      toast.success('Signature request deleted')
     },
     onError: (error) => {
-      console.error('Error cancelling signature request:', error)
-      toast.error('Failed to cancel signature request')
+      console.error('Error deleting signature request:', error)
+      toast.error('Failed to delete signature request')
     },
   })
 }

@@ -55,6 +55,171 @@ function parseNumber(value) {
   return null;
 }
 
+function normalizeHeaderKey(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+function buildRowLookup(row) {
+  const lookup = new Map();
+  if (!row || typeof row !== 'object') return lookup;
+
+  for (const [key, value] of Object.entries(row)) {
+    lookup.set(normalizeHeaderKey(key), value);
+  }
+
+  return lookup;
+}
+
+function getRowValue(lookup, aliases) {
+  const keys = Array.isArray(aliases) ? aliases : [aliases];
+  for (const alias of keys) {
+    const value = lookup.get(normalizeHeaderKey(alias));
+    if (value != null && String(value).trim() !== '') return value;
+  }
+  return null;
+}
+
+function parseSpreadsheetDate(value) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const parsed = XLSX.SSF?.parse_date_code?.(value);
+    if (parsed?.y && parsed?.m && parsed?.d) {
+      return new Date(Date.UTC(parsed.y, parsed.m - 1, parsed.d));
+    }
+  }
+
+  if (typeof value !== 'string') return null;
+
+  const raw = value.trim();
+  if (!raw) return null;
+
+  const mdy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (mdy) {
+    const month = Number(mdy[1]);
+    const day = Number(mdy[2]);
+    let year = Number(mdy[3]);
+    if (year < 100) year += 2000;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const ymd = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (ymd) {
+    const year = Number(ymd[1]);
+    const month = Number(ymd[2]);
+    const day = Number(ymd[3]);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) return parsed;
+
+  return null;
+}
+
+function formatUsageMonth(date) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC'
+  }).format(date);
+}
+
+function normalizeDemandUnit(value) {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (!raw) return null;
+  if (raw.includes('mixed')) return 'mixed';
+  if (raw.includes('kva')) return 'kVA';
+  if (raw.includes('kw')) return 'kW';
+  return null;
+}
+
+function extractDemandField(lookup, aliases) {
+  const keys = Array.isArray(aliases) ? aliases : [aliases];
+  const candidates = [];
+
+  for (const alias of keys) {
+    const rawValue = getRowValue(lookup, alias);
+    const numericValue = parseNumber(rawValue);
+    if (numericValue == null) continue;
+
+    const unit = normalizeDemandUnit(alias) || (normalizeHeaderKey(alias).includes('kva') ? 'kVA' : 'kW');
+    candidates.push({ value: numericValue, unit });
+  }
+
+  if (candidates.length === 0) {
+    return { value: null, unit: null };
+  }
+
+  const preferred = candidates.find((candidate) => Math.abs(candidate.value) > 0);
+  return preferred || candidates[0];
+}
+
+function collectServiceAddress(lookup) {
+  const parts = [
+    getRowValue(lookup, ['Service Address 1', 'Service Address1', 'Service Address']),
+    getRowValue(lookup, ['Service Address 2', 'Service Address2']),
+    getRowValue(lookup, ['Service Address 3', 'Service Address3']),
+  ]
+    .map((part) => normalizeAddress(part))
+    .filter(Boolean);
+
+  if (parts.length > 0) {
+    return normalizeAddress(parts.join(', '));
+  }
+
+  const fallback = normalizeAddress(
+    getRowValue(lookup, ['Service Address', 'Address', 'Site Address', 'Service Location', 'Location'])
+  );
+
+  return fallback || '';
+}
+
+function normalizeStructuredUsageRow(row, sheetName) {
+  if (!row || typeof row !== 'object') return null;
+
+  const lookup = buildRowLookup(row);
+  const actualKwh = parseNumber(getRowValue(lookup, ['Actual KWH', 'Actual KWh', 'Actual Usage', 'Usage', 'kWh', 'KWH']));
+
+  if (actualKwh == null) return null;
+
+  const esid = normalizeEsid(getRowValue(lookup, ['ESI ID', 'ESIID', 'ESI', 'ESI Id', 'ESI #', 'ESIID#', 'ESI Number']));
+  const serviceAddress = collectServiceAddress(lookup);
+  const endDate = parseSpreadsheetDate(getRowValue(lookup, ['End Date', 'Ending Date', 'Bill End Date', 'Billing End Date']));
+  const startDate = parseSpreadsheetDate(getRowValue(lookup, ['Start Date', 'Beginning Date', 'Bill Start Date', 'Billing Start Date']));
+  const monthDate = endDate || startDate;
+  const month = formatUsageMonth(monthDate) || String(getRowValue(lookup, ['Month', 'Billing Month', 'Period']) ?? '').trim();
+  const billedDemand = extractDemandField(lookup, ['Billed KW', 'Billed KVA', 'Billing KW', 'Billing KVA', 'Demand Billed', 'Billed Demand']);
+  const actualDemand = extractDemandField(lookup, ['Metered KW', 'Metered KVA', 'Actual KW', 'Actual KVA', 'Peak KW', 'Peak KVA', 'Demand']);
+  const tdspCharges = parseNumber(getRowValue(lookup, ['TDSP Charges', 'TDSP Charge', 'Delivery Charges', 'TDSP']));
+  const powerFactor = parseNumber(getRowValue(lookup, ['Power Factor', 'PF']));
+  const billingDays = startDate && endDate
+    ? Math.max(1, Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1)
+    : null;
+
+  return {
+    month: month || '',
+    kwh: actualKwh,
+    billed_kw: billedDemand.value,
+    actual_kw: actualDemand.value,
+    billed_demand_unit: billedDemand.unit,
+    actual_demand_unit: actualDemand.unit,
+    tdsp_charges: tdspCharges,
+    esid: esid || null,
+    service_address: serviceAddress || null,
+    billing_days: billingDays,
+    power_factor: powerFactor,
+    source_sheet: sheetName || null
+  };
+}
+
 function monthSortKey(value) {
   if (!value) return null;
   const raw = String(value).trim();
@@ -83,26 +248,42 @@ function normalizeUsageHistory(rows) {
   return rows
     .map((row) => {
       if (!row || typeof row !== 'object') return null;
+      const lookup = buildRowLookup(row);
 
       // Actual KWH is the authoritative usage column in utility usage exports.
       const actualKwh = parseNumber(
+        getRowValue(lookup, ['Actual KWH', 'Actual KWh', 'Actual Usage', 'Usage', 'kWh', 'KWH']) ??
         row.actual_kwh ??
         row.actualKwh ??
         row.actualKWH ??
-        row['Actual KWH'] ??
-        row.kwh
+        row.kwh ??
+        row.kwh_usage
       );
 
       if (actualKwh == null) return null;
 
+      const billedDemand = extractDemandField(lookup, ['Billed KW', 'Billed KVA', 'Billing KW', 'Billing KVA', 'Demand Billed', 'Billed Demand']);
+      const actualDemand = extractDemandField(lookup, ['Metered KW', 'Metered KVA', 'Actual KW', 'Actual KVA', 'Peak KW', 'Peak KVA', 'Demand']);
+
       return {
         month: String(row.month ?? row.period ?? row.billing_month ?? '').trim(),
         kwh: actualKwh,
-        billed_kw: parseNumber(row.billed_kw ?? row.billedKw ?? row['Billed KW']) ?? 0,
-        actual_kw: parseNumber(row.actual_kw ?? row.actualKw ?? row.metered_kw ?? row['Metered KW']) ?? 0,
-        tdsp_charges: parseNumber(row.tdsp_charges ?? row.tdspCharges ?? row['TDSP Charges']) ?? 0,
-        esid: normalizeEsid(row.esid ?? row.esi_id ?? row.esiId) || null,
-        service_address: normalizeAddress(row.service_address ?? row.address ?? row.site ?? row.site_name) || null
+        billed_kw: billedDemand.value,
+        actual_kw: actualDemand.value,
+        billed_demand_unit: normalizeDemandUnit(row.billed_demand_unit ?? row.billedDemandUnit ?? row.billed_unit ?? row.billedUnit) || billedDemand.unit,
+        actual_demand_unit: normalizeDemandUnit(row.actual_demand_unit ?? row.actualDemandUnit ?? row.actual_unit ?? row.actualUnit) || actualDemand.unit,
+        tdsp_charges: parseNumber(getRowValue(lookup, ['TDSP Charges', 'TDSP Charge', 'Delivery Charges', 'TDSP'])) ?? null,
+        esid: normalizeEsid(getRowValue(lookup, ['ESI ID', 'ESIID', 'ESI', 'ESI Id', 'ESI #', 'ESIID#', 'ESI Number']) ?? row.esid ?? row.esi_id ?? row.esiId) || null,
+        service_address: normalizeAddress(
+          getRowValue(lookup, ['Service Address 1', 'Service Address1', 'Service Address 2', 'Service Address2', 'Service Address 3', 'Service Address3', 'Service Address']) ??
+          row.service_address ??
+          row.address ??
+          row.site ??
+          row.site_name
+        ) || null,
+        billing_days: parseNumber(getRowValue(lookup, ['Billing Days', 'Billing Day', 'Days']) ?? row.billing_days ?? row.billingDays) ?? null,
+        power_factor: parseNumber(getRowValue(lookup, ['Power Factor', 'PF']) ?? row.power_factor ?? row.powerFactor) ?? null,
+        source_sheet: String(row.source_sheet ?? row.sheet ?? '').trim() || null
       };
     })
     .filter(Boolean);
@@ -111,20 +292,127 @@ function normalizeUsageHistory(rows) {
 function deriveAnnualUsageFromHistory(rows) {
   if (!Array.isArray(rows) || rows.length === 0) return null;
 
-  const withSort = rows
-    .map((row) => ({ row, sortKey: monthSortKey(row.month) }))
-    .filter((x) => x.sortKey != null);
+  const monthlyTotals = new Map();
 
-  // Fall back to raw rows if month parsing fails.
-  const source = withSort.length > 0
-    ? withSort.sort((a, b) => b.sortKey - a.sortKey).map((x) => x.row)
-    : rows;
+  for (const row of rows) {
+    const month = String(row.month ?? '').trim();
+    const kwh = parseNumber(row.kwh);
+    if (!month || kwh == null) continue;
 
-  const latestTwelve = source.slice(0, 12);
-  if (latestTwelve.length === 0) return null;
+    const current = monthlyTotals.get(month) || 0;
+    monthlyTotals.set(month, current + kwh);
+  }
 
-  const total = latestTwelve.reduce((sum, row) => sum + (parseNumber(row.kwh) || 0), 0);
+  if (monthlyTotals.size === 0) {
+    const total = rows.reduce((sum, row) => sum + (parseNumber(row.kwh) || 0), 0);
+    return total > 0 ? Math.round(total) : null;
+  }
+
+  const sortedMonths = Array.from(monthlyTotals.entries())
+    .map(([month, total]) => ({
+      month,
+      total,
+      sortKey: monthSortKey(month)
+    }))
+    .filter((entry) => entry.sortKey != null)
+    .sort((a, b) => b.sortKey - a.sortKey);
+
+  if (sortedMonths.length === 0) {
+    const total = rows.reduce((sum, row) => sum + (parseNumber(row.kwh) || 0), 0);
+    return total > 0 ? Math.round(total) : null;
+  }
+
+  const latestTwelve = sortedMonths.slice(0, 12);
+  const total = latestTwelve.reduce((sum, entry) => sum + entry.total, 0);
   return total > 0 ? Math.round(total) : null;
+}
+
+function deriveLatestMonthUsage(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return null;
+
+  const monthlyTotals = new Map();
+  for (const row of rows) {
+    const month = String(row.month ?? '').trim();
+    const kwh = parseNumber(row.kwh);
+    if (!month || kwh == null) continue;
+    monthlyTotals.set(month, (monthlyTotals.get(month) || 0) + kwh);
+  }
+
+  if (monthlyTotals.size === 0) return null;
+
+  const sortedMonths = Array.from(monthlyTotals.entries())
+    .map(([month, total]) => ({
+      month,
+      total,
+      sortKey: monthSortKey(month)
+    }))
+    .filter((entry) => entry.sortKey != null)
+    .sort((a, b) => b.sortKey - a.sortKey);
+
+  if (sortedMonths.length === 0) return null;
+  const latest = sortedMonths[0];
+  return latest.total > 0 ? Math.round(latest.total) : null;
+}
+
+function buildStructuredUsageAnalysis(workbook) {
+  if (!workbook || !Array.isArray(workbook.SheetNames) || workbook.SheetNames.length === 0) {
+    return null;
+  }
+
+  const rows = [];
+  const esids = new Map();
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets?.[sheetName];
+    if (!sheet) continue;
+
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: false });
+    for (const row of rawRows) {
+      const normalized = normalizeStructuredUsageRow(row, sheetName);
+      if (!normalized) continue;
+      rows.push(normalized);
+
+      if (normalized.esid) {
+        const existing = esids.get(normalized.esid);
+        const nextAddress = normalized.service_address || null;
+        if (!existing || (!existing.address && nextAddress)) {
+          esids.set(normalized.esid, {
+            id: normalized.esid,
+            address: nextAddress
+          });
+        }
+      }
+    }
+  }
+
+  if (rows.length === 0) return null;
+
+  rows.sort((a, b) => {
+    const aKey = monthSortKey(a.month) ?? 0;
+    const bKey = monthSortKey(b.month) ?? 0;
+    if (aKey !== bKey) return aKey - bKey;
+    const aSite = normalizeAddressKey(a.service_address || a.esid || '');
+    const bSite = normalizeAddressKey(b.service_address || b.esid || '');
+    return aSite.localeCompare(bSite);
+  });
+
+  const normalizedRows = normalizeUsageHistory(rows);
+  const annualUsage = deriveAnnualUsageFromHistory(normalizedRows);
+  const monthlyKwh = deriveLatestMonthUsage(normalizedRows);
+
+  return {
+    type: 'USAGE_DATA',
+    data: {
+      contract_end_date: null,
+      strike_price: null,
+      supplier: null,
+      annual_usage: annualUsage,
+      monthly_kwh: monthlyKwh,
+      billing_days: null,
+      esids: Array.from(esids.values()),
+      usage_history: normalizedRows
+    }
+  };
 }
 
 /**
@@ -144,13 +432,7 @@ export default async function handler(req, res) {
   try {
     const perplexityApiKey = process.env.PERPLEXITY_API_KEY;
     const openRouterKey = process.env.OPEN_ROUTER_API_KEY;
-
-    if (!perplexityApiKey && !openRouterKey) {
-      logger.error('[Analyze Document] Missing AI configuration');
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Server configuration error: AI keys missing' }));
-      return;
-    }
+    const canUseAI = Boolean(perplexityApiKey || openRouterKey);
 
     const { accountId, filePath, fileName } = req.body;
 
@@ -223,31 +505,53 @@ export default async function handler(req, res) {
       lowerFileName.endsWith('.xlsx') ||
       lowerFileName.endsWith('.xls');
 
-    let textContentSnippet = "";
-    if (isCsvOrText) {
-      const fullText = Buffer.from(arrayBuffer).toString('utf-8');
-      // Cap text to avoid overwhelming context, but large enough for monthly/daily interval CSVs
-      textContentSnippet = fullText.substring(0, 50000);
-    } else if (isExcel) {
-      // Convert Excel to CSV text so the AI can read it like a CSV
-      try {
-        const workbook = XLSX.read(Buffer.from(arrayBuffer), { type: 'buffer' });
-        const csvParts = [];
-        for (const sheetName of workbook.SheetNames) {
-          const sheet = workbook.Sheets[sheetName];
-          const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
-          if (csv.trim()) {
-            csvParts.push(`=== Sheet: ${sheetName} ===\n${csv}`);
-          }
-        }
-        textContentSnippet = csvParts.join('\n\n').substring(0, 50000);
-        logger.log('[Analyze Document] Excel converted to CSV text, length:', textContentSnippet.length);
-      } catch (xlsxErr) {
-        logger.error('[Analyze Document] Excel parse failed:', xlsxErr.message);
+    let workbook = null;
+    let fullText = '';
+    let structuredUsageAnalysis = null;
+    let textContentSnippet = '';
+
+    try {
+      if (isCsvOrText) {
+        fullText = Buffer.from(arrayBuffer).toString('utf-8');
+        workbook = XLSX.read(fullText, { type: 'string', cellDates: true });
+      } else if (isExcel) {
+        workbook = XLSX.read(Buffer.from(arrayBuffer), { type: 'buffer', cellDates: true });
       }
+    } catch (parseErr) {
+      logger.warn('[Analyze Document] Workbook parse failed, falling back to text snippet:', parseErr?.message || parseErr);
     }
 
-    let prompt = `
+    if (workbook) {
+      structuredUsageAnalysis = buildStructuredUsageAnalysis(workbook);
+
+      const csvParts = [];
+      for (const sheetName of workbook.SheetNames) {
+        const sheet = workbook.Sheets[sheetName];
+        const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+        if (csv.trim()) {
+          csvParts.push(`=== Sheet: ${sheetName} ===\n${csv}`);
+        }
+      }
+      textContentSnippet = csvParts.join('\n\n').substring(0, 50000);
+      logger.log('[Analyze Document] Spreadsheet converted to CSV text, length:', textContentSnippet.length);
+    } else if (isCsvOrText) {
+      textContentSnippet = fullText.substring(0, 50000);
+    }
+
+    if (structuredUsageAnalysis) {
+      logger.log('[Analyze Document] Structured usage file parsed locally; skipping AI extraction');
+    } else if (!canUseAI) {
+      logger.error('[Analyze Document] Missing AI configuration and no structured usage data available');
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Server configuration error: AI keys missing' }));
+      return;
+    }
+
+    let analysis = structuredUsageAnalysis;
+    let prompt = null;
+
+    if (!analysis) {
+      prompt = `
     You are an expert energy analyst for Nodal Point CRM. Analyze this document.
     
     The original filename is: "${safeFileName}"
@@ -267,16 +571,17 @@ export default async function handler(req, res) {
 
     Task 2: Extract key data fields.
     - contract_end_date: The specific expiration date (YYYY-MM-DD).
-    - strike_price: The energy rate (in cents/kWh or $/MWh). Convert to cents (e.g., 0.045).
+    - strike_price: The energy rate (in cents/kWh or $/MWh). Convert to cents (e.g. 0.045).
     - supplier: The name of the retail electricity provider (REP).
     - annual_usage: IF THIS IS A USAGE DATA FILE (like a CSV/XLSX usage profile) spanning 12 or 13 months, CALCULATE the EXACT 12-month annual usage across the most recent 12 months in the file.
       IMPORTANT: when the file has an "Actual KWH" column, use that as the kWh source of truth (not Metered KW or Billed KW).
+      If demand is shown in kVA instead of kW, keep the number and set the matching demand unit field to "kVA" instead of converting it.
       Otherwise, extract estimated annual kWh if present.
     - monthly_kwh: The total kWh consumed in the billing period.
     - billing_days: Number of days in the billing period.
     - esids: An array of ALL ESI ID numbers (17-22 digits) found in the document. Include service addresses if found.
     - usage_history: When usage data is present, return monthly rows with these exact keys:
-      { "month": "MMM YYYY", "kwh": number, "billed_kw": number|null, "actual_kw": number|null, "tdsp_charges": number|null, "esid": "string|null", "service_address": "string|null" }.
+      { "month": "MMM YYYY", "kwh": number, "billed_kw": number|null, "actual_kw": number|null, "billed_demand_unit": "kW"|"kVA"|null, "actual_demand_unit": "kW"|"kVA"|null, "tdsp_charges": number|null, "esid": "string|null", "service_address": "string|null" }.
       If an "Actual KWH" column exists, map that value into "kwh".
       For multi-site files, include one row per site per month (do not collapse sites together).
 
@@ -291,16 +596,15 @@ export default async function handler(req, res) {
         "monthly_kwh": number or null,
         "billing_days": number or null,
         "esids": [{ "id": "string", "address": "string" }],
-        "usage_history": [{ "month": "MMM YYYY", "kwh": number, "billed_kw": number, "actual_kw": number, "tdsp_charges": number, "esid": "string", "service_address": "string" }]
+        "usage_history": [{ "month": "MMM YYYY", "kwh": number, "billed_kw": number, "actual_kw": number, "billed_demand_unit": "kW" | "kVA", "actual_demand_unit": "kW" | "kVA", "tdsp_charges": number, "esid": "string", "service_address": "string" }]
       }
     }
     `;
 
-    if (isCsvOrText || isExcel) {
-      prompt += `\n\n[DOCUMENT CONTENT START]\n${textContentSnippet}\n[DOCUMENT CONTENT END]\n`;
+      if (isCsvOrText || isExcel) {
+        prompt += `\n\n[DOCUMENT CONTENT START]\n${textContentSnippet}\n[DOCUMENT CONTENT END]\n`;
+      }
     }
-
-    let analysis = null;
 
     // Helper block to construct message content to avoid sending text files as image_url
     const buildMessageContent = () => {
@@ -320,7 +624,9 @@ export default async function handler(req, res) {
     };
 
     // 3. Try Perplexity (Sonar-Pro)
-    if (perplexityApiKey) {
+    if (analysis) {
+      logger.log('[Analyze Document] Structured usage extraction ready; skipping AI calls');
+    } else if (perplexityApiKey) {
       try {
         logger.log('[Analyze Document] Trying Perplexity...');
 
@@ -415,15 +721,32 @@ export default async function handler(req, res) {
 
     logger.log('[Analyze Document] Analysis successful:', analysis.type);
 
-    const { type, data } = analysis;
+    const { type } = analysis;
+    const data = analysis.data && typeof analysis.data === 'object' ? analysis.data : {};
+    analysis.data = data;
     const normalizedUsageHistory = normalizeUsageHistory(data?.usage_history);
     const derivedAnnualUsageFromHistory = deriveAnnualUsageFromHistory(normalizedUsageHistory);
+    const derivedMonthlyUsage = deriveLatestMonthUsage(normalizedUsageHistory);
+    const esidMapFromHistory = new Map();
 
     if (normalizedUsageHistory.length > 0) {
       data.usage_history = normalizedUsageHistory;
     }
     if (derivedAnnualUsageFromHistory != null) {
       data.annual_usage = derivedAnnualUsageFromHistory;
+    }
+    if (derivedMonthlyUsage != null && data.monthly_kwh == null) {
+      data.monthly_kwh = derivedMonthlyUsage;
+    }
+    for (const row of normalizedUsageHistory) {
+      if (!row?.esid) continue;
+      const nextAddress = row.service_address || null;
+      if (!esidMapFromHistory.has(row.esid) || (!esidMapFromHistory.get(row.esid)?.address && nextAddress)) {
+        esidMapFromHistory.set(row.esid, { id: row.esid, address: nextAddress });
+      }
+    }
+    if ((!Array.isArray(data.esids) || data.esids.length === 0) && esidMapFromHistory.size > 0) {
+      data.esids = Array.from(esidMapFromHistory.values());
     }
 
     // 5. Update Database

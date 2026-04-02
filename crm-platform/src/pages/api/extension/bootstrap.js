@@ -1,6 +1,7 @@
 import { cors } from '../_cors.js'
 import { requireUser, supabaseAdmin } from '@/lib/supabase'
 import { inferNameParts, trimText } from './_shared.js'
+import { getVoicemailGreeting, normalizeTwilioNumberEntry } from '@/lib/voicemail'
 
 function normalizePhoneNumber(value) {
   const raw = trimText(value)
@@ -21,25 +22,7 @@ function normalizeTwilioNumbers(raw) {
   if (!Array.isArray(raw)) return []
 
   return raw
-    .map((entry) => {
-      if (!entry) return null
-      if (typeof entry === 'string') {
-        const number = normalizePhoneNumber(entry)
-        if (!number) return null
-        return { name: 'Primary', number, selected: false }
-      }
-      if (typeof entry === 'object') {
-        const candidate = entry
-        const number = normalizePhoneNumber(candidate.number ?? candidate.phone ?? '')
-        if (!number) return null
-        return {
-          name: trimText(candidate.name ?? 'Primary') || 'Primary',
-          number,
-          selected: Boolean(candidate.selected || false)
-        }
-      }
-      return null
-    })
+    .map((entry) => normalizeTwilioNumberEntry(entry))
     .filter(Boolean)
 }
 
@@ -73,6 +56,7 @@ function normalizeProfile(row, emailFallback) {
     website: trimText(settings.website || row.website || '') || null,
     twilioNumbers,
     selectedPhoneNumber,
+    voicemailGreeting: getVoicemailGreeting(settings),
     bridgeToMobile: Boolean(settings.bridgeToMobile || row.bridge_to_mobile || row.bridgeToMobile || false),
   }
 }
