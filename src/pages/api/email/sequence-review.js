@@ -10,9 +10,52 @@ function asObject(value) {
 }
 
 function buildSourceTruthLine(linkedInUrl, website) {
-  if (linkedInUrl) return 'SOURCE_TRUTH: LinkedIn available as a research signal only. Do NOT mention LinkedIn, say you found them on LinkedIn, or reference their LinkedIn profile in the email copy.';
+  if (linkedInUrl) return 'SOURCE_TRUTH: LinkedIn is available as a research signal only. Do NOT mention LinkedIn, profiles, or how you found them in the email copy.';
   if (website) return 'SOURCE_TRUTH: LinkedIn not available. Do NOT mention LinkedIn. You may reference company website/public company info.';
   return 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
+}
+
+function detectReplyStage(prompt) {
+  const text = String(prompt || '').toLowerCase();
+  if (/(pattern[-\s]?interrupt|no[-\s]?reply|breakup|ghost)/.test(text)) return 'no_reply';
+  if (/(first[-\s]?touch|forensic opener|day\s*0|day\s*1|intro)/.test(text)) return 'first_touch';
+  if (/(follow[-\s]?up|opened|clicked|day\s*3|day\s*7|day\s*14)/.test(text)) return 'follow_up';
+  return 'general';
+}
+
+function buildReplyFirstDirective(stage) {
+  const map = {
+    first_touch: [
+      'REPLY-FIRST NOTE: Keep the body at 60-90 words in 2-3 short paragraphs.',
+      'Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations = demand spikes or delivery charges; owner/GM = leverage or timing. Use one lane only.',
+      'Use one concrete company or location fact and make the payoff explicit: a marked-up statement showing where the leak is most likely coming from and what to check first.',
+      'Prefer a statement CTA like "Send the latest statement and I\'ll tell you where the leak is most likely coming from." The ask should tell them exactly what they get back.',
+      'Subject line: 1-4 words, plain, specific, and value-led.',
+      'Never mention LinkedIn, profiles, or how you found them.'
+    ].join('\n'),
+    follow_up: [
+      'REPLY-FIRST NOTE: Keep the body at 50-80 words.',
+      'Add one new fact or angle. Reference prior contact by topic only, never opens or clicks.',
+      'Reinforce the concrete output: the bill lines worth checking and the likely leak area.',
+      'Prefer an affirmative CTA over a question, and keep the payoff concrete.',
+      'Subject line: 1-4 words, specific and plain.'
+    ].join('\n'),
+    no_reply: [
+      'REPLY-FIRST NOTE: Keep the body at 35-55 words and max 2 sentences.',
+      'Assume you already reached the right person. Do not ask who owns electricity review.',
+      'Sentence 1 should state the value in plain English and name one likely leak area.',
+      'Sentence 2 should offer to mark up the latest statement and call out the lines worth checking first.',
+      'Subject line: 1-4 words, direct and sharp.'
+    ].join('\n'),
+    general: [
+      'REPLY-FIRST NOTE: Use the shortest draft that still gives one real observation and a concrete reason to reply.',
+      'Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
+      'One CTA only. Prefer a statement or a simple yes/no if needed.',
+      'Subject line: 1-5 words.'
+    ].join('\n')
+  };
+
+  return map[stage] || map.general;
 }
 
 function senderDomainFromEmail(email) {
@@ -204,6 +247,7 @@ export default async function handler(req, res) {
       ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
       : null;
     const sourceTruthLine = buildSourceTruthLine(linkedInUrl, website);
+    const replyStage = detectReplyStage(executionMeta?.prompt || '');
     const researchFacts = [
       account?.description ? `Company summary: ${account.description}` : null,
       account?.industry ? `Industry: ${account.industry}` : null,
@@ -237,11 +281,12 @@ export default async function handler(req, res) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        prompt: `${executionMeta?.prompt || 'Draft a personalized follow-up'}\n\n${sourceTruthLine}`,
+        prompt: `${executionMeta?.prompt || 'Draft a personalized follow-up'}\n\n${buildReplyFirstDirective(replyStage)}\n\n${sourceTruthLine}`,
         provider: 'openrouter',
         type: 'email',
         vectors: Array.isArray(executionMeta?.vectors) ? executionMeta.vectors : [],
         mode: 'generate_email',
+        sequenceStage: replyStage,
         contact: {
           name: `${contact.firstName || ''} ${contact.lastName || ''}`.trim(),
           email: contact.email,
