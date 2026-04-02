@@ -4,7 +4,7 @@
 import twilio from 'twilio';
 import logger from '../_logger.js';
 import { supabaseAdmin } from '../../../lib/supabase.ts';
-import { getVoicemailGreeting, resolveUserForBusinessNumber } from '../../../lib/voicemail.ts';
+import { getVoicemailGreetingForTwilioNumber, resolveUserForBusinessNumber } from '../../../lib/voicemail.ts';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 export default async function handler(req, res) {
@@ -92,6 +92,7 @@ export default async function handler(req, res) {
         const agentEmail = requestUrl.searchParams.get('agentEmail');
         const targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
         const businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone');
+        const businessPhoneSidFromQuery = requestUrl.searchParams.get('businessPhoneSid');
         const powerDialSessionId = requestUrl.searchParams.get('powerDialSessionId');
         const powerDialBatchId = requestUrl.searchParams.get('powerDialBatchId');
         const powerDialBatchIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchIndex'));
@@ -153,11 +154,12 @@ export default async function handler(req, res) {
     let voicemailGreeting = null;
     // When the browser client rejects the call, Twilio commonly reports `canceled`.
     // We treat that the same as no-answer/busy so declined inbound calls still get voicemail.
-    const shouldPlayVoicemail = !isPowerDialBatch && ['no-answer', 'busy', 'canceled', 'failed'].includes(normalizedDialStatus);
+        const shouldPlayVoicemail = !isPowerDialBatch && ['no-answer', 'busy', 'canceled', 'failed'].includes(normalizedDialStatus);
 
     if (shouldPlayVoicemail) {
       try {
         const candidateNumber = businessPhoneFromQuery || targetPhoneFromQuery || body.To || body.From || '';
+        const voicemailIdentifier = businessPhoneSidFromQuery || candidateNumber;
         const { data: users, error } = await supabaseAdmin
           .from('users')
           .select('id, email, settings')
@@ -167,9 +169,10 @@ export default async function handler(req, res) {
           logger.warn('[DialComplete] Failed to load users for voicemail lookup:', error.message);
         } else {
           const matchedUser = resolveUserForBusinessNumber(users, candidateNumber);
-          voicemailGreeting = getVoicemailGreeting(matchedUser?.settings || {});
+          voicemailGreeting = getVoicemailGreetingForTwilioNumber(matchedUser?.settings || {}, voicemailIdentifier);
           logger.log('[DialComplete] Voicemail lookup:', {
             candidateNumber,
+            voicemailIdentifier,
             matchedEmail: matchedUser?.email || null,
             hasGreeting: !!voicemailGreeting?.publicUrl
           });
