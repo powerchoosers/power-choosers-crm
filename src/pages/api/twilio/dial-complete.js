@@ -63,7 +63,6 @@ export default async function handler(req, res) {
 
     // If body is empty but query has Twilio params, use query (redirect lost POST body)
     if (Object.keys(body).length === 0 && req.query && Object.keys(req.query).length > 0) {
-      logger.warn('[DialComplete] POST body was empty, falling back to query params');
       body = req.query;
     }
 
@@ -98,13 +97,6 @@ export default async function handler(req, res) {
     const isPowerDialBatch = Boolean(powerDialSessionId || powerDialBatchId || powerDialTargetCount != null);
     const businessPhoneSidFromBody = toText(body.ToSid || body.BusinessPhoneSid || body.businessPhoneSid || body.toSid || body.to_sid || '');
     const businessPhoneFromBody = toText(body.To || body.BusinessPhone || body.businessPhone || body.to || '');
-
-    logger.log('[DialComplete] Call completed:', {
-      callSid: CallSid,
-      childCallSid: DialCallSid,
-      status: DialCallStatus,
-      duration: DialCallDuration
-    });
 
     // ================================================================
     // STEP 1: LOG TO SUPABASE *BEFORE* responding to Twilio.
@@ -150,7 +142,6 @@ export default async function handler(req, res) {
         }).catch(err => {
           logger.error('[DialComplete] Supabase log failed:', err?.message);
         });
-        logger.log('[DialComplete] ✅ Final state logged to Supabase');
       } catch (logErr) {
         logger.error('[DialComplete] Error logging call:', logErr?.message);
       }
@@ -192,14 +183,6 @@ export default async function handler(req, res) {
               break;
             }
           }
-          logger.log('[DialComplete] Voicemail lookup:', {
-            candidateNumber,
-            receivedTo: businessPhoneFromBody || businessPhoneFromQuery || null,
-            receivedToSid: businessPhoneSidFromBody || businessPhoneSidFromQuery || null,
-            voicemailCandidates,
-            matchedEmail: matchedUser?.email || null,
-            hasGreeting: !!voicemailGreeting?.publicUrl
-          });
         }
       } catch (lookupError) {
         logger.warn('[DialComplete] Voicemail lookup error:', lookupError?.message || lookupError);
@@ -210,11 +193,9 @@ export default async function handler(req, res) {
     // We strictly use <Hangup/> to ensure call ends cleanly without system messages
     if (shouldPlayVoicemail) {
       if (voicemailGreeting?.publicUrl) {
-        logger.log('[DialComplete] Playing voicemail greeting for unanswered call')
         twiml.play(voicemailGreeting.publicUrl)
         twiml.hangup()
       } else {
-        logger.log('[DialComplete] No voicemail greeting found, using fallback unavailable message')
         twiml.say('The person you called is unavailable. Please try again later.')
         twiml.hangup()
       }
@@ -232,7 +213,6 @@ export default async function handler(req, res) {
 
         default:
           // For unknown statuses or cancellations, just hang up silently
-          logger.log('[DialComplete] Unhandled status:', DialCallStatus);
           twiml.hangup();
           break;
       }
