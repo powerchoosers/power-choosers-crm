@@ -436,84 +436,91 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         const meta = await resolvePhoneMeta(from)
         setMetadata(meta)
 
-        const toastId = toast(
-          <IncomingCallToast meta={meta} from={from} />,
-          {
-            action: {
-              label: 'Answer',
-              onClick: async () => {
-                // Ported from legacy phone.js: Set audio devices before answering
-                if (newDevice.audio) {
-                  try {
-                    const inputDevices = newDevice.audio.availableInputDevices
-                    let inputDeviceId = 'default'
-                    if (inputDevices && inputDevices.size > 0) {
-                      const deviceIds = Array.from(inputDevices.keys())
-                      if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                        inputDeviceId = deviceIds[0] as string
-                      }
-                    }
-                    await newDevice.audio.setInputDevice(inputDeviceId)
+        let toastId: string | number | undefined
 
-                    if (newDevice.audio.isOutputSelectionSupported) {
-                      const outputDevices = newDevice.audio.availableOutputDevices
-                      let outputDeviceId = 'default'
-                      if (outputDevices && outputDevices.size > 0) {
-                        const deviceIds = Array.from(outputDevices.keys())
-                        if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                          outputDeviceId = deviceIds[0] as string
-                        }
-                      }
-                      newDevice.audio.speakerDevices.set(outputDeviceId)
-                    }
-                  } catch (audioError) {
-                    console.warn('[Voice] Audio setup failed for incoming call:', audioError)
+        const answerIncomingCall = async () => {
+          // Ported from legacy phone.js: Set audio devices before answering
+          if (newDevice.audio) {
+            try {
+              const inputDevices = newDevice.audio.availableInputDevices
+              let inputDeviceId = 'default'
+              if (inputDevices && inputDevices.size > 0) {
+                const deviceIds = Array.from(inputDevices.keys())
+                if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                  inputDeviceId = deviceIds[0] as string
+                }
+              }
+              await newDevice.audio.setInputDevice(inputDeviceId)
+
+              if (newDevice.audio.isOutputSelectionSupported) {
+                const outputDevices = newDevice.audio.availableOutputDevices
+                let outputDeviceId = 'default'
+                if (outputDevices && outputDevices.size > 0) {
+                  const deviceIds = Array.from(outputDevices.keys())
+                  if (!deviceIds.includes('default') && deviceIds.length > 0) {
+                    outputDeviceId = deviceIds[0] as string
                   }
                 }
-
-                call.accept()
-                isCallSessionActiveRef.current = true
-                setCurrentCall(call)
-                setActive(true)
-                setStatus('connected')
-                setCallHealth('good')
-                toast.dismiss(toastId)
-
-                // Track Health Monitor: Check for silence via WebRTC getStats()
-                const monitorMediaHealth = async () => {
-                  if (call.status() !== 'open') return;
-                  try {
-                    if (typeof (call as any).getStats !== 'function') {
-                      console.warn('[Voice] getStats is not supported in this environment');
-                      return;
-                    }
-                    const stats = await (call as any).getStats();
-                    stats.forEach((report: any) => {
-                      if (report.localAudioTrackStats) {
-                        report.localAudioTrackStats.forEach((stat: any) => {
-                          if (stat.audioLevel === 0 && !call.isMuted()) {
-                            console.warn('[Voice] Diagnostic: No local audio energy detected (Inbound). Check Mic.');
-                          }
-                        });
-                      }
-                    });
-                    if (call.status() === 'open') {
-                      setTimeout(monitorMediaHealth, 5000);
-                    }
-                  } catch (err) {
-                    console.error('[Voice] Media monitor error (Inbound):', err);
-                  }
-                };
-                monitorMediaHealth();
+                newDevice.audio.speakerDevices.set(outputDeviceId)
               }
-            },
-            cancel: {
-              label: 'Decline',
-              onClick: () => {
-                call.reject()
-                toast.dismiss(toastId)
+            } catch (audioError) {
+              console.warn('[Voice] Audio setup failed for incoming call:', audioError)
+            }
+          }
+
+          call.accept()
+          isCallSessionActiveRef.current = true
+          setCurrentCall(call)
+          setActive(true)
+          setStatus('connected')
+          setCallHealth('good')
+          if (toastId !== undefined) {
+            toast.dismiss(toastId)
+          }
+
+          // Track Health Monitor: Check for silence via WebRTC getStats()
+          const monitorMediaHealth = async () => {
+            if (call.status() !== 'open') return;
+            try {
+              if (typeof (call as any).getStats !== 'function') {
+                console.warn('[Voice] getStats is not supported in this environment');
+                return;
               }
-            },
+              const stats = await (call as any).getStats();
+              stats.forEach((report: any) => {
+                if (report.localAudioTrackStats) {
+                  report.localAudioTrackStats.forEach((stat: any) => {
+                    if (stat.audioLevel === 0 && !call.isMuted()) {
+                      console.warn('[Voice] Diagnostic: No local audio energy detected (Inbound). Check Mic.');
+                    }
+                  });
+                }
+              });
+              if (call.status() === 'open') {
+                setTimeout(monitorMediaHealth, 5000);
+              }
+            } catch (err) {
+              console.error('[Voice] Media monitor error (Inbound):', err);
+            }
+          };
+          monitorMediaHealth();
+        }
+
+        const declineIncomingCall = () => {
+          call.reject()
+          if (toastId !== undefined) {
+            toast.dismiss(toastId)
+          }
+        }
+
+        toastId = toast(
+          <IncomingCallToast
+            meta={meta}
+            from={from}
+            onAnswer={answerIncomingCall}
+            onDecline={declineIncomingCall}
+          />,
+          {
             duration: 30000, // Longer duration for incoming call
           }
         )
