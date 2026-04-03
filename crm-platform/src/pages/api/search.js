@@ -179,7 +179,7 @@ export default async function handler(req, res) {
           accountId,
           city,
           state,
-          accounts ( name, domain, logo_url, metadata, industry )
+          accounts!contacts_accountId_fkey ( name, domain, logo_url, metadata, industry )
         `)
         .or(orQuery);
 
@@ -238,7 +238,7 @@ export default async function handler(req, res) {
             accountId,
             city,
             state,
-            accounts ( name, domain, logo_url, metadata, industry )
+            accounts!contacts_accountId_fkey ( name, domain, logo_url, metadata, industry )
           `)
           .or('mobile.not.is.null,workPhone.not.is.null,otherPhone.not.is.null,companyPhone.not.is.null,phone.not.is.null')
           .limit(2000);
