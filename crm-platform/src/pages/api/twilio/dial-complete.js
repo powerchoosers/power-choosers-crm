@@ -7,6 +7,12 @@ import { supabaseAdmin } from '../../../lib/supabase.ts';
 import { getVoicemailGreetingForTwilioNumber, resolveUserForBusinessNumber } from '../../../lib/voicemail.ts';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
+function toText(value) {
+  if (typeof value === 'string') return value.trim();
+  if (value == null) return '';
+  return String(value).trim();
+}
+
 export default async function handler(req, res) {
   // Twilio generally POSTs to this endpoint, but we allow GET for health checks or debugging
   if (req.method !== 'POST' && req.method !== 'GET') {
@@ -67,6 +73,31 @@ export default async function handler(req, res) {
       const parsed = parseInt(String(value ?? ''), 10);
       return Number.isFinite(parsed) ? parsed : null;
     };
+    const protocol = req.headers['x-forwarded-proto'] || 'https';
+    const host = req.headers.host || req.headers['x-forwarded-host'] || '';
+    const requestUrl = new URL(req.url || '/', `${protocol}://${host || 'localhost'}`);
+    const contactId = requestUrl.searchParams.get('contactId');
+    const contactName = requestUrl.searchParams.get('contactName');
+    const contactTitle = requestUrl.searchParams.get('contactTitle');
+    const accountId = requestUrl.searchParams.get('accountId');
+    const accountName = requestUrl.searchParams.get('accountName');
+    const agentId = requestUrl.searchParams.get('agentId');
+    const agentEmail = requestUrl.searchParams.get('agentEmail');
+    const targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
+    const businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone');
+    const businessPhoneSidFromQuery = requestUrl.searchParams.get('businessPhoneSid');
+    const powerDialSessionId = requestUrl.searchParams.get('powerDialSessionId');
+    const powerDialBatchId = requestUrl.searchParams.get('powerDialBatchId');
+    const powerDialBatchIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchIndex'));
+    const powerDialBatchSize = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchSize'));
+    const powerDialTargetIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetIndex'));
+    const powerDialTargetCount = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetCount'));
+    const powerDialSourceLabel = requestUrl.searchParams.get('powerDialSourceLabel');
+    const powerDialSelectedCount = parseOptionalInt(requestUrl.searchParams.get('powerDialSelectedCount'));
+    const powerDialDialableCount = parseOptionalInt(requestUrl.searchParams.get('powerDialDialableCount'));
+    const isPowerDialBatch = Boolean(powerDialSessionId || powerDialBatchId || powerDialTargetCount != null);
+    const businessPhoneSidFromBody = toText(body.ToSid || body.BusinessPhoneSid || body.businessPhoneSid || body.toSid || body.to_sid || '');
+    const businessPhoneFromBody = toText(body.To || body.BusinessPhone || body.businessPhone || body.to || '');
 
     logger.log('[DialComplete] Call completed:', {
       callSid: CallSid,
@@ -80,32 +111,6 @@ export default async function handler(req, res) {
     // ================================================================
     if (CallSid) {
       try {
-        const protocol = req.headers['x-forwarded-proto'] || 'https';
-        const host = req.headers.host || req.headers['x-forwarded-host'] || '';
-        const requestUrl = new URL(req.url, `${protocol}://${host}`);
-        const contactId = requestUrl.searchParams.get('contactId');
-        const contactName = requestUrl.searchParams.get('contactName');
-        const contactTitle = requestUrl.searchParams.get('contactTitle');
-        const accountId = requestUrl.searchParams.get('accountId');
-        const accountName = requestUrl.searchParams.get('accountName');
-        const agentId = requestUrl.searchParams.get('agentId');
-        const agentEmail = requestUrl.searchParams.get('agentEmail');
-        const targetPhoneFromQuery = requestUrl.searchParams.get('targetPhone');
-        const businessPhoneFromQuery = requestUrl.searchParams.get('businessPhone');
-        const businessPhoneSidFromQuery = requestUrl.searchParams.get('businessPhoneSid');
-        const powerDialSessionId = requestUrl.searchParams.get('powerDialSessionId');
-        const powerDialBatchId = requestUrl.searchParams.get('powerDialBatchId');
-        const powerDialBatchIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchIndex'));
-        const powerDialBatchSize = parseOptionalInt(requestUrl.searchParams.get('powerDialBatchSize'));
-        const powerDialTargetIndex = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetIndex'));
-        const powerDialTargetCount = parseOptionalInt(requestUrl.searchParams.get('powerDialTargetCount'));
-        const powerDialSourceLabel = requestUrl.searchParams.get('powerDialSourceLabel');
-        const powerDialSelectedCount = parseOptionalInt(requestUrl.searchParams.get('powerDialSelectedCount'));
-        const powerDialDialableCount = parseOptionalInt(requestUrl.searchParams.get('powerDialDialableCount'));
-        const isPowerDialBatch = Boolean(powerDialSessionId || powerDialBatchId || powerDialTargetCount != null);
-        const businessPhoneSidFromBody = toText(body.ToSid || body.BusinessPhoneSid || body.businessPhoneSid || body.toSid || body.to_sid || '');
-        const businessPhoneFromBody = toText(body.To || body.BusinessPhone || body.businessPhone || body.to || '');
-
         let resolvedTargetPhone = targetPhoneFromQuery || body.DialedNumber || body.Called || body.To || body.From || '';
 
         if ((!resolvedTargetPhone || String(resolvedTargetPhone).startsWith('client:') || String(resolvedTargetPhone).startsWith('AP')) && DialCallSid && process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN) {
@@ -131,7 +136,7 @@ export default async function handler(req, res) {
           agentId: agentId || null,
           agentEmail: agentEmail || null,
           targetPhone: resolvedTargetPhone || '',
-          businessPhone: businessPhoneFromQuery || undefined,
+          businessPhone: businessPhoneFromBody || businessPhoneFromQuery || undefined,
           powerDialSessionId: powerDialSessionId || null,
           powerDialBatchId: powerDialBatchId || null,
           powerDialBatchIndex,
