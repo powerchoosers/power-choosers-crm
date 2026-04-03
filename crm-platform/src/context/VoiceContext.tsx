@@ -9,6 +9,7 @@ import { formatToE164 } from '@/lib/utils'
 import { usePathname } from 'next/navigation'
 import { IncomingCallToast } from '@/components/calls/IncomingCallToast'
 import type { PowerDialTarget } from '@/lib/powerDialer'
+import { supabase } from '@/lib/supabase'
 
 interface VoiceMetadata {
   name?: string
@@ -117,9 +118,16 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  const getSearchAuthHeader = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+    return (token ? { Authorization: `Bearer ${token}` } : {}) as HeadersInit
+  }, [])
+
   const resolvePhoneMeta = useCallback(async (phoneNumber: string) => {
     try {
-      const response = await fetch(`/api/search?phone=${encodeURIComponent(phoneNumber)}`)
+      const headers = await getSearchAuthHeader()
+      const response = await fetch(`/api/search?phone=${encodeURIComponent(phoneNumber)}`, { headers })
       if (response.ok) {
         const data = await response.json()
         if (data.success) {
@@ -160,7 +168,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       console.warn('[Voice] Metadata resolution failed:', error)
     }
     return null
-  }, [])
+  }, [getSearchAuthHeader])
 
   const initDevice = useCallback(async () => {
     // Helper to check if we are in the platform area (check at call time)
