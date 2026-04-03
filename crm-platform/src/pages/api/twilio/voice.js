@@ -84,8 +84,12 @@ async function getTwilioIncomingNumbersList() {
         const client = twilio(accountSid, authToken);
         const list = await client.incomingPhoneNumbers.list({ limit: 1000 });
         inboundNumbersCache = list
-            .map((num) => normalizePhoneNumber(num.phoneNumber))
-            .filter(Boolean);
+            .map((num) => ({
+                sid: num.sid || null,
+                number: normalizePhoneNumber(num.phoneNumber),
+                name: num.friendlyName || null,
+            }))
+            .filter((num) => Boolean(num.number));
         inboundNumbersCacheUpdatedAt = now;
     } catch (error) {
         logger.error('[Voice] Unable to refresh incoming numbers list:', error?.message || error);
@@ -97,7 +101,7 @@ async function getTwilioIncomingNumbersList() {
 async function resolveInboundPhoneNumbers() {
     const fetched = await getTwilioIncomingNumbersList();
     const candidates = [
-        ...fetched,
+        ...fetched.map((item) => item.number).filter(Boolean),
         ...parseNumberList(process.env.TWILIO_PHONE_NUMBERS),
         ...parseNumberList(process.env.TWILIO_INBOUND_NUMBERS),
         ...parseNumberList(process.env.TWILIO_INBOUND_PHONE_NUMBERS),
@@ -116,6 +120,25 @@ async function resolveInboundPhoneNumbers() {
         }
     });
     return unique;
+}
+
+async function resolveInboundPhoneDetails(businessNumber) {
+    const normalizedBusiness = normalizePhoneNumber(businessNumber);
+    const digitsBusiness = digitsOnly(businessNumber);
+    if (!normalizedBusiness && !digitsBusiness) {
+        return null;
+    }
+
+    const fetched = await getTwilioIncomingNumbersList();
+    return fetched.find((item) => {
+        if (item.sid && businessNumber && item.sid === businessNumber) return true;
+
+        const itemNumber = item.number || '';
+        if (normalizedBusiness && normalizePhoneNumber(itemNumber) === normalizedBusiness) return true;
+        if (digitsBusiness && digitsOnly(itemNumber) === digitsBusiness) return true;
+
+        return false;
+    }) || null;
 }
 
 function extractNormalizedUserNumbers(settings) {
@@ -338,6 +361,7 @@ export default async function handler(req, res) {
         const businessNumber = isInboundToBusiness
             ? (inboundPhoneNumbers.find((num) => digitsOnly(num) === digitsOnly(RawTo)) || primaryBusinessNumber)
             : primaryBusinessNumber;
+        const businessPhoneDetails = businessNumber ? await resolveInboundPhoneDetails(businessNumber) : null;
 
         // For outbound browser calls: use custom callerId or business number
         // For inbound PSTN: use business number when connecting to browser
@@ -378,6 +402,8 @@ export default async function handler(req, res) {
             if (accountId) callbackParams.append('accountId', accountId);
             if (targetPhone) callbackParams.append('targetPhone', targetPhone);
             if (businessNumber) callbackParams.append('businessPhone', businessNumber);
+            if (businessPhoneDetails?.sid) callbackParams.append('businessPhoneSid', businessPhoneDetails.sid);
+            if (businessPhoneDetails?.name) callbackParams.append('businessPhoneName', businessPhoneDetails.name);
         }
         const cbq = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
