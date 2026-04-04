@@ -36,9 +36,9 @@ export const TaskTableRow = memo(function TaskTableRow({
             onClick={() => {
                 saveScroll?.()
                 if (task.contactId) {
-                    router.push(`/network/contacts/${task.contactId}`)
+                    router.push(`/network/contacts/${task.contactId}?taskId=${encodeURIComponent(task.id)}`)
                 } else if (task.accountId) {
-                    router.push(`/network/accounts/${task.accountId}`)
+                    router.push(`/network/accounts/${task.accountId}?taskId=${encodeURIComponent(task.id)}`)
                 }
             }}
             className={cn(

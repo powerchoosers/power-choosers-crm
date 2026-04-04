@@ -19,6 +19,7 @@ import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { NeuralLoader } from '@/components/chat/NeuralLoader'
 import { DecryptionText } from '@/components/chat/DecryptionText'
 import { useTasks } from '@/hooks/useTasks'
+import { buildProtocolTaskMetadata } from '@/lib/protocol-context'
 
 interface Diagnostic {
   model: string
@@ -208,6 +209,55 @@ function toDisplayStringArray(value: unknown): string[] {
     .filter((item): item is string => typeof item === 'string')
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+type LooseCardPayload = {
+  type?: unknown
+  data?: unknown
+}
+
+function parseCardPayload(rawSegment: string): LooseCardPayload | null {
+  const raw = rawSegment.trim()
+  if (!raw) return null
+
+  const candidates = new Set<string>()
+  const pushCandidate = (value: string) => {
+    const trimmed = value.trim()
+    if (trimmed) candidates.add(trimmed)
+  }
+
+  pushCandidate(raw)
+  pushCandidate(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''))
+
+  const braceStart = raw.indexOf('{')
+  const braceEnd = raw.lastIndexOf('}')
+  if (braceStart >= 0 && braceEnd > braceStart) {
+    const sliced = raw.slice(braceStart, braceEnd + 1)
+    pushCandidate(sliced)
+    pushCandidate(sliced.replace(/,\s*([}\]])/g, '$1'))
+  }
+
+  pushCandidate(raw.replace(/,\s*([}\]])/g, '$1'))
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate)
+      if (isRecord(parsed)) return parsed as LooseCardPayload
+    } catch {
+      // Try the next repair pass.
+    }
+  }
+
+  return null
+}
+
+function summarizeBrokenCardPayload(rawSegment: string, limit = 220): string {
+  return rawSegment
+    .replace(/\s+/g, ' ')
+    .replace(/^JSON_DATA:/i, '')
+    .replace(/END_JSON$/i, '')
+    .trim()
+    .slice(0, limit)
 }
 
 /** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText (word-stagger reveal) for first segment. Supports multiple artifacts per line and content with asterisks (non-greedy match). Supports blue bullets (•). */
@@ -748,6 +798,49 @@ function ProtocolCardView({ card }: { card: ProtocolCardData }) {
             </Button>
           )}
         </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function BrokenCardFallback({ rawSegment, reason }: { rawSegment: string; reason?: string }) {
+  const rawToCopy = `JSON_DATA:${rawSegment}END_JSON`
+  const summary = summarizeBrokenCardPayload(rawSegment)
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/80 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden border-amber-500/20"
+    >
+      <div className="px-4 py-3 border-b border-amber-500/10 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+          <span className="text-[10px] font-mono text-amber-300 uppercase tracking-widest truncate">Recovered card payload</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => navigator.clipboard.writeText(rawToCopy)}
+          className="text-[9px] font-mono text-zinc-300 border border-white/10 bg-white/[0.03] px-2 py-1 rounded-md uppercase tracking-widest hover:border-white/20 hover:text-white transition-colors"
+        >
+          Copy raw
+        </button>
+      </div>
+
+      <div className="p-4 space-y-3">
+        <p className="text-sm text-zinc-300 leading-6">
+          Gemini returned a card payload with a small formatting problem, so I&apos;m showing the readable part instead of dropping the whole card.
+        </p>
+        {summary && (
+          <div className="rounded-xl bg-black/30 border border-white/5 p-3 text-xs font-mono text-zinc-400 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {summary}
+          </div>
+        )}
+        {reason && (
+          <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+            {reason}
+          </p>
+        )}
       </div>
     </motion.div>
   )
@@ -1748,6 +1841,15 @@ export function GeminiChatPanel() {
     async (opts: { title: string; description?: string }) => {
       const protocolTargetAccountId = contextData ? toDisplayString(contextData.targetAccountId || contextData.parentAccountId || contextData.parentCompanyId) : ''
       const protocolTargetContactId = contextData ? toDisplayString(contextData.targetContactId || contextData.decisionMakerId) : ''
+      const protocolTaskMetadata = storeContext && storeContext.type === 'protocol'
+        ? buildProtocolTaskMetadata(storeContext as any, {
+            taskTitle: opts.title,
+            description: opts.description ?? opts.title,
+            taskStatus: 'Pending',
+            taskPriority: 'Medium',
+            source: 'gemini_chat',
+          })
+        : null
       await addTaskAsync({
         title: opts.title,
         description: opts.description ?? opts.title,
@@ -1763,9 +1865,10 @@ export function GeminiChatPanel() {
           : contextInfo.type === 'protocol' && protocolTargetAccountId
             ? protocolTargetAccountId
             : undefined,
+        metadata: protocolTaskMetadata ?? undefined,
       })
     },
-    [addTaskAsync, contextData, contextInfo]
+    [addTaskAsync, contextData, contextInfo, storeContext]
   )
 
   const [input, setInput] = useState('')
@@ -2378,14 +2481,27 @@ SELECT * FROM hybrid_search_accounts(
                           }
                           try {
                             const [jsonPart, ...rest] = part.split('END_JSON')
-                            const data = JSON.parse(jsonPart)
+                            const parsed = parseCardPayload(jsonPart)
                             const trailingText = rest.join('END_JSON').trim()
+
+                            if (parsed && typeof parsed.type === 'string' && isRecord(parsed.data)) {
+                              return (
+                                <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
+                                  <div className="w-full overflow-hidden grid grid-cols-1">
+                                    <ComponentRenderer type={parsed.type} data={parsed.data as Record<string, unknown>} onCreateTask={handleCreateTask} contextInfo={contextInfo} />
+                                  </div>
+                                  {trailingText && (
+                                    <div className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
+                                      <ProseWithArtifacts text={trailingText} />
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            }
 
                             return (
                               <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
-                                <div className="w-full overflow-hidden grid grid-cols-1">
-                                  <ComponentRenderer type={data.type} data={data.data} onCreateTask={handleCreateTask} contextInfo={contextInfo} />
-                                </div>
+                                <BrokenCardFallback rawSegment={jsonPart} reason="Card payload could not be parsed cleanly." />
                                 {trailingText && (
                                   <div className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
                                     <ProseWithArtifacts text={trailingText} />
@@ -2394,18 +2510,9 @@ SELECT * FROM hybrid_search_accounts(
                               </div>
                             )
                           } catch (e) {
-                            const rawSegment = part.split('END_JSON')[0] ?? part
-                            const rawToCopy = `JSON_DATA:${rawSegment}END_JSON`
                             return (
-                              <div key={partKey} className="text-[10px] font-mono p-2 bg-red-500/10 rounded flex flex-wrap items-center gap-2">
-                                <span className="text-red-400">[System_Error: Data_Corruption]</span>
-                                <button
-                                  type="button"
-                                  onClick={() => navigator.clipboard.writeText(rawToCopy)}
-                                  className="text-zinc-400 hover:text-zinc-300 border border-white/10 hover:border-white/20 px-1.5 py-0.5 rounded text-[9px] uppercase tracking-wider"
-                                >
-                                  Copy raw
-                                </button>
+                              <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
+                                <BrokenCardFallback rawSegment={part.split('END_JSON')[0] ?? part} reason={e instanceof Error ? e.message : 'Malformed card data'} />
                               </div>
                             )
                           }

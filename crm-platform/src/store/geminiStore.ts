@@ -1,13 +1,19 @@
 import { create } from 'zustand'
+import type { ProtocolContextPayload } from '@/lib/protocol-context'
+
+type GeminiContext =
+  | ProtocolContextPayload
+  | {
+      type: string
+      id: string
+      label: string
+      data?: Record<string, unknown>
+    }
+  | null
 
 interface GeminiState {
-  activeContext: {
-    type: string
-    id: string
-    label: string
-    data?: Record<string, unknown>
-  } | null
-  setContext: (context: { type: string; id: string; label: string; data?: Record<string, unknown> } | null) => void
+  activeContext: GeminiContext
+  setContext: (context: GeminiContext) => void
   isOpen: boolean
   isHistoryOpen: boolean
   setIsOpen: (open: boolean) => void
