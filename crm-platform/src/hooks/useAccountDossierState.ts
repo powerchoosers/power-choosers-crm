@@ -8,6 +8,7 @@ import { useEntityTasks } from '@/hooks/useEntityTasks'
 import { useTasks, useAllPendingTasks } from '@/hooks/useTasks'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
+import { buildProtocolContextFromTask } from '@/lib/protocol-context'
 import { toast } from 'sonner'
 import { parseISO, isValid } from 'date-fns'
 import { formatMillValue } from '@/lib/mills'
@@ -120,7 +121,7 @@ function parseAccountHierarchy(account: any): AccountHierarchyContext {
     }
 }
 
-export function useAccountDossierState(id: string) {
+export function useAccountDossierState(id: string, taskIdFromUrl?: string | null) {
     const router = useRouter()
 
     const { data: account, isLoading, isFetched } = useAccount(id)
@@ -378,11 +379,46 @@ export function useAccountDossierState(id: string) {
             })
         }
         return () => setContext(null)
-    }, [account, setContext])
+    }, [account, taskIdFromUrl, setContext])
 
     useEffect(() => {
         setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, visiblePendingTasks.length - 1)))
     }, [visiblePendingTasks.length])
+
+    useEffect(() => {
+        if (!taskIdFromUrl || !visiblePendingTasks.length) return
+        const idx = visiblePendingTasks.findIndex((task) => String(task.id) === taskIdFromUrl)
+        if (idx >= 0) setCurrentTaskIndex(idx)
+    }, [taskIdFromUrl, visiblePendingTasks])
+
+    useEffect(() => {
+        if (!taskIdFromUrl) return
+        const matchingTask = allPendingTasks.find((task) => String(task.id) === taskIdFromUrl)
+        if (!matchingTask) return
+
+        const hierarchy = parseAccountHierarchy(account)
+        const protocolContext = buildProtocolContextFromTask(matchingTask, {
+            targetAccountId: account?.id || undefined,
+            targetAccountName: account?.name || undefined,
+            targetContactId: account?.primaryContactId || undefined,
+            targetContactName: account?.primaryContactId ? matchingTask.relatedTo || account?.name : undefined,
+            decisionMakerId: account?.primaryContactId || undefined,
+            parentAccountId: hierarchy.parentAccountId || undefined,
+            parentCompanyName: hierarchy.parentCompanyName || undefined,
+            subsidiaryAccountIds: hierarchy.subsidiaryAccountIds,
+            subsidiaryCompanyNames: hierarchy.subsidiaryCompanyNames,
+            organizationRole: hierarchy.organizationRole,
+            hierarchySummary: hierarchy.hierarchySummary,
+            taskId: taskIdFromUrl,
+            taskTitle: matchingTask.title,
+            taskPriority: matchingTask.priority,
+            taskStatus: matchingTask.status,
+        })
+
+        if (!protocolContext) return
+        setContext(protocolContext)
+        return () => setContext(null)
+    }, [taskIdFromUrl, allPendingTasks, account, setContext])
 
     const navigateToTaskDossier = (task: any) => {
         const cid = (task.contactId != null && String(task.contactId).trim() !== '') ? String(task.contactId).trim() : undefined

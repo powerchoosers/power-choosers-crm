@@ -1,12 +1,14 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { createPortal } from 'react-dom'
 import { GitMerge } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
+import { useGeminiStore } from '@/store/geminiStore'
+import { buildProtocolContext } from '@/lib/protocol-context'
 import {
   Select,
   SelectContent,
@@ -18,6 +20,7 @@ import { ForensicClose } from '@/components/ui/ForensicClose'
 import { ForensicRefresh } from '@/components/ui/ForensicRefresh'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { useUIStore } from '@/store/uiStore'
 
 interface SequenceMemberRow {
   memberId: string
@@ -123,6 +126,9 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
   const [availableSequences, setAvailableSequences] = useState<{ id: string; name: string }[]>([])
   const [selectedSequenceId, setSelectedSequenceId] = useState<string | null>(null)
+  const requestTokenRef = useRef(0)
+  const setGeminiContext = useGeminiStore((state) => state.setContext)
+  const setActiveSequenceId = useUIStore((state) => state.setActiveSequenceId)
 
   useEffect(() => { setIsClient(true) }, [])
 
@@ -145,6 +151,7 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
   const fetchIntel = useCallback(async (targetId: string) => {
     if (!targetId) return
+    const requestToken = ++requestTokenRef.current
     setLoading(true)
     setError(null)
     try {
@@ -160,19 +167,32 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
       })
       const data = await response.json() as SequenceIntelResponse
       if (!response.ok) throw new Error(data?.error || 'Failed to load sequence intel')
+      if (requestToken !== requestTokenRef.current) return
 
       setRows(Array.isArray(data.rows) ? data.rows : [])
       setSummary(data.summary || null)
       setName(data.sequence?.name || '')
+
+      const { data: sequenceRecord, error: sequenceError } = await supabase
+        .from('sequences')
+        .select('*')
+        .eq('id', targetId)
+        .single()
+      if (requestToken !== requestTokenRef.current) return
+      if (!sequenceError && sequenceRecord) {
+        setGeminiContext(buildProtocolContext(sequenceRecord, { protocolId: targetId }))
+      }
     } catch (err: any) {
+      if (requestToken !== requestTokenRef.current) return
       setRows([])
       setSummary(null)
       setName('')
       setError(err?.message || 'Failed to load sequence intel')
     } finally {
+      if (requestToken !== requestTokenRef.current) return
       setLoading(false)
     }
-  }, [])
+  }, [setGeminiContext])
 
   useEffect(() => {
     if (isOpen) {
@@ -180,6 +200,18 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
       else fetchProtocols()
     }
   }, [isOpen, selectedSequenceId, fetchIntel, fetchProtocols])
+
+  useEffect(() => {
+    if (!isOpen) {
+      setGeminiContext(null)
+      setActiveSequenceId(null)
+      return
+    }
+    if (selectedSequenceId) {
+      setActiveSequenceId(selectedSequenceId)
+    }
+    return () => setGeminiContext(null)
+  }, [isOpen, selectedSequenceId, setActiveSequenceId, setGeminiContext])
 
   const formatTimestamp = (value?: string | null) => {
     if (!value) return '-'

@@ -1,0 +1,42 @@
+{
+  "type": "protocol_card",
+  "data": {
+    "protocolId": "protocol_renewal_q2_001",
+    "protocolName": "Q2 Renewal Protocol",
+    "description": "Three-step follow-up for a Texas mid-market account.",
+    "stepCount": 3,
+    "stepSummary": [
+      "1. Confirm the renewal window and decision maker.",
+      "2. Send the short cost view.",
+      "3. Book a 15-minute review."
+    ],
+    "targetContactId": "contact_decision_maker_001",
+    "targetContactName": "Maria Sanchez",
+    "targetAccountId": "account_hierarchy_001",
+    "targetAccountName": "High Plains Packaging",
+    "decisionMakerId": "contact_decision_maker_001",
+    "parentCompanyName": "High Plains Holdings",
+    "parentAccountId": "account_parent_001",
+    "subsidiaryAccountIds": [
+      "account_sub_001",
+      "account_sub_002"
+    ],
+    "subsidiaryCompanyNames": [
+      "High Plains Cold Storage",
+      "High Plains Logistics"
+    ],
+    "organizationRole": "subsidiary",
+    "hierarchySummary": "Role: subsidiary | Parent company: High Plains Holdings | Subsidiaries: High Plains Cold Storage; High Plains Logistics",
+    "selectedNode": {
+      "id": "node_email_01",
+      "label": "Intro Email",
+      "type": "email"
+    },
+    "senderEmail": "signals@nodalpoint.io",
+    "siteAddress": "1200 Commerce St",
+    "siteCity": "Fort Worth",
+    "siteState": "TX",
+    "utilityTerritory": "Oncor",
+    "marketContext": "Texas deregulated market"
+  }
+}

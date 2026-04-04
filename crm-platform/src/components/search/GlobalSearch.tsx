@@ -5,7 +5,7 @@ import { Search, X, Building2, Users, Plus, Sparkles, Loader2, GitMerge, CheckCi
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { useSearchContacts } from '@/hooks/useContacts'
 import { useSearchAccounts } from '@/hooks/useAccounts'
-import { useSearchProtocols } from '@/hooks/useProtocols'
+import { useSearchProtocols, type Protocol } from '@/hooks/useProtocols'
 import { useSearchTasks } from '@/hooks/useTasks'
 import { useSearchCalls } from '@/hooks/useCalls'
 import { useSearchEmails } from '@/hooks/useEmails'
@@ -14,6 +14,9 @@ import { useRouter } from 'next/navigation'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { AnimatePresence, motion } from 'framer-motion'
+import { useGeminiStore } from '@/store/geminiStore'
+import { useUIStore } from '@/store/uiStore'
+import { buildProtocolContext } from '@/lib/protocol-context'
 
 export function GlobalSearch() {
   const [query, setQuery] = useState('')
@@ -22,6 +25,8 @@ export function GlobalSearch() {
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const setGeminiContext = useGeminiStore((state) => state.setContext)
+  const setActiveSequenceId = useUIStore((state) => state.setActiveSequenceId)
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -80,7 +85,7 @@ export function GlobalSearch() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleSelect = (id: string, type: 'people' | 'account' | 'protocol' | 'target' | 'task' | 'call' | 'email') => {
+  const handleSelect = (id: string, type: 'people' | 'account' | 'protocol' | 'target' | 'task' | 'call' | 'email', protocol?: Protocol) => {
     setIsOpen(false)
     setQuery('')
     if (type === 'people') {
@@ -88,7 +93,13 @@ export function GlobalSearch() {
     } else if (type === 'account') {
       router.push(`/network/accounts/${id}`)
     } else if (type === 'protocol') {
-      router.push(`/network/protocols`)
+      if (protocol) {
+        setActiveSequenceId(protocol.id)
+        setGeminiContext(buildProtocolContext(protocol))
+        router.push(`/network/protocols/${protocol.id}/builder`)
+      } else {
+        router.push(`/network/protocols`)
+      }
     } else if (type === 'target') {
       router.push(`/network/targets`)
     } else if (type === 'task') {
@@ -268,7 +279,7 @@ export function GlobalSearch() {
                       {filteredProtocols.map(protocol => (
                         <button
                           key={protocol.id}
-                          onClick={() => handleSelect(protocol.id, 'protocol')}
+                          onClick={() => handleSelect(protocol.id, 'protocol', protocol)}
                           className="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-white/5 transition-colors text-left group"
                         >
                           <div className="w-8 h-8 rounded-2xl bg-zinc-800 flex items-center justify-center text-xs font-medium text-zinc-400 group-hover:text-white border border-white/5 group-hover:border-white/10 transition-colors overflow-hidden">

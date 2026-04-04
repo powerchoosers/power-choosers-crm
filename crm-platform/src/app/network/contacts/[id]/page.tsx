@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
@@ -28,9 +28,10 @@ export default function ContactDossierPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const id = (params?.id as string) || ''
+  const taskIdFromUrl = searchParams?.get('taskId') ?? null
 
   // Centralized State Hook
-  const s = useContactDossierState(id)
+  const s = useContactDossierState(id, taskIdFromUrl)
   const openCompose = useComposeStore((state) => state.openCompose)
   const deleteContact = useDeleteContact()
 
@@ -43,13 +44,6 @@ export default function ContactDossierPage() {
 
   const [glowingFields, setGlowingFields] = useState<Set<string>>(new Set())
   const [isRecalibrating, setIsRecalibrating] = useState(false)
-
-  const taskIdFromUrl = searchParams?.get('taskId') ?? null
-  useEffect(() => {
-    if (!taskIdFromUrl || !s.pendingTasks.length) return
-    const idx = s.pendingTasks.findIndex((t) => t.id === taskIdFromUrl)
-    if (idx >= 0) s.setCurrentTaskIndex(idx)
-  }, [taskIdFromUrl, s.pendingTasks]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTerminalSubmit = async (input: string) => {
     const timestamp = format(new Date(), 'yyyy-MM-dd HH:mm')

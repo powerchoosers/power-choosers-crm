@@ -326,7 +326,7 @@ function buildReplyStageDirective(stage) {
       '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
       '- First-touch tone should be thoughtful and specific, not pushy. First-touch CTA must stay low-friction. Good patterns: "Worth seeing where the extra cost is likely coming from?" "Okay if I send the one-page cost view?" "Am I barking up the right tree on this?"',
       '- Never ask for a utility bill, statement, or invoice in first touch.',
-      '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = load timing / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check.',
+      '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = load timing / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: budget drift, fixed cost check, load timing, renewal timing, simple cost check.',
       '- Never mention LinkedIn, a profile, or how the person was found.',
     ].join('\n'),
     follow_up: [
@@ -336,7 +336,7 @@ function buildReplyStageDirective(stage) {
       '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
       '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the cost breakdown." "Want the rate-vs-delivery view?" "Is this worth a quick look?"',
       '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
-      '- Subject line should sound slightly more diagnostic than Day 1, not generic.',
+      '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: rate vs delivery, demand adds cost, timing check.',
     ].join('\n'),
     no_reply: [
       '- NO REPLY: 35-55 words, maximum 2 sentences.',
@@ -345,12 +345,12 @@ function buildReplyStageDirective(stage) {
       '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short cost view.',
       '- No-reply tone should be sharper and cleaner than prior touches.',
       '- Never ask for a bill, statement, or invoice in this branch.',
-      '- Subject line should be the sharpest and simplest one in the sequence.',
+      '- Subject line should be the sharpest and simplest one in the sequence. Examples: short cost view, quick yes/no, close the loop.',
     ].join('\n'),
     general: [
       '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
       '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
-      '- Use a plain subject line with 1-5 words, but vary it by title and stage.',
+      '- Use a plain subject line with 1-4 words, but vary it by title and stage.',
       '- One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
       '- As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
     ].join('\n')
@@ -595,7 +595,7 @@ export default async function handler(req, res) {
             - Avoid vague openers: "energy costs are tough", "costs can shift quite a bit", "utility charges are complex", "getting good value for electricity can be tricky."
             - Do not start with "I noticed on the website", "Came across your", "Reviewing", or "many organizations in your sector". Those sound templated.
           10. SUBJECT RULE:
-            - Subject line must be 4–7 words.
+            - Subject line must be 1–4 words.
             - Vary the angle: use the account city OR company name as an anchor, OR lead with a cost-specific question, OR reference renewal/contract timing, OR use a "I noticed something" hook.
             - If a Texas utility territory is known, it may appear once if it clarifies the subject, but do not force it.
             - Do NOT fall back to the same formula every time (avoid always writing "[City] bill check").
@@ -605,7 +605,7 @@ export default async function handler(req, res) {
               - Operations: "load timing at {{company}}", "delivery charges in {{city}}", "where demand is adding cost"
               - Purchasing: "renewal timing for {{company}}", "vendor fit on power costs", "who owns contract timing?"
               - Owner/VP: "simple cost check", "timing before renewal", "where the extra cost sits"
-            - Keep the subject line plain enough to feel manual, not clever enough to feel templated.
+            - Keep the subject line plain enough to feel manual, not clever enough to feel templated. Favor short, literal phrases over marketing language.
           11. JARGON TRANSLATION RULE:
             - Never use unexplained acronyms like 4CP, ESI ID, pass-through, or nodal adder in cold outreach. If a Texas utility name is clearly known, you may say Oncor, CenterPoint, AEP Texas, TNMP, or LP&L once in plain English.
             - Name one primary cost lane in plain business language and only add the second lane if it genuinely sharpens the diagnosis. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". The concept stays constant, the exact words must not.

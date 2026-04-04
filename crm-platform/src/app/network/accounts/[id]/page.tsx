@@ -1,9 +1,8 @@
 'use client'
 
-import { useParams } from 'next/navigation'
+import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { Button } from '@/components/ui/button'
-import { useRouter } from 'next/navigation'
 
 // Modular Components
 import { useAccountDossierState } from '@/hooks/useAccountDossierState'
@@ -15,10 +14,12 @@ import { AccountNetworkPanel } from '@/components/dossier/account-dossier/Accoun
 
 export default function AccountDossierPage() {
   const params = useParams()
+  const searchParams = useSearchParams()
   const router = useRouter()
   const id = (params?.id as string) || ''
+  const taskIdFromUrl = searchParams?.get('taskId') ?? null
 
-  const state = useAccountDossierState(id)
+  const state = useAccountDossierState(id, taskIdFromUrl)
   const deleteAccount = useDeleteAccount()
 
   const handleDelete = () => {
