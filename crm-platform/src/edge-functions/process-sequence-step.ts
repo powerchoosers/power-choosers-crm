@@ -11,6 +11,7 @@ import { z } from 'npm:zod'
 import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '../lib/forensic-notes.ts'
 import { buildUsableCallContextEntries, buildUsableCallContextBlock } from '../lib/call-context.ts'
+import { getTexasEnergyContext } from '../lib/texas-territory.ts'
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!)
 
@@ -135,17 +136,164 @@ function cleanCompanyName(input: any): string {
     const raw = String(input || '').trim();
     if (!raw) return 'your company';
 
+    const hasRelationshipDescriptor = /\b(?:a|an|part of|subsidiary of|division of|member of)\b/i.test(raw)
+        || /,\s*(?:a|an)\s+[^,]+?\s+company\b/i.test(raw);
+
     const cleaned = raw
         .replace(/\s+d\/b\/a\s+.+$/i, '')
         .replace(/\s+dba\s+.+$/i, '')
         .replace(/\s+a\/k\/a\s+.+$/i, '')
         .replace(/\s+aka\s+.+$/i, '')
-        .replace(/,\s*(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '')
-        .replace(/\s+(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '')
+        .replace(/,\s*(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '')
+        .replace(/\s+(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '')
+        .replace(hasRelationshipDescriptor ? /\s+$/ : /,\s*(company)\.?$/i, '')
+        .replace(hasRelationshipDescriptor ? /\s+$/ : /\s+(company)\.?$/i, '')
         .replace(/\s{2,}/g, ' ')
         .trim();
 
     return cleaned || raw;
+}
+
+function isTexasState(value: any): boolean {
+    const text = String(value || '').trim().toLowerCase();
+    return text === 'tx' || text === 'texas';
+}
+
+function normalizeStringList(value: any): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+        .map((item) => {
+            if (typeof item === 'string') return item.trim();
+            if (item && typeof item === 'object') {
+                const address = typeof item.address === 'string' ? item.address.trim() : '';
+                const city = typeof item.city === 'string' ? item.city.trim() : '';
+                const state = typeof item.state === 'string' ? item.state.trim() : '';
+                return address || [city, state].filter(Boolean).join(', ');
+            }
+            return '';
+        })
+        .filter(Boolean);
+}
+
+function extractPrimarySiteDetails(account: any): { address: string; city: string; state: string } {
+    const direct = typeof account?.address === 'string' ? account.address.trim() : '';
+    const city = typeof account?.city === 'string' ? account.city.trim() : '';
+    const state = typeof account?.state === 'string' ? account.state.trim() : '';
+    const serviceAddresses = Array.isArray(account?.service_addresses) ? account.service_addresses : [];
+
+    if (serviceAddresses.length > 0) {
+        const candidates: Array<{ address: string; city: string; state: string; isPrimary: boolean }> = [];
+        for (const item of serviceAddresses) {
+            if (typeof item === 'string' && item.trim()) {
+                candidates.push({ address: item.trim(), city: '', state: '', isPrimary: false });
+                continue;
+            }
+            if (item && typeof item === 'object') {
+                const normalized = item && typeof item === 'object' && !Array.isArray(item) ? item as Record<string, unknown> : {};
+                const serviceAddress = typeof item.address === 'string' ? item.address.trim() : '';
+                const serviceCity = typeof item.city === 'string' ? item.city.trim() : '';
+                const serviceState = typeof item.state === 'string' ? item.state.trim() : '';
+                const flagText = [normalized.type, normalized.label, normalized.name, normalized.kind]
+                    .filter((part) => typeof part === 'string')
+                    .join(' ')
+                    .toLowerCase();
+                const isPrimary = [normalized.isPrimary, normalized.primary, normalized.is_primary, normalized.preferred, normalized.default]
+                    .some((flag) => flag === true || flag === 'true' || flag === 1 || flag === '1')
+                    || /\b(primary|headquarters|head office|hq|main|billing)\b/.test(flagText);
+                candidates.push({
+                    address: serviceAddress || [serviceCity, serviceState].filter(Boolean).join(', '),
+                    city: serviceCity,
+                    state: serviceState,
+                    isPrimary,
+                });
+            }
+        }
+
+        if (candidates.length > 0) {
+            const normalizedCity = normalizeCityKey(city);
+            const normalizedState = normalizeCityKey(state);
+            const preferred = candidates.find((candidate) => candidate.isPrimary)
+                || candidates.find((candidate) => normalizedCity && normalizeCityKey(candidate.city) === normalizedCity)
+                || candidates.find((candidate) => normalizedState && normalizeCityKey(candidate.state) === normalizedState)
+                || candidates[0];
+            return preferred;
+        }
+    }
+
+    return {
+        address: direct || [city, state].filter(Boolean).join(', '),
+        city,
+        state,
+    };
+}
+
+function normalizeCityKey(value: any): string {
+    return String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/&/g, 'and')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, ' ');
+}
+
+const TEXAS_UTILITY_TERRITORY_BY_CITY: Record<string, string> = {
+    dallas: 'Oncor',
+    'fort worth': 'Oncor',
+    arlington: 'Oncor',
+    plano: 'Oncor',
+    irving: 'Oncor',
+    mckinney: 'Oncor',
+    denton: 'Oncor',
+    tyler: 'Oncor',
+    'wichita falls': 'Oncor',
+    waxahachie: 'Oncor',
+    houston: 'CenterPoint',
+    pasadena: 'CenterPoint',
+    pearland: 'CenterPoint',
+    'sugar land': 'CenterPoint',
+    baytown: 'CenterPoint',
+    beaumont: 'CenterPoint',
+    galveston: 'CenterPoint',
+    'corpus christi': 'AEP Texas',
+    laredo: 'AEP Texas',
+    mcallen: 'AEP Texas',
+    harlingen: 'AEP Texas',
+    victoria: 'AEP Texas',
+    midland: 'TNMP',
+    odessa: 'TNMP',
+    pecos: 'TNMP',
+    lubbock: 'LP&L',
+};
+
+function deriveUtilityTerritory(city: any, state: any): string {
+    if (!isTexasState(state)) return '';
+    return TEXAS_UTILITY_TERRITORY_BY_CITY[normalizeCityKey(city)] || 'Texas/ERCOT';
+}
+
+function extractPrimarySiteAddress(account: any): string {
+    return extractPrimarySiteDetails(account).address;
+}
+
+function extractHierarchyIds(metadata: any): { parentAccountId: string | null; subsidiaryAccountIds: string[] } {
+    const safeMeta = normalizeMetadata(metadata);
+    const relationships = normalizeMetadata(safeMeta.relationships);
+    const parentAccountId = typeof relationships.parentAccountId === 'string' && relationships.parentAccountId.trim()
+        ? relationships.parentAccountId.trim()
+        : typeof safeMeta.parentAccountId === 'string' && safeMeta.parentAccountId.trim()
+            ? safeMeta.parentAccountId.trim()
+            : null;
+    const subsidiaryAccountIds = Array.isArray(relationships.subsidiaryAccountIds)
+        ? relationships.subsidiaryAccountIds
+            .filter((id) => typeof id === 'string')
+            .map((id) => id.trim())
+            .filter(Boolean)
+        : Array.isArray(safeMeta.subsidiaryAccountIds)
+            ? safeMeta.subsidiaryAccountIds
+                .filter((id) => typeof id === 'string')
+                .map((id) => id.trim())
+                .filter(Boolean)
+            : [];
+    return { parentAccountId, subsidiaryAccountIds };
 }
 
 function normalizeReplyStage(value: any): 'first_touch' | 'follow_up' | 'no_reply' | 'general' {
@@ -169,32 +317,45 @@ function buildReplyStageDirective(stage: string): string {
     const directives: Record<string, string> = {
         first_touch: [
             '- FIRST TOUCH: 60-90 words, 2-3 short paragraphs.',
-            '- Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations = demand spikes or delivery charges; owner/GM = leverage or timing. Use one lane only.',
+            '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget variance, renewal timing, or approval pressure; facilities/operations/warehouse/logistics/manufacturing = demand spikes, delivery charges, or load timing; purchasing/contracts/procurement/asset management = renewal timing and vendor coordination; owner/CEO/president/GM/VP = leverage, timing, and simplicity; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
             '- Start with one concrete company, role, city, or operating fact.',
-            '- Make the payoff explicit: they get a marked-up statement showing where the leak is most likely coming from and what to check first.',
-            '- Use one direct statement CTA. Prefer "Send the latest statement and I\'ll tell you where the leak is most likely coming from."',
-            '- Subject line: 1-4 words, plain, specific, and value-led.',
+            '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
+            '- First-touch tone should be thoughtful and specific, not pushy. First-touch CTA must stay low-friction. Good patterns: "Worth seeing where the extra cost is likely coming from?" "Okay if I send the one-page cost view?" "Am I barking up the right tree on this?"',
+            '- Never ask for a utility bill, statement, or invoice in first touch.',
+            '- If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
+            '- If the site is in Texas and utility territory is known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. Do not use market shorthand.',
+            '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = utility territory / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: "budget drift at {{company}}", "Oncor delivery charges", "renewal timing for {{company}}", "simple cost check".',
             '- Never mention LinkedIn, a profile, or how you found them.',
         ].join('\n'),
         follow_up: [
             '- FOLLOW-UP: 50-80 words, 2-3 short paragraphs.',
             '- Add one new fact or angle. Reference prior contact by topic only, never opens or clicks.',
-            '- Reinforce the concrete output: the bill lines worth checking and the likely leak area.',
-            '- Use one direct statement CTA. Prefer an affirmative sentence over a question, and keep the payoff concrete.',
-            '- Subject line: 1-4 words, specific and plain.',
+            '- Reinforce one concrete output that does not require document sharing yet: a cost breakdown, a rate-vs-delivery view, a short call, or a routing reply.',
+            '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
+            '- If the account is a subsidiary, keep the operating company and parent company separate. Anchor the note to the site or local location, not the corporate HQ unless that is the actual site.',
+            '- If the site is in Texas and utility territory is known, use the plain name once naturally. Keep it as a location cue, not jargon.',
+            '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the cost breakdown." "Want the rate-vs-delivery view?" "Is this worth a quick look?"',
+            '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
+            '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: "rate vs delivery at {{company}}", "where demand adds cost", "one more timing check".',
         ].join('\n'),
         no_reply: [
             '- NO REPLY: 35-55 words, maximum 2 sentences.',
             '- Assume you already reached the right person. Do not ask who owns electricity review.',
             '- Sentence 1 should state the value in plain English and name one likely leak area.',
-            '- Sentence 2 should offer to mark up the latest statement and call out the lines worth checking first.',
-            '- Subject line: 1-4 words, direct and sharp.',
+            '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short cost view.',
+            '- No-reply tone should be sharper and cleaner than prior touches.',
+            '- Never ask for a bill, statement, or invoice in this branch.',
+            '- If the account is outside Texas, keep the market framing broad enough for a deregulated market and do not imply Texas-only coverage.',
+            '- If the site is in Texas and utility territory is known, use the plain name once naturally, but keep the message short.',
+            '- Subject line should be the sharpest and simplest one in the sequence. Examples: "short cost view", "quick yes/no", "close the loop".',
         ].join('\n'),
         general: [
             '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
             '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
-            '- Use a plain subject line with 1-5 words.',
-            '- One CTA only. Prefer a statement first; use a simple yes/no only if it still names the payoff.',
+            '- Use a plain subject line with 1-5 words, but vary it by title and stage. Finance should sound like budget/timing; operations like utility territory, delivery, or demand; purchasing like renewal/vendor; owner like simple check/leverage.',
+            '- One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
+            '- As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
+            '- Do not confuse a parent company with the operating company. If there is a subsidiary relationship, keep the local site and operating entity in view.',
         ].join('\n')
     };
 
@@ -209,6 +370,10 @@ function pickValueLane(member: any): string {
         return 'budget variance or renewal timing';
     }
 
+    if (/(purchasing|procurement|contracts|asset management|buyer|materials management|purchasing manager)/.test(title)) {
+        return 'renewal timing or vendor coordination';
+    }
+
     if (/(facility|facilities|operations|plant|maintenance|logistics|warehouse|production|engineering|supply chain|operations manager|plant manager)/.test(title) || /(manufacturing|logistics|warehouse|distribution|food|cold storage|hospitality|retail|industrial)/.test(industry)) {
         return 'demand spikes or delivery charges';
     }
@@ -217,30 +382,38 @@ function pickValueLane(member: any): string {
         return 'timing or leverage before renewal';
     }
 
+    if (/(school|church|nonprofit|health|hospital|education|government|municipal)/.test(industry) || /(school|church|nonprofit|health|hospital|education|director|superintendent|pastor|principal|administrator)/.test(title)) {
+        return 'stewardship and predictability';
+    }
+
     return 'delivery charges';
 }
 
-function buildContextualFallbackBody(member: any, replyStage: string, location?: string | null): string {
+function buildContextualFallbackBody(member: any, replyStage: string, location?: string | null, utilityTerritory?: string | null): string {
     const stage = normalizeReplyStage(replyStage);
     const firstName = String(member?.firstName || '').trim();
     const companyName = cleanCompanyName(member?.company_name || member?.company || member?.account_name || 'your company');
-    const companyPhrase = location ? `${companyName} in ${location}` : companyName;
+    const companyPhrase = location
+        ? `${companyName} in ${location}${utilityTerritory ? ` (${utilityTerritory})` : ''}`
+        : utilityTerritory
+            ? `${companyName} (${utilityTerritory})`
+            : companyName;
     const opener = firstName ? `${firstName},\n\n` : '';
     const valueLane = pickValueLane(member);
 
     if (stage === 'no_reply') {
-        return `${opener}I'm probably sending this to the right person already, and the useful question is whether the leak sits in ${valueLane}.\n\nSend the latest statement and I'll mark up the lines worth checking first.`;
+        return `${opener}I'm probably already with the right person, and the useful question is whether ${companyPhrase} is leaking margin through ${valueLane}.\n\nIf you want the short cost view, reply yes and I'll send it.`;
     }
 
     if (stage === 'follow_up') {
-        return `${opener}I was looking back at ${companyPhrase} and the useful question is whether the drift is coming from ${valueLane}.\n\nSend the latest statement and I'll mark up the lines worth checking first.`;
+        return `${opener}I was looking back at ${companyPhrase}, and the useful question is whether the drift is coming from ${valueLane}.\n\nReply and I'll send the short cost breakdown.`;
     }
 
     if (stage === 'first_touch') {
-        return `${opener}I was looking at ${companyPhrase} and the useful question is whether the bill leak sits in ${valueLane}.\n\nSend your latest electricity statement and I'll mark up the lines worth checking first.`;
+        return `${opener}I was looking at ${companyPhrase}, and the useful question is whether the spend drift sits in ${valueLane}.\n\nOkay if I send the one-page cost view?`;
     }
 
-    return `${opener}I was looking at ${companyPhrase} and the useful question is whether the bill is leaking through ${valueLane}.\n\nSend your latest electricity statement and I'll mark up the lines worth checking first.`;
+    return `${opener}I was looking at ${companyPhrase}, and the useful question is whether the spend drift sits in ${valueLane}.\n\nI can send the cost view first, and if you want hard numbers after that, I can review the latest statement.`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -391,6 +564,9 @@ async function handleGeneration(execution, job) {
            a.load_factor as account_load_factor,
            a.city as account_city,
            a.state as account_state,
+           a.address as account_address,
+           a.service_addresses as account_service_addresses,
+           a.metadata as account_metadata,
            a.electricity_supplier as account_supplier,
            a.current_rate as account_current_rate,
            a.contract_end_date as account_contract_end_date,
@@ -416,11 +592,54 @@ async function handleGeneration(execution, job) {
     const accountState = member.account_state ? member.account_state.trim() : null;
     const contactCity = member.contact_city ? member.contact_city.trim() : null;
     const contactState = member.contact_state ? member.contact_state.trim() : null;
-    const location = accountCity
-        ? `${accountCity}${accountState ? `, ${accountState}` : ''}`
-        : contactCity
-            ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
-            : null;
+    const primarySite = extractPrimarySiteDetails({
+        address: member.account_address,
+        service_addresses: member.account_service_addresses,
+        city: accountCity,
+        state: accountState
+    });
+    const siteCity = primarySite.city || accountCity || contactCity || '';
+    const siteState = primarySite.state || accountState || contactState || '';
+    const texasEnergy = getTexasEnergyContext(siteCity, siteState, primarySite.address || siteCity);
+    const utilityTerritory = typeof member.utility_territory === 'string' && member.utility_territory.trim()
+        ? member.utility_territory.trim()
+        : texasEnergy.utilityTerritory;
+    const location = primarySite.address
+        ? primarySite.address
+        : siteCity
+            ? `${siteCity}${siteState ? `, ${siteState}` : ''}`
+            : accountCity
+                ? `${accountCity}${accountState ? `, ${accountState}` : ''}`
+            : contactCity
+                ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
+                : null;
+    const hierarchyIds = extractHierarchyIds(member.account_metadata);
+    const relatedIds = [hierarchyIds.parentAccountId, ...(hierarchyIds.subsidiaryAccountIds || [])].filter(Boolean);
+    const relatedAccounts = relatedIds.length
+        ? await sql`
+            SELECT id, name
+            FROM accounts
+            WHERE id::text = ANY(${relatedIds}::text[])
+        `
+        : [];
+    const relatedAccountMap = new Map((relatedAccounts || []).map((row: any) => [row.id, row.name]));
+    const parentCompanyName = hierarchyIds.parentAccountId ? relatedAccountMap.get(hierarchyIds.parentAccountId) || null : null;
+    const subsidiaryCompanyNames = (hierarchyIds.subsidiaryAccountIds || [])
+        .map((id) => relatedAccountMap.get(id))
+        .filter(Boolean);
+    const organizationRole = hierarchyIds.parentAccountId
+        ? 'subsidiary'
+        : hierarchyIds.subsidiaryAccountIds.length > 0
+            ? 'parent'
+        : 'standalone';
+    const primarySiteAddress = primarySite.address;
+    const marketContext = texasEnergy.marketContext;
+    const hierarchySummary = [
+        `Operating company: ${member.company_name || 'Unknown'}`,
+        `Parent company: ${parentCompanyName || hierarchyIds.parentAccountId || 'none'}`,
+        `Subsidiaries: ${subsidiaryCompanyNames.length ? subsidiaryCompanyNames.join('; ') : hierarchyIds.subsidiaryAccountIds.length ? `${hierarchyIds.subsidiaryAccountIds.length} linked account(s)` : 'none'}`,
+        `Role: ${organizationRole}`
+    ].join(' | ');
     const sourceTruthLine = linkedInUrl
         ? 'SOURCE_TRUTH: LinkedIn is available as a research signal only. Do NOT mention LinkedIn, profiles, or how you found them in the email copy.'
         : website
@@ -436,11 +655,18 @@ async function handleGeneration(execution, job) {
         member.account_industry ? `Industry: ${member.account_industry}` : null,
         member.account_employees ? `Scale: ${member.account_employees}` : null,
         member.account_revenue ? `Revenue: ${member.account_revenue}` : null,
+        primarySiteAddress ? `Site address: ${primarySiteAddress}` : null,
         (accountCity || accountState) ? `HQ: ${[accountCity, accountState].filter(Boolean).join(', ')}` : null,
         member.account_website || website ? `Website: ${member.account_website || website}` : null,
         member.account_linkedin_url ? 'LinkedIn: available' : null,
+        primarySite.state ? `Site state: ${primarySite.state}` : null,
         member.contact_title ? `Contact title: ${member.contact_title}` : null,
-        member.contact_city || member.contact_state ? `Contact location: ${[member.contact_city, member.contact_state].filter(Boolean).join(', ')}` : null
+        member.contact_city || member.contact_state ? `Contact location: ${[member.contact_city, member.contact_state].filter(Boolean).join(', ')}` : null,
+        marketContext ? `Market context: ${marketContext}` : null,
+        parentCompanyName ? `Parent company: ${parentCompanyName}` : null,
+        subsidiaryCompanyNames.length ? `Subsidiaries: ${subsidiaryCompanyNames.join('; ')}` : null,
+        `Organization role: ${organizationRole}`,
+        `Hierarchy summary: ${hierarchySummary}`
     ].filter(Boolean).join('\n');
 
     const callRows = member.contact_id
@@ -513,6 +739,21 @@ async function handleGeneration(execution, job) {
                 city: accountCity || contactCity || null,
                 state: accountState || contactState || null,
                 location,
+                address: member.account_address || null,
+                service_addresses: member.account_service_addresses || null,
+                site_address: primarySiteAddress || null,
+                site_state: siteState || null,
+                site_city: siteCity || null,
+                tdu: texasEnergy.tduDisplay || null,
+                tdu_candidates: texasEnergy.tduCandidates || [],
+                market_context: marketContext,
+                utility_territory: utilityTerritory || null,
+                parent_company: parentCompanyName,
+                parent_company_id: hierarchyIds.parentAccountId,
+                subsidiary_companies: subsidiaryCompanyNames,
+                subsidiary_count: subsidiaryCompanyNames.length,
+                organization_role: organizationRole,
+                hierarchy_summary: hierarchySummary,
                 linkedin_url: linkedInUrl,
                 domain: accountDomain,
                 website,
@@ -536,7 +777,7 @@ async function handleGeneration(execution, job) {
     const subject = result.subject || metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point'
 
     if (!body) {
-        body = buildContextualFallbackBody(member, replyStage, location);
+        body = buildContextualFallbackBody(member, replyStage, location, utilityTerritory);
     }
 
     if (!body.includes('NODAL_FORENSIC_SIGNATURE') && !body.includes('nodal-signature')) {
@@ -703,7 +944,7 @@ async function handleSend(execution, job) {
         detectReplyStage(metadata?.prompt || metadata?.label || metadata?.name || '', metadata?.body || metadata?.aiBody || '')
     );
     const htmlBody = String(metadata?.body || metadata?.aiBody || '').trim() ||
-        buildContextualFallbackBody(member, replyStage, member.account_city || null);
+        buildContextualFallbackBody(member, replyStage, member.account_city || null, utilityTerritory);
 
     const response = await fetch(`${API_BASE_URL}/api/email/zoho-send-sequence`, {
         method: 'POST',

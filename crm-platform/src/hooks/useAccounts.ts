@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { millDecimal } from '@/lib/mills'
 import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
+import { getTexasEnergyContext } from '@/lib/texas-territory'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 export interface Account {
@@ -26,6 +27,8 @@ export interface Account {
   longitude?: number | null
   serviceAddresses?: any[]
   address?: string
+  tdu?: string
+  utilityTerritory?: string
   updated: string
   ownerId?: string
   linkedinUrl?: string
@@ -259,6 +262,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           const city = data.city || ''
           const state = data.state || ''
           const location = city ? `${city}, ${state}` : (data.address || '')
+          const texasEnergy = getTexasEnergyContext(city, state, data.address || location)
           const loadZone = resolveAccountLoadZone(data)
 
           return {
@@ -276,6 +280,8 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
             state,
             serviceAddresses: data.service_addresses || [],
             address: data.address || '',
+            tdu: texasEnergy.tduDisplay || '',
+            utilityTerritory: texasEnergy.utilityTerritory || '',
             updated: data.updatedAt || new Date().toISOString(),
             sqft: data.metadata?.sqft || '',
             occupancy: data.metadata?.occupancy || '',
@@ -362,6 +368,7 @@ export function useAccount(id: string) {
       const city = data.city || ''
       const state = data.state || ''
       const location = city ? `${city}, ${state}` : (data.address || '')
+      const texasEnergy = getTexasEnergyContext(city, state, data.address || location)
       const loadZone = resolveAccountLoadZone(data)
 
       return {
@@ -382,6 +389,8 @@ export function useAccount(id: string) {
         longitude: data.longitude != null ? Number(data.longitude) : null,
         serviceAddresses: data.service_addresses || [],
         address: data.address || '',
+        tdu: texasEnergy.tduDisplay || '',
+        utilityTerritory: texasEnergy.utilityTerritory || '',
         updated: data.updatedAt || new Date().toISOString(),
         sqft: data.metadata?.sqft || '',
         occupancy: data.metadata?.occupancy || '',
