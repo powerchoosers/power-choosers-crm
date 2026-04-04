@@ -10,6 +10,7 @@ import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { mapLocationToZone, LOAD_ZONE_COLOR_MAP, type ErcotZone, ERCOT_ZONES } from '@/lib/market-mapping'
+import { getTexasEnergyContext } from '@/lib/texas-territory'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { domainToClickableUrl } from '@/lib/url'
 
@@ -21,6 +22,30 @@ interface AccountUplinkCardProps {
   isSaving?: boolean
   recentlyUpdatedFields?: Set<string>
 }
+
+type SignalBlockProps = {
+  icon: React.ElementType
+  label: string
+  value: string
+  style: React.CSSProperties
+}
+
+const SignalBlock = ({ icon: Icon, label, value, style }: SignalBlockProps) => (
+  <div className="flex items-center justify-between gap-3 p-3 nodal-glass rounded-xl border border-white/5 min-w-0">
+    <div className="flex items-center gap-3 min-w-0 flex-1">
+      <Icon className="w-4 h-4 text-zinc-500 shrink-0" />
+      <div className="flex flex-col min-w-0">
+        <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{label}</span>
+        <span
+          className="font-mono text-[10px] uppercase tracking-widest mt-0.5 truncate max-w-full px-2 py-0.5 rounded border"
+          style={style}
+        >
+          {value}
+        </span>
+      </div>
+    </div>
+  </div>
+)
 
 export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
   account,
@@ -36,11 +61,19 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
   const storedZone = (account.loadZone as ErcotZone | undefined)
   const locationZone = mapLocationToZone(account.city, account.state, account.location || account.address)
   const resolvedZone = storedZone && LOAD_ZONE_COLOR_MAP[storedZone] ? storedZone : locationZone
+  const texasEnergy = getTexasEnergyContext(account.city, account.state, account.location || account.address)
+  const resolvedTdu = account.tdu || texasEnergy.tduDisplay || (texasEnergy.isTexas ? 'Texas/ERCOT' : 'N/A')
   const zoneColor = LOAD_ZONE_COLOR_MAP[resolvedZone] ?? LOAD_ZONE_COLOR_MAP[ERCOT_ZONES.NORTH]
+  const tduColor = '#002FA7'
   const zoneStyle = {
     color: zoneColor,
     backgroundColor: `${zoneColor}1f`,
     borderColor: `${zoneColor}2f`,
+  }
+  const tduStyle = {
+    color: tduColor,
+    backgroundColor: `${tduColor}18`,
+    borderColor: `${tduColor}2a`,
   }
 
   const handleCallClick = () => {
@@ -319,20 +352,10 @@ export const AccountUplinkCard: React.FC<AccountUplinkCardProps> = ({
           </div>
         )}
 
-        {/* Zone Identifier (Nodal Glass Style) */}
-        <div className="w-full group flex items-center justify-between p-3 nodal-glass rounded-xl border border-white/5">
-          <div className="flex items-center gap-3 min-w-0">
-            <Building2 className="w-4 h-4 text-zinc-500 shrink-0" />
-            <div className="flex flex-col items-start min-w-0">
-              <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Zone Identifier</span>
-                <span
-                  className="font-mono text-[10px] uppercase tracking-widest mt-0.5 truncate max-w-full px-2 py-0.5 rounded border"
-                  style={zoneStyle}
-                >
-                  {resolvedZone}
-                </span>
-              </div>
-            </div>
+        {/* Market Signals */}
+        <div className="space-y-2">
+          <SignalBlock icon={Building2} label="Load Zone" value={resolvedZone} style={zoneStyle} />
+          <SignalBlock icon={MapPin} label="TDU" value={resolvedTdu} style={tduStyle} />
         </div>
       </div>
     </div>
