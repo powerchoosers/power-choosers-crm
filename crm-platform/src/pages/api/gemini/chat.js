@@ -1537,6 +1537,99 @@ Output rules:
     // Pre-fetch dossier context (notes + recent calls) when user is viewing a contact or account
     let dossierContextBlock = '';
     const requestContext = req.body?.context;
+    const contextData = requestContext && typeof requestContext.data === 'object' && requestContext.data !== null ? requestContext.data : {};
+    const asText = (value) => typeof value === 'string' && value.trim() ? value.trim() : '';
+    const asTextArray = (value) => Array.isArray(value)
+      ? value
+        .filter((item) => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+      : [];
+    const firstText = (...values) => {
+      for (const value of values) {
+        const text = asText(value);
+        if (text) return text;
+      }
+      return '';
+    };
+    const parseHierarchyContext = (source = {}, context = {}) => {
+      const sourceRecord = source && typeof source === 'object' ? source : {};
+      const sourceMetadata = sourceRecord.metadata && typeof sourceRecord.metadata === 'object' ? sourceRecord.metadata : {};
+      const sourceRelationships = sourceMetadata.relationships && typeof sourceMetadata.relationships === 'object' ? sourceMetadata.relationships : {};
+      const contextRecord = context && typeof context === 'object' ? context : {};
+      const contextHierarchy = contextRecord.hierarchy && typeof contextRecord.hierarchy === 'object' ? contextRecord.hierarchy : {};
+
+      const parentAccountId = firstText(
+        contextRecord.parentAccountId,
+        contextRecord.parentCompanyId,
+        contextHierarchy.parentAccountId,
+        contextHierarchy.parentCompanyId,
+        contextHierarchy.parentAccountID,
+        sourceRelationships.parentAccountId,
+        sourceRelationships.parentCompanyId,
+        sourceRelationships.parentAccountID,
+        sourceMetadata.parentAccountId,
+        sourceMetadata.parentCompanyId,
+        sourceMetadata.parent_company_id,
+        sourceRecord.parentAccountId,
+        sourceRecord.parentCompanyId,
+        sourceRecord.parent_account_id
+      ) || null;
+
+      const parentCompanyName = firstText(
+        contextRecord.parentCompanyName,
+        contextHierarchy.parentCompanyName,
+        contextHierarchy.parentCompany,
+        sourceRelationships.parentCompanyName,
+        sourceRelationships.parentCompany,
+        sourceMetadata.parent_company_name,
+        sourceMetadata.parentCompanyName
+      ) || null;
+
+      const subsidiaryAccountIds = asTextArray(
+        contextRecord.subsidiaryAccountIds || contextHierarchy.subsidiaryAccountIds || sourceRelationships.subsidiaryAccountIds || sourceMetadata.subsidiaryAccountIds
+      );
+
+      const subsidiaryCompanyNames = asTextArray(
+        contextRecord.subsidiaryCompanyNames ||
+        contextHierarchy.subsidiaryCompanyNames ||
+        sourceRelationships.subsidiaryCompanies ||
+        sourceRelationships.subsidiaryCompanyNames ||
+        sourceMetadata.subsidiaryCompanies ||
+        sourceMetadata.subsidiaryCompanyNames ||
+        sourceMetadata.subsidiary_company_names
+      );
+
+      const organizationRole = parentAccountId
+        ? 'subsidiary'
+        : subsidiaryAccountIds.length > 0
+          ? 'parent'
+          : 'standalone';
+
+      const hierarchySummary = firstText(
+        contextRecord.hierarchySummary,
+        [
+          `Role: ${organizationRole}`,
+          parentCompanyName ? `Parent company: ${parentCompanyName}` : null,
+          parentAccountId && !parentCompanyName ? `Parent company id: ${parentAccountId}` : null,
+          subsidiaryCompanyNames.length
+            ? `Subsidiaries: ${subsidiaryCompanyNames.join('; ')}`
+            : subsidiaryAccountIds.length
+              ? `Subsidiaries: ${subsidiaryAccountIds.length} linked account(s)`
+              : null,
+        ].filter(Boolean).join(' | ')
+      );
+
+      return {
+        parentAccountId,
+        parentCompanyName,
+        subsidiaryAccountIds,
+        subsidiaryCompanyNames,
+        organizationRole,
+        hierarchySummary,
+      };
+    };
+
     if (requestContext?.type === 'contact' && requestContext?.id) {
       try {
         const contactId = String(requestContext.id).trim();
@@ -1576,6 +1669,41 @@ Output rules:
           if (title) lines.push(`Title: ${title}`);
           const company = contact.companyName ?? contact.company ?? contact.company_name ?? linkedAccount?.name;
           if (company) lines.push(`Company: ${company}`);
+          const hierarchy = parseHierarchyContext(linkedAccount || {}, contextData);
+          if (hierarchy.parentCompanyName || hierarchy.parentAccountId || hierarchy.subsidiaryCompanyNames.length || hierarchy.subsidiaryAccountIds.length) {
+            lines.push(`Hierarchy role: ${hierarchy.organizationRole}`);
+            if (hierarchy.parentCompanyName || hierarchy.parentAccountId) lines.push(`Parent company: ${hierarchy.parentCompanyName || hierarchy.parentAccountId}`);
+            if (hierarchy.subsidiaryCompanyNames.length) lines.push(`Subsidiaries: ${hierarchy.subsidiaryCompanyNames.join('; ')}`);
+            else if (hierarchy.subsidiaryAccountIds.length) lines.push(`Subsidiaries: ${hierarchy.subsidiaryAccountIds.length} linked account(s)`);
+          }
+          const primaryContactId = firstText(
+            contextData.primaryContactId,
+            contextData.decisionMakerId,
+            contextData.accountPrimaryContactId,
+            linkedAccount?.primaryContactId,
+            linkedAccount?.primary_contact_id,
+            linkedAccount?.primaryContactID
+          );
+          if (primaryContactId) {
+            if (primaryContactId === contactId) {
+              lines.push(`Decision maker: this contact`)
+            } else {
+              const { data: primaryContact } = await supabaseAdmin
+                .from('contacts')
+                .select('id, name, title, email, phone, mobile, workDirectPhone, otherPhone, companyPhone')
+                .eq('id', primaryContactId)
+                .single();
+              if (primaryContact) {
+                lines.push(`Decision maker: ${primaryContact.name || primaryContactId}`);
+                if (primaryContact.title) lines.push(`Decision maker title: ${primaryContact.title}`);
+                const primaryPhone = primaryContact.mobile || primaryContact.workDirectPhone || primaryContact.otherPhone || primaryContact.companyPhone || primaryContact.phone || '';
+                if (primaryPhone) lines.push(`Decision maker phone: ${primaryPhone}`);
+                if (primaryContact.email) lines.push(`Decision maker email: ${primaryContact.email}`);
+              } else {
+                lines.push(`Decision maker id: ${primaryContactId}`);
+              }
+            }
+          }
           const noteEntries = buildForensicNoteEntries([
             { label: `CONTACT NOTE • ${name}`, notes: contact.notes ?? contact.metadata?.notes ?? '' },
             { label: `ACCOUNT NOTE • ${linkedAccount?.name || company || 'UNKNOWN ACCOUNT'}`, notes: linkedAccount?.description || linkedAccount?.notes || '' },
@@ -1661,6 +1789,37 @@ Output rules:
           if (account.industry) lines.push(`Industry: ${account.industry}`);
           if (account.contract_end_date) lines.push(`Contract end: ${account.contract_end_date}`);
           if (account.electricity_supplier) lines.push(`Supplier: ${account.electricity_supplier}`);
+          const hierarchy = parseHierarchyContext(account, contextData);
+          if (hierarchy.parentCompanyName || hierarchy.parentAccountId || hierarchy.subsidiaryCompanyNames.length || hierarchy.subsidiaryAccountIds.length) {
+            lines.push(`Hierarchy role: ${hierarchy.organizationRole}`);
+            if (hierarchy.parentCompanyName || hierarchy.parentAccountId) lines.push(`Parent company: ${hierarchy.parentCompanyName || hierarchy.parentAccountId}`);
+            if (hierarchy.subsidiaryCompanyNames.length) lines.push(`Subsidiaries: ${hierarchy.subsidiaryCompanyNames.join('; ')}`);
+            else if (hierarchy.subsidiaryAccountIds.length) lines.push(`Subsidiaries: ${hierarchy.subsidiaryAccountIds.length} linked account(s)`);
+          }
+          const primaryContactId = firstText(
+            contextData.primaryContactId,
+            contextData.decisionMakerId,
+            contextData.accountPrimaryContactId,
+            account.primaryContactId,
+            account.primary_contact_id,
+            account.primaryContactID
+          );
+          if (primaryContactId) {
+            const { data: primaryContact } = await supabaseAdmin
+              .from('contacts')
+              .select('id, name, title, email, phone, mobile, workDirectPhone, otherPhone, companyPhone')
+              .eq('id', primaryContactId)
+              .single();
+            if (primaryContact) {
+              lines.push(`Decision maker: ${primaryContact.name || primaryContactId}`);
+              if (primaryContact.title) lines.push(`Decision maker title: ${primaryContact.title}`);
+              const primaryPhone = primaryContact.mobile || primaryContact.workDirectPhone || primaryContact.otherPhone || primaryContact.companyPhone || primaryContact.phone || '';
+              if (primaryPhone) lines.push(`Decision maker phone: ${primaryPhone}`);
+              if (primaryContact.email) lines.push(`Decision maker email: ${primaryContact.email}`);
+            } else {
+              lines.push(`Decision maker id: ${primaryContactId}`);
+            }
+          }
           const noteEntries = buildForensicNoteEntries([
             { label: `ACCOUNT NOTE • ${account.name || 'UNKNOWN ACCOUNT'}`, notes: account.notes ?? account.description ?? '' },
           ]);
@@ -1692,6 +1851,115 @@ Output rules:
         if (lines.length) dossierContextBlock = '\n\n' + lines.join('\n');
       } catch (e) {
         console.error('[Gemini Chat] Dossier context fetch (account):', e?.message || e);
+      }
+    } else if (requestContext?.type === 'protocol' && requestContext?.id) {
+      try {
+        const protocolId = String(requestContext.id).trim();
+        const { data: sequence } = await supabaseAdmin
+          .from('sequences')
+          .select('*')
+          .eq('id', protocolId)
+          .single();
+
+        const protocolRecord = sequence || {};
+        const protocolName = firstText(
+          contextData.protocolName,
+          protocolRecord.name,
+          contextData.label,
+          `Protocol ${protocolId}`
+        );
+        const protocolDescription = firstText(
+          contextData.description,
+          protocolRecord.description
+        );
+        const protocolStepCount = contextData.stepCount != null
+          ? String(contextData.stepCount).trim()
+          : Array.isArray(protocolRecord.bgvector?.nodes)
+            ? String(protocolRecord.bgvector.nodes.length)
+            : '';
+        const protocolStepSummary = asTextArray(contextData.stepSummary);
+        const derivedStepSummary = protocolStepSummary.length > 0
+          ? protocolStepSummary
+          : Array.isArray(protocolRecord.bgvector?.nodes)
+            ? protocolRecord.bgvector.nodes.slice(0, 12).map((node, index) => {
+                const nodeData = node && typeof node === 'object' ? node.data || node : {};
+                const label = firstText(nodeData.label, node.label, `Step ${index + 1}`);
+                const type = firstText(nodeData.type, node.type, 'step');
+                return `${index + 1}. ${label} [${type}]`;
+              })
+            : [];
+        const targetAccountId = firstText(contextData.targetAccountId, contextData.parentAccountId, contextData.parentCompanyId);
+        const targetContactId = firstText(contextData.targetContactId, contextData.decisionMakerId);
+        const targetAccountName = firstText(contextData.targetAccountName, contextData.parentCompanyName, protocolRecord.targetAccountName);
+        const targetContactName = firstText(contextData.targetContactName, protocolRecord.targetContactName);
+        const senderEmail = firstText(contextData.senderEmail, protocolRecord.bgvector?.settings?.senderEmail);
+        const selectedNode = contextData.selectedNode && typeof contextData.selectedNode === 'object' ? contextData.selectedNode : null;
+        const hierarchy = parseHierarchyContext(targetAccountId ? { id: targetAccountId, name: targetAccountName, ...protocolRecord } : protocolRecord, contextData);
+        let targetAccount = null;
+        if (targetAccountId) {
+          const { data } = await supabaseAdmin
+            .from('accounts')
+            .select('id, name, industry, contract_end_date, electricity_supplier, domain, notes, description')
+            .eq('id', targetAccountId)
+            .single();
+          targetAccount = data;
+        }
+        let targetContact = null;
+        if (targetContactId) {
+          const { data } = await supabaseAdmin
+            .from('contacts')
+            .select('id, name, title, email, phone, mobile, workDirectPhone, otherPhone, companyPhone')
+            .eq('id', targetContactId)
+            .single();
+          targetContact = data;
+        }
+
+        lines.push(`CURRENT PROTOCOL: ${protocolName}`);
+        if (protocolDescription) lines.push(`Description: ${protocolDescription}`);
+        if (protocolStepCount) lines.push(`Step count: ${protocolStepCount}`);
+        if (derivedStepSummary.length) {
+          lines.push('STEP SUMMARY:');
+          derivedStepSummary.forEach((step) => lines.push(`  - ${step}`));
+        }
+        if (selectedNode) {
+          const selectedLabel = firstText(selectedNode.label, selectedNode.id, 'Selected node');
+          const selectedType = firstText(selectedNode.type, '');
+          lines.push(`Selected node: ${selectedLabel}${selectedType ? ` [${selectedType}]` : ''}`);
+        }
+        if (senderEmail) lines.push(`Sender email: ${senderEmail}`);
+        if (targetContact) {
+          lines.push(`Target contact: ${targetContact.name || targetContactId}`);
+          if (targetContact.title) lines.push(`Target contact title: ${targetContact.title}`);
+          const targetPhone = targetContact.mobile || targetContact.workDirectPhone || targetContact.otherPhone || targetContact.companyPhone || targetContact.phone || '';
+          if (targetPhone) lines.push(`Target contact phone: ${targetPhone}`);
+          if (targetContact.email) lines.push(`Target contact email: ${targetContact.email}`);
+        } else if (targetContactId) {
+          lines.push(`Target contact id: ${targetContactId}`);
+        }
+        if (targetAccount) {
+          lines.push(`Target account: ${targetAccount.name || targetAccountId}`);
+          if (targetAccount.industry) lines.push(`Target account industry: ${targetAccount.industry}`);
+          if (targetAccount.contract_end_date) lines.push(`Target account contract end: ${targetAccount.contract_end_date}`);
+          if (targetAccount.electricity_supplier) lines.push(`Target account supplier: ${targetAccount.electricity_supplier}`);
+        } else if (targetAccountId) {
+          lines.push(`Target account id: ${targetAccountId}`);
+        }
+        if (hierarchy.parentCompanyName || hierarchy.parentAccountId || hierarchy.subsidiaryCompanyNames.length || hierarchy.subsidiaryAccountIds.length) {
+          lines.push(`Hierarchy role: ${hierarchy.organizationRole}`);
+          if (hierarchy.parentCompanyName || hierarchy.parentAccountId) lines.push(`Parent company: ${hierarchy.parentCompanyName || hierarchy.parentAccountId}`);
+          if (hierarchy.subsidiaryCompanyNames.length) lines.push(`Subsidiaries: ${hierarchy.subsidiaryCompanyNames.join('; ')}`);
+          else if (hierarchy.subsidiaryAccountIds.length) lines.push(`Subsidiaries: ${hierarchy.subsidiaryAccountIds.length} linked account(s)`);
+        }
+        if (hierarchy.hierarchySummary) lines.push(`Hierarchy summary: ${hierarchy.hierarchySummary}`);
+        if (contextData.siteAddress || contextData.siteCity || contextData.siteState) {
+          const siteParts = [contextData.siteAddress, contextData.siteCity, contextData.siteState].filter(Boolean).join(', ');
+          if (siteParts) lines.push(`Site: ${siteParts}`);
+        }
+        if (contextData.utilityTerritory) lines.push(`Utility territory: ${contextData.utilityTerritory}`);
+        if (contextData.marketContext) lines.push(`Market context: ${contextData.marketContext}`);
+        if (lines.length) dossierContextBlock = '\n\n' + lines.join('\n');
+      } catch (e) {
+        console.error('[Gemini Chat] Dossier context fetch (protocol):', e?.message || e);
       }
     }
 
@@ -2443,7 +2711,11 @@ Output rules:
         UI_COMPONENT_PROTOCOL:
         - You can trigger UI components by wrapping a valid JSON block between \`JSON_DATA:\` and \`END_JSON\`.
         - EXTREMELY IMPORTANT: The JSON MUST be perfectly valid. No trailing commas, no missing quotes, no unescaped newlines inside strings.
-        - The \`type\` value MUST be lowercase (e.g. contact_dossier, identity_card, forensic_grid). Example: JSON_DATA:{"type": "contact_dossier", "data": {...}}END_JSON
+        - The \`type\` value MUST be lowercase (e.g. contact_dossier, identity_card, decision_maker_card, hierarchy_card, protocol_card, forensic_grid). Example: JSON_DATA:{"type": "contact_dossier", "data": {...}}END_JSON
+        - When the answer is about the decision maker, return \`decision_maker_card\`.
+        - When the answer is about parent/subsidiary relationships, return \`hierarchy_card\`.
+        - When the answer is about a protocol or sequence, return \`protocol_card\` with the step summary, target contact/account, and selected node.
+        - \`sequence_card\` is accepted as a backwards-compatible alias for \`protocol_card\`.
         - If you are unsure of the data, DO NOT trigger a component. Provide a text summary instead.
         - DO NOT put conversational text INSIDE the JSON block.
 
@@ -2491,6 +2763,7 @@ Output rules:
         - Example: "${firstName}, I've analyzed the current market volatility. We're seeing a spike in LZ_HOUSTON due to generation outages. JSON_DATA:{\"type\": \"news_ticker\", \"data\": {...}}END_JSON"
         - If the user asks a simple question, still provide a brief narrative before any data.
         - When presenting tool-backed data (grids, cards), you may add a single phrase in the narrative such as "From CRM" or "Live data" so the user sees it as verified.
+        - If the answer is a single decision maker, hierarchy view, or protocol review, prefer a dedicated card over a plain list.
 
         RICH MEDIA PROTOCOL:
         - The user interface is a "Forensic HUD". Do NOT return Markdown tables. Do NOT respond to list-style queries (e.g. "accounts expiring in 2026", "manufacturers", "accounts with contract end dates", "list accounts") with ONLY a bulleted or numbered list in the narrative. You MUST include at least one JSON_DATA block: either multiple identity_card components (one per account/contact) or one forensic_grid. The user needs clickable cards or a grid to open dossiers.
@@ -2498,6 +2771,13 @@ Output rules:
           JSON_DATA:{"type": "news_ticker", "data": {"items": [{"title": "...", "source": "...", "trend": "up|down", "volatility": "..."}]}}END_JSON
         - When providing prospect/person details (Dossier), use:
           JSON_DATA:{"type": "contact_dossier", "data": {"name": "...", "title": "...", "company": "...", "initials": "...", "energyMaturity": "...", "contractStatus": "active|expired|negotiating", "contractExpiration": "YYYY-MM-DD", "id": "..."}}END_JSON
+        - When the user asks who the decision maker is, or you already know the decision maker from context, use:
+          JSON_DATA:{"type": "decision_maker_card", "data": {"type": "contact", "id": "...", "name": "...", "title": "...", "company": "...", "initials": "XX", "subtitle": "Decision Maker", "status": "active"}}END_JSON
+        - When parent/subsidiary relationships matter, use:
+          JSON_DATA:{"type": "hierarchy_card", "data": {"accountId": "...", "accountName": "...", "role": "parent", "parentCompanyName": "...", "parentAccountId": "...", "subsidiaryAccountIds": ["..."], "subsidiaryCompanyNames": ["..."], "hierarchySummary": "..."}}END_JSON
+        - When reviewing a protocol or sequence, use:
+          JSON_DATA:{"type": "protocol_card", "data": {"protocolId": "...", "protocolName": "...", "description": "...", "stepCount": 3, "stepSummary": ["1. ...", "2. ..."], "targetContactId": "...", "targetContactName": "...", "targetAccountId": "...", "targetAccountName": "...", "decisionMakerId": "...", "parentCompanyName": "...", "parentAccountId": "...", "subsidiaryAccountIds": ["..."], "subsidiaryCompanyNames": ["..."], "organizationRole": "parent", "hierarchySummary": "...", "selectedNode": {"id": "...", "label": "...", "type": "email"}, "senderEmail": "...", "siteAddress": "...", "siteCity": "...", "siteState": "...", "utilityTerritory": "...", "marketContext": "..."}}END_JSON
+        - \`sequence_card\` may be used instead of \`protocol_card\` if the response is framing the workflow as a sequence.
         - When providing Account/Position data (Maturity), use:
           JSON_DATA:{"type": "position_maturity", "data": {"expiration": "...", "daysRemaining": 123, "currentSupplier": "...", "strikePrice": "$0.0000", "annualUsage": "...", "estimatedRevenue": "...", "margin": "...", "isSimulation": false, "accountId": "optional-account-uuid"}}END_JSON
         - When returning position_maturity from \`get_account_details\`, include \`accountId\` (the account id from the tool result) in the data so the UI can show an "Open account" link to the dossier.
@@ -2528,6 +2808,7 @@ Output rules:
         CONTEXTUAL AWARENESS:
         The user is currently viewing: ${JSON.stringify(req.body.context || { type: 'general' })}
         - If the user's query applies to this context (e.g., "who is the decision maker?", "draft an email to him", "find a Louis at this company", "phone number for the Allen location"), PRIORITY ONE is to use this context. When context has \`type: 'account'\` and \`id\`, use that \`id\` as \`accountId\` for \`list_contacts\` and as \`account_id\` for \`get_account_details\`.
+        - When context has \`type: 'protocol'\`, use the protocol context first. Treat \`stepSummary\`, \`selectedNode\`, \`targetContactId\`, \`targetAccountId\`, \`decisionMakerId\`, \`hierarchySummary\`, and \`senderEmail\` as first-class context, not optional hints.
         - If the user's query is unrelated (e.g., "general market trends", "new search"), IGNORE the current screen context and answer broadly.
         - Use this to offer proactive, zero-click insights ONLY when relevant.
         ${dossierContextBlock ? `
