@@ -96,6 +96,7 @@ import { supabase } from '@/lib/supabase';
 import ForensicSignature from '@/components/emails/ForensicSignature';
 import { useUIStore } from '@/store/uiStore';
 import { buildUsableCallContextEntries } from '@/lib/call-context';
+import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
 
 // Mock Data for Visualization (The "Test Sequence")
 const MOCK_NODES: Node[] = [
@@ -667,6 +668,168 @@ function ProtocolArchitectInner() {
     return allContacts.find((c) => c.id === testContactId) as ContactDetail | undefined;
   }, [contactsData, testContactId, fetchedTestContact]);
 
+  const testAccountId = testContact?.accountId || '';
+  const { data: testAccount } = useAccount(testAccountId);
+
+  const pickPrimaryServiceAddress = (
+    serviceAddresses: unknown[],
+    fallbackCity = '',
+    fallbackState = '',
+  ): { address: string; city: string; state: string } => {
+    const candidates = (Array.isArray(serviceAddresses) ? serviceAddresses : [])
+      .map((item) => {
+        if (typeof item === 'string') {
+          const address = item.trim();
+          return address ? { address, city: '', state: '', isPrimary: false } : null;
+        }
+
+        if (item && typeof item === 'object') {
+          const record = item as Record<string, unknown>;
+          const address = typeof record.address === 'string' ? record.address.trim() : '';
+          const city = typeof record.city === 'string' ? record.city.trim() : '';
+          const state = typeof record.state === 'string' ? record.state.trim() : '';
+          const flagText = [record.type, record.label, record.name, record.kind]
+            .filter((part) => typeof part === 'string')
+            .join(' ')
+            .toLowerCase();
+          const isPrimary = [record.isPrimary, record.primary, record.is_primary, record.preferred, record.default]
+            .some((flag) => flag === true || flag === 'true' || flag === 1 || flag === '1')
+            || /\b(primary|headquarters|head office|hq|main|billing)\b/.test(flagText);
+          const resolvedAddress = address || [city, state].filter(Boolean).join(', ');
+          return resolvedAddress ? { address: resolvedAddress, city, state, isPrimary } : null;
+        }
+
+        return null;
+      })
+      .filter((item): item is { address: string; city: string; state: string; isPrimary: boolean } => !!item);
+
+    if (candidates.length === 0) {
+      return { address: '', city: '', state: '' };
+    }
+
+    const normalizedFallbackCity = normalizeCityKey(fallbackCity);
+    const normalizedFallbackState = normalizeCityKey(fallbackState);
+    const preferred = candidates.find((candidate) => candidate.isPrimary)
+      || candidates.find((candidate) => (
+        normalizedFallbackCity
+        && normalizeCityKey(candidate.city) === normalizedFallbackCity
+      ) || (
+        normalizedFallbackState
+        && normalizeCityKey(candidate.state) === normalizedFallbackState
+      ))
+      || candidates[0];
+
+    return {
+      address: preferred.address,
+      city: preferred.city,
+      state: preferred.state,
+    };
+  };
+
+  const testAccountContext = useMemo(() => {
+    const metadata = testAccount?.metadata && typeof testAccount.metadata === 'object'
+      ? testAccount.metadata as Record<string, any>
+      : {};
+    const relationships = metadata.relationships && typeof metadata.relationships === 'object'
+      ? metadata.relationships as Record<string, any>
+      : {};
+    const parentAccountId = typeof relationships.parentAccountId === 'string' && relationships.parentAccountId.trim()
+      ? relationships.parentAccountId.trim()
+      : typeof metadata.parentAccountId === 'string' && metadata.parentAccountId.trim()
+        ? metadata.parentAccountId.trim()
+        : typeof metadata.parent_company_id === 'string' && metadata.parent_company_id.trim()
+          ? metadata.parent_company_id.trim()
+          : null;
+    const parentCompanyName = typeof relationships.parentCompanyName === 'string' && relationships.parentCompanyName.trim()
+      ? relationships.parentCompanyName.trim()
+      : typeof relationships.parentCompany === 'string' && relationships.parentCompany.trim()
+        ? relationships.parentCompany.trim()
+        : typeof metadata.parent_company_name === 'string' && metadata.parent_company_name.trim()
+          ? metadata.parent_company_name.trim()
+          : null;
+    const subsidiaryAccountIds = Array.isArray(relationships.subsidiaryAccountIds)
+      ? relationships.subsidiaryAccountIds
+        .filter((id: unknown): id is string => typeof id === 'string')
+        .map((id: string) => id.trim())
+        .filter(Boolean)
+      : Array.isArray(metadata.subsidiaryAccountIds)
+        ? metadata.subsidiaryAccountIds
+          .filter((id: unknown): id is string => typeof id === 'string')
+          .map((id: string) => id.trim())
+          .filter(Boolean)
+        : [];
+    const subsidiaryCompanyNames = Array.isArray(relationships.subsidiaryCompanies)
+      ? relationships.subsidiaryCompanies
+        .filter((name: unknown): name is string => typeof name === 'string')
+        .map((name: string) => name.trim())
+        .filter(Boolean)
+      : Array.isArray(relationships.subsidiaryCompanyNames)
+        ? relationships.subsidiaryCompanyNames
+          .filter((name: unknown): name is string => typeof name === 'string')
+          .map((name: string) => name.trim())
+          .filter(Boolean)
+        : [];
+    const serviceAddresses = Array.isArray(testAccount?.serviceAddresses) ? testAccount.serviceAddresses : [];
+    const primaryServiceAddress = pickPrimaryServiceAddress(serviceAddresses, testAccount?.city, testAccount?.state);
+    let siteAddress = '';
+    let siteCity = '';
+    let siteState = '';
+    if (primaryServiceAddress.address) {
+      siteAddress = primaryServiceAddress.address;
+      siteCity = primaryServiceAddress.city;
+      siteState = primaryServiceAddress.state;
+    }
+    if (!siteAddress) siteAddress = testAccount?.address || testContact?.location || '';
+    if (!siteCity) {
+      siteCity = typeof testAccount?.city === 'string' && testAccount.city.trim()
+        ? testAccount.city.trim()
+        : typeof testContact?.city === 'string' && testContact.city.trim()
+          ? testContact.city.trim()
+          : '';
+    }
+    if (!siteState) {
+      siteState = typeof testAccount?.state === 'string' && testAccount.state.trim()
+        ? testAccount.state.trim()
+        : typeof testContact?.state === 'string' && testContact.state.trim()
+          ? testContact.state.trim()
+          : '';
+    }
+    const texasEnergy = getTexasEnergyContext(siteCity || testAccount?.city || testContact?.city || '', siteState, siteAddress || testAccount?.address || testContact?.location || '');
+    const utilityTerritory = texasEnergy.utilityTerritory;
+    const marketContext = texasEnergy.marketContext;
+    const organizationRole = parentAccountId
+      ? 'subsidiary'
+      : subsidiaryAccountIds.length > 0
+        ? 'parent'
+        : 'standalone';
+    const hierarchySummary = [
+      `Operating company: ${testAccount?.name || testContact?.company || testContact?.metadata?.general?.company || 'Unknown'}`,
+      `Parent company: ${parentCompanyName || parentAccountId || 'none'}`,
+      `Subsidiaries: ${subsidiaryCompanyNames.length ? subsidiaryCompanyNames.join('; ') : subsidiaryAccountIds.length ? `${subsidiaryAccountIds.length} linked account(s)` : 'none'}`,
+      `Role: ${organizationRole}`,
+      siteAddress ? `Site: ${siteAddress}` : null,
+      texasEnergy.tduDisplay ? `TDU: ${texasEnergy.tduDisplay}` : null,
+      marketContext ? `Market: ${marketContext}` : null
+    ].filter(Boolean).join(' | ');
+
+    return {
+      parentAccountId,
+      parentCompanyName,
+      subsidiaryAccountIds,
+      subsidiaryCompanyNames,
+      subsidiaryCount: subsidiaryAccountIds.length,
+      siteAddress,
+      siteCity,
+      siteState,
+      tduDisplay: texasEnergy.tduDisplay,
+      tduCandidates: texasEnergy.tduCandidates,
+      utilityTerritory,
+      marketContext,
+      organizationRole,
+      hierarchySummary,
+    };
+  }, [testAccount?.address, testAccount?.city, testAccount?.metadata, testAccount?.name, testAccount?.serviceAddresses, testAccount?.state, testContact?.company, testContact?.city, testContact?.location, testContact?.metadata?.general?.company, testContact?.state]);
+
   const insertVariable = (variable: string) => {
     if (!textareaRef.current || !selectedNode) return;
 
@@ -743,18 +906,33 @@ function ProtocolArchitectInner() {
           mode: 'generate_email',
           contact: {
             name: `${testContact.firstName} ${testContact.lastName}`,
-            company: testContact.company || testContact.metadata?.general?.company || 'Unknown',
-            industry: testContact.metadata?.general?.industry || 'Unknown',
-            location: testContact.location,
-            city: testContact.city,
-            state: testContact.state,
-            load_zone: testContact.metadata?.energy?.loadZone,
+            company: testAccount?.name || testContact.company || testContact.metadata?.general?.company || 'Unknown',
+            company_description: testAccount?.description || testContact.metadata?.general?.company || '',
+            industry: testAccount?.industry || testContact.metadata?.general?.industry || 'Unknown',
+            location: testAccountContext.siteAddress || testContact.location,
+            city: testAccount?.city || testContact.city,
+            state: testAccount?.state || testContact.state,
+            address: testAccount?.address || null,
+            service_addresses: testAccount?.serviceAddresses || null,
+            site_address: testAccountContext.siteAddress || null,
+            site_city: testAccountContext.siteCity || null,
+            site_state: testAccountContext.siteState || null,
+            tdu: testAccountContext.tduDisplay || null,
+            tdu_candidates: testAccountContext.tduCandidates || [],
+            market_context: testAccountContext.marketContext,
+            utility_territory: testAccountContext.utilityTerritory || null,
+            parent_company: testAccountContext.parentCompanyName || null,
+            parent_company_id: testAccountContext.parentAccountId,
+            subsidiary_companies: testAccountContext.subsidiaryCompanyNames,
+            subsidiary_count: testAccountContext.subsidiaryCount,
+            organization_role: testAccountContext.organizationRole,
+            hierarchy_summary: testAccountContext.hierarchySummary,
             contractEndDate: testContact.metadata?.energy?.contractEndDate,
             load_factor: testContact.metadata?.energy?.loadFactor,
             annual_usage: testContact.metadata?.energy?.annualUsage || testContact.annualUsage,
             transcript: buildUsableCallContextEntries(testCalls || [], 1)[0]?.transcriptSnippet || null,
             news: testNews?.slice(0, 5).map(n => n.title + ': ' + n.snippet).join(' | '),
-            metadata: testContact.metadata
+            metadata: testAccount?.metadata || testContact.metadata
           },
           vectors: selectedNode.data.vectors || []
         })
@@ -839,7 +1017,7 @@ function ProtocolArchitectInner() {
       .replace(/{{first_name}}/g, testContact.firstName || 'Friend')
       .replace(/{{last_name}}/g, testContact.lastName || '')
       .replace(/{{company_name}}/g, testContact.metadata?.general?.company || 'your company')
-      .replace(/{{load_zone}}/g, testContact.metadata?.energy?.loadZone || 'LZ_NORTH')
+      .replace(/{{utility_territory}}/g, testAccountContext.utilityTerritory || 'your local utility territory')
       .replace(/{{scarcity_risk}}/g, 'HIGH'); // Mocked for now
   }, [selectedNode?.data.body, selectedNode?.data.aiBody, testContact, emailViewMode]);
 
@@ -1772,7 +1950,7 @@ function ProtocolArchitectInner() {
                                 <SelectItem value="first_name">First Name</SelectItem>
                                 <SelectItem value="last_name">Last Name</SelectItem>
                                 <SelectItem value="company_name">Company Name</SelectItem>
-                                <SelectItem value="load_zone">Load Zone</SelectItem>
+                                <SelectItem value="utility_territory">Utility Territory</SelectItem>
                                 <SelectItem value="scarcity_risk">Scarcity Risk</SelectItem>
                               </SelectContent>
                             </Select>
@@ -1785,7 +1963,7 @@ function ProtocolArchitectInner() {
                         <textarea
                           ref={textareaRef}
                           className="w-full h-48 bg-transparent p-4 text-sm text-zinc-300 font-mono resize-none outline-none placeholder:text-zinc-700"
-                          placeholder="Hi {{first_name}}, I noticed your 4CP exposure in the LZ_NORTH node..."
+                          placeholder="Hi {{first_name}}, I noticed your site sits in {{utility_territory}} territory..."
                           value={selectedNode?.data.body as string || ''}
                           onChange={(e) => updateNodeData(selectedNode!.id, { body: e.target.value })}
                         />
@@ -1802,7 +1980,7 @@ function ProtocolArchitectInner() {
                             placeholder={
                               "Write the signal you want.\n\n" +
                               "Example:\n" +
-                              "Dallas CFOs with high 4CP exposure. Reference their load zone.\n" +
+                              "Dallas CFOs with high 4CP exposure. Reference their utility territory once if known.\n" +
                               "Two short paragraphs. No bullets."
                             }
                             value={(selectedNode?.data.prompt as string) || ""}

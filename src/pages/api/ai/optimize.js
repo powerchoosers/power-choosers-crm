@@ -1,5 +1,6 @@
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
+import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
 
 function extractJsonObject(raw) {
   if (!raw || typeof raw !== 'string') return null;
@@ -72,6 +73,9 @@ function cleanCompanyName(input) {
   const raw = String(input || '').trim();
   if (!raw) return 'Unknown';
 
+  const hasRelationshipDescriptor = /\b(?:a|an|part of|subsidiary of|division of|member of)\b/i.test(raw)
+    || /,\s*(?:a|an)\s+[^,]+?\s+company\b/i.test(raw);
+
   let cleaned = raw;
 
   // Outreach should use the operating name, not the full legal entity string.
@@ -79,11 +83,105 @@ function cleanCompanyName(input) {
   cleaned = cleaned.replace(/\s+dba\s+.+$/i, '');
   cleaned = cleaned.replace(/\s+a\/k\/a\s+.+$/i, '');
   cleaned = cleaned.replace(/\s+aka\s+.+$/i, '');
-  cleaned = cleaned.replace(/,\s*(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '');
-  cleaned = cleaned.replace(/\s+(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|company|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '');
+  cleaned = cleaned.replace(/,\s*(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '');
+  cleaned = cleaned.replace(/\s+(incorporated|inc|llc|l\.l\.c\.|ltd|limited|corp|corporation|co|lp|l\.p\.|llp|l\.l\.p\.)\.?$/i, '');
+  if (!hasRelationshipDescriptor) {
+    cleaned = cleaned.replace(/,\s*(company)\.?$/i, '');
+    cleaned = cleaned.replace(/\s+(company)\.?$/i, '');
+  }
   cleaned = cleaned.replace(/\s{2,}/g, ' ').trim();
 
   return cleaned || raw;
+}
+
+function normalizeListOfStrings(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => {
+      if (typeof item === 'string') return item.trim();
+      if (item && typeof item === 'object') {
+        const address = typeof item.address === 'string' ? item.address.trim() : '';
+        const city = typeof item.city === 'string' ? item.city.trim() : '';
+        const state = typeof item.state === 'string' ? item.state.trim() : '';
+        return address || [city, state].filter(Boolean).join(', ');
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
+function extractPrimarySiteDetails(value) {
+  const empty = { address: '', city: '', state: '' };
+  if (!value) return empty;
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed ? { address: trimmed, city: '', state: '' } : empty;
+  }
+
+  if (Array.isArray(value)) {
+    const candidates = [];
+    for (const item of value) {
+      const details = extractPrimarySiteDetails(item);
+      if (!details.address && !details.city && !details.state) continue;
+
+      const normalized = item && typeof item === 'object' && !Array.isArray(item) ? item : {};
+      const flagText = [normalized.type, normalized.label, normalized.name, normalized.kind]
+        .filter((part) => typeof part === 'string')
+        .join(' ')
+        .toLowerCase();
+      const isPrimary = [normalized.isPrimary, normalized.primary, normalized.is_primary, normalized.preferred, normalized.default]
+        .some((flag) => flag === true || flag === 'true' || flag === 1 || flag === '1')
+        || /\b(primary|headquarters|head office|hq|main|billing)\b/.test(flagText);
+
+      candidates.push({ ...details, isPrimary });
+    }
+    if (candidates.length > 0) {
+      const normalizedCity = normalizeCityKey(city);
+      const normalizedState = normalizeCityKey(state);
+      const preferred = candidates.find((candidate) => candidate.isPrimary)
+        || candidates.find((candidate) => normalizedCity && normalizeCityKey(candidate.city) === normalizedCity)
+        || candidates.find((candidate) => normalizedState && normalizeCityKey(candidate.state) === normalizedState)
+        || candidates[0];
+      return preferred;
+    }
+    return empty;
+  }
+
+  if (typeof value === 'object') {
+    const address = typeof value.address === 'string' ? value.address.trim() : '';
+    const city = typeof value.city === 'string' ? value.city.trim() : '';
+    const state = typeof value.state === 'string' ? value.state.trim() : '';
+    return { address: address || [city, state].filter(Boolean).join(', '), city, state };
+  }
+
+  return empty;
+}
+
+function extractHierarchyIds(metadata) {
+  const safeMeta = metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? metadata : {};
+  const relationships = safeMeta.relationships && typeof safeMeta.relationships === 'object' && !Array.isArray(safeMeta.relationships)
+    ? safeMeta.relationships
+    : {};
+  const parentAccountId = typeof relationships.parentAccountId === 'string' && relationships.parentAccountId.trim()
+    ? relationships.parentAccountId.trim()
+    : typeof safeMeta.parentAccountId === 'string' && safeMeta.parentAccountId.trim()
+      ? safeMeta.parentAccountId.trim()
+      : typeof safeMeta.parent_company_id === 'string' && safeMeta.parent_company_id.trim()
+        ? safeMeta.parent_company_id.trim()
+        : null;
+  const subsidiaryAccountIds = Array.isArray(relationships.subsidiaryAccountIds)
+    ? relationships.subsidiaryAccountIds
+      .filter((id) => typeof id === 'string')
+      .map((id) => id.trim())
+      .filter(Boolean)
+    : Array.isArray(safeMeta.subsidiaryAccountIds)
+      ? safeMeta.subsidiaryAccountIds
+        .filter((id) => typeof id === 'string')
+        .map((id) => id.trim())
+        .filter(Boolean)
+      : [];
+  return { parentAccountId, subsidiaryAccountIds };
 }
 
 function softenFirstTouchEnergyJargon(input, strategy) {
@@ -126,20 +224,20 @@ function cleanSequenceCopy(input) {
     .replace(/\bI could (?:take a look|have a look|look at it|look it over|review it)\b/gi, 'I can take a look')
     .replace(/\bI could quickly\b/gi, 'I can quickly')
     .replace(/\bI could (?:highlight|share|give|provide|point out)\b/gi, (m) => m.replace('could', 'can'))
-    .replace(/\bWould that be helpful\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
-    .replace(/\bWould that quick review be helpful\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
-    .replace(/\bWould you be open to me reviewing it\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
-    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "Send it over and I'll mark up the lines worth checking. ")
-    .replace(/\bWant me to take a look\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
-    .replace(/\bWorth a quick check\?\s*/gi, "Send the latest statement and I'll mark up the lines worth checking. ")
-    .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll mark up the lines worth checking")
-    .replace(/\bI can reply with 2-3 observations\b/gi, "I'll mark up the lines worth checking")
-    .replace(/\b2-3 specific observations\b/gi, "the lines worth checking")
-    .replace(/\bshort breakdown of what stands out\b/gi, 'what looks worth checking first')
-    .replace(/\bI review electricity statements for Nodal Point\b/gi, 'I can mark up the lines worth checking')
-    .replace(/\bMy company, Nodal Point, helps businesses understand their energy bills better\.?\s*/gi, 'I can mark up the lines worth checking. ')
-    .replace(/\bI review these bills\b/gi, 'I can mark up the lines worth checking')
-    .replace(/\b3-point readout\b/gi, 'the lines worth checking')
+    .replace(/\bWould that be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a one-page cost view. ")
+    .replace(/\bWould that quick review be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a one-page cost view. ")
+    .replace(/\bWould you be open to me reviewing it\?\s*/gi, "If you'd like, I'll send a one-page cost view first. ")
+    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "If useful, I'll send a short cost breakdown first. ")
+    .replace(/\bWant me to take a look\?\s*/gi, "If useful, I'll send a short cost breakdown first. ")
+    .replace(/\bWorth a quick check\?\s*/gi, "If useful, I'll send a short cost breakdown first. ")
+    .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll send a short cost breakdown")
+    .replace(/\bI can reply with 2-3 observations\b/gi, "I'll send a short cost breakdown")
+    .replace(/\b2-3 specific observations\b/gi, "a short cost breakdown")
+    .replace(/\bshort breakdown of what stands out\b/gi, 'a short view of what is driving cost')
+    .replace(/\bI review electricity statements for Nodal Point\b/gi, 'I review commercial electricity costs')
+    .replace(/\bMy company, Nodal Point, helps businesses understand their energy bills better\.?\s*/gi, 'I review commercial electricity costs for Nodal Point. ')
+    .replace(/\bI review these bills\b/gi, 'I review these electricity costs')
+    .replace(/\b3-point readout\b/gi, 'one-page snapshot')
 
   return text;
 }
@@ -162,9 +260,43 @@ function deGenericizeFirstTouchCopy(input, strategy) {
     .replace(/Reviewing ([^<]+?), I noticed/gi, 'I was reviewing $1 and saw')
     .replace(/many organizations in your sector see costs shift constantly in the ERCOT market/gi, 'a lot of companies in your space see those costs move with ERCOT')
     .replace(/I regularly diagnose Texas electricity bills, looking for billing errors or contract issues/gi, 'I review Texas electricity bills for billing issues and contract leaks')
-    .replace(/I offer a quick check on those details/gi, 'I can take a quick look at those details')
-    .replace(/If you sent me your latest electricity statement, I could reply with a 2-3 point snapshot of what stands out/gi, 'If you send me your latest electricity statement, I can mark up the lines worth checking')
-    .replace(/If you sent me your latest bill, I could reply with a few bullet points on what stands out/gi, 'If you send me your latest bill, I can mark up the lines worth checking');
+    .replace(/I offer a quick check on those details/gi, 'I can send a quick cost view on those details')
+    .replace(/If you sent me your latest electricity statement, I could reply with a 2-3 point snapshot of what stands out/gi, 'If useful, I can send a short view of what I would check first')
+    .replace(/If you sent me your latest bill, I could reply with a few bullet points on what stands out/gi, 'If useful, I can send a short view of what I would check first');
+}
+
+function enforceStageSpecificCTA(input, replyStage) {
+  let text = String(input || '');
+  const stage = normalizeReplyStage(replyStage);
+  if (!text) return text;
+
+  const billAskPatterns = [
+    /\bsend (?:me |over |across )?(?:the |your )?(?:latest |current )?(?:electricity |utility |power )?(?:statement|bill|invoice)\b[^.?!]*/gi,
+    /\bshare (?:the |your )?(?:latest |current )?(?:electricity |utility |power )?(?:statement|bill|invoice)\b[^.?!]*/gi,
+    /\bif you send (?:me |over |across )?(?:the |your )?(?:latest |current )?(?:electricity |utility |power )?(?:statement|bill|invoice)\b[^.?!]*/gi,
+    /\bif you share (?:the |your )?(?:latest |current )?(?:electricity |utility |power )?(?:statement|bill|invoice)\b[^.?!]*/gi
+  ];
+
+  if (stage === 'first_touch') {
+    for (const pattern of billAskPatterns) {
+      text = text.replace(pattern, "reply and I'll send a one-page cost view");
+    }
+  } else if (stage === 'follow_up') {
+    for (const pattern of billAskPatterns) {
+      text = text.replace(pattern, "reply and I'll send a short cost breakdown");
+    }
+  } else if (stage === 'no_reply') {
+    for (const pattern of billAskPatterns) {
+      text = text.replace(pattern, 'reply and I can send the short cost view');
+    }
+    text = text.replace(/\bwho (?:at [^?.,]+ )?(?:handles|reviews|owns) (?:your |the )?(?:electricity|energy|utility|power) (?:agreement|agreements|bill|bills|review)\??/gi, 'if this sits with you, reply and I can send the short cost view');
+  }
+
+  return text
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\.\s+\./g, '.')
+    .replace(/,\s+\./g, '.')
+    .trim();
 }
 
 function normalizeReplyStage(value) {
@@ -195,32 +327,38 @@ function buildReplyStageDirective(stage) {
   const directives = {
     first_touch: [
       '- FIRST TOUCH: 60-90 words, 2-3 short paragraphs.',
-      '- Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations = demand spikes or delivery charges; owner/GM = leverage or timing. Use one lane only.',
+      '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget variance, renewal timing, or approval pressure; facilities/operations/warehouse/logistics/manufacturing = demand spikes, delivery charges, or load timing; purchasing/contracts/procurement/asset management = renewal timing and vendor coordination; owner/CEO/president/GM/VP = leverage, timing, and simplicity; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
       '- Start with one concrete company, role, city, or operating fact.',
-      '- Make the payoff explicit: they get a marked-up statement showing where the leak is most likely coming from and what to check first.',
-      '- Use one direct statement CTA. Prefer "Send the latest statement and I\'ll tell you where the leak is most likely coming from."',
-      '- Subject line: 1-4 words, plain, specific, and value-led.',
+      '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
+      '- First-touch tone should be thoughtful and specific, not pushy. First-touch CTA must stay low-friction. Good patterns: "Worth seeing where the extra cost is likely coming from?" "Okay if I send the one-page cost view?" "Am I barking up the right tree on this?"',
+      '- Never ask for a utility bill, statement, or invoice in first touch.',
+      '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = load timing / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check.',
       '- Never mention LinkedIn, a profile, or how the person was found.',
     ].join('\n'),
     follow_up: [
       '- FOLLOW-UP: 50-80 words, 2-3 short paragraphs.',
       '- Add one new fact or angle. Reference prior contact by topic only, never opens/clicks.',
-      '- Reinforce the concrete output: the bill lines worth checking and the likely leak area.',
-      '- Use one direct statement CTA. Prefer an affirmative sentence over a question, and keep the payoff concrete.',
-      '- Subject line: 1-4 words, specific and plain.',
+      '- Reinforce one concrete output that does not require document sharing yet: a cost breakdown, a rate-vs-delivery view, a short call, or a routing reply.',
+      '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
+      '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the cost breakdown." "Want the rate-vs-delivery view?" "Is this worth a quick look?"',
+      '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
+      '- Subject line should sound slightly more diagnostic than Day 1, not generic.',
     ].join('\n'),
     no_reply: [
       '- NO REPLY: 35-55 words, maximum 2 sentences.',
       '- Assume you already reached the right person. Do not ask who owns electricity review.',
       '- Sentence 1 should state the value in plain English and name one likely leak area.',
-      '- Sentence 2 should offer to mark up the latest statement and call out the lines worth checking first.',
-      '- Subject line: 1-4 words, direct and sharp.',
+      '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short cost view.',
+      '- No-reply tone should be sharper and cleaner than prior touches.',
+      '- Never ask for a bill, statement, or invoice in this branch.',
+      '- Subject line should be the sharpest and simplest one in the sequence.',
     ].join('\n'),
     general: [
       '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
       '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
-      '- Use a plain subject line with 1-5 words.',
-      '- One CTA only. Prefer a statement first; use a simple yes/no only if it still names the payoff.',
+      '- Use a plain subject line with 1-5 words, but vary it by title and stage.',
+      '- One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
+      '- As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
     ].join('\n')
   };
 
@@ -264,12 +402,102 @@ export default async function handler(req, res) {
       const hasEnergyVector = Array.isArray(vectors) && vectors.some(v => ['energy_context', 'energy_intel'].includes(String(v)));
       const contactTitle = typeof contact?.title === 'string' && contact.title.trim() ? contact.title.trim() : 'Unknown';
       const contactIndustry = typeof contact?.industry === 'string' && contact.industry.trim() ? contact.industry.trim() : 'Unknown';
-      const contactLocation = typeof contact?.location === 'string' && contact.location.trim()
-        ? contact.location.trim()
-        : (typeof contact?.city === 'string' && contact.city.trim()
-          ? `${contact.city.trim()}${contact?.state ? `, ${String(contact.state).trim()}` : ''}`
-          : 'Unknown');
-      const companyName = cleanCompanyName(contact?.company);
+      const stateValue = typeof contact?.state === 'string' ? contact.state.trim() : '';
+      const primarySiteDetails = extractPrimarySiteDetails(
+        contact?.site_address ||
+        contact?.service_addresses ||
+        contact?.serviceAddresses ||
+        contact?.address
+      );
+      const hierarchyIds = extractHierarchyIds(contact?.metadata);
+      const parentCompanyId = typeof contact?.parent_company_id === 'string' && contact.parent_company_id.trim()
+        ? contact.parent_company_id.trim()
+        : hierarchyIds.parentAccountId;
+      const parentCompanyCount = Number.isFinite(Number(contact?.subsidiary_count))
+        ? Number(contact.subsidiary_count)
+        : hierarchyIds.subsidiaryAccountIds.length;
+      const siteState = typeof contact?.site_state === 'string' && contact.site_state.trim()
+        ? contact.site_state.trim()
+        : primarySiteDetails.state || stateValue;
+      const siteCity = typeof contact?.site_city === 'string' && contact.site_city.trim()
+        ? contact.site_city.trim()
+        : primarySiteDetails.city || '';
+      const texasEnergy = getTexasEnergyContext(siteCity, siteState, siteAddress || primarySiteDetails.address || siteCity);
+      const utilityTerritory = typeof contact?.utility_territory === 'string' && contact.utility_territory.trim()
+        ? contact.utility_territory.trim()
+        : texasEnergy.utilityTerritory;
+      const explicitTduDisplay = typeof contact?.tdu === 'string' && contact.tdu.trim()
+        ? contact.tdu.trim()
+        : typeof contact?.tdu_display === 'string' && contact.tdu_display.trim()
+          ? contact.tdu_display.trim()
+          : '';
+      const explicitTduCandidates = Array.isArray(contact?.tdu_candidates)
+        ? contact.tdu_candidates
+          .filter((item) => typeof item === 'string')
+          .map((item) => item.trim())
+          .filter(Boolean)
+        : [];
+      const marketContext = typeof contact?.market_context === 'string' && contact.market_context.trim()
+        ? contact.market_context.trim()
+        : texasEnergy.marketContext;
+      const tduCandidates = explicitTduCandidates.length ? explicitTduCandidates : texasEnergy.tduCandidates;
+      const tduDisplay = explicitTduDisplay || texasEnergy.tduDisplay;
+      const parentCompany = typeof contact?.parent_company === 'string' && contact.parent_company.trim()
+        ? contact.parent_company.trim()
+        : typeof contact?.parentCompany === 'string' && contact.parentCompany.trim()
+          ? contact.parentCompany.trim()
+          : typeof contact?.parent_company_name === 'string' && contact.parent_company_name.trim()
+            ? contact.parent_company_name.trim()
+            : typeof contact?.metadata?.relationships?.parentCompanyName === 'string' && contact.metadata.relationships.parentCompanyName.trim()
+              ? contact.metadata.relationships.parentCompanyName.trim()
+            : null;
+      const subsidiaryCompanies = [
+        ...(Array.isArray(contact?.subsidiary_companies) ? contact.subsidiary_companies : []),
+        ...(Array.isArray(contact?.subsidiaryCompanies) ? contact.subsidiaryCompanies : []),
+        ...(Array.isArray(contact?.metadata?.relationships?.subsidiaryCompanies) ? contact.metadata.relationships.subsidiaryCompanies : []),
+      ]
+        .map((item) => (typeof item === 'string' ? item.trim() : ''))
+        .filter(Boolean);
+      const organizationRole = typeof contact?.organization_role === 'string' && contact.organization_role.trim()
+        ? contact.organization_role.trim()
+        : parentCompany || parentCompanyId
+          ? 'subsidiary'
+          : subsidiaryCompanies.length || parentCompanyCount
+            ? 'parent'
+            : 'standalone';
+      const siteAddress = typeof contact?.site_address === 'string' && contact.site_address.trim()
+        ? contact.site_address.trim()
+        : primarySiteDetails.address
+          || (typeof contact?.address === 'string' && contact.address.trim()
+            ? contact.address.trim()
+            : '');
+      let contactLocation = siteAddress;
+      if (!contactLocation) {
+        if (siteCity) {
+          contactLocation = `${siteCity}${siteState ? `, ${siteState}` : ''}`;
+        } else if (primarySiteDetails.city) {
+          contactLocation = `${primarySiteDetails.city}${primarySiteDetails.state ? `, ${primarySiteDetails.state}` : ''}`;
+        } else if (typeof contact?.location === 'string' && contact.location.trim()) {
+          contactLocation = contact.location.trim();
+        } else if (typeof contact?.city === 'string' && contact.city.trim()) {
+          contactLocation = `${contact.city.trim()}${contact?.state ? `, ${String(contact.state).trim()}` : ''}`;
+        } else {
+          contactLocation = 'Unknown';
+        }
+      }
+      const companyName = cleanCompanyName(contact?.company || contact?.operating_company || contact?.outreach_company);
+      const hierarchySummary = typeof contact?.hierarchy_summary === 'string' && contact.hierarchy_summary.trim()
+        ? contact.hierarchy_summary.trim()
+        : typeof contact?.relationship_summary === 'string' && contact.relationship_summary.trim()
+          ? contact.relationship_summary.trim()
+          : [
+            `Operating company: ${companyName}`,
+            `Parent company: ${parentCompany || parentCompanyId || 'none'}`,
+            `Subsidiaries: ${subsidiaryCompanies.length ? subsidiaryCompanies.join('; ') : parentCompanyCount ? `${parentCompanyCount} linked account(s)` : 'none'}`,
+            `Role: ${organizationRole}`,
+            siteAddress ? `Site: ${siteAddress}` : null,
+            `Market: ${marketContext}`,
+          ].filter(Boolean).join(' | ');
       const companyDescription = typeof contact?.company_description === 'string' && contact.company_description.trim()
         ? contact.company_description.trim()
         : typeof contact?.description === 'string' && contact.description.trim()
@@ -304,6 +532,19 @@ export default async function handler(req, res) {
         `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${companyName}`,
         `- COMPANY_OUTREACH_NAME: ${companyName}`,
         contact?.company && companyName !== contact.company ? `- COMPANY_LEGAL_NAME: ${contact.company}` : null,
+        siteAddress ? `- SITE_ADDRESS: ${siteAddress}` : null,
+        siteCity ? `- SITE_CITY: ${siteCity}` : null,
+        siteState ? `- SITE_STATE: ${siteState}` : null,
+        utilityTerritory ? `- UTILITY_TERRITORY: ${utilityTerritory}` : null,
+        tduDisplay ? `- TDU_DISPLAY: ${tduDisplay}` : null,
+        tduCandidates.length ? `- TDU_CANDIDATES: ${tduCandidates.join('; ')}` : null,
+        `- MARKET_CONTEXT: ${marketContext}`,
+        `- ORG_STRUCTURE: role=${organizationRole}; parent=${parentCompany || parentCompanyId || 'none'}; parent_id=${parentCompanyId || 'none'}; subsidiaries=${subsidiaryCompanies.length ? subsidiaryCompanies.join('; ') : parentCompanyCount ? `${parentCompanyCount} linked account(s)` : 'none'}`,
+        hierarchySummary ? `- HIERARCHY_SUMMARY: ${hierarchySummary}` : null,
+        parentCompany ? `- PARENT_COMPANY: ${parentCompany}` : null,
+        parentCompanyId ? `- PARENT_COMPANY_ID: ${parentCompanyId}` : null,
+        subsidiaryCompanies.length ? `- SUBSIDIARY_COMPANIES: ${subsidiaryCompanies.join('; ')}` : null,
+        parentCompanyCount && !subsidiaryCompanies.length ? `- SUBSIDIARY_COUNT: ${parentCompanyCount}` : null,
         companyDescription ? `- COMPANY_DESCRIPTION: ${companyDescription}` : null,
         companyResearch ? `- COMPANY_RESEARCH: ${companyResearch}` : null,
         callContext ? `- CALL_CONTEXT: ${callContext}` : null,
@@ -312,7 +553,7 @@ export default async function handler(req, res) {
         `- LOCATION: ${contactLocation}`,
         `- VECTOR_STATE: energy_enabled=${hasEnergyVector}`,
         hasEnergyVector
-          ? `- ENERGY_INTEL: Supplier ${supplier}, Current Rate ${currentRate}, Load Zone ${contact?.load_zone || 'Unknown'}, Factor ${loadFactor || 'Unknown'}, Annual Usage ${annualUsage || 'Unknown'}, Contract End Year ${contractEndYear || 'Unknown'}`
+          ? `- ENERGY_INTEL: Supplier ${supplier}, Current Rate ${currentRate}, Utility Territory ${utilityTerritory || 'Unknown'}, TDU ${tduDisplay || 'Unknown'}, Factor ${loadFactor || 'Unknown'}, Annual Usage ${annualUsage || 'Unknown'}, Contract End Year ${contractEndYear || 'Unknown'}`
           : '- ENERGY_INTEL: disabled_by_vector',
         `- SOURCE_TRUTH: source_label=${sourceLabel}, has_linkedin=${hasLinkedIn}, has_website=${hasWebsite}`,
         contact?.linkedin_url && `- LINKEDIN_URL: ${contact.linkedin_url}`,
@@ -351,28 +592,38 @@ export default async function handler(req, res) {
           6. If you use bullets, this email fails. Use paragraphs only.
           7. NO CITATIONS OR LINKS: Do not include any external links, URLs, or bracketed citations (e.g. [source.com]).
           8. TEXAS DEREGULATED MARKET (ERCOT): Keep context Texas/ERCOT and forbid UK references (like "Citizens Advice").
+            - If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets. Do not imply Texas-only coverage.
           9. HOOK RULE:
-            - Sentence one must mention the account city (or the outreach-friendly company name if no city exists) and tie that place to one SPECIFIC, concrete operational reality.
-            - CRITICAL: City + industry alone is NOT a hook. "For logistics companies in Houston, costs can shift quite a bit" tells the recipient nothing specific about them and reads as a template. Use one fact from: account description, company scale, revenue, a known operational characteristic of that specific industry in that market, or a recent signal. If no specific data exists, make an observation about that industry's energy profile (e.g., "cold storage facilities in Dallas run 24/7 baseload which concentrates demand charge exposure" or "rail service yards carry high fixed-load hours that push peak billing hard") — never a generic "costs can shift" statement.
+            - Sentence one must mention the specific site/location being discussed (address, city, or operating site) and tie that place to one SPECIFIC, concrete operational reality.
+            - If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orient the reader. Never confuse the parent company with the site.
+            - If the site is in Texas and a single TDU is clearly known, use that plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.
+            - CRITICAL: City + industry alone is NOT a hook. "For logistics companies in Houston, costs can shift quite a bit" tells the recipient nothing specific about them and reads as a template. Use one fact from: account description, company scale, revenue, a known operational characteristic of that specific industry in that market, the parent/subsidiary structure, the site address, or a recent signal. If no specific data exists, make an observation about that industry's energy profile (e.g., "cold storage facilities in Dallas run 24/7 baseload which concentrates demand charge exposure" or "rail service yards carry high fixed-load hours that push peak billing hard") — never a generic "costs can shift" statement.
             - Avoid vague openers: "energy costs are tough", "costs can shift quite a bit", "utility charges are complex", "getting good value for electricity can be tricky."
             - Do not start with "I noticed on the website", "Came across your", "Reviewing", or "many organizations in your sector". Those sound templated.
           10. SUBJECT RULE:
             - Subject line must be 4–7 words.
             - Vary the angle: use the account city OR company name as an anchor, OR lead with a cost-specific question, OR reference renewal/contract timing, OR use a "I noticed something" hook.
+            - If a Texas utility territory is known, it may appear once if it clarifies the subject, but do not force it.
             - Do NOT fall back to the same formula every time (avoid always writing "[City] bill check").
             - Never use "Quick question", "Following up", "Just checking in", or "Reaching out" as subject openers.
-            - Keep it problem-based and specific (e.g., "Fort Worth industrial billing gap", "before your 2027 contract renewal", "who reviews electricity at [Company]?").
+            - Keep it problem-based and specific. Persona examples:
+              - Finance: "budget drift at {{company}}", "before renewal timing slips", "fixed cost check for {{city}}"
+              - Operations: "load timing at {{company}}", "delivery charges in {{city}}", "where demand is adding cost"
+              - Purchasing: "renewal timing for {{company}}", "vendor fit on power costs", "who owns contract timing?"
+              - Owner/VP: "simple cost check", "timing before renewal", "where the extra cost sits"
+            - Keep the subject line plain enough to feel manual, not clever enough to feel templated.
           11. JARGON TRANSLATION RULE:
-            - Never use unexplained acronyms like 4CP, TDU, ESI ID, pass-through, nodal adder, or load zone shorthand in cold outreach.
+            - Never use unexplained acronyms like 4CP, ESI ID, pass-through, or nodal adder in cold outreach. If a Texas utility name is clearly known, you may say Oncor, CenterPoint, AEP Texas, TNMP, or LP&L once in plain English.
             - Name one primary cost lane in plain business language and only add the second lane if it genuinely sharpens the diagnosis. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". The concept stays constant, the exact words must not.
             - If a technical term is necessary, define it in the same sentence in plain English.
           12. CTA RULE:
-            - First touch: ask for interest with a concrete offer, not a meeting request.
-            - Offer: if they send Lewis their latest electricity statement, he will reply with the likely leak area and the lines worth checking first.
-            - Use PRESENT conditional or an affirmative CTA: "Send the latest statement and I'll tell you where the leak is most likely coming from." NEVER past conditional: "if you sent it, I could reply."
-            - Preferred CTA forms: "Send it over and I'll mark up the lines worth checking.", "I'll tell you where the leak is most likely coming from if you send the latest statement.", "I'll reply with the lines worth checking first if you send the latest statement."
-            - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?", "Want me to take a look?" — these are indirect and passive.
-            - Do not stack more than one question. Prefer a statement CTA when it sounds natural and make sure the statement names the payoff.
+            - First touch: ask for a low-friction reply with a concrete offer, not a bill request and not a generic meeting ask.
+            - Early-sequence offer options: a quick benchmark, a one-page snapshot, a short call, or a simple routing reply.
+            - First-touch and no-reply branches must NOT ask for a utility bill, statement, or invoice.
+            - Later/high-intent branches may optionally ask for the latest statement only to confirm hard numbers after interest is established.
+            - Use PRESENT conditional or an affirmative CTA. Good examples: "Reply and I'll send the one-page snapshot." "Open to a 15-minute call next week?" "Am I barking up the right tree on this?" NEVER past conditional: "if you sent it, I could reply."
+            - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?", "Want me to take a look?" These are indirect and passive.
+            - Do not stack more than one question. One CTA only.
           13. VOICE RULE:
             - Use first-person peer language from Lewis ("I", "I can", "I review"), not corporate team language.
             - Avoid openers like "our firm", "we help businesses", or "at Nodal Point, we...".
@@ -386,18 +637,22 @@ export default async function handler(req, res) {
           15. COMPANY NAME RULE:
             - Use COMPANY_OUTREACH_NAME in copy, not the full legal entity name.
             - Strip legal suffixes like Inc, LLC, Ltd, Corp and ignore DBA phrasing unless the STRATEGY explicitly requires the legal name.
+            - Preserve operating-company relationship language when it identifies the actual recipient entity, such as "Haag, a Salas O'Brien Company" or "Jarvis Press, An RRD Company." Do not strip the parent-company phrase out of that name.
+            - If PARENT_COMPANY exists, use it as context once at most. Do not confuse the parent with the operating site.
             - No normal human writes "Eduardo E. Lozano & Co., Inc. dba eelco" in a cold email opener. Do not do that.
           16. FIELD USAGE QUALITY RULE:
             - If ROLE is known, tailor one phrase to that role's business priorities.
             - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
-            - If LOCATION is known, anchor the observation to that place naturally.
+            - If LOCATION is known, anchor the observation to that place naturally. Prefer the site address or operating location over the corporate HQ when both exist. If a Texas utility territory is known, use it once as a location cue, not jargon.
+            - If the account is a subsidiary, distinguish the operating company from the parent company and keep the local site in view.
             - If any field is Unknown, do not invent it and do not force awkward placeholders.
             - If company description, employee count, recent signal, or notes are available, use at most one of them naturally. Do not stack all of them into one sentence.
             - If CALL_CONTEXT is present, use only human conversation or substantive call notes. Ignore no-answer calls, voicemail menus, extension trees, and IVR noise.
             - If COMPANY_RESEARCH exists, use one concrete fact from it. Do not say you "looked at LinkedIn" or "noticed on the website" unless that source mention directly adds credibility.
           17. ENERGY INTEL RULES:
-            - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, load zone, or contract timing details.
+            - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, utility territory, TDU, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
+            - If the site is in Texas and utility territory is known, you may reference the territory once naturally.
             - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
             - Never state certainty about exact contract month/day unless explicitly provided as verified in STRATEGY text.
           18. OPEN TRACKING RULE:
@@ -406,7 +661,7 @@ export default async function handler(req, res) {
             - Reference prior contact by CONTENT only: "following up on my note about [company's] electricity costs" or "circling back on the forensic review I mentioned."
           19. CTA TENSE RULE:
             - All CTAs must use present conditional, never past conditional.
-            - CORRECT: "If you send your latest statement, I'll reply." WRONG: "If you sent it over, I could reply."
+            - CORRECT: "Reply and I'll send the snapshot." or "If you send the statement later, I'll verify the hard numbers." WRONG: "If you sent it over, I could reply."
             - Use "I'll" or "I can" — never "I could" in a CTA.
           20. ANTI-FILLER RULE:
             - Every sentence must earn its place with a specific observation. Delete any sentence that could apply to any company in any industry.
@@ -419,7 +674,7 @@ export default async function handler(req, res) {
           REPLY-DRIVING GENERAL RULES:
           - Use the fewest context facts that still make the email feel manual. More detail is not better if it makes the ask harder to answer.
           - If the draft starts sounding generic, cut a sentence instead of adding a vague one.
-          - A direct request beats a clever line. The recipient should know exactly what they get back: the bill lines worth checking, the likely leak area, or the cost area to verify.
+          - A direct request beats a clever line. The recipient should know exactly what they get back: a quick benchmark, a one-page snapshot, a short call, or later-stage hard-number validation.
           - If the draft smells like a fallback, replace it with a concrete value prop instead of making it shorter. Short is fine only when the payoff is obvious.
 
           HIGH_AGENCY_IDENTITY_RESOLUTION:
@@ -429,7 +684,7 @@ export default async function handler(req, res) {
             - If STRATEGY says "the prospect" or "them" -> Use ${contact?.name || 'the contact'}.
             - If STRATEGY says "their company" or "the business" -> Use ${companyName || 'the business'}.
             - If STRATEGY says "their industry" -> Use ${contact?.industry || 'their industry'}.
-            - If STRATEGY says "their location" -> Use ${contact?.location || contact?.city || 'their area'}.
+            - If STRATEGY says "their location" -> Use ${contact?.site_address || contact?.location || contact?.address || contact?.city || 'their area'}.
           - WEAVE DATA NATURALLY: A high-agency analyst doesn't use placeholders; they use facts. If you know they are in 'Manufacturing', don't just say 'your industry'. Say 'the manufacturing sector' or 'your production facility'.
 
           INTELLIGENT_CONTEXT_MAPPING:
@@ -526,11 +781,14 @@ export default async function handler(req, res) {
           const bodyCandidate = parsed.body_html || parsed.body || parsed.content || '';
           finalResult = {
             optimized: ensureThanksSignoff(
-              cleanSequenceCopy(
-                deGenericizeFirstTouchCopy(
-                  softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
-                  prompt
-                )
+              enforceStageSpecificCTA(
+                cleanSequenceCopy(
+                  deGenericizeFirstTouchCopy(
+                    softenFirstTouchEnergyJargon(normalizeBodyHtml(bodyCandidate), prompt),
+                    prompt
+                  )
+                ),
+                replyStage
               ),
               contact?.sender_first_name
             ),
@@ -541,11 +799,14 @@ export default async function handler(req, res) {
           // Fallback if AI didn't return valid JSON despite instructions
           finalResult = {
             optimized: ensureThanksSignoff(
-              cleanSequenceCopy(
-                deGenericizeFirstTouchCopy(
-                  softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
-                  prompt
-                )
+              enforceStageSpecificCTA(
+                cleanSequenceCopy(
+                  deGenericizeFirstTouchCopy(
+                    softenFirstTouchEnergyJargon(normalizeBodyHtml(generatedContent), prompt),
+                    prompt
+                  )
+                ),
+                replyStage
               ),
               contact?.sender_first_name
             ),
@@ -580,11 +841,39 @@ export default async function handler(req, res) {
       throw new Error('OpenRouter API key not configured');
     }
 
+    const legacyPrimarySiteDetails = extractPrimarySiteDetails(
+      contact?.site_address ||
+      contact?.service_addresses ||
+      contact?.serviceAddresses ||
+      contact?.address
+    );
+    const legacySiteState = typeof contact?.site_state === 'string' && contact.site_state.trim()
+      ? contact.site_state.trim()
+      : legacyPrimarySiteDetails.state || (typeof contact?.state === 'string' ? contact.state.trim() : '');
+    const legacySiteCity = typeof contact?.site_city === 'string' && contact.site_city.trim()
+      ? contact.site_city.trim()
+      : legacyPrimarySiteDetails.city || '';
+    const legacyTexasEnergy = getTexasEnergyContext(legacySiteCity, legacySiteState, legacyPrimarySiteDetails.address || legacySiteCity);
+    const legacyUtilityTerritory = typeof contact?.utility_territory === 'string' && contact.utility_territory.trim()
+      ? contact.utility_territory.trim()
+      : legacyTexasEnergy.utilityTerritory;
+    const legacyExplicitTduDisplay = typeof contact?.tdu === 'string' && contact.tdu.trim()
+      ? contact.tdu.trim()
+      : typeof contact?.tdu_display === 'string' && contact.tdu_display.trim()
+        ? contact.tdu_display.trim()
+        : '';
+    const legacyMarketContext = typeof contact?.market_context === 'string' && contact.market_context.trim()
+      ? contact.market_context.trim()
+      : legacyTexasEnergy.marketContext;
+    const legacyTduDisplay = legacyExplicitTduDisplay || legacyTexasEnergy.tduDisplay;
     const contactContext = contact ? `
       TARGET CONTACT:
       - Name: ${contact.name}
       - Company: ${contact.company}
-      - Load Zone: ${contact.load_zone}
+      - Site: ${legacyPrimarySiteDetails.address || legacySiteCity || 'Unknown'}
+      - Utility Territory: ${legacyUtilityTerritory || 'Unknown'}
+      - TDU: ${legacyTduDisplay || 'Unknown'}
+      - Market Context: ${legacyMarketContext}
     ` : '';
 
     const systemPrompt = `
