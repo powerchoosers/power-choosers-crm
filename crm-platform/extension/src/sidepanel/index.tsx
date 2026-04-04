@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio, Plus, ShieldCheck, Linkedin, Loader2 } from 'lucide-react'
@@ -1303,7 +1303,7 @@ function App() {
       (account as any)?.metadata?.logo_url ||
       ''
   ) || null
-  const forensicLogEntries = useMemo(() => {
+  const forensicLogEntries = (() => {
     const noteSources: ForensicNoteSource[] = []
     const accountName = account?.name || 'UNKNOWN ACCOUNT'
     const contactName = contact?.name || 'UNKNOWN CONTACT'
@@ -1334,7 +1334,7 @@ function App() {
     }
 
     return buildForensicNoteEntries(noteSources)
-  }, [account?.description, account?.name, accountContacts, contact?.id, contact?.name, contact?.notes, hasContactMatch, match?.contacts])
+  })()
 
   const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
   const showCallButton = Boolean(selectedNumber && dialTarget)
