@@ -61,6 +61,8 @@ export function useContactDossierState(id: string) {
         const c = contact as any
         const linkedAccountId = c?.linkedAccountId || c?.linked_account_id || c?.accountId || c?.account_id || ''
         const contextAccountId = account?.id || linkedAccountId || ''
+        const accountPrimaryContactId = account?.primaryContactId || null
+        const isPrimaryContact = !!accountPrimaryContactId && accountPrimaryContactId === id
         const label = `${String(contact.name || editCompany || 'UNKNOWN CONTACT').toUpperCase()}`
         setContext({
             type: 'contact',
@@ -68,6 +70,10 @@ export function useContactDossierState(id: string) {
             label,
             data: {
                 accountId: contextAccountId,
+                linkedAccountId: contextAccountId,
+                accountPrimaryContactId,
+                decisionMakerId: accountPrimaryContactId,
+                isDecisionMaker: isPrimaryContact,
                 contactTitle: c?.title || c?.jobTitle || '',
                 contactCompany: c?.companyName || c?.company || c?.company_name || '',
                 domain,

@@ -79,6 +79,7 @@ export type MatchContact = {
   primaryPhoneField?: string | null
   city: string | null
   state: string | null
+  notes?: string | null
   score: number
   reason: string
 }
@@ -479,11 +480,13 @@ export function buildMatchContext(match: MatchResult | null): string {
     lines.push(`Contact: ${match.contact.name}`)
     if (match.contact.title) lines.push(`Title: ${match.contact.title}`)
     if (match.contact.accountName) lines.push(`Account: ${match.contact.accountName}`)
+    if (match.contact.notes) lines.push(`Contact notes: ${match.contact.notes.slice(0, 300)}`)
   }
   if (match.account) {
     lines.push(`Account: ${match.account.name}`)
     if (match.account.industry) lines.push(`Industry: ${match.account.industry}`)
     if (match.account.city || match.account.state) lines.push(`Location: ${[match.account.city, match.account.state].filter(Boolean).join(', ')}`)
+    if (match.account.description) lines.push(`Account notes: ${match.account.description.slice(0, 300)}`)
   }
   return lines.filter(Boolean).join('\n')
 }

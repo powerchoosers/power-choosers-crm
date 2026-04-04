@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy, Newspaper, ExternalLink } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy, Newspaper, ExternalLink, GitBranch, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -92,6 +92,43 @@ type IdentityCardData = {
   sourceReliability?: string
 }
 
+type HierarchyCardData = {
+  accountId: string
+  accountName: string
+  role: 'parent' | 'subsidiary' | 'standalone'
+  parentCompanyName?: string | null
+  parentAccountId?: string | null
+  subsidiaryAccountIds?: string[]
+  subsidiaryCompanyNames?: string[]
+  hierarchySummary?: string
+}
+
+type ProtocolCardData = {
+  protocolId: string
+  protocolName: string
+  description?: string
+  stepCount?: number
+  stepSummary?: Array<string | { label?: string; status?: string }>
+  targetContactId?: string | null
+  targetContactName?: string | null
+  targetAccountId?: string | null
+  targetAccountName?: string | null
+  decisionMakerId?: string | null
+  parentCompanyName?: string | null
+  parentAccountId?: string | null
+  subsidiaryAccountIds?: string[]
+  subsidiaryCompanyNames?: string[]
+  organizationRole?: string
+  hierarchySummary?: string
+  selectedNode?: { id?: string; label?: string; type?: string } | null
+  senderEmail?: string | null
+  siteAddress?: string | null
+  siteCity?: string | null
+  siteState?: string | null
+  utilityTerritory?: string | null
+  marketContext?: string | null
+}
+
 type PositionMaturity = {
   expiration: string
   daysRemaining: number
@@ -159,6 +196,18 @@ type MarketPulse = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
+}
+
+function toDisplayString(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
+
+function toDisplayStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
 /** Renders prose with **text** as High-Contrast Data Artifacts (Obsidian & Glass). Optionally use DecryptionText (word-stagger reveal) for first segment. Supports multiple artifacts per line and content with asterisks (non-greedy match). Supports blue bullets (•). */
@@ -258,7 +307,7 @@ function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }
   )
 }
 
-type ContextInfo = { type: string; id?: string | string[]; displayLabel?: string }
+type ContextInfo = { type: string; id?: string | string[]; label?: string; displayLabel?: string; data?: Record<string, unknown> }
 
 type PromptSuggestion = {
   label: string
@@ -485,6 +534,225 @@ function IdentityCardView({ card }: { card: IdentityCardData }) {
   )
 }
 
+function HierarchyCardView({ card }: { card: HierarchyCardData }) {
+  const router = useRouter()
+  const subsidiaries = Array.isArray(card.subsidiaryCompanyNames) ? card.subsidiaryCompanyNames : []
+  const subsidiaryIds = Array.isArray(card.subsidiaryAccountIds) ? card.subsidiaryAccountIds : []
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/80 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <GitBranch size={14} className="text-zinc-400 shrink-0" />
+          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest truncate">Corporate Hierarchy</span>
+        </div>
+        <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] whitespace-nowrap">{card.role}</span>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div className="space-y-1">
+          <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-[0.2em]">Operating Company</div>
+          <div className="text-white text-base font-semibold truncate">{card.accountName}</div>
+          <div className="text-[10px] font-mono text-zinc-600 truncate">{card.hierarchySummary || card.accountId}</div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl bg-black/30 border border-white/5 p-3">
+            <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+              <Building2 size={12} className="text-zinc-500" />
+              Parent
+            </div>
+            <div className="mt-2 text-sm text-zinc-200 font-medium truncate">
+              {card.parentCompanyName || card.parentAccountId || 'None'}
+            </div>
+            {card.parentAccountId && (
+              <button
+                type="button"
+                onClick={() => router.push(`/network/accounts/${card.parentAccountId}`)}
+                className="mt-2 text-[9px] font-mono text-[#002FA7] uppercase tracking-widest hover:text-[#002FA7]/80"
+              >
+                Open parent →
+              </button>
+            )}
+          </div>
+
+          <div className="rounded-xl bg-black/30 border border-white/5 p-3">
+            <div className="flex items-center gap-2 text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+              <Building2 size={12} className="text-zinc-500" />
+              Subsidiaries
+            </div>
+            <div className="mt-2 text-sm text-zinc-200 font-medium">
+              {subsidiaries.length ? `${subsidiaries.length} linked account(s)` : 'None'}
+            </div>
+            {subsidiaries.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {subsidiaries.slice(0, 4).map((name, index) => {
+                  const targetId = subsidiaryIds[index]
+                  const canOpen = typeof targetId === 'string' && targetId.trim().length > 0
+                  return canOpen ? (
+                    <button
+                      key={`${name}-${index}`}
+                      type="button"
+                      onClick={() => router.push(`/network/accounts/${targetId}`)}
+                      className="text-[9px] font-mono text-zinc-300 bg-white/[0.03] border border-white/10 px-2 py-1 rounded-full hover:border-[#002FA7]/40 hover:text-white transition-colors"
+                    >
+                      {name}
+                    </button>
+                  ) : (
+                    <span
+                      key={`${name}-${index}`}
+                      className="text-[9px] font-mono text-zinc-400 bg-white/[0.03] border border-white/10 px-2 py-1 rounded-full"
+                    >
+                      {name}
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            size="sm"
+            className="h-8 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30"
+            onClick={() => router.push(`/network/accounts/${card.accountId}`)}
+          >
+            Open account
+          </Button>
+          {card.parentAccountId && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px] uppercase tracking-widest hover:bg-white/[0.06]"
+              onClick={() => router.push(`/network/accounts/${card.parentAccountId}`)}
+            >
+              Parent dossier
+            </Button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function ProtocolCardView({ card }: { card: ProtocolCardData }) {
+  const router = useRouter()
+  const stepItems = Array.isArray(card.stepSummary) ? card.stepSummary : []
+  const previewSteps = stepItems.slice(0, 5).map((step, index) => {
+    if (typeof step === 'string') return { label: step, status: undefined as string | undefined, index }
+    return {
+      label: toDisplayString(step.label) || `Step ${index + 1}`,
+      status: toDisplayString(step.status),
+      index,
+    }
+  })
+  const copySteps = async () => {
+    const text = stepItems
+      .map((step, index) => typeof step === 'string' ? `${index + 1}. ${step}` : `${index + 1}. ${toDisplayString(step.label) || `Step ${index + 1}`}`)
+      .join('\n')
+    if (text) await navigator.clipboard.writeText(text)
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/80 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Sparkles size={14} className="text-zinc-400 shrink-0" />
+          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest truncate">Protocol</span>
+        </div>
+        <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] whitespace-nowrap">
+          {card.stepCount ?? stepItems.length} steps
+        </span>
+      </div>
+
+      <div className="p-4 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-white text-base font-semibold truncate">{card.protocolName}</div>
+            {card.description && <div className="text-zinc-400 text-xs mt-1 line-clamp-2">{card.description}</div>}
+          </div>
+          <Button
+            size="sm"
+            className="h-8 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30 shrink-0"
+            onClick={() => router.push(`/network/protocols/${card.protocolId}/builder`)}
+          >
+            Open builder
+          </Button>
+        </div>
+
+        {(card.targetContactName || card.targetAccountName || card.hierarchySummary) && (
+          <div className="rounded-xl bg-black/30 border border-white/5 p-3 space-y-1">
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Target Context</div>
+            {card.targetContactName && <div className="text-sm text-zinc-200">Contact: {card.targetContactName}</div>}
+            {card.targetAccountName && <div className="text-sm text-zinc-200">Account: {card.targetAccountName}</div>}
+            {card.hierarchySummary && <div className="text-[10px] font-mono text-zinc-500 leading-relaxed">{card.hierarchySummary}</div>}
+          </div>
+        )}
+
+        {previewSteps.length > 0 && (
+          <div className="rounded-xl bg-black/30 border border-white/5 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Step Preview</div>
+              <button
+                type="button"
+                onClick={copySteps}
+                className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest hover:text-[#002FA7]/80"
+              >
+                Copy steps
+              </button>
+            </div>
+            <div className="mt-2 space-y-1.5">
+              {previewSteps.map((step) => (
+                <div key={`${step.index}-${step.label}`} className="flex items-start gap-2">
+                  <span className="text-[9px] font-mono text-zinc-600 shrink-0 mt-0.5">{step.index + 1}.</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm text-zinc-200 break-words">{step.label}</div>
+                    {step.status && (
+                      <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">{step.status}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          {card.targetContactId && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px] uppercase tracking-widest hover:bg-white/[0.06]"
+              onClick={() => router.push(`/network/contacts/${card.targetContactId}`)}
+            >
+              Open contact
+            </Button>
+          )}
+          {card.targetAccountId && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px] uppercase tracking-widest hover:bg-white/[0.06]"
+              onClick={() => router.push(`/network/accounts/${card.targetAccountId}`)}
+            >
+              Open account
+            </Button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
 function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: string; data: unknown; onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>; contextInfo?: ContextInfo }) {
   const router = useRouter()
 
@@ -492,6 +760,20 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
     case 'identity_card': {
       if (!isRecord(data)) return null
       return <IdentityCardView card={data as IdentityCardData} />
+    }
+    case 'decision_maker_card': {
+      if (!isRecord(data)) return null
+      const card = data as Partial<IdentityCardData>
+      return <IdentityCardView card={{ ...card, type: 'contact', status: card.status ?? 'active', subtitle: card.subtitle || 'Decision Maker' } as IdentityCardData} />
+    }
+    case 'hierarchy_card': {
+      if (!isRecord(data)) return null
+      return <HierarchyCardView card={data as HierarchyCardData} />
+    }
+    case 'protocol_card':
+    case 'sequence_card': {
+      if (!isRecord(data)) return null
+      return <ProtocolCardView card={data as ProtocolCardData} />
     }
     case 'flight_check': {
       if (!isRecord(data)) return null
@@ -1113,9 +1395,11 @@ export function GeminiChatPanel() {
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
-    let baseContext: { type: string, id?: string | string[], label: string };
+    let baseContext: ContextInfo;
     if (storeContext) {
       baseContext = storeContext;
+    } else if (pathname?.includes('/protocols/')) {
+      baseContext = { type: 'protocol', id: params?.id, label: `PROTOCOL: ${String(params?.id || '').slice(0, 12)}` };
     } else if (pathname?.includes('/people/') || pathname?.includes('/contacts/')) {
       baseContext = { type: 'contact', id: params?.id, label: `CONTACT: ${String(params?.id || '').slice(0, 12)}` };
     } else if (pathname?.includes('/accounts/')) {
@@ -1128,9 +1412,10 @@ export function GeminiChatPanel() {
 
     // Rethink: Ensure the label is clean and then add the correct prefix here
     // This prevents double prefixing regardless of where the label comes from
-    const cleanLabel = baseContext.label
+    const cleanLabel = (baseContext.label || baseContext.displayLabel || baseContext.type)
       .replace(/^TARGET:\s*/i, '')
       .replace(/^ACTIVE_CONTEXT:\s*/i, '')
+      .replace(/^PROTOCOL:\s*/i, '')
       .replace(/^CONTACT:\s*/i, '')
       .replace(/^ACCOUNT:\s*/i, '')
       .trim();
@@ -1138,6 +1423,8 @@ export function GeminiChatPanel() {
     let displayLabel;
     if (baseContext.type === 'general' || cleanLabel === 'GLOBAL_SCOPE' || cleanLabel === 'GLOBAL_DASHBOARD') {
       displayLabel = `ACTIVE_CONTEXT: ${cleanLabel}`;
+    } else if (baseContext.type === 'protocol') {
+      displayLabel = `PROTOCOL: ${cleanLabel}`;
     } else {
       displayLabel = `TARGET: ${cleanLabel}`;
     }
@@ -1145,8 +1432,17 @@ export function GeminiChatPanel() {
     return { ...baseContext, displayLabel };
   }, [pathname, params, storeContext])
 
-  const contactId = contextInfo.type === 'contact' && typeof contextInfo.id === 'string' ? contextInfo.id : ''
-  const accountIdForAccount = contextInfo.type === 'account' && typeof contextInfo.id === 'string' ? contextInfo.id : ''
+  const contextData = isRecord(contextInfo.data) ? contextInfo.data : null
+  const contactId = contextInfo.type === 'contact' && typeof contextInfo.id === 'string'
+    ? contextInfo.id
+    : contextInfo.type === 'protocol'
+      ? toDisplayString(contextData?.targetContactId || contextData?.decisionMakerId)
+      : ''
+  const accountIdForAccount = contextInfo.type === 'account' && typeof contextInfo.id === 'string'
+    ? contextInfo.id
+    : contextInfo.type === 'protocol'
+      ? toDisplayString(contextData?.targetAccountId || contextData?.parentAccountId || contextData?.parentCompanyId)
+      : ''
   const { data: contactForNews } = useContact(contactId)
   const linkedAccountId = (contactForNews as { linkedAccountId?: string })?.linkedAccountId
   const { data: accountForNews } = useAccount(accountIdForAccount || linkedAccountId || '')
@@ -1159,6 +1455,8 @@ export function GeminiChatPanel() {
         return "Ask about this account, contracts, or contacts..."
       case 'contact':
         return "Ask about this contact or their account..."
+      case 'protocol':
+        return "Ask about this protocol, its steps, or target account..."
       case 'dashboard':
         return "Accounts expiring in 2026 · Who's at this company? · Market..."
       default:
@@ -1199,6 +1497,22 @@ export function GeminiChatPanel() {
         },
       ]
     }
+    if (contextInfo.type === 'protocol') {
+      return [
+        {
+          label: 'Step Review',
+          prompt: 'Summarize the active protocol steps and call out the next step.'
+        },
+        {
+          label: 'Hierarchy',
+          prompt: 'Show the parent company and subsidiary context tied to this protocol.'
+        },
+        {
+          label: 'Decision Maker',
+          prompt: 'Identify the decision maker tied to this protocol target.'
+        },
+      ]
+    }
     return [
       {
         label: 'Expiring Accounts',
@@ -1225,7 +1539,7 @@ export function GeminiChatPanel() {
           .order('updated_at', { ascending: false })
           .limit(30)
 
-        if ((contextInfo.type === 'account' || contextInfo.type === 'contact') && typeof contextInfo.id === 'string') {
+        if ((contextInfo.type === 'account' || contextInfo.type === 'contact' || contextInfo.type === 'protocol') && typeof contextInfo.id === 'string') {
           query = query.eq('context_type', contextInfo.type).eq('context_id', contextInfo.id)
         } else if (contextInfo.type === 'dashboard' || contextInfo.type === 'general') {
           query = query.in('context_type', ['dashboard', 'general'])
@@ -1270,6 +1584,7 @@ export function GeminiChatPanel() {
     const lower = text.toLowerCase()
     let intent = 'Chat'
     if (lower.includes('deep-dive forensic analysis')) intent = 'Forensic Brief'
+    else if (/(protocol|sequence|step review|checklist)/.test(lower)) intent = 'Protocol Review'
     else if (/(phone|number|dial)/.test(lower)) intent = 'Phone Hunt'
     else if (/(email|draft)/.test(lower)) intent = 'Email Draft'
     else if (/(who|contact|decision maker)/.test(lower)) intent = 'Contact Lookup'
@@ -1399,7 +1714,7 @@ export function GeminiChatPanel() {
   }, [isOpen, user?.user_metadata?.avatar_url, profile?.hostedPhotoUrl])
 
   // Initialize with Contextual Greeting (skip when account/contact – proactive report will run instead)
-  const isAccountOrContact = contextInfo.type === 'account' || contextInfo.type === 'contact'
+  const isAccountOrContact = contextInfo.type === 'account' || contextInfo.type === 'contact' || contextInfo.type === 'protocol'
   const hasContextId = typeof contextInfo.id === 'string' && contextInfo.id.length > 0
   useEffect(() => {
     if (!isOpen || messages.length !== 0) return
@@ -1414,6 +1729,8 @@ export function GeminiChatPanel() {
           ? `System ready, ${firstName}. I see you're viewing contact ${params?.id || 'target'}. Scanning Gmail for recent threads and Apollo for firmographics...`
           : contextInfo.type === 'account'
             ? `System ready, ${firstName}. Analyzing account data for ${params?.id || 'target'}. Checking energy market conditions for this node...`
+            : contextInfo.type === 'protocol'
+              ? `System ready, ${firstName}. Reviewing protocol ${params?.id || 'target'}. Scanning step map, hierarchy, and target context...`
             : `System ready, ${firstName}. Awaiting command for Nodal Point intelligence network.`
       }
     ])
@@ -1429,16 +1746,26 @@ export function GeminiChatPanel() {
   const { addTaskAsync } = useTasks()
   const handleCreateTask = useCallback(
     async (opts: { title: string; description?: string }) => {
+      const protocolTargetAccountId = contextData ? toDisplayString(contextData.targetAccountId || contextData.parentAccountId || contextData.parentCompanyId) : ''
+      const protocolTargetContactId = contextData ? toDisplayString(contextData.targetContactId || contextData.decisionMakerId) : ''
       await addTaskAsync({
         title: opts.title,
         description: opts.description ?? opts.title,
         status: 'Pending',
         priority: 'Medium',
-        contactId: contextInfo.type === 'contact' && typeof contextInfo.id === 'string' ? contextInfo.id : undefined,
-        accountId: contextInfo.type === 'account' && typeof contextInfo.id === 'string' ? contextInfo.id : undefined,
+        contactId: contextInfo.type === 'contact' && typeof contextInfo.id === 'string'
+          ? contextInfo.id
+          : contextInfo.type === 'protocol' && protocolTargetContactId
+            ? protocolTargetContactId
+            : undefined,
+        accountId: contextInfo.type === 'account' && typeof contextInfo.id === 'string'
+          ? contextInfo.id
+          : contextInfo.type === 'protocol' && protocolTargetAccountId
+            ? protocolTargetAccountId
+            : undefined,
       })
     },
-    [addTaskAsync, contextInfo]
+    [addTaskAsync, contextData, contextInfo]
   )
 
   const [input, setInput] = useState('')
@@ -1593,7 +1920,7 @@ SELECT * FROM hybrid_search_accounts(
       if (typeof data.model === 'string' && data.model.trim() && (allowedGemini.includes(data.model) || data.model.startsWith('sonar') || data.model.includes('/'))) setSelectedModel(data.model)
       const isNewsRequest = /news|company news|give me the news|what'?s the news|latest news|news on|any news|news about|reports? about/i.test(messageText.trim())
       const isFirstExchange = messagesForApi.length <= 1
-      const showNewsCard = (contextInfo.type === 'contact' || contextInfo.type === 'account') && (isNewsRequest || isFirstExchange) && apolloNewsSignals && apolloNewsSignals.length > 0
+      const showNewsCard = (contextInfo.type === 'contact' || contextInfo.type === 'account' || contextInfo.type === 'protocol') && (isNewsRequest || isFirstExchange) && apolloNewsSignals && apolloNewsSignals.length > 0
       const assistantMetadata = {
         provider: typeof data.provider === 'string' ? data.provider : undefined,
         model: typeof data.model === 'string' ? data.model : undefined,
@@ -1672,6 +1999,22 @@ SELECT * FROM hybrid_search_accounts(
           }
         ]
       }
+      if (contextInfo.type === 'protocol') {
+        return [
+          {
+            label: 'Step Review',
+            prompt: 'Summarize the active protocol steps and call out the next step.'
+          },
+          {
+            label: 'Hierarchy',
+            prompt: 'Show the parent company and subsidiary context tied to this protocol.'
+          },
+          {
+            label: 'Decision Maker',
+            prompt: 'Identify the decision maker tied to this protocol target.'
+          }
+        ]
+      }
       return [
         {
           label: 'Broaden CRM',
@@ -1692,6 +2035,22 @@ SELECT * FROM hybrid_search_accounts(
         {
           label: 'Checklist',
           prompt: 'Create a short checklist to fill missing phone and contact data for this account.'
+        }
+      ]
+    }
+    if (contextInfo.type === 'protocol') {
+      return [
+        {
+          label: 'Protocol Steps',
+          prompt: 'Summarize this protocol into a clean step-by-step card.'
+        },
+        {
+          label: 'Hierarchy',
+          prompt: 'Show the parent company and subsidiary context tied to this protocol.'
+        },
+        {
+          label: 'Decision Maker',
+          prompt: 'Identify the decision maker tied to this protocol target.'
         }
       ]
     }

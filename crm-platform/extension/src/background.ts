@@ -1,11 +1,8 @@
 import {
   DEFAULT_CALL_LIMIT,
   DEFAULT_CHAT_LIMIT,
-  DEFAULT_NOTE_LIMIT,
   STATE_KEY,
   buildContextPrompt,
-  buildTransmissionNoteBody,
-  buildTransmissionTaskTitle,
   defaultCallState,
   defaultState,
   extractDomain,
@@ -21,6 +18,7 @@ import {
   type PageSnapshot,
   type RecentCall,
 } from './shared'
+import { format } from 'date-fns'
 
 const DEFAULT_APP_ORIGIN = 'https://www.nodalpoint.io'
 const INCOMING_NOTIFICATION_ID = 'nodal-point-incoming-call'
@@ -105,7 +103,7 @@ async function hydrateState() {
         ...(saved.call || {}),
       },
       accountContacts: Array.isArray(saved.accountContacts) ? saved.accountContacts : [],
-      notes: Array.isArray(saved.notes) ? saved.notes : [],
+      notes: [],
       chat: Array.isArray(saved.chat) ? saved.chat : [],
       recentCalls: Array.isArray(saved.recentCalls) ? saved.recentCalls : [],
     }
@@ -736,6 +734,7 @@ function normalizeMatchContact(raw: any): MatchResult['contact'] {
     primaryPhoneField: trimText(raw.primaryPhoneField || raw.metadata?.primaryPhoneField) || null,
     city: trimText(raw.city) || null,
     state: trimText(raw.state) || null,
+    notes: trimText(raw.notes || raw.metadata?.notes) || null,
     score: Number(raw.score || raw.matchScore || 0) || 0,
     reason: trimText(raw.reason || raw.matchReason || 'Matched from CRM data') || 'Matched from CRM data',
   }
@@ -1024,69 +1023,66 @@ async function saveTransmissionNote(payload: any) {
 
   const contactId = trimText(payload?.contactId || state.match?.contact?.id) || ''
   const accountId = trimText(payload?.accountId || state.match?.account?.id || state.match?.contact?.accountId || '') || ''
-  const title = buildTransmissionTaskTitle(state.page, state.match)
-  const description = buildTransmissionNoteBody({
-    note,
-    page: state.page,
-    match: state.match,
-    auth: state.auth,
-  })
-
-  const taskPayload = {
-    title,
-    description,
-    priority: payload?.priority || 'low',
-    status: payload?.status || 'pending',
-    contactId: contactId || undefined,
-    accountId: accountId || undefined,
-    userEmail: state.auth.email || undefined,
-    metadata: {
-      source: 'browser-extension',
-      noteType: 'transmission_log',
-      page: state.page
-        ? {
-            title: state.page.title,
-            url: state.page.url,
-            origin: state.page.origin,
-            selectedText: state.page.selectedText,
-          }
-        : null,
-      match: state.match
-        ? {
-            accountId: state.match.account?.id || null,
-            contactId: state.match.contact?.id || null,
-            summary: state.match.summary,
-          }
-        : null,
-      screenshot: false,
-    },
+  if (!contactId && !accountId) {
+    throw new Error('Match a contact or account before saving a log entry.')
   }
 
+  const noteLine = `[${format(new Date(), 'yyyy-MM-dd HH:mm')}] ${note}`
   const data = await fetchAuthedJson(
-    '/api/tasks/create-task-with-invite',
+    '/api/extension/save-note',
     {
       method: 'POST',
-      body: JSON.stringify(taskPayload),
+      body: JSON.stringify({
+        note: noteLine,
+        contactId: contactId || undefined,
+        accountId: accountId || undefined,
+        appOrigin: state.auth.appOrigin || state.page?.origin || DEFAULT_APP_ORIGIN,
+      }),
     },
     state.auth.appOrigin
   )
 
-  const noteEntry = {
-    id: crypto.randomUUID(),
-    text: description,
-    createdAt: nowIso(),
-    source: payload?.source === 'ai' ? 'ai' : 'manual',
-    targetType: contactId ? 'contact' : accountId ? 'account' : 'page',
-    targetId: contactId || accountId || null,
-    title,
-    savedToCrm: true,
-  } as const
+  const savedContact = data?.contact || null
+  const savedAccount = data?.account || null
+  const targetType = trimText(data?.targetType || (savedContact ? 'contact' : 'account')) as 'contact' | 'account'
+  const targetAccountId = trimText(data?.accountId || savedContact?.accountId || accountId || '')
 
-  await setState((draft) => {
-    draft.notes = [noteEntry, ...draft.notes].slice(0, DEFAULT_NOTE_LIMIT)
-  })
+  if (savedContact || savedAccount) {
+    await setState((draft) => {
+      if (draft.match && savedContact?.id && (draft.match?.contact?.id === savedContact.id || contactId === savedContact.id)) {
+        draft.match.contact = normalizeMatchContact(savedContact)
+        draft.match.contacts = Array.isArray(draft.match.contacts)
+          ? draft.match.contacts.map((item) =>
+              item?.id === savedContact.id ? normalizeMatchContact(savedContact) || item : item
+            )
+          : draft.match.contacts
+        draft.accountContacts = Array.isArray(draft.accountContacts)
+          ? draft.accountContacts.map((item) =>
+              item?.id === savedContact.id ? { ...item, ...savedContact } : item
+            )
+          : draft.accountContacts
+      }
+      if (draft.match && savedAccount?.id && (draft.match?.account?.id === savedAccount.id || accountId === savedAccount.id)) {
+        draft.match.account = normalizeMatchAccount(savedAccount)
+      }
+    })
+  }
 
-  return { ok: true, task: data?.task || null, note: noteEntry }
+  if (targetType === 'contact' && targetAccountId) {
+    try {
+      await loadAccountContacts(targetAccountId, state.auth.appOrigin)
+    } catch (error) {
+      console.warn('[Extension] Account contacts refresh after save failed:', error)
+    }
+  }
+
+  return {
+    ok: true,
+    contact: savedContact,
+    account: savedAccount,
+    note: noteLine,
+    targetType,
+  }
 }
 
 async function loadRecentCallsForState() {
@@ -1267,7 +1263,6 @@ async function handleAuthSync(payload: any, sender: any) {
 }
 
 async function handleAuthClear() {
-  const priorNotes = state.notes
   await setState((draft) => {
     draft.auth = null
     draft.page = null
@@ -1276,7 +1271,7 @@ async function handleAuthClear() {
     draft.accountContacts = []
     draft.call = defaultCallState()
     draft.recentCalls = []
-    draft.notes = priorNotes
+    draft.notes = []
     draft.chat = draft.chat.slice(-DEFAULT_CHAT_LIMIT)
   })
 

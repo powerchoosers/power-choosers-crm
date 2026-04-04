@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Phone, Globe, Building2, ArrowUpRight, Star, MapPin, Mail, Smartphone, Landmark, Clock, Grid3X3, Radio, Plus, ShieldCheck, Linkedin, Loader2 } from 'lucide-react'
@@ -15,6 +15,7 @@ import {
   type MatchAccount,
   type MatchContact,
 } from '../shared'
+import { buildForensicNoteEntries, type ForensicNoteSource } from '../../../src/lib/forensic-notes'
 import { mapLocationToZone, LOAD_ZONE_COLOR_MAP, ERCOT_ZONES, type ErcotZone } from '../../../src/lib/market-mapping'
 import { resolveContactPhotoUrl } from '../../../src/lib/contactAvatar'
 import { ContactAvatar } from '../contactAvatar'
@@ -1225,10 +1226,11 @@ function App() {
 
   if (!state) return null
 
-  const { auth, page, pageStatus, match, call, accountContacts, notes } = state
+  const { auth, page, pageStatus, match, call, accountContacts } = state
   const account = match?.account
   const contact = match?.contact
   const hasMatchedAccount = Boolean(account?.id)
+  const hasContactMatch = Boolean(contact?.id)
   const pageDomain = extractDomain(page?.origin || page?.url) || null
   const selectedNumber = resolveCallerId(auth)
   const accountLocation = trimText((account as any)?.city || (account as any)?.state || (account as any)?.address || '')
@@ -1301,7 +1303,39 @@ function App() {
       (account as any)?.metadata?.logo_url ||
       ''
   ) || null
-  
+  const forensicLogEntries = useMemo(() => {
+    const noteSources: ForensicNoteSource[] = []
+    const accountName = account?.name || 'UNKNOWN ACCOUNT'
+    const contactName = contact?.name || 'UNKNOWN CONTACT'
+    const matchedContactNotes = trimText((contact as any)?.notes || accountContacts.find((item) => item?.id === contact?.id)?.notes || '')
+
+    if (trimText(account?.description || '')) {
+      noteSources.push({
+        label: `ACCOUNT NOTE • ${accountName}`,
+        notes: account?.description || null,
+      })
+    }
+
+    if (hasContactMatch) {
+      noteSources.push({
+        label: `CONTACT NOTE • ${contactName}`,
+        notes: matchedContactNotes || null,
+      })
+    } else {
+      const crmContacts = accountContacts.length > 0 ? accountContacts : ((match?.contacts || []) as MatchContact[])
+      crmContacts.forEach((item) => {
+        const notes = trimText(item?.notes || '')
+        if (!notes) return
+        noteSources.push({
+          label: `CONTACT NOTE • ${item?.name || 'UNKNOWN CONTACT'}`,
+          notes,
+        })
+      })
+    }
+
+    return buildForensicNoteEntries(noteSources)
+  }, [account?.description, account?.name, accountContacts, contact?.id, contact?.name, contact?.notes, hasContactMatch, match?.contacts])
+
   const callIsLive = call.state === 'incoming' || call.state === 'connected' || call.state === 'dialing'
   const showCallButton = Boolean(selectedNumber && dialTarget)
   const loadingMode = pageStatus === 'ingesting'
@@ -1789,14 +1823,14 @@ function App() {
                 className="np-card"
               >
                 <div className="np-section-head">
-                  <div className="np-kicker font-mono">02 // INTELLIGENCE</div>
-                  <span className="np-micro font-mono">{notes.length} total</span>
+                  <div className="np-kicker font-mono">02 // FORENSIC LOG STREAM</div>
+                  <span className="np-micro font-mono">{forensicLogEntries.length} total</span>
                 </div>
 
                 <div className="np-note-composer" style={{ marginBottom: 16 }}>
                   <textarea
                     className="nodal-input nodal-input--textarea"
-                    placeholder="Log forensic findings..."
+                    placeholder="Log forensic finding to CRM..."
                     rows={3}
                     value={noteDraft}
                     onChange={(e) => setNoteDraft(e.target.value)}
@@ -1809,7 +1843,7 @@ function App() {
                         await saveNote({ note: noteDraft, contactId: contact?.id, accountId: account?.id })
                         setNoteDraft('')
                       })}
-                      disabled={!noteDraft.trim() || busy === 'save-note'}
+                      disabled={!noteDraft.trim() || busy === 'save-note' || (!contact?.id && !account?.id)}
                     >
                       {busy === 'save-note' ? 'COMMITTING...' : 'COMMIT LOG'}
                     </button>
@@ -1817,16 +1851,20 @@ function App() {
                 </div>
 
                 <div className="np-note-list np-scroll" style={{ maxHeight: '200px' }}>
-                  {notes.map((note) => (
-                    <div key={note.id} className="np-note-entry font-mono" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8, padding: 10, borderRadius: 8 }}>
-                      <div className="np-note-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                        <span className="text-[9px] uppercase tracking-tighter" style={{ color: 'var(--np-blue)' }}>{note.source === 'ai' ? 'AI_SYS' : 'USER'}</span>
-                        <span className="text-[9px] opacity-40">{new Date(note.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                      </div>
-                      <p className="text-[11px] leading-relaxed text-zinc-300 m-0">{note.text}</p>
+                  {forensicLogEntries.map((entry, idx) => (
+                    <div key={`${entry.sourceLabel}-${entry.timestamp || 'na'}-${idx}`} className="np-note-entry font-mono" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)', marginBottom: 8, padding: 10, borderRadius: 8 }}>
+                      {(entry.timestamp || entry.showSourceLabel) && (
+                        <div className="np-note-meta" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, gap: 8 }}>
+                          <span className="text-[9px] uppercase tracking-tighter" style={{ color: 'var(--np-blue)' }}>{entry.timestamp || 'CRM'}</span>
+                          {entry.showSourceLabel ? (
+                            <span className="text-[9px] opacity-40">{entry.sourceLabel}</span>
+                          ) : null}
+                        </div>
+                      )}
+                      <p className="text-[11px] leading-relaxed text-zinc-300 m-0 whitespace-pre-wrap break-words">{entry.content}</p>
                     </div>
                   ))}
-                  {notes.length === 0 && <p className="np-micro text-center py-2 opacity-30">No intelligence logs found.</p>}
+                  {forensicLogEntries.length === 0 && <p className="np-micro text-center py-2 opacity-30">No CRM log stream found for this record.</p>}
                 </div>
               </motion.section>
 
