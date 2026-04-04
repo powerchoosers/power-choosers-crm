@@ -85,6 +85,7 @@ function normalizeContactRow(row, score = 0, reason = 'Matched from CRM data') {
     ) || null,
     city: trimText(row.city) || null,
     state: trimText(row.state) || null,
+    notes: trimText(row.notes || row.metadata?.notes) || null,
     score: Number(score) || 0,
     reason: trimText(reason) || 'Matched from CRM data',
   }
@@ -295,6 +296,7 @@ export default async function handler(req, res) {
         city,
         state,
         metadata,
+        notes,
         accounts!contacts_accountId_fkey (
           id,
           name,
@@ -641,6 +643,7 @@ export default async function handler(req, res) {
         city,
         state,
         metadata,
+        notes,
         accounts!contacts_accountId_fkey (
           id,
           name,

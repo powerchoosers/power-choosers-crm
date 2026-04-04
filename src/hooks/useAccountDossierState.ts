@@ -37,6 +37,89 @@ function clamp01(n: number) {
     return n
 }
 
+type AccountHierarchyContext = {
+    parentAccountId: string | null
+    parentCompanyName: string | null
+    subsidiaryAccountIds: string[]
+    subsidiaryCompanyNames: string[]
+    organizationRole: 'parent' | 'subsidiary' | 'standalone'
+    hierarchySummary: string
+}
+
+function toTrimmedString(value: unknown): string {
+    return typeof value === 'string' && value.trim() ? value.trim() : ''
+}
+
+function toTrimmedStringArray(value: unknown): string[] {
+    if (!Array.isArray(value)) return []
+    return value
+        .filter((item): item is string => typeof item === 'string')
+        .map((item) => item.trim())
+        .filter(Boolean)
+}
+
+function parseAccountHierarchy(account: any): AccountHierarchyContext {
+    const metadata = account?.metadata && typeof account.metadata === 'object'
+        ? account.metadata as Record<string, unknown>
+        : {}
+    const relationships = metadata.relationships && typeof metadata.relationships === 'object'
+        ? metadata.relationships as Record<string, unknown>
+        : {}
+
+    const parentAccountId = toTrimmedString(
+        relationships.parentAccountId ??
+        relationships.parentAccountID ??
+        metadata.parentAccountId ??
+        metadata.parent_company_id
+    ) || null
+
+    const parentCompanyName = toTrimmedString(
+        relationships.parentCompanyName ??
+        relationships.parentCompany ??
+        metadata.parent_company_name ??
+        metadata.parentCompanyName
+    ) || null
+
+    const subsidiaryAccountIds = toTrimmedStringArray(
+        relationships.subsidiaryAccountIds ??
+        metadata.subsidiaryAccountIds
+    )
+
+    const subsidiaryCompanyNames = toTrimmedStringArray(
+        relationships.subsidiaryCompanies ??
+        relationships.subsidiaryCompanyNames ??
+        metadata.subsidiaryCompanies ??
+        metadata.subsidiaryCompanyNames ??
+        metadata.subsidiary_company_names
+    )
+
+    const organizationRole = parentAccountId
+        ? 'subsidiary'
+        : subsidiaryAccountIds.length > 0
+            ? 'parent'
+            : 'standalone'
+
+    const hierarchySummary = [
+        `Role: ${organizationRole}`,
+        parentCompanyName ? `Parent company: ${parentCompanyName}` : null,
+        parentAccountId && !parentCompanyName ? `Parent company id: ${parentAccountId}` : null,
+        subsidiaryCompanyNames.length
+            ? `Subsidiaries: ${subsidiaryCompanyNames.join('; ')}`
+            : subsidiaryAccountIds.length
+                ? `Subsidiaries: ${subsidiaryAccountIds.length} linked account(s)`
+                : null,
+    ].filter(Boolean).join(' | ')
+
+    return {
+        parentAccountId,
+        parentCompanyName,
+        subsidiaryAccountIds,
+        subsidiaryCompanyNames,
+        organizationRole,
+        hierarchySummary,
+    }
+}
+
 export function useAccountDossierState(id: string) {
     const router = useRouter()
 
@@ -264,12 +347,23 @@ export function useAccountDossierState(id: string) {
 
     useEffect(() => {
         if (account) {
+            const hierarchy = parseAccountHierarchy(account)
+            const decisionMakerId = account.primaryContactId || null
             setContext({
                 type: 'account',
                 id: account.id,
                 label: `${account.name?.toUpperCase() || 'UNKNOWN ACCOUNT'}`,
                 data: {
                     ...account,
+                    decisionMakerId,
+                    primaryContactId: decisionMakerId,
+                    hierarchy,
+                    parentAccountId: hierarchy.parentAccountId,
+                    parentCompanyName: hierarchy.parentCompanyName,
+                    subsidiaryAccountIds: hierarchy.subsidiaryAccountIds,
+                    subsidiaryCompanyNames: hierarchy.subsidiaryCompanyNames,
+                    organizationRole: hierarchy.organizationRole,
+                    hierarchySummary: hierarchy.hierarchySummary,
                     revenue: account.revenue || account.metadata?.revenue || account.metadata?.annual_revenue,
                     employees: account.employees || account.metadata?.employees || account.metadata?.employee_count,
                     industry: account.industry || account.metadata?.industry,

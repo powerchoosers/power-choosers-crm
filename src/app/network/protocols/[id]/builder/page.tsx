@@ -95,6 +95,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import ForensicSignature from '@/components/emails/ForensicSignature';
 import { useUIStore } from '@/store/uiStore';
+import { useGeminiStore } from '@/store/geminiStore';
 import { buildUsableCallContextEntries } from '@/lib/call-context';
 import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
 
@@ -481,6 +482,7 @@ function ProtocolArchitectInner() {
   const { data: foundryAssets } = useFoundryAssets();
   const burnerFrom = getBurnerFromEmail(user?.email ?? undefined);
   const burnerSenderName = getBurnerSenderName(profile?.firstName ?? undefined);
+  const setGeminiContext = useGeminiStore((state) => state.setContext);
 
   // Sender Identity State
   const [senderEmail, setSenderEmail] = useState<string>('');
@@ -829,6 +831,77 @@ function ProtocolArchitectInner() {
       hierarchySummary,
     };
   }, [testAccount?.address, testAccount?.city, testAccount?.metadata, testAccount?.name, testAccount?.serviceAddresses, testAccount?.state, testContact?.company, testContact?.city, testContact?.location, testContact?.metadata?.general?.company, testContact?.state]);
+
+  const protocolStepSummary = useMemo(() => {
+    return (nodes || [])
+      .slice(0, 12)
+      .map((node, index) => {
+        const label = typeof node?.data?.label === 'string' && node.data.label.trim()
+          ? node.data.label.trim()
+          : `Step ${index + 1}`;
+        const type = typeof node?.data?.type === 'string' && node.data.type.trim()
+          ? node.data.type.trim()
+          : 'step';
+        const delay = node?.data?.delay != null ? String(node.data.delay).trim() : '';
+        const delayUnit = typeof node?.data?.delayUnit === 'string' && node.data.delayUnit.trim()
+          ? node.data.delayUnit.trim()
+          : 'days';
+        return `${index + 1}. ${label}${delay ? ` (${delay} ${delayUnit})` : ''} [${type}]`;
+      });
+  }, [nodes]);
+
+  const protocolContextPayload = useMemo(() => {
+    const protocolName = protocol?.name || (id === TEST_PROTOCOL_ID ? 'Test Protocol' : 'Protocol');
+    const targetContactName = testContact
+      ? `${testContact.firstName || testContact.name || ''} ${testContact.lastName || ''}`.trim() || testContact.name || null
+      : null;
+
+    return {
+      type: 'protocol',
+      id: protocol?.id || id,
+      label: `PROTOCOL: ${protocolName.toUpperCase()}`,
+      data: {
+        protocolId: protocol?.id || id,
+        protocolName,
+        description: protocol?.description || '',
+        stepCount: Array.isArray(nodes) ? nodes.length : 0,
+        stepSummary: protocolStepSummary,
+        selectedNode: selectedNode ? {
+          id: selectedNode.id,
+          label: typeof selectedNode.data?.label === 'string' ? selectedNode.data.label : '',
+          type: typeof selectedNode.data?.type === 'string' ? selectedNode.data.type : '',
+        } : null,
+        senderEmail: senderEmail || null,
+        targetContactId: testContact?.id || null,
+        targetContactName,
+        targetAccountId: testAccount?.id || null,
+        targetAccountName: testAccount?.name || null,
+        decisionMakerId: testAccount?.primaryContactId || testContact?.id || null,
+        parentAccountId: testAccountContext.parentAccountId,
+        parentCompanyId: testAccountContext.parentAccountId,
+        parentCompanyName: testAccountContext.parentCompanyName,
+        subsidiaryAccountIds: testAccountContext.subsidiaryAccountIds,
+        subsidiaryCompanyNames: testAccountContext.subsidiaryCompanyNames,
+        organizationRole: testAccountContext.organizationRole,
+        hierarchySummary: testAccountContext.hierarchySummary,
+        siteAddress: testAccountContext.siteAddress,
+        siteCity: testAccountContext.siteCity,
+        siteState: testAccountContext.siteState,
+        utilityTerritory: testAccountContext.utilityTerritory,
+        marketContext: testAccountContext.marketContext,
+      },
+    };
+  }, [id, nodes, protocol, protocolStepSummary, selectedNode, senderEmail, testAccount?.id, testAccount?.name, testAccount?.primaryContactId, testContact, testAccountContext]);
+
+  useEffect(() => {
+    if (!protocolContextPayload) {
+      setGeminiContext(null);
+      return;
+    }
+
+    setGeminiContext(protocolContextPayload as any);
+    return () => setGeminiContext(null);
+  }, [protocolContextPayload, setGeminiContext]);
 
   const insertVariable = (variable: string) => {
     if (!textareaRef.current || !selectedNode) return;
