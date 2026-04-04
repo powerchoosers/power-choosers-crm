@@ -75,13 +75,7 @@ function extractPrimarySiteDetails(account) {
     }
 
     if (candidates.length > 0) {
-      const normalizedCity = normalizeCityKey(city);
-      const normalizedState = normalizeCityKey(state);
-      const preferred = candidates.find((candidate) => candidate.isPrimary)
-        || candidates.find((candidate) => normalizedCity && normalizeCityKey(candidate.city) === normalizedCity)
-        || candidates.find((candidate) => normalizedState && normalizeCityKey(candidate.state) === normalizedState)
-        || candidates[0];
-      return preferred;
+      return candidates.find((candidate) => candidate.isPrimary) || candidates[0];
     }
   }
 
