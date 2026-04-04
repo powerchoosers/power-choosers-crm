@@ -30,11 +30,11 @@ export function TaskManagement() {
 
   const navigateToTaskTarget = (task: Task) => {
     if (task.contactId) {
-      router.push(`/network/contacts/${task.contactId}`)
+      router.push(`/network/contacts/${task.contactId}?taskId=${encodeURIComponent(task.id)}`)
       return
     }
     if (task.accountId) {
-      router.push(`/network/accounts/${task.accountId}`)
+      router.push(`/network/accounts/${task.accountId}?taskId=${encodeURIComponent(task.id)}`)
     }
   }
 

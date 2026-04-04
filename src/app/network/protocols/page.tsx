@@ -51,6 +51,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
 import { cn } from '@/lib/utils'
+import { useGeminiStore } from '@/store/geminiStore'
+import { useUIStore } from '@/store/uiStore'
+import { buildProtocolContext } from '@/lib/protocol-context'
 
 const PAGE_SIZE = 50
 
@@ -73,6 +76,8 @@ function toDisplayDate(value: unknown): Date | null {
 
 export default function ProtocolsPage() {
   const router = useRouter()
+  const setGeminiContext = useGeminiStore((state) => state.setContext)
+  const setActiveSequenceId = useUIStore((state) => state.setActiveSequenceId)
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
@@ -292,7 +297,11 @@ export default function ProtocolsPage() {
                         "border-white/5 transition-colors group cursor-pointer",
                         isSelected ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10" : "hover:bg-white/[0.02]"
                       )}
-                      onClick={() => router.push(`/network/protocols/${protocol.id}/builder`)}
+                      onClick={() => {
+                        setActiveSequenceId(protocol.id)
+                        setGeminiContext(buildProtocolContext(protocol))
+                        router.push(`/network/protocols/${protocol.id}/builder`)
+                      }}
                     >
                     <TableCell className="py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-center px-2 relative group/select">

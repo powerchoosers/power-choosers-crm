@@ -1,0 +1,19 @@
+{
+  "type": "hierarchy_card",
+  "data": {
+    "accountId": "account_hierarchy_001",
+    "accountName": "High Plains Packaging",
+    "role": "subsidiary",
+    "parentCompanyName": "High Plains Holdings",
+    "parentAccountId": "account_parent_001",
+    "subsidiaryAccountIds": [
+      "account_sub_001",
+      "account_sub_002"
+    ],
+    "subsidiaryCompanyNames": [
+      "High Plains Cold Storage",
+      "High Plains Logistics"
+    ],
+    "hierarchySummary": "Role: subsidiary | Parent company: High Plains Holdings | Subsidiaries: High Plains Cold Storage; High Plains Logistics"
+  }
+}

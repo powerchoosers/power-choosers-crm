@@ -9,6 +9,7 @@ import { useEntityTasks } from '@/hooks/useEntityTasks'
 import { useTasks, useAllPendingTasks } from '@/hooks/useTasks'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
+import { buildProtocolContextFromTask } from '@/lib/protocol-context'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { formatMillValue } from '@/lib/mills'
@@ -31,7 +32,7 @@ function parseDomainFromWebsite(value?: string | null): string | undefined {
     }
 }
 
-export function useContactDossierState(id: string) {
+export function useContactDossierState(id: string, taskIdFromUrl?: string | null) {
     const router = useRouter()
 
     const { data: contact, isLoading, isFetched } = useContact(id)
@@ -81,7 +82,7 @@ export function useContactDossierState(id: string) {
         } as any)
         return () => setContext(null)
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, contact, account?.id, domain, setContext])
+    }, [id, contact, account?.id, domain, taskIdFromUrl, setContext])
 
     const [isSaving, setIsSaving] = useState(false)
     const [showSynced, setShowSynced] = useState(false)
@@ -203,6 +204,35 @@ export function useContactDossierState(id: string) {
     useEffect(() => {
         setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, visiblePendingTasks.length - 1)))
     }, [visiblePendingTasks.length])
+
+    useEffect(() => {
+        if (!taskIdFromUrl || !visiblePendingTasks.length) return
+        const idx = visiblePendingTasks.findIndex((task) => String(task.id) === taskIdFromUrl)
+        if (idx >= 0) setCurrentTaskIndex(idx)
+    }, [taskIdFromUrl, visiblePendingTasks])
+
+    useEffect(() => {
+        if (!taskIdFromUrl) return
+        const matchingTask = allPendingTasks.find((task) => String(task.id) === taskIdFromUrl)
+        if (!matchingTask) return
+
+        const linkedAccountId = (contact as any)?.linkedAccountId || (contact as any)?.linked_account_id || (contact as any)?.accountId || (contact as any)?.account_id || account?.id || ''
+        const protocolContext = buildProtocolContextFromTask(matchingTask, {
+            targetContactId: id,
+            targetContactName: contact?.name || undefined,
+            targetAccountId: linkedAccountId || undefined,
+            targetAccountName: account?.name || (contact as any)?.companyName || (contact as any)?.company || undefined,
+            decisionMakerId: account?.primaryContactId || undefined,
+            taskId: taskIdFromUrl,
+            taskTitle: matchingTask.title,
+            taskPriority: matchingTask.priority,
+            taskStatus: matchingTask.status,
+        })
+
+        if (!protocolContext) return
+        setContext(protocolContext)
+        return () => setContext(null)
+    }, [taskIdFromUrl, allPendingTasks, contact, account?.id, account?.name, account?.primaryContactId, id, setContext])
 
     const navigateToTaskDossier = (task: any) => {
         const cid = (task.contactId != null && String(task.contactId).trim() !== '') ? String(task.contactId).trim() : undefined
