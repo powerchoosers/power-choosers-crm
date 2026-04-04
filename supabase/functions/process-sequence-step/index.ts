@@ -275,7 +275,7 @@ function buildReplyStageDirective(stage: string): string {
             '- Never ask for a utility bill, statement, or invoice in first touch.',
             '- If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
             '- If the site is in Texas and utility territory is known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. Do not use market shorthand.',
-            '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = utility territory / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: "budget drift at {{company}}", "Oncor delivery charges", "renewal timing for {{company}}", "simple cost check".',
+            '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = utility territory / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: "budget drift", "fixed cost", "load timing", "renewal timing", "simple cost check".',
             '- Never mention LinkedIn, a profile, or how you found them.',
         ].join('\n'),
         follow_up: [
@@ -287,7 +287,7 @@ function buildReplyStageDirective(stage: string): string {
             '- If the site is in Texas and utility territory is known, use the plain name once naturally. Keep it as a location cue, not jargon.',
             '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the cost breakdown." "Want the rate-vs-delivery view?" "Is this worth a quick look?"',
             '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
-            '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: "rate vs delivery at {{company}}", "where demand adds cost", "one more timing check".',
+            '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: "rate vs delivery", "demand adds cost", "timing check".',
         ].join('\n'),
         no_reply: [
             '- NO REPLY: 35-55 words, maximum 2 sentences.',
@@ -303,7 +303,7 @@ function buildReplyStageDirective(stage: string): string {
         general: [
             '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
             '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
-            '- Use a plain subject line with 1-5 words, but vary it by title and stage. Finance should sound like budget/timing; operations like utility territory, delivery, or demand; purchasing like renewal/vendor; owner like simple check/leverage.',
+            '- Use a plain subject line with 1-4 words, but vary it by title and stage. Finance should sound like budget/timing; operations like utility territory, delivery, or demand; purchasing like renewal/vendor; owner like simple check/leverage.',
             '- One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
             '- As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
             '- Do not confuse a parent company with the operating company. If there is a subsidiary relationship, keep the local site and operating entity in view.',
