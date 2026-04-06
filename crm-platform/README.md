@@ -42,3 +42,6 @@ This repo also has an Electron wrapper for a desktop version of the CRM.
 - `npm run desktop:dev` starts the Next app locally and opens it in Electron.
 - `npm run desktop:prod` opens the hosted production app in Electron.
 - `npm run desktop:dist` packages an installer into `release/`.
+- `npm run desktop:publish` publishes a Windows build to GitHub Releases.
+- The GitHub Actions desktop release workflow publishes a fresh Windows build on every push to `main`.
+- Installed desktop builds check GitHub Releases for updates and show a top-screen banner when an update is ready to install.
