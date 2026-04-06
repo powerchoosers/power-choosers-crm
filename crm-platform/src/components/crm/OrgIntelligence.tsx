@@ -16,6 +16,7 @@ import { useCallStore } from '@/store/callStore';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { ContactAvatar } from '@/components/ui/ContactAvatar';
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar';
 import type { ComposeContext } from '@/components/emails/ComposeModal';
 import { cn } from '@/lib/utils';
 import { formatPhoneNumber } from '@/lib/formatPhone';
@@ -311,10 +312,10 @@ function normalizeLinkedinUrl(value: unknown): string {
 
 function contactCacheKey(contact: ApolloContactRow): string {
   return (
-    sanitizeContactText(contact.crmId || '') ||
-    sanitizeContactText(contact.id || '') ||
     sanitizeContactText(contact.email || '').toLowerCase() ||
     normalizeLinkedinUrl(contact.linkedin || '') ||
+    sanitizeContactText(contact.crmId || '') ||
+    sanitizeContactText(contact.id || '') ||
     buildNameKey(contact.firstName, contact.lastName) ||
     sanitizeContactText(contact.name || '').toLowerCase()
   );
@@ -323,56 +324,6 @@ function contactCacheKey(contact: ApolloContactRow): string {
 function mergeApolloContactRows(primary: ApolloContactRow[], secondary: ApolloContactRow[]): ApolloContactRow[] {
   const byKey = new Map<string, ApolloContactRow>();
   const extras: ApolloContactRow[] = [];
-
-  const addPhone = (value: unknown, seen: Set<string>, phones: PhoneEntry[], fallback?: PhoneEntry) => {
-    const number = typeof value === 'string'
-      ? value
-      : isRecord(value) && typeof value.number === 'string'
-        ? value.number
-        : typeof fallback === 'string'
-          ? fallback
-          : '';
-    const normalized = sanitizeContactText(number);
-    if (!normalized) return;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) return;
-    seen.add(key);
-    if (isRecord(value) && typeof value.number === 'string') {
-      phones.push({
-        number: value.number,
-        type: typeof value.type === 'string' ? value.type : undefined,
-      });
-      return;
-    }
-    phones.push(normalized);
-  };
-
-  const mergeContact = (existing: ApolloContactRow, fresh: ApolloContactRow): ApolloContactRow => {
-    const mergedPhones: PhoneEntry[] = [];
-    const seen = new Set<string>();
-    (Array.isArray(existing.phones) ? existing.phones : []).forEach((entry) => addPhone(entry, seen, mergedPhones));
-    (Array.isArray(fresh.phones) ? fresh.phones : []).forEach((entry) => addPhone(entry, seen, mergedPhones));
-
-    return {
-      ...existing,
-      ...fresh,
-      id: sanitizeContactText(fresh.id || existing.id || ''),
-      crmId: sanitizeContactText(fresh.crmId || existing.crmId || '') || undefined,
-      name: sanitizeContactText(fresh.name || existing.name || '') || 'Contact',
-      firstName: sanitizeContactText(fresh.firstName || existing.firstName || '') || undefined,
-      lastName: sanitizeContactText(fresh.lastName || existing.lastName || '') || undefined,
-      title: sanitizeContactText(fresh.title || existing.title || '') || undefined,
-      email: sanitizeContactText(fresh.email || '') || sanitizeContactText(existing.email || '') || 'N/A',
-      photoUrl: sanitizeContactText(fresh.photoUrl || existing.photoUrl || '') || undefined,
-      location: sanitizeContactText(fresh.location || existing.location || '') || undefined,
-      linkedin: sanitizeContactText(fresh.linkedin || existing.linkedin || '') || undefined,
-      status: fresh.status === 'verified' || existing.status === 'verified'
-        ? 'verified'
-        : fresh.status || existing.status,
-      isMonitored: Boolean(fresh.isMonitored || existing.isMonitored || fresh.crmId || existing.crmId),
-      phones: mergedPhones,
-    };
-  };
 
   const insert = (contact: ApolloContactRow) => {
     const key = contactCacheKey(contact);
@@ -387,13 +338,81 @@ function mergeApolloContactRows(primary: ApolloContactRow[], secondary: ApolloCo
       return;
     }
 
-    byKey.set(key, mergeContact(existing, contact));
+    byKey.set(key, mergeApolloContact(existing, contact));
   };
 
   primary.forEach(insert);
   secondary.forEach(insert);
 
   return [...extras, ...byKey.values()];
+}
+
+function mergeApolloContact(existing: ApolloContactRow, fresh: ApolloContactRow): ApolloContactRow {
+  const mergedPhones: PhoneEntry[] = [];
+  const seen = new Set<string>();
+
+  const addPhone = (value: unknown, fallback?: PhoneEntry) => {
+    const number = typeof value === 'string'
+      ? value
+      : isRecord(value) && typeof value.number === 'string'
+        ? value.number
+        : typeof fallback === 'string'
+          ? fallback
+          : '';
+    const normalized = sanitizeContactText(number);
+    if (!normalized) return;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    if (isRecord(value) && typeof value.number === 'string') {
+      mergedPhones.push({
+        number: value.number,
+        type: typeof value.type === 'string' ? value.type : undefined,
+      });
+      return;
+    }
+    mergedPhones.push(normalized);
+  };
+
+  (Array.isArray(existing.phones) ? existing.phones : []).forEach((entry) => addPhone(entry));
+  (Array.isArray(fresh.phones) ? fresh.phones : []).forEach((entry) => addPhone(entry));
+
+  return {
+    ...existing,
+    ...fresh,
+    id: sanitizeContactText(fresh.id || existing.id || ''),
+    crmId: sanitizeContactText(fresh.crmId || existing.crmId || '') || undefined,
+    name: sanitizeContactText(fresh.name || existing.name || '') || 'Contact',
+    firstName: sanitizeContactText(fresh.firstName || existing.firstName || '') || undefined,
+    lastName: sanitizeContactText(fresh.lastName || existing.lastName || '') || undefined,
+    title: sanitizeContactText(fresh.title || existing.title || '') || undefined,
+    email: sanitizeContactText(fresh.email || '') || sanitizeContactText(existing.email || '') || 'N/A',
+    photoUrl: sanitizeContactText(fresh.photoUrl || existing.photoUrl || '') || undefined,
+    location: sanitizeContactText(fresh.location || existing.location || '') || undefined,
+    linkedin: sanitizeContactText(fresh.linkedin || existing.linkedin || '') || undefined,
+    status: fresh.status === 'verified' || existing.status === 'verified'
+      ? 'verified'
+      : fresh.status || existing.status,
+    isMonitored: Boolean(fresh.isMonitored || existing.isMonitored || fresh.crmId || existing.crmId),
+    phones: mergedPhones,
+  };
+}
+
+function hydrateApolloContactsWithCache(current: ApolloContactRow[], cached: ApolloContactRow[]): ApolloContactRow[] {
+  if (current.length === 0 || cached.length === 0) return current;
+
+  const cachedByKey = new Map<string, ApolloContactRow>();
+  cached.forEach((contact) => {
+    const key = contactCacheKey(contact);
+    if (key && !cachedByKey.has(key)) {
+      cachedByKey.set(key, contact);
+    }
+  });
+
+  return current.map((contact) => {
+    const cachedMatch = cachedByKey.get(contactCacheKey(contact));
+    return cachedMatch ? mergeApolloContact(cachedMatch, contact) : contact;
+  });
 }
 
 export default function OrgIntelligence({ domain: initialDomain, companyName, website, accountId, accountLogoUrl, accountDomain }: OrgIntelligenceProps) {
@@ -620,18 +639,19 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       }
 
       const bestCandidate = [...supabaseCandidates, ...localCandidates].sort((a, b) => {
+        if (b.priority !== a.priority) return b.priority - a.priority;
         if (b.timestamp !== a.timestamp) return b.timestamp - a.timestamp;
-        return b.priority - a.priority;
+        return a.key.localeCompare(b.key);
       })[0];
 
       if (bestCandidate?.cache) {
         applyCachedData(bestCandidate.cache);
 
-        // Keep the freshest copy in the browser for quick reloads.
-        localStorage.setItem(`apollo_cache_${bestCandidate.key}`, JSON.stringify(bestCandidate.cache));
-        if (bestCandidate.source === 'supabase' && domainKey && bestCandidate.key !== domainKey) {
-          localStorage.setItem(`apollo_cache_${domainKey}`, JSON.stringify(bestCandidate.cache));
-        }
+        // Keep all related keys in sync so account/contact flips stay on the same cached node.
+        const serializedCache = JSON.stringify(bestCandidate.cache);
+        keysToCheck.forEach((key) => {
+          localStorage.setItem(`apollo_cache_${key}`, serializedCache);
+        });
         return;
       }
 
@@ -1417,6 +1437,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
 
     setScanStatus('scanning');
+    const previousData = data;
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -1529,9 +1550,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             typeof contact.state === 'string' ? contact.state : null
           ].filter(Boolean).join(', ')
 
-          const photoUrl = typeof contact.photo_url === 'string'
-            ? contact.photo_url
-            : (typeof contact.photoUrl === 'string' ? contact.photoUrl : undefined)
+          const photoUrl = resolveContactPhotoUrl(contact)
 
           // Apollo phone numbers are often in a 'phones' array
           const phones: string[] = []
@@ -1561,11 +1580,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         })
         .filter((v): v is ApolloContactRow => v !== null)
 
-      setData(mappedData);
+      const hydratedData = hydrateApolloContactsWithCache(mappedData, previousData);
+      const mergedCacheData = mergeApolloContactRows(previousData, mappedData);
+
+      setData(hydratedData);
       setScanStatus('complete');
 
       // Save to cache
-      saveToCache(currentSummary, mappedData, {
+      saveToCache(currentSummary, mergedCacheData, {
         searchTerm: '',
         currentPage: 1,
       });
@@ -1667,9 +1689,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             typeof c.state === 'string' ? c.state : null
           ].filter(Boolean).join(', ');
 
-          const photoUrl = typeof c.photo_url === 'string'
-            ? c.photo_url
-            : (typeof c.photoUrl === 'string' ? c.photoUrl : undefined);
+          const photoUrl = resolveContactPhotoUrl(c);
 
           const phones: PhoneEntry[] = [];
           if (Array.isArray(c.phones)) {
@@ -1717,9 +1737,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         .filter((v): v is ApolloContactRow => v !== null);
 
       const mergedCacheData = mergeApolloContactRows(previousData, mappedData);
+      const hydratedData = hydrateApolloContactsWithCache(mappedData, previousData);
 
       if (mappedData.length > 0) {
-        setData(mappedData);
+        setData(hydratedData);
         setCurrentPage(1);
         saveToCache(companySummary, mergedCacheData, {
           searchTerm: term,
@@ -1731,7 +1752,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (accountId) {
           const { data: crmContacts, error: crmError } = await supabase
             .from('contacts')
-            .select('id, firstName, lastName, name, email, title, city, state, linkedinUrl, phone, mobile, workPhone, otherPhone')
+            .select('id, firstName, lastName, name, email, title, city, state, linkedinUrl, phone, mobile, workPhone, otherPhone, metadata')
             .eq('accountId', accountId)
             .limit(200);
 
@@ -1773,6 +1794,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   isMonitored: true,
                   location: [sanitizeContactText(c.city), sanitizeContactText(c.state)].filter(Boolean).join(', ') || undefined,
                   linkedin: sanitizeContactText(c.linkedinUrl) || undefined,
+                  photoUrl: resolveContactPhotoUrl(c, c.metadata),
                   phones
                 };
               });
@@ -1780,9 +1802,11 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         }
 
         if (crmFallback.length > 0) {
-          setData(crmFallback);
+          const hydratedFallback = hydrateApolloContactsWithCache(crmFallback, previousData);
+          const mergedFallbackCache = mergeApolloContactRows(previousData, crmFallback);
+          setData(hydratedFallback);
           setCurrentPage(1);
-          saveToCache(companySummary, mergeApolloContactRows(previousData, crmFallback), {
+          saveToCache(companySummary, mergedFallbackCache, {
             searchTerm: term,
             currentPage: 1,
           });
