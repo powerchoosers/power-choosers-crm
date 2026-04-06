@@ -323,13 +323,18 @@ function createWindow() {
   })
 
   mainWindow.webContents.on('context-menu', (event, params) => {
-    const menu = buildTextContextMenu(params, event.sender)
+    const webContents = mainWindow?.webContents
+    if (!webContents) {
+      return
+    }
+
+    const menu = buildTextContextMenu(params, webContents)
 
     if (!menu) {
       return
     }
 
-    const popupWindow = BrowserWindow.fromWebContents(event.sender) || mainWindow
+    const popupWindow = BrowserWindow.fromWebContents(webContents) || mainWindow
     menu.popup({
       window: popupWindow,
       frame: params.frame,
