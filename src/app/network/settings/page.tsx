@@ -99,6 +99,13 @@ function getDesktopUpdateBadge(state: DesktopUpdateState | null, isDesktopApp: b
     }
   }
 
+  const errorText = String(state?.error || '').toLowerCase()
+  const looksLikeMissingRelease =
+    errorText.includes('404') ||
+    errorText.includes('not found') ||
+    errorText.includes('no published') ||
+    errorText.includes('release not found')
+
   switch (state?.phase) {
     case 'checking':
       return {
@@ -121,6 +128,12 @@ function getDesktopUpdateBadge(state: DesktopUpdateState | null, isDesktopApp: b
         className: 'border-emerald-500/20 text-emerald-400 bg-emerald-500/5',
       }
     case 'error':
+      if (looksLikeMissingRelease) {
+        return {
+          label: 'No release yet',
+          className: 'border-white/10 text-zinc-500 bg-white/[0.03]',
+        }
+      }
       return {
         label: 'Update error',
         className: 'border-red-500/20 text-red-400 bg-red-500/5',
@@ -281,10 +294,24 @@ export default function SettingsPage() {
       }
 
       if (!result.ok) {
+        const errorText = String(result.reason || result.state.error || '').toLowerCase()
+        const looksLikeMissingRelease =
+          errorText.includes('404') ||
+          errorText.includes('not found') ||
+          errorText.includes('no published') ||
+          errorText.includes('release not found')
+
         const message = result.reason === 'not_packaged'
           ? 'Desktop updates only work in the packaged app'
-          : 'Unable to check for desktop updates'
-        toast.error(message, { id: toastId })
+          : looksLikeMissingRelease
+            ? 'No desktop release has been published yet'
+            : 'Unable to check for desktop updates'
+
+        if (looksLikeMissingRelease) {
+          toast.info(message, { id: toastId })
+        } else {
+          toast.error(message, { id: toastId })
+        }
         return
       }
 
