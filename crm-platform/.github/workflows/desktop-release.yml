@@ -1,0 +1,41 @@
+name: Desktop Release
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Stamp desktop build version
+        shell: pwsh
+        run: |
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); const buildNumber = (Number(process.env.GITHUB_RUN_NUMBER || '0') * 1000) + Number(process.env.GITHUB_RUN_ATTEMPT || '1'); const [major = '0', minor = '1'] = String(pkg.version || '0.1.0').split('.'); pkg.version = major + '.' + minor + '.' + buildNumber; fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n'); console.log('Stamped desktop build version:', pkg.version);"
+
+      - name: Build and publish desktop installer
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npx electron-builder --win --publish always
