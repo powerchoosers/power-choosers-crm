@@ -25,11 +25,11 @@ function buildNameKey(firstName, lastName) {
 
 function contactCacheKey(contact) {
   return (
-    sanitizeText(contact?.id || '') ||
-    sanitizeText(contact?.crmId || '') ||
-    sanitizeText(contact?.apolloPersonId || contact?.apollo_person_id || '') ||
     sanitizeText(contact?.email || '').toLowerCase() ||
     sanitizeText(contact?.linkedin || contact?.linkedinUrl || '').toLowerCase() ||
+    sanitizeText(contact?.crmId || '') ||
+    sanitizeText(contact?.apolloPersonId || contact?.apollo_person_id || '') ||
+    sanitizeText(contact?.id || '') ||
     buildNameKey(contact?.firstName, contact?.lastName) ||
     sanitizeText(contact?.name || '').toLowerCase()
   )
@@ -353,4 +353,3 @@ export default async function handler(req, res) {
     }));
   }
 }
-
