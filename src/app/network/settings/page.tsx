@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu, Mic, Square, Loader2, Volume2 } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu, Mic, Square, Loader2, Volume2, Download } from 'lucide-react'
 import { useSyncStore } from '@/store/syncStore'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useUIStore } from '@/store/uiStore'
 import { getVoicemailGreetingForTwilioNumber, normalizePhoneNumber, type TwilioNumberEntry, type VoicemailGreeting } from '@/lib/voicemail'
 import { NodalAudioScrubber } from '@/components/audio/NodalAudioScrubber'
+import type { DesktopUpdateCheckResult, DesktopUpdateState } from '@/types/desktop'
 
 type VoicemailRecorderState = {
   audioContext: AudioContext
@@ -88,6 +89,48 @@ function blobToDataUrl(blob: Blob) {
     reader.onerror = () => reject(reader.error || new Error('Failed to read audio blob'))
     reader.readAsDataURL(blob)
   })
+}
+
+function getDesktopUpdateBadge(state: DesktopUpdateState | null, isDesktopApp: boolean) {
+  if (!isDesktopApp) {
+    return {
+      label: 'Desktop only',
+      className: 'border-white/10 text-zinc-500 bg-white/[0.03]',
+    }
+  }
+
+  switch (state?.phase) {
+    case 'checking':
+      return {
+        label: 'Checking',
+        className: 'border-blue-500/20 text-blue-300 bg-blue-500/5',
+      }
+    case 'available':
+      return {
+        label: 'Update found',
+        className: 'border-[#002FA7]/30 text-[#8ba6ff] bg-[#002FA7]/10',
+      }
+    case 'downloading':
+      return {
+        label: `Downloading ${state.progress ?? 0}%`,
+        className: 'border-[#002FA7]/30 text-[#8ba6ff] bg-[#002FA7]/10',
+      }
+    case 'downloaded':
+      return {
+        label: 'Ready to install',
+        className: 'border-emerald-500/20 text-emerald-400 bg-emerald-500/5',
+      }
+    case 'error':
+      return {
+        label: 'Update error',
+        className: 'border-red-500/20 text-red-400 bg-red-500/5',
+      }
+    default:
+      return {
+        label: 'Up to date',
+        className: 'border-white/10 text-zinc-500 bg-white/[0.03]',
+      }
+  }
 }
 
 export default function SettingsPage() {
@@ -159,6 +202,9 @@ export default function SettingsPage() {
   // Diagnostics State
   const [diagData, setDiagData] = useState<any>(null)
   const [isCheckingHealth, setIsCheckingHealth] = useState(false)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
+  const [desktopUpdateState, setDesktopUpdateState] = useState<DesktopUpdateState | null>(null)
+  const [isCheckingDesktopUpdate, setIsCheckingDesktopUpdate] = useState(false)
 
   const runDiagnostics = async () => {
     setIsCheckingHealth(true)
@@ -177,6 +223,94 @@ export default function SettingsPage() {
   useEffect(() => {
     if (diagData === null) runDiagnostics()
   }, [])
+
+  useEffect(() => {
+    const bridge = window.nodalDesktop
+
+    if (!bridge?.isDesktop || process.env.NODE_ENV !== 'production') {
+      setIsDesktopApp(false)
+      setDesktopUpdateState(null)
+      return
+    }
+
+    let isMounted = true
+    setIsDesktopApp(true)
+
+    const syncDesktopUpdateState = async () => {
+      try {
+        const currentState = await bridge.getUpdateState()
+        if (isMounted) {
+          setDesktopUpdateState(currentState)
+        }
+      } catch {
+        // Keep the settings page usable if the desktop bridge is not ready yet.
+      }
+    }
+
+    void syncDesktopUpdateState()
+
+    const unsubscribe = bridge.onUpdateEvent((nextState) => {
+      if (!isMounted) {
+        return
+      }
+
+      setDesktopUpdateState(nextState)
+    })
+
+    return () => {
+      isMounted = false
+      unsubscribe()
+    }
+  }, [])
+
+  const checkDesktopUpdates = async () => {
+    const bridge = window.nodalDesktop
+
+    if (!bridge?.isDesktop || !isDesktopApp) {
+      toast.error('Desktop updates are only available in the installed app')
+      return
+    }
+
+    setIsCheckingDesktopUpdate(true)
+    const toastId = toast.loading('Checking for desktop updates...')
+
+    try {
+      const result: DesktopUpdateCheckResult = await bridge.checkForUpdatesNow()
+      if (result.state) {
+        setDesktopUpdateState(result.state)
+      }
+
+      if (!result.ok) {
+        const message = result.reason === 'not_packaged'
+          ? 'Desktop updates only work in the packaged app'
+          : 'Unable to check for desktop updates'
+        toast.error(message, { id: toastId })
+        return
+      }
+
+      if (result.skipped) {
+        if (result.state.phase === 'downloaded') {
+          toast.success('Update is already ready to install', { id: toastId })
+        } else if (result.state.phase === 'downloading' || result.state.phase === 'available') {
+          toast.success('An update is already in progress', { id: toastId })
+        } else {
+          toast.success('You are already on the latest version', { id: toastId })
+        }
+        return
+      }
+
+      if (result.updateAvailable) {
+        toast.success('Update found. Downloading in the background.', { id: toastId })
+      } else {
+        toast.success('You are already on the latest version', { id: toastId })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to check for desktop updates'
+      toast.error(message, { id: toastId })
+    } finally {
+      setIsCheckingDesktopUpdate(false)
+    }
+  }
 
   // Email Connections
   const [connections, setConnections] = useState<any[]>([])
@@ -1558,6 +1692,38 @@ export default function SettingsPage() {
                       </div>
                       <Badge variant="outline" className="border-white/10 text-[9px] font-mono text-zinc-500 uppercase">Edge</Badge>
                     </div>
+
+                    {isDesktopApp && (
+                      <div className="px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.01] transition-colors group">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 rounded-lg bg-zinc-900/50 border border-white/5">
+                            <Download className="w-4 h-4 text-zinc-400" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-zinc-200">Desktop Updates</p>
+                            <p className="text-[10px] text-zinc-500 font-mono tracking-tighter">Check GitHub Releases for the newest build</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="outline"
+                            className={cn('border-white/10 text-[9px] font-mono uppercase', getDesktopUpdateBadge(desktopUpdateState, isDesktopApp).className)}
+                          >
+                            {getDesktopUpdateBadge(desktopUpdateState, isDesktopApp).label}
+                          </Badge>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={checkDesktopUpdates}
+                            disabled={isCheckingDesktopUpdate || desktopUpdateState?.phase === 'checking' || desktopUpdateState?.phase === 'available' || desktopUpdateState?.phase === 'downloading' || desktopUpdateState?.phase === 'downloaded'}
+                            className="nodal-glass border-white/5 text-zinc-400 hover:text-white hover:border-white/20 transition-all font-mono text-[10px]"
+                          >
+                            <RefreshCw className={cn("w-3 h-3 mr-2", isCheckingDesktopUpdate && "animate-spin")} />
+                            {isCheckingDesktopUpdate ? 'CHECKING...' : 'CHECK NOW'}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Card>
 
