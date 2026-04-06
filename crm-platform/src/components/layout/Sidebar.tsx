@@ -93,10 +93,6 @@ const navigationStructure = [
   }
 ];
 
-const SIDEBAR_COLLAPSED_WIDTH = 70
-const SIDEBAR_EXPANDED_WIDTH = 280
-const SIDEBAR_REVEAL_WIDTH = SIDEBAR_EXPANDED_WIDTH - SIDEBAR_COLLAPSED_WIDTH
-
 export function Sidebar() {
   const { setRightPanelMode } = useUIStore()
   const pathname = usePathname()
@@ -125,24 +121,32 @@ export function Sidebar() {
   // suppressHydrationWarning: browser extensions (e.g. Cursor) can inject data-cursor-ref onto <a> tags
   // after SSR, causing server/client attribute mismatch. Suppress only for this sidebar subtree.
   return (
-    <aside
+    <motion.aside
+      layout
       suppressHydrationWarning
       className={cn(
-        "hidden lg:block fixed left-0 top-0 bottom-0 z-40 overflow-visible"
+        "hidden lg:flex fixed left-0 top-0 bottom-0 z-40 bg-zinc-950/80 backdrop-blur-xl border-r border-white/5 flex-col shadow-2xl transition-shadow duration-500"
       )}
-      style={{ width: SIDEBAR_COLLAPSED_WIDTH }}
+      animate={{
+        width: isHovered ? 280 : 70,
+        boxShadow: isHovered ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "0 0 0 0 rgba(0, 0, 0, 0)"
+      }}
       onMouseEnter={() => {
         setIsHovered(true)
       }}
       onMouseLeave={() => setIsHovered(false)}
+      transition={{
+        type: "spring",
+        stiffness: 300,
+        damping: 30,
+        mass: 0.8
+      }}
     >
       <motion.div
-        className="absolute inset-y-0 left-0 flex flex-col overflow-hidden border-r border-white/5 bg-zinc-950/80 shadow-2xl backdrop-blur-xl"
+        className="h-24 flex items-center justify-start border-b border-white/5 overflow-hidden whitespace-nowrap"
         animate={{
-          clipPath: isHovered
-            ? "inset(0px 0px 0px 0px)"
-            : `inset(0px ${SIDEBAR_REVEAL_WIDTH}px 0px 0px)`,
-          boxShadow: isHovered ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)" : "0 0 0 0 rgba(0, 0, 0, 0)"
+          paddingLeft: isHovered ? 18 : 11,
+          paddingRight: isHovered ? 18 : 11
         }}
         transition={{
           type: "spring",
@@ -150,14 +154,10 @@ export function Sidebar() {
           damping: 30,
           mass: 0.8
         }}
-        style={{ width: SIDEBAR_EXPANDED_WIDTH, willChange: "clip-path, box-shadow" }}
       >
         <motion.div
-          className="h-24 flex items-center justify-start border-b border-white/5 overflow-hidden whitespace-nowrap"
-          animate={{
-            paddingLeft: isHovered ? 18 : 11,
-            paddingRight: isHovered ? 18 : 11
-          }}
+          layout="position"
+          className="w-12 h-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-2 shadow-lg shadow-black/20"
           transition={{
             type: "spring",
             stiffness: 300,
@@ -165,52 +165,54 @@ export function Sidebar() {
             mass: 0.8
           }}
         >
-          <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center flex-shrink-0 p-2 shadow-lg shadow-black/20">
-            <div className="relative w-full h-full">
-              <Image src="/images/nodalpoint.png" alt="Nodal Point" fill className="object-contain" />
-            </div>
+          <div className="relative w-full h-full">
+            <Image src="/images/nodalpoint.png" alt="Nodal Point" fill className="object-contain" />
           </div>
-          <AnimatePresence>
-            {isHovered && (
-              <motion.div
-                key="sidebar-title"
-                initial={{ opacity: 0, x: -10, filter: "blur(4px)" }}
-                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
-                exit={{ opacity: 0, x: -10, filter: "blur(4px)" }}
-                transition={{ duration: 0.3, delay: 0.1 }}
-                className="ml-4 font-bold text-lg tracking-tighter text-white"
-              >
-                Nodal<span className="text-zinc-100">Point</span> Network
-              </motion.div>
-            )}
-          </AnimatePresence>
         </motion.div>
-
-        <motion.nav
-          className={cn(
-            "flex-1 py-6 flex flex-col overflow-x-hidden np-scroll",
-            isHovered ? "overflow-y-auto custom-scrollbar" : "overflow-y-hidden"
-          )}
-          animate={{
-            paddingLeft: isHovered ? 18 : 11,
-            paddingRight: isHovered ? 18 : 11
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 30,
-            mass: 0.8
-          }}
-        >
-          {navigationStructure.map((group, groupIndex) => (
-            <div
-              key={group.group}
-              className={cn("flex flex-col gap-1", groupIndex !== navigationStructure.length - 1 && (isHovered ? "mb-8" : "mb-4"))}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.div
+              key="sidebar-title"
+              layout="position"
+              initial={{ opacity: 0, x: -10, filter: "blur(4px)" }}
+              animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+              exit={{ opacity: 0, x: -10, filter: "blur(4px)" }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              className="ml-4 font-bold text-lg tracking-tighter text-white"
             >
-              <AnimatePresence>
+              Nodal<span className="text-zinc-100">Point</span> Network
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      <motion.nav
+        className={cn(
+          "flex-1 py-6 flex flex-col overflow-x-hidden np-scroll",
+          isHovered ? "overflow-y-auto custom-scrollbar" : "overflow-y-hidden"
+        )}
+        animate={{
+          paddingLeft: isHovered ? 18 : 11,
+          paddingRight: isHovered ? 18 : 11
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+          mass: 0.8
+        }}
+      >
+        {navigationStructure.map((group, groupIndex) => (
+          <motion.div
+            layout
+            key={group.group}
+            className={cn("flex flex-col gap-1", groupIndex !== navigationStructure.length - 1 && (isHovered ? "mb-8" : "mb-4"))}
+          >
+            <AnimatePresence mode="popLayout">
               {isHovered ? (
                 <motion.div
                   key="header"
+                  layout
                   initial={{ opacity: 0, filter: "blur(4px)" }}
                   animate={{ opacity: 1, filter: "blur(0px)" }}
                   exit={{ opacity: 0, filter: "blur(4px)" }}
@@ -222,6 +224,7 @@ export function Sidebar() {
                 groupIndex !== 0 && (
                   <motion.div
                     key="divider"
+                    layout
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: 32 }}
                     exit={{ opacity: 0, width: 0 }}
@@ -231,189 +234,202 @@ export function Sidebar() {
               )}
             </AnimatePresence>
 
-              {group.items.filter((item: any) => !item.roles || item.roles.includes(role || '')).map((item: any) => {
-                const isActive = pathname === item.href
+            {group.items.filter((item: any) => !item.roles || item.roles.includes(role || '')).map((item: any) => {
+              const isActive = pathname === item.href
 
-                const content = (
-                  <>
-                    <AnimatePresence>
-                      {isActive && (
-                        <motion.div key="active-indicator">
-                          <motion.div
-                            layoutId="activeBackground"
-                            className="absolute inset-0 bg-white/[0.05] rounded-xl border border-white/5"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                          />
-                          {/* Laser Sight Indicator - full height of nav item */}
-                          <motion.div
-                            layoutId="laserSight"
-                            className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full z-20 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
-                            initial={{ opacity: 0, x: -2 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -2 }}
-                            transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    <div className="flex-shrink-0 w-12 flex justify-center items-center relative z-10">
-                      <div className="relative">
-                        <item.icon
-                          size={20}
-                          className={cn(
-                            "transition-all duration-300",
-                            isActive
-                              ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
-                              : "text-zinc-500 group-hover:text-zinc-200 group-hover:scale-110"
-                          )}
+              const content = (
+                <>
+                  <AnimatePresence>
+                    {isActive && (
+                      <motion.div key="active-indicator">
+                        <motion.div
+                          layoutId="activeBackground"
+                          className="absolute inset-0 bg-white/[0.05] rounded-xl border border-white/5"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         />
-                        {item.isAction && (
-                          <div className="absolute -top-1 -right-1">
-                            <Plus size={8} className="text-white fill-white" />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <AnimatePresence>
-                      {isHovered && (
-                        <motion.span
-                          key="nav-item-name"
-                          initial={{ opacity: 0, x: -10 }}
+                        {/* Laser Sight Indicator - full height of nav item */}
+                        <motion.div
+                          layoutId="laserSight"
+                          className="absolute left-0 top-0 bottom-0 w-1 bg-white rounded-r-full z-20 shadow-[0_0_10px_rgba(255,255,255,0.5)]"
+                          initial={{ opacity: 0, x: -2 }}
                           animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -10 }}
-                          transition={{ duration: 0.3, delay: 0.1 }}
-                          className="font-medium whitespace-nowrap relative z-10 text-sm text-zinc-300 group-hover:text-white"
-                        >
-                          {item.name}
-                        </motion.span>
+                          exit={{ opacity: 0, x: -2 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                        />
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <motion.div
+                    layout
+                    className="flex-shrink-0 w-12 flex justify-center items-center relative z-10"
+                  >
+                    <div className="relative">
+                      <item.icon
+                        size={20}
+                        className={cn(
+                          "transition-all duration-300",
+                          isActive
+                            ? "text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]"
+                            : "text-zinc-500 group-hover:text-zinc-200 group-hover:scale-110"
+                        )}
+                      />
+                      {item.isAction && (
+                        <div className="absolute -top-1 -right-1">
+                          <Plus size={8} className="text-white fill-white" />
+                        </div>
                       )}
-                    </AnimatePresence>
-                  </>
-                );
-
-                const buttonClasses = cn(
-                  "flex items-center rounded-xl group relative h-12 justify-start w-full overflow-hidden",
-                  isActive
-                    ? "text-white"
-                    : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]"
-                );
-
-                if (item.isAction) {
-                  return (
-                    <div key={item.name}>
-                      <button
-                        onClick={() => {
-                          playNavTick()
-                          setRightPanelMode(item.action)
-                        }}
-                        className={buttonClasses}
-                      >
-                        {content}
-                      </button>
                     </div>
-                  )
-                }
+                  </motion.div>
 
+                  <AnimatePresence mode="popLayout">
+                    {isHovered && (
+                      <motion.span
+                        key="nav-item-name"
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        transition={{ duration: 0.3, delay: 0.1 }}
+                        className="font-medium whitespace-nowrap relative z-10 text-sm text-zinc-300 group-hover:text-white"
+                      >
+                        {item.name}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </>
+              );
+
+              const buttonClasses = cn(
+                "flex items-center rounded-xl group relative h-12 justify-start w-full overflow-hidden",
+                isActive
+                  ? "text-white"
+                  : "text-zinc-400 hover:text-zinc-200 hover:bg-white/[0.02]"
+              );
+
+              if (item.isAction) {
                 return (
-                  <div key={item.href}>
-                    <Link
-                      href={item.href}
-                      prefetch={false}
+                  <motion.div layout key={item.name}>
+                    <button
+                      onClick={() => {
+                        playNavTick()
+                        setRightPanelMode(item.action)
+                      }}
                       className={buttonClasses}
-                      onClick={() => playNavTick()}
                     >
                       {content}
-                    </Link>
-                  </div>
+                    </button>
+                  </motion.div>
                 )
-              })}
-            </div>
-          ))}
-        </motion.nav>
+              }
 
-        <motion.div
-          className="border-t border-white/5 overflow-hidden whitespace-nowrap bg-zinc-950/50 backdrop-blur-md"
-          animate={{
-            paddingLeft: isHovered ? 18 : 15,
-            paddingRight: isHovered ? 18 : 15,
-            paddingTop: isHovered ? 15 : 15,
-            paddingBottom: isHovered ? 15 : 15
-          }}
-          transition={{
-            type: "spring",
-            stiffness: 300,
-            damping: 30,
-            mass: 0.8
-          }}
-        >
-          <div className="flex items-center gap-3 h-10">
-            <div className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-inner">
-              {profile?.hostedPhotoUrl ? (
-                <Image
-                  src={profile.hostedPhotoUrl}
-                  alt="User"
-                  width={40}
-                  height={40}
-                  className="w-full h-full object-cover"
-                />
-              ) : user?.user_metadata?.avatar_url ? (
-                <Image
-                  src={user.user_metadata.avatar_url}
-                  alt="User"
-                  width={40}
-                  height={40}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="text-sm font-bold text-zinc-500">
-                  {user?.email ? user.email[0].toUpperCase() : 'U'}
-                </span>
-              )}
-            </div>
-            <AnimatePresence>
-              {isHovered && (
-                <motion.div
-                  key="user-profile-info"
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  className="flex-1 min-w-0"
-                >
-                  <div className="text-sm text-white font-semibold truncate">
-                    {mounted ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User') : 'User'}
-                  </div>
-                  <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono truncate">
-                    {mounted ? (role || 'Network_Agent') : 'Network_Agent'}
-                  </div>
+              return (
+                <motion.div layout key={item.href}>
+                  <Link
+                    href={item.href}
+                    prefetch={false}
+                    className={buttonClasses}
+                    onClick={() => playNavTick()}
+                  >
+                    {content}
+                  </Link>
                 </motion.div>
-              )}
-            </AnimatePresence>
+              )
+            })}
+          </motion.div>
+        ))}
+      </motion.nav>
 
-            <AnimatePresence>
-              {isHovered && (
-                <motion.button
-                  key="logout-button"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                  onClick={handleLogout}
-                  className="p-2.5 hover:bg-red-500/10 rounded-xl text-zinc-500 hover:text-red-400 transition-colors"
-                  title="Terminate Session"
-                >
-                  <LogOut size={18} />
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
+      <motion.div
+        layout
+        className="border-t border-white/5 overflow-hidden whitespace-nowrap bg-zinc-950/50 backdrop-blur-md"
+        animate={{
+          paddingLeft: isHovered ? 18 : 15,
+          paddingRight: isHovered ? 18 : 15,
+          paddingTop: isHovered ? 15 : 15,
+          paddingBottom: isHovered ? 15 : 15
+        }}
+        transition={{
+          type: "spring",
+          stiffness: 300,
+          damping: 30,
+          mass: 0.8
+        }}
+      >
+        <div className="flex items-center gap-3 h-10">
+          <motion.div
+            layout="position"
+            className="w-10 h-10 rounded-xl bg-zinc-900 border border-white/10 flex-shrink-0 flex items-center justify-center overflow-hidden shadow-inner"
+            transition={{
+              type: "spring",
+              stiffness: 300,
+              damping: 30,
+              mass: 0.8
+            }}
+          >
+            {profile?.hostedPhotoUrl ? (
+              <Image
+                src={profile.hostedPhotoUrl}
+                alt="User"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : user?.user_metadata?.avatar_url ? (
+              <Image
+                src={user.user_metadata.avatar_url}
+                alt="User"
+                width={40}
+                height={40}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-sm font-bold text-zinc-500">
+                {user?.email ? user.email[0].toUpperCase() : 'U'}
+              </span>
+            )}
+          </motion.div>
+          <AnimatePresence>
+            {isHovered && (
+              <motion.div
+                key="user-profile-info"
+                layout="position"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                className="flex-1 min-w-0"
+              >
+                <div className="text-sm text-white font-semibold truncate">
+                  {mounted ? (user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User') : 'User'}
+                </div>
+                <div className="text-[10px] text-zinc-500 uppercase tracking-wider font-mono truncate">
+                  {mounted ? (role || 'Network_Agent') : 'Network_Agent'}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence>
+            {isHovered && (
+              <motion.button
+                key="logout-button"
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={handleLogout}
+                className="p-2.5 hover:bg-red-500/10 rounded-xl text-zinc-500 hover:text-red-400 transition-colors"
+                title="Terminate Session"
+              >
+                <LogOut size={18} />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </motion.div>
-    </aside>
+    </motion.aside>
   )
 }
