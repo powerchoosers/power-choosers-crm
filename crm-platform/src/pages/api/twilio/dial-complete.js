@@ -150,9 +150,15 @@ export default async function handler(req, res) {
     // Create TwiML response that ENDS the call without retry
     const twiml = new VoiceResponse();
     let voicemailGreeting = null;
-    // When the browser client rejects the call, Twilio commonly reports `canceled`.
-    // We treat that the same as no-answer/busy so declined inbound calls still get voicemail.
-    const shouldPlayVoicemail = !isPowerDialBatch && ['no-answer', 'busy', 'canceled', 'failed'].includes(normalizedDialStatus);
+    const voicemailDropRequested = ['1', 'true', 'yes', 'on'].includes(
+      String(requestUrl.searchParams.get('voicemailDrop') || requestUrl.searchParams.get('playVoicemail') || '').toLowerCase()
+    );
+    const isOutboundDial = Boolean(targetPhoneFromQuery);
+    // Inbound unanswered calls can still use the saved greeting.
+    // Outbound calls should only play a greeting when voicemail drop was explicitly requested.
+    const shouldPlayVoicemail = !isPowerDialBatch &&
+      ['no-answer', 'busy', 'canceled', 'failed'].includes(normalizedDialStatus) &&
+      (!isOutboundDial || voicemailDropRequested);
 
     if (shouldPlayVoicemail) {
       try {
