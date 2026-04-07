@@ -262,6 +262,13 @@ export function TopBar() {
   const inputRef = useRef<HTMLInputElement>(null)
   const dialpadContainerRef = useRef<HTMLDivElement>(null)
 
+  const openCommandBar = useCallback(() => {
+    setIsShowingCallBar(false)
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('nodal:open-command-bar'))
+    }, 0)
+  }, [])
+
   const durationInterval = useRef<NodeJS.Timeout | null>(null)
   const callStartRef = useRef<number | null>(null)
   // Directly resolve the account from DB using accountId — hard guarantee for logo/domain
@@ -298,9 +305,34 @@ export function TopBar() {
     mainContainer.addEventListener('scroll', handleScroll, { passive: true });
     return () => {
       if (rafId !== null) cancelAnimationFrame(rafId);
-      mainContainer.removeEventListener('scroll', handleScroll);
+    mainContainer.removeEventListener('scroll', handleScroll);
     };
   }, []);
+
+  useEffect(() => {
+    const handleShortcut = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey) && !e.altKey) {
+        e.preventDefault()
+        openCommandBar()
+      }
+    }
+
+    document.addEventListener('keydown', handleShortcut)
+    return () => document.removeEventListener('keydown', handleShortcut)
+  }, [openCommandBar])
+
+  useEffect(() => {
+    const bridge = window.nodalDesktop
+    if (!bridge?.isDesktop) return
+
+    const unsubscribe = bridge.onUiEvent((event) => {
+      if (event.type === 'open-command-bar') {
+        openCommandBar()
+      }
+    })
+
+    return () => unsubscribe()
+  }, [openCommandBar])
 
   const selectedNumber = profile.selectedPhoneNumber || (profile.twilioNumbers && profile.twilioNumbers.length > 0 ? profile.twilioNumbers[0].number : null)
   const selectedNumberName = profile.twilioNumbers?.find(n => n.number === selectedNumber)?.name || "Default"

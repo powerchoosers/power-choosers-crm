@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { normalizeWebsiteForImport } from '@/lib/url';
 import { ForensicClose } from '@/components/ui/ForensicClose';
+import { isCsvFile } from '@/lib/file-ingestion';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -62,7 +63,7 @@ const ACCOUNT_FIELDS = [
   { id: 'description', label: 'Forensic Log / Description', required: false },
 ];
 
-export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpen: boolean; onClose: () => void; initialFile?: File | null }) {
   const [step, setStep] = useState<ImportStep>('VECTOR_SELECT');
   const [importVector, setImportVector] = useState<ImportVector | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -270,7 +271,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
   };
 
   // --- LOGIC: HANDLE FILE UPLOAD ---
-  const handleFile = (uploadedFile: File) => {
+  const handleFile = (uploadedFile: File, vectorOverride: ImportVector | null = importVector) => {
     if (uploadedFile) {
       setFile(uploadedFile);
       setIsProcessing(true);
@@ -291,13 +292,13 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
               setCsvHeaders(headers);
               setCsvData(results.data);
               
-              if (importVector) {
-                runHygieneCheck(results.data, importVector);
+              if (vectorOverride) {
+                runHygieneCheck(results.data, vectorOverride);
                 
                 // --- PRE-CALIBRATE MAPPING BEFORE TRANSITION ---
                 const newMapping: Record<string, string> = {};
-                const cachedMapping = loadMappingFromCache(importVector);
-                const targetFields = importVector === 'CONTACTS' ? CONTACT_FIELDS : ACCOUNT_FIELDS;
+                const cachedMapping = loadMappingFromCache(vectorOverride);
+                const targetFields = vectorOverride === 'CONTACTS' ? CONTACT_FIELDS : ACCOUNT_FIELDS;
                 
                 headers.forEach(header => {
                   // 1. Try Cached Mapping First
@@ -316,7 +317,7 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                   if (match) newMapping[header.raw] = match.id;
                 });
                 setFieldMapping(newMapping);
-                saveMappingToCache(importVector, newMapping);
+                saveMappingToCache(vectorOverride, newMapping);
               }
               
               // Only transition once everything is ready
@@ -377,12 +378,22 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     setIsDragging(false);
     
     const droppedFile = e.dataTransfer.files?.[0];
-    if (droppedFile && droppedFile.type === 'text/csv') {
+    if (droppedFile && isCsvFile(droppedFile)) {
       handleFile(droppedFile);
     } else {
       toast.error('Invalid payload. CSV required.');
     }
   };
+
+  useEffect(() => {
+    if (!isOpen) {
+      return
+    }
+
+    if (initialFile && !file && !isProcessing) {
+      setFile(initialFile)
+    }
+  }, [isOpen, initialFile, file, isProcessing])
 
   // --- LOGIC: EXECUTE IMPORT ---
   const handleInitiateIngestion = async () => {
@@ -729,7 +740,13 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                 className="p-6 grid grid-cols-2 gap-4"
               >
                 <button
-                  onClick={() => { setImportVector('CONTACTS'); setStep('UPLOAD'); }}
+                  onClick={() => {
+                    setImportVector('CONTACTS')
+                    setStep('UPLOAD')
+                    if (initialFile) {
+                      handleFile(initialFile, 'CONTACTS')
+                    }
+                  }}
                   className="group relative py-12 px-8 rounded-xl nodal-monolith-edge nodal-module-glass hover:bg-black/30 hover:border-[#002FA7]/50 transition-all flex flex-col items-center justify-center gap-4"
                 >
                   <div className="w-16 h-16 rounded-2xl bg-black/40 flex items-center justify-center group-hover:bg-[#002FA7]/20 transition-colors">
@@ -742,7 +759,13 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                 </button>
 
                 <button
-                  onClick={() => { setImportVector('ACCOUNTS'); setStep('UPLOAD'); }}
+                  onClick={() => {
+                    setImportVector('ACCOUNTS')
+                    setStep('UPLOAD')
+                    if (initialFile) {
+                      handleFile(initialFile, 'ACCOUNTS')
+                    }
+                  }}
                   className="group relative py-12 px-8 rounded-xl nodal-monolith-edge nodal-module-glass hover:bg-black/30 hover:border-[#002FA7]/50 transition-all flex flex-col items-center justify-center gap-4"
                 >
                   <div className="w-16 h-16 rounded-2xl bg-black/40 flex items-center justify-center group-hover:bg-[#002FA7]/20 transition-colors">
@@ -753,6 +776,12 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
                     <div className="text-xs text-zinc-500 font-mono mt-1 uppercase tracking-widest">ACCOUNTS // COMPANIES // ASSETS</div>
                   </div>
                 </button>
+
+                {initialFile && (
+                  <div className="col-span-2 rounded-xl border border-white/5 bg-black/30 px-4 py-3 text-sm text-zinc-300">
+                    Staged file: <span className="font-mono text-white">{initialFile.name}</span>
+                  </div>
+                )}
               </motion.div>
             )}
 
@@ -1139,7 +1168,6 @@ export function BulkImportModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     </Dialog>
   );
 }
-
 
 
 

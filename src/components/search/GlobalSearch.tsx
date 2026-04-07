@@ -46,14 +46,17 @@ export function GlobalSearch() {
   const isSearching = isSearchingContacts || isSearchingAccounts || isSearchingProtocols || isSearchingTargets || isSearchingTasks || isSearchingCalls || isSearchingEmails
 
   useEffect(() => {
+    const open = () => {
+      setIsOpen(true)
+      setTimeout(() => inputRef.current?.focus(), 10)
+    }
+
+    window.addEventListener('nodal:open-command-bar', open as EventListener)
+    return () => window.removeEventListener('nodal:open-command-bar', open as EventListener)
+  }, [])
+
+  useEffect(() => {
     const down = (e: KeyboardEvent) => {
-      if (e.key === 'k' && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setIsOpen((open) => !open)
-        if (!isOpen) {
-          setTimeout(() => inputRef.current?.focus(), 10)
-        }
-      }
       if (e.key === 'Escape' && isOpen) {
         e.preventDefault()
         setIsOpen(false)

@@ -2,10 +2,11 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useEmailTrackingNotifications } from '@/hooks/useEmailTrackingNotifications'
+import { useDesktopNotifications } from '@/hooks/useDesktopNotifications'
 import { playPing, playAlert } from '@/lib/audio'
 import { useUIStore } from '@/store/uiStore'
 import { useQueryClient } from '@tanstack/react-query'
@@ -16,6 +17,8 @@ import { showInboxEmailToast } from '@/lib/inbox-email-toast'
 import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe'
 import { getSignatureRequestKindConfig, normalizeSignatureRequestKind } from '@/lib/signature-request'
 import { getFallbackEmailOwnerScope, isEmailInOwnerScope } from '@/lib/email-scope'
+import { showDesktopNotification } from '@/lib/desktop-notifications'
+import { forensicNotify } from '@/lib/notifications'
 
 const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -72,6 +75,7 @@ function isCrmRoute(pathname: string | null) {
 
 export function GlobalSync() {
   const pathname = usePathname()
+  const router = useRouter()
   const onCrmRoute = isCrmRoute(pathname)
   const { user, loading, role } = useAuth()
   const { performSync } = useZohoSync()
@@ -82,6 +86,7 @@ export function GlobalSync() {
 
   // Real-time email tracking notifications (opens/clicks) — CRM routes only
   useEmailTrackingNotifications({ enabled: onCrmRoute })
+  useDesktopNotifications({ enabled: onCrmRoute })
 
   // Resolve owner scope once on mount (covers shared inboxes like signal@nodalpoint.io)
   useEffect(() => {
@@ -255,6 +260,7 @@ export function GlobalSync() {
             metadata?: Record<string, any> | null
             title?: string | null
             message?: string | null
+            link?: string | null
           }
 
           if (!notification?.id) return
@@ -306,6 +312,12 @@ export function GlobalSync() {
                   </div>,
                   { duration: isUrgent ? 30000 : 10000 }
               )
+              void showDesktopNotification({
+                title: notification.title || 'Reminder',
+                body: notification.message || 'A follow-up is due.',
+                link: videoUrl || notification.link || null,
+                kind: 'reminder',
+              })
           } else if (notifType === 'rsvp') {
               const statusStr = String(notification.data?.status || 'UNKNOWN').toUpperCase();
               const isAccepted = statusStr === 'ACCEPTED' ||
@@ -343,6 +355,12 @@ export function GlobalSync() {
                   sourceLabel: sourceLabel || undefined,
                   emailId: signalId || undefined,
               })
+              void showDesktopNotification({
+                title: notification.title || 'New Email',
+                body: notification.message || snippet,
+                link: notification.link || null,
+                kind: 'email',
+              })
           }
 
         }
@@ -353,13 +371,29 @@ export function GlobalSync() {
         }
       })
 
+    const desktopUiUnsubscribe =
+      typeof window !== 'undefined' && window.nodalDesktop?.onUiEvent
+        ? window.nodalDesktop.onUiEvent((event) => {
+            if (event.type === 'refresh-data') {
+              forensicNotify.update('Refreshing data...')
+              void performSync(true)
+              queryClient.invalidateQueries()
+            }
+
+            if (event.type === 'navigate' && event.href) {
+              router.push(event.href)
+            }
+          })
+        : undefined
+
     return () => {
       clearTimeout(timer)
       supabase.removeChannel(sigChannel)
       supabase.removeChannel(emailChannel)
       supabase.removeChannel(notificationChannel)
+      desktopUiUnsubscribe?.()
     }
-  }, [loading, user, performSync, queryClient, onCrmRoute])
+  }, [loading, user, performSync, queryClient, onCrmRoute, router])
 
   useEffect(() => {
     if (loading || !user?.email || !onCrmRoute) return
@@ -418,6 +452,12 @@ export function GlobalSync() {
                 </div>,
                 { duration: isUrgent ? 30000 : 10000 }
             );
+            void showDesktopNotification({
+              title: row.title || 'Reminder',
+              body: row.message || 'A follow-up is due.',
+              link: videoUrl || row.link || null,
+              kind: 'reminder',
+            })
         } else if (notifType === 'rsvp') {
             const statusStr = String(payload.status || 'UNKNOWN').toUpperCase();
             const isAccepted = statusStr === 'ACCEPTED' ||
@@ -454,6 +494,12 @@ export function GlobalSync() {
               sourceLabel: formatSourceLabel(payload.source || row.metadata?.source),
               emailId: signalId || undefined,
             });
+            void showDesktopNotification({
+              title: row.title || 'New Email',
+              body: row.message || String(payload.snippet || 'New message received'),
+              link: row.link || null,
+              kind: 'email',
+            })
         }
 
       }
