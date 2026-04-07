@@ -192,6 +192,15 @@ export function useDesktopFolderSync() {
     return bridge.writeFolderSyncFile(payload)
   }, [])
 
+  const deleteFile = useCallback(async (relativePath: string) => {
+    const bridge = getDesktopBridge()
+    if (!bridge?.deleteFolderSyncFile) {
+      throw new Error('Folder sync bridge unavailable')
+    }
+
+    return bridge.deleteFolderSyncFile(relativePath)
+  }, [])
+
   const acknowledgeFile = useCallback(async (payload: DesktopFolderSyncAcknowledgeInput) => {
     const bridge = getDesktopBridge()
     if (!bridge?.acknowledgeFolderSyncFile) {
@@ -217,6 +226,7 @@ export function useDesktopFolderSync() {
     openFolder,
     readFile,
     writeFile,
+    deleteFile,
     acknowledgeFile,
   }), [
     isDesktop,
@@ -230,6 +240,7 @@ export function useDesktopFolderSync() {
     openFolder,
     readFile,
     writeFile,
+    deleteFile,
     acknowledgeFile,
   ])
 }
