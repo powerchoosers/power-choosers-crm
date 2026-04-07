@@ -8,11 +8,13 @@ import { useAuth } from '@/context/AuthContext'
 import { useDesktopFolderSync } from '@/hooks/useDesktopFolderSync'
 import {
   buildVaultAccountFolderLabel,
+  buildVaultDocumentTypeFolderLabel,
   buildVaultSyncStoragePath,
   formatBytes,
   ingestAccountFileData,
   normalizeVaultRelativePath,
   parseVaultAccountFolderLabel,
+  parseVaultDocumentTypeFolderLabel,
 } from '@/lib/file-ingestion'
 
 type RemoteVaultDocument = {
@@ -21,6 +23,8 @@ type RemoteVaultDocument = {
   name: string
   size: string | null
   type: string | null
+  document_type: string | null
+  updated_at: string | null
   storage_path: string
   metadata?: Record<string, unknown> | null
 }
@@ -28,6 +32,15 @@ type RemoteVaultDocument = {
 type RemoteAccount = {
   id: string
   name: string | null
+}
+
+type SyncedFileEntry = {
+  documentId?: string | null
+  documentUpdatedAt?: string | null
+}
+
+type FolderSyncStateLike = {
+  syncedFiles?: Record<string, SyncedFileEntry>
 }
 
 function base64ToUint8Array(base64: string) {
@@ -91,20 +104,40 @@ function parseDocumentSize(value?: string | null) {
   return amount * multiplier
 }
 
+function getRemoteDocumentTypeHint(document: RemoteVaultDocument) {
+  const metadata = document.metadata
+  const aiExtraction = metadata && typeof metadata === 'object' ? metadata['ai_extraction'] : null
+  const aiExtractionRecord =
+    aiExtraction && typeof aiExtraction === 'object' && !Array.isArray(aiExtraction)
+      ? (aiExtraction as Record<string, unknown>)
+      : null
+  const aiExtractionType = typeof aiExtractionRecord?.type === 'string' ? aiExtractionRecord.type : null
+
+  return document.document_type || aiExtractionType || document.type || null
+}
+
 function resolveRemoteRootRelativePath(document: RemoteVaultDocument, accountName: string | null) {
   const accountFolder = buildVaultAccountFolderLabel(document.account_id || 'unassigned', accountName)
+  const documentTypeFolder = buildVaultDocumentTypeFolderLabel(getRemoteDocumentTypeHint(document))
   const storedRelativePath = normalizeVaultRelativePath(
     String(document.metadata?.relativePath || document.metadata?.localRelativePath || '')
   )
 
   if (storedRelativePath) {
-    const firstSegment = storedRelativePath.split('/').filter(Boolean)[0] || ''
-    const parsedFolder = parseVaultAccountFolderLabel(firstSegment)
-    if (parsedFolder && parsedFolder.accountId === document.account_id) {
-      return storedRelativePath
+    const segments = storedRelativePath.split('/').filter(Boolean)
+    const firstSegment = segments[0] || ''
+    if (parseVaultAccountFolderLabel(firstSegment)) {
+      segments.shift()
     }
 
-    return `${accountFolder}/${storedRelativePath}`
+    if (parseVaultDocumentTypeFolderLabel(segments[0] || '')) {
+      segments.shift()
+    }
+
+    const relativeLeafPath = normalizeVaultRelativePath(segments.join('/'))
+    if (relativeLeafPath) {
+      return `${accountFolder}/${documentTypeFolder}/${relativeLeafPath}`
+    }
   }
 
   const rawFileName = normalizeVaultRelativePath(document.name || 'file') || 'file'
@@ -115,7 +148,11 @@ function resolveRemoteRootRelativePath(document: RemoteVaultDocument, accountNam
       ? `${rawFileName.slice(0, dotIndex)}-${shortId}${rawFileName.slice(dotIndex)}`
       : `${rawFileName}-${shortId}`
 
-  return `${accountFolder}/${fallbackName}`
+  return `${accountFolder}/${documentTypeFolder}/${fallbackName}`
+}
+
+function findSyncedFileEntry(state: FolderSyncStateLike, documentId: string) {
+  return Object.entries(state.syncedFiles || {}).find(([, entry]) => entry.documentId === documentId) || null
 }
 
 export function DesktopFolderSyncBridge() {
@@ -124,6 +161,7 @@ export function DesktopFolderSyncBridge() {
   const folderSync = useDesktopFolderSync()
   const localSyncBusyRef = useRef(false)
   const remoteSyncBusyRef = useRef(false)
+  const pendingRemotePullRef = useRef(false)
   const pendingForceRemotePullRef = useRef(false)
 
   const isFolderSyncActive = Boolean(
@@ -137,7 +175,7 @@ export function DesktopFolderSyncBridge() {
   const fetchRemoteDocuments = useCallback(async () => {
     const { data, error } = await supabase
       .from('documents')
-      .select('id, account_id, name, size, type, storage_path, metadata')
+      .select('id, account_id, name, size, type, document_type, updated_at, storage_path, metadata')
       .order('account_id', { ascending: true })
       .order('created_at', { ascending: true })
 
@@ -169,6 +207,8 @@ export function DesktopFolderSyncBridge() {
       accountId?: string | null
       accountName?: string | null
       accountFolder?: string | null
+      previousRelativePath?: string | null
+      documentUpdatedAt?: string | null
     }) => {
       await folderSync.acknowledgeFile(payload)
     },
@@ -200,7 +240,7 @@ export function DesktopFolderSyncBridge() {
 
       localSyncBusyRef.current = true
       const toastId = toast.loading('Syncing vault changes...')
-      let shouldKickRemotePull = false
+      let shouldRefreshRemoteDocs = false
 
       try {
         const [remoteDocuments, remoteAccounts] = await Promise.all([fetchRemoteDocuments(), fetchAccountNames()])
@@ -264,14 +304,15 @@ export function DesktopFolderSyncBridge() {
               mtimeMs: file.mtimeMs,
               documentId: existingRemote.id,
               storagePath: existingRemote.storage_path,
-              direction: 'local-to-vault',
-              accountId,
-              accountName,
-              accountFolder,
-            })
+            direction: 'local-to-vault',
+            accountId,
+            accountName,
+            accountFolder,
+            documentUpdatedAt: existingRemote.updated_at || null,
+          })
             syncedDocumentIds.add(existingRemote.id)
             linkedCount += 1
-            shouldKickRemotePull = true
+            shouldRefreshRemoteDocs = true
             continue
           }
 
@@ -307,6 +348,7 @@ export function DesktopFolderSyncBridge() {
             accountId,
             accountName,
             accountFolder,
+            documentUpdatedAt: result.documentUpdatedAt || null,
           })
 
           if (result.analysisType) {
@@ -317,7 +359,7 @@ export function DesktopFolderSyncBridge() {
           }
 
           uploadedCount += 1
-          shouldKickRemotePull = true
+          shouldRefreshRemoteDocs = true
         }
 
         if (customerPromotionNeeded) {
@@ -360,11 +402,16 @@ export function DesktopFolderSyncBridge() {
         toast.error(error instanceof Error ? error.message : 'Vault sync failed', { id: toastId })
       } finally {
         localSyncBusyRef.current = false
-        if (shouldKickRemotePull || pendingForceRemotePullRef.current) {
-          const forceRemotePull = pendingForceRemotePullRef.current || shouldKickRemotePull
+        if (pendingForceRemotePullRef.current) {
+          pendingRemotePullRef.current = false
           pendingForceRemotePullRef.current = false
           window.setTimeout(() => {
-            void pullRemoteDocs(forceRemotePull ? { force: true } : undefined)
+            void pullRemoteDocs({ force: true })
+          }, 1000)
+        } else if (shouldRefreshRemoteDocs || pendingRemotePullRef.current) {
+          pendingRemotePullRef.current = false
+          window.setTimeout(() => {
+            void pullRemoteDocs()
           }, 1000)
         }
       }
@@ -381,6 +428,8 @@ export function DesktopFolderSyncBridge() {
     if (remoteSyncBusyRef.current || localSyncBusyRef.current) {
       if (options?.force) {
         pendingForceRemotePullRef.current = true
+      } else {
+        pendingRemotePullRef.current = true
       }
       return
     }
@@ -394,8 +443,27 @@ export function DesktopFolderSyncBridge() {
         return accumulator
       }, {})
 
-      const syncedDocumentIds = new Set(state.syncedDocumentIds || [])
-      const unsyncedDocuments = options?.force ? remoteDocuments : remoteDocuments.filter((doc) => !syncedDocumentIds.has(doc.id))
+      const unsyncedDocuments = options?.force
+        ? remoteDocuments
+        : remoteDocuments.filter((doc) => {
+            const accountName = doc.account_id ? accountNameMap[doc.account_id] || doc.account_id : 'Unassigned'
+            const canonicalRelativePath = normalizeVaultRelativePath(resolveRemoteRootRelativePath(doc, accountName))
+            const syncedEntry = findSyncedFileEntry(state, doc.id)
+
+            if (!syncedEntry) {
+              return true
+            }
+
+            if (normalizeVaultRelativePath(syncedEntry[0] || '') !== canonicalRelativePath) {
+              return true
+            }
+
+            if (doc.updated_at && syncedEntry[1].documentUpdatedAt !== doc.updated_at) {
+              return true
+            }
+
+            return false
+          })
 
       if (unsyncedDocuments.length === 0) {
         return
@@ -406,6 +474,8 @@ export function DesktopFolderSyncBridge() {
       for (const doc of unsyncedDocuments) {
         const accountName = doc.account_id ? accountNameMap[doc.account_id] || doc.account_id : 'Unassigned'
         const rootRelativePath = normalizeVaultRelativePath(resolveRemoteRootRelativePath(doc, accountName))
+        const syncedEntry = findSyncedFileEntry(state, doc.id)
+        const previousRelativePath = syncedEntry?.[0] || null
 
         const { data, error } = await supabase.storage.from('vault').createSignedUrl(doc.storage_path, 120, {
           download: doc.name,
@@ -433,6 +503,10 @@ export function DesktopFolderSyncBridge() {
           mimeType: doc.type || 'application/octet-stream',
         })
 
+        if (previousRelativePath && previousRelativePath !== writeResult.relativePath) {
+          await folderSync.deleteFile(previousRelativePath).catch(() => null)
+        }
+
         await markSynced({
           relativePath: writeResult.relativePath,
           size: writeResult.size,
@@ -443,6 +517,8 @@ export function DesktopFolderSyncBridge() {
           accountId: doc.account_id || null,
           accountName,
           accountFolder: buildVaultAccountFolderLabel(doc.account_id || 'unassigned', accountName),
+          previousRelativePath: previousRelativePath && previousRelativePath !== writeResult.relativePath ? previousRelativePath : null,
+          documentUpdatedAt: doc.updated_at || null,
         })
 
         downloadedCount += 1
@@ -457,9 +533,15 @@ export function DesktopFolderSyncBridge() {
     } finally {
       remoteSyncBusyRef.current = false
       if (pendingForceRemotePullRef.current) {
+        pendingRemotePullRef.current = false
         pendingForceRemotePullRef.current = false
         window.setTimeout(() => {
           void pullRemoteDocs({ force: true })
+        }, 1000)
+      } else if (pendingRemotePullRef.current) {
+        pendingRemotePullRef.current = false
+        window.setTimeout(() => {
+          void pullRemoteDocs()
         }, 1000)
       }
     }
@@ -480,7 +562,7 @@ export function DesktopFolderSyncBridge() {
         void pushLocalFiles(event.state, event.files)
       }
 
-      if (event.type === 'scan-complete' && (event.reason === 'manual' || event.reason === 'connect')) {
+      if (event.type === 'scan-complete' && (event.reason === 'manual' || event.reason === 'connect' || event.reason === 'tray')) {
         void pullRemoteDocs({ force: true })
       }
 

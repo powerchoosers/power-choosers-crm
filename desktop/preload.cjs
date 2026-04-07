@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('nodalDesktop', {
   openFolderSyncLocation: () => ipcRenderer.invoke('desktop-folder-sync:open-folder'),
   readFolderSyncFile: (absolutePath) => ipcRenderer.invoke('desktop-folder-sync:read-file', absolutePath),
   writeFolderSyncFile: (payload) => ipcRenderer.invoke('desktop-folder-sync:write-file', payload),
+  deleteFolderSyncFile: (relativePath) => ipcRenderer.invoke('desktop-folder-sync:delete-file', relativePath),
   acknowledgeFolderSyncFile: (payload) => ipcRenderer.invoke('desktop-folder-sync:acknowledge-file', payload),
   onUiEvent: (listener) => {
     const handler = (_event, payload) => {
