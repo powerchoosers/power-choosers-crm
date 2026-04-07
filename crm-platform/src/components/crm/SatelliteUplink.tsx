@@ -203,9 +203,6 @@ export default function SatelliteUplink({
             }
 
             // Sync Phone if empty
-            // NOTE: Mapbox API does not return phone numbers, so this logic will only work
-            // if the backend search endpoint has another data source or is still key-compatible
-            // but returning null.
             if (!currentPhone && searchData.phone) {
               updates.phone = searchData.phone;
             }
@@ -247,24 +244,20 @@ export default function SatelliteUplink({
         // PERSIST COORDINATES TO DATABASE (One-time cost, lifetime free)
         // Always save to accounts table - contacts use account location (business location, not personal address)
         if (entityType === 'account' && entityId) {
-          // Save directly to account
           await supabase
             .from('accounts')
             .update({
               latitude: coords.lat,
               longitude: coords.lng,
-              // Also update address if it was resolved but missing
               ...(resolvedAddress && !address ? { address: resolvedAddress } : {})
             })
             .eq('id', entityId);
         } else if (entityType === 'contact' && accountId) {
-          // For contacts, save to their account (business location, not personal address)
           await supabase
             .from('accounts')
             .update({
               latitude: coords.lat,
               longitude: coords.lng,
-              // Also update address if it was resolved but missing
               ...(resolvedAddress && !address ? { address: resolvedAddress } : {})
             })
             .eq('id', accountId);
@@ -307,7 +300,6 @@ export default function SatelliteUplink({
             })
             .eq('id', entityId);
         } else if (entityType === 'contact' && accountId) {
-          // For contacts, save to their account (business location, not personal address)
           await supabase
             .from('accounts')
             .update({
@@ -330,6 +322,37 @@ export default function SatelliteUplink({
   // All hooks must run before any conditional return (Rules of Hooks)
   const mapExpanded = isActive && !!coordinates;
   const stableCoordinates = useMemo(() => coordinates, [coordinates?.lat, coordinates?.lng]);
+
+  // Memoised shadow intel markers — lifted OUT of JSX to fix React Rules of Hooks violation.
+  // useMemo must never be called inside JSX (inside a Map callback).
+  const shadowIntelMarkers = useMemo(() => nearbyBusinesses.map((biz: any) => (
+    <Marker
+      key={biz.id}
+      longitude={biz.lng}
+      latitude={biz.lat}
+      anchor="center"
+    >
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          setSelectedPOI(null);
+          setTimeout(() => {
+            setSelectedPOI({
+              ...biz,
+              isShadow: true
+            });
+          }, 10);
+        }}
+        className="w-16 h-16 rounded-full bg-transparent hover:bg-[#002FA7]/5 border border-transparent hover:border-[#002FA7]/20 transition-all cursor-pointer group/shadow"
+        title={biz.name}
+      >
+        {/* Subtle target indicator only on hover */}
+        <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/shadow:opacity-100 transition-opacity">
+          <div className="w-1.5 h-1.5 bg-[#002FA7] rounded-full shadow-[0_0_10px_#002FA7]" />
+        </div>
+      </button>
+    </Marker>
+  )), [nearbyBusinesses]);
 
   useEffect(() => {
     if (!pendingBottomAlign || !mapExpanded) return;
@@ -529,35 +552,8 @@ export default function SatelliteUplink({
             </Marker>
 
             {/* SHADOW INTELLIGENCE LAYER: Invisible hotspots for buildings with no labels */}
-            {/* Memoised: markers only re-render when the businesses list itself changes */}
-            {useMemo(() => nearbyBusinesses.map((biz) => (
-              <Marker
-                key={biz.id}
-                longitude={biz.lng}
-                latitude={biz.lat}
-                anchor="center"
-              >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSelectedPOI(null);
-                    setTimeout(() => {
-                      setSelectedPOI({
-                        ...biz,
-                        isShadow: true
-                      });
-                    }, 10);
-                  }}
-                  className="w-16 h-16 rounded-full bg-transparent hover:bg-[#002FA7]/5 border border-transparent hover:border-[#002FA7]/20 transition-all cursor-pointer group/shadow"
-                  title={biz.name}
-                >
-                  {/* Subtle target indicator only on hover */}
-                  <div className="w-full h-full flex items-center justify-center opacity-0 group-hover/shadow:opacity-100 transition-opacity">
-                    <div className="w-1.5 h-1.5 bg-[#002FA7] rounded-full shadow-[0_0_10px_#002FA7]" />
-                  </div>
-                </button>
-              </Marker>
-            )), [nearbyBusinesses])}
+            {/* Markers are pre-computed at component level — useMemo cannot be called inside JSX */}
+            {shadowIntelMarkers}
 
             {/* POPUP FOR SELECTED POI */}
             {selectedPOI && (

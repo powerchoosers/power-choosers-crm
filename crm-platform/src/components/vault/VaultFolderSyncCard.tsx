@@ -1,21 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FolderOpen, RefreshCw, UploadCloud, Clock3, Link2, Link2Off, Loader2, Database } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { FolderOpen, RefreshCw, UploadCloud, Clock3, Link2, Link2Off, Loader2, Database, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
 import { useDesktopFolderSync } from '@/hooks/useDesktopFolderSync'
 import { cn } from '@/lib/utils'
@@ -29,11 +23,16 @@ function formatShortTime(value?: string | null) {
 
 export function VaultFolderSyncCard() {
   const sync = useDesktopFolderSync()
+  const [mounted, setMounted] = useState(false)
   const [setupOpen, setSetupOpen] = useState(false)
   const [folderPath, setFolderPath] = useState('')
   const [keepRunningInTray, setKeepRunningInTray] = useState(false)
   const [isWorking, setIsWorking] = useState(false)
   const didInitSetupRef = useRef(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const isDesktopReady = Boolean(sync.isDesktop)
   const isConnected = Boolean(sync.state?.enabled && sync.state.folderPath)
@@ -52,6 +51,16 @@ export function VaultFolderSyncCard() {
     setFolderPath(sync.state?.folderPath || '')
     setKeepRunningInTray(Boolean(sync.state?.keepRunningInTray))
   }, [setupOpen, sync.state?.folderPath, sync.state?.keepRunningInTray])
+
+  // Close on Escape — Radix handled this automatically, manual now we use a portal
+  useEffect(() => {
+    if (!setupOpen) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSetupOpen(false)
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [setupOpen])
 
   const statusBadge = useMemo(() => {
     if (!isDesktopReady) {
@@ -137,29 +146,11 @@ export function VaultFolderSyncCard() {
   const handleSyncNow = async () => {
     setIsWorking(true)
     const toastId = toast.loading('Rebuilding vault mirror...')
-    const startedLastSyncAt = sync.state?.lastSyncAt ?? null
-    let nextState = sync.state
 
     try {
+      await sync.scanNow()
+      // Fire the event so DesktopFolderSyncBridge also runs pullRemoteDocs({ force: true })
       window.dispatchEvent(new CustomEvent('vault-folder-sync:refresh-now'))
-
-      const deadline = Date.now() + 30_000
-      let didProgress = false
-
-      while (Date.now() < deadline) {
-        await new Promise((resolve) => window.setTimeout(resolve, 750))
-        nextState = await sync.refreshState()
-
-        if ((nextState?.lastSyncAt ?? null) !== startedLastSyncAt) {
-          didProgress = true
-          break
-        }
-      }
-
-      if (!didProgress) {
-        throw new Error('Vault sync did not report progress. Make sure the desktop app is open in the tray.')
-      }
-
       toast.success('Vault mirror updated', { id: toastId })
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Vault sync failed', { id: toastId })
@@ -346,72 +337,106 @@ export function VaultFolderSyncCard() {
         </CardContent>
       </Card>
 
-      <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
-        <DialogContent
-          overlayClassName="z-[1000] bg-black/70 backdrop-blur-xl"
-          className="z-[1001] sm:max-w-[760px] border-white/10 bg-zinc-950/95 text-zinc-100 shadow-2xl"
-        >
-          <DialogHeader>
-            <DialogTitle className="font-mono uppercase tracking-[0.18em] text-sm">Link Root Vault Folder</DialogTitle>
-            <DialogDescription className="text-zinc-500 font-mono text-xs uppercase tracking-[0.12em]">
-              Choose one folder on your computer. The vault will mirror into it by account folders.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-            <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Root folder</div>
-            <div className="flex gap-2">
-              <Input
-                value={folderPath}
-                readOnly
-                placeholder="Choose a folder..."
-                className="font-mono text-xs bg-black/30 border-white/10 text-zinc-200"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleChooseFolder}
-                disabled={isWorking}
-                className="border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px]"
+      {/* Full-screen portal overlay — renders into document.body to cover sidebar, topbar, and right panel */}
+      {mounted && createPortal(
+        <AnimatePresence>
+          {setupOpen && (
+            <motion.div
+              key="vault-setup-overlay"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4"
+              onClick={(e) => { if (e.target === e.currentTarget) setSetupOpen(false) }}
+            >
+              <motion.div
+                key="vault-setup-content"
+                initial={{ scale: 0.97, opacity: 0, y: 8 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.97, opacity: 0, y: 8 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="w-full max-w-[760px] bg-zinc-950 border border-white/10 rounded-2xl shadow-2xl overflow-hidden"
               >
-                Browse
-              </Button>
-            </div>
-            <div className="text-[11px] text-zinc-600 font-mono">
-              Use a folder you want to keep synced. The app will create subfolders for each account inside it.
-            </div>
+                {/* Header */}
+                <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
+                  <div>
+                    <div className="font-mono uppercase tracking-[0.18em] text-sm text-zinc-100">Link Root Vault Folder</div>
+                    <div className="text-zinc-500 font-mono text-xs uppercase tracking-[0.12em] mt-1">
+                      Choose one folder on your computer. The vault will mirror into it by account folders.
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSetupOpen(false)}
+                    className="p-1.5 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-all"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
 
-            <Separator className="bg-white/5" />
+                {/* Body */}
+                <div className="p-6 space-y-4">
+                  <div className="space-y-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+                    <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Root folder</div>
+                    <div className="flex gap-2">
+                      <Input
+                        value={folderPath}
+                        readOnly
+                        placeholder="Choose a folder..."
+                        className="font-mono text-xs bg-black/30 border-white/10 text-zinc-200"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleChooseFolder}
+                        disabled={isWorking}
+                        className="border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px]"
+                      >
+                        Browse
+                      </Button>
+                    </div>
+                    <div className="text-[11px] text-zinc-600 font-mono">
+                      Use a folder you want to keep synced. The app will create subfolders for each account inside it.
+                    </div>
 
-            <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-              <div>
-                <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Keep running in tray</div>
-                <div className="text-[11px] text-zinc-600 font-mono">Required if you want sync to keep working after you close the window.</div>
-              </div>
-              <Switch checked={keepRunningInTray} onCheckedChange={setKeepRunningInTray} />
-            </div>
-          </div>
+                    <Separator className="bg-white/5" />
 
-          <DialogFooter className="gap-2 sm:gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              className="border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px]"
-              onClick={() => setSetupOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleConnect}
-              disabled={isWorking || !folderPath.trim()}
-              className="bg-[#002FA7] text-white hover:bg-[#0036c6] font-mono text-[10px]"
-            >
-              {isWorking ? 'LINKING...' : 'LINK ROOT FOLDER'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+                      <div>
+                        <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Keep running in tray</div>
+                        <div className="text-[11px] text-zinc-600 font-mono">Required if you want sync to keep working after you close the window.</div>
+                      </div>
+                      <Switch checked={keepRunningInTray} onCheckedChange={setKeepRunningInTray} />
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px]"
+                      onClick={() => setSetupOpen(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleConnect}
+                      disabled={isWorking || !folderPath.trim()}
+                      className="bg-[#002FA7] text-white hover:bg-[#0036c6] font-mono text-[10px]"
+                    >
+                      {isWorking ? 'LINKING...' : 'LINK ROOT FOLDER'}
+                    </Button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </>
   )
 }
