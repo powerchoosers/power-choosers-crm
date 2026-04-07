@@ -256,6 +256,7 @@ export function DesktopFolderSyncBridge() {
   const folderSync = useDesktopFolderSync()
   const localSyncBusyRef = useRef(false)
   const remoteSyncBusyRef = useRef(false)
+  const manualRefreshRunningRef = useRef(false)
   const pendingRemotePullRef = useRef(false)
   const pendingForceRemotePullRef = useRef(false)
 
@@ -642,6 +643,26 @@ export function DesktopFolderSyncBridge() {
     }
   }, [fetchAccountNames, fetchRemoteDocuments, folderSync, markSynced, queryClient])
 
+  const runManualMirrorRefresh = useCallback(async () => {
+    if (!isFolderSyncActive) {
+      return
+    }
+
+    if (localSyncBusyRef.current || remoteSyncBusyRef.current) {
+      pendingForceRemotePullRef.current = true
+      return
+    }
+
+    manualRefreshRunningRef.current = true
+
+    try {
+      await folderSync.scanNow().catch(() => null)
+      await pullRemoteDocs({ force: true })
+    } finally {
+      manualRefreshRunningRef.current = false
+    }
+  }, [folderSync, isFolderSyncActive, pullRemoteDocs])
+
   useEffect(() => {
     if (!folderSync.isDesktop || loading || !user) {
       return
@@ -658,6 +679,9 @@ export function DesktopFolderSyncBridge() {
       }
 
       if (event.type === 'scan-complete' && (event.reason === 'manual' || event.reason === 'connect' || event.reason === 'tray')) {
+        if (manualRefreshRunningRef.current) {
+          return
+        }
         void pullRemoteDocs({ force: true })
       }
 
@@ -674,6 +698,17 @@ export function DesktopFolderSyncBridge() {
       unsubscribe()
     }
   }, [folderSync.isDesktop, loading, pullRemoteDocs, pushLocalFiles, user])
+
+  useEffect(() => {
+    const handleRefreshNow = () => {
+      void runManualMirrorRefresh()
+    }
+
+    window.addEventListener('vault-folder-sync:refresh-now', handleRefreshNow)
+    return () => {
+      window.removeEventListener('vault-folder-sync:refresh-now', handleRefreshNow)
+    }
+  }, [runManualMirrorRefresh])
 
   useEffect(() => {
     if (!isFolderSyncActive) {

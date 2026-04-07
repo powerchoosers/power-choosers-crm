@@ -30,8 +30,8 @@ import { VaultFolderSyncCard } from '@/components/vault/VaultFolderSyncCard'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useDesktopFolderSync } from '@/hooks/useDesktopFolderSync'
+import { ForensicClose } from '@/components/ui/ForensicClose'
 
 const VAULT_FILTERS: { id: DocumentTypeFilter; label: string; icon: React.ElementType }[] = [
   { id: 'ALL_ASSETS', label: 'All Assets', icon: FileStack },
@@ -71,6 +71,7 @@ export default function VaultPage() {
   const [ingestionDocType, setIngestionDocType] = useState<DocumentTypeFilter>('CONTRACT')
   const [ingestionAccountSearch, setIngestionAccountSearch] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [mirrorOpen, setMirrorOpen] = useState(false)
 
   const queryClient = useQueryClient()
   const invalidateVault = useVaultDocumentsInvalidate()
@@ -315,29 +316,16 @@ export default function VaultPage() {
           </div>
 
           {desktopFolderSync.isDesktop && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="shrink-0 border-white/10 bg-white/[0.03] text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]"
-                  aria-label="Open vault mirror"
-                >
-                  <Link2 className="w-4 h-4" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="end"
-                side="bottom"
-                sideOffset={12}
-                className="w-[min(92vw,760px)] p-0 bg-zinc-950 border-white/10 shadow-2xl overflow-hidden"
-              >
-                <div className="max-h-[72vh] overflow-auto p-0">
-                  <VaultFolderSyncCard />
-                </div>
-              </PopoverContent>
-            </Popover>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0 border-white/10 bg-white/[0.03] text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]"
+              aria-label="Open vault mirror"
+              onClick={() => setMirrorOpen(true)}
+            >
+              <Link2 className="w-4 h-4" />
+            </Button>
           )}
         </div>
       </div>
@@ -579,6 +567,35 @@ export default function VaultPage() {
           )}
         </main>
       </div>
+
+      <AnimatePresence>
+        {mirrorOpen && desktopFolderSync.isDesktop && (
+          <motion.div
+            key="vault-mirror-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-xl p-4"
+            onClick={() => setMirrorOpen(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.96, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.96, opacity: 0, y: 16 }}
+              transition={{ duration: 0.22, ease: [0.23, 1, 0.32, 1] }}
+              onClick={(event) => event.stopPropagation()}
+              className="relative w-full max-w-[min(96vw,1080px)]"
+            >
+              <div className="absolute -top-3 -right-3 z-10">
+                <ForensicClose onClick={() => setMirrorOpen(false)} className="rounded-full bg-zinc-950/90 border border-white/10 shadow-xl" />
+              </div>
+              <div className="max-h-[calc(100vh-3rem)] overflow-auto">
+                <VaultFolderSyncCard />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Ingestion modal */}
       <AnimatePresence>
