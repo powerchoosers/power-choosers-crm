@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { type DealStage } from '@/types/deals'
 import type { SignatureRequestKind } from '@/lib/signature-request'
 
-export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'SEND_PORTAL_ACCESS';
+export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'CREATE_PROPOSAL' | 'SEND_PORTAL_ACCESS';
 
 export interface SignatureRequestContext {
   documentId?: string
@@ -14,6 +14,20 @@ export interface SignatureRequestContext {
   dealId?: string
   documentType?: string | null
   requestKind?: SignatureRequestKind
+}
+
+export interface ProposalContext {
+  accountId: string
+  accountName?: string
+  accountLogoUrl?: string
+  accountDomain?: string
+  dealId?: string
+  dealTitle?: string
+  contactId?: string
+  attentionLine?: string
+  supplierName?: string
+  defaultRate?: number | string
+  defaultTermMonths?: number
 }
 
 export interface IngestionContext {
@@ -79,6 +93,9 @@ interface UIState {
   /** Pre-filled context for signature requests */
   signatureRequestContext: SignatureRequestContext | null
   setSignatureRequestContext: (ctx: SignatureRequestContext | null) => void
+  /** Pre-filled context for proposal drafting */
+  proposalContext: ProposalContext | null
+  setProposalContext: (ctx: ProposalContext | null) => void
   /** Pre-filled context for portal access provisioning */
   portalAccessContext: PortalAccessContext | null
   setPortalAccessContext: (ctx: PortalAccessContext | null) => void
@@ -136,6 +153,8 @@ export const useUIStore = create<UIState>()(
       setDealContext: (ctx) => set({ dealContext: ctx }),
       signatureRequestContext: null,
       setSignatureRequestContext: (ctx) => set({ signatureRequestContext: ctx }),
+      proposalContext: null,
+      setProposalContext: (ctx) => set({ proposalContext: ctx }),
       portalAccessContext: null,
       setPortalAccessContext: (ctx) => set({ portalAccessContext: ctx }),
       ingestionIdentifier: null,
