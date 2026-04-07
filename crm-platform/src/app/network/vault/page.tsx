@@ -311,8 +311,6 @@ export default function VaultPage() {
       </div>
 
       <VaultFolderSyncCard
-        defaultAccountId={selectedAccountId}
-        defaultAccountName={currentAccount?.name ?? null}
       />
 
       <div className="flex flex-1 min-h-0 gap-4">

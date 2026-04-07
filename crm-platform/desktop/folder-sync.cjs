@@ -15,10 +15,8 @@ function createDefaultState() {
     watching: false,
     keepRunningInTray: false,
     folderPath: null,
-    accountId: null,
-    accountName: null,
     syncId: null,
-    mode: 'mirror',
+    mode: 'vault-root',
     lastScanAt: null,
     lastSyncAt: null,
     lastError: null,
@@ -43,6 +41,57 @@ function normalizeRelativePath(value) {
     .map((segment) => sanitizeRelativePathSegment(segment))
     .filter(Boolean)
     .join('/')
+}
+
+function buildVaultAccountFolderLabel(accountId, accountName) {
+  const safeAccountId = String(accountId || '').trim() || 'unknown-account'
+  const safeAccountName = sanitizeRelativePathSegment(String(accountName || '').trim() || 'Account').slice(0, 64)
+  return `${safeAccountName} [${safeAccountId}]`
+}
+
+function parseVaultAccountFolderLabel(folderName) {
+  const normalized = String(folderName || '').trim()
+  const match = normalized.match(/^(.*)\s\[([^\[\]]+)\]$/)
+
+  if (!match) {
+    return null
+  }
+
+  const accountName = String(match[1] || '').trim()
+  const accountId = String(match[2] || '').trim()
+
+  if (!accountId) {
+    return null
+  }
+
+  return {
+    accountId,
+    accountName: accountName || accountId,
+    folderLabel: normalized,
+  }
+}
+
+function parseVaultRootRelativePath(relativePath) {
+  const normalized = normalizeRelativePath(relativePath)
+  if (!normalized) {
+    return null
+  }
+
+  const segments = normalized.split('/').filter(Boolean)
+  if (segments.length === 0) {
+    return null
+  }
+
+  const folder = parseVaultAccountFolderLabel(segments[0])
+  if (!folder) {
+    return null
+  }
+
+  return {
+    ...folder,
+    relativePath: normalized,
+    nestedRelativePath: segments.slice(1).join('/'),
+  }
 }
 
 function fingerprintForStat(stat) {
@@ -102,10 +151,10 @@ function isIgnoredFileName(fileName) {
   return false
 }
 
-function buildSyncId(folderPath, accountId) {
+function buildSyncId(folderPath) {
   return crypto
     .createHash('sha1')
-    .update(`${String(folderPath || '').toLowerCase()}|${String(accountId || '').toLowerCase()}`)
+    .update(`${String(folderPath || '').toLowerCase()}`)
     .digest('hex')
     .slice(0, 16)
 }
@@ -180,10 +229,8 @@ function cloneState(state) {
     keepRunningInTray: Boolean(state.keepRunningInTray),
     folderPath: state.folderPath || null,
     folderName: state.folderPath ? path.basename(state.folderPath) : null,
-    accountId: state.accountId || null,
-    accountName: state.accountName || null,
     syncId: state.syncId || null,
-    mode: state.mode || 'mirror',
+    mode: 'vault-root',
     lastScanAt: state.lastScanAt || null,
     lastSyncAt: state.lastSyncAt || null,
     lastError: state.lastError || null,
@@ -324,7 +371,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
   }
 
   function scheduleScan(reason = 'manual') {
-    if (!state.enabled || !state.folderPath || !state.accountId) {
+    if (!state.enabled || !state.folderPath) {
       return
     }
 
@@ -338,7 +385,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
   }
 
   async function runScan(reason = 'manual') {
-    if (!state.enabled || !state.folderPath || !state.accountId) {
+    if (!state.enabled || !state.folderPath) {
       return cloneState(state)
     }
 
@@ -356,9 +403,19 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
             continue
           }
 
+          const parsed = parseVaultRootRelativePath(file.relativePath)
+          if (!parsed) {
+            continue
+          }
+
           const current = state.syncedFiles[file.relativePath]
           if (!current || current.fingerprint !== file.fingerprint) {
-            detected.push(file)
+            detected.push({
+              ...file,
+              accountId: parsed.accountId,
+              accountName: parsed.accountName,
+              accountFolder: parsed.folderLabel,
+            })
           }
         }
 
@@ -406,7 +463,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
   async function chooseFolder() {
     const windowRef = typeof getMainWindow === 'function' ? getMainWindow() : null
     const result = await dialog.showOpenDialog(windowRef || undefined, {
-      title: 'Choose a vault mirror folder',
+      title: 'Choose a root vault folder',
       buttonLabel: 'Choose Folder',
       properties: ['openDirectory', 'createDirectory', 'promptToCreate'],
     })
@@ -418,7 +475,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
     return path.resolve(result.filePaths[0])
   }
 
-  async function connectFolderSync({ folderPath, accountId, accountName, keepRunningInTray = false }) {
+  async function connectFolderSync({ folderPath, keepRunningInTray = false }) {
     const folderPathInput = String(folderPath || '').trim()
     if (!folderPathInput) {
       throw new Error('Choose a folder first')
@@ -431,12 +488,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
       throw new Error('Selected path is not a folder')
     }
 
-    const resolvedAccountId = String(accountId || '').trim()
-    if (!resolvedAccountId) {
-      throw new Error('Choose an account to mirror')
-    }
-
-    const nextSyncId = buildSyncId(resolvedFolderPath, resolvedAccountId)
+    const nextSyncId = buildSyncId(resolvedFolderPath)
     const previousSyncId = state.syncId
 
     if (previousSyncId !== nextSyncId) {
@@ -450,9 +502,8 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
       ...state,
       enabled: true,
       watching: true,
+      mode: 'vault-root',
       folderPath: resolvedFolderPath,
-      accountId: resolvedAccountId,
-      accountName: String(accountName || state.accountName || '').trim() || null,
       syncId: nextSyncId,
       keepRunningInTray: Boolean(keepRunningInTray),
       lastError: null,
@@ -544,7 +595,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
       throw new Error('Missing file path')
     }
 
-    const finalRelativePath = await resolveUniqueRelativePath(folderPath, preferredRelativePath)
+    const finalRelativePath = preferredRelativePath
     const finalAbsolutePath = path.join(folderPath, finalRelativePath)
     const directoryName = path.dirname(finalAbsolutePath)
     await fs.promises.mkdir(directoryName, { recursive: true })
@@ -571,6 +622,9 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
     documentId,
     storagePath,
     direction,
+    accountId,
+    accountName,
+    accountFolder,
   }) {
     const normalizedRelativePath = normalizeRelativePath(relativePath)
     if (!normalizedRelativePath) {
@@ -588,6 +642,9 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
         documentId: documentId || null,
         storagePath: storagePath || null,
         direction: direction || 'local-to-vault',
+        accountId: accountId || null,
+        accountName: accountName || null,
+        accountFolder: accountFolder || null,
         syncedAt: new Date().toISOString(),
       },
     }

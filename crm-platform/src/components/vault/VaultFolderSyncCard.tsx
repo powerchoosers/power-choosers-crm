@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { FolderOpen, RefreshCw, UploadCloud, Download, Clock3, Link2, Link2Off, Search, Loader2 } from 'lucide-react'
+import { FolderOpen, RefreshCw, UploadCloud, Clock3, Link2, Link2Off, Loader2, Database } from 'lucide-react'
 import { toast } from 'sonner'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,14 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
-import { useSearchAccounts } from '@/hooks/useAccounts'
 import { useDesktopFolderSync } from '@/hooks/useDesktopFolderSync'
 import { cn } from '@/lib/utils'
-
-interface VaultFolderSyncCardProps {
-  defaultAccountId?: string | null
-  defaultAccountName?: string | null
-}
 
 function formatShortTime(value?: string | null) {
   if (!value) return 'Never'
@@ -33,22 +27,16 @@ function formatShortTime(value?: string | null) {
   return date.toLocaleString()
 }
 
-export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountName = null }: VaultFolderSyncCardProps) {
+export function VaultFolderSyncCard() {
   const sync = useDesktopFolderSync()
   const [setupOpen, setSetupOpen] = useState(false)
   const [folderPath, setFolderPath] = useState('')
-  const [accountQuery, setAccountQuery] = useState(defaultAccountName || '')
-  const [selectedAccount, setSelectedAccount] = useState<{ id: string; name: string } | null>(
-    defaultAccountId && defaultAccountName ? { id: defaultAccountId, name: defaultAccountName } : null
-  )
   const [keepRunningInTray, setKeepRunningInTray] = useState(false)
   const [isWorking, setIsWorking] = useState(false)
   const didInitSetupRef = useRef(false)
 
-  const { data: searchAccounts = [], isFetching: searchingAccounts } = useSearchAccounts(accountQuery)
-
   const isDesktopReady = Boolean(sync.isDesktop)
-  const isConnected = Boolean(sync.state?.enabled && sync.state.folderPath && sync.state.accountId)
+  const isConnected = Boolean(sync.state?.enabled && sync.state.folderPath)
 
   useEffect(() => {
     if (!setupOpen) {
@@ -63,22 +51,7 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
     didInitSetupRef.current = true
     setFolderPath(sync.state?.folderPath || '')
     setKeepRunningInTray(Boolean(sync.state?.keepRunningInTray))
-
-    if (sync.state?.accountId) {
-      setSelectedAccount({
-        id: sync.state.accountId,
-        name: sync.state.accountName || sync.state.accountId,
-      })
-      if (sync.state.accountName) {
-        setAccountQuery(sync.state.accountName)
-      }
-    } else if (defaultAccountId) {
-      setSelectedAccount({ id: defaultAccountId, name: defaultAccountName || defaultAccountId })
-      if (defaultAccountName) {
-        setAccountQuery(defaultAccountName)
-      }
-    }
-  }, [setupOpen, sync.state?.accountId, sync.state?.accountName, sync.state?.folderPath, sync.state?.keepRunningInTray, defaultAccountId, defaultAccountName])
+  }, [setupOpen, sync.state?.folderPath, sync.state?.keepRunningInTray])
 
   const statusBadge = useMemo(() => {
     if (!isDesktopReady) {
@@ -96,12 +69,12 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
       }
     }
 
-    if (sync.state?.folderPath || sync.state?.accountId) {
+    if (sync.state?.folderPath) {
       return { label: 'Paused', className: 'border-amber-500/20 text-amber-300 bg-amber-500/5' }
     }
 
     return { label: 'Not linked', className: 'border-white/10 text-zinc-500 bg-white/[0.03]' }
-  }, [isConnected, isDesktopReady, sync.state?.accountId, sync.state?.folderPath, sync.state?.keepRunningInTray, sync.state?.lastError])
+  }, [isConnected, isDesktopReady, sync.state?.folderPath, sync.state?.keepRunningInTray, sync.state?.lastError])
 
   const handleChooseFolder = async () => {
     try {
@@ -116,23 +89,16 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
 
   const handleConnect = async () => {
     if (!folderPath.trim()) {
-      toast.error('Choose a folder first')
-      return
-    }
-
-    if (!selectedAccount?.id) {
-      toast.error('Choose an account first')
+      toast.error('Choose a root vault folder first')
       return
     }
 
     setIsWorking(true)
-    const toastId = toast.loading('Linking folder to vault...')
+    const toastId = toast.loading('Linking root vault folder...')
 
     try {
       const result = await sync.connect({
         folderPath,
-        accountId: selectedAccount.id,
-        accountName: selectedAccount.name,
         keepRunningInTray,
       })
 
@@ -140,7 +106,7 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
         throw new Error(result?.reason || 'Failed to connect folder')
       }
 
-      toast.success('Folder linked to the vault', { id: toastId })
+      toast.success('Root vault folder linked', { id: toastId })
       setSetupOpen(false)
       await sync.scanNow().catch(() => null)
     } catch (error) {
@@ -152,7 +118,7 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
 
   const handlePause = async () => {
     setIsWorking(true)
-    const toastId = toast.loading('Pausing folder sync...')
+    const toastId = toast.loading('Pausing vault sync...')
 
     try {
       const result = await sync.disconnect()
@@ -160,9 +126,9 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
         throw new Error(result?.reason || 'Failed to pause sync')
       }
 
-      toast.success('Folder sync paused', { id: toastId })
+      toast.success('Vault sync paused', { id: toastId })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to pause folder sync', { id: toastId })
+      toast.error(error instanceof Error ? error.message : 'Failed to pause vault sync', { id: toastId })
     } finally {
       setIsWorking(false)
     }
@@ -170,17 +136,17 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
 
   const handleSyncNow = async () => {
     setIsWorking(true)
-    const toastId = toast.loading('Scanning folder and vault...')
+    const toastId = toast.loading('Scanning vault root...')
 
     try {
       const result = await sync.scanNow()
       if (!result?.ok) {
-        throw new Error(result?.reason || 'Folder sync scan failed')
+        throw new Error(result?.reason || 'Vault scan failed')
       }
 
-      toast.success('Folder sync scan complete', { id: toastId })
+      toast.success('Vault sync complete', { id: toastId })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Folder sync scan failed', { id: toastId })
+      toast.error(error instanceof Error ? error.message : 'Vault scan failed', { id: toastId })
     } finally {
       setIsWorking(false)
     }
@@ -221,7 +187,7 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
       <Card className="nodal-glass border-white/5 overflow-hidden !p-0 !gap-0">
         <CardHeader className="h-11 px-5 border-b border-white/5 bg-white/[0.03] flex items-center justify-between !p-0 !gap-0 !px-5">
           <CardTitle className="text-[10px] font-mono tracking-[0.2em] text-zinc-100 flex items-center gap-2.5 uppercase leading-none">
-            <Link2 className="w-3.5 h-3.5 text-zinc-400" /> Folder Mirror
+            <Link2 className="w-3.5 h-3.5 text-zinc-400" /> Root Vault Mirror
           </CardTitle>
           <div className="flex items-center gap-2">
             <div className={cn('w-1.5 h-1.5 rounded-full', isConnected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-zinc-600')} />
@@ -232,28 +198,20 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
         </CardHeader>
         <CardContent className="p-5 space-y-4">
           <CardDescription className="text-xs text-zinc-500 font-mono leading-relaxed">
-            Link one folder to one account. New files sync both ways while the desktop app is open.
-            Deletions stay manual so the vault does not eat your files by accident.
+            Pick one root folder and the app will mirror the whole vault into it.
+            It creates one account folder inside the root, so everything stays organized both ways.
           </CardDescription>
 
           {isConnected ? (
             <div className="space-y-4">
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Folder</div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Root folder</div>
                   <div className="mt-1 flex items-center gap-2 text-sm text-zinc-200">
                     <FolderOpen className="size-4 text-[#8ba6ff]" />
                     <span className="truncate">{sync.state?.folderName || 'Linked folder'}</span>
                   </div>
                   <div className="mt-1 text-[11px] text-zinc-500 font-mono truncate">{sync.state?.folderPath}</div>
-                </div>
-                <div className="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Account</div>
-                  <div className="mt-1 flex items-center gap-2 text-sm text-zinc-200">
-                    <Link2 className="size-4 text-[#8ba6ff]" />
-                    <span className="truncate">{sync.state?.accountName || 'Linked account'}</span>
-                  </div>
-                  <div className="mt-1 text-[11px] text-zinc-500 font-mono truncate">{sync.state?.accountId}</div>
                 </div>
                 <div className="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
                   <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Last sync</div>
@@ -264,6 +222,14 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
                   <div className="mt-1 text-[11px] text-zinc-500 font-mono">
                     {sync.state?.syncedFileCount || 0} file{(sync.state?.syncedFileCount || 0) === 1 ? '' : 's'} tracked
                   </div>
+                </div>
+                <div className="rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Mirror mode</div>
+                  <div className="mt-1 flex items-center gap-2 text-sm text-zinc-200">
+                    <Database className="size-4 text-[#8ba6ff]" />
+                    <span>Two-way root sync</span>
+                  </div>
+                  <div className="mt-1 text-[11px] text-zinc-500 font-mono">Account folders are created inside the root folder.</div>
                 </div>
               </div>
 
@@ -304,7 +270,7 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
                 <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
                   <div>
                     <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Keep running in tray</div>
-                    <div className="text-[11px] text-zinc-600 font-mono">Hide the window and keep the mirror live.</div>
+                    <div className="text-[11px] text-zinc-600 font-mono">Leave the mirror live when you close the window.</div>
                   </div>
                   <Switch checked={keepRunningInTray} onCheckedChange={handleTrayToggle} />
                 </div>
@@ -321,12 +287,10 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
               <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm text-zinc-200">
                   <UploadCloud className="size-4 text-[#8ba6ff]" />
-                  Connect a local folder
+                  Connect a root vault folder
                 </div>
                 <div className="text-[11px] uppercase tracking-[0.18em] text-zinc-500 font-mono">
-                  {sync.state?.folderPath && sync.state?.accountId
-                    ? 'Your folder link is paused. Open the setup to resume it.'
-                    : 'Pick the folder you want to mirror into the vault. You can keep it on desktop, a shared drive, or a project folder.'}
+                  Pick the folder that should mirror the whole vault. The app will create account folders inside it.
                 </div>
                 <Button
                   type="button"
@@ -334,18 +298,18 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
                   className="border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px]"
                   onClick={() => setSetupOpen(true)}
                 >
-                  <Link2 className="w-3.5 h-3.5 mr-2" /> {sync.state?.folderPath && sync.state?.accountId ? 'Resume Sync' : 'Link Folder'}
+                  <Link2 className="w-3.5 h-3.5 mr-2" /> {sync.state?.folderPath ? 'Resume Sync' : 'Link Root Folder'}
                 </Button>
               </div>
               <div className="rounded-2xl border border-white/5 bg-white/[0.03] p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm text-zinc-200">
-                  <Download className="size-4 text-[#8ba6ff]" />
-                  What it does
+                  <Database className="size-4 text-[#8ba6ff]" />
+                  How it works
                 </div>
                 <ul className="space-y-2 text-[11px] text-zinc-500 font-mono">
-                  <li>• New files in the folder upload into the vault.</li>
-                  <li>• Vault files for that account copy back into the folder.</li>
-                  <li>• Deletes stay manual so you do not lose evidence by accident.</li>
+                  <li>• Every vault file copies into the root folder.</li>
+                  <li>• Account folders are created inside the root folder automatically.</li>
+                  <li>• Changes sync both ways while the desktop app is open.</li>
                 </ul>
               </div>
             </div>
@@ -354,108 +318,45 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
       </Card>
 
       <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
-        <DialogContent className="sm:max-w-[860px] border-white/10 bg-zinc-950/95 text-zinc-100">
+        <DialogContent className="sm:max-w-[760px] border-white/10 bg-zinc-950/95 text-zinc-100">
           <DialogHeader>
-            <DialogTitle className="font-mono uppercase tracking-[0.18em] text-sm">Link Folder Mirror</DialogTitle>
+            <DialogTitle className="font-mono uppercase tracking-[0.18em] text-sm">Link Root Vault Folder</DialogTitle>
             <DialogDescription className="text-zinc-500 font-mono text-xs uppercase tracking-[0.12em]">
-              Pick a folder and the account it should mirror. Adds and updates sync in both directions.
+              Choose one folder on your computer. The vault will mirror into it by account folders.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 md:grid-cols-[0.95fr_1.05fr]">
-            <div className="space-y-3 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Folder</div>
-              <div className="flex gap-2">
-                <Input
-                  value={folderPath}
-                  readOnly
-                  placeholder="Choose a folder..."
-                  className="font-mono text-xs bg-black/30 border-white/10 text-zinc-200"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleChooseFolder}
-                  disabled={isWorking}
-                  className="border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px]"
-                >
-                  Browse
-                </Button>
-              </div>
-              <div className="text-[11px] text-zinc-600 font-mono">
-                Tip: choose a folder you actually want to keep synced. The app will watch it while the desktop app is open.
-              </div>
-
-              <Separator className="bg-white/5" />
-
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
-                <div>
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Keep running in tray</div>
-                  <div className="text-[11px] text-zinc-600 font-mono">Required if you want sync to keep working after you close the window.</div>
-                </div>
-                <Switch checked={keepRunningInTray} onCheckedChange={setKeepRunningInTray} />
-              </div>
+          <div className="space-y-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Root folder</div>
+            <div className="flex gap-2">
+              <Input
+                value={folderPath}
+                readOnly
+                placeholder="Choose a folder..."
+                className="font-mono text-xs bg-black/30 border-white/10 text-zinc-200"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleChooseFolder}
+                disabled={isWorking}
+                className="border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px]"
+              >
+                Browse
+              </Button>
+            </div>
+            <div className="text-[11px] text-zinc-600 font-mono">
+              Use a folder you want to keep synced. The app will create subfolders for each account inside it.
             </div>
 
-            <div className="space-y-3 rounded-2xl border border-white/5 bg-white/[0.03] p-4">
-              <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Account</div>
-              <div className="flex items-center gap-2 rounded-2xl border border-[#002FA7]/20 bg-[#002FA7]/8 px-4 py-3">
-                <Search className="size-4 text-[#8ba6ff]" />
-                <Input
-                  value={accountQuery}
-                  onChange={(event) => {
-                    setAccountQuery(event.target.value)
-                    setSelectedAccount(null)
-                  }}
-                  placeholder="Search account..."
-                  className="border-0 bg-transparent px-0 font-mono text-xs text-zinc-100 placeholder:text-zinc-600 focus-visible:ring-0"
-                />
+            <Separator className="bg-white/5" />
+
+            <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/5 bg-black/20 px-4 py-3">
+              <div>
+                <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Keep running in tray</div>
+                <div className="text-[11px] text-zinc-600 font-mono">Required if you want sync to keep working after you close the window.</div>
               </div>
-
-              {selectedAccount ? (
-                <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-                  <div className="text-[10px] uppercase tracking-[0.18em] text-emerald-300 font-mono">Selected account</div>
-                  <div className="mt-1 text-sm text-zinc-100">{selectedAccount.name}</div>
-                  <div className="text-[11px] text-zinc-500 font-mono">{selectedAccount.id}</div>
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-white/5 bg-black/20 px-4 py-3 text-[11px] text-zinc-600 font-mono">
-                  Pick the account that should own the folder mirror.
-                </div>
-              )}
-
-              <div className="max-h-56 overflow-auto rounded-2xl border border-white/5 bg-black/20 p-2">
-                {searchingAccounts ? (
-                  <div className="flex items-center justify-center py-6 text-zinc-600">
-                    <Loader2 className="size-4 animate-spin" />
-                  </div>
-                ) : searchAccounts.length === 0 ? (
-                  <div className="px-3 py-6 text-center text-[11px] text-zinc-600 font-mono">
-                    Type at least two letters to search accounts.
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {searchAccounts.map((account) => {
-                      const active = selectedAccount?.id === account.id
-
-                      return (
-                        <button
-                          key={account.id}
-                          type="button"
-                          onClick={() => setSelectedAccount({ id: account.id, name: account.name })}
-                          className={cn(
-                            'w-full rounded-2xl border px-3 py-3 text-left transition-colors',
-                            active ? 'border-[#002FA7]/40 bg-[#002FA7]/10' : 'border-white/5 bg-white/[0.02] hover:bg-white/[0.04]'
-                          )}
-                        >
-                          <div className="text-sm text-zinc-100">{account.name}</div>
-                          <div className="text-[11px] text-zinc-500 font-mono">{account.domain || account.industry || account.id}</div>
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
-              </div>
+              <Switch checked={keepRunningInTray} onCheckedChange={setKeepRunningInTray} />
             </div>
           </div>
 
@@ -471,10 +372,10 @@ export function VaultFolderSyncCard({ defaultAccountId = null, defaultAccountNam
             <Button
               type="button"
               onClick={handleConnect}
-              disabled={isWorking || !folderPath.trim() || !selectedAccount?.id}
+              disabled={isWorking || !folderPath.trim()}
               className="bg-[#002FA7] text-white hover:bg-[#0036c6] font-mono text-[10px]"
             >
-              {isWorking ? 'LINKING...' : 'LINK FOLDER'}
+              {isWorking ? 'LINKING...' : 'LINK ROOT FOLDER'}
             </Button>
           </DialogFooter>
         </DialogContent>

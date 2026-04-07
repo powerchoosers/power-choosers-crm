@@ -13,10 +13,8 @@ export interface DesktopFolderSyncState {
   keepRunningInTray: boolean
   folderPath: string | null
   folderName: string | null
-  accountId: string | null
-  accountName: string | null
   syncId: string | null
-  mode: 'mirror'
+  mode: 'vault-root'
   lastScanAt?: string | null
   lastSyncAt?: string | null
   lastError?: string | null
@@ -43,6 +41,9 @@ export interface DesktopFolderSyncFileEntry {
   size: number
   mtimeMs: number
   fingerprint: string
+  accountId?: string | null
+  accountName?: string | null
+  accountFolder?: string | null
 }
 
 export interface DesktopFolderSyncReadResult {
@@ -68,8 +69,6 @@ export interface DesktopFolderSyncWriteResult {
 
 export interface DesktopFolderSyncConnectInput {
   folderPath: string
-  accountId: string
-  accountName?: string | null
   keepRunningInTray?: boolean
 }
 
@@ -80,6 +79,9 @@ export interface DesktopFolderSyncAcknowledgeInput {
   documentId?: string | null
   storagePath?: string | null
   direction?: 'local-to-vault' | 'vault-to-local'
+  accountId?: string | null
+  accountName?: string | null
+  accountFolder?: string | null
 }
 
 export type DesktopFolderSyncEvent =

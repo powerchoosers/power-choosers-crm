@@ -54,6 +54,34 @@ export function sanitizeStoragePathSegment(value: string) {
     .slice(0, 96) || 'file'
 }
 
+export function buildVaultAccountFolderLabel(accountId: string, accountName?: string | null) {
+  const safeAccountId = String(accountId || '').trim() || 'unknown-account'
+  const safeAccountName = sanitizeStoragePathSegment(String(accountName || '').trim() || 'Account').slice(0, 64)
+  return `${safeAccountName} [${safeAccountId}]`
+}
+
+export function parseVaultAccountFolderLabel(folderName: string) {
+  const normalized = String(folderName || '').trim()
+  const match = normalized.match(/^(.*)\s\[([^\[\]]+)\]$/)
+
+  if (!match) {
+    return null
+  }
+
+  const accountName = String(match[1] || '').trim()
+  const accountId = String(match[2] || '').trim()
+
+  if (!accountId) {
+    return null
+  }
+
+  return {
+    accountId,
+    accountName: accountName || accountId,
+    folderLabel: normalized,
+  }
+}
+
 export function normalizeVaultRelativePath(value: string) {
   return String(value || '')
     .replace(/\\/g, '/')

@@ -7,19 +7,27 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { useDesktopFolderSync } from '@/hooks/useDesktopFolderSync'
 import {
+  buildVaultAccountFolderLabel,
   buildVaultSyncStoragePath,
   formatBytes,
   ingestAccountFileData,
   normalizeVaultRelativePath,
+  parseVaultAccountFolderLabel,
 } from '@/lib/file-ingestion'
 
 type RemoteVaultDocument = {
   id: string
+  account_id: string | null
   name: string
   size: string | null
   type: string | null
   storage_path: string
   metadata?: Record<string, unknown> | null
+}
+
+type RemoteAccount = {
+  id: string
+  name: string | null
 }
 
 function base64ToUint8Array(base64: string) {
@@ -52,10 +60,62 @@ function normalizeKey(value: string) {
     .replace(/\s+/g, ' ')
 }
 
-function parseRemoteDocumentSize(value?: string | null) {
+function parseDocumentSize(value?: string | null) {
   const raw = String(value || '').trim()
-  if (!raw) return ''
-  return raw
+  if (!raw) {
+    return 0
+  }
+
+  const match = raw.match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i)
+  if (!match) {
+    return 0
+  }
+
+  const amount = Number.parseFloat(match[1] || '0')
+  if (!Number.isFinite(amount)) {
+    return 0
+  }
+
+  const unit = String(match[2] || 'B').toUpperCase()
+  const multiplier =
+    unit === 'KB'
+      ? 1024
+      : unit === 'MB'
+        ? 1024 ** 2
+        : unit === 'GB'
+          ? 1024 ** 3
+          : unit === 'TB'
+            ? 1024 ** 4
+            : 1
+
+  return amount * multiplier
+}
+
+function resolveRemoteRootRelativePath(document: RemoteVaultDocument, accountName: string | null) {
+  const accountFolder = buildVaultAccountFolderLabel(document.account_id || 'unassigned', accountName)
+  const storedRelativePath = normalizeVaultRelativePath(
+    String(document.metadata?.relativePath || document.metadata?.localRelativePath || '')
+  )
+
+  if (storedRelativePath) {
+    const firstSegment = storedRelativePath.split('/').filter(Boolean)[0] || ''
+    const parsedFolder = parseVaultAccountFolderLabel(firstSegment)
+    if (parsedFolder && parsedFolder.accountId === document.account_id) {
+      return storedRelativePath
+    }
+
+    return `${accountFolder}/${storedRelativePath}`
+  }
+
+  const rawFileName = normalizeVaultRelativePath(document.name || 'file') || 'file'
+  const dotIndex = rawFileName.lastIndexOf('.')
+  const shortId = document.id ? String(document.id).slice(0, 8) : 'file'
+  const fallbackName =
+    dotIndex > 0
+      ? `${rawFileName.slice(0, dotIndex)}-${shortId}${rawFileName.slice(dotIndex)}`
+      : `${rawFileName}-${shortId}`
+
+  return `${accountFolder}/${fallbackName}`
 }
 
 export function DesktopFolderSyncBridge() {
@@ -67,23 +127,17 @@ export function DesktopFolderSyncBridge() {
 
   const isFolderSyncActive = Boolean(
     folderSync.isDesktop &&
-    !loading &&
-    user &&
-    folderSync.state?.enabled &&
-    folderSync.state?.folderPath &&
-    folderSync.state?.accountId
+      !loading &&
+      user &&
+      folderSync.state?.enabled &&
+      folderSync.state?.folderPath
   )
 
   const fetchRemoteDocuments = useCallback(async () => {
-    const accountId = folderSync.state?.accountId
-    if (!accountId) {
-      return []
-    }
-
     const { data, error } = await supabase
       .from('documents')
-      .select('id, name, size, type, storage_path, metadata')
-      .eq('account_id', accountId)
+      .select('id, account_id, name, size, type, storage_path, metadata')
+      .order('account_id', { ascending: true })
       .order('created_at', { ascending: true })
 
     if (error) {
@@ -91,167 +145,233 @@ export function DesktopFolderSyncBridge() {
     }
 
     return (data ?? []) as RemoteVaultDocument[]
-  }, [folderSync.state?.accountId])
+  }, [])
 
-  const markSynced = useCallback(async (payload: {
-    relativePath: string
-    size: number
-    mtimeMs: number
-    documentId?: string | null
-    storagePath?: string | null
-    direction: 'local-to-vault' | 'vault-to-local'
-  }) => {
-    await folderSync.acknowledgeFile(payload)
-  }, [folderSync])
+  const fetchAccountNames = useCallback(async () => {
+    const { data, error } = await supabase.from('accounts').select('id, name')
 
-  const pushLocalFiles = useCallback(async (state: NonNullable<typeof folderSync.state>, files: Array<{
-    absolutePath: string
-    relativePath: string
-    fileName: string
-    size: number
-    mtimeMs: number
-    fingerprint: string
-  }>) => {
-    if (!state.accountId || !state.syncId) {
-      return
+    if (error) {
+      throw error
     }
 
-    if (localSyncBusyRef.current) {
-      return
-    }
+    return (data ?? []) as RemoteAccount[]
+  }, [])
 
-    localSyncBusyRef.current = true
-    const toastId = toast.loading('Syncing folder changes...')
-    let shouldKickRemotePull = false
+  const markSynced = useCallback(
+    async (payload: {
+      relativePath: string
+      size: number
+      mtimeMs: number
+      documentId?: string | null
+      storagePath?: string | null
+      direction: 'local-to-vault' | 'vault-to-local'
+      accountId?: string | null
+      accountName?: string | null
+      accountFolder?: string | null
+    }) => {
+      await folderSync.acknowledgeFile(payload)
+    },
+    [folderSync]
+  )
 
-    try {
-      const remoteDocuments = await fetchRemoteDocuments()
-      const syncedDocumentIds = new Set(state.syncedDocumentIds || [])
-      const remoteByRelativePath = new Map<string, RemoteVaultDocument>()
-      const remoteByNameAndSize = new Map<string, RemoteVaultDocument>()
-
-      for (const doc of remoteDocuments) {
-        const relativePath = normalizeVaultRelativePath(String(doc.metadata?.relativePath || doc.metadata?.localRelativePath || ''))
-        if (relativePath) {
-          remoteByRelativePath.set(relativePath, doc)
-        }
-
-        const nameKey = normalizeKey(doc.name)
-        const sizeKey = normalizeKey(parseRemoteDocumentSize(doc.size))
-        if (nameKey && sizeKey) {
-          remoteByNameAndSize.set(`${nameKey}|${sizeKey}`, doc)
-        }
+  const pushLocalFiles = useCallback(
+    async (
+      state: NonNullable<typeof folderSync.state>,
+      files: Array<{
+        absolutePath: string
+        relativePath: string
+        fileName: string
+        size: number
+        mtimeMs: number
+        fingerprint: string
+        accountId?: string | null
+        accountName?: string | null
+        accountFolder?: string | null
+      }>
+    ) => {
+      if (!state.folderPath || !state.syncId) {
+        return
       }
 
-      let uploadedCount = 0
-      let linkedCount = 0
-      let customerPromotionNeeded = false
+      if (localSyncBusyRef.current) {
+        return
+      }
 
-      for (const file of files) {
-        const localState = state.syncedFiles?.[file.relativePath]
-        if (localState?.fingerprint === file.fingerprint) {
-          continue
-        }
+      localSyncBusyRef.current = true
+      const toastId = toast.loading('Syncing vault changes...')
+      let shouldKickRemotePull = false
 
-        const relativeMatch = remoteByRelativePath.get(file.relativePath)
-        const nameMatch = remoteByNameAndSize.get(`${normalizeKey(file.fileName)}|${normalizeKey(formatBytes(file.size))}`)
-        const existingRemote = relativeMatch || nameMatch || null
+      try {
+        const [remoteDocuments, remoteAccounts] = await Promise.all([fetchRemoteDocuments(), fetchAccountNames()])
+        const accountNameMap = remoteAccounts.reduce<Record<string, string>>((accumulator, account) => {
+          accumulator[account.id] = account.name || account.id
+          return accumulator
+        }, {})
 
-        if (existingRemote && !syncedDocumentIds.has(existingRemote.id)) {
-          await markSynced({
-            relativePath: file.relativePath,
-            size: file.size,
-            mtimeMs: file.mtimeMs,
-            documentId: existingRemote.id,
-            storagePath: existingRemote.storage_path,
-            direction: 'local-to-vault',
-          })
-          syncedDocumentIds.add(existingRemote.id)
-          linkedCount += 1
-          shouldKickRemotePull = true
-          continue
-        }
+        const syncedDocumentIds = new Set(state.syncedDocumentIds || [])
+        const remoteByRelativePath = new Map<string, RemoteVaultDocument>()
+        const remoteByNameAndSize = new Map<string, RemoteVaultDocument>()
 
-        const fileData = await folderSync.readFile(file.absolutePath)
-        const result = await ingestAccountFileData({
-          accountId: state.accountId,
-          fileName: file.fileName,
-          fileData: base64ToUint8Array(fileData.base64),
-          fileType: fileData.mimeType,
-          fileSize: fileData.size,
-          apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || null,
-          storagePath: buildVaultSyncStoragePath(state.accountId, state.syncId, file.relativePath),
-          metadata: {
-            syncSource: 'desktop-folder-sync',
-            syncId: state.syncId,
-            relativePath: file.relativePath,
-            localFileName: file.fileName,
-            localFingerprint: file.fingerprint,
-          },
-          upsert: true,
-        })
+        for (const doc of remoteDocuments) {
+          const accountName = doc.account_id ? accountNameMap[doc.account_id] || doc.account_id : 'Unassigned'
+          const rootRelativePath = normalizeVaultRelativePath(resolveRemoteRootRelativePath(doc, accountName))
+          remoteByRelativePath.set(rootRelativePath, doc)
 
-        await markSynced({
-          relativePath: file.relativePath,
-          size: fileData.size,
-          mtimeMs: fileData.mtimeMs,
-          documentId: result.documentId,
-          storagePath: result.storagePath,
-          direction: 'local-to-vault',
-        })
-
-        if (result.analysisType) {
-          const normalizedAnalysis = result.analysisType.toUpperCase()
-          if (normalizedAnalysis === 'CONTRACT' || normalizedAnalysis === 'SIGNED_CONTRACT' || normalizedAnalysis === 'BILL') {
-            customerPromotionNeeded = true
+          const nameKey = normalizeKey(doc.name)
+          const sizeKey = normalizeKey(formatBytes(parseDocumentSize(doc.size)))
+          if (nameKey && sizeKey) {
+            remoteByNameAndSize.set(`${normalizeKey(String(doc.account_id || ''))}|${nameKey}|${sizeKey}`, doc)
           }
         }
 
-        uploadedCount += 1
-        shouldKickRemotePull = true
-      }
+        let uploadedCount = 0
+        let linkedCount = 0
+        let customerPromotionNeeded = false
+        let warnedAboutMissingAccountFolder = false
 
-      if (customerPromotionNeeded && state.accountId) {
-        const { error: accountError } = await supabase
-          .from('accounts')
-          .update({ status: 'CUSTOMER' })
-          .eq('id', state.accountId)
+        for (const file of files) {
+          const rootRelativePath = normalizeVaultRelativePath(file.relativePath)
+          const localState = state.syncedFiles?.[rootRelativePath]
+          if (localState?.fingerprint === file.fingerprint) {
+            continue
+          }
 
-        if (accountError) {
-          console.error('[Folder Sync] Account status update failed:', accountError)
+          const parsedFolder =
+            file.accountFolder ? parseVaultAccountFolderLabel(file.accountFolder) : parseVaultAccountFolderLabel(rootRelativePath.split('/')[0] || '')
+
+          const accountId = file.accountId || parsedFolder?.accountId || null
+          const accountName = file.accountName || parsedFolder?.accountName || null
+          const accountFolder = file.accountFolder || parsedFolder?.folderLabel || null
+
+          if (!accountId || !accountFolder) {
+            if (!warnedAboutMissingAccountFolder) {
+              warnedAboutMissingAccountFolder = true
+              toast.error('Put files inside an account folder inside the root vault folder.')
+            }
+            continue
+          }
+
+          const relativeMatch = remoteByRelativePath.get(rootRelativePath)
+          const sizeKey = normalizeKey(formatBytes(file.size))
+          const nameMatch = remoteByNameAndSize.get(`${normalizeKey(accountId)}|${normalizeKey(file.fileName)}|${sizeKey}`)
+          const existingRemote = relativeMatch || nameMatch || null
+
+          if (existingRemote && !syncedDocumentIds.has(existingRemote.id)) {
+            await markSynced({
+              relativePath: rootRelativePath,
+              size: file.size,
+              mtimeMs: file.mtimeMs,
+              documentId: existingRemote.id,
+              storagePath: existingRemote.storage_path,
+              direction: 'local-to-vault',
+              accountId,
+              accountName,
+              accountFolder,
+            })
+            syncedDocumentIds.add(existingRemote.id)
+            linkedCount += 1
+            shouldKickRemotePull = true
+            continue
+          }
+
+          const fileData = await folderSync.readFile(file.absolutePath)
+          const result = await ingestAccountFileData({
+            accountId,
+            fileName: file.fileName,
+            fileData: base64ToUint8Array(fileData.base64),
+            fileType: fileData.mimeType,
+            fileSize: fileData.size,
+            apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || null,
+            storagePath: buildVaultSyncStoragePath(accountId, state.syncId, rootRelativePath),
+            metadata: {
+              syncSource: 'desktop-vault-root',
+              syncId: state.syncId,
+              relativePath: rootRelativePath,
+              accountFolder,
+              accountId,
+              accountName,
+              localFileName: file.fileName,
+              localFingerprint: file.fingerprint,
+            },
+            upsert: true,
+          })
+
+          await markSynced({
+            relativePath: rootRelativePath,
+            size: fileData.size,
+            mtimeMs: fileData.mtimeMs,
+            documentId: result.documentId,
+            storagePath: result.storagePath,
+            direction: 'local-to-vault',
+            accountId,
+            accountName,
+            accountFolder,
+          })
+
+          if (result.analysisType) {
+            const normalizedAnalysis = result.analysisType.toUpperCase()
+            if (normalizedAnalysis === 'CONTRACT' || normalizedAnalysis === 'SIGNED_CONTRACT' || normalizedAnalysis === 'BILL') {
+              customerPromotionNeeded = true
+            }
+          }
+
+          uploadedCount += 1
+          shouldKickRemotePull = true
+        }
+
+        if (customerPromotionNeeded) {
+          const accountsToPromote = Array.from(
+            new Set(
+              files
+                .map((file) => file.accountId || parseVaultAccountFolderLabel(file.accountFolder || file.relativePath.split('/')[0] || '')?.accountId || null)
+                .filter((value): value is string => Boolean(value))
+            )
+          )
+
+          for (const accountId of accountsToPromote) {
+            const { error: accountError } = await supabase
+              .from('accounts')
+              .update({ status: 'CUSTOMER' })
+              .eq('id', accountId)
+
+            if (accountError) {
+              console.error('[Folder Sync] Account status update failed:', accountError)
+            }
+          }
+        }
+
+        if (uploadedCount > 0 || linkedCount > 0) {
+          toast.success(
+            linkedCount > 0 && uploadedCount === 0
+              ? `Linked ${linkedCount} existing vault file${linkedCount === 1 ? '' : 's'} to the root mirror.`
+              : `Synced ${uploadedCount} file${uploadedCount === 1 ? '' : 's'} to the vault.`,
+            { id: toastId }
+          )
+        } else {
+          toast.success('Root vault is already in sync.', { id: toastId })
+        }
+
+        await queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
+        await queryClient.invalidateQueries({ queryKey: ['vault-accounts'] })
+        await queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      } catch (error) {
+        console.error('[Folder Sync] Local upload failed:', error)
+        toast.error(error instanceof Error ? error.message : 'Vault sync failed', { id: toastId })
+      } finally {
+        localSyncBusyRef.current = false
+        if (shouldKickRemotePull) {
+          window.setTimeout(() => {
+            void pullRemoteDocs()
+          }, 1000)
         }
       }
-
-      if (uploadedCount > 0 || linkedCount > 0) {
-        toast.success(
-          linkedCount > 0 && uploadedCount === 0
-            ? `Linked ${linkedCount} existing vault file${linkedCount === 1 ? '' : 's'} to the folder.`
-            : `Synced ${uploadedCount} file${uploadedCount === 1 ? '' : 's'} to the vault.`,
-          { id: toastId }
-        )
-      } else {
-        toast.success('Folder is already in sync.', { id: toastId })
-      }
-
-      await queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
-      await queryClient.invalidateQueries({ queryKey: ['vault-accounts'] })
-      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-    } catch (error) {
-      console.error('[Folder Sync] Local upload failed:', error)
-      toast.error(error instanceof Error ? error.message : 'Folder sync failed', { id: toastId })
-    } finally {
-      localSyncBusyRef.current = false
-      if (shouldKickRemotePull) {
-        window.setTimeout(() => {
-          void pullRemoteDocs()
-        }, 1000)
-      }
-    }
-  }, [fetchRemoteDocuments, folderSync, markSynced, queryClient])
+    },
+    [fetchAccountNames, fetchRemoteDocuments, folderSync, markSynced, queryClient]
+  )
 
   const pullRemoteDocs = useCallback(async () => {
     const state = folderSync.state
-    if (!state?.enabled || !state.folderPath || !state.accountId || !state.syncId) {
+    if (!state?.enabled || !state.folderPath || !state.syncId) {
       return
     }
 
@@ -262,7 +382,12 @@ export function DesktopFolderSyncBridge() {
     remoteSyncBusyRef.current = true
 
     try {
-      const remoteDocuments = await fetchRemoteDocuments()
+      const [remoteDocuments, remoteAccounts] = await Promise.all([fetchRemoteDocuments(), fetchAccountNames()])
+      const accountNameMap = remoteAccounts.reduce<Record<string, string>>((accumulator, account) => {
+        accumulator[account.id] = account.name || account.id
+        return accumulator
+      }, {})
+
       const syncedDocumentIds = new Set(state.syncedDocumentIds || [])
       const unsyncedDocuments = remoteDocuments.filter((doc) => !syncedDocumentIds.has(doc.id))
 
@@ -273,6 +398,9 @@ export function DesktopFolderSyncBridge() {
       let downloadedCount = 0
 
       for (const doc of unsyncedDocuments) {
+        const accountName = doc.account_id ? accountNameMap[doc.account_id] || doc.account_id : 'Unassigned'
+        const rootRelativePath = normalizeVaultRelativePath(resolveRemoteRootRelativePath(doc, accountName))
+
         const { data, error } = await supabase.storage.from('vault').createSignedUrl(doc.storage_path, 120, {
           download: doc.name,
         })
@@ -293,7 +421,7 @@ export function DesktopFolderSyncBridge() {
         const arrayBuffer = await response.arrayBuffer()
         const base64 = arrayBufferToBase64(arrayBuffer)
         const writeResult = await folderSync.writeFile({
-          relativePath: normalizeVaultRelativePath(String(doc.metadata?.relativePath || doc.metadata?.localRelativePath || doc.name || 'file')),
+          relativePath: rootRelativePath,
           fileName: doc.name || 'file',
           base64,
           mimeType: doc.type || 'application/octet-stream',
@@ -306,13 +434,16 @@ export function DesktopFolderSyncBridge() {
           documentId: doc.id,
           storagePath: doc.storage_path,
           direction: 'vault-to-local',
+          accountId: doc.account_id || null,
+          accountName,
+          accountFolder: buildVaultAccountFolderLabel(doc.account_id || 'unassigned', accountName),
         })
 
         downloadedCount += 1
       }
 
       if (downloadedCount > 0) {
-        toast.success(`Copied ${downloadedCount} vault file${downloadedCount === 1 ? '' : 's'} into the folder.`)
+        toast.success(`Copied ${downloadedCount} vault file${downloadedCount === 1 ? '' : 's'} into the root folder.`)
         await queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
       }
     } catch (error) {
@@ -320,7 +451,7 @@ export function DesktopFolderSyncBridge() {
     } finally {
       remoteSyncBusyRef.current = false
     }
-  }, [fetchRemoteDocuments, folderSync, markSynced, queryClient])
+  }, [fetchAccountNames, fetchRemoteDocuments, folderSync, markSynced, queryClient])
 
   useEffect(() => {
     if (!folderSync.isDesktop || loading || !user) {
