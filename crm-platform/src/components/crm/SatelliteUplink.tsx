@@ -2,11 +2,25 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { MapPin, Satellite, Wifi, Loader2, Search, Copy, CheckCircle2 } from 'lucide-react';
 import Map, { Marker, Popup } from 'react-map-gl/mapbox';
+import type { MapRef } from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+
+// Hoisted outside component — avoids re-creating the string on every render
+const POPUP_STYLE_OVERRIDE = `
+  .mapboxgl-popup-content {
+    background: transparent !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+  .mapboxgl-popup-tip {
+    display: none !important;
+  }
+`;
 
 interface SatelliteUplinkProps {
   address: string;
@@ -51,6 +65,9 @@ export default function SatelliteUplink({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [pendingBottomAlign, setPendingBottomAlign] = useState(false);
   const mapPanelRef = useRef<HTMLDivElement | null>(null);
+  const mapRef = useRef<MapRef | null>(null);
+  // RAF handle for throttling mousemove feature queries
+  const mouseMoveRafRef = useRef<number | null>(null);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -426,6 +443,7 @@ export default function SatelliteUplink({
         ) : (
           /* The "Unlocked" State - Mapbox Map with Satellite View */
           <Map
+            ref={mapRef}
             initialViewState={{
               longitude: stableCoordinates.lng,
               latitude: stableCoordinates.lat,
@@ -435,24 +453,27 @@ export default function SatelliteUplink({
             mapStyle="mapbox://styles/mapbox/standard-satellite"
             mapboxAccessToken={mapboxToken}
             attributionControl={false}
-            onMouseEnter={() => {
-              const canvas = document.querySelector('.mapboxgl-canvas') as HTMLCanvasElement;
-              if (canvas) canvas.style.cursor = 'pointer';
-            }}
             onMouseLeave={() => {
-              const canvas = document.querySelector('.mapboxgl-canvas') as HTMLCanvasElement;
-              if (canvas) canvas.style.cursor = '';
+              // Cancel any pending RAF when mouse leaves the map
+              if (mouseMoveRafRef.current !== null) {
+                cancelAnimationFrame(mouseMoveRafRef.current);
+                mouseMoveRafRef.current = null;
+              }
+              mapRef.current?.getMap().getCanvas().style.setProperty('cursor', '');
             }}
             onMouseMove={(e) => {
+              // Throttle via RAF — only one queryRenderedFeatures per animation frame
+              if (mouseMoveRafRef.current !== null) return;
+              const point = e.point;
               const map = e.target;
-              const features = map.queryRenderedFeatures(e.point);
-              const hasLabel = features.some(f => f.properties?.name || f.properties?.['name:en']);
-              const canvas = map.getCanvas();
-              if (hasLabel) {
-                canvas.style.cursor = 'pointer';
-              } else {
-                canvas.style.cursor = '';
-              }
+              mouseMoveRafRef.current = requestAnimationFrame(() => {
+                mouseMoveRafRef.current = null;
+                const features = map.queryRenderedFeatures(point);
+                const hasLabel = features.some(
+                  (f) => f.properties?.name || f.properties?.['name:en']
+                );
+                map.getCanvas().style.cursor = hasLabel ? 'pointer' : '';
+              });
             }}
             onStyleData={(e: any) => {
               const map = e.target;
@@ -508,7 +529,8 @@ export default function SatelliteUplink({
             </Marker>
 
             {/* SHADOW INTELLIGENCE LAYER: Invisible hotspots for buildings with no labels */}
-            {nearbyBusinesses.map((biz) => (
+            {/* Memoised: markers only re-render when the businesses list itself changes */}
+            {useMemo(() => nearbyBusinesses.map((biz) => (
               <Marker
                 key={biz.id}
                 longitude={biz.lng}
@@ -535,7 +557,7 @@ export default function SatelliteUplink({
                   </div>
                 </button>
               </Marker>
-            ))}
+            )), [nearbyBusinesses])}
 
             {/* POPUP FOR SELECTED POI */}
             {selectedPOI && (
@@ -548,19 +570,8 @@ export default function SatelliteUplink({
                 maxWidth="none"
                 style={{ padding: 0 }}
               >
-                {/* Kill the default pointer tip completely */}
-                <style dangerouslySetInnerHTML={{
-                  __html: `
-                  .mapboxgl-popup-content {
-                    background: transparent !important;
-                    box-shadow: none !important;
-                    padding: 0 !important;
-                    border: none !important;
-                  }
-                  .mapboxgl-popup-tip {
-                    display: none !important;
-                  }
-                `}} />
+                {/* Kill the default pointer tip completely — style string hoisted outside component */}
+                <style dangerouslySetInnerHTML={{ __html: POPUP_STYLE_OVERRIDE }} />
 
                 <div className="flex flex-col items-center">
                   {/* CUSTOM ANIMATED POINTER: Shows up second */}
