@@ -209,29 +209,37 @@ export function DesktopFileIngestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent showCloseButton={false} className="max-w-4xl w-full bg-zinc-950/96 text-white border-white/10 shadow-2xl overflow-hidden">
+      <DialogContent
+        showCloseButton={false}
+        className="!flex !h-[min(92vh,58rem)] !w-[min(96vw,80rem)] !max-w-none !flex-col !overflow-hidden !rounded-[28px] !border-white/10 !bg-zinc-950/98 !p-0 text-white !shadow-[0_28px_120px_rgba(0,0,0,0.78)]"
+      >
         <DialogTitle className="sr-only">Attach Files to Account</DialogTitle>
         <DialogDescription className="sr-only">
           Search for the correct account, then attach the files for ingestion.
         </DialogDescription>
 
-        <div className="flex items-center justify-between gap-4 border-b border-white/5 px-5 py-4 nodal-recessed">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-[#002FA7]/15 border border-[#002FA7]/30">
-              <UploadCloud className="size-4 text-[#8ba6ff]" />
+        <div className="flex items-start justify-between gap-4 border-b border-white/5 bg-gradient-to-b from-[#002FA7]/10 to-transparent px-6 py-5 nodal-recessed">
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="flex size-12 shrink-0 items-center justify-center rounded-2xl border border-[#002FA7]/30 bg-[#002FA7]/15">
+              <UploadCloud className="size-5 text-[#8ba6ff]" />
             </div>
-            <div>
-              <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">File Routing</div>
-              <div className="text-sm text-zinc-200">Drop and attach documents to the right account</div>
+            <div className="min-w-0">
+              <div className="text-[10px] uppercase tracking-[0.28em] text-[#8ba6ff]">File routing</div>
+              <div className="mt-1 text-base font-medium text-zinc-100 sm:text-lg">
+                Drop files onto the right account
+              </div>
+              <div className="mt-1 max-w-2xl text-sm leading-6 text-zinc-400">
+                CSV files go to bulk import. PDFs, bills, contracts, and images are staged here for account attachment.
+              </div>
             </div>
           </div>
 
           <ForensicClose onClick={onClose} size={18} />
         </div>
 
-        <div className="grid gap-4 p-5 lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+        <div className="grid flex-1 min-h-0 gap-5 overflow-y-auto px-6 py-5 np-scroll xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+          <div className="min-w-0 space-y-4">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.02] p-4 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">Selected Files</div>
@@ -261,7 +269,7 @@ export function DesktopFileIngestModal({
                 onChange={handleFileInputChange}
               />
 
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 max-h-[22rem] space-y-2 overflow-y-auto pr-1 np-scroll">
                 <AnimatePresence initial={false}>
                   {selectedFiles.length === 0 ? (
                     <motion.div
@@ -269,12 +277,12 @@ export function DesktopFileIngestModal({
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       exit={{ opacity: 0 }}
-                      className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-8 text-center"
+                      className="rounded-3xl border border-dashed border-white/10 bg-black/20 px-4 py-10 text-center"
                     >
-                      <FileText className="mx-auto size-5 text-zinc-500" />
-                      <p className="mt-3 text-sm text-zinc-300">No files staged yet.</p>
+                      <FileText className="mx-auto size-6 text-zinc-500" />
+                      <p className="mt-3 text-sm text-zinc-200">Drop a PDF, bill, or contract here.</p>
                       <p className="mt-1 text-[11px] uppercase tracking-[0.2em] text-zinc-500">
-                        PDF, DOCX, XLSX, images, and bills work best here
+                        Or click Add Files to browse your computer
                       </p>
                     </motion.div>
                   ) : (
@@ -284,7 +292,7 @@ export function DesktopFileIngestModal({
                         initial={{ opacity: 0, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}
-                        className="flex items-center gap-3 rounded-2xl border border-white/5 bg-black/30 px-3 py-2"
+                        className="flex items-center gap-3 rounded-2xl border border-white/5 bg-black/30 px-3 py-2.5"
                       >
                         <div className="flex size-9 items-center justify-center rounded-xl bg-white/[0.04] border border-white/5">
                           <FileText className="size-4 text-zinc-400" />
@@ -312,7 +320,7 @@ export function DesktopFileIngestModal({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.02] p-4 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]">
               <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">Routing Summary</div>
               <div className="mt-2 text-sm text-zinc-200">
                 {selectedFiles.length > 0
@@ -330,8 +338,8 @@ export function DesktopFileIngestModal({
             </div>
           </div>
 
-          <div className="space-y-4">
-            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-4">
+          <div className="min-w-0 space-y-4">
+            <div className="rounded-3xl border border-white/5 bg-white/[0.02] p-4 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset]">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">Account Search</div>
@@ -360,8 +368,10 @@ export function DesktopFileIngestModal({
 
               <div className="mt-4 max-h-[18rem] space-y-2 overflow-y-auto pr-1 np-scroll">
                 {searchResults.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-8 text-center text-sm text-zinc-500">
-                    Type at least two letters to search accounts.
+                  <div className="rounded-3xl border border-dashed border-white/10 bg-black/20 px-4 py-8 text-center text-sm text-zinc-500">
+                    {accountQuery.length < 2
+                      ? 'Type at least two letters to search accounts.'
+                      : 'No matching accounts found.'}
                   </div>
                 ) : (
                   searchResults.map((account) => {
@@ -411,16 +421,16 @@ export function DesktopFileIngestModal({
           </div>
         </div>
 
-        <DialogFooter className="flex items-center justify-between gap-3 border-t border-white/5 bg-black/30 px-5 py-4">
+        <DialogFooter className="flex flex-col gap-3 border-t border-white/5 bg-black/35 px-6 py-4 nodal-recessed sm:flex-row sm:items-center sm:justify-between">
           <div className="text-[10px] uppercase tracking-[0.24em] text-zinc-500">
-            Account must be selected before the files can be routed.
+            {selectedAccountId ? 'Ready to route selected files.' : 'Select an account before attaching files.'}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex w-full items-center gap-2 sm:w-auto sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={onClose}
-              className="h-10 rounded-xl border-white/10 bg-white/[0.03] text-[10px] uppercase tracking-[0.18em] text-zinc-300"
+              className="h-10 flex-1 rounded-xl border-white/10 bg-white/[0.03] text-[10px] uppercase tracking-[0.18em] text-zinc-300 sm:flex-none"
             >
               Cancel
             </Button>
@@ -428,7 +438,7 @@ export function DesktopFileIngestModal({
               type="button"
               onClick={() => void handleAttach()}
               disabled={isUploading || selectedFiles.length === 0 || !selectedAccountId}
-              className="h-10 rounded-xl bg-[#002FA7] px-4 text-[10px] uppercase tracking-[0.18em] text-white hover:bg-[#0036c0]"
+              className="h-10 flex-1 rounded-xl bg-[#002FA7] px-4 text-[10px] uppercase tracking-[0.18em] text-white hover:bg-[#0036c0] sm:flex-none"
             >
               {isUploading ? <Loader2 className="mr-2 size-4 animate-spin" /> : null}
               Attach Files
