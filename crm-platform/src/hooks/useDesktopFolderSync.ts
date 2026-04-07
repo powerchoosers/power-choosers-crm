@@ -8,6 +8,7 @@ import type {
   DesktopFolderSyncReadResult,
   DesktopFolderSyncState,
   DesktopFolderSyncWriteResult,
+  NodalDesktopBridge,
 } from '@/types/desktop'
 
 function getDesktopBridge() {
@@ -18,6 +19,20 @@ function getDesktopBridge() {
   return window.nodalDesktop ?? null
 }
 
+type FolderSyncBridge = NodalDesktopBridge & {
+  getFolderSyncState: () => Promise<DesktopFolderSyncState>
+  onFolderSyncEvent: (listener: (event: DesktopFolderSyncEvent) => void) => () => void
+}
+
+function hasFolderSyncBridge(bridge: ReturnType<typeof getDesktopBridge>): bridge is FolderSyncBridge {
+  return Boolean(
+    bridge !== null &&
+      bridge.isDesktop &&
+      typeof bridge.getFolderSyncState === 'function' &&
+      typeof bridge.onFolderSyncEvent === 'function'
+  )
+}
+
 export function useDesktopFolderSync() {
   const [isDesktop, setIsDesktop] = useState(false)
   const [state, setState] = useState<DesktopFolderSyncState | null>(null)
@@ -25,7 +40,7 @@ export function useDesktopFolderSync() {
   useEffect(() => {
     const bridge = getDesktopBridge()
 
-    if (!bridge?.isDesktop) {
+    if (!hasFolderSyncBridge(bridge)) {
       setIsDesktop(false)
       setState(null)
       return
@@ -59,7 +74,9 @@ export function useDesktopFolderSync() {
 
     return () => {
       mounted = false
-      unsubscribe()
+      if (typeof unsubscribe === 'function') {
+        unsubscribe()
+      }
     }
   }, [])
 
