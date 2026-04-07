@@ -1,6 +1,7 @@
 const path = require('path')
-const { app, BrowserWindow, Menu, Tray, Notification, clipboard, globalShortcut, ipcMain, nativeImage, shell, session } = require('electron')
+const { app, BrowserWindow, Menu, Tray, Notification, clipboard, globalShortcut, ipcMain, nativeImage, shell, session, dialog } = require('electron')
 const { autoUpdater } = require('electron-updater')
+const { createFolderSyncManager } = require('./folder-sync.cjs')
 
 const DEV_URL = 'http://localhost:3000/network'
 const PROD_URL = 'https://www.nodalpoint.io/network'
@@ -10,6 +11,7 @@ let mainWindow = null
 let tray = null
 let updateCheckTimer = null
 let isQuitting = false
+let folderSyncManager = null
 let checkForUpdates = async () => {}
 let latestUpdateState = {
   phase: 'idle',
@@ -119,8 +121,11 @@ function installDownloadedUpdate() {
 
 function buildTrayMenu() {
   const isUpdateReady = latestUpdateState.phase === 'downloaded'
+  const folderSyncState = folderSyncManager?.getState?.() || null
+  const isFolderSyncLinked = Boolean(folderSyncState?.folderPath && folderSyncState?.accountId)
+  const isFolderSyncActive = Boolean(folderSyncState?.enabled && folderSyncState?.folderPath)
 
-  return Menu.buildFromTemplate([
+  const template = [
     {
       label: 'Open Nodal Point',
       click: () => {
@@ -152,6 +157,37 @@ function buildTrayMenu() {
         sendUiEvent({ type: 'open-file-attach' })
       },
     },
+  ]
+
+  if (isFolderSyncLinked) {
+    template.push(
+      { type: 'separator' },
+      {
+        label: 'Open Sync Folder',
+        click: () => {
+          void folderSyncManager.openFolderSyncLocation()
+        },
+      },
+      {
+        label: 'Sync Folder Now',
+        enabled: isFolderSyncActive,
+        click: () => {
+          void folderSyncManager.scanNow('tray')
+        },
+      },
+      {
+        label: 'Keep Sync Running in Tray',
+        type: 'checkbox',
+        checked: Boolean(folderSyncState?.keepRunningInTray),
+        enabled: isFolderSyncLinked,
+        click: (menuItem) => {
+          void folderSyncManager.setKeepRunningInTray(Boolean(menuItem.checked))
+        },
+      }
+    )
+  }
+
+  template.push(
     { type: 'separator' },
     {
       label: 'Check for Updates',
@@ -175,7 +211,9 @@ function buildTrayMenu() {
         app.quit()
       },
     },
-  ])
+  )
+
+  return Menu.buildFromTemplate(template)
 }
 
 function updateTrayMenu() {
@@ -513,6 +551,15 @@ function createWindow() {
   }
 
   mainWindow.on('close', (event) => {
+    if (app.isPackaged && folderSyncManager?.shouldKeepRunningInTray?.() && !isQuitting) {
+      event.preventDefault()
+      mainWindow.hide()
+      if (!tray) {
+        createTray()
+      }
+      return
+    }
+
     if (app.isPackaged && tray && !isQuitting) {
       tray.destroy()
       tray = null
@@ -537,6 +584,12 @@ if (!gotSingleInstanceLock) {
     }
 
     setupAutoUpdates()
+    folderSyncManager = createFolderSyncManager({
+      app,
+      ipcMain,
+      dialog,
+      getMainWindow: () => mainWindow,
+    })
     createWindow()
     createTray()
 
@@ -605,4 +658,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true
   globalShortcut.unregisterAll()
+  if (folderSyncManager) {
+    void folderSyncManager.dispose()
+  }
 })
