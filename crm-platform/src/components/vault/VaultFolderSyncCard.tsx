@@ -137,11 +137,27 @@ export function VaultFolderSyncCard() {
   const handleSyncNow = async () => {
     setIsWorking(true)
     const toastId = toast.loading('Rebuilding vault mirror...')
+    const startedLastSyncAt = sync.state?.lastSyncAt ?? null
+    let nextState = sync.state
 
     try {
-      const result = await sync.scanNow()
-      if (!result?.ok) {
-        throw new Error(result?.reason || 'Vault scan failed')
+      window.dispatchEvent(new CustomEvent('vault-folder-sync:refresh-now'))
+
+      const deadline = Date.now() + 30_000
+      let didProgress = false
+
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 750))
+        nextState = await sync.refreshState()
+
+        if ((nextState?.lastSyncAt ?? null) !== startedLastSyncAt) {
+          didProgress = true
+          break
+        }
+      }
+
+      if (!didProgress) {
+        throw new Error('Vault sync did not report progress. Make sure the desktop app is open in the tray.')
       }
 
       toast.success('Vault mirror updated', { id: toastId })
@@ -234,8 +250,8 @@ export function VaultFolderSyncCard() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -265,12 +281,24 @@ export function VaultFolderSyncCard() {
                     disabled={isWorking}
                   >
                     <Link2Off className="w-3.5 h-3.5 mr-2" /> Pause Sync
-                  </Button>
-                </div>
+                </Button>
+              </div>
 
-                <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
-                  <div>
-                    <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Keep running in tray</div>
+              {isWorking && (
+                <div className="rounded-2xl border border-[#002FA7]/20 bg-[#002FA7]/10 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3 text-[10px] uppercase tracking-[0.18em] text-zinc-400 font-mono">
+                    <span>Rebuilding mirror</span>
+                    <Loader2 className="size-3.5 animate-spin text-[#8ba6ff]" />
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
+                    <div className="h-full w-1/3 rounded-full bg-[#002FA7] opacity-80 animate-pulse" />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 rounded-2xl border border-white/5 bg-white/[0.03] px-4 py-3">
+                <div>
+                  <div className="text-[10px] uppercase tracking-[0.18em] text-zinc-500 font-mono">Keep running in tray</div>
                     <div className="text-[11px] text-zinc-600 font-mono">Leave the mirror live when you close the window.</div>
                   </div>
                   <Switch checked={keepRunningInTray} onCheckedChange={handleTrayToggle} />
@@ -319,7 +347,10 @@ export function VaultFolderSyncCard() {
       </Card>
 
       <Dialog open={setupOpen} onOpenChange={setSetupOpen}>
-        <DialogContent className="sm:max-w-[760px] border-white/10 bg-zinc-950/95 text-zinc-100">
+        <DialogContent
+          overlayClassName="z-[1000] bg-black/70 backdrop-blur-xl"
+          className="z-[1001] sm:max-w-[760px] border-white/10 bg-zinc-950/95 text-zinc-100 shadow-2xl"
+        >
           <DialogHeader>
             <DialogTitle className="font-mono uppercase tracking-[0.18em] text-sm">Link Root Vault Folder</DialogTitle>
             <DialogDescription className="text-zinc-500 font-mono text-xs uppercase tracking-[0.12em]">
