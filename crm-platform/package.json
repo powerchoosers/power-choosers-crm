@@ -145,7 +145,8 @@
       {
         "provider": "github",
         "owner": "powerchoosers",
-        "repo": "power-choosers-crm"
+        "repo": "power-choosers-crm",
+        "releaseType": "release"
       }
     ],
     "afterPack": "scripts/after-pack.mjs",
