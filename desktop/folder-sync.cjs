@@ -43,10 +43,8 @@ function normalizeRelativePath(value) {
     .join('/')
 }
 
-function buildVaultAccountFolderLabel(accountId, accountName) {
-  const safeAccountId = String(accountId || '').trim() || 'unknown-account'
-  const safeAccountName = sanitizeRelativePathSegment(String(accountName || '').trim() || 'Account').slice(0, 64)
-  return `${safeAccountName} [${safeAccountId}]`
+function buildVaultAccountFolderLabel(_accountId, accountName) {
+  return sanitizeRelativePathSegment(String(accountName || '').trim() || 'Account').slice(0, 64)
 }
 
 function normalizeVaultDocumentType(value) {
@@ -135,23 +133,33 @@ function parseVaultDocumentTypeFolderLabel(folderName) {
 
 function parseVaultAccountFolderLabel(folderName) {
   const normalized = String(folderName || '').trim()
-  const match = normalized.match(/^(.*)\s\[([^\[\]]+)\]$/)
-
-  if (!match) {
+  if (!normalized) {
     return null
   }
 
-  const accountName = String(match[1] || '').trim()
-  const accountId = String(match[2] || '').trim()
+  const legacyMatch = normalized.match(/^(.*)\s\[([^\[\]]+)\]$/)
+  if (legacyMatch) {
+    const accountName = String(legacyMatch[1] || '').trim()
+    const accountId = String(legacyMatch[2] || '').trim()
 
-  if (!accountId) {
-    return null
+    if (!accountId) {
+      return null
+    }
+
+    return {
+      accountId,
+      accountName: accountName || accountId,
+      folderLabel: normalized,
+    }
   }
+
+  const suffixMatch = normalized.match(/^(.*)\s\((\d+)\)$/)
 
   return {
-    accountId,
-    accountName: accountName || accountId,
+    accountId: null,
+    accountName: String(suffixMatch?.[1] || normalized).trim() || normalized,
     folderLabel: normalized,
+    duplicateIndex: suffixMatch ? Number.parseInt(suffixMatch[2] || '0', 10) || null : null,
   }
 }
 
