@@ -32,6 +32,19 @@ type RemoteVaultDocument = {
 type RemoteAccount = {
   id: string
   name: string | null
+  createdAt: string | null
+}
+
+type AccountFolderIndexEntry = {
+  accountId: string
+  accountName: string
+  folderLabel: string
+}
+
+type AccountFolderIndex = {
+  byAccountId: Map<string, AccountFolderIndexEntry>
+  byFolderLabel: Map<string, AccountFolderIndexEntry>
+  byBaseLabel: Map<string, AccountFolderIndexEntry[]>
 }
 
 type SyncedFileEntry = {
@@ -116,8 +129,90 @@ function getRemoteDocumentTypeHint(document: RemoteVaultDocument) {
   return document.document_type || aiExtractionType || document.type || null
 }
 
-function resolveRemoteRootRelativePath(document: RemoteVaultDocument, accountName: string | null) {
-  const accountFolder = buildVaultAccountFolderLabel(document.account_id || 'unassigned', accountName)
+function buildAccountFolderIndex(remoteAccounts: RemoteAccount[]): AccountFolderIndex {
+  const groupedAccounts = new Map<string, RemoteAccount[]>()
+
+  for (const account of remoteAccounts) {
+    const baseFolderLabel = buildVaultAccountFolderLabel(account.id, account.name)
+    const normalizedBaseLabel = normalizeKey(baseFolderLabel)
+    const bucket = groupedAccounts.get(normalizedBaseLabel) || []
+    bucket.push(account)
+    groupedAccounts.set(normalizedBaseLabel, bucket)
+  }
+
+  const byAccountId = new Map<string, AccountFolderIndexEntry>()
+  const byFolderLabel = new Map<string, AccountFolderIndexEntry>()
+  const byBaseLabel = new Map<string, AccountFolderIndexEntry[]>()
+
+  for (const [baseLabel, accounts] of groupedAccounts.entries()) {
+    const sortedAccounts = [...accounts].sort((left, right) => {
+      const leftTime = left.createdAt ? new Date(left.createdAt).getTime() : 0
+      const rightTime = right.createdAt ? new Date(right.createdAt).getTime() : 0
+
+      if (leftTime !== rightTime) {
+        return leftTime - rightTime
+      }
+
+      return left.id.localeCompare(right.id)
+    })
+
+    const baseFolderLabel = buildVaultAccountFolderLabel(sortedAccounts[0]?.id || '', sortedAccounts[0]?.name || null)
+    const entries: AccountFolderIndexEntry[] = []
+
+    sortedAccounts.forEach((account, index) => {
+      const folderLabel = index === 0 ? baseFolderLabel : `${baseFolderLabel} (${index + 1})`
+      const entry = {
+        accountId: account.id,
+        accountName: account.name || 'Account',
+        folderLabel,
+      }
+
+      byAccountId.set(account.id, entry)
+      byFolderLabel.set(normalizeKey(folderLabel), entry)
+      entries.push(entry)
+    })
+
+    byBaseLabel.set(baseLabel, entries)
+  }
+
+  return {
+    byAccountId,
+    byFolderLabel,
+    byBaseLabel,
+  }
+}
+
+function resolveAccountFolderEntry(
+  accountFolderIndex: AccountFolderIndex,
+  input: {
+    accountId?: string | null
+    accountName?: string | null
+    folderLabel?: string | null
+  }
+) {
+  if (input.accountId && accountFolderIndex.byAccountId.has(input.accountId)) {
+    return accountFolderIndex.byAccountId.get(input.accountId) || null
+  }
+
+  const normalizedFolderLabel = input.folderLabel ? normalizeKey(input.folderLabel) : null
+  if (normalizedFolderLabel && accountFolderIndex.byFolderLabel.has(normalizedFolderLabel)) {
+    return accountFolderIndex.byFolderLabel.get(normalizedFolderLabel) || null
+  }
+
+  if (input.accountName) {
+    const normalizedBaseLabel = normalizeKey(buildVaultAccountFolderLabel(input.accountId || '', input.accountName))
+    const candidates = accountFolderIndex.byBaseLabel.get(normalizedBaseLabel) || []
+
+    if (candidates.length === 1) {
+      return candidates[0] || null
+    }
+  }
+
+  return null
+}
+
+function resolveRemoteRootRelativePath(document: RemoteVaultDocument, accountFolderLabel: string | null) {
+  const accountFolder = accountFolderLabel || 'Unassigned'
   const documentTypeFolder = buildVaultDocumentTypeFolderLabel(getRemoteDocumentTypeHint(document))
   const storedRelativePath = normalizeVaultRelativePath(
     String(document.metadata?.relativePath || document.metadata?.localRelativePath || '')
@@ -187,7 +282,7 @@ export function DesktopFolderSyncBridge() {
   }, [])
 
   const fetchAccountNames = useCallback(async () => {
-    const { data, error } = await supabase.from('accounts').select('id, name')
+    const { data, error } = await supabase.from('accounts').select('id, name, createdAt')
 
     if (error) {
       throw error
@@ -244,18 +339,17 @@ export function DesktopFolderSyncBridge() {
 
       try {
         const [remoteDocuments, remoteAccounts] = await Promise.all([fetchRemoteDocuments(), fetchAccountNames()])
-        const accountNameMap = remoteAccounts.reduce<Record<string, string>>((accumulator, account) => {
-          accumulator[account.id] = account.name || account.id
-          return accumulator
-        }, {})
+        const accountFolderIndex = buildAccountFolderIndex(remoteAccounts)
 
         const syncedDocumentIds = new Set(state.syncedDocumentIds || [])
         const remoteByRelativePath = new Map<string, RemoteVaultDocument>()
         const remoteByNameAndSize = new Map<string, RemoteVaultDocument>()
 
         for (const doc of remoteDocuments) {
-          const accountName = doc.account_id ? accountNameMap[doc.account_id] || doc.account_id : 'Unassigned'
-          const rootRelativePath = normalizeVaultRelativePath(resolveRemoteRootRelativePath(doc, accountName))
+          const accountFolderEntry = doc.account_id ? accountFolderIndex.byAccountId.get(doc.account_id) || null : null
+          const rootRelativePath = normalizeVaultRelativePath(
+            resolveRemoteRootRelativePath(doc, accountFolderEntry?.folderLabel || 'Unassigned')
+          )
           remoteByRelativePath.set(rootRelativePath, doc)
 
           const nameKey = normalizeKey(doc.name)
@@ -267,7 +361,7 @@ export function DesktopFolderSyncBridge() {
 
         let uploadedCount = 0
         let linkedCount = 0
-        let customerPromotionNeeded = false
+        const promotedAccountIds = new Set<string>()
         let warnedAboutMissingAccountFolder = false
 
         for (const file of files) {
@@ -277,12 +371,19 @@ export function DesktopFolderSyncBridge() {
             continue
           }
 
-          const parsedFolder =
-            file.accountFolder ? parseVaultAccountFolderLabel(file.accountFolder) : parseVaultAccountFolderLabel(rootRelativePath.split('/')[0] || '')
+          const parsedFolder = file.accountFolder
+            ? parseVaultAccountFolderLabel(file.accountFolder)
+            : parseVaultAccountFolderLabel(rootRelativePath.split('/')[0] || '')
 
-          const accountId = file.accountId || parsedFolder?.accountId || null
-          const accountName = file.accountName || parsedFolder?.accountName || null
-          const accountFolder = file.accountFolder || parsedFolder?.folderLabel || null
+          const resolvedFolderEntry = resolveAccountFolderEntry(accountFolderIndex, {
+            accountId: file.accountId || parsedFolder?.accountId || null,
+            accountName: file.accountName || parsedFolder?.accountName || null,
+            folderLabel: file.accountFolder || parsedFolder?.folderLabel || null,
+          })
+
+          const accountId = resolvedFolderEntry?.accountId || file.accountId || parsedFolder?.accountId || null
+          const accountName = resolvedFolderEntry?.accountName || file.accountName || parsedFolder?.accountName || null
+          const accountFolder = resolvedFolderEntry?.folderLabel || file.accountFolder || parsedFolder?.folderLabel || null
 
           if (!accountId || !accountFolder) {
             if (!warnedAboutMissingAccountFolder) {
@@ -354,7 +455,7 @@ export function DesktopFolderSyncBridge() {
           if (result.analysisType) {
             const normalizedAnalysis = result.analysisType.toUpperCase()
             if (normalizedAnalysis === 'CONTRACT' || normalizedAnalysis === 'SIGNED_CONTRACT' || normalizedAnalysis === 'BILL') {
-              customerPromotionNeeded = true
+              promotedAccountIds.add(accountId)
             }
           }
 
@@ -362,16 +463,8 @@ export function DesktopFolderSyncBridge() {
           shouldRefreshRemoteDocs = true
         }
 
-        if (customerPromotionNeeded) {
-          const accountsToPromote = Array.from(
-            new Set(
-              files
-                .map((file) => file.accountId || parseVaultAccountFolderLabel(file.accountFolder || file.relativePath.split('/')[0] || '')?.accountId || null)
-                .filter((value): value is string => Boolean(value))
-            )
-          )
-
-          for (const accountId of accountsToPromote) {
+        if (promotedAccountIds.size > 0) {
+          for (const accountId of promotedAccountIds) {
             const { error: accountError } = await supabase
               .from('accounts')
               .update({ status: 'CUSTOMER' })
@@ -438,16 +531,15 @@ export function DesktopFolderSyncBridge() {
 
     try {
       const [remoteDocuments, remoteAccounts] = await Promise.all([fetchRemoteDocuments(), fetchAccountNames()])
-      const accountNameMap = remoteAccounts.reduce<Record<string, string>>((accumulator, account) => {
-        accumulator[account.id] = account.name || account.id
-        return accumulator
-      }, {})
+      const accountFolderIndex = buildAccountFolderIndex(remoteAccounts)
 
       const unsyncedDocuments = options?.force
         ? remoteDocuments
         : remoteDocuments.filter((doc) => {
-            const accountName = doc.account_id ? accountNameMap[doc.account_id] || doc.account_id : 'Unassigned'
-            const canonicalRelativePath = normalizeVaultRelativePath(resolveRemoteRootRelativePath(doc, accountName))
+            const accountFolderEntry = doc.account_id ? accountFolderIndex.byAccountId.get(doc.account_id) || null : null
+            const canonicalRelativePath = normalizeVaultRelativePath(
+              resolveRemoteRootRelativePath(doc, accountFolderEntry?.folderLabel || 'Unassigned')
+            )
             const syncedEntry = findSyncedFileEntry(state, doc.id)
 
             if (!syncedEntry) {
@@ -472,8 +564,11 @@ export function DesktopFolderSyncBridge() {
       let downloadedCount = 0
 
       for (const doc of unsyncedDocuments) {
-        const accountName = doc.account_id ? accountNameMap[doc.account_id] || doc.account_id : 'Unassigned'
-        const rootRelativePath = normalizeVaultRelativePath(resolveRemoteRootRelativePath(doc, accountName))
+        const accountFolderEntry = doc.account_id ? accountFolderIndex.byAccountId.get(doc.account_id) || null : null
+        const accountName = accountFolderEntry?.accountName || 'Unassigned'
+        const rootRelativePath = normalizeVaultRelativePath(
+          resolveRemoteRootRelativePath(doc, accountFolderEntry?.folderLabel || 'Unassigned')
+        )
         const syncedEntry = findSyncedFileEntry(state, doc.id)
         const previousRelativePath = syncedEntry?.[0] || null
 
@@ -516,7 +611,7 @@ export function DesktopFolderSyncBridge() {
           direction: 'vault-to-local',
           accountId: doc.account_id || null,
           accountName,
-          accountFolder: buildVaultAccountFolderLabel(doc.account_id || 'unassigned', accountName),
+          accountFolder: accountFolderEntry?.folderLabel || buildVaultAccountFolderLabel(doc.account_id || 'unassigned', accountName),
           previousRelativePath: previousRelativePath && previousRelativePath !== writeResult.relativePath ? previousRelativePath : null,
           documentUpdatedAt: doc.updated_at || null,
         })
