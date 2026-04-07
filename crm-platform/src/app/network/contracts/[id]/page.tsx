@@ -27,6 +27,7 @@ import { useAuth } from '@/context/AuthContext'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
+import { buildProposalAttentionLine } from '@/lib/proposal'
 import { type Deal, type DealStage, DEAL_STAGES } from '@/types/deals'
 import { toast } from 'sonner'
 
@@ -645,7 +646,7 @@ export default function ContractDetailPage() {
   const { data: account } = useAccount(deal?.accountId ?? '')
   const { data: contacts = [] } = useAccountContacts(deal?.accountId ?? '')
   const { mutate: updateAccount } = useUpdateAccount()
-  const { setRightPanelMode, setDealContext, setSignatureRequestContext, setIngestionContext } = useUIStore()
+  const { setRightPanelMode, setDealContext, setSignatureRequestContext, setIngestionContext, setProposalContext } = useUIStore()
 
   // Brief state
   const [briefLoading, setBriefLoading] = useState(false)
@@ -697,6 +698,20 @@ export default function ContractDetailPage() {
       .filter((otherDeal) => otherDeal.id !== deal.id)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }, [accountDeals, deal?.id])
+
+  const proposalAttentionLine = useMemo(() => {
+    return buildProposalAttentionLine(
+      contacts.map((contact) => ({
+        id: contact.id,
+        name: contact.name,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        title: contact.title,
+      })),
+      deal?.contactId || account?.primaryContactId || null,
+      'Decision Team'
+    )
+  }, [account?.primaryContactId, contacts, deal?.contactId])
 
   // ---------------------------------------------------------------------------
   // Handlers
@@ -752,6 +767,24 @@ export default function ContractDetailPage() {
       requestKind: 'CONTRACT',
     })
     setRightPanelMode('CREATE_SIGNATURE_REQUEST')
+  }
+
+  const handleOpenProposal = () => {
+    if (!deal) return
+    setProposalContext({
+      accountId: deal.accountId,
+      accountName: deal.account?.name || deal.accountId,
+      accountLogoUrl: deal.account?.logoUrl ?? deal.account?.logo_url,
+      accountDomain: deal.account?.domain,
+      dealId: deal.id,
+      dealTitle: deal.title,
+      contactId: deal.contactId || account?.primaryContactId || undefined,
+      attentionLine: proposalAttentionLine,
+      supplierName: 'ENGIE',
+      defaultRate: parseNumber((deal.metadata as any)?.sellRate) ?? undefined,
+      defaultTermMonths: deal.contractLength ?? undefined,
+    })
+    setRightPanelMode('CREATE_PROPOSAL')
   }
 
   const generateBrief = async () => {
@@ -852,6 +885,11 @@ export default function ContractDetailPage() {
           label: 'Edit Contract',
           onClick: handleOpenEdit,
           icon: <Pencil size={14} className="mr-1.5" />,
+        }}
+        secondaryAction={{
+          label: 'Create Proposal',
+          onClick: handleOpenProposal,
+          icon: <FileText size={14} className="mr-1.5" />,
         }}
       />
 

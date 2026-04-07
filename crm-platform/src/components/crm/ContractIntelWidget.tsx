@@ -1,6 +1,6 @@
 'use client'
 
-import { Plus, MoreHorizontal, FileSignature, X, Clock } from 'lucide-react'
+import { Plus, MoreHorizontal, FileSignature, FileText, X, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useDealsByAccount, useDealsByContact } from '@/hooks/useDeals'
 import { type Deal, type DealStage } from '@/types/deals'
@@ -11,6 +11,7 @@ import { useUIStore } from '@/store/uiStore'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDeleteDeal } from '@/hooks/useDeals'
 import { useCancelSignatureRequest } from '@/hooks/useSignatures'
+import { useAccountContacts } from '@/hooks/useContacts'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   DropdownMenu,
@@ -21,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useState } from 'react'
+import { buildProposalAttentionLine } from '@/lib/proposal'
 
 // ---------------------------------------------------------------------------
 // Stage indicator styles (compact, for dossier view)
@@ -85,10 +87,11 @@ function getSignatureRequestStatus(reqStatus: string, expiresAt?: string | null)
 interface DealCardProps {
   deal: Deal
   onEdit: (deal: Deal) => void
+  onCreateProposal: (deal: Deal) => void
   onRequestDelete: (dealId: string) => void
 }
 
-function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
+function DealCard({ deal, onEdit, onCreateProposal, onRequestDelete }: DealCardProps) {
   const router = useRouter()
   const cancelSignature = useCancelSignatureRequest()
   const [isSignaturesExpanded, setIsSignaturesExpanded] = useState(false)
@@ -299,6 +302,14 @@ function DealCard({ deal, onEdit, onRequestDelete }: DealCardProps) {
               <FileSignature className="h-3.5 w-3.5 text-zinc-400" />
               Create Document
             </DropdownMenuItem>
+
+            <DropdownMenuItem
+              className="hover:bg-white/5 cursor-pointer flex items-center gap-2"
+              onClick={() => onCreateProposal(deal)}
+            >
+              <FileText className="h-3.5 w-3.5 text-zinc-400" />
+              Create Proposal
+            </DropdownMenuItem>
             
             {deal.signature_requests && deal.signature_requests.length > 0 && (
               <DropdownMenuItem
@@ -363,13 +374,15 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
   const { data: accountDeals = [], isLoading: loadingAccount } = useDealsByAccount(accountId)
   const { data: contactDeals = [], isLoading: loadingContact } = useDealsByContact(contactId)
   const deleteDeal = useDeleteDeal()
-  const { setRightPanelMode, setDealContext } = useUIStore()
+  const { setRightPanelMode, setDealContext, setProposalContext } = useUIStore()
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [removedDealIds, setRemovedDealIds] = useState<Record<string, true>>({})
 
   // Show deals from the most relevant source; avoid duplicates if both provided
   const deals: Deal[] = accountId ? accountDeals : contactDeals
   const isLoading = accountId ? loadingAccount : loadingContact
+  const resolvedAccountId = accountId || contactDeals[0]?.accountId || ''
+  const { data: accountContacts = [] } = useAccountContacts(resolvedAccountId)
 
   const visibleDeals = deals.filter(d => !removedDealIds[d.id])
   const activeDeals = visibleDeals.filter(d => d.stage !== 'TERMINATED')
@@ -395,6 +408,40 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
       yearlyCommission: deal.yearlyCommission,
     })
     setRightPanelMode('CREATE_DEAL')
+  }
+
+  const handleCreateProposal = (deal: Deal) => {
+    const sellRate = (deal.metadata as Record<string, unknown> | undefined)?.sellRate
+    const defaultRate =
+      typeof sellRate === 'number' || typeof sellRate === 'string'
+        ? sellRate
+        : undefined
+    const attentionLine = buildProposalAttentionLine(
+      accountContacts.map((contact) => ({
+        id: contact.id,
+        name: contact.name,
+        firstName: contact.firstName,
+        lastName: contact.lastName,
+        title: contact.title,
+      })),
+      deal.contactId || null,
+      deal.account?.name || deal.title || 'Decision Team'
+    )
+
+    setProposalContext({
+      accountId: deal.accountId,
+      accountName: deal.account?.name || deal.accountId,
+      accountLogoUrl: deal.account?.logoUrl ?? deal.account?.logo_url,
+      accountDomain: deal.account?.domain,
+      dealId: deal.id,
+      dealTitle: deal.title,
+      contactId: deal.contactId,
+      attentionLine,
+      supplierName: 'ENGIE',
+      defaultRate,
+      defaultTermMonths: deal.contractLength ?? undefined,
+    })
+    setRightPanelMode('CREATE_PROPOSAL')
   }
 
   const handleDelete = async () => {
@@ -456,6 +503,7 @@ export function ContractIntelWidget({ accountId, contactId }: ContractIntelWidge
                 <DealCard
                   deal={deal}
                   onEdit={openEditInRightPanel}
+                  onCreateProposal={handleCreateProposal}
                   onRequestDelete={(dealId) => setDeleteId(dealId)}
                 />
               </motion.div>

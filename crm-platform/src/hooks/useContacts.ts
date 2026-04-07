@@ -9,6 +9,7 @@ export interface Contact {
   name: string
   firstName?: string
   lastName?: string
+  title?: string
   ownerId?: string | null
   email: string
   phone: string
