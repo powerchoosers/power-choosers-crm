@@ -25,6 +25,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
+import { VaultFolderSyncCard } from '@/components/vault/VaultFolderSyncCard'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -308,6 +309,11 @@ export default function VaultPage() {
           </div>
         </div>
       </div>
+
+      <VaultFolderSyncCard
+        defaultAccountId={selectedAccountId}
+        defaultAccountName={currentAccount?.name ?? null}
+      />
 
       <div className="flex flex-1 min-h-0 gap-4">
         {/* Sidebar: sliding pill + white text/icon when selected */}
