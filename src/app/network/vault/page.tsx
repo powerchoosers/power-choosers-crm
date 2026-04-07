@@ -14,6 +14,7 @@ import {
   Trash2,
   ExternalLink,
   Loader2,
+  Link2,
   X,
 } from 'lucide-react'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
@@ -29,6 +30,8 @@ import { VaultFolderSyncCard } from '@/components/vault/VaultFolderSyncCard'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { useDesktopFolderSync } from '@/hooks/useDesktopFolderSync'
 
 const VAULT_FILTERS: { id: DocumentTypeFilter; label: string; icon: React.ElementType }[] = [
   { id: 'ALL_ASSETS', label: 'All Assets', icon: FileStack },
@@ -73,6 +76,7 @@ export default function VaultPage() {
   const invalidateVault = useVaultDocumentsInvalidate()
   const { data: documents = [], isLoading: docsLoading } = useVaultDocuments(filter)
   const { data: searchAccounts = [], isFetching: searchAccountsLoading } = useSearchAccounts(ingestionAccountSearch)
+  const desktopFolderSync = useDesktopFolderSync()
 
   const accountsWithDocs = useMemo(() => {
     const byAccount = new Map<string, { docs: VaultDocument[]; lastAt: string }>()
@@ -299,19 +303,44 @@ export default function VaultPage() {
           'hover:border-[#002FA7]/40 hover:bg-[#002FA7]/5'
         )}
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-[14px] bg-[#002FA7]/20 flex items-center justify-center">
-            <UploadCloud className="w-5 h-5 text-[#002FA7]" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-[14px] bg-[#002FA7]/20 flex items-center justify-center">
+              <UploadCloud className="w-5 h-5 text-[#002FA7]" />
+            </div>
+            <div>
+              <p className="text-xs font-mono text-zinc-400 uppercase tracking-widest">Ingestion zone</p>
+              <p className="text-[10px] text-zinc-600 font-mono">Drop files to assign account and document type</p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-mono text-zinc-400 uppercase tracking-widest">Ingestion zone</p>
-            <p className="text-[10px] text-zinc-600 font-mono">Drop files to assign account and document type</p>
-          </div>
+
+          {desktopFolderSync.isDesktop && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="shrink-0 border-white/10 bg-white/[0.03] text-zinc-400 hover:text-zinc-100 hover:bg-white/[0.06]"
+                  aria-label="Open vault mirror"
+                >
+                  <Link2 className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                side="bottom"
+                sideOffset={12}
+                className="w-[min(92vw,760px)] p-0 bg-zinc-950 border-white/10 shadow-2xl overflow-hidden"
+              >
+                <div className="max-h-[72vh] overflow-auto p-0">
+                  <VaultFolderSyncCard />
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
         </div>
       </div>
-
-      <VaultFolderSyncCard
-      />
 
       <div className="flex flex-1 min-h-0 gap-4">
         {/* Sidebar: sliding pill + white text/icon when selected */}
