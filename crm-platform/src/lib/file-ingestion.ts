@@ -4,6 +4,7 @@ export interface IngestedAccountFileResult {
   storagePath: string
   analysisType: string | null
   documentId: string | null
+  documentUpdatedAt: string | null
 }
 
 export interface IngestAccountFileOptions {
@@ -58,6 +59,90 @@ export function buildVaultAccountFolderLabel(accountId: string, accountName?: st
   const safeAccountId = String(accountId || '').trim() || 'unknown-account'
   const safeAccountName = sanitizeStoragePathSegment(String(accountName || '').trim() || 'Account').slice(0, 64)
   return `${safeAccountName} [${safeAccountId}]`
+}
+
+export function normalizeVaultDocumentType(value?: string | null) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_')
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized === 'SIGNED_CONTRACT' || normalized === 'CONTRACT' || normalized === 'CONTRACTS') {
+    return 'CONTRACT'
+  }
+
+  if (normalized === 'BILL' || normalized === 'INVOICE' || normalized === 'INVOICES') {
+    return 'INVOICE'
+  }
+
+  if (normalized === 'LOE' || normalized === 'LOES') {
+    return 'LOE'
+  }
+
+  if (normalized === 'USAGE' || normalized === 'USAGE_DATA' || normalized === 'TELEMETRY') {
+    return 'USAGE_DATA'
+  }
+
+  if (normalized === 'PROPOSAL' || normalized === 'PROPOSALS') {
+    return 'PROPOSAL'
+  }
+
+  return null
+}
+
+export function buildVaultDocumentTypeFolderLabel(documentType?: string | null) {
+  switch (normalizeVaultDocumentType(documentType)) {
+    case 'CONTRACT':
+      return 'Contracts'
+    case 'LOE':
+      return 'LOEs'
+    case 'INVOICE':
+      return 'Invoices'
+    case 'USAGE_DATA':
+      return 'Telemetry'
+    case 'PROPOSAL':
+      return 'Proposals'
+    default:
+      return 'Unsorted'
+  }
+}
+
+export function parseVaultDocumentTypeFolderLabel(folderName: string) {
+  const normalized = String(folderName || '').trim().toLowerCase()
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized === 'contracts' || normalized === 'contract') {
+    return { documentType: 'CONTRACT', folderLabel: 'Contracts' }
+  }
+
+  if (normalized === 'loes' || normalized === 'loe') {
+    return { documentType: 'LOE', folderLabel: 'LOEs' }
+  }
+
+  if (normalized === 'invoices' || normalized === 'invoice' || normalized === 'bills' || normalized === 'bill') {
+    return { documentType: 'INVOICE', folderLabel: 'Invoices' }
+  }
+
+  if (normalized === 'telemetry' || normalized === 'usage data' || normalized === 'usage_data' || normalized === 'usage') {
+    return { documentType: 'USAGE_DATA', folderLabel: 'Telemetry' }
+  }
+
+  if (normalized === 'proposals' || normalized === 'proposal') {
+    return { documentType: 'PROPOSAL', folderLabel: 'Proposals' }
+  }
+
+  if (normalized === 'unsorted' || normalized === 'other') {
+    return { documentType: null, folderLabel: 'Unsorted' }
+  }
+
+  return null
 }
 
 export function parseVaultAccountFolderLabel(folderName: string) {
@@ -256,6 +341,7 @@ async function ingestVaultDocument({
     storagePath: resolvedStoragePath,
     analysisType: typeof result?.analysis?.type === 'string' ? result.analysis.type : null,
     documentId,
+    documentUpdatedAt: typeof result?.documentUpdatedAt === 'string' ? result.documentUpdatedAt : null,
   }
 }
 

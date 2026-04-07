@@ -199,7 +199,8 @@ export function VaultFolderSyncCard() {
         <CardContent className="p-5 space-y-4">
           <CardDescription className="text-xs text-zinc-500 font-mono leading-relaxed">
             Pick one root folder and the app will mirror the whole vault into it.
-            It creates one account folder inside the root, so everything stays organized both ways.
+            It creates one account folder inside the root, then sorts files into Contracts, LOEs, Invoices,
+            Telemetry, and Proposals underneath.
           </CardDescription>
 
           {isConnected ? (
@@ -229,7 +230,7 @@ export function VaultFolderSyncCard() {
                     <Database className="size-4 text-[#8ba6ff]" />
                     <span>Two-way root sync</span>
                   </div>
-                  <div className="mt-1 text-[11px] text-zinc-500 font-mono">Account folders are created inside the root folder.</div>
+                  <div className="mt-1 text-[11px] text-zinc-500 font-mono">Account folders sit first, then document-type folders underneath.</div>
                 </div>
               </div>
 

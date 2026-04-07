@@ -30,6 +30,10 @@ export interface DesktopFolderSyncState {
       storagePath?: string | null
       direction?: 'local-to-vault' | 'vault-to-local'
       syncedAt?: string | null
+      accountId?: string | null
+      accountName?: string | null
+      accountFolder?: string | null
+      documentUpdatedAt?: string | null
     }
   >
 }
@@ -82,6 +86,8 @@ export interface DesktopFolderSyncAcknowledgeInput {
   accountId?: string | null
   accountName?: string | null
   accountFolder?: string | null
+  previousRelativePath?: string | null
+  documentUpdatedAt?: string | null
 }
 
 export type DesktopFolderSyncEvent =
@@ -152,6 +158,7 @@ export interface NodalDesktopBridge {
     base64: string
     mimeType?: string | null
   }) => Promise<DesktopFolderSyncWriteResult>
+  deleteFolderSyncFile: (relativePath: string) => Promise<{ ok: boolean; reason?: string }>
   acknowledgeFolderSyncFile: (payload: DesktopFolderSyncAcknowledgeInput) => Promise<DesktopFolderSyncState>
   onUiEvent: (listener: (event: DesktopUiEvent) => void) => () => void
   onUpdateEvent: (listener: (state: DesktopUpdateState) => void) => () => void

@@ -794,6 +794,7 @@ export default async function handler(req, res) {
         .eq('storage_path', filePath);
     }
 
+    const nowIso = new Date().toISOString();
     const updates = {};
     const { data: accountSnapshot } = await supabaseAdmin
       .from('accounts')
@@ -900,7 +901,6 @@ export default async function handler(req, res) {
     };
 
     if (data.esids && Array.isArray(data.esids) && data.esids.length > 0) {
-      const nowIso = new Date().toISOString();
       const incomingByEsid = new Map();
 
       for (const row of data.esids) {
@@ -1036,7 +1036,12 @@ export default async function handler(req, res) {
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true, analysis, meterSync: meterSyncSummary }));
+    res.end(JSON.stringify({
+      success: true,
+      analysis,
+      meterSync: meterSyncSummary,
+      documentUpdatedAt: nowIso,
+    }));
 
   } catch (error) {
     logger.error('[Analyze Document] Error:', error);

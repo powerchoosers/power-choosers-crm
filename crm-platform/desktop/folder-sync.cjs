@@ -49,6 +49,90 @@ function buildVaultAccountFolderLabel(accountId, accountName) {
   return `${safeAccountName} [${safeAccountId}]`
 }
 
+function normalizeVaultDocumentType(value) {
+  const normalized = String(value || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_')
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized === 'SIGNED_CONTRACT' || normalized === 'CONTRACT' || normalized === 'CONTRACTS') {
+    return 'CONTRACT'
+  }
+
+  if (normalized === 'BILL' || normalized === 'INVOICE' || normalized === 'INVOICES') {
+    return 'INVOICE'
+  }
+
+  if (normalized === 'LOE' || normalized === 'LOES') {
+    return 'LOE'
+  }
+
+  if (normalized === 'USAGE' || normalized === 'USAGE_DATA' || normalized === 'TELEMETRY') {
+    return 'USAGE_DATA'
+  }
+
+  if (normalized === 'PROPOSAL' || normalized === 'PROPOSALS') {
+    return 'PROPOSAL'
+  }
+
+  return null
+}
+
+function buildVaultDocumentTypeFolderLabel(documentType) {
+  switch (normalizeVaultDocumentType(documentType)) {
+    case 'CONTRACT':
+      return 'Contracts'
+    case 'LOE':
+      return 'LOEs'
+    case 'INVOICE':
+      return 'Invoices'
+    case 'USAGE_DATA':
+      return 'Telemetry'
+    case 'PROPOSAL':
+      return 'Proposals'
+    default:
+      return 'Unsorted'
+  }
+}
+
+function parseVaultDocumentTypeFolderLabel(folderName) {
+  const normalized = String(folderName || '').trim().toLowerCase()
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized === 'contracts' || normalized === 'contract') {
+    return { documentType: 'CONTRACT', folderLabel: 'Contracts' }
+  }
+
+  if (normalized === 'loes' || normalized === 'loe') {
+    return { documentType: 'LOE', folderLabel: 'LOEs' }
+  }
+
+  if (normalized === 'invoices' || normalized === 'invoice' || normalized === 'bills' || normalized === 'bill') {
+    return { documentType: 'INVOICE', folderLabel: 'Invoices' }
+  }
+
+  if (normalized === 'telemetry' || normalized === 'usage data' || normalized === 'usage_data' || normalized === 'usage') {
+    return { documentType: 'USAGE_DATA', folderLabel: 'Telemetry' }
+  }
+
+  if (normalized === 'proposals' || normalized === 'proposal') {
+    return { documentType: 'PROPOSAL', folderLabel: 'Proposals' }
+  }
+
+  if (normalized === 'unsorted' || normalized === 'other') {
+    return { documentType: null, folderLabel: 'Unsorted' }
+  }
+
+  return null
+}
+
 function parseVaultAccountFolderLabel(folderName) {
   const normalized = String(folderName || '').trim()
   const match = normalized.match(/^(.*)\s\[([^\[\]]+)\]$/)
@@ -92,6 +176,42 @@ function parseVaultRootRelativePath(relativePath) {
     relativePath: normalized,
     nestedRelativePath: segments.slice(1).join('/'),
   }
+}
+
+function buildCanonicalVaultRootRelativePath(document, accountName, storedRelativePath) {
+  const accountFolder = buildVaultAccountFolderLabel(document.account_id || 'unassigned', accountName)
+  const documentTypeFolder = buildVaultDocumentTypeFolderLabel(
+    document.document_type || document?.metadata?.ai_extraction?.type || document.type
+  )
+  const normalizedStoredPath = normalizeRelativePath(storedRelativePath || '')
+  const segments = normalizedStoredPath ? normalizedStoredPath.split('/').filter(Boolean) : []
+
+  if (segments.length > 0) {
+    const parsedAccount = parseVaultAccountFolderLabel(segments[0])
+    if (parsedAccount) {
+      segments.shift()
+    }
+
+    const parsedType = parseVaultDocumentTypeFolderLabel(segments[0] || '')
+    if (parsedType) {
+      segments.shift()
+    }
+  }
+
+  const leafPath = normalizeRelativePath(segments.join('/'))
+  if (leafPath) {
+    return `${accountFolder}/${documentTypeFolder}/${leafPath}`
+  }
+
+  const rawFileName = normalizeRelativePath(document.name || 'file') || 'file'
+  const dotIndex = rawFileName.lastIndexOf('.')
+  const shortId = document.id ? String(document.id).slice(0, 8) : 'file'
+  const fallbackName =
+    dotIndex > 0
+      ? `${rawFileName.slice(0, dotIndex)}-${shortId}${rawFileName.slice(dotIndex)}`
+      : `${rawFileName}-${shortId}`
+
+  return `${accountFolder}/${documentTypeFolder}/${fallbackName}`
 }
 
 function fingerprintForStat(stat) {
@@ -625,6 +745,8 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
     accountId,
     accountName,
     accountFolder,
+    previousRelativePath,
+    documentUpdatedAt,
   }) {
     const normalizedRelativePath = normalizeRelativePath(relativePath)
     if (!normalizedRelativePath) {
@@ -633,8 +755,26 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
 
     const fingerprint = `${Number(size || 0)}:${Math.round(Number(mtimeMs || Date.now()))}`
 
+    const normalizedPreviousRelativePath = normalizeRelativePath(previousRelativePath || '')
+
     state.syncedFiles = {
-      ...state.syncedFiles,
+      ...Object.fromEntries(
+        Object.entries(state.syncedFiles || {}).filter(([relativePathKey, entry]) => {
+          if (relativePathKey === normalizedRelativePath) {
+            return true
+          }
+
+          if (normalizedPreviousRelativePath && relativePathKey === normalizedPreviousRelativePath) {
+            return false
+          }
+
+          if (documentId && entry?.documentId === documentId) {
+            return false
+          }
+
+          return true
+        })
+      ),
       [normalizedRelativePath]: {
         fingerprint,
         size: Number(size || 0),
@@ -645,6 +785,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
         accountId: accountId || null,
         accountName: accountName || null,
         accountFolder: accountFolder || null,
+        documentUpdatedAt: documentUpdatedAt || null,
         syncedAt: new Date().toISOString(),
       },
     }
@@ -659,6 +800,55 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
     persistState()
     emitState('file-acknowledged')
     return cloneState(state)
+  }
+
+  async function deleteFolderSyncFile(relativePath) {
+    const folderPath = state.folderPath ? path.resolve(state.folderPath) : null
+
+    if (!folderPath) {
+      throw new Error('No folder linked')
+    }
+
+    const normalizedRelativePath = normalizeRelativePath(relativePath)
+    if (!normalizedRelativePath) {
+      throw new Error('Missing file path')
+    }
+
+    const absolutePath = path.join(folderPath, normalizedRelativePath)
+
+    try {
+      await fs.promises.unlink(absolutePath)
+    } catch (error) {
+      if (!error || error.code !== 'ENOENT') {
+        throw error
+      }
+    }
+
+    let currentDir = path.dirname(absolutePath)
+    const rootDir = path.resolve(folderPath)
+    while (currentDir.startsWith(rootDir) && currentDir !== rootDir) {
+      try {
+        await fs.promises.rmdir(currentDir)
+      } catch {
+        break
+      }
+
+      const parentDir = path.dirname(currentDir)
+      if (parentDir === currentDir) {
+        break
+      }
+      currentDir = parentDir
+    }
+
+    if (state.syncedFiles && state.syncedFiles[normalizedRelativePath]) {
+      const nextSyncedFiles = { ...state.syncedFiles }
+      delete nextSyncedFiles[normalizedRelativePath]
+      state.syncedFiles = nextSyncedFiles
+      persistState()
+      emitState('file-deleted')
+    }
+
+    return { ok: true }
   }
 
   function shouldKeepRunningInTray() {
@@ -704,6 +894,9 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
     ipcMain.handle('desktop-folder-sync:write-file', async (_event, payload) => {
       return writeFolderSyncFile(payload || {})
     })
+    ipcMain.handle('desktop-folder-sync:delete-file', async (_event, relativePath) => {
+      return deleteFolderSyncFile(relativePath)
+    })
     ipcMain.handle('desktop-folder-sync:acknowledge-file', async (_event, payload) => {
       return acknowledgeFolderSyncFile(payload || {})
     })
@@ -728,6 +921,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
     openFolderSyncLocation,
     readFolderSyncFile,
     writeFolderSyncFile,
+    deleteFolderSyncFile,
     acknowledgeFolderSyncFile,
     shouldKeepRunningInTray,
     dispose,
