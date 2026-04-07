@@ -21,6 +21,30 @@ import { DesktopUpdateBanner } from '@/components/layout/DesktopUpdateBanner'
 import { useUIStore } from '@/store/uiStore'
 import { SequenceIntelModal } from '@/components/sequences/SequenceIntelModal'
 
+const PERSISTED_QUERY_FAMILIES = new Set([
+  'accounts',
+  'account',
+  'account-bill-intel',
+  'contacts',
+  'contact',
+  'calls',
+  'emails',
+  'email',
+  'email-thread',
+  'entity-emails',
+  'tasks',
+  'tasks-all-pending',
+  'tasks-count',
+  'tasks-metrics',
+  'targets',
+  'vault-documents',
+  'notification-center-feed',
+  'signature-requests',
+  'market-pulse',
+  'eia-retail-tx',
+  'scripts',
+])
+
 function GlobalShortcuts() {
   const toggleWarRoom = useWarRoomStore((s) => s.toggle)
   const toggleSequenceIntel = useUIStore((s) => s.toggleSequenceIntel)
@@ -75,25 +99,20 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PersistQueryClientProvider
       client={queryClient}
-      persistOptions={{
-        persister,
-        buster: 'v2',
-        maxAge: 1000 * 60 * 60 * 24,
-        dehydrateOptions: {
-          shouldDehydrateMutation: () => false,
-          shouldDehydrateQuery: (query) => {
-            if (query.state.fetchStatus === 'fetching') return false
-            const key0 = Array.isArray(query.queryKey) ? query.queryKey[0] : undefined
-            if (typeof key0 !== 'string') return false
-            return [
-              'calls',
-              'market-pulse',
-              'eia-retail-tx',
-              'scripts',
-            ].includes(key0)
-          },
-        },
-      }}
+          persistOptions={{
+            persister,
+            buster: 'v3',
+            maxAge: 1000 * 60 * 60 * 24,
+            dehydrateOptions: {
+              shouldDehydrateMutation: () => false,
+              shouldDehydrateQuery: (query) => {
+                if (query.state.fetchStatus === 'fetching') return false
+                const key0 = Array.isArray(query.queryKey) ? query.queryKey[0] : undefined
+                if (typeof key0 !== 'string') return false
+                return PERSISTED_QUERY_FAMILIES.has(key0)
+              },
+            },
+          }}
     >
       <AuthProvider>
         <VoiceProvider>

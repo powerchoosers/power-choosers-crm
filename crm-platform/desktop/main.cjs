@@ -1,5 +1,5 @@
 const path = require('path')
-const { app, BrowserWindow, Menu, clipboard, ipcMain, shell, session } = require('electron')
+const { app, BrowserWindow, Menu, Tray, Notification, clipboard, globalShortcut, ipcMain, nativeImage, shell, session } = require('electron')
 const { autoUpdater } = require('electron-updater')
 
 const DEV_URL = 'http://localhost:3000/network'
@@ -7,7 +7,9 @@ const PROD_URL = 'https://www.nodalpoint.io/network'
 const UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000
 
 let mainWindow = null
+let tray = null
 let updateCheckTimer = null
+let isQuitting = false
 let checkForUpdates = async () => {}
 let latestUpdateState = {
   phase: 'idle',
@@ -23,6 +25,8 @@ function sendUpdateState(nextState) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('desktop-update:event', latestUpdateState)
   }
+
+  updateTrayMenu()
 }
 
 function resetUpdateState() {
@@ -37,6 +41,164 @@ function resetUpdateState() {
 
 function getUpdateVersion(info) {
   return info?.version || info?.releaseName || null
+}
+
+function focusMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    return null
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore()
+  }
+
+  mainWindow.show()
+  mainWindow.focus()
+  return mainWindow
+}
+
+function sendUiEvent(payload) {
+  const windowRef = focusMainWindow()
+  if (!windowRef) {
+    return
+  }
+
+  if (windowRef.webContents.isLoading()) {
+    windowRef.webContents.once('did-finish-load', () => {
+      if (!windowRef.isDestroyed()) {
+        windowRef.webContents.send('desktop-ui:event', payload)
+      }
+    })
+    return
+  }
+
+  windowRef.webContents.send('desktop-ui:event', payload)
+}
+
+function showDesktopNotification(payload) {
+  const title = String(payload?.title || '').trim()
+  const body = String(payload?.body || '').trim()
+
+  if (!title) {
+    return { ok: false, reason: 'missing_title' }
+  }
+
+  const notification = new Notification({
+    title,
+    body,
+    silent: false,
+  })
+
+  notification.on('click', () => {
+    const windowRef = focusMainWindow()
+    if (windowRef && payload?.link) {
+      const link = String(payload.link)
+      if (/^https?:\/\//i.test(link)) {
+        shell.openExternal(link)
+      } else {
+        sendUiEvent({ type: 'navigate', href: link })
+      }
+    }
+  })
+
+  notification.show()
+  return { ok: true }
+}
+
+function installDownloadedUpdate() {
+  if (latestUpdateState.phase !== 'downloaded') {
+    return { ok: false, reason: 'no_update_ready' }
+  }
+
+  setImmediate(() => {
+    autoUpdater.quitAndInstall()
+  })
+
+  return { ok: true }
+}
+
+function buildTrayMenu() {
+  const isUpdateReady = latestUpdateState.phase === 'downloaded'
+
+  return Menu.buildFromTemplate([
+    {
+      label: 'Open Nodal Point',
+      click: () => {
+        focusMainWindow()
+      },
+    },
+    {
+      label: 'Quick Search',
+      accelerator: 'Ctrl/Cmd+Shift+K',
+      click: () => {
+        sendUiEvent({ type: 'open-command-bar' })
+      },
+    },
+    {
+      label: 'Sync Now',
+      click: () => {
+        sendUiEvent({ type: 'refresh-data' })
+      },
+    },
+    {
+      label: 'Import CSV',
+      click: () => {
+        sendUiEvent({ type: 'open-csv-import' })
+      },
+    },
+    {
+      label: 'Attach Files',
+      click: () => {
+        sendUiEvent({ type: 'open-file-attach' })
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Check for Updates',
+      click: async () => {
+        focusMainWindow()
+        await checkForUpdates()
+      },
+    },
+    {
+      label: 'Install Update Now',
+      enabled: isUpdateReady,
+      click: () => {
+        installDownloadedUpdate()
+      },
+    },
+    { type: 'separator' },
+    {
+      label: 'Quit',
+      click: () => {
+        isQuitting = true
+        app.quit()
+      },
+    },
+  ])
+}
+
+function updateTrayMenu() {
+  if (!tray) {
+    return
+  }
+
+  tray.setContextMenu(buildTrayMenu())
+}
+
+function createTray() {
+  if (!app.isPackaged || tray) {
+    return
+  }
+
+  const trayIconPath = path.join(__dirname, '..', 'public', 'favicon.ico')
+  const trayIcon = nativeImage.createFromPath(trayIconPath)
+  tray = new Tray(trayIcon)
+  tray.setToolTip('Nodal Point CRM')
+  tray.on('double-click', () => {
+    focusMainWindow()
+  })
+  updateTrayMenu()
 }
 
 function isUpdateCheckBusy() {
@@ -259,15 +421,15 @@ function setupAutoUpdates() {
     }
   })
   ipcMain.handle('desktop-update:install', async () => {
-    if (latestUpdateState.phase !== 'downloaded') {
-      return { ok: false, reason: 'no_update_ready' }
+    return installDownloadedUpdate()
+  })
+
+  ipcMain.handle('desktop-notification:show', async (_event, payload) => {
+    if (!app.isPackaged) {
+      return { ok: false, reason: 'not_packaged' }
     }
 
-    setImmediate(() => {
-      autoUpdater.quitAndInstall()
-    })
-
-    return { ok: true }
+    return showDesktopNotification(payload)
   })
 }
 
@@ -347,6 +509,13 @@ function createWindow() {
     mainWindow.webContents.once('did-finish-load', startUpdateChecks)
   }
 
+  mainWindow.on('close', (event) => {
+    if (app.isPackaged && tray && !isQuitting) {
+      event.preventDefault()
+      mainWindow.hide()
+    }
+  })
+
   mainWindow.on('closed', () => {
     mainWindow = null
   })
@@ -365,6 +534,19 @@ if (!gotSingleInstanceLock) {
     }
 
     setupAutoUpdates()
+    createWindow()
+    createTray()
+
+    globalShortcut.unregisterAll()
+    if (app.isPackaged) {
+      const didRegister = globalShortcut.register('CommandOrControl+Shift+K', () => {
+        sendUiEvent({ type: 'open-command-bar' })
+      })
+
+      if (!didRegister) {
+        console.warn('[Electron] Failed to register CommandOrControl+Shift+K')
+      }
+    }
 
     session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
       const allowedPermissions = new Set([
@@ -376,12 +558,14 @@ if (!gotSingleInstanceLock) {
       callback(allowedPermissions.has(permission))
     })
 
-    createWindow()
-
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow()
+        createTray()
+        return
       }
+
+      focusMainWindow()
     })
   })
 
@@ -405,7 +589,17 @@ app.on('window-all-closed', () => {
     updateCheckTimer = null
   }
 
+  if (tray && process.platform !== 'darwin' && isQuitting) {
+    tray.destroy()
+    tray = null
+  }
+
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  isQuitting = true
+  globalShortcut.unregisterAll()
 })
