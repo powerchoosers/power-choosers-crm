@@ -20,6 +20,7 @@ import { TaskCreationPanel } from '../right-panel/TaskCreationPanel'
 import { DealCreationPanel } from '../right-panel/DealCreationPanel'
 import { SignatureRequestPanel } from '@/components/right-panel/SignatureRequestPanel'
 import { PortalAccessPanel } from '@/components/right-panel/PortalAccessPanel'
+import { ProposalBuilderPanel } from '@/components/right-panel/ProposalBuilderPanel'
 
 /** When on dossier: 'context' = Active Context widgets, 'scanning' = Scanning Mode widgets. Only used when isActiveContext. */
 type DossierPanelView = 'context' | 'scanning'
@@ -234,6 +235,8 @@ export function RightPanel() {
           <DealCreationPanel key="deal" />
         ) : rightPanelMode === 'CREATE_SIGNATURE_REQUEST' ? (
           <SignatureRequestPanel key="sigreq" />
+        ) : rightPanelMode === 'CREATE_PROPOSAL' ? (
+          <ProposalBuilderPanel key="proposal" />
         ) : rightPanelMode === 'SEND_PORTAL_ACCESS' ? (
           <PortalAccessPanel key="portal-access" />
         ) : rightPanelMode !== 'DEFAULT' ? (
