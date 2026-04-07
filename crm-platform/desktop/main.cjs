@@ -195,6 +195,9 @@ function createTray() {
   const trayIcon = nativeImage.createFromPath(trayIconPath)
   tray = new Tray(trayIcon)
   tray.setToolTip('Nodal Point CRM')
+  tray.on('click', () => {
+    focusMainWindow()
+  })
   tray.on('double-click', () => {
     focusMainWindow()
   })
@@ -511,8 +514,8 @@ function createWindow() {
 
   mainWindow.on('close', (event) => {
     if (app.isPackaged && tray && !isQuitting) {
-      event.preventDefault()
-      mainWindow.hide()
+      tray.destroy()
+      tray = null
     }
   })
 
