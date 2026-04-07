@@ -136,7 +136,7 @@ export function VaultFolderSyncCard() {
 
   const handleSyncNow = async () => {
     setIsWorking(true)
-    const toastId = toast.loading('Scanning vault root...')
+    const toastId = toast.loading('Rebuilding vault mirror...')
 
     try {
       const result = await sync.scanNow()
@@ -144,9 +144,9 @@ export function VaultFolderSyncCard() {
         throw new Error(result?.reason || 'Vault scan failed')
       }
 
-      toast.success('Vault sync complete', { id: toastId })
+      toast.success('Vault mirror updated', { id: toastId })
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Vault scan failed', { id: toastId })
+      toast.error(error instanceof Error ? error.message : 'Vault sync failed', { id: toastId })
     } finally {
       setIsWorking(false)
     }

@@ -124,6 +124,7 @@ export function DesktopFolderSyncBridge() {
   const folderSync = useDesktopFolderSync()
   const localSyncBusyRef = useRef(false)
   const remoteSyncBusyRef = useRef(false)
+  const pendingForceRemotePullRef = useRef(false)
 
   const isFolderSyncActive = Boolean(
     folderSync.isDesktop &&
@@ -359,9 +360,11 @@ export function DesktopFolderSyncBridge() {
         toast.error(error instanceof Error ? error.message : 'Vault sync failed', { id: toastId })
       } finally {
         localSyncBusyRef.current = false
-        if (shouldKickRemotePull) {
+        if (shouldKickRemotePull || pendingForceRemotePullRef.current) {
+          const forceRemotePull = pendingForceRemotePullRef.current || shouldKickRemotePull
+          pendingForceRemotePullRef.current = false
           window.setTimeout(() => {
-            void pullRemoteDocs()
+            void pullRemoteDocs(forceRemotePull ? { force: true } : undefined)
           }, 1000)
         }
       }
@@ -369,13 +372,16 @@ export function DesktopFolderSyncBridge() {
     [fetchAccountNames, fetchRemoteDocuments, folderSync, markSynced, queryClient]
   )
 
-  const pullRemoteDocs = useCallback(async () => {
+  const pullRemoteDocs = useCallback(async (options?: { force?: boolean }) => {
     const state = folderSync.state
     if (!state?.enabled || !state.folderPath || !state.syncId) {
       return
     }
 
     if (remoteSyncBusyRef.current || localSyncBusyRef.current) {
+      if (options?.force) {
+        pendingForceRemotePullRef.current = true
+      }
       return
     }
 
@@ -389,7 +395,7 @@ export function DesktopFolderSyncBridge() {
       }, {})
 
       const syncedDocumentIds = new Set(state.syncedDocumentIds || [])
-      const unsyncedDocuments = remoteDocuments.filter((doc) => !syncedDocumentIds.has(doc.id))
+      const unsyncedDocuments = options?.force ? remoteDocuments : remoteDocuments.filter((doc) => !syncedDocumentIds.has(doc.id))
 
       if (unsyncedDocuments.length === 0) {
         return
@@ -450,6 +456,12 @@ export function DesktopFolderSyncBridge() {
       console.error('[Folder Sync] Remote pull failed:', error)
     } finally {
       remoteSyncBusyRef.current = false
+      if (pendingForceRemotePullRef.current) {
+        pendingForceRemotePullRef.current = false
+        window.setTimeout(() => {
+          void pullRemoteDocs({ force: true })
+        }, 1000)
+      }
     }
   }, [fetchAccountNames, fetchRemoteDocuments, folderSync, markSynced, queryClient])
 
@@ -468,6 +480,14 @@ export function DesktopFolderSyncBridge() {
         void pushLocalFiles(event.state, event.files)
       }
 
+      if (event.type === 'scan-complete' && (event.reason === 'manual' || event.reason === 'connect')) {
+        void pullRemoteDocs({ force: true })
+      }
+
+      if (event.type === 'scan-complete' && event.reason === 'startup') {
+        void pullRemoteDocs()
+      }
+
       if (event.type === 'error' && event.message) {
         toast.error(event.message)
       }
@@ -476,7 +496,7 @@ export function DesktopFolderSyncBridge() {
     return () => {
       unsubscribe()
     }
-  }, [folderSync.isDesktop, loading, pushLocalFiles, user])
+  }, [folderSync.isDesktop, loading, pullRemoteDocs, pushLocalFiles, user])
 
   useEffect(() => {
     if (!isFolderSyncActive) {
