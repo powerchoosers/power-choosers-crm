@@ -24,7 +24,7 @@ type RemoteVaultDocument = {
   size: string | null
   type: string | null
   document_type: string | null
-  updated_at: string | null
+  created_at: string | null
   storage_path: string
   metadata?: Record<string, unknown> | null
 }
@@ -271,7 +271,7 @@ export function DesktopFolderSyncBridge() {
   const fetchRemoteDocuments = useCallback(async () => {
     const { data, error } = await supabase
       .from('documents')
-      .select('id, account_id, name, size, type, document_type, updated_at, storage_path, metadata')
+      .select('id, account_id, name, size, type, document_type, created_at, storage_path, metadata')
       .order('account_id', { ascending: true })
       .order('created_at', { ascending: true })
 
@@ -414,7 +414,7 @@ export function DesktopFolderSyncBridge() {
             accountId,
             accountName,
             accountFolder,
-            documentUpdatedAt: existingRemote.updated_at || null,
+            documentUpdatedAt: existingRemote.created_at || null,
           })
             syncedDocumentIds.add(existingRemote.id)
             linkedCount += 1
@@ -559,7 +559,7 @@ export function DesktopFolderSyncBridge() {
               return true
             }
 
-            if (doc.updated_at && syncedEntry[1].documentUpdatedAt !== doc.updated_at) {
+            if (doc.created_at && syncedEntry[1].documentUpdatedAt !== doc.created_at) {
               return true
             }
 
@@ -622,7 +622,7 @@ export function DesktopFolderSyncBridge() {
           accountName,
           accountFolder: accountFolderEntry?.folderLabel || buildVaultAccountFolderLabel(doc.account_id || 'unassigned', accountName),
           previousRelativePath: previousRelativePath && previousRelativePath !== writeResult.relativePath ? previousRelativePath : null,
-          documentUpdatedAt: doc.updated_at || null,
+          documentUpdatedAt: doc.created_at || null,
         })
 
         downloadedCount += 1
