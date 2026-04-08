@@ -81,6 +81,11 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
   return window.btoa(binary)
 }
 
+function isMissingFileError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error || '')
+  return message.includes('ENOENT') || message.includes('no such file or directory')
+}
+
 function normalizeKey(value: string) {
   return String(value || '')
     .trim()
@@ -336,6 +341,7 @@ export function DesktopFolderSyncBridge() {
   const manualRefreshRunningRef = useRef(false)
   const pendingRemotePullRef = useRef(false)
   const pendingForceRemotePullRef = useRef(false)
+  const recentFolderErrorsRef = useRef(new Map<string, number>())
 
   const isFolderSyncActive = Boolean(
     folderSync.isDesktop &&
@@ -499,7 +505,16 @@ export function DesktopFolderSyncBridge() {
             continue
           }
 
-          const fileData = await folderSync.readFile(file.absolutePath)
+          let fileData
+          try {
+            fileData = await folderSync.readFile(file.absolutePath)
+          } catch (error) {
+            if (isMissingFileError(error)) {
+              // The file was moved or deleted after the scan detected it. Skip it quietly.
+              continue
+            }
+            throw error
+          }
           const canonicalFileName = existingRemote
             ? buildRemoteVaultFileLeafName(existingRemote, rootRelativePath)
             : file.fileName
@@ -790,6 +805,18 @@ export function DesktopFolderSyncBridge() {
 
       if (event.type === 'error' && event.message) {
         console.error('[Folder Sync Bridge] Error:', event.message)
+        if (isMissingFileError(event.message)) {
+          return
+        }
+
+        const normalizedMessage = String(event.message).trim()
+        const now = Date.now()
+        const lastShownAt = recentFolderErrorsRef.current.get(normalizedMessage) || 0
+        if (now - lastShownAt < 15000) {
+          return
+        }
+
+        recentFolderErrorsRef.current.set(normalizedMessage, now)
         toast.error(event.message)
       }
     })
@@ -827,7 +854,7 @@ export function DesktopFolderSyncBridge() {
       console.log('[Folder Sync Bridge] Interval timer firing')
       void folderSync.scanNow().catch(() => null)
       void pullRemoteDocs()
-    }, 60 * 1000)
+    }, 5 * 60 * 1000)
 
     return () => {
       window.clearTimeout(kickoffTimer)
