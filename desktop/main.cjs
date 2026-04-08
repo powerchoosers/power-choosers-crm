@@ -546,6 +546,11 @@ function createWindow() {
 
   mainWindow.loadURL(getStartUrl())
 
+  // Open DevTools in packaged app for debugging
+  if (app.isPackaged) {
+    mainWindow.webContents.openDevTools()
+  }
+
   if (app.isPackaged) {
     mainWindow.webContents.once('did-finish-load', startUpdateChecks)
   }
