@@ -204,6 +204,58 @@ Rules:
 - Favor concise, understandable solutions over clever ones.
 - If something looks inconsistent or wasteful, call it out clearly instead of working around it silently.
 
+## Desktop Electron App
+
+The project includes a desktop Electron shell for Windows (with potential for macOS/Linux).
+
+### Key Files
+- `desktop/main.cjs` - Main process with auto-updater, tray, and window management
+- `desktop/preload.cjs` - Preload script exposing `window.nodalDesktop` API
+- `desktop/folder-sync.cjs` - Folder sync feature for local file management
+
+### Auto-Update System
+- Uses `electron-updater` with GitHub Releases as the publish target
+- Auto-downloads updates in background (`autoUpdater.autoDownload = true`)
+- Does NOT auto-install on quit (`autoUpdater.autoInstallOnAppQuit = false`)
+- User must manually trigger install via tray menu or UI button
+- Update check interval: every 6 hours
+- Publish config: GitHub releases under `powerchoosers/power-choosers-crm`
+
+### Update State Phases
+`idle` → `checking` → `available` → `downloading` → `downloaded` → `error`
+
+### Desktop API (`window.nodalDesktop`)
+```typescript
+interface NodalDesktop {
+  isDesktop: boolean
+  getUpdateState(): Promise<UpdateState>
+  checkForUpdatesNow(): Promise<{ ok: boolean; state: UpdateState }>
+  installUpdate(): Promise<{ ok: boolean }>
+  showNotification(payload: { title: string; body: string; link?: string }): Promise<{ ok: boolean }>
+  onUpdateEvent(listener: (state: UpdateState) => void): () => void
+  onUiEvent(listener: (payload: any) => void): () => void
+}
+```
+
+### Build Commands
+```bash
+npm run desktop:dev      # Dev mode with hot reload
+npm run desktop:prod     # Run packaged app locally
+npm run desktop:pack     # Build unpacked (--dir)
+npm run desktop:dist     # Build installer
+npm run desktop:publish  # Build and publish to GitHub Releases
+```
+
+### Tray Features
+- Open Nodal Point
+- Quick Search (Ctrl+Shift+K)
+- Sync Now
+- Import CSV
+- Attach Files
+- Check for Updates
+- Install Update Now
+- Quit
+
 ## When Updating This File
 
 Keep this document short and operational.
