@@ -536,8 +536,6 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
         const files = await walkFolder(state.folderPath)
         const detected = []
 
-        const detected = []
-
         for (const file of files) {
           if (shouldSuppressPath(file.relativePath)) {
             continue
