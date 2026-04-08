@@ -253,20 +253,21 @@ type ContactRow = {
   avatar_url?: string | null
   photoUrl?: string | null
   photo_url?: string | null
+  createdAt?: string | null
   accounts?: AccountJoin | AccountJoin[] | null
 }
 
 const PAGE_SIZE = 50
 
 const CONTACTS_QUERY_BUSTER = 'v5'
-const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata, avatarUrl, avatar_url, photoUrl, photo_url'
-const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, accountId, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url)'
-const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, website, linkedinUrl, notes, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
+const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata'
+const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, accountId, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url)'
+const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
 const CONTACT_DETAIL_SELECT = `
           id, name, ownerId, firstName, lastName,
           email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt,
-          lastContactedAt, lastActivityAt, accountId, account_id, title, city, state, website, linkedinUrl, notes,
-          metadata, avatarUrl, avatar_url, photoUrl, photo_url,
+          lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes,
+          metadata,
           accounts!contacts_accountId_fkey (
             id, name, domain, logo_url, metadata, city, state, industry, address,
             electricity_supplier, annual_usage, current_rate, contract_end_date,
@@ -670,7 +671,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
             logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
             status: item.status || 'Lead',
-            lastContact: item.lastContactedAt || item.created_at || new Date().toISOString(),
+            lastContact: item.lastContactedAt || item.createdAt || item.created_at || new Date().toISOString(),
             accountId: item.accountId || undefined,
             industry: account?.industry || undefined,
             title: item.title || metadata?.title || metadata?.job_title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
