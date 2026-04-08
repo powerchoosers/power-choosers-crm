@@ -26,12 +26,22 @@ function createDefaultState() {
 }
 
 function sanitizeRelativePathSegment(value) {
-  return String(value || '')
-    .trim()
+  const trimmed = String(value || '').trim()
+  
+  // Check if this looks like a filename (has an extension)
+  const lastDotIndex = trimmed.lastIndexOf('.')
+  const hasExtension = lastDotIndex > 0 && lastDotIndex < trimmed.length - 1
+  
+  let sanitized = trimmed
     .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '-')
-    .replace(/\.+$/g, '')
     .replace(/\s+/g, ' ')
-    .slice(0, 96) || 'file'
+  
+  // Only remove trailing dots if it's NOT a file extension
+  if (!hasExtension) {
+    sanitized = sanitized.replace(/\.+$/g, '')
+  }
+  
+  return sanitized.slice(0, 96) || 'file'
 }
 
 function normalizeRelativePath(value) {
@@ -526,10 +536,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
         const files = await walkFolder(state.folderPath)
         const detected = []
 
-        const parsedFiles = []
-        const skippedNoParse = []
-        const skippedNoAccountId = []
-        const skippedFingerprintMatch = []
+        const detected = []
 
         for (const file of files) {
           if (shouldSuppressPath(file.relativePath)) {
@@ -538,12 +545,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
 
           const parsed = parseVaultRootRelativePath(file.relativePath)
           if (!parsed) {
-            skippedNoParse.push(file.relativePath)
             continue
-          }
-
-          if (!parsed.accountId) {
-            skippedNoAccountId.push({ relativePath: file.relativePath, parsed })
           }
 
           const current = state.syncedFiles[file.relativePath]
@@ -554,29 +556,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
               accountName: parsed.accountName,
               accountFolder: parsed.folderLabel,
             })
-          } else {
-            skippedFingerprintMatch.push(file.relativePath)
           }
-        }
-
-        // Debug logging
-        console.log('[Folder Sync] Scan results:', {
-          totalFiles: files.length,
-          detectedCount: detected.length,
-          skippedNoParse: skippedNoParse.length,
-          skippedNoAccountId: skippedNoAccountId.length,
-          skippedFingerprintMatch: skippedFingerprintMatch.length,
-        })
-
-        if (skippedNoParse.length > 0) {
-          console.log('[Folder Sync] Files skipped (no parse):', skippedNoParse.slice(0, 5))
-        }
-        if (skippedNoAccountId.length > 0) {
-          console.log('[Folder Sync] Files skipped (no accountId):', skippedNoAccountId.slice(0, 5))
-        }
-
-        if (detected.length > 0) {
-          console.log('[Folder Sync] Files to sync:', detected.map(f => f.relativePath).slice(0, 5))
         }
 
         state.lastScanAt = new Date().toISOString()
@@ -584,15 +564,12 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
         persistState()
 
         if (detected.length > 0) {
-          console.log('[Folder Sync] Emitting local-files-detected with', detected.length, 'files')
           sendEvent({
             type: 'local-files-detected',
             reason,
             files: detected,
             state: cloneState(state),
           })
-        } else {
-          console.log('[Folder Sync] No files detected for sync')
         }
 
         sendEvent({
