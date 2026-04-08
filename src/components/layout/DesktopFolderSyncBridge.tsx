@@ -13,8 +13,10 @@ import {
   formatBytes,
   ingestAccountFileData,
   normalizeVaultRelativePath,
+  normalizeVaultDocumentType,
   parseVaultAccountFolderLabel,
   parseVaultDocumentTypeFolderLabel,
+  sanitizeStoragePathSegment,
 } from '@/lib/file-ingestion'
 
 type RemoteVaultDocument = {
@@ -129,6 +131,89 @@ function getRemoteDocumentTypeHint(document: RemoteVaultDocument) {
   return document.document_type || aiExtractionType || document.type || null
 }
 
+function inferRemoteFileExtension(document: RemoteVaultDocument) {
+  const mimeType = String(document.type || '').trim().toLowerCase()
+
+  switch (mimeType) {
+    case 'application/pdf':
+      return '.pdf'
+    case 'text/csv':
+      return '.csv'
+    case 'text/plain':
+      return '.txt'
+    case 'application/json':
+      return '.json'
+    case 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+      return '.xlsx'
+    case 'application/vnd.ms-excel':
+      return '.xls'
+    case 'application/msword':
+      return '.doc'
+    case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+      return '.docx'
+    case 'image/png':
+      return '.png'
+    case 'image/jpeg':
+      return '.jpg'
+    case 'image/webp':
+      return '.webp'
+    case 'image/gif':
+      return '.gif'
+    default:
+      return ''
+  }
+}
+
+function inferRemoteFileBaseName(document: RemoteVaultDocument) {
+  switch (normalizeVaultDocumentType(getRemoteDocumentTypeHint(document))) {
+    case 'CONTRACT':
+      return 'contract'
+    case 'LOE':
+      return 'loe'
+    case 'INVOICE':
+      return 'invoice'
+    case 'USAGE_DATA':
+      return 'telemetry'
+    case 'PROPOSAL':
+      return 'proposal'
+    default:
+      return 'file'
+  }
+}
+
+function buildRemoteVaultFileLeafName(document: RemoteVaultDocument, sourceLeafPath?: string | null) {
+  const candidates = [sourceLeafPath, document.name, document.storage_path]
+  for (const candidate of candidates) {
+    const normalizedCandidate = normalizeVaultRelativePath(String(candidate || ''))
+    const leaf = normalizedCandidate.split('/').filter(Boolean).pop() || ''
+    if (!leaf) {
+      continue
+    }
+
+    const extensionMatch = leaf.match(/(\.[^.]+)$/)
+    const extension = extensionMatch?.[1] || ''
+    const base = extension ? leaf.slice(0, -extension.length) : leaf
+    const sanitizedBase = sanitizeStoragePathSegment(base)
+    const isGenericBase = !sanitizedBase || ['file', 'document', 'attachment', 'download', 'scan', 'blob', 'unnamed', 'untitled'].includes(sanitizedBase.toLowerCase())
+
+    if (extension && !isGenericBase) {
+      return `${sanitizedBase}${extension}`
+    }
+
+    if (!extension && !isGenericBase) {
+      const inferredExtension = inferRemoteFileExtension(document)
+      return `${sanitizedBase}${inferredExtension}`
+    }
+  }
+
+  const fallbackBase = inferRemoteFileBaseName(document)
+  const shortId = document.id ? String(document.id).slice(0, 8) : ''
+  const suffix = shortId ? `-${shortId}` : ''
+  const inferredExtension = inferRemoteFileExtension(document)
+
+  return `${fallbackBase}${suffix}${inferredExtension}`
+}
+
 function buildAccountFolderIndex(remoteAccounts: RemoteAccount[]): AccountFolderIndex {
   const groupedAccounts = new Map<string, RemoteAccount[]>()
 
@@ -231,19 +316,11 @@ function resolveRemoteRootRelativePath(document: RemoteVaultDocument, accountFol
 
     const relativeLeafPath = normalizeVaultRelativePath(segments.join('/'))
     if (relativeLeafPath) {
-      return `${accountFolder}/${documentTypeFolder}/${relativeLeafPath}`
+      return `${accountFolder}/${documentTypeFolder}/${buildRemoteVaultFileLeafName(document, relativeLeafPath)}`
     }
   }
 
-  const rawFileName = normalizeVaultRelativePath(document.name || 'file') || 'file'
-  const dotIndex = rawFileName.lastIndexOf('.')
-  const shortId = document.id ? String(document.id).slice(0, 8) : 'file'
-  const fallbackName =
-    dotIndex > 0
-      ? `${rawFileName.slice(0, dotIndex)}-${shortId}${rawFileName.slice(dotIndex)}`
-      : `${rawFileName}-${shortId}`
-
-  return `${accountFolder}/${documentTypeFolder}/${fallbackName}`
+  return `${accountFolder}/${documentTypeFolder}/${buildRemoteVaultFileLeafName(document)}`
 }
 
 function findSyncedFileEntry(state: FolderSyncStateLike, documentId: string) {
@@ -423,14 +500,18 @@ export function DesktopFolderSyncBridge() {
           }
 
           const fileData = await folderSync.readFile(file.absolutePath)
+          const canonicalFileName = existingRemote
+            ? buildRemoteVaultFileLeafName(existingRemote, rootRelativePath)
+            : file.fileName
+          const storagePath = existingRemote?.storage_path || buildVaultSyncStoragePath(accountId, state.syncId, rootRelativePath)
           const result = await ingestAccountFileData({
             accountId,
-            fileName: file.fileName,
+            fileName: canonicalFileName,
             fileData: base64ToUint8Array(fileData.base64),
             fileType: fileData.mimeType,
             fileSize: fileData.size,
             apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || null,
-            storagePath: buildVaultSyncStoragePath(accountId, state.syncId, rootRelativePath),
+            storagePath,
             metadata: {
               syncSource: 'desktop-vault-root',
               syncId: state.syncId,
@@ -439,6 +520,7 @@ export function DesktopFolderSyncBridge() {
               accountId,
               accountName,
               localFileName: file.fileName,
+              canonicalFileName,
               localFingerprint: file.fingerprint,
             },
             upsert: true,
@@ -581,8 +663,9 @@ export function DesktopFolderSyncBridge() {
         const syncedEntry = findSyncedFileEntry(state, doc.id)
         const previousRelativePath = syncedEntry?.[0] || null
 
+        const canonicalFileName = buildRemoteVaultFileLeafName(doc, rootRelativePath)
         const { data, error } = await supabase.storage.from('vault').createSignedUrl(doc.storage_path, 120, {
-          download: doc.name,
+          download: canonicalFileName,
         })
 
         if (error) {
@@ -602,7 +685,7 @@ export function DesktopFolderSyncBridge() {
         const base64 = arrayBufferToBase64(arrayBuffer)
         const writeResult = await folderSync.writeFile({
           relativePath: rootRelativePath,
-          fileName: doc.name || 'file',
+          fileName: canonicalFileName,
           base64,
           mimeType: doc.type || 'application/octet-stream',
         })
