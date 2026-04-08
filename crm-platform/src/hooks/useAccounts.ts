@@ -114,8 +114,8 @@ export interface AccountFilters {
 
 const PAGE_SIZE = 50
 const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url'
-const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedinUrl, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
-const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedinUrl, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId'
+const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
+const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website'
 
 function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
   const city = data.city || ''
@@ -148,7 +148,7 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
     sqft: data.metadata?.sqft || '',
     occupancy: data.metadata?.occupancy || '',
     ownerId: data.ownerId,
-    linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
+    linkedinUrl: data.linkedin_url || data.linkedinUrl || '',
     loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
     loadZone,
     annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
