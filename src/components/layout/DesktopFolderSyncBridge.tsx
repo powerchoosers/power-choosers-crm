@@ -326,11 +326,15 @@ export function DesktopFolderSyncBridge() {
         accountFolder?: string | null
       }>
     ) => {
+      console.log('[Folder Sync Bridge] pushLocalFiles called with', files.length, 'files')
+
       if (!state.folderPath || !state.syncId) {
+        console.log('[Folder Sync Bridge] pushLocalFiles: no folderPath or syncId')
         return
       }
 
       if (localSyncBusyRef.current) {
+        console.log('[Folder Sync Bridge] pushLocalFiles: already busy')
         return
       }
 
@@ -514,12 +518,15 @@ export function DesktopFolderSyncBridge() {
   )
 
   const pullRemoteDocs = useCallback(async (options?: { force?: boolean }) => {
+    console.log('[Folder Sync Bridge] pullRemoteDocs called, force:', options?.force)
     const state = folderSync.state
     if (!state?.enabled || !state.folderPath || !state.syncId) {
+      console.log('[Folder Sync Bridge] pullRemoteDocs: not enabled or no folderPath/syncId')
       return
     }
 
     if (remoteSyncBusyRef.current || localSyncBusyRef.current) {
+      console.log('[Folder Sync Bridge] pullRemoteDocs: busy, queuing')
       if (options?.force) {
         pendingForceRemotePullRef.current = true
       } else {
@@ -529,6 +536,7 @@ export function DesktopFolderSyncBridge() {
     }
 
     remoteSyncBusyRef.current = true
+    console.log('[Folder Sync Bridge] pullRemoteDocs: starting')
 
     try {
       const [remoteDocuments, remoteAccounts] = await Promise.all([fetchRemoteDocuments(), fetchAccountNames()])
@@ -620,12 +628,15 @@ export function DesktopFolderSyncBridge() {
         downloadedCount += 1
       }
 
+      console.log('[Folder Sync Bridge] pullRemoteDocs: downloadedCount =', downloadedCount, ', unsynced count =', unsyncedDocuments.length)
       if (downloadedCount > 0) {
         toast.success(`Copied ${downloadedCount} vault file${downloadedCount === 1 ? '' : 's'} into the root folder.`)
         await queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
+      } else if (unsyncedDocuments.length > 0) {
+        console.log('[Folder Sync Bridge] pullRemoteDocs: no downloads but there are unsynced docs - checking why')
       }
     } catch (error) {
-      console.error('[Folder Sync] Remote pull failed:', error)
+      console.error('[Folder Sync Bridge] Remote pull failed:', error)
     } finally {
       remoteSyncBusyRef.current = false
       if (pendingForceRemotePullRef.current) {
@@ -674,7 +685,10 @@ export function DesktopFolderSyncBridge() {
     }
 
     const unsubscribe = bridge.onFolderSyncEvent((event) => {
+      console.log('[Folder Sync Bridge] Event received:', event.type, event.reason, event.files?.length || event.detectedCount || '')
+
       if (event.type === 'local-files-detected') {
+        console.log('[Folder Sync Bridge] Processing', event.files?.length, 'local files')
         void pushLocalFiles(event.state, event.files)
       }
 
@@ -682,14 +696,17 @@ export function DesktopFolderSyncBridge() {
         if (manualRefreshRunningRef.current) {
           return
         }
+        console.log('[Folder Sync Bridge] Scan complete, pulling remote docs (force)')
         void pullRemoteDocs({ force: true })
       }
 
       if (event.type === 'scan-complete' && event.reason === 'startup') {
+        console.log('[Folder Sync Bridge] Scan complete (startup), pulling remote docs')
         void pullRemoteDocs()
       }
 
       if (event.type === 'error' && event.message) {
+        console.error('[Folder Sync Bridge] Error:', event.message)
         toast.error(event.message)
       }
     })
@@ -712,15 +729,19 @@ export function DesktopFolderSyncBridge() {
 
   useEffect(() => {
     if (!isFolderSyncActive) {
+      console.log('[Folder Sync Bridge] Interval effect: not active')
       return
     }
 
+    console.log('[Folder Sync Bridge] Interval effect: starting, folderSync.state:', folderSync.state?.enabled, folderSync.state?.folderPath)
     void folderSync.scanNow().catch(() => null)
     const kickoffTimer = window.setTimeout(() => {
+      console.log('[Folder Sync Bridge] Kickoff timer firing')
       void pullRemoteDocs()
     }, 4000)
 
     const timer = window.setInterval(() => {
+      console.log('[Folder Sync Bridge] Interval timer firing')
       void folderSync.scanNow().catch(() => null)
       void pullRemoteDocs()
     }, 60 * 1000)
