@@ -685,7 +685,7 @@ export function DesktopFolderSyncBridge() {
     }
 
     const unsubscribe = bridge.onFolderSyncEvent((event) => {
-      console.log('[Folder Sync Bridge] Event received:', event.type, event.reason, (event as any).files?.length || event.detectedCount || '')
+      console.log('[Folder Sync Bridge] Event received:', event.type, (event as any).reason, (event as any).files?.length || (event as any).detectedCount || '')
 
       if (event.type === 'local-files-detected') {
         console.log('[Folder Sync Bridge] Processing', (event as any).files?.length, 'local files')
