@@ -159,6 +159,7 @@ export function GlobalSync() {
             void invalidateDossierState()
             queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
+            queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
           } else if (oldRecord.status !== 'opened' && newRecord.status === 'opened') {
             if (isOwner) {
               if (soundEnabled) playPing();
@@ -169,6 +170,7 @@ export function GlobalSync() {
             invalidateDeals()
             invalidateEmails()
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
+            queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
           } else if (oldRecord.status !== 'viewed' && newRecord.status === 'viewed') {
             if (isOwner) {
               if (soundEnabled) playPing();
@@ -179,6 +181,7 @@ export function GlobalSync() {
             invalidateDeals()
             invalidateEmails()
             queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
+            queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
           }
         }
       )
@@ -238,6 +241,7 @@ export function GlobalSync() {
           queryClient.invalidateQueries({ queryKey: ['emails-search'] })
           queryClient.invalidateQueries({ queryKey: ['emails-count'] })
           queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+          queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
         }
       )
       .subscribe((status) => {
@@ -318,6 +322,7 @@ export function GlobalSync() {
                 link: videoUrl || notification.link || null,
                 kind: 'reminder',
               })
+              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
           } else if (notifType === 'rsvp') {
               const statusStr = String(notification.data?.status || 'UNKNOWN').toUpperCase();
               const isAccepted = statusStr === 'ACCEPTED' ||
@@ -327,6 +332,7 @@ export function GlobalSync() {
               // Immediately refresh task data so the badge updates alongside the toast
               queryClient.invalidateQueries({ queryKey: ['tasks'] })
               queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] })
+              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
 
               if (useUIStore.getState().soundEnabled) playPing();
 
@@ -344,6 +350,7 @@ export function GlobalSync() {
                   </div>,
                   { duration: 6000 }
               )
+              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
           } else {
               showInboxEmailToast({
                   name,
@@ -361,6 +368,7 @@ export function GlobalSync() {
                 link: notification.link || null,
                 kind: 'email',
               })
+              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
           }
 
         }
@@ -377,7 +385,7 @@ export function GlobalSync() {
             if (event.type === 'refresh-data') {
               forensicNotify.update('Refreshing data...')
               void performSync(true)
-              queryClient.invalidateQueries()
+              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
             }
 
             if (event.type === 'navigate' && event.href) {
@@ -394,127 +402,6 @@ export function GlobalSync() {
       desktopUiUnsubscribe?.()
     }
   }, [loading, user, performSync, queryClient, onCrmRoute, router])
-
-  useEffect(() => {
-    if (loading || !user?.email || !onCrmRoute) return
-
-    let cancelled = false
-
-    const pollNotifications = async () => {
-      const scope = ownerScopeRef.current.length > 0
-        ? ownerScopeRef.current
-        : [String(user.email || '').toLowerCase()]
-
-      const cutoff = new Date(Date.now() - 10 * 60 * 1000).toISOString()
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('id, ownerId, title, message, type, read, link, data, metadata, createdAt')
-        .in('ownerId', scope)
-        .eq('read', false)
-        .gte('createdAt', cutoff)
-        .order('createdAt', { ascending: true })
-        .limit(20)
-
-      if (error || cancelled || !Array.isArray(data)) return
-
-      for (const row of data) {
-        const payload = (row.data && typeof row.data === 'object') ? row.data as Record<string, any> : {}
-        const signalId = String(payload.emailId || row.id || '').trim()
-        if (!signalId || seenInboxSignalIdsRef.current.has(signalId)) continue
-        if (!consumeInboxToastId(signalId)) continue
-
-        seenInboxSignalIdsRef.current.add(signalId)
-
-        const notifType = String(row.type || '').toLowerCase();
-
-        if (notifType === 'reminder') {
-            const mins = payload.reminderMinutes as number | undefined;
-            const videoUrl = payload.videoCallUrl as string | null | undefined;
-            const isUrgent = mins === 15;
-            if (soundEnabled) isUrgent ? playAlert() : playPing();
-            toast(
-                <div className="flex items-start gap-3">
-                    {videoUrl ? (
-                        <Video className="w-5 h-5 text-[#002FA7] shrink-0 mt-0.5" />
-                    ) : (
-                        <Bell className={`w-5 h-5 shrink-0 mt-0.5 ${isUrgent ? 'text-amber-400' : 'text-zinc-400'}`} />
-                    )}
-                    <div className="flex flex-col gap-0.5">
-                        <span className="font-medium text-sm">{row.title}</span>
-                        <span className="text-xs text-zinc-400">{row.message}</span>
-                        {videoUrl && (
-                            <a href={videoUrl} target="_blank" rel="noopener noreferrer"
-                               className="text-xs text-[#002FA7] underline mt-1 font-mono">
-                                Join Video Briefing →
-                            </a>
-                        )}
-                    </div>
-                </div>,
-                { duration: isUrgent ? 30000 : 10000 }
-            );
-            void showDesktopNotification({
-              title: row.title || 'Reminder',
-              body: row.message || 'A follow-up is due.',
-              link: videoUrl || row.link || null,
-              kind: 'reminder',
-            })
-        } else if (notifType === 'rsvp') {
-            const statusStr = String(payload.status || 'UNKNOWN').toUpperCase();
-            const isAccepted = statusStr === 'ACCEPTED' ||
-                               row.title?.toLowerCase().includes('confirmed') ||
-                               row.message?.toLowerCase().includes('accepted');
-
-            // Refresh task data so badge updates
-            queryClient.invalidateQueries({ queryKey: ['tasks'] })
-            queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] })
-
-            if (soundEnabled) playPing();
-            toast(
-                <div className="flex items-center gap-3">
-                    {isAccepted ? (
-                        <CalendarCheck className="w-5 h-5 text-emerald-400" />
-                    ) : (
-                        <CalendarX className="w-5 h-5 text-red-400" />
-                    )}
-                    <div className="flex flex-col">
-                        <span className="font-medium">{row.title || 'RSVP Update'}</span>
-                        <span className="text-xs text-zinc-400">{row.message}</span>
-                    </div>
-                </div>,
-                { duration: 6000 }
-            );
-        } else {
-            showInboxEmailToast({
-              name: String(payload.contactName || row.title?.replace(/^New email from\s+/i, '') || 'CRM contact'),
-              company: String(payload.company || 'Unknown company'),
-              subject: String(payload.subject || row.message || 'New email from CRM contact'),
-              snippet: String(payload.snippet || row.message || 'New message received'),
-              hasAttachments: Boolean(payload.hasAttachments),
-              photoUrl: (payload.photoUrl as string | null) ?? null,
-              sourceLabel: formatSourceLabel(payload.source || row.metadata?.source),
-              emailId: signalId || undefined,
-            });
-            void showDesktopNotification({
-              title: row.title || 'New Email',
-              body: row.message || String(payload.snippet || 'New message received'),
-              link: row.link || null,
-              kind: 'email',
-            })
-        }
-
-      }
-    }
-
-    void pollNotifications()
-    const interval = setInterval(() => {
-      void pollNotifications()
-    }, 15000)
-
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [loading, user?.email, onCrmRoute])
 
   return null
 }

@@ -227,6 +227,7 @@ export function useEmailTrackingNotifications({ enabled = true }: { enabled?: bo
           queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
           queryClient.invalidateQueries({ queryKey: ['emails-count'] })
           queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+          queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
 
           const soundEnabled = useUIStore.getState().soundEnabled
 
