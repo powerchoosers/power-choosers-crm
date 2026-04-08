@@ -10,6 +10,13 @@ import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe';
 const CRM_PREFIXES = ['/network', '/market-data'];
 
 const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {};
+const shouldLogZohoSync = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEBUG_SYNC === '1'
+
+function debugZohoSync(...args: unknown[]) {
+    if (shouldLogZohoSync) {
+        console.log(...args)
+    }
+}
 
 async function getOwnerScope(user: { id?: string; email?: string | null }) {
     const primary = String(user.email || '').toLowerCase().trim();
@@ -77,7 +84,7 @@ export function useZohoSync() {
 
             const ownerScope = await getOwnerScope({ id: user.id, email: user.email });
             if (ownerScope.length === 0) return;
-            console.log(`[Zoho Sync] Initiating sync for scope: ${ownerScope.join(', ')}`);
+            debugZohoSync(`[Zoho Sync] Initiating sync for scope: ${ownerScope.join(', ')}`);
 
             let totalSynced = 0;
             for (const inboxEmail of ownerScope) {
@@ -91,7 +98,7 @@ export function useZohoSync() {
 
                 if (data.success) {
                     totalSynced += Number(data.count || 0);
-                    console.log(`[Zoho Sync] ${inboxEmail}: synced ${data.count || 0} emails.`, data.debug || '');
+                    debugZohoSync(`[Zoho Sync] ${inboxEmail}: synced ${data.count || 0} emails.`, data.debug || '');
                     if (Array.isArray(data.notifications) && data.notifications.length > 0) {
                         showSyncNotifications(data.notifications);
                     }

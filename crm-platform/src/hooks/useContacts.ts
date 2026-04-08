@@ -259,6 +259,20 @@ type ContactRow = {
 const PAGE_SIZE = 50
 
 const CONTACTS_QUERY_BUSTER = 'v5'
+const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, first_name, lastName, last_name, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata, avatarUrl, avatar_url, photoUrl, photo_url'
+const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, first_name, firstname, FirstName, lastName, last_name, lastname, LastName, accountId, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url)'
+const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, first_name, firstname, FirstName, lastName, last_name, lastname, LastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, created_at, lastContactedAt, lastActivityAt, accountId, account_id, title, city, state, website, linkedinUrl, notes, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
+const CONTACT_DETAIL_SELECT = `
+          id, name, ownerId, firstName, first_name, firstname, FirstName, lastName, last_name, lastname, LastName,
+          email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, created_at,
+          lastContactedAt, lastActivityAt, accountId, account_id, title, city, state, website, linkedinUrl, notes,
+          metadata, avatarUrl, avatar_url, photoUrl, photo_url,
+          accounts!contacts_accountId_fkey (
+            id, name, domain, logo_url, metadata, city, state, industry, address,
+            electricity_supplier, annual_usage, current_rate, contract_end_date,
+            service_addresses, description, phone
+          )
+        `
 
 const PRIMARY_PHONE_FIELDS = ['mobile', 'workDirectPhone', 'otherPhone'] as const
 
@@ -338,6 +352,55 @@ function buildContactName(args: {
   return rawName || email || 'Unknown'
 }
 
+function patchContactDetailCache(cached: any, contactPatch: Partial<ContactDetail> & { id: string }) {
+  if (!cached || cached.id !== contactPatch.id) return cached
+  return {
+    ...cached,
+    ...contactPatch,
+    linkedAccountId: contactPatch.accountId ?? contactPatch.linkedAccountId ?? cached.linkedAccountId,
+  }
+}
+
+function patchContactListCache(old: any, contactPatch: Partial<ContactDetail> & { id: string }) {
+  if (!old?.pages) return old
+  return {
+    ...old,
+    pages: old.pages.map((page: any) => {
+      if (!page || !Array.isArray(page.contacts)) return page
+      return {
+        ...page,
+        contacts: page.contacts.map((contact: Contact) =>
+          contact.id === contactPatch.id
+            ? {
+                ...contact,
+                ...contactPatch,
+                name: contactPatch.name ?? contact.name,
+                accountId: contactPatch.accountId ?? contact.accountId,
+                company: contactPatch.companyName ?? contact.company,
+                companyPhone: contactPatch.companyPhone ?? contact.companyPhone,
+                workDirectPhone: contactPatch.workDirectPhone ?? contact.workDirectPhone,
+                location: contactPatch.location ?? contact.location,
+              }
+            : contact
+        ),
+      }
+    }),
+  }
+}
+
+function patchAccountContactsCache(old: any, contactPatch: Partial<ContactDetail> & { id: string }) {
+  if (!Array.isArray(old)) return old
+  return old.map((contact: Contact) =>
+    contact.id === contactPatch.id
+      ? {
+          ...contact,
+          ...contactPatch,
+          name: contactPatch.name ?? contact.name,
+        }
+      : contact
+  )
+}
+
 export function useAccountContacts(accountId: string) {
   const { user, loading } = useAuth()
 
@@ -348,7 +411,7 @@ export function useAccountContacts(accountId: string) {
 
       const { data, error } = await supabase
         .from('contacts')
-        .select('*')
+        .select(ACCOUNT_CONTACTS_SELECT)
         .eq('accountId', accountId)
 
       if (error) {
@@ -409,7 +472,7 @@ export function useSearchContacts(queryTerm: string) {
       try {
         let query = supabase
           .from('contacts')
-          .select('*, accounts!contacts_accountId_fkey(name, domain, logo_url)');
+          .select(CONTACT_SEARCH_SELECT);
 
         // Admin and dev see all contacts; others filtered by ownerId
         if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
@@ -479,7 +542,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         let query = supabase
           .from('contacts')
-          .select('*, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state)', { count: 'exact' });
+          .select(CONTACT_LIST_SELECT, { count: 'exact' });
 
         if (listId) {
           // Fetch targetIds from list_members first due to lack of FK for inner join
@@ -734,14 +797,7 @@ export function useContact(id: string) {
 
       const { data, error } = await supabase
         .from('contacts')
-        .select(`
-          *,
-          accounts!contacts_accountId_fkey (
-            name, domain, logo_url, metadata, city, state, industry,
-            electricity_supplier, annual_usage, current_rate, contract_end_date,
-            service_addresses, description, phone
-          )
-        `)
+        .select(CONTACT_DETAIL_SELECT)
         .eq('id', id)
         .single()
 
@@ -773,7 +829,7 @@ export function useContact(id: string) {
         if (companyName) {
           const { data: foundAccount } = await supabase
             .from('accounts')
-            .select('name, domain, logo_url, metadata, city, state, industry, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone, id')
+            .select('id, name, domain, logo_url, metadata, city, state, industry, address, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone')
             .ilike('name', companyName)
             .limit(1)
             .maybeSingle()
@@ -1168,14 +1224,64 @@ export function useUpdateContact() {
         }
       }
 
-      return { id, ...updates }
+      return {
+        id,
+        ...updates,
+        accountId: targetAccountId ?? updates.accountId,
+        linkedAccountId: targetAccountId ?? updates.linkedAccountId ?? updates.accountId,
+      }
     },
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      queryClient.invalidateQueries({ queryKey: ['contact', CONTACTS_QUERY_BUSTER, variables.id] })
-      queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
-      queryClient.invalidateQueries({ queryKey: ['account'] })
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) =>
+        patchContactListCache(old, variables)
+      )
+      queryClient.setQueriesData({ queryKey: ['contact'] }, (cached: any) =>
+        patchContactDetailCache(cached, variables)
+      )
+      queryClient.setQueriesData({ queryKey: ['account-contacts'] }, (old: any) =>
+        patchAccountContactsCache(old, variables)
+      )
+
+      if (variables.accountId || variables.linkedAccountId) {
+        const linkedAccountId = variables.accountId || variables.linkedAccountId
+        queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+          if (!cached || cached.id !== linkedAccountId) return cached
+          return {
+            ...cached,
+            name: variables.companyName ?? cached.name,
+            companyPhone: variables.companyPhone ?? cached.companyPhone,
+            electricitySupplier: variables.electricitySupplier ?? cached.electricitySupplier,
+            annualUsage: variables.annualUsage ?? cached.annualUsage,
+            currentRate: variables.currentRate ?? cached.currentRate,
+            contractEnd: variables.contractEnd ?? cached.contractEnd,
+            serviceAddresses: variables.serviceAddresses ?? cached.serviceAddresses,
+          }
+        })
+        queryClient.setQueriesData({ queryKey: ['accounts'] }, (old: any) => {
+          if (!old?.pages) return old
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => {
+              if (!page || !Array.isArray(page.accounts)) return page
+              return {
+                ...page,
+                accounts: page.accounts.map((account: any) =>
+                  account.id === linkedAccountId
+                    ? {
+                        ...account,
+                        name: variables.companyName ?? account.name,
+                        companyPhone: variables.companyPhone ?? account.companyPhone,
+                        annualUsage: variables.annualUsage ?? account.annualUsage,
+                        currentRate: variables.currentRate ?? account.currentRate,
+                        contractEnd: variables.contractEnd ?? account.contractEnd,
+                      }
+                    : account
+                ),
+              }
+            }),
+          }
+        })
+      }
     }
   })
 }

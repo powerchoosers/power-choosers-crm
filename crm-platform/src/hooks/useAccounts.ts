@@ -113,6 +113,115 @@ export interface AccountFilters {
 }
 
 const PAGE_SIZE = 50
+const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url'
+const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedinUrl, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
+const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedinUrl, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId'
+
+function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
+  const city = data.city || ''
+  const state = data.state || ''
+  const location = city ? `${city}, ${state}` : (data.address || '')
+  const texasEnergy = getTexasEnergyContext(city, state, data.address || location)
+  const loadZone = resolveAccountLoadZone(data)
+
+  return {
+    id: data.id,
+    name: data.name || 'Unknown Account',
+    industry: data.industry || '',
+    domain: data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
+    description: data.description || '',
+    logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || '',
+    companyPhone: data.phone || '',
+    contractEnd: data.contract_end_date || '',
+    employees: data.employees?.toString() || '',
+    revenue: data.revenue || '',
+    location,
+    city,
+    state,
+    latitude: data.latitude != null ? Number(data.latitude) : null,
+    longitude: data.longitude != null ? Number(data.longitude) : null,
+    serviceAddresses: data.service_addresses || [],
+    address: data.address || '',
+    tdu: texasEnergy.tduDisplay || '',
+    utilityTerritory: texasEnergy.utilityTerritory || '',
+    updated: data.updatedAt || new Date().toISOString(),
+    sqft: data.metadata?.sqft || '',
+    occupancy: data.metadata?.occupancy || '',
+    ownerId: data.ownerId,
+    linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
+    loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
+    loadZone,
+    annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
+    electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
+    currentRate: data.current_rate || data.metadata?.current_rate || '',
+    status: data.status || 'PROSPECT',
+    meters: metersOverride ?? data.metadata?.meters ?? [],
+    mills: data.metadata?.mills || '',
+    metadata: data.metadata || {},
+    primaryContactId: data.primaryContactId || null,
+  }
+}
+
+function patchAccountListCache(old: any, accountPatch: Partial<Account> & { id: string }) {
+  if (!old?.pages) return old
+  return {
+    ...old,
+    pages: old.pages.map((page: any) => {
+      if (!page || !Array.isArray(page.accounts)) return page
+      return {
+        ...page,
+        accounts: page.accounts.map((account: Account) =>
+          account.id === accountPatch.id
+            ? { ...account, ...accountPatch }
+            : account
+        ),
+      }
+    }),
+  }
+}
+
+function patchLinkedAccountInContactCache(contact: any, accountPatch: Partial<Account> & { id: string }) {
+  if (!contact) return contact
+  const linkedAccountId = contact.linkedAccountId || contact.accountId
+  if (linkedAccountId !== accountPatch.id) return contact
+
+  const location = accountPatch.city || accountPatch.state
+    ? [accountPatch.city, accountPatch.state].filter(Boolean).join(', ')
+    : accountPatch.address
+
+  return {
+    ...contact,
+    company: accountPatch.name ?? contact.company,
+    companyName: accountPatch.name ?? contact.companyName,
+    companyDomain: accountPatch.domain ?? contact.companyDomain,
+    logoUrl: accountPatch.logoUrl ?? contact.logoUrl,
+    companyPhone: accountPatch.companyPhone ?? contact.companyPhone,
+    industry: accountPatch.industry ?? contact.industry,
+    website: accountPatch.domain ?? contact.website,
+    location: location || contact.location,
+    city: accountPatch.city ?? contact.city,
+    state: accountPatch.state ?? contact.state,
+    linkedAccountId: accountPatch.id,
+    accountId: accountPatch.id,
+    electricitySupplier: accountPatch.electricitySupplier ?? contact.electricitySupplier,
+    annualUsage: accountPatch.annualUsage ?? contact.annualUsage,
+    currentRate: accountPatch.currentRate ?? contact.currentRate,
+    contractEnd: accountPatch.contractEnd ?? contact.contractEnd,
+    serviceAddresses: accountPatch.serviceAddresses ?? contact.serviceAddresses,
+    accountDescription: accountPatch.description ?? contact.accountDescription,
+  }
+}
+
+function shouldInvalidateDealCaches(updates: Partial<Account>) {
+  return Boolean(
+    updates.name !== undefined ||
+    updates.annualUsage !== undefined ||
+    updates.currentRate !== undefined ||
+    updates.contractEnd !== undefined ||
+    updates.mills !== undefined ||
+    updates.status !== undefined
+  )
+}
 
 function resolveAccountLoadZone(data: any): ErcotZone {
   const metadataZone =
@@ -139,7 +248,7 @@ export function useSearchAccounts(queryTerm: string) {
       if (loading || !user) return []
 
       try {
-        let query = supabase.from('accounts').select('*');
+        let query = supabase.from('accounts').select(ACCOUNT_SEARCH_SELECT);
 
         // Admin and dev see all accounts; others filtered by ownerId
         if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
@@ -190,7 +299,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         if (!enabled || loading) return { accounts: [], nextCursor: null };
         if (!user && !loading) return { accounts: [], nextCursor: null };
 
-        let query = supabase.from('accounts').select('*', { count: 'exact' });
+        let query = supabase.from('accounts').select(ACCOUNT_LIST_SELECT, { count: 'exact' });
 
         if (listId) {
           // Fetch targetIds from list_members first due to lack of FK for inner join
@@ -258,47 +367,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           return { accounts: [], nextCursor: null };
         }
 
-        const accounts = data.map(data => {
-          const city = data.city || ''
-          const state = data.state || ''
-          const location = city ? `${city}, ${state}` : (data.address || '')
-          const texasEnergy = getTexasEnergyContext(city, state, data.address || location)
-          const loadZone = resolveAccountLoadZone(data)
-
-          return {
-            id: data.id,
-            name: data.name || 'Unknown Account',
-            industry: data.industry || '',
-            domain: data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
-            logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || '',
-            companyPhone: data.phone || '',
-            contractEnd: data.contract_end_date || '',
-            employees: data.employees?.toString() || '',
-            revenue: data.revenue || '',
-            location,
-            city,
-            state,
-            serviceAddresses: data.service_addresses || [],
-            address: data.address || '',
-            tdu: texasEnergy.tduDisplay || '',
-            utilityTerritory: texasEnergy.utilityTerritory || '',
-            updated: data.updatedAt || new Date().toISOString(),
-            sqft: data.metadata?.sqft || '',
-            occupancy: data.metadata?.occupancy || '',
-            ownerId: data.ownerId,
-            linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
-            // Forensic/Asset Fields
-            loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
-            loadZone,
-            annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
-            electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
-            currentRate: data.current_rate || data.metadata?.current_rate || '',
-            status: data.status || 'PROSPECT',
-            meters: data.metadata?.meters || [],
-            mills: data.metadata?.mills || '',
-            metadata: data.metadata || {}
-          }
-        }) as Account[];
+        const accounts = data.map((row) => mapAccountRow(row)) as Account[];
 
         const hasNextPage = count ? from + PAGE_SIZE < count : false;
 
@@ -331,7 +400,7 @@ export function useAccount(id: string) {
 
       const { data, error } = await supabase
         .from('accounts')
-        .select('*')
+        .select(ACCOUNT_DETAIL_SELECT)
         .eq('id', id)
         .single()
 
@@ -365,49 +434,7 @@ export function useAccount(id: string) {
         meters = data.metadata?.meters || []
       }
 
-      const city = data.city || ''
-      const state = data.state || ''
-      const location = city ? `${city}, ${state}` : (data.address || '')
-      const texasEnergy = getTexasEnergyContext(city, state, data.address || location)
-      const loadZone = resolveAccountLoadZone(data)
-
-      return {
-        id: data.id,
-        name: data.name || 'Unknown Account',
-        industry: data.industry || '',
-        domain: data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
-        description: data.description || '',
-        logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || '',
-        companyPhone: data.phone || '',
-        contractEnd: data.contract_end_date || '',
-        employees: data.employees?.toString() || '',
-        revenue: data.revenue || '',
-        location,
-        city,
-        state,
-        latitude: data.latitude != null ? Number(data.latitude) : null,
-        longitude: data.longitude != null ? Number(data.longitude) : null,
-        serviceAddresses: data.service_addresses || [],
-        address: data.address || '',
-        tdu: texasEnergy.tduDisplay || '',
-        utilityTerritory: texasEnergy.utilityTerritory || '',
-        updated: data.updatedAt || new Date().toISOString(),
-        sqft: data.metadata?.sqft || '',
-        occupancy: data.metadata?.occupancy || '',
-        ownerId: data.ownerId,
-        linkedinUrl: data.linkedinUrl || data.linkedin_url || '',
-        // Forensic/Asset Fields
-        loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
-        loadZone,
-        annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
-        electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
-        currentRate: data.current_rate || data.metadata?.current_rate || '',
-        mills: data.metadata?.mills || '',
-        status: data.status || 'PROSPECT',
-        meters,
-        metadata: data.metadata || {},
-        primaryContactId: data.primaryContactId || null,
-      } as Account
+      return mapAccountRow(data, meters) as Account
     },
     enabled: !!id && !loading && !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes
@@ -819,14 +846,44 @@ export function useUpdateAccount() {
       return { id, ...updates }
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      queryClient.invalidateQueries({ queryKey: ['account'] })
-      queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      queryClient.invalidateQueries({ queryKey: ['contact'] })
-      queryClient.invalidateQueries({ queryKey: ['deals'] })
-      queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
-      queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
-      queryClient.invalidateQueries({ queryKey: ['deal'] })
+      queryClient.setQueriesData({ queryKey: ['accounts'] }, (old: any) =>
+        patchAccountListCache(old, data)
+      )
+      queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) =>
+        cached?.id === data.id ? { ...cached, ...data } : cached
+      )
+      queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) => {
+        if (!old?.pages) return old
+        return {
+          ...old,
+          pages: old.pages.map((page: any) => {
+            if (!page || !Array.isArray(page.contacts)) return page
+            return {
+              ...page,
+              contacts: page.contacts.map((contact: any) =>
+                patchLinkedAccountInContactCache(contact, data)
+              ),
+            }
+          }),
+        }
+      })
+      queryClient.setQueriesData({ queryKey: ['contact'] }, (cached: any) =>
+        patchLinkedAccountInContactCache(cached, data)
+      )
+
+      if (shouldInvalidateDealCaches(data)) {
+        queryClient.invalidateQueries({ queryKey: ['deals'] })
+        queryClient.invalidateQueries({
+          predicate: (query) => Array.isArray(query.queryKey) &&
+            query.queryKey[0] === 'deals-by-account' &&
+            query.queryKey[2] === data.id
+        })
+        queryClient.invalidateQueries({
+          predicate: (query) => Array.isArray(query.queryKey) &&
+            query.queryKey[0] === 'account-bill-intel' &&
+            query.queryKey[1] === data.id
+        })
+      }
     }
   })
 }
