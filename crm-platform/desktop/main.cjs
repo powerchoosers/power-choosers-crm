@@ -576,6 +576,20 @@ const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock) {
   app.quit()
 } else {
+  app.on('second-instance', () => {
+    // When user tries to open the app again (clicks taskbar icon or launches from Start menu)
+    // restore and focus the existing window
+    if (mainWindow) {
+      if (!mainWindow.isVisible()) {
+        mainWindow.show()
+      }
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore()
+      }
+      mainWindow.focus()
+    }
+  })
+
   app.whenReady().then(() => {
     app.setAppUserModelId('io.nodalpoint.crm')
 
