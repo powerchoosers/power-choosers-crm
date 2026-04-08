@@ -104,7 +104,6 @@ export function useNotificationCenter() {
   const query = useQuery({
     queryKey: ['notification-center-feed', user?.id || user?.email || 'anonymous'],
     enabled: Boolean(user?.email),
-    refetchInterval: 20000,
     queryFn: async (): Promise<{ items: NotificationFeedItem[]; ownerScope: string[] }> => {
       const ownerScope = await resolveOwnerScope({ id: user?.id, email: user?.email })
       if (ownerScope.length === 0) return { items: [], ownerScope: [] }

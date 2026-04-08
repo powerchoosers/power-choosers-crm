@@ -9,10 +9,6 @@ import { createIDBPersister } from '@/lib/persister'
 import { ChunkLoadErrorHandler } from '@/components/layout/ChunkLoadErrorHandler'
 import { WarRoomOverlay } from '@/components/war-room/WarRoomOverlay'
 import { useWarRoomStore } from '@/store/warRoomStore'
-import { supabase } from '@/lib/supabase'
-import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
-import { CheckCircle, Eye } from 'lucide-react'
 import { GlobalComposeModal } from '@/components/emails/GlobalComposeModal'
 import { GlobalSync } from '@/components/layout/GlobalSync'
 import { DesktopUpdateBanner } from '@/components/layout/DesktopUpdateBanner'
@@ -49,7 +45,6 @@ const PERSISTED_QUERY_FAMILIES = new Set([
 function GlobalShortcuts() {
   const toggleWarRoom = useWarRoomStore((s) => s.toggle)
   const toggleSequenceIntel = useUIStore((s) => s.toggleSequenceIntel)
-  const activeSequenceId = useUIStore((s) => s.activeSequenceId)
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -68,17 +63,12 @@ function GlobalShortcuts() {
       if (isCtrl && isAlt && key === 'i') {
         e.preventDefault()
         e.stopPropagation()
-        console.log('>>> ATTEMPTING TO TOGGLE SEQUENCE INTEL')
         toggleSequenceIntel()
-        toast.success('Sequence Intel Toggled', {
-          description: 'Global Intelligence modal should appear.',
-          duration: 2000
-        })
       }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [toggleWarRoom, toggleSequenceIntel, activeSequenceId])
+  }, [toggleWarRoom, toggleSequenceIntel])
 
   return null
 }
