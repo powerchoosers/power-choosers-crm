@@ -259,12 +259,12 @@ type ContactRow = {
 const PAGE_SIZE = 50
 
 const CONTACTS_QUERY_BUSTER = 'v5'
-const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, first_name, lastName, last_name, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata, avatarUrl, avatar_url, photoUrl, photo_url'
-const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, first_name, firstname, FirstName, lastName, last_name, lastname, LastName, accountId, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url)'
-const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, first_name, firstname, FirstName, lastName, last_name, lastname, LastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, created_at, lastContactedAt, lastActivityAt, accountId, account_id, title, city, state, website, linkedinUrl, notes, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
+const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata, avatarUrl, avatar_url, photoUrl, photo_url'
+const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, accountId, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url)'
+const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, website, linkedinUrl, notes, metadata, avatarUrl, avatar_url, photoUrl, photo_url, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
 const CONTACT_DETAIL_SELECT = `
-          id, name, ownerId, firstName, first_name, firstname, FirstName, lastName, last_name, lastname, LastName,
-          email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, created_at,
+          id, name, ownerId, firstName, lastName,
+          email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt,
           lastContactedAt, lastActivityAt, accountId, account_id, title, city, state, website, linkedinUrl, notes,
           metadata, avatarUrl, avatar_url, photoUrl, photo_url,
           accounts!contacts_accountId_fkey (
@@ -424,8 +424,8 @@ export function useAccountContacts(accountId: string) {
 
       return (data || []).map(row => {
         const metadata = normalizeMetadata((row as ContactRow).metadata)
-        const fName = row.firstName || row.first_name || ''
-        const lName = row.lastName || row.last_name || ''
+        const fName = row.firstName || ''
+        const lName = row.lastName || ''
         return {
           id: row.id,
           name: buildContactName({
@@ -829,7 +829,7 @@ export function useContact(id: string) {
         if (companyName) {
           const { data: foundAccount } = await supabase
             .from('accounts')
-            .select('id, name, domain, logo_url, metadata, city, state, industry, address, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone')
+          .select('id, name, domain, logo_url, metadata, city, state, industry, address, electricity_supplier, annual_usage, current_rate, contract_end_date, service_addresses, description, phone')
             .ilike('name', companyName)
             .limit(1)
             .maybeSingle()
