@@ -1856,17 +1856,18 @@ Return exactly one subject line.`,
           <AnimatePresence>
             {showCc && (
               <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
-                className="overflow-hidden flex items-center gap-2"
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="flex items-center gap-2"
               >
                 <span className="text-xs font-mono text-zinc-500 w-8 flex-shrink-0">Cc</span>
                 <EmailChipField
                   chips={ccChips}
                   onChange={setCcChips}
                   placeholder="Carbon copy..."
+                  autoFocus
                 />
                 <ForensicClose 
                   size={14} 
