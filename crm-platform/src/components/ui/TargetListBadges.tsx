@@ -14,10 +14,14 @@ const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts']
 const ACCOUNT_TARGET_TYPES = ['account', 'accounts', 'company', 'companies']
 
 /**
- * Per-cell hook — TanStack Query deduplicates and caches by (entityType, entityId).
- * staleTime 5m means each entity is only fetched once per page visit.
+ * Per-cell fallback hook — only runs when preloadedLists is not provided.
+ * TanStack Query deduplicates and caches by (entityType, entityId).
  */
-function useEntityListMemberships(entityId: string, entityType: 'contact' | 'account') {
+function useEntityListMemberships(
+    entityId: string,
+    entityType: 'contact' | 'account',
+    opts?: { enabled?: boolean },
+) {
     return useQuery<ListEntry[]>({
         queryKey: ['entity-list-memberships', entityType, entityId],
         queryFn: async () => {
@@ -42,7 +46,53 @@ function useEntityListMemberships(entityId: string, entityType: 'contact' | 'acc
 
             return lists.map((l) => ({ listId: l.id, listName: l.name }))
         },
-        enabled: !!entityId,
+        enabled: !!entityId && (opts?.enabled !== false),
+        staleTime: 1000 * 60 * 5,
+    })
+}
+
+/**
+ * Page-level batch hook — fetches list memberships for ALL visible entity IDs
+ * in exactly 2 Supabase queries instead of 2N per-row queries.
+ * Pass the returned Map into table.meta so cells can read it.
+ */
+export function usePageListMemberships(entityIds: string[], entityType: 'contact' | 'account') {
+    return useQuery<Map<string, ListEntry[]>>({
+        queryKey: ['page-list-memberships', entityType, entityIds.slice().sort().join(',')],
+        queryFn: async () => {
+            if (!entityIds.length) return new Map()
+
+            const types = entityType === 'contact' ? CONTACT_TARGET_TYPES : ACCOUNT_TARGET_TYPES
+
+            const { data: memberships } = await supabase
+                .from('list_members')
+                .select('listId, targetId')
+                .in('targetId', entityIds)
+                .in('targetType', types)
+
+            if (!memberships?.length) return new Map()
+
+            const listIds = [...new Set(memberships.map((m) => m.listId))]
+
+            const { data: lists } = await supabase
+                .from('lists')
+                .select('id, name')
+                .in('id', listIds)
+
+            const listMap = new Map(lists?.map((l) => [l.id, l.name]) ?? [])
+
+            const result = new Map<string, ListEntry[]>()
+            for (const membership of memberships) {
+                const name = listMap.get(membership.listId)
+                if (!name) continue
+                const existing = result.get(membership.targetId) ?? []
+                existing.push({ listId: membership.listId, listName: name })
+                result.set(membership.targetId, existing)
+            }
+
+            return result
+        },
+        enabled: entityIds.length > 0,
         staleTime: 1000 * 60 * 5,
     })
 }
@@ -53,6 +103,11 @@ interface TargetListBadgesProps {
     /** Max badges to show before "+N" overflow chip. Default: 2 */
     maxVisible?: number
     className?: string
+    /**
+     * Pre-fetched list memberships from usePageListMemberships, passed via table.meta.
+     * When provided, skips the per-row fetch entirely.
+     */
+    preloadedLists?: ListEntry[]
 }
 
 export function TargetListBadges({
@@ -60,10 +115,19 @@ export function TargetListBadges({
     entityType,
     maxVisible = 2,
     className,
+    preloadedLists,
 }: TargetListBadgesProps) {
-    const { data: lists, isLoading } = useEntityListMemberships(entityId, entityType)
+    // Only fire the per-row query when no batch-preloaded data is available
+    const { data: fetchedLists, isLoading } = useEntityListMemberships(
+        entityId,
+        entityType,
+        { enabled: preloadedLists === undefined },
+    )
 
-    if (isLoading) {
+    // Prefer preloaded data; fall back to individually fetched
+    const lists = preloadedLists ?? fetchedLists
+
+    if (preloadedLists === undefined && isLoading) {
         return (
             <div className={cn('flex items-center gap-1', className)}>
                 <div className="h-3.5 w-14 rounded-md bg-white/5 animate-pulse" />

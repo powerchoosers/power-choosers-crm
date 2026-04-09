@@ -121,8 +121,6 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
   const city = data.city || ''
   const state = data.state || ''
   const location = city ? `${city}, ${state}` : (data.address || '')
-  const texasEnergy = getTexasEnergyContext(city, state, data.address || location)
-  const loadZone = resolveAccountLoadZone(data)
 
   return {
     id: data.id,
@@ -142,15 +140,16 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
     longitude: data.longitude != null ? Number(data.longitude) : null,
     serviceAddresses: data.service_addresses || [],
     address: data.address || '',
-    tdu: texasEnergy.tduDisplay || '',
-    utilityTerritory: texasEnergy.utilityTerritory || '',
+    // tdu/utilityTerritory/loadZone are computed on-demand in the dossier detail view
+    tdu: '',
+    utilityTerritory: '',
     updated: data.updatedAt || new Date().toISOString(),
     sqft: data.metadata?.sqft || '',
     occupancy: data.metadata?.occupancy || '',
     ownerId: data.ownerId,
     linkedinUrl: data.linkedin_url || data.linkedinUrl || '',
     loadFactor: data.load_factor ?? data.metadata?.loadFactor ?? 0.45,
-    loadZone,
+    loadZone: resolveAccountLoadZone(data),
     annualUsage: data.annual_usage || data.metadata?.annual_usage || '',
     electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
     currentRate: data.current_rate || data.metadata?.current_rate || '',
@@ -434,7 +433,14 @@ export function useAccount(id: string) {
         meters = data.metadata?.meters || []
       }
 
-      return mapAccountRow(data, meters) as Account
+      const base = mapAccountRow(data, meters) as Account
+      // Enrich with TDU/utility territory for the dossier view (single record, not the list)
+      const texasEnergy = getTexasEnergyContext(base.city, base.state, base.address || base.location)
+      return {
+        ...base,
+        tdu: texasEnergy.tduDisplay || '',
+        utilityTerritory: texasEnergy.utilityTerritory || '',
+      } as Account
     },
     enabled: !!id && !loading && !!user,
     staleTime: 1000 * 60 * 5, // 5 minutes
