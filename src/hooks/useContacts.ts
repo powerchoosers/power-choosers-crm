@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
+import { queryPredicateById } from '@/lib/queryKeys'
 
 export interface Contact {
   id: string
@@ -1168,21 +1169,21 @@ export function useUpdateContact() {
   const queryClient = useQueryClient()
   return useMutation({
     onMutate: async (updates) => {
-      await queryClient.cancelQueries({ queryKey: ['contact', updates.id] })
-      const previousContact = queryClient.getQueryData(['contact', updates.id])
-      
-      if (previousContact) {
-        queryClient.setQueryData(['contact', updates.id], {
-          ...(previousContact as object),
-          ...updates
-        })
-      }
-      
-      return { previousContact }
+      const contactPredicate = queryPredicateById('contact', updates.id)
+      await queryClient.cancelQueries({ predicate: contactPredicate })
+      const previousContactQueries = queryClient.getQueriesData({ predicate: contactPredicate })
+
+      queryClient.setQueriesData({ predicate: contactPredicate }, (cached: any) =>
+        patchContactDetailCache(cached, updates)
+      )
+
+      return { previousContactQueries }
     },
     onError: (err, updates, context) => {
-      if (context?.previousContact) {
-        queryClient.setQueryData(['contact', updates.id], context.previousContact)
+      if (context?.previousContactQueries) {
+        for (const [queryKey, value] of context.previousContactQueries) {
+          queryClient.setQueryData(queryKey, value)
+        }
       }
     },
     mutationFn: async ({ id, ...updates }: Partial<ContactDetail> & { id: string }) => {
@@ -1261,10 +1262,11 @@ export function useUpdateContact() {
       }
     },
     onSuccess: (_, variables) => {
+      const contactPredicate = queryPredicateById('contact', variables.id)
       queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) =>
         patchContactListCache(old, variables)
       )
-      queryClient.setQueriesData({ queryKey: ['contact', variables.id] }, (cached: any) =>
+      queryClient.setQueriesData({ predicate: contactPredicate }, (cached: any) =>
         patchContactDetailCache(cached, variables)
       )
       queryClient.setQueriesData({ queryKey: ['account-contacts'] }, (old: any) =>

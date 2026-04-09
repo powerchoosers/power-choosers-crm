@@ -5,6 +5,7 @@ import { millDecimal } from '@/lib/mills'
 import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
 import { getTexasEnergyContext } from '@/lib/texas-territory'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
+import { queryPredicateById } from '@/lib/queryKeys'
 
 export interface Account {
   id: string
@@ -742,26 +743,26 @@ export function useUpdateAccount() {
   const queryClient = useQueryClient()
   return useMutation({
     onMutate: async (updates) => {
-      await queryClient.cancelQueries({ queryKey: ['account', updates.id] })
-      const previousAccount = queryClient.getQueryData(['account', updates.id])
-      
-      if (previousAccount) {
-        queryClient.setQueryData(['account', updates.id], {
-          ...(previousAccount as object),
-          ...updates
-        })
-      }
-      
-      return { previousAccount }
+      const accountPredicate = queryPredicateById('account', updates.id)
+      await queryClient.cancelQueries({ predicate: accountPredicate })
+      const previousAccountQueries = queryClient.getQueriesData({ predicate: accountPredicate })
+
+      queryClient.setQueriesData({ predicate: accountPredicate }, (cached: any) =>
+        cached?.id === updates.id ? { ...cached, ...updates } : cached
+      )
+
+      return { previousAccountQueries }
     },
     onError: (err, updates, context) => {
-      if (context?.previousAccount) {
-        queryClient.setQueryData(['account', updates.id], context.previousAccount)
+      if (context?.previousAccountQueries) {
+        for (const [queryKey, value] of context.previousAccountQueries) {
+          queryClient.setQueryData(queryKey, value)
+        }
       }
     },
     mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
       // 1. Try to get metadata from cache to save a roundtrip
-      const cachedAccount = queryClient.getQueryData(['account', id]) as Account | undefined
+      const cachedAccount = queryClient.getQueriesData({ predicate: queryPredicateById('account', id) })[0]?.[1] as Account | undefined
       let currentMetadata = cachedAccount?.metadata || {}
 
       if (!cachedAccount?.metadata) {
@@ -878,7 +879,7 @@ export function useUpdateAccount() {
       queryClient.setQueriesData({ queryKey: ['accounts'] }, (old: any) =>
         patchAccountListCache(old, data)
       )
-      queryClient.setQueriesData({ queryKey: ['account', data.id] }, (cached: any) =>
+      queryClient.setQueriesData({ predicate: queryPredicateById('account', data.id) }, (cached: any) =>
         cached?.id === data.id ? { ...cached, ...data } : cached
       )
       queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) => {
