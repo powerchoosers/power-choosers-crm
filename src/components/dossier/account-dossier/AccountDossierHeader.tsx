@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState, useEffect } from 'react'
+import { memo, useState, useEffect, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { formatDistanceToNow, parseISO, isValid } from 'date-fns'
@@ -108,6 +108,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
     isCompleting = false
 }: AccountDossierHeaderProps) {
     const router = useRouter()
+    const [isPending, startTransition] = useTransition()
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
 
     return (
@@ -489,7 +490,12 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
 
                             {/* Padlock — always visible */}
                             <motion.button
-                                onClick={toggleEditing}
+                                onClick={() => {
+                                    startTransition(() => {
+                                        toggleEditing()
+                                    })
+                                }}
+                                disabled={isPending}
                                 animate={!isEditing ? { backgroundColor: "transparent", scale: 1 } : {}}
                                 className={cn(
                                     "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
