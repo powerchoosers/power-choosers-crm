@@ -112,8 +112,18 @@ function installDownloadedUpdate() {
     return { ok: false, reason: 'no_update_ready' }
   }
 
+  // Force the app into quitting state so the window close handler
+  // doesn't intercept it and hide to the tray instead.
+  isQuitting = true
+
+  // Explicitly command the window to close to clear the process lock
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.close()
+  }
+
   setImmediate(() => {
-    autoUpdater.quitAndInstall()
+    // isSilent = false, isForceRunAfter = true
+    autoUpdater.quitAndInstall(false, true)
   })
 
   return { ok: true }
