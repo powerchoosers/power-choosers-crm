@@ -66,8 +66,8 @@ export default function SatelliteUplink({
   const [pendingBottomAlign, setPendingBottomAlign] = useState(false);
   const mapPanelRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapRef | null>(null);
-  // RAF handle for throttling mousemove feature queries
-  const mouseMoveRafRef = useRef<number | null>(null);
+  // Timestamp for throttling mousemove feature queries
+  const lastMouseMoveRef = useRef<number>(0);
 
   const mapboxToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
@@ -477,28 +477,27 @@ export default function SatelliteUplink({
             mapboxAccessToken={mapboxToken}
             attributionControl={false}
             onMouseLeave={() => {
-              // Cancel any pending RAF when mouse leaves the map
-              if (mouseMoveRafRef.current !== null) {
-                cancelAnimationFrame(mouseMoveRafRef.current);
-                mouseMoveRafRef.current = null;
-              }
               mapRef.current?.getMap().getCanvas().style.setProperty('cursor', '');
             }}
             onMouseMove={(e) => {
-              // Throttle via RAF — only one queryRenderedFeatures per animation frame
-              if (mouseMoveRafRef.current !== null) return;
+              // Throttle to max 10 times a second to prevent heavy CPU thrashing
+              const now = Date.now();
+              if (now - lastMouseMoveRef.current < 100) return;
+              lastMouseMoveRef.current = now;
+
               const point = e.point;
               const map = e.target;
-              mouseMoveRafRef.current = requestAnimationFrame(() => {
-                mouseMoveRafRef.current = null;
+              
+              // Push to end of event loop to avoid blocking mouse event
+              setTimeout(() => {
                 const features = map.queryRenderedFeatures(point);
                 const hasLabel = features.some(
                   (f) => f.properties?.name || f.properties?.['name:en']
                 );
                 map.getCanvas().style.cursor = hasLabel ? 'pointer' : '';
-              });
+              }, 0);
             }}
-            onStyleData={(e: any) => {
+            onLoad={(e: any) => {
               const map = e.target;
               try {
                 map.setConfigProperty('basemap', 'showPointOfInterestLabels', true);
@@ -585,7 +584,7 @@ export default function SatelliteUplink({
                     initial={{ scale: 0.8, opacity: 0, y: -10 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-                    className="nodal-module-glass nodal-monolith-edge p-3 min-w-[220px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-3xl bg-black/95 ring-1 ring-white/10 group/popup relative z-10"
+                    className="nodal-module-glass nodal-monolith-edge p-3 min-w-[220px] rounded-xl shadow-2xl border border-[#002FA7]/30 backdrop-blur-md bg-black/95 ring-1 ring-white/10 group/popup relative z-10"
                   >
                     <div className="flex justify-between items-start mb-1.5">
                       <div>
