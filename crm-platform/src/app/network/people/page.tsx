@@ -122,8 +122,20 @@ export default function PeoplePage() {
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
-  // Defer lastTouch until main list has loaded — avoids parallel query storm on mount
-  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useContactLastTouch(queryLoading ? [] : contactIds)
+  const [deferredContactIds, setDeferredContactIds] = useState<string[]>([])
+  useEffect(() => {
+    if (queryLoading || contactIds.length === 0) {
+      setDeferredContactIds([])
+      return
+    }
+    const timer = setTimeout(() => {
+      setDeferredContactIds(contactIds)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [contactIds, queryLoading])
+
+  // Defer lastTouch until main list has loaded and stabilized — avoids parallel query storm on mount
+  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useContactLastTouch(deferredContactIds)
   // Batch-fetch list memberships for all visible rows in 2 queries instead of 2N
   const { data: listMemberships } = usePageListMemberships(queryLoading ? [] : contactIds, 'contact')
   const pendingSelectCountRef = useRef<number | null>(null)
