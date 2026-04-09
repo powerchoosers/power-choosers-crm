@@ -29,14 +29,15 @@ export const AccountTableRow = memo(function AccountTableRow({
     healthUpdatedAt,
     isSelected
 }: AccountTableRowProps) {
+    const isAnimated = index < 12
     return (
         <motion.tr
-            initial={{ opacity: 0 }}
+            initial={isAnimated ? { opacity: 0 } : false}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, scale: 0.98 }}
             transition={{
                 duration: 0.3,
-                delay: Math.min(index * 0.02, 0.4),
+                delay: isAnimated ? Math.min(index * 0.02, 0.25) : 0,
                 ease: [0.23, 1, 0.32, 1]
             }}
             data-state={isSelected && "selected"}
