@@ -338,7 +338,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                 const previousContactQueries = queryClient.getQueriesData({ queryKey: ['contact'] })
                 const previousAccountQueries = queryClient.getQueriesData({ queryKey: ['account'] })
 
-                queryClient.setQueriesData({ queryKey: ['contact'] }, (cached: any) => {
+                queryClient.setQueriesData({ queryKey: ['contact', id] }, (cached: any) => {
                     if (!cached || cached.id !== id) return cached
                     return {
                         ...cached,
@@ -364,7 +364,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                 })
 
                 if (linkedAccountId) {
-                    queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+                    queryClient.setQueriesData({ queryKey: ['account', linkedAccountId] }, (cached: any) => {
                         if (!cached || cached.id !== linkedAccountId) return cached
                         return {
                             ...cached,
