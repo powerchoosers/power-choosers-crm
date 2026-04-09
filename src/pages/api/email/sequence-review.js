@@ -592,8 +592,7 @@ export default async function handler(req, res) {
       sentAt: null
     };
     // Always use the sequence-configured fromEmail (from bgvector.settings.senderEmail).
-    // Do NOT preserve the existing `from` — the DB trigger writes the owner's primary email
-    // as a placeholder, which is wrong when a burner account (getnodalpoint.com) is configured.
+    // Keep the ownership metadata, but do not let an older placeholder `from` win here.
     const preservedOwner = typeof nextEmailMeta.ownerId === 'string' ? nextEmailMeta.ownerId : null;
 
     const baseEmailPayload = {
