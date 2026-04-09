@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useEffect, useState } from 'react'
+import { memo, useEffect, useState, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -98,6 +98,7 @@ export const DossierHeader = memo(function DossierHeader({
     isCompleting = false
 }: DossierHeaderProps) {
     const router = useRouter()
+    const [isPending, startTransition] = useTransition()
     const contactName = contact?.name || 'Unknown Contact'
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
 
@@ -553,7 +554,12 @@ export const DossierHeader = memo(function DossierHeader({
 
                             {/* Padlock — always visible */}
                             <motion.button
-                                onClick={toggleEditing}
+                                onClick={() => {
+                                    startTransition(() => {
+                                        toggleEditing()
+                                    })
+                                }}
+                                disabled={isPending}
                                 className={cn(
                                     "w-7 h-7 flex items-center justify-center transition-all duration-300 rounded-lg",
                                     isEditing ? "text-white bg-[#002FA7]/10 border border-[#002FA7]/30 shadow-[0_0_15px_rgba(0,47,167,0.2)] scale-110" : "text-zinc-500 hover:text-white hover:scale-105 hover:shadow-[0_0_12px_rgba(0,47,167,0.15)]"

@@ -263,12 +263,13 @@ export function useAccountDossierState(id: string, taskIdFromUrl?: string | null
                 if ((account?.contractEnd || '') !== (editContractEnd || '')) changedFields.add('contractEnd')
                 if ((account?.companyPhone || '') !== (editCompanyPhone || '')) changedFields.add('companyPhone')
                 if ((account?.address || '') !== (editAddress || '')) changedFields.add('address')
+
                 if (changedFields.size) {
                     setRecentlyUpdatedFields(changedFields)
                 }
 
                 const previousAccountQueries = queryClient.getQueriesData({ queryKey: ['account'] })
-                queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+                queryClient.setQueriesData({ queryKey: ['account', id] }, (cached: any) => {
                     if (!cached || cached.id !== id) return cached
                     return {
                         ...cached,
