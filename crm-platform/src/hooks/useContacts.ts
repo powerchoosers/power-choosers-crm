@@ -1167,6 +1167,24 @@ export function useUpsertContact() {
 export function useUpdateContact() {
   const queryClient = useQueryClient()
   return useMutation({
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: ['contact', updates.id] })
+      const previousContact = queryClient.getQueryData(['contact', updates.id])
+      
+      if (previousContact) {
+        queryClient.setQueryData(['contact', updates.id], {
+          ...(previousContact as object),
+          ...updates
+        })
+      }
+      
+      return { previousContact }
+    },
+    onError: (err, updates, context) => {
+      if (context?.previousContact) {
+        queryClient.setQueryData(['contact', updates.id], context.previousContact)
+      }
+    },
     mutationFn: async ({ id, ...updates }: Partial<ContactDetail> & { id: string }) => {
       const dbUpdates: Record<string, unknown> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name

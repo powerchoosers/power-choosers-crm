@@ -728,7 +728,6 @@ export function useUpsertAccount() {
           .eq('id', existingId)
           .select()
           .single();
-
         if (error) throw error;
         return { id: data.id, ...account, _isNew: false };
       }
@@ -742,19 +741,43 @@ export function useUpsertAccount() {
 export function useUpdateAccount() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
-      // 1. Fetch current data to get metadata
-      const { data: current, error: fetchError } = await supabase
-        .from('accounts')
-        .select('metadata')
-        .eq('id', id)
-        .single()
-
-      if (fetchError) {
-        console.warn('Could not fetch current metadata, proceeding with empty metadata', fetchError)
+    onMutate: async (updates) => {
+      await queryClient.cancelQueries({ queryKey: ['account', updates.id] })
+      const previousAccount = queryClient.getQueryData(['account', updates.id])
+      
+      if (previousAccount) {
+        queryClient.setQueryData(['account', updates.id], {
+          ...(previousAccount as object),
+          ...updates
+        })
       }
+      
+      return { previousAccount }
+    },
+    onError: (err, updates, context) => {
+      if (context?.previousAccount) {
+        queryClient.setQueryData(['account', updates.id], context.previousAccount)
+      }
+    },
+    mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
+      // 1. Try to get metadata from cache to save a roundtrip
+      const cachedAccount = queryClient.getQueryData(['account', id]) as Account | undefined
+      let currentMetadata = cachedAccount?.metadata || {}
 
-      const currentMetadata = current?.metadata || {}
+      if (!cachedAccount?.metadata) {
+        // Fetch current data if not in cache (fallback)
+        const { data: current, error: fetchError } = await supabase
+          .from('accounts')
+          .select('metadata')
+          .eq('id', id)
+          .single()
+
+        if (fetchError) {
+          console.warn('Could not fetch current metadata, proceeding with empty metadata', fetchError)
+        } else {
+          currentMetadata = current?.metadata || {}
+        }
+      }
 
       // 2. Map updates to DB columns
       const dbUpdates: Record<string, string | number | null | object> = {}
@@ -779,7 +802,7 @@ export function useUpdateAccount() {
       if (updates.annualUsage !== undefined) dbUpdates.annual_usage = updates.annualUsage || null
       if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier || null
       if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate || null
-      if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT' // PROSPECT | ACTIVE_LOAD | CUSTOMER | CHURNED
+      if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT' 
 
       // Metadata updates
       const newMetadata = { ...currentMetadata }
@@ -874,9 +897,6 @@ export function useUpdateAccount() {
         }
       })
       // Avoid traversing all individual contact caches - only target contacts we know about if possible
-      // Since we don't know which individual contacts belong to this account here, 
-      // traversing ['contact'] might be necessary to keep them in sync, but it's expensive.
-      // Optimally, we can skip it since individual contacts fetch fresh when opened.
       // queryClient.setQueriesData({ queryKey: ['contact'] }, ...)
 
       if (shouldInvalidateDealCaches(data)) {
