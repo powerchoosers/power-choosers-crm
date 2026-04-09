@@ -228,6 +228,8 @@ function parseCardPayload(rawSegment: string): LooseCardPayload | null {
 
   pushCandidate(raw)
   pushCandidate(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''))
+  pushCandidate(raw.replace(/\\'/g, "'"))
+  pushCandidate(raw.replace(/\\'/g, "'").replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, ''))
 
   const braceStart = raw.indexOf('{')
   const braceEnd = raw.lastIndexOf('}')
@@ -235,6 +237,8 @@ function parseCardPayload(rawSegment: string): LooseCardPayload | null {
     const sliced = raw.slice(braceStart, braceEnd + 1)
     pushCandidate(sliced)
     pushCandidate(sliced.replace(/,\s*([}\]])/g, '$1'))
+    pushCandidate(sliced.replace(/\\'/g, "'"))
+    pushCandidate(sliced.replace(/\\'/g, "'").replace(/,\s*([}\]])/g, '$1'))
   }
 
   pushCandidate(raw.replace(/,\s*([}\]])/g, '$1'))

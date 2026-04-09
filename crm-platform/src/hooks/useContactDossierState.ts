@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { formatMillValue } from '@/lib/mills'
 import { isTodayOrOverdue } from '@/lib/task-date'
+import { queryPredicateById } from '@/lib/queryKeys'
 
 function parseDomainFromWebsite(value?: string | null): string | undefined {
     if (value == null) return undefined
@@ -335,10 +336,11 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                     setRecentlyUpdatedFields(changedFields)
                 }
 
-                const previousContactQueries = queryClient.getQueriesData({ queryKey: ['contact', id] })
+                const contactPredicate = queryPredicateById('contact', id)
+                const previousContactQueries = queryClient.getQueriesData({ predicate: contactPredicate })
                 const previousAccountQueries = linkedAccountId ? queryClient.getQueriesData({ queryKey: ['account', linkedAccountId] }) : []
 
-                queryClient.setQueriesData({ queryKey: ['contact', id] }, (cached: any) => {
+                queryClient.setQueriesData({ predicate: contactPredicate }, (cached: any) => {
                     if (!cached || cached.id !== id) return cached
                     return {
                         ...cached,
