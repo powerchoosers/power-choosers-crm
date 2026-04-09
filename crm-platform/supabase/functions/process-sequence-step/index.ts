@@ -601,7 +601,10 @@ async function handleGeneration(execution, job) {
     const senderDomain = senderEmail && senderEmail.includes('@')
         ? senderEmail.split('@')[1]
         : null;
+    const targetEmailId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
+    const defaultSubject = String(metadata?.subject || metadata?.aiSubject || metadata?.label || 'Message from Nodal Point').trim();
 
+    try {
     const response = await fetch(`${API_BASE_URL}/api/ai/optimize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'User-Agent': 'SupabaseEdgeFunction/1.0' },
@@ -664,7 +667,7 @@ async function handleGeneration(execution, job) {
 
     const result = await response.json()
     let body = extractGeneratedBody(result)
-    const subject = result.subject || metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point'
+    const subject = result.subject || defaultSubject
 
     if (!body) {
         body = buildContextualFallbackBody(member, replyStage, location, utilityTerritory);
@@ -676,6 +679,71 @@ async function handleGeneration(execution, job) {
         : { body: bodyWithFooter, subject };
 
     return metadataPatch;
+    } catch (error) {
+        const failedAt = new Date().toISOString();
+        const failureReason = String((error as Error)?.message || 'AI generation failed').trim().slice(0, 500);
+        const failureText = `Generation failed: ${failureReason}`;
+        const failureMetadata = {
+            ...(metadata || {}),
+            source: 'sequence',
+            sequenceExecutionId: String(execution.id),
+            sequenceId: String(execution.sequence_id),
+            memberId: String(execution.member_id),
+            emailRecordId: String(targetEmailId),
+            status: 'failed',
+            failureReason,
+            failedAt,
+            senderEmail,
+            senderDomain,
+            from: senderEmail,
+            ownerId: senderEmail,
+        };
+
+        await sql`
+            INSERT INTO emails (
+              id, "contactId", "accountId", "from", "to", subject, html, text, status, type,
+              is_read, "scheduledSendTime", timestamp, "sentAt", "createdAt", "updatedAt", "ownerId", metadata
+            ) VALUES (
+              ${String(targetEmailId)},
+              ${member.contact_id || null},
+              ${member.account_id || null},
+              ${senderEmail || null},
+              ${JSON.stringify(member.contact_email ? [member.contact_email] : [])}::jsonb,
+              ${defaultSubject},
+              '',
+              ${failureText},
+              'failed',
+              'scheduled',
+              true,
+              ${execution.scheduled_at || failedAt},
+              ${execution.scheduled_at || failedAt},
+              null,
+              ${failedAt},
+              ${failedAt},
+              ${senderEmail || null},
+              ${JSON.stringify(failureMetadata)}::jsonb
+            )
+            ON CONFLICT (id) DO UPDATE SET
+              "contactId" = EXCLUDED."contactId",
+              "accountId" = EXCLUDED."accountId",
+              "from" = EXCLUDED."from",
+              "to" = EXCLUDED."to",
+              subject = EXCLUDED.subject,
+              html = EXCLUDED.html,
+              text = EXCLUDED.text,
+              status = EXCLUDED.status,
+              type = EXCLUDED.type,
+              is_read = EXCLUDED.is_read,
+              "scheduledSendTime" = EXCLUDED."scheduledSendTime",
+              timestamp = EXCLUDED.timestamp,
+              "sentAt" = EXCLUDED."sentAt",
+              "updatedAt" = EXCLUDED."updatedAt",
+              "ownerId" = EXCLUDED."ownerId",
+              metadata = EXCLUDED.metadata
+        `;
+
+        throw error;
+    }
 }
 
 async function handleSend(execution, job) {

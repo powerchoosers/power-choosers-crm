@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import type { RefObject } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
@@ -114,6 +114,42 @@ export function EmailList({
     return email.type === filter
   })
 
+  const displayedEmails = useMemo(() => {
+    const next = [...filteredEmails]
+    if (filter !== 'scheduled') return next
+
+    const statusRank = (status?: string) => {
+      switch (String(status || '').toLowerCase()) {
+        case 'failed':
+          return 0
+        case 'awaiting_generation':
+          return 1
+        case 'queued':
+          return 2
+        case 'pending':
+          return 3
+        case 'waiting':
+          return 4
+        case 'sending':
+          return 5
+        default:
+          return 6
+      }
+    }
+
+    const emailTime = (email: Email) => {
+      const value = email.sentAt || email.scheduledSendTime || email.date || email.timestamp || 0
+      const time = new Date(value).getTime()
+      return Number.isFinite(time) ? time : 0
+    }
+
+    return next.sort((a, b) => {
+      const rankDiff = statusRank(a.status) - statusRank(b.status)
+      if (rankDiff !== 0) return rankDiff
+      return emailTime(b) - emailTime(a)
+    })
+  }, [filteredEmails, filter])
+
   const totalForActiveFilter = (() => {
     if (filter === 'all') return totalEmails ?? filteredEmails.length
     if (filter === 'received') return totalReceived ?? filteredEmails.length
@@ -124,14 +160,14 @@ export function EmailList({
 
   // Auto-reset to page 1 if the filter changes and makes the current page invalid
   useEffect(() => {
-    if (currentPage > 1 && filteredEmails.length > 0 && (currentPage - 1) * itemsPerPage >= filteredEmails.length) {
+    if (currentPage > 1 && displayedEmails.length > 0 && (currentPage - 1) * itemsPerPage >= displayedEmails.length) {
       setCurrentPage(1)
     }
-  }, [filter, filteredEmails.length, currentPage, setCurrentPage])
+  }, [filter, displayedEmails.length, currentPage, setCurrentPage])
 
   // Pagination Logic
-  const totalPages = Math.max(1, Math.ceil(filteredEmails.length / itemsPerPage))
-  const paginatedEmails = filteredEmails.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
+  const totalPages = Math.max(1, Math.ceil(displayedEmails.length / itemsPerPage))
+  const paginatedEmails = displayedEmails.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
   const gridCols = (filter === 'sent' || filter === 'scheduled')
     ? "grid-cols-[40px_minmax(120px,1fr)_150px_minmax(0,2fr)_auto_150px]"
     : "grid-cols-[40px_minmax(120px,1fr)_150px_minmax(0,2fr)_150px]"
@@ -165,7 +201,7 @@ export function EmailList({
     </div>
   ))
 
-  const selectableTotal = totalAvailable ?? filteredEmails.length
+  const selectableTotal = totalAvailable ?? displayedEmails.length
   const allOnPageSelected = paginatedEmails.length > 0 && paginatedEmails.every(e => selectedIds.has(e.id))
   const toggleAllOnPage = () => {
     if (!onSelectionChange) return
@@ -187,12 +223,12 @@ export function EmailList({
     onSelectionChange(next)
   }
 
-  const showingStart = filteredEmails.length === 0
+  const showingStart = displayedEmails.length === 0
     ? 0
-    : Math.min(filteredEmails.length, (currentPage - 1) * itemsPerPage + 1)
-  const showingEnd = filteredEmails.length === 0
+    : Math.min(displayedEmails.length, (currentPage - 1) * itemsPerPage + 1)
+  const showingEnd = displayedEmails.length === 0
     ? 0
-    : Math.min(filteredEmails.length, currentPage * itemsPerPage)
+    : Math.min(displayedEmails.length, currentPage * itemsPerPage)
 
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage)
@@ -355,6 +391,18 @@ export function EmailList({
     return { label: domain || 'unknown', isMain }
   }
 
+  const getScheduledFailureMessage = (email: Email) => {
+    const raw = String(
+      email?.metadata?.failureReason ||
+      email?.metadata?.sendFailureReason ||
+      email?.metadata?.errorMessage ||
+      email?.metadata?.error ||
+      email.text ||
+      ''
+    ).trim()
+    return raw || 'Generation failed. Retry this row.'
+  }
+
   const formatDate = (dateString: string | number | undefined) => {
     if (!dateString) return null;
     try {
@@ -467,6 +515,12 @@ export function EmailList({
         </div>
         <div className="text-[10px] text-zinc-600 font-mono uppercase tracking-[0.2em]">
           Total_Entropy: <span className="text-zinc-400 tabular-nums">{totalForActiveFilter}</span>
+          {filter === 'scheduled' && displayedEmails.some((email) => String(email.status || '').toLowerCase() === 'failed') && (
+            <>
+              <span className="mx-2 text-zinc-700">|</span>
+              Failed_Emails: <span className="text-red-400 tabular-nums">{displayedEmails.filter((email) => String(email.status || '').toLowerCase() === 'failed').length}</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -548,6 +602,8 @@ export function EmailList({
           ) : (
             paginatedEmails.map((email, index) => {
               const isOutbound = email.type === 'sent' || email.type === 'scheduled'
+              const normalizedStatus = String(email.status || '').toLowerCase()
+              const isFailed = normalizedStatus === 'failed'
               const executionId = String(email?.metadata?.sequenceExecutionId || '')
               const hasGeneratedContent = Boolean(String(email.html || '').trim())
               const isAccepted = Boolean(email?.metadata?.reviewAccepted)
@@ -589,20 +645,27 @@ export function EmailList({
                 ? `To: ${(recipientLabels.length ? recipientLabels : [primaryContact?.displayName || primaryEmail || 'Unknown recipient']).join(', ')}`
                 : (primaryContact?.displayName || email.from)
               const fallbackDomain = primaryEmail.includes('@') ? primaryEmail.split('@')[1] : undefined
+              const failedMessage = isFailed ? getScheduledFailureMessage(email) : ''
 
               return (
                 <div
                   key={email.id}
                   onClick={() => onSelectEmail(email)}
-                className={cn(
-                  "group grid items-center gap-3 px-2 py-3 cursor-pointer transition-all border-l-2 border-b border-white/5",
-                  gridCols,
-                  hasClicks ? "border-l-[#002FA7]" : selectedEmailId === email.id ? "border-l-[#002FA7]" : "border-l-transparent",
-                  email.unread ? "bg-[#002FA7]/8" : "",
-                  isSelected ? "selected-container shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
-                  !isSelected && "hover:bg-white/[0.03]"
-                )}
-              >
+                  className={cn(
+                    "group grid items-center gap-3 px-2 py-3 cursor-pointer transition-all border-l-2 border-b border-white/5",
+                    gridCols,
+                    isFailed
+                      ? "border-l-red-500 bg-red-500/[0.04]"
+                      : hasClicks
+                        ? "border-l-[#002FA7]"
+                        : selectedEmailId === email.id
+                          ? "border-l-[#002FA7]"
+                          : "border-l-transparent",
+                    email.unread ? "bg-[#002FA7]/8" : "",
+                    isSelected ? "selected-container shadow-[0_0_20px_rgba(0,0,0,0.4)]" : "",
+                    !isSelected && "hover:bg-white/[0.03]"
+                  )}
+                >
                   {/* Select / Row number */}
                   <div className="flex items-center justify-center relative group/select min-h-[40px]">
                     {onSelectionChange ? (
@@ -709,10 +772,15 @@ export function EmailList({
                     <div className="flex items-center gap-1.5">
                       <h4 className={cn(
                         "text-[13px] truncate tracking-tight transition-all origin-left group-hover:scale-[1.01] flex-1",
-                        email.unread ? "font-medium text-zinc-100" : "text-zinc-500 group-hover:text-zinc-300"
+                        email.unread ? "font-medium text-zinc-100" : isFailed ? "text-red-300 group-hover:text-red-200" : "text-zinc-500 group-hover:text-zinc-300"
                       )}>
                         {email.subject}
                       </h4>
+                      {isFailed && (
+                        <span className="flex-none rounded border border-red-500/40 bg-red-500/10 px-1.5 py-0.5 text-[9px] font-mono uppercase tracking-widest text-red-300">
+                          Failed
+                        </span>
+                      )}
                       {email.attachments && email.attachments.length > 0 && (
                         <div className="flex items-center gap-1 text-zinc-500 flex-shrink-0" title={`${email.attachments.length} attachment${email.attachments.length > 1 ? 's' : ''}`}>
                           <Paperclip className="w-3 h-3" />
@@ -722,8 +790,11 @@ export function EmailList({
                         </div>
                       )}
                     </div>
-                    <p className="text-[11px] text-zinc-600 truncate group-hover:text-zinc-500 transition-colors">
-                      {email.snippet || email.text || 'No preview available'}
+                    <p className={cn(
+                      "text-[11px] truncate transition-colors",
+                      isFailed ? "text-red-400/80 group-hover:text-red-300" : "text-zinc-600 group-hover:text-zinc-500"
+                    )}>
+                      {isFailed ? failedMessage : (email.snippet || email.text || 'No preview available')}
                     </p>
                   </div>
 
@@ -767,7 +838,8 @@ export function EmailList({
 
                   {filter === 'scheduled' && (
                     <div className="flex items-center">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="flex items-center gap-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
@@ -780,24 +852,20 @@ export function EmailList({
                               onGenerateScheduled(email)
                             }
                           }}
-                          disabled={
-                            !executionId ||
-                            isGenerating ||
-                            (showRegenerateLabel ? !onRegenerateScheduled : !onGenerateScheduled)
-                          }
+                          disabled={!executionId || isGenerating || (showRegenerateLabel ? !onRegenerateScheduled : !onGenerateScheduled)}
                           className={cn(
                             "icon-button-forensic h-8 px-3 text-[9px] font-mono uppercase tracking-widest disabled:opacity-40",
                             showRegenerateLabel
-                              ? "text-violet-300 border-violet-500/40"
-                              : "text-emerald-400 border-emerald-500/40"
+                              ? (isFailed ? "text-red-300 border-red-500/40" : "text-violet-300 border-violet-500/40")
+                              : (isFailed ? "text-red-300 border-red-500/40" : "text-emerald-400 border-emerald-500/40")
                           )}
                           title={
                             executionId
-                              ? `${showRegenerateLabel ? 'Regenerate' : 'Generate'} draft now`
+                              ? `${isFailed ? 'Retry' : showRegenerateLabel ? 'Regenerate' : 'Generate'} draft now`
                               : 'Missing execution link'
                           }
                         >
-                          {isGenerating ? 'Generating...' : showRegenerateLabel ? 'Regenerate' : 'Generate'}
+                          {isGenerating ? 'Generating...' : isFailed ? 'Retry' : showRegenerateLabel ? 'Regenerate' : 'Generate'}
                         </button>
                         {hasGeneratedContent && (
                           <button
@@ -815,6 +883,12 @@ export function EmailList({
                           >
                             {isAccepting ? 'Saving...' : isAccepted ? 'Accepted' : 'Accept'}
                           </button>
+                        )}
+                        </div>
+                        {isFailed && failedMessage && (
+                          <div className="max-w-[280px] text-[10px] font-mono uppercase tracking-[0.14em] text-red-400/80 truncate">
+                            {failedMessage}
+                          </div>
                         )}
                       </div>
                     </div>

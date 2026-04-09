@@ -426,6 +426,10 @@ export default async function handler(req, res) {
     const preferredFrom = String(sequenceSender || '').trim();
     const fromEmail = preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io';
     const senderDomain = senderDomainFromEmail(fromEmail);
+    const targetEmailId = String(emailId || executionMeta.emailRecordId || `seq_exec_${execution.id}`);
+    const defaultSubject = String(
+      executionMeta.subject || executionMeta.aiSubject || executionMeta.label || 'Message from Nodal Point'
+    ).trim();
 
     // Calculate contract end year (mirrors edge function logic)
     const contractEndYear = account?.contract_end_date
@@ -508,7 +512,7 @@ export default async function handler(req, res) {
       optimizeData.optimized || optimizeData.optimizedContent || optimizeData.content || ''
     ).trim();
     const generatedSubject = String(
-      optimizeData.subject || executionMeta.subject || executionMeta.aiSubject || 'Message from Nodal Point'
+      optimizeData.subject || defaultSubject
     ).trim();
 
     if (!generatedBody) {
@@ -572,7 +576,6 @@ export default async function handler(req, res) {
 
     if (saveExecutionError) throw saveExecutionError;
 
-    const targetEmailId = String(emailId || nextExecutionMeta.emailRecordId || `seq_exec_${execution.id}`);
     const { data: existingEmail } = await supabase
       .from('emails')
       .select('id, metadata, "from"')
@@ -631,6 +634,54 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     logger.error('[Sequence Review] Failed:', error);
+    try {
+      const failedAt = new Date().toISOString();
+      const failureReason = String(error?.message || 'Failed to process sequence review action').trim().slice(0, 500);
+      const failureText = `Generation failed: ${failureReason}`;
+      const failureMetadata = {
+        ...asObject(executionMeta),
+        source: 'sequence',
+        sequenceExecutionId: execution.id,
+        sequenceId: execution.sequence_id,
+        memberId: execution.member_id,
+        emailRecordId: targetEmailId,
+        status: 'failed',
+        failureReason,
+        failedAt,
+        senderEmail: fromEmail,
+        senderDomain,
+        from: fromEmail,
+        ownerId: fromEmail,
+      };
+
+      const { error: failureUpsertError } = await supabase
+        .from('emails')
+        .upsert({
+          id: targetEmailId,
+          contactId: contact?.id || null,
+          accountId: contact?.accountId || null,
+          from: fromEmail,
+          to: contact?.email ? [contact.email] : [],
+          subject: defaultSubject,
+          html: '',
+          text: failureText,
+          status: 'failed',
+          type: 'scheduled',
+          is_read: true,
+          scheduledSendTime: execution?.scheduled_at || null,
+          timestamp: execution?.scheduled_at || failedAt,
+          sentAt: null,
+          updatedAt: failedAt,
+          ownerId: fromEmail,
+          metadata: failureMetadata
+        }, { onConflict: 'id' });
+
+      if (failureUpsertError) {
+        logger.warn('[Sequence Review] Failed email upsert warning:', failureUpsertError.message);
+      }
+    } catch (persistError) {
+      logger.warn('[Sequence Review] Failed to persist failed email row:', persistError?.message || persistError);
+    }
     res.status(500).json({ error: error?.message || 'Failed to process sequence review action' });
   }
 }
