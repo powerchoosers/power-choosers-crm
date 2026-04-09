@@ -43,6 +43,7 @@ export function useContactLastTouch(contactIds: string[]) {
     return useQuery<Map<string, string>>({
         queryKey: key,
         queryFn: async () => {
+
             if (!contactIds.length) return new Map()
 
             // 1) Most recent call per contactId
@@ -86,6 +87,7 @@ export function useContactLastTouch(contactIds: string[]) {
                     `to.cs.["${e}"]`,
                 ]).join(',')
 
+
                 const { data: emailRows } = await supabase
                     .from('emails')
                     .select('from, to, timestamp')
@@ -124,6 +126,7 @@ export function useContactLastTouch(contactIds: string[]) {
                 else if (email) result.set(id, email)
                 // If neither → contact never touched → not added to map → healthScore = 'cold'
             }
+
 
             return result
         },

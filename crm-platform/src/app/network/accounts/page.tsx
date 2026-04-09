@@ -39,7 +39,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { type ContactHealthScore } from '@/components/ui/ContactAvatar'
-import { TargetListBadges } from '@/components/ui/TargetListBadges'
+import { TargetListBadges, usePageListMemberships } from '@/components/ui/TargetListBadges'
 import { useAccountLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
 import { Badge } from '@/components/ui/badge'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
@@ -109,7 +109,6 @@ export default function AccountsPage() {
   const createAccount = useCreateAccount()
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [deletingAccountIds, setDeletingAccountIds] = useState<Set<string>>(new Set())
@@ -120,11 +119,10 @@ export default function AccountsPage() {
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
   const accountIds = useMemo(() => accounts.map(a => a.id), [accounts])
-  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useAccountLastTouch(accountIds)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
+  // Defer lastTouch until main list has loaded — avoids parallel query storm on mount
+  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useAccountLastTouch(queryLoading ? [] : accountIds)
+  // Batch-fetch list memberships for all visible rows in 2 queries instead of 2N
+  const { data: listMemberships } = usePageListMemberships(queryLoading ? [] : accountIds, 'account')
 
   // After handleSelectCount fetches more, apply selection once we have enough accounts
   useEffect(() => {
@@ -139,7 +137,7 @@ export default function AccountsPage() {
     }
   }, [accounts.length, accounts])
 
-  const isLoading = queryLoading || !isMounted
+  const isLoading = queryLoading
   const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
 
   const effectiveTotalRecords = totalAccounts ?? accounts.length
@@ -543,12 +541,17 @@ export default function AccountsPage() {
       {
         id: 'targetLists',
         header: 'Target Lists',
-        cell: ({ row }) => (
-          <TargetListBadges
-            entityId={row.original.id}
-            entityType="account"
-          />
-        ),
+        cell: ({ row, table }) => {
+          const meta = table.options.meta as any
+          const preloadedLists = meta?.listMemberships?.get(row.original.id)
+          return (
+            <TargetListBadges
+              entityId={row.original.id}
+              entityType="account"
+              preloadedLists={preloadedLists}
+            />
+          )
+        },
       },
       {
         id: 'actions',
@@ -601,7 +604,8 @@ export default function AccountsPage() {
     columns,
     meta: {
       lastTouchMap,
-      lastTouchLoading
+      lastTouchLoading,
+      listMemberships,
     },
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),

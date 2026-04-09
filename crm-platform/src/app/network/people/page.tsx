@@ -35,8 +35,9 @@ import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader
 import { formatDistanceToNow, format, isAfter, subMonths } from 'date-fns'
 import { useContacts, useContactsCount, useDeleteContacts, useCreateContact, Contact } from '@/hooks/useContacts'
 import { useOwnerDirectory } from '@/hooks/useOwnerDirectory'
-import { TargetListBadges } from '@/components/ui/TargetListBadges'
+import { TargetListBadges, usePageListMemberships } from '@/components/ui/TargetListBadges'
 import { useContactLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
+
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
@@ -111,7 +112,6 @@ export default function PeoplePage() {
   const createContact = useCreateContact()
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
@@ -122,12 +122,11 @@ export default function PeoplePage() {
 
   const contacts = useMemo(() => data?.pages.flatMap(page => page.contacts) || [], [data])
   const contactIds = useMemo(() => contacts.map(c => c.id), [contacts])
-  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useContactLastTouch(contactIds)
+  // Defer lastTouch until main list has loaded — avoids parallel query storm on mount
+  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useContactLastTouch(queryLoading ? [] : contactIds)
+  // Batch-fetch list memberships for all visible rows in 2 queries instead of 2N
+  const { data: listMemberships } = usePageListMemberships(queryLoading ? [] : contactIds, 'contact')
   const pendingSelectCountRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
 
   // After handleSelectCount fetches more, apply selection once we have enough contacts
   useEffect(() => {
@@ -142,7 +141,7 @@ export default function PeoplePage() {
     }
   }, [contacts.length, contacts])
 
-  const isLoading = queryLoading || !isMounted
+  const isLoading = queryLoading
   const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
 
   const effectiveTotalRecords = totalContacts ?? contacts.length
@@ -205,6 +204,7 @@ export default function PeoplePage() {
   useEffect(() => {
     const needed = (pagination.pageIndex + 2) * PAGE_SIZE
     if (hasNextPage && !isFetchingNextPage && contacts.length < needed) {
+
       fetchNextPage()
     }
   }, [pagination.pageIndex, contacts.length, hasNextPage, isFetchingNextPage, fetchNextPage])
@@ -491,12 +491,17 @@ export default function PeoplePage() {
       {
         id: 'targetLists',
         header: 'Target Lists',
-        cell: ({ row }) => (
-          <TargetListBadges
-            entityId={row.original.id}
-            entityType="contact"
-          />
-        ),
+        cell: ({ row, table }) => {
+          const meta = table.options.meta as any
+          const preloadedLists = meta?.listMemberships?.get(row.original.id)
+          return (
+            <TargetListBadges
+              entityId={row.original.id}
+              entityType="contact"
+              preloadedLists={preloadedLists}
+            />
+          )
+        },
       },
       {
         id: "actions",
@@ -579,7 +584,8 @@ export default function PeoplePage() {
     columns,
     meta: {
       lastTouchMap,
-      lastTouchLoading
+      lastTouchLoading,
+      listMemberships,
     },
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
@@ -675,12 +681,12 @@ export default function PeoplePage() {
 
       <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
         <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
-          <Table>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={handleDragEnd}
-            >
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <Table>
               <TableHeader className="sticky top-0 z-20 border-b border-white/5">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
@@ -695,8 +701,7 @@ export default function PeoplePage() {
                   </TableRow>
                 ))}
               </TableHeader>
-            </DndContext>
-            <TableBody>
+              <TableBody>
               {isLoading ? (
                 <ForensicTableSkeleton columns={columns.length} rows={12} type="people" />
               ) : isError ? (
@@ -728,8 +733,9 @@ export default function PeoplePage() {
                   </TableCell>
                 </TableRow>
               )}
-            </TableBody>
-          </Table>
+              </TableBody>
+            </Table>
+          </DndContext>
         </div>
 
         <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">

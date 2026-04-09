@@ -538,8 +538,15 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       try {
-        if (!enabled || loading) return { contacts: [], nextCursor: null };
-        if (!user && !loading) return { contacts: [], nextCursor: null };
+
+        if (!enabled || loading) {
+
+          return { contacts: [], nextCursor: null };
+        }
+        if (!user && !loading) {
+
+          return { contacts: [], nextCursor: null };
+        }
 
         let query = supabase
           .from('contacts')
@@ -610,6 +617,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
           .order('createdAt', { ascending: false });
 
         if (error) {
+
           if (error.message !== 'FetchUserError: Request was aborted') {
             console.error("Error fetching contacts:", error);
           }
@@ -683,11 +691,13 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         const hasNextPage = count ? from + PAGE_SIZE < count : false;
 
+
         return {
           contacts,
           nextCursor: hasNextPage ? pageParam + 1 : null
         };
       } catch (error) {
+
         console.error("Error fetching contacts from Supabase:", error);
         throw error;
       }
