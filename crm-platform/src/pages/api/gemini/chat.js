@@ -2040,6 +2040,14 @@ Output rules:
             return { id: String(b.data.id), name: b.data.name ? String(b.data.name) : null };
           }
 
+          if (b.type === 'identity_card' && b.data && b.data.type === 'account' && b.data.id) {
+            return { id: String(b.data.id), name: b.data.name ? String(b.data.name) : null };
+          }
+
+          if (b.type === 'hierarchy_card' && b.data && b.data.accountId) {
+            return { id: String(b.data.accountId), name: b.data.accountName ? String(b.data.accountName) : null };
+          }
+
           // Check for forensic_grid with a single result
           if (b.type === 'forensic_grid') {
             const rows = Array.isArray(b.data?.rows) ? b.data.rows : [];
@@ -2051,6 +2059,77 @@ Output rules:
       }
       return null;
     };
+
+    const inferLastContactFromHistory = () => {
+      for (let i = cleanedMessages.length - 1; i >= 0; i--) {
+        const m = cleanedMessages[i];
+        if (m.role !== 'assistant') continue;
+        const blocks = extractJsonBlocks(m.content);
+        for (const b of blocks) {
+          if (!b || typeof b !== 'object') continue;
+          const data = b.data && typeof b.data === 'object' ? b.data : null;
+          if (!data) continue;
+
+          if ((b.type === 'contact_dossier' || b.type === 'decision_maker_card' || (b.type === 'identity_card' && data.type === 'contact')) && data.id) {
+            return {
+              id: String(data.id),
+              name: data.name ? String(data.name) : null,
+              title: data.title ? String(data.title) : null,
+            };
+          }
+
+          if (b.type === 'interaction_snippet' && typeof data.contactName === 'string' && data.contactName.trim()) {
+            return {
+              id: null,
+              name: String(data.contactName).trim(),
+              title: null,
+            };
+          }
+        }
+      }
+      return null;
+    };
+
+    const FOLLOW_UP_CUE_PATTERN = /\b(it|that|this|he|she|they|them|those|there|what about|how about|same one|the owner|the contact|the company|the account|more on that|follow up)\b/i;
+
+    let historyContextBlock = '';
+    if (FOLLOW_UP_CUE_PATTERN.test(prompt || '')) {
+      try {
+        const inferredContact = inferLastContactFromHistory();
+        const inferredAccount = inferLastAccountFromHistory();
+        const historyLines = [];
+
+        if (inferredContact?.id) {
+          const contact = await toolHandlers.get_contact_details({ contact_id: String(inferredContact.id) });
+          const linkedAccount = contact?.accounts || null;
+          const contactName = contact?.name || [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim() || inferredContact.name || 'Unknown contact';
+          historyLines.push(`FOLLOW-UP CONTACT: ${contactName}`);
+          if (contact?.title || contact?.jobTitle || inferredContact.title) historyLines.push(`Title: ${contact?.title || contact?.jobTitle || inferredContact.title}`);
+          if (linkedAccount?.name) historyLines.push(`Company: ${linkedAccount.name}`);
+          const contactPhone = contact?.mobile || contact?.workDirectPhone || contact?.otherPhone || contact?.companyPhone || contact?.phone || '';
+          if (contactPhone) historyLines.push(`Phone: ${contactPhone}`);
+          if (contact?.email) historyLines.push(`Email: ${contact.email}`);
+          if (contact?.contract_end_date) historyLines.push(`Contract end: ${contact.contract_end_date}`);
+          if (contact?.electricity_supplier) historyLines.push(`Supplier: ${contact.electricity_supplier}`);
+        } else if (inferredAccount?.id) {
+          const account = await toolHandlers.get_account_details({ account_id: String(inferredAccount.id) });
+          const accountName = account?.name || inferredAccount.name || 'Unknown account';
+          historyLines.push(`FOLLOW-UP ACCOUNT: ${accountName}`);
+          if (account?.industry) historyLines.push(`Industry: ${account.industry}`);
+          if (account?.contract_end_date) historyLines.push(`Contract end: ${account.contract_end_date}`);
+          if (account?.electricity_supplier) historyLines.push(`Supplier: ${account.electricity_supplier}`);
+          if (account?.domain) historyLines.push(`Domain: ${account.domain}`);
+          const primaryContact = Array.isArray(account?.contacts) ? account.contacts.find((c) => c && (c.name || c.id)) : null;
+          if (primaryContact?.name) historyLines.push(`Primary contact: ${primaryContact.name}`);
+        }
+
+        if (historyLines.length) {
+          historyContextBlock = historyLines.join('\n');
+        }
+      } catch (e) {
+        console.error('[Gemini Chat] Follow-up context fetch:', e?.message || e);
+      }
+    }
 
     const daysUntil = (dateStr) => {
       const d = new Date(dateStr);
@@ -2619,6 +2698,10 @@ Output rules:
         - TODAY'S DATE: ${new Date().toISOString().split('T')[0]} (Year: ${new Date().getFullYear()})
         - CURRENT CONTEXT: "This year" means ${new Date().getFullYear()}.
         - WEB_MODE: ${webEnabled ? 'WEB_ASSIST_ENABLED' : 'WEB_ASSIST_DISABLED'}
+        - IMPORTANT: Treat every user message as a task. Use CRM, calls, emails, Apollo, and web search before asking for more context.
+        - If the user gives even a partial clue, search with it. Do not send back a generic "I don't have the context" reply if a best-effort search can be tried.
+        - Only ask for more context after you have already tried the most reasonable CRM/web lookup you can with the clues available.
+        - If the user says "just do it", "just look", "research it", or similar, proceed with the best search you can and answer from the result.
 
         FORENSIC_INTELLIGENCE_PROTOCOL:
         - Your mission is to provide strategic sales intelligence. Move beyond simple data retrieval.
@@ -2649,6 +2732,9 @@ Output rules:
           - *Example for missing expiration*: "Tonie, when you look at your current energy agreement, is the expiration date something that's actively monitored, or is it one of those things that usually just rolls over without much review?"
           - *Example for missing usage*: "How does the seasonal change in your production schedule typically affect your energy budget expectations?"
         - If the user says "most recent call", "last call", "what did he say", or "he told me", search the preloaded call context first, then use \`search_transcripts\` or \`search_interactions\` with broad terms like "email", "number", "contact", or the nearest clue from the request. Do NOT ask for a keyword before searching those sources.
+        - If the user asks who was mentioned on a call, who the owner was, or what was said, answer from the preloaded call context first if the answer is already there. Do not make the user restate the request just to unlock the answer.
+        - If the user gives a month and day without a year and the current year is already implied by the chat or screen context, assume the current year and search with that.
+        - If the user says "just look", "just do it", "research it for me", or similar, treat that as permission to make the best reasonable search attempt with the clues already available.
 
         PERSON vs COMPANY (CRITICAL):
         - If the user asks to find a PERSON (e.g. "find a Louis", "someone named X", "who works at this company", "a person that works for this company"), you MUST use \`list_contacts\` with the person's name in \`search\` and, when the user is on an account page, \`accountId\` from context. Do NOT use \`list_accounts\` for person names.
@@ -2690,7 +2776,10 @@ Output rules:
 
         CRM_LOOKUP_GUIDANCE:
         - Use CRM search tools only when the user clearly asks for a lookup or record-specific answer.
+        - If the user asks for a lookup, do one best-effort search with the clues already given before asking for more detail.
         - Do not turn tests, small talk, or general questions into CRM searches.
+        - Do not make the user do the search work for you when a reasonable lookup can be attempted immediately.
+        - If the user asks you to draft, write, or rewrite something, produce the best usable version immediately using the available context. Do not block on extra research unless the user explicitly asks for verified facts.
 
         INDUSTRY_INTELLIGENCE:
         - "Manufacturing" is a broad sector. If the user asks for "Manufacturing" or "Manufacturers", you MUST search for these related industries:
@@ -2811,6 +2900,10 @@ Output rules:
         - When context has \`type: 'protocol'\`, use the protocol context first. Treat \`stepSummary\`, \`selectedNode\`, \`targetContactId\`, \`targetAccountId\`, \`decisionMakerId\`, \`hierarchySummary\`, and \`senderEmail\` as first-class context, not optional hints.
         - If the user's query is unrelated (e.g., "general market trends", "new search"), IGNORE the current screen context and answer broadly.
         - Use this to offer proactive, zero-click insights ONLY when relevant.
+        ${historyContextBlock ? `
+        RECENT FOLLOW-UP CONTEXT (carry this forward if the user's wording is vague):
+        ${historyContextBlock}
+        ` : ''}
         ${dossierContextBlock ? `
         PRELOADED DOSSIER CONTEXT (notes + transmission log — use this instead of calling tools for quick answers):
         ${dossierContextBlock}
@@ -3261,7 +3354,7 @@ Output rules:
     const validHistory = [];
     let nextExpectedRole = 'user';
 
-    const historyToProcess = historyCandidates.slice(-10);
+    const historyToProcess = historyCandidates.slice(-15);
     let startIndex = 0;
     const firstUserInHistory = historyToProcess.findIndex((m) => m.role === 'user');
     if (firstUserInHistory > 0) startIndex = firstUserInHistory;

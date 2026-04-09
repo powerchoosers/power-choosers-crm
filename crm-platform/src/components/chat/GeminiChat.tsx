@@ -1988,7 +1988,7 @@ SELECT * FROM hybrid_search_accounts(
     const updatedMessages = [...current, userMessage]
     const firstUserIndex = updatedMessages.findIndex((m) => m.role === 'user')
     const relevantHistory = firstUserIndex >= 0 ? updatedMessages.slice(firstUserIndex) : updatedMessages
-    let messagesForApi = relevantHistory.slice(-10)
+    let messagesForApi = relevantHistory.slice(-15)
     if (messagesForApi.length > 0 && messagesForApi[0].role === 'assistant') messagesForApi = messagesForApi.slice(1)
 
     setMessages(updatedMessages)

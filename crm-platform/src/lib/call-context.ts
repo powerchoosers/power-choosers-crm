@@ -86,6 +86,49 @@ function parseAiInsightsObject(raw: unknown): Record<string, unknown> | null {
   return null
 }
 
+function extractBestOperatorSummary(parsed: Record<string, unknown>): string {
+  const sources: unknown[] = []
+
+  const topLevelResults = parsed.operatorResults
+  if (Array.isArray(topLevelResults)) {
+    sources.push(topLevelResults)
+  }
+
+  const conversationalIntelligence = parsed.conversationalIntelligence
+  if (conversationalIntelligence && typeof conversationalIntelligence === 'object') {
+    const nestedResults = (conversationalIntelligence as { operatorResults?: unknown }).operatorResults
+    if (Array.isArray(nestedResults)) {
+      sources.push(nestedResults)
+    }
+  }
+
+  let bestFallback = ''
+
+  for (const source of sources) {
+    for (const result of source as Array<Record<string, unknown>>) {
+      const textGenerationResults = result.textGenerationResults
+      const candidate = textGenerationResults && typeof textGenerationResults === 'object'
+        ? (textGenerationResults as { result?: unknown }).result
+        : null
+
+      if (typeof candidate !== 'string' || !candidate.trim()) continue
+
+      const text = cleanWhitespace(candidate)
+      const name = cleanWhitespace(String(result.name || ''))
+
+      if (/conversation summary|summary/i.test(name)) {
+        return text
+      }
+
+      if (!bestFallback || text.length > bestFallback.length) {
+        bestFallback = text
+      }
+    }
+  }
+
+  return bestFallback
+}
+
 function extractSpeakerTurns(rawInsights: unknown) {
   const parsed = parseAiInsightsObject(rawInsights)
   const turns = Array.isArray(parsed?.speakerTurns) ? parsed?.speakerTurns : []
@@ -119,6 +162,7 @@ function scoreConversationSegment(text: string) {
   if (/(capabilities brief|pdf|brochure|one[-\s]?pager|deck|pdf|company)/i.test(normalized)) score += 10
   if (/(review|boss|manager|executive manager|take a look|take a look at)/i.test(normalized)) score += 9
   if (/(follow up|next step|reach out|proposal|vendor)/i.test(normalized)) score += 5
+  if (/(owner|ownership|decision maker|who owns|who is the owner|owner's name|boss)/i.test(normalized)) score += 10
   if (hasHumanSignal(text)) score += 2
   if (normalized.length > 80) score += 1
 
@@ -211,8 +255,14 @@ function normalizeAiInsights(raw: unknown): string {
   if (!raw) return ''
   try {
     const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-    if (parsed && typeof parsed === 'object' && typeof (parsed as { summary?: unknown }).summary === 'string') {
-      return cleanWhitespace(String((parsed as { summary: string }).summary))
+    if (parsed && typeof parsed === 'object') {
+      const insights = parsed as Record<string, unknown>
+      const operatorSummary = extractBestOperatorSummary(insights)
+      if (operatorSummary) return operatorSummary
+
+      if (typeof insights.summary === 'string') {
+        return cleanWhitespace(String(insights.summary))
+      }
     }
   } catch {
     return ''
