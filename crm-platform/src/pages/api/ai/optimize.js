@@ -416,6 +416,12 @@ export default async function handler(req, res) {
       const siteCity = typeof contact?.site_city === 'string' && contact.site_city.trim()
         ? contact.site_city.trim()
         : primarySiteDetails.city || '';
+      const siteAddress = typeof contact?.site_address === 'string' && contact.site_address.trim()
+        ? contact.site_address.trim()
+        : primarySiteDetails.address
+          || (typeof contact?.address === 'string' && contact.address.trim()
+            ? contact.address.trim()
+            : '');
       const texasEnergy = getTexasEnergyContext(siteCity, siteState, siteAddress || primarySiteDetails.address || siteCity);
       const utilityTerritory = typeof contact?.utility_territory === 'string' && contact.utility_territory.trim()
         ? contact.utility_territory.trim()
@@ -459,12 +465,6 @@ export default async function handler(req, res) {
           : subsidiaryCompanies.length || parentCompanyCount
             ? 'parent'
             : 'standalone';
-      const siteAddress = typeof contact?.site_address === 'string' && contact.site_address.trim()
-        ? contact.site_address.trim()
-        : primarySiteDetails.address
-          || (typeof contact?.address === 'string' && contact.address.trim()
-            ? contact.address.trim()
-            : '');
       let contactLocation = siteAddress;
       if (!contactLocation) {
         if (siteCity) {
