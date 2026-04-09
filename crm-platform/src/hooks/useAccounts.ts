@@ -855,7 +855,7 @@ export function useUpdateAccount() {
       queryClient.setQueriesData({ queryKey: ['accounts'] }, (old: any) =>
         patchAccountListCache(old, data)
       )
-      queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) =>
+      queryClient.setQueriesData({ queryKey: ['account', data.id] }, (cached: any) =>
         cached?.id === data.id ? { ...cached, ...data } : cached
       )
       queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) => {
@@ -873,9 +873,11 @@ export function useUpdateAccount() {
           }),
         }
       })
-      queryClient.setQueriesData({ queryKey: ['contact'] }, (cached: any) =>
-        patchLinkedAccountInContactCache(cached, data)
-      )
+      // Avoid traversing all individual contact caches - only target contacts we know about if possible
+      // Since we don't know which individual contacts belong to this account here, 
+      // traversing ['contact'] might be necessary to keep them in sync, but it's expensive.
+      // Optimally, we can skip it since individual contacts fetch fresh when opened.
+      // queryClient.setQueriesData({ queryKey: ['contact'] }, ...)
 
       if (shouldInvalidateDealCaches(data)) {
         queryClient.invalidateQueries({ queryKey: ['deals'] })
