@@ -268,7 +268,7 @@ export function useAccountDossierState(id: string, taskIdFromUrl?: string | null
                     setRecentlyUpdatedFields(changedFields)
                 }
 
-                const previousAccountQueries = queryClient.getQueriesData({ queryKey: ['account'] })
+                const previousAccountQueries = queryClient.getQueriesData({ queryKey: ['account', id] })
                 queryClient.setQueriesData({ queryKey: ['account', id] }, (cached: any) => {
                     if (!cached || cached.id !== id) return cached
                     return {

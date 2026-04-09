@@ -335,8 +335,8 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                     setRecentlyUpdatedFields(changedFields)
                 }
 
-                const previousContactQueries = queryClient.getQueriesData({ queryKey: ['contact'] })
-                const previousAccountQueries = queryClient.getQueriesData({ queryKey: ['account'] })
+                const previousContactQueries = queryClient.getQueriesData({ queryKey: ['contact', id] })
+                const previousAccountQueries = linkedAccountId ? queryClient.getQueriesData({ queryKey: ['account', linkedAccountId] }) : []
 
                 queryClient.setQueriesData({ queryKey: ['contact', id] }, (cached: any) => {
                     if (!cached || cached.id !== id) return cached
