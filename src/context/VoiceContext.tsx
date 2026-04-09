@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation'
 import { IncomingCallToast } from '@/components/calls/IncomingCallToast'
 import type { PowerDialTarget } from '@/lib/powerDialer'
 import { supabase } from '@/lib/supabase'
+import { isDesktopBridgeAvailable, showDesktopNotification } from '@/lib/desktop-notifications'
 
 interface VoiceMetadata {
   name?: string
@@ -108,6 +109,15 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
       return { granted: false, denied: false }
     }
+
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default' && !isDesktopBridgeAvailable()) {
+      try {
+        await Notification.requestPermission()
+      } catch (err) {
+        console.warn('[Voice] Failed to request Notification permission', err)
+      }
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       stream.getTracks().forEach((t) => t.stop())
@@ -437,8 +447,20 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setMetadata(meta)
 
         let toastId: string | number | undefined
+        let nativeNotification: Notification | undefined
+
+        const clearNativeNotification = () => {
+          try {
+            if (nativeNotification && typeof nativeNotification.close === 'function') {
+              nativeNotification.close()
+            }
+          } catch (e) {
+            console.warn('[Voice] Failed to close native notification', e)
+          }
+        }
 
         const answerIncomingCall = async () => {
+          clearNativeNotification()
           // Ported from legacy phone.js: Set audio devices before answering
           if (newDevice.audio) {
             try {
@@ -507,12 +529,14 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         }
 
         const declineIncomingCall = () => {
+          clearNativeNotification()
           call.reject()
           if (toastId !== undefined) {
             toast.dismiss(toastId)
           }
         }
 
+        // 1) Show In-App Toast
         toastId = toast(
           <IncomingCallToast
             meta={meta}
@@ -525,7 +549,32 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           }
         )
 
+        // 2) Show Global / Desktop Notification
+        const nfTitle = `Incoming Call: ${meta?.name || from || 'Unknown'}`
+        const nfBody = meta?.account ? `from ${meta.account}` : 'Click to view in CRM.'
+        
+        if (isDesktopBridgeAvailable()) {
+          void showDesktopNotification({
+            title: nfTitle,
+            body: nfBody,
+            kind: 'system',
+          })
+        } else if (typeof window !== 'undefined' && 'Notification' in window && window.Notification.permission === 'granted') {
+          try {
+            nativeNotification = new window.Notification(nfTitle, {
+              body: nfBody,
+              requireInteraction: true,
+            })
+            nativeNotification.onclick = () => {
+              window.focus()
+            }
+          } catch (e) {
+            console.warn('[Voice] Error creating native notification', e)
+          }
+        }
+
         call.on('cancel', () => {
+          clearNativeNotification()
           console.log('[Voice] Call cancelled by caller')
           isCallSessionActiveRef.current = false
           toast.dismiss(toastId)
@@ -541,6 +590,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         })
 
         call.on('disconnect', () => {
+          clearNativeNotification()
           isCallSessionActiveRef.current = false
           toast.dismiss(toastId)
           setCurrentCall(null)
