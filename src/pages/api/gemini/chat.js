@@ -2800,6 +2800,7 @@ Output rules:
         UI_COMPONENT_PROTOCOL:
         - You can trigger UI components by wrapping a valid JSON block between \`JSON_DATA:\` and \`END_JSON\`.
         - EXTREMELY IMPORTANT: The JSON MUST be perfectly valid. No trailing commas, no missing quotes, no unescaped newlines inside strings.
+        - Do not escape apostrophes with backslashes inside JSON strings. Use normal JSON string quoting and plain apostrophes.
         - The \`type\` value MUST be lowercase (e.g. contact_dossier, identity_card, decision_maker_card, hierarchy_card, protocol_card, forensic_grid). Example: JSON_DATA:{"type": "contact_dossier", "data": {...}}END_JSON
         - When the answer is about the decision maker, return \`decision_maker_card\`.
         - When the answer is about parent/subsidiary relationships, return \`hierarchy_card\`.
