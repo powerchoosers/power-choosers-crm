@@ -41,6 +41,23 @@ function normalizeSubject(input) {
   return value.replace(/\s+/g, ' ').slice(0, 140);
 }
 
+function normalizeLiveSignalText(input) {
+  if (!input) return '';
+  if (Array.isArray(input)) {
+    return input
+      .map((item) => normalizeLiveSignalText(item))
+      .filter(Boolean)
+      .join(' | ');
+  }
+  if (typeof input === 'object') {
+    const title = normalizeLiveSignalText(input.title);
+    const snippet = normalizeLiveSignalText(input.snippet);
+    const summary = normalizeLiveSignalText(input.summary);
+    return [title, snippet || summary].filter(Boolean).join(': ');
+  }
+  return String(input).trim();
+}
+
 function normalizeSenderFirstName(input) {
   const cleaned = String(input || '').replace(/<[^>]*>/g, '').trim();
   if (!cleaned) return 'Lewis';
@@ -371,6 +388,8 @@ export default async function handler(req, res) {
 
   const { draft, type, context, contact, prompt, provider, mode = 'generate_email', vectors = [], sequenceStage, replyStage: replyStageInput } = req.body;
   const replyStage = normalizeReplyStage(sequenceStage || replyStageInput || detectReplyStage(prompt, draft));
+  const liveSignalVectorIds = new Set(['recent_news', 'market_signal', 'market_news', 'live_news']);
+  const wantsLiveSignals = Array.isArray(vectors) && vectors.some((value) => liveSignalVectorIds.has(String(value)));
 
   if (!draft && !prompt) {
     res.writeHead(400, { 'Content-Type': 'application/json' });
@@ -521,6 +540,16 @@ export default async function handler(req, res) {
           : typeof contact?.notes === 'string' && contact.notes.trim()
             ? contact.notes.trim()
             : '';
+      const liveSignalContext = wantsLiveSignals
+        ? normalizeLiveSignalText(
+          contact?.liveSignals ||
+          contact?.market_signal ||
+          contact?.market_news ||
+          contact?.news ||
+          contact?.recent_news ||
+          ''
+        )
+        : '';
 
       const dataVectors = [
         `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${companyName}`,
@@ -554,7 +583,7 @@ export default async function handler(req, res) {
         contact?.linkedinUrl && `- LINKEDIN_URL: ${contact.linkedinUrl}`,
         contact?.website && `- WEBSITE: ${contact.website}`,
         contact?.domain && `- DOMAIN: ${contact.domain}`,
-        vectors.includes('recent_news') && `- SIGNALS: ${contact?.news || 'No news signals.'}`,
+        wantsLiveSignals && `- LIVE_MARKET_SIGNAL: ${liveSignalContext || 'No live signal available.'}`,
         recentSignal ? `- RECENT_SIGNAL: ${recentSignal}` : null,
         vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${callContext || 'No usable call transcripts.'}`,
         contact?.metadata && `- EXTENDED_METADATA: ${JSON.stringify(contact.metadata)}`
@@ -686,6 +715,7 @@ export default async function handler(req, res) {
           - RESOLVE PLACEHOLDERS: If the STRATEGY *does* contain variables like {{company}}, {{industry}}, etc., resolve them.
           - If a field is missing (e.g., no asset_type), infer it logically (e.g., "facilities" or "operation nodes") or use a natural, professional phrase.
           - Do not wait for explicit instructions; if you see a relevant data point (like a recent call or a news signal), weave it in.
+          - If NEURAL_CONTEXT includes a LIVE_MARKET_SIGNAL, use the strongest current signal only. Prefer real supply shocks, ERCOT tightness, summer demand, or rate easing when the data supports it.
 
           NEURAL_CONTEXT:
           ${dataVectors}
@@ -724,6 +754,7 @@ export default async function handler(req, res) {
           HIGH_AGENCY_IDENTITY_RESOLUTION:
           - DO NOT wait for bracketed variables. If the draft is generic (e.g. "your company", "your industry"), you MUST replace those with specific data from NEURAL_CONTEXT (e.g. "${companyName || 'your business'}", "${contact?.industry || 'your industry'}").
           - When optimizing, make the text feel manual and researched. A high-agency analyst doesn't use placeholders; they use facts.
+          - If NEURAL_CONTEXT includes a LIVE_MARKET_SIGNAL, use the strongest current signal only. Prefer supply shocks, ERCOT tightness, summer demand, or rate easing when the data supports it.
 
           NEURAL_CONTEXT:
           ${dataVectors}
