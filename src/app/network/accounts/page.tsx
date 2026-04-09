@@ -119,8 +119,20 @@ export default function AccountsPage() {
 
   const accounts = useMemo(() => data?.pages.flatMap(page => page.accounts) || [], [data])
   const accountIds = useMemo(() => accounts.map(a => a.id), [accounts])
-  // Defer lastTouch until main list has loaded — avoids parallel query storm on mount
-  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useAccountLastTouch(queryLoading ? [] : accountIds)
+  const [deferredAccountIds, setDeferredAccountIds] = useState<string[]>([])
+  useEffect(() => {
+    if (queryLoading || accountIds.length === 0) {
+      setDeferredAccountIds([])
+      return
+    }
+    const timer = setTimeout(() => {
+      setDeferredAccountIds(accountIds)
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [accountIds, queryLoading])
+
+  // Defer lastTouch until main list has loaded and stabilized — avoids parallel query storm on mount
+  const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useAccountLastTouch(deferredAccountIds)
   // Batch-fetch list memberships for all visible rows in 2 queries instead of 2N
   const { data: listMemberships } = usePageListMemberships(queryLoading ? [] : accountIds, 'account')
 
