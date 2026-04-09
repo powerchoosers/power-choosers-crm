@@ -91,6 +91,7 @@ import { useProtocolBuilder } from '@/hooks/useProtocolBuilder';
 import { useAuth } from '@/context/AuthContext';
 import { useFoundryAssets } from '@/hooks/useFoundryAssets';
 import { getBurnerFromEmail, getBurnerSenderName } from '@/lib/burner-email';
+import { analyzeProtocolEmailCooldownRisk, formatCooldownDuration } from '@/lib/protocol-safety';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
 import ForensicSignature from '@/components/emails/ForensicSignature';
@@ -850,6 +851,9 @@ function ProtocolArchitectInner() {
       });
   }, [nodes]);
 
+  const cooldownAnalysis = useMemo(() => analyzeProtocolEmailCooldownRisk(nodes, edges), [nodes, edges]);
+  const cooldownIssuePreview = cooldownAnalysis.issues.slice(0, 3);
+
   const protocolContextPayload = useMemo(() => {
     const protocolName = protocol?.name || (id === TEST_PROTOCOL_ID ? 'Test Protocol' : 'Protocol');
     const targetContactName = testContact
@@ -1576,6 +1580,25 @@ function ProtocolArchitectInner() {
         </div>
 
         <div className="flex items-center gap-3">
+          <div
+            className={cn(
+              "h-9 px-3 rounded-xl border flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest",
+              cooldownAnalysis.hasRisk
+                ? "border-rose-500/20 bg-rose-500/10 text-rose-200"
+                : "border-emerald-500/20 bg-emerald-500/10 text-emerald-200"
+            )}
+          >
+            {cooldownAnalysis.hasRisk ? (
+              <AlertTriangle className="w-3.5 h-3.5 text-rose-300" />
+            ) : (
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+            )}
+            <span>
+              {cooldownAnalysis.hasRisk
+                ? `24H Risk ${cooldownAnalysis.issueCount}`
+                : '24H Clear'}
+            </span>
+          </div>
           <button
             onClick={() => setSequenceIntelOpen(true)}
             disabled={id === TEST_PROTOCOL_ID}
@@ -1775,6 +1798,52 @@ function ProtocolArchitectInner() {
 
               <TabsContent value="calibration" className="flex-1 overflow-y-auto overflow-x-hidden p-8 pt-6 pr-6 scrollbar-thin min-h-0">
                 <div className="space-y-8 pb-32">
+                  {cooldownAnalysis.hasRisk && (
+                    <div className="rounded-2xl border border-rose-500/20 bg-rose-500/5 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl border border-rose-500/20 bg-rose-500/10 flex items-center justify-center shrink-0">
+                          <AlertTriangle className="w-4 h-4 text-rose-300" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-mono uppercase tracking-[0.2em] text-rose-300">
+                            24H_Cooldown_Risk
+                          </div>
+                          <div className="text-sm text-zinc-300 mt-1">
+                            These branches would move to another email too soon. The scheduler will stretch them to at least 24 hours, but the protocol should be tightened before deploy.
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 space-y-2">
+                        {cooldownIssuePreview.map((issue) => (
+                          <div key={`${issue.sourceNodeId}-${issue.targetNodeId}-${issue.pathNodeIds.join('>')}`} className="rounded-xl border border-white/5 bg-black/30 p-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-zinc-100 truncate">
+                                  {issue.sourceNodeLabel} → {issue.targetNodeLabel}
+                                </div>
+                                <div className="mt-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                                  Gap: {formatCooldownDuration(issue.gapHours)}
+                                </div>
+                              </div>
+                              <span className="text-[9px] font-mono uppercase tracking-widest text-rose-300 shrink-0">
+                                Under 24h
+                              </span>
+                            </div>
+                            <div className="mt-2 text-[10px] font-mono text-zinc-500 leading-relaxed">
+                              {issue.pathSummary}
+                            </div>
+                          </div>
+                        ))}
+                        {cooldownAnalysis.issueCount > cooldownIssuePreview.length && (
+                          <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">
+                            + {cooldownAnalysis.issueCount - cooldownIssuePreview.length} more branch{cooldownAnalysis.issueCount - cooldownIssuePreview.length === 1 ? '' : 'es'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-3">
                     <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Protocol Label</label>
                     <input
