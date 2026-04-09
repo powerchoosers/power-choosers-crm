@@ -379,28 +379,30 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                 }
 
                 try {
-                    // Update contact-specific fields
-                    await updateContact.mutateAsync({
-                        id,
-                        name: fullName,
-                        firstName: editFirstName,
-                        lastName: editLastName,
-                        title: editTitle,
-                        companyName: editCompany,
-                        phone: editPhone,
-                        email: editEmail,
-                        notes: editNotes,
-                        location: editLocation,
-                        logoUrl: editLogoUrl,
-                        website: editWebsite,
-                        linkedinUrl: editLinkedinUrl,
-                        serviceAddresses: editServiceAddresses,
-                        mobile: editMobile,
-                        workDirectPhone: editWorkDirect,
-                        otherPhone: editOther,
-                        companyPhone: editCompanyPhone,
-                        primaryPhoneField: editPrimaryField,
-                    })
+                    const mutations: Promise<any>[] = [
+                        // Update contact-specific fields
+                        updateContact.mutateAsync({
+                            id,
+                            name: fullName,
+                            firstName: editFirstName,
+                            lastName: editLastName,
+                            title: editTitle,
+                            companyName: editCompany,
+                            phone: editPhone,
+                            email: editEmail,
+                            notes: editNotes,
+                            location: editLocation,
+                            logoUrl: editLogoUrl,
+                            website: editWebsite,
+                            linkedinUrl: editLinkedinUrl,
+                            serviceAddresses: editServiceAddresses,
+                            mobile: editMobile,
+                            workDirectPhone: editWorkDirect,
+                            otherPhone: editOther,
+                            companyPhone: editCompanyPhone,
+                            primaryPhoneField: editPrimaryField,
+                        })
+                    ]
 
                     // If linked to an account, sync energy data and the company website domain
                     if (linkedAccountId) {
@@ -415,8 +417,10 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                         if (websiteDomain !== undefined) {
                             accountPayload.domain = websiteDomain
                         }
-                        await updateAccount.mutateAsync(accountPayload)
+                        mutations.push(updateAccount.mutateAsync(accountPayload))
                     }
+
+                    await Promise.all(mutations)
 
                     setShowSynced(true)
                     setTimeout(() => setShowSynced(false), 3000)
