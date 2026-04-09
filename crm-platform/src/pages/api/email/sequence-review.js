@@ -16,6 +16,130 @@ function buildSourceTruthLine(linkedInUrl, website) {
   return 'SOURCE_TRUTH: LinkedIn and website not available. Do NOT mention LinkedIn or website; use generic public company research wording.';
 }
 
+function normalizeDomain(value) {
+  const raw = String(value || '').trim().toLowerCase();
+  if (!raw) return '';
+  return raw
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/')[0];
+}
+
+function normalizeLiveSignalText(input) {
+  if (!input) return '';
+  if (Array.isArray(input)) {
+    return input
+      .map((item) => normalizeLiveSignalText(item))
+      .filter(Boolean)
+      .join(' | ');
+  }
+  if (typeof input === 'object') {
+    const title = normalizeLiveSignalText(input.title);
+    const snippet = normalizeLiveSignalText(input.snippet);
+    const summary = normalizeLiveSignalText(input.summary);
+    return [title, snippet || summary].filter(Boolean).join(': ');
+  }
+  return String(input).trim();
+}
+
+function formatMwh(value) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return '';
+  return `$${num.toFixed(2)}/MWh`;
+}
+
+function summarizeTelemetry(rows) {
+  if (!Array.isArray(rows) || rows.length === 0) return '';
+  const latest = rows[0] || {};
+  const previous = rows[1] || {};
+  const hubAvg = Number(latest?.prices?.hub_avg);
+  const prevHubAvg = Number(previous?.prices?.hub_avg);
+  const reserves = Number(latest?.grid?.reserves);
+  const scarcityProb = latest?.grid?.scarcity_prob ?? 'unknown';
+  const trend = Number.isFinite(hubAvg) && Number.isFinite(prevHubAvg)
+    ? hubAvg > prevHubAvg
+      ? `rates up versus prior snapshot (${formatMwh(prevHubAvg)})`
+      : hubAvg < prevHubAvg
+        ? `rates easing versus prior snapshot (${formatMwh(prevHubAvg)})`
+        : `flat versus prior snapshot (${formatMwh(prevHubAvg)})`
+    : '';
+
+  const parts = [
+    'ERCOT snapshot:',
+    Number.isFinite(hubAvg) ? `hub avg ${formatMwh(hubAvg)}` : null,
+    Number.isFinite(reserves) ? `reserves ${reserves.toLocaleString()} MW` : null,
+    `scarcity probability ${scarcityProb}`,
+    trend || null
+  ].filter(Boolean);
+
+  return parts.join(', ');
+}
+
+async function buildLiveSignalContext(account, accountDomain) {
+  const segments = [];
+  const normalizedDomain = normalizeDomain(accountDomain || account?.website || account?.domain || '');
+
+  if (normalizedDomain && !normalizedDomain.endsWith('nodalpoint.io')) {
+    try {
+      const { data: companyNews } = await supabase
+        .from('apollo_news_articles')
+        .select('title, snippet, published_at')
+        .eq('domain', normalizedDomain)
+        .order('published_at', { ascending: false, nullsFirst: false })
+        .limit(3);
+
+      const companySignal = (companyNews || [])
+        .map((item) => normalizeLiveSignalText([item?.title, item?.snippet]))
+        .filter(Boolean)
+        .join(' | ');
+
+      if (companySignal) {
+        segments.push(`Company news: ${companySignal}`);
+      }
+    } catch (error) {
+      logger.warn('[Sequence Review] Company news lookup failed:', error.message);
+    }
+  }
+
+  try {
+    const { data: cacheRow } = await supabase
+      .from('ai_cache')
+      .select('insights')
+      .eq('key', 'energy-news')
+      .maybeSingle();
+
+    const energyItems = Array.isArray(asObject(cacheRow?.insights)?.items) ? asObject(cacheRow?.insights).items : [];
+    const energySignal = (energyItems || [])
+      .slice(0, 4)
+      .map((item) => normalizeLiveSignalText([item?.title, item?.snippet]))
+      .filter(Boolean)
+      .join(' | ');
+
+    if (energySignal) {
+      segments.push(`Market news: ${energySignal}`);
+    }
+  } catch (error) {
+    logger.warn('[Sequence Review] Energy news lookup failed:', error.message);
+  }
+
+  try {
+    const { data: telemetryRows } = await supabase
+      .from('market_telemetry')
+      .select('timestamp, prices, grid')
+      .order('created_at', { ascending: false, nullsFirst: false })
+      .limit(2);
+
+    const telemetrySignal = summarizeTelemetry(telemetryRows || []);
+    if (telemetrySignal) {
+      segments.push(telemetrySignal);
+    }
+  } catch (error) {
+    logger.warn('[Sequence Review] Market telemetry lookup failed:', error.message);
+  }
+
+  return segments.join('\n');
+}
+
 function detectReplyStage(prompt) {
   const text = String(prompt || '').toLowerCase();
   if (/(pattern[-\s]?interrupt|no[-\s]?reply|breakup|ghost)/.test(text)) return 'no_reply';
@@ -430,6 +554,11 @@ export default async function handler(req, res) {
     const defaultSubject = String(
       executionMeta.subject || executionMeta.aiSubject || executionMeta.label || 'Message from Nodal Point'
     ).trim();
+    const wantsLiveSignals = Array.isArray(executionMeta.vectors)
+      && executionMeta.vectors.some((value) => ['recent_news', 'market_signal', 'market_news', 'live_news'].includes(String(value)));
+    const liveSignalContext = wantsLiveSignals
+      ? await buildLiveSignalContext(account, accountDomain)
+      : '';
 
     // Calculate contract end year (mirrors edge function logic)
     const contractEndYear = account?.contract_end_date
@@ -495,6 +624,10 @@ export default async function handler(req, res) {
           sender_email: fromEmail,
           sender_domain: senderDomain,
           sender_first_name: senderFirstName,
+          news: liveSignalContext || null,
+          market_news: liveSignalContext || null,
+          market_signal: liveSignalContext || null,
+          liveSignals: liveSignalContext || null,
           call_context: usableCallContext || null,
           transcript: usableCalls[0]?.transcriptSnippet || null,
           notes: noteContext || null

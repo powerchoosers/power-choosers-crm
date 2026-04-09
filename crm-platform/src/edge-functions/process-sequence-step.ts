@@ -95,6 +95,131 @@ function appendPreviewUnsubscribeFooter(html: string, email?: string | null): st
     return `${content}${footer}`;
 }
 
+function normalizeDomain(value: string | null | undefined): string {
+    const raw = String(value || '').trim().toLowerCase();
+    if (!raw) return '';
+    return raw
+        .replace(/^https?:\/\//, '')
+        .replace(/^www\./, '')
+        .split('/')[0];
+}
+
+function normalizeLiveSignalText(input: any): string {
+    if (!input) return '';
+    if (Array.isArray(input)) {
+        return input
+            .map((item) => normalizeLiveSignalText(item))
+            .filter(Boolean)
+            .join(' | ');
+    }
+    if (typeof input === 'object') {
+        const title = normalizeLiveSignalText((input as any).title);
+        const snippet = normalizeLiveSignalText((input as any).snippet);
+        const summary = normalizeLiveSignalText((input as any).summary);
+        return [title, snippet || summary].filter(Boolean).join(': ');
+    }
+    return String(input).trim();
+}
+
+function formatMwh(value: any): string {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return `$${num.toFixed(2)}/MWh`;
+}
+
+function summarizeTelemetry(rows: any[]): string {
+    if (!Array.isArray(rows) || rows.length === 0) return '';
+    const latest = rows[0] || {};
+    const previous = rows[1] || {};
+    const hubAvg = Number(latest?.prices?.hub_avg);
+    const prevHubAvg = Number(previous?.prices?.hub_avg);
+    const reserves = Number(latest?.grid?.reserves);
+    const scarcityProb = latest?.grid?.scarcity_prob ?? 'unknown';
+    const trend = Number.isFinite(hubAvg) && Number.isFinite(prevHubAvg)
+        ? hubAvg > prevHubAvg
+            ? `rates up versus prior snapshot (${formatMwh(prevHubAvg)})`
+            : hubAvg < prevHubAvg
+                ? `rates easing versus prior snapshot (${formatMwh(prevHubAvg)})`
+                : `flat versus prior snapshot (${formatMwh(prevHubAvg)})`
+        : '';
+
+    const parts = [
+        'ERCOT snapshot:',
+        Number.isFinite(hubAvg) ? `hub avg ${formatMwh(hubAvg)}` : null,
+        Number.isFinite(reserves) ? `reserves ${reserves.toLocaleString()} MW` : null,
+        `scarcity probability ${scarcityProb}`,
+        trend || null
+    ].filter(Boolean);
+
+    return parts.join(', ');
+}
+
+async function buildLiveSignalContext(accountDomain: string | null | undefined): Promise<string> {
+    const segments: string[] = [];
+    const normalizedDomain = normalizeDomain(accountDomain);
+
+    if (normalizedDomain && !normalizedDomain.endsWith('nodalpoint.io')) {
+        try {
+            const companyNews = await sql`
+                SELECT title, snippet, published_at
+                FROM apollo_news_articles
+                WHERE domain = ${normalizedDomain}
+                ORDER BY published_at DESC NULLS LAST
+                LIMIT 3
+            `;
+            const companySignal = (companyNews || [])
+                .map((item: any) => normalizeLiveSignalText([item?.title, item?.snippet]))
+                .filter(Boolean)
+                .join(' | ');
+            if (companySignal) {
+                segments.push(`Company news: ${companySignal}`);
+            }
+        } catch (error) {
+            console.warn('[Process Sequence] Company news lookup failed:', error);
+        }
+    }
+
+    try {
+        const [cacheRow] = await sql`
+            SELECT insights
+            FROM ai_cache
+            WHERE key = 'energy-news'
+            LIMIT 1
+        `;
+        const insights = cacheRow?.insights && typeof cacheRow.insights === 'object' && !Array.isArray(cacheRow.insights)
+            ? cacheRow.insights
+            : {};
+        const energyItems = Array.isArray((insights as any).items) ? (insights as any).items : [];
+        const energySignal = energyItems
+            .slice(0, 4)
+            .map((item: any) => normalizeLiveSignalText([item?.title, item?.snippet]))
+            .filter(Boolean)
+            .join(' | ');
+        if (energySignal) {
+            segments.push(`Market news: ${energySignal}`);
+        }
+    } catch (error) {
+        console.warn('[Process Sequence] Energy news lookup failed:', error);
+    }
+
+    try {
+        const telemetryRows = await sql`
+            SELECT timestamp, prices, grid
+            FROM market_telemetry
+            ORDER BY created_at DESC
+            LIMIT 2
+        `;
+        const telemetrySignal = summarizeTelemetry(telemetryRows as any[]);
+        if (telemetrySignal) {
+            segments.push(telemetrySignal);
+        }
+    } catch (error) {
+        console.warn('[Process Sequence] Market telemetry lookup failed:', error);
+    }
+
+    return segments.join('\n');
+}
+
 function normalizeMetadata(raw: any): Record<string, any> {
     if (!raw) return {};
     if (typeof raw === 'object' && !Array.isArray(raw)) return raw as Record<string, any>;
@@ -708,6 +833,11 @@ async function handleGeneration(execution, job) {
         : null;
     const targetEmailId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
     const defaultSubject = String(metadata?.subject || metadata?.aiSubject || metadata?.label || 'Message from Nodal Point').trim();
+    const wantsLiveSignals = Array.isArray(metadata?.vectors)
+        && metadata.vectors.some((value: unknown) => ['recent_news', 'market_signal', 'market_news', 'live_news'].includes(String(value)));
+    const liveSignalContext = wantsLiveSignals
+        ? await buildLiveSignalContext(accountDomain || member.account_website || null)
+        : '';
 
     try {
     const response = await fetch(`${API_BASE_URL}/api/ai/optimize`, {
@@ -766,6 +896,10 @@ async function handleGeneration(execution, job) {
                 sender_email: senderEmail,
                 sender_domain: senderDomain,
                 sender_first_name: member.owner_first_name || null,
+                news: liveSignalContext || null,
+                market_news: liveSignalContext || null,
+                market_signal: liveSignalContext || null,
+                liveSignals: liveSignalContext || null,
                 call_context: callContext || null,
                 transcript: usableCalls[0]?.transcriptSnippet || null,
                 notes: noteContext || null
@@ -1024,7 +1158,20 @@ async function handleSend(execution, job) {
             html: htmlBody,
             email_id: emailRecordId,
             contactId: member.contact_id || undefined,
-            metadata: { execution_id: execution.id, member_id: member.id }
+            metadata: {
+                source: 'sequence',
+                execution_id: execution.id,
+                sequenceExecutionId: execution.id,
+                sequence_id: execution.sequence_id,
+                sequenceId: execution.sequence_id,
+                member_id: member.id,
+                memberId: member.id,
+                step_type: execution.step_type,
+                stepType: execution.step_type,
+                emailRecordId,
+                senderEmail: fromEmail,
+                senderDomain
+            }
         })
     })
 
