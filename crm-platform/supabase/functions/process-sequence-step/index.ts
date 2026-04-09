@@ -536,13 +536,28 @@ async function handleGeneration(execution, job) {
     const accountState = member.account_state ? member.account_state.trim() : null;
     const contactCity = member.contact_city ? member.contact_city.trim() : null;
     const contactState = member.contact_state ? member.contact_state.trim() : null;
-    const location = siteCity
-        ? `${siteCity}${siteState ? `, ${siteState}` : ''}`
-        : accountCity
-            ? `${accountCity}${accountState ? `, ${accountState}` : ''}`
-            : contactCity
-                ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
-                : null;
+    const primarySite = extractPrimarySiteDetails({
+        address: member.account_address,
+        service_addresses: member.account_service_addresses,
+        city: accountCity,
+        state: accountState
+    });
+    const primarySiteAddress = primarySite.address;
+    const siteCity = primarySite.city || accountCity || contactCity || '';
+    const siteState = primarySite.state || accountState || contactState || '';
+    const texasEnergy = getTexasEnergyContext(siteCity, siteState, primarySiteAddress || siteCity);
+    const utilityTerritory = typeof member.utility_territory === 'string' && member.utility_territory.trim()
+        ? member.utility_territory.trim()
+        : texasEnergy.utilityTerritory;
+    const location = primarySiteAddress
+        ? primarySiteAddress
+        : siteCity
+            ? `${siteCity}${siteState ? `, ${siteState}` : ''}`
+            : accountCity
+                ? `${accountCity}${accountState ? `, ${accountState}` : ''}`
+                : contactCity
+                    ? `${contactCity}${contactState ? `, ${contactState}` : ''}`
+                    : null;
     const hierarchyIds = extractHierarchyIds(member.account_metadata);
     const relatedIds = [hierarchyIds.parentAccountId, ...(hierarchyIds.subsidiaryAccountIds || [])].filter(Boolean);
     const relatedAccounts = relatedIds.length
@@ -562,19 +577,6 @@ async function handleGeneration(execution, job) {
         : hierarchyIds.subsidiaryAccountIds.length > 0
             ? 'parent'
             : 'standalone';
-    const primarySite = extractPrimarySiteDetails({
-        address: member.account_address,
-        service_addresses: member.account_service_addresses,
-        city: accountCity,
-        state: accountState
-    });
-    const primarySiteAddress = primarySite.address;
-    const siteCity = primarySite.city || accountCity || contactCity || '';
-    const siteState = primarySite.state || accountState || contactState || '';
-    const texasEnergy = getTexasEnergyContext(siteCity, siteState, primarySiteAddress || siteCity);
-    const utilityTerritory = typeof member.utility_territory === 'string' && member.utility_territory.trim()
-        ? member.utility_territory.trim()
-        : texasEnergy.utilityTerritory;
     const marketContext = texasEnergy.marketContext;
     const hierarchySummary = [
         `Operating company: ${member.company_name || 'Unknown'}`,
