@@ -1246,7 +1246,7 @@ export function useUpdateContact() {
       queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) =>
         patchContactListCache(old, variables)
       )
-      queryClient.setQueriesData({ queryKey: ['contact'] }, (cached: any) =>
+      queryClient.setQueriesData({ queryKey: ['contact', variables.id] }, (cached: any) =>
         patchContactDetailCache(cached, variables)
       )
       queryClient.setQueriesData({ queryKey: ['account-contacts'] }, (old: any) =>
@@ -1255,7 +1255,7 @@ export function useUpdateContact() {
 
       if (variables.accountId || variables.linkedAccountId) {
         const linkedAccountId = variables.accountId || variables.linkedAccountId
-        queryClient.setQueriesData({ queryKey: ['account'] }, (cached: any) => {
+        queryClient.setQueriesData({ queryKey: ['account', linkedAccountId] }, (cached: any) => {
           if (!cached || cached.id !== linkedAccountId) return cached
           return {
             ...cached,
