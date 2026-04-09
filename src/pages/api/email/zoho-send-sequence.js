@@ -370,6 +370,36 @@ export default async function handler(req, res) {
 
     } catch (error) {
         logger.error('[Zoho Sequence] Error sending email:', error, 'zoho-send-sequence');
+        if (email_id) {
+            try {
+                const failedAt = new Date().toISOString();
+                const failureReason = String(error?.message || 'Failed to send sequence email').trim().slice(0, 500);
+                const failureMetadata = {
+                    ...(body.metadata && typeof body.metadata === 'object' ? body.metadata : {}),
+                    provider: 'zoho',
+                    zohoFolder: 'failed',
+                    failureReason,
+                    failedAt,
+                    isSequenceEmail: true,
+                };
+
+                const { error: failureUpdateError } = await supabase
+                    .from('emails')
+                    .update({
+                        status: 'failed',
+                        type: 'scheduled',
+                        updatedAt: failedAt,
+                        metadata: failureMetadata
+                    })
+                    .eq('id', email_id);
+
+                if (failureUpdateError) {
+                    logger.error('[Zoho Sequence] Failed to mark email as failed:', failureUpdateError.message);
+                }
+            } catch (failurePersistError) {
+                logger.error('[Zoho Sequence] Failed to persist send failure state:', failurePersistError?.message || failurePersistError);
+            }
+        }
         res.writeHead(error.status || 500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({
             error: 'Failed to send email',
