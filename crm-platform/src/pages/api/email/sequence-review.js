@@ -756,7 +756,17 @@ export default async function handler(req, res) {
       .upsert(baseEmailPayload, { onConflict: 'id' });
 
     if (upsertEmailError) {
-      logger.warn('[Sequence Review] email upsert warning:', upsertEmailError.message);
+      throw upsertEmailError;
+    }
+
+    const { data: savedEmail, error: verifyEmailError } = await supabase
+      .from('emails')
+      .select('id')
+      .eq('id', targetEmailId)
+      .maybeSingle();
+
+    if (verifyEmailError || !savedEmail) {
+      throw verifyEmailError || new Error(`Generated email row was not persisted for ${targetEmailId}`);
     }
 
     res.status(200).json({
