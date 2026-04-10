@@ -5,7 +5,7 @@ import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js'
 
 /**
  * Nodal Point Embedding Engine (OpenRouter Version)
- * Decoupled from Google SDK to use standard OpenAI-compatible completions/embeddings
+ * Keep outputs at 768 dimensions so they match the existing vector columns.
  */
 
 const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY')
@@ -14,7 +14,11 @@ if (!OPENROUTER_API_KEY) {
 }
 const DB_URL = Deno.env.get('SUPABASE_DB_URL')
 
-const sql = postgres(DB_URL!)
+if (!DB_URL) {
+    throw new Error('SUPABASE_DB_URL is not set in Supabase Secrets')
+}
+
+const sql = postgres(DB_URL)
 
 const jobSchema = z.object({
     jobId: z.number(),
@@ -26,11 +30,14 @@ const jobSchema = z.object({
 })
 
 const QUEUE_NAME = 'embedding_jobs'
+const EMBEDDING_MODEL = 'openai/text-embedding-3-small'
+const EMBEDDING_DIMENSIONS = 768
+const MAX_READS_BEFORE_ARCHIVE = 3
 
 Deno.serve(async (req) => {
     if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 })
 
-    let body;
+    let body
     try {
         body = await req.json()
     } catch (e) {
@@ -39,7 +46,10 @@ Deno.serve(async (req) => {
 
     const parseResult = z.array(jobSchema).safeParse(body)
     if (!parseResult.success) {
-        return new Response(JSON.stringify({ error: 'Invalid job schema', details: parseResult.error }), { status: 400 })
+        return new Response(JSON.stringify({ error: 'Invalid job schema', details: parseResult.error }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+        })
     }
 
     const jobs = parseResult.data
@@ -52,6 +62,7 @@ Deno.serve(async (req) => {
             completed.push(job)
         } catch (e) {
             console.error(`Job ${job.jobId} failed:`, e)
+            await handleFailure(job, e)
             failed.push({ ...job, error: e.message })
         }
     }
@@ -64,12 +75,11 @@ Deno.serve(async (req) => {
 async function processJob(job: z.infer<typeof jobSchema>) {
     const { jobId, id, schema, table, contentFunction, embeddingColumn } = job
 
-    // 1. Get content
     const [row] = await sql`
-    SELECT ${sql(contentFunction)}(t) as content 
-    FROM ${sql(schema)}.${sql(table)} t 
-    WHERE id = ${id}
-  `
+      SELECT ${sql(contentFunction)}(t) as content
+      FROM ${sql(schema)}.${sql(table)} t
+      WHERE id = ${id}
+    `
 
     if (!row || !row.content) {
         console.warn(`No content found for ${schema}.${table}/${id}`)
@@ -77,19 +87,20 @@ async function processJob(job: z.infer<typeof jobSchema>) {
         return
     }
 
-    // 2. Clear content if it's too long (OpenRouter/OpenAI limit)
-    const text = (row.content as string).slice(0, 8000)
+    const text = String(row.content).slice(0, 8000)
 
-    // 3. Get Embedding from OpenRouter
     const response = await fetch('https://openrouter.ai/api/v1/embeddings', {
         method: 'POST',
         headers: {
             'Authorization': `Bearer ${OPENROUTER_API_KEY}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://nodalpoint.io',
+            'X-Title': 'Nodal Point CRM',
         },
         body: JSON.stringify({
-            model: 'openai/text-embedding-3-small',
-            input: text
+            model: EMBEDDING_MODEL,
+            input: text,
+            dimensions: EMBEDDING_DIMENSIONS,
         })
     })
 
@@ -105,14 +116,46 @@ async function processJob(job: z.infer<typeof jobSchema>) {
     }
 
     const embedding = result.data[0].embedding
+    if (!Array.isArray(embedding) || embedding.length !== EMBEDDING_DIMENSIONS) {
+        throw new Error(`Expected ${EMBEDDING_DIMENSIONS} dimensions, received ${Array.isArray(embedding) ? embedding.length : 'invalid'}`)
+    }
 
-    // 4. Update DB
     await sql`
-    UPDATE ${sql(schema)}.${sql(table)}
-    SET ${sql(embeddingColumn)} = ${JSON.stringify(embedding)}
-    WHERE id = ${id}
-  `
+      UPDATE ${sql(schema)}.${sql(table)}
+      SET ${sql(embeddingColumn)} = ${JSON.stringify(embedding)}
+      WHERE id = ${id}
+    `
 
-    // 5. Cleanup Queue
     await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
+}
+
+async function handleFailure(job: z.infer<typeof jobSchema>, error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    const shouldArchiveImmediately =
+        message.toLowerCase().includes('dimension') ||
+        message.toLowerCase().includes('invalid request') ||
+        message.toLowerCase().includes('invalid input') ||
+        message.toLowerCase().includes('not available') ||
+        message.includes('400') ||
+        message.includes('404')
+
+    const readCount = await getReadCount(job.jobId)
+    if (shouldArchiveImmediately || readCount >= MAX_READS_BEFORE_ARCHIVE) {
+        try {
+            await sql`SELECT pgmq.archive(${QUEUE_NAME}, ${job.jobId}::bigint)`
+            console.warn(`Archived embedding job ${job.jobId} after ${readCount} reads: ${message}`)
+        } catch (archiveError) {
+            console.error(`Failed to archive embedding job ${job.jobId}:`, archiveError)
+        }
+    }
+}
+
+async function getReadCount(jobId: number) {
+    const [row] = await sql`
+      SELECT read_ct
+      FROM pgmq.q_embedding_jobs
+      WHERE msg_id = ${jobId}::bigint
+    `
+
+    return row?.read_ct ?? 0
 }
