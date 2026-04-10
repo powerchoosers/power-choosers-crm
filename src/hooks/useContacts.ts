@@ -4,6 +4,7 @@ import { useAuth } from '@/context/AuthContext'
 import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
+import { buildStatusIlikeClauses } from '@/lib/status-filters'
 
 export interface Contact {
   id: string
@@ -585,7 +586,10 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         // Apply column filters
         if (filters?.status && filters.status.length > 0) {
-          query = query.in('status', filters.status);
+          const statusConditions = buildStatusIlikeClauses(filters.status)
+          if (statusConditions.length > 0) {
+            query = query.or(statusConditions.join(','))
+          }
         }
 
         if (filters?.title && filters.title.length > 0) {
@@ -758,7 +762,10 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
 
       // Apply column filters
       if (filters?.status && filters.status.length > 0) {
-        query = query.in('status', filters.status);
+        const statusConditions = buildStatusIlikeClauses(filters.status)
+        if (statusConditions.length > 0) {
+          query = query.or(statusConditions.join(','))
+        }
       }
 
       if (filters?.title && filters.title.length > 0) {
