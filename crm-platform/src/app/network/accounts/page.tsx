@@ -8,7 +8,6 @@ import {
   useReactTable,
   getPaginationRowModel,
   getSortedRowModel,
-  getFilteredRowModel,
   ColumnDef,
   SortingState,
   ColumnFiltersState,
@@ -627,8 +626,8 @@ export default function AccountsPage() {
     onSortingChange: setSorting,
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
-    getFilteredRowModel: getFilteredRowModel(),
     onGlobalFilterChange: setGlobalFilter,
+    manualFiltering: true,
     onPaginationChange: (updater) => {
       if (typeof updater === 'function') {
         const nextPagination = updater(pagination)
@@ -650,7 +649,7 @@ export default function AccountsPage() {
     },
   })
 
-  const filteredRowCount = table.getFilteredRowModel().rows.length
+  const filteredRowCount = accounts.length
   const showingStart = filteredRowCount === 0
     ? 0
     : Math.min(filteredRowCount, pagination.pageIndex * PAGE_SIZE + 1)
