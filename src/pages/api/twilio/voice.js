@@ -388,6 +388,8 @@ export default async function handler(req, res) {
             : (host ? `${proto}://${host}` : 'https://www.nodalpoint.io');
 
         const callbackParams = new URLSearchParams();
+        if (isInboundPstn) callbackParams.append('callDirection', 'inbound');
+        else callbackParams.append('callDirection', 'outbound');
         if (agentId) callbackParams.append('agentId', agentId);
         if (agentEmail) callbackParams.append('agentEmail', agentEmail);
         if (powerDialSessionId) callbackParams.append('powerDialSessionId', powerDialSessionId);
