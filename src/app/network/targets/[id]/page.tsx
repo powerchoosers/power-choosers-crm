@@ -73,6 +73,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { buildPowerDialTargets } from '@/lib/powerDialer'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
+import { normalizeStatusToken } from '@/lib/status-filters'
 
 const PAGE_SIZE = 50
 
@@ -489,11 +490,14 @@ export default function TargetDetailPage() {
       filterFn: () => true, // Server-side filtered
       cell: ({ row }) => {
         const status = row.getValue('status') as string
+        const normalizedStatus = normalizeStatusToken(status)
+        const isCustomer = normalizedStatus === 'CUSTOMER'
+        const isLead = normalizedStatus === 'LEAD'
         return (
           <div className="flex items-center gap-2">
             <div className={cn(
               "w-1.5 h-1.5 rounded-full",
-              status === 'Customer' ? "bg-emerald-500 animate-pulse" : "bg-zinc-600"
+              isCustomer ? "bg-emerald-500 animate-pulse" : isLead ? "bg-[#002FA7]" : "bg-zinc-600"
             )} />
             <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500">{status}</span>
           </div>
@@ -664,8 +668,9 @@ export default function TargetDetailPage() {
         const account = row.original
         const hasContract = !!account.contractEnd
         const isExpired = hasContract && new Date(account.contractEnd) < new Date()
-        const isCustomer = account.status === 'CUSTOMER'
-        const isActiveLoad = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+        const normalizedStatus = normalizeStatusToken(account.status)
+        const isCustomer = normalizedStatus === 'CUSTOMER'
+        const isActiveLoad = (!isExpired && hasContract) || normalizedStatus === 'ACTIVE_LOAD' || normalizedStatus === 'ACTIVE'
         const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active' : isExpired ? 'Expired' : 'No Contract'
         const isActive = isCustomer || isActiveLoad
         return (

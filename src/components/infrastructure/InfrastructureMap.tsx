@@ -9,6 +9,7 @@ import { mapLocationToZone, ERCOT_ZONES } from '@/lib/market-mapping';
 import { useAuth } from '@/context/AuthContext';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
+import { normalizeStatusToken } from '@/lib/status-filters';
 
 const HOVER_DELAY_MS = 1000;
 /** Time to keep card open after leaving marker so user can move to card and click Open dossier */
@@ -25,12 +26,12 @@ function isContractActive(contractEnd?: string | null) {
 }
 
 function isCustomerStatus(status?: string | null) {
-  return (status ?? '').trim().toUpperCase() === 'CUSTOMER';
+  return normalizeStatusToken(status) === 'CUSTOMER';
 }
 
 function isTrueActiveLoadAccount(account: { status?: string | null; contract_end_date?: string | null }) {
-  const normalized = (account.status ?? '').trim().toUpperCase();
-  return normalized === 'ACTIVE_LOAD' || isContractActive(account.contract_end_date);
+  const normalized = normalizeStatusToken(account.status);
+  return normalized === 'ACTIVE_LOAD' || normalized === 'ACTIVE' || isContractActive(account.contract_end_date);
 }
 
 function isInfrastructureEligibleAccount(account: { status?: string | null; contract_end_date?: string | null }) {

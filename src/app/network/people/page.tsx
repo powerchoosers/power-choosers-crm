@@ -74,6 +74,7 @@ import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { toast } from 'sonner'
 import { useComposeStore } from '@/store/composeStore'
+import { normalizeStatusToken, statusMatchesFilter } from '@/lib/status-filters'
 
 const PAGE_SIZE = 50
 
@@ -447,11 +448,12 @@ export default function PeoplePage() {
       {
         accessorKey: 'status',
         header: 'Status',
-        filterFn: 'arrIncludesSome',
+        filterFn: (row, id, value) => statusMatchesFilter(row.getValue(id), value),
         cell: ({ row }) => {
           const status = row.getValue('status') as string
-          const isCustomer = status === 'Customer'
-          const isLead = status === 'Lead'
+          const normalizedStatus = normalizeStatusToken(status)
+          const isCustomer = normalizedStatus === 'CUSTOMER'
+          const isLead = normalizedStatus === 'LEAD'
 
           return (
             <div className="flex items-center gap-2">

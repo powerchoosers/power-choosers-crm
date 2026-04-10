@@ -32,6 +32,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useDesktopFolderSync } from '@/hooks/useDesktopFolderSync'
 import { ForensicClose } from '@/components/ui/ForensicClose'
+import { normalizeStatusToken } from '@/lib/status-filters'
 
 const VAULT_FILTERS: { id: DocumentTypeFilter; label: string; icon: React.ElementType }[] = [
   { id: 'ALL_ASSETS', label: 'All Assets', icon: FileStack },
@@ -529,37 +530,45 @@ export default function VaultPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
                     {folderList
                       .filter((f) => !globalFilter || f.name.toLowerCase().includes(globalFilter.toLowerCase()))
-                      .map((folder) => (
-                        <motion.button
-                          key={folder.accountId}
-                          type="button"
-                          onClick={() => setSelectedAccountId(folder.accountId)}
-                          className="nodal-void-card p-4 text-left transition-all hover:border-[#002FA7]/30 hover:bg-[#002FA7]/10 group"
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                        >
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <CompanyIcon
-                              logoUrl={folder.logoUrl}
-                              domain={folder.domain}
-                              name={folder.name}
-                              size={36}
-                              roundedClassName="rounded-[14px]"
-                            />
-                            <span
-                              className={cn(
-                                'w-2 h-2 rounded-full flex-shrink-0',
-                                folder.status === 'CUSTOMER' ? 'bg-[#002FA7]' : folder.status === 'PROSPECT' ? 'bg-amber-500' : 'bg-zinc-600'
-                              )}
-                            />
-                          </div>
-                          <p className="font-mono text-sm text-zinc-200 truncate mb-1">{folder.name}</p>
-                          <p className="text-[10px] font-mono text-zinc-500 tabular-nums">
-                            DOCS: {String(folder.fileCount).padStart(2, '0')} · {folder.totalSize}
-                          </p>
-                          <p className="text-[10px] font-mono text-zinc-600">{formatDistanceToNow(new Date(folder.lastAt), { addSuffix: true })}</p>
-                        </motion.button>
-                      ))}
+                      .map((folder) => {
+                        const normalizedStatus = normalizeStatusToken(folder.status)
+
+                        return (
+                          <motion.button
+                            key={folder.accountId}
+                            type="button"
+                            onClick={() => setSelectedAccountId(folder.accountId)}
+                            className="nodal-void-card p-4 text-left transition-all hover:border-[#002FA7]/30 hover:bg-[#002FA7]/10 group"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <div className="flex items-center justify-between gap-2 mb-2">
+                              <CompanyIcon
+                                logoUrl={folder.logoUrl}
+                                domain={folder.domain}
+                                name={folder.name}
+                                size={36}
+                                roundedClassName="rounded-[14px]"
+                              />
+                              <span
+                                className={cn(
+                                  'w-2 h-2 rounded-full flex-shrink-0',
+                                  normalizedStatus === 'CUSTOMER'
+                                    ? 'bg-[#002FA7]'
+                                    : normalizedStatus === 'PROSPECT'
+                                      ? 'bg-amber-500'
+                                      : 'bg-zinc-600'
+                                )}
+                              />
+                            </div>
+                            <p className="font-mono text-sm text-zinc-200 truncate mb-1">{folder.name}</p>
+                            <p className="text-[10px] font-mono text-zinc-500 tabular-nums">
+                              DOCS: {String(folder.fileCount).padStart(2, '0')} · {folder.totalSize}
+                            </p>
+                            <p className="text-[10px] font-mono text-zinc-600">{formatDistanceToNow(new Date(folder.lastAt), { addSuffix: true })}</p>
+                          </motion.button>
+                        )
+                      })}
                   </div>
                 )}
               </div>
