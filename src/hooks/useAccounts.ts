@@ -300,7 +300,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         if (!enabled || loading) return { accounts: [], nextCursor: null };
         if (!user && !loading) return { accounts: [], nextCursor: null };
 
-        let query = supabase.from('accounts').select(ACCOUNT_LIST_SELECT, { count: 'exact' });
+        let query = supabase.from('accounts').select(ACCOUNT_LIST_SELECT);
 
         if (listId) {
           // Fetch targetIds from list_members first due to lack of FK for inner join
@@ -350,7 +350,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         const from = pageParam * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
-        const { data, error, count } = await query
+        const { data, error } = await query
           .range(from, to)
           .order('name', { ascending: true });
 
@@ -369,7 +369,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
 
         const accounts = data.map((row) => mapAccountRow(row)) as Account[];
 
-        const hasNextPage = count ? from + PAGE_SIZE < count : false;
+        const hasNextPage = data.length === PAGE_SIZE;
 
         return {
           accounts,
