@@ -6,6 +6,7 @@ import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
 import { getTexasEnergyContext } from '@/lib/texas-territory'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
+import { buildStatusIlikeClauses } from '@/lib/status-filters'
 
 export interface Account {
   id: string
@@ -336,11 +337,10 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           query = query.in('industry', filters.industry);
         }
         if (filters?.status && filters.status.length > 0) {
-          // DB may store 'active' for Active Load and 'CUSTOMER' for Customer; expand filter to match both
-          const statusValues = filters.status.flatMap((s: string) =>
-            s === 'ACTIVE_LOAD' ? ['ACTIVE_LOAD', 'active'] : s === 'CUSTOMER' ? ['CUSTOMER', 'customer'] : [s]
-          );
-          query = query.in('status', statusValues);
+          const statusConditions = buildStatusIlikeClauses(filters.status)
+          if (statusConditions.length > 0) {
+            query = query.or(statusConditions.join(','))
+          }
         }
         if (filters?.location && filters.location.length > 0) {
           const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
@@ -559,10 +559,10 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
         query = query.in('industry', filters.industry);
       }
       if (filters?.status && filters.status.length > 0) {
-        const statusValues = filters.status.flatMap((s: string) =>
-          s === 'ACTIVE_LOAD' ? ['ACTIVE_LOAD', 'active'] : s === 'CUSTOMER' ? ['CUSTOMER', 'customer'] : [s]
-        );
-        query = query.in('status', statusValues);
+        const statusConditions = buildStatusIlikeClauses(filters.status)
+        if (statusConditions.length > 0) {
+          query = query.or(statusConditions.join(','))
+        }
       }
       if (filters?.location && filters.location.length > 0) {
         const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');

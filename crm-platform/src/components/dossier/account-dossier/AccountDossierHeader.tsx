@@ -14,6 +14,7 @@ import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import DestructModal from '@/components/network/DestructModal'
 import { cn } from '@/lib/utils'
 import { domainToClickableUrl } from '@/lib/url'
+import { normalizeStatusToken } from '@/lib/status-filters'
 
 function parseContractEndDate(raw: unknown): Date | null {
     if (!raw) return null
@@ -328,8 +329,9 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                         const hasContract = !!account.contractEnd
                                         const contractEnd = parseContractEndDate(account.contractEnd)
                                         const isExpired = hasContract && contractEnd && contractEnd < new Date()
-                                        const isCustomer = account.status === 'CUSTOMER'
-                                        const isActiveLoad = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+                                        const normalizedStatus = normalizeStatusToken(account.status)
+                                        const isCustomer = normalizedStatus === 'CUSTOMER'
+                                        const isActiveLoad = (!isExpired && hasContract) || normalizedStatus === 'ACTIVE_LOAD' || normalizedStatus === 'ACTIVE'
 
                                         const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active Load' : isExpired ? 'Expired' : 'No Contract'
                                         return (

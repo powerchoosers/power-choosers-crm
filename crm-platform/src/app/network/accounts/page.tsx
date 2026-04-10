@@ -71,6 +71,7 @@ import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { toast } from 'sonner'
+import { normalizeStatusToken, statusMatchesFilter } from '@/lib/status-filters'
 
 const PAGE_SIZE = 50
 
@@ -421,13 +422,14 @@ export default function AccountsPage() {
       {
         id: 'status',
         header: 'Status',
-        filterFn: 'arrIncludesSome',
+        filterFn: (row, id, value) => statusMatchesFilter(row.getValue(id), value),
         cell: ({ row }) => {
           const account = row.original
           const hasContract = !!account.contractEnd
           const isExpired = hasContract && new Date(account.contractEnd) < new Date()
-          const isCustomer = account.status === 'CUSTOMER'
-          const isActiveLoad = (hasContract && !isExpired) || account.status === 'ACTIVE_LOAD'
+          const normalizedStatus = normalizeStatusToken(account.status)
+          const isCustomer = normalizedStatus === 'CUSTOMER'
+          const isActiveLoad = (!isExpired && hasContract) || normalizedStatus === 'ACTIVE_LOAD' || normalizedStatus === 'ACTIVE'
           const displayStatus = isCustomer
             ? 'Customer'
             : isActiveLoad
