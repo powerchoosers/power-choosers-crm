@@ -552,7 +552,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
 
         let query = supabase
           .from('contacts')
-          .select(CONTACT_LIST_SELECT, { count: 'exact' });
+          .select(CONTACT_LIST_SELECT);
 
         if (listId) {
           // Fetch targetIds from list_members first due to lack of FK for inner join
@@ -615,7 +615,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         const from = pageParam * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
-        const { data, error, count } = await query
+        const { data, error } = await query
           .range(from, to)
           .order('lastName', { ascending: true })
           .order('firstName', { ascending: true })
@@ -694,7 +694,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
           }
         }) as Contact[];
 
-        const hasNextPage = count ? from + PAGE_SIZE < count : false;
+        const hasNextPage = data.length === PAGE_SIZE;
 
 
         return {
