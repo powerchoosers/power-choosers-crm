@@ -1,25 +1,57 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import dotenv from 'dotenv';
+const OPENROUTER_API_KEY = process.env.OPEN_ROUTER_API_KEY || process.env.OPENROUTER_API_KEY;
+const EMBEDDING_MODEL = 'openai/text-embedding-3-small';
+const EMBEDDING_DIMENSIONS = 768;
+const EMBEDDING_URL = 'https://openrouter.ai/api/v1/embeddings';
 
-dotenv.config();
-
-const apiKey = process.env.GEMINI_API_KEY || process.env.FREE_GEMINI_KEY;
-if (!apiKey) {
-  console.warn('GEMINI_API_KEY is not set. Embedding generation will fail.');
+if (!OPENROUTER_API_KEY) {
+  console.warn('OPEN_ROUTER_API_KEY is not set. Embedding generation will fail.');
 }
-
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: "text-embedding-004" });
 
 export async function generateEmbedding(text) {
   if (!text || typeof text !== 'string') return null;
-  
-  // Clean text and truncate if necessary (Gemini has a limit, but it's high)
-  const cleanText = text.trim().slice(0, 9000); // Safety limit
+  if (!OPENROUTER_API_KEY) return null;
+
+  // Keep requests small so we do not waste bandwidth on verbose prompts.
+  const cleanText = text.trim().slice(0, 8000);
 
   try {
-    const result = await model.embedContent(cleanText);
-    return result.embedding.values;
+    const response = await fetch(EMBEDDING_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://nodalpoint.io',
+        'X-Title': 'Nodal Point CRM',
+      },
+      body: JSON.stringify({
+        model: EMBEDDING_MODEL,
+        input: cleanText,
+        dimensions: EMBEDDING_DIMENSIONS,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      console.error('[embeddings] OpenRouter error:', response.status, errorBody);
+      return null;
+    }
+
+    const result = await response.json();
+    const embedding = result?.data?.[0]?.embedding;
+
+    if (!Array.isArray(embedding)) {
+      console.error('[embeddings] OpenRouter returned an invalid embedding payload:', result);
+      return null;
+    }
+
+    if (embedding.length !== EMBEDDING_DIMENSIONS) {
+      console.error(
+        `[embeddings] Expected ${EMBEDDING_DIMENSIONS} dimensions, received ${embedding.length}`,
+      );
+      return null;
+    }
+
+    return embedding;
   } catch (error) {
     console.error('Error generating embedding:', error);
     return null;
