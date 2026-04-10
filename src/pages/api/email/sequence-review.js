@@ -439,6 +439,10 @@ export default async function handler(req, res) {
       : hierarchyIds.subsidiaryAccountIds.length > 0
         ? 'parent'
         : 'standalone';
+    const accountCity = account?.city ? account.city.trim() : null;
+    const accountState = account?.state ? account.state.trim() : null;
+    const contactCity = contact.city ? contact.city.trim() : null;
+    const contactState = contact.state ? contact.state.trim() : null;
     const primarySite = extractPrimarySiteDetails(account);
     const primarySiteAddress = primarySite.address;
     const siteCity = typeof primarySite.city === 'string' && primarySite.city.trim()
@@ -505,10 +509,6 @@ export default async function handler(req, res) {
     const accountDomain = account?.domain || null;
     const website = account?.website || (accountDomain ? `https://${accountDomain}` : null);
     // Prefer the actual site over HQ/contact city when available.
-    const accountCity = account?.city ? account.city.trim() : null;
-    const accountState = account?.state ? account.state.trim() : null;
-    const contactCity = contact.city ? contact.city.trim() : null;
-    const contactState = contact.state ? contact.state.trim() : null;
     const location = primarySiteAddress
       ? primarySiteAddress
       : siteCity
