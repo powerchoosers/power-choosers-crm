@@ -153,7 +153,8 @@ export default async function handler(req, res) {
     const voicemailDropRequested = ['1', 'true', 'yes', 'on'].includes(
       String(requestUrl.searchParams.get('voicemailDrop') || requestUrl.searchParams.get('playVoicemail') || '').toLowerCase()
     );
-    const isOutboundDial = Boolean(targetPhoneFromQuery);
+    const callDirection = requestUrl.searchParams.get('callDirection');
+    const isOutboundDial = callDirection ? callDirection === 'outbound' : Boolean(targetPhoneFromQuery);
     // Inbound unanswered calls can still use the saved greeting.
     // Outbound calls should only play a greeting when voicemail drop was explicitly requested.
     const shouldPlayVoicemail = !isPowerDialBatch &&
@@ -199,7 +200,8 @@ export default async function handler(req, res) {
     // We strictly use <Hangup/> to ensure call ends cleanly without system messages
     if (shouldPlayVoicemail) {
       if (voicemailGreeting?.publicUrl) {
-        twiml.play(voicemailGreeting.publicUrl)
+        const playUrl = voicemailGreeting.publicUrl + (voicemailGreeting.publicUrl.includes('?') ? '&' : '?') + 'cb=' + Date.now();
+        twiml.play(playUrl)
         twiml.hangup()
       } else {
         twiml.say('The person you called is unavailable. Please try again later.')
