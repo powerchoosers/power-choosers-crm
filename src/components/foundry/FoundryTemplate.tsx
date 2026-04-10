@@ -56,12 +56,85 @@ export default function FoundryTemplate({
 
     return (
         <Html>
-            <Head />
+            <Head>
+                <meta charSet="utf-8" />
+                <meta name="color-scheme" content="light dark" />
+                <meta name="supported-color-schemes" content="light dark" />
+                <style>{`
+                    :root {
+                        color-scheme: light dark;
+                    }
+
+                    [data-ogsc] .foundry-email-shell,
+                    [data-ogsc] .foundry-email-container,
+                    [data-ogsc] .foundry-email-header,
+                    [data-ogsc] .foundry-email-content,
+                    [data-ogsc] .foundry-email-footer {
+                        background-color: #0a0a0a !important;
+                        color: #e4e4e7 !important;
+                    }
+
+                    @media (prefers-color-scheme: dark) {
+                        .foundry-email-shell {
+                            background-color: #0a0a0a !important;
+                        }
+
+                        .foundry-email-container {
+                            background-color: #0f0f0f !important;
+                            border-color: rgba(255, 255, 255, 0.08) !important;
+                            box-shadow: none !important;
+                        }
+
+                        .foundry-email-header,
+                        .foundry-email-footer {
+                            background-color: #0f0f0f !important;
+                            border-color: rgba(255, 255, 255, 0.08) !important;
+                        }
+
+                        .foundry-email-content {
+                            background-color: #0f0f0f !important;
+                        }
+
+                        .foundry-email-surface {
+                            background-color: #111111 !important;
+                            border-color: rgba(255, 255, 255, 0.08) !important;
+                        }
+
+                        .foundry-email-surface-soft {
+                            background-color: #18181b !important;
+                            border-color: rgba(255, 255, 255, 0.08) !important;
+                        }
+
+                        .foundry-email-border {
+                            border-color: rgba(255, 255, 255, 0.08) !important;
+                        }
+
+                        .foundry-email-brand,
+                        .foundry-email-copy,
+                        .foundry-email-headline,
+                        .foundry-email-value,
+                        .foundry-email-footer-name {
+                            color: #e4e4e7 !important;
+                        }
+
+                        .foundry-email-muted,
+                        .foundry-email-ref,
+                        .foundry-email-caption {
+                            color: #a1a1aa !important;
+                        }
+
+                        .foundry-email-accent,
+                        .foundry-email-link {
+                            color: #6b8eff !important;
+                        }
+                    }
+                `}</style>
+            </Head>
             <Preview>{(blocks[0]?.content?.text || 'Nodal Point Intelligence').slice(0, 100)}</Preview>
-            <Body style={main}>
-                <Container style={container}>
+            <Body style={main} className="foundry-email-shell">
+                <Container style={container} className="foundry-email-container">
                     {/* HEADER */}
-                    <Section style={header}>
+                    <Section style={header} className="foundry-email-header">
                         <Row>
                             <Column style={headerLeft}>
                                 <Img
@@ -71,16 +144,16 @@ export default function FoundryTemplate({
                                     alt="Nodal Point"
                                     style={logo}
                                 />
-                                <Text style={brandText}>NODAL_POINT // INTELLIGENCE</Text>
+                                <Text style={brandText} className="foundry-email-brand">NODAL_POINT // INTELLIGENCE</Text>
                             </Column>
                             <Column style={headerRight}>
-                                <Text style={refText}>REF: {'{{date}}'} // {'{{context_id}}'}</Text>
+                                <Text style={refText} className="foundry-email-ref">REF: {'{{date}}'} // {'{{context_id}}'}</Text>
                             </Column>
                         </Row>
                     </Section>
 
                     {/* CONTENT BLOCKS */}
-                    <Section style={contentSection}>
+                    <Section style={contentSection} className="foundry-email-content">
                         {blocks.map((block) => {
                             // TEXT_MODULE
                             if (block.type === 'TEXT_MODULE') {
@@ -91,15 +164,15 @@ export default function FoundryTemplate({
 
                                 if (useAi && !text.trim()) {
                                     return (
-                                        <Section key={block.id} style={aiLoadingBox}>
-                                            <Text style={aiLoadingText}>[ AI_GENERATION_IN_PROGRESS ]</Text>
+                                        <Section key={block.id} style={aiLoadingBox} className="foundry-email-surface foundry-email-border">
+                                            <Text style={aiLoadingText} className="foundry-email-muted">[ AI_GENERATION_IN_PROGRESS ]</Text>
                                         </Section>
                                     )
                                 }
 
                                 return (
                                     <Section key={block.id} style={blockMargin}>
-                                        <Text style={paragraph}>
+                                        <Text style={paragraph} className="foundry-email-copy">
                                             {text.split(/\n\n+/).map((p: string, i: number) => (
                                                 <React.Fragment key={i}>
                                                     {p}
@@ -113,8 +186,8 @@ export default function FoundryTemplate({
                                             <Section style={bulletSection}>
                                                 {bullets.map((bullet: string, i: number) => (
                                                     <Row key={i} style={bulletRow}>
-                                                        <Column style={bulletDotCol}>●</Column>
-                                                        <Column style={bulletTextCol}>{bullet}</Column>
+                                                        <Column style={bulletDotCol} className="foundry-email-accent">●</Column>
+                                                        <Column style={bulletTextCol} className="foundry-email-muted">{bullet}</Column>
                                                     </Row>
                                                 ))}
                                             </Section>
@@ -141,26 +214,26 @@ export default function FoundryTemplate({
                                 const valueColors = block.content.valueColors || []
 
                                 const getValueStyle = (color: string) => {
-                                    if (color === 'yellow') return { color: '#b45309' }
-                                    if (color === 'red') return { color: '#dc2626' }
-                                    if (color === 'black') return { color: '#18181b' }
-                                    return { color: '#059669' }
+                                    if (color === 'yellow') return { color: '#b45309', className: 'foundry-email-accent' }
+                                    if (color === 'red') return { color: '#dc2626', className: 'foundry-email-accent' }
+                                    if (color === 'black') return { color: '#18181b', className: 'foundry-email-value' }
+                                    return { color: '#059669', className: 'foundry-email-accent' }
                                 }
 
                                 return (
-                                    <Section key={block.id} style={gridContainer}>
-                                        <Row style={gridHeaderRow}>
+                                    <Section key={block.id} style={gridContainer} className="foundry-email-surface foundry-email-border">
+                                        <Row style={gridHeaderRow} className="foundry-email-border">
                                             {headers.map((h: string, i: number) => (
-                                                <Column key={i} style={gridHeaderCell}>{h}</Column>
+                                                <Column key={i} style={gridHeaderCell} className="foundry-email-muted">{h}</Column>
                                             ))}
                                         </Row>
                                         {rows.map((row: string[], ri: number) => {
                                             const rowColor = valueColors[ri] ?? 'green'
                                             const valueStyle = getValueStyle(rowColor)
                                             return (
-                                                <Row key={ri}>
-                                                    {row.map((cell: string, ci: number) => (
-                                                        <Column key={ci} style={{ ...gridCell, ...(ci > 0 ? valueStyle : { color: '#18181b' }) }}>
+                                              <Row key={ri}>
+                                                {row.map((cell: string, ci: number) => (
+                                                        <Column key={ci} style={{ ...gridCell, ...(ci > 0 ? { color: valueStyle.color } : { color: '#18181b' }) }} className={ci > 0 ? valueStyle.className : 'foundry-email-copy'}>
                                                             {cell}
                                                         </Column>
                                                     ))}
@@ -181,28 +254,28 @@ export default function FoundryTemplate({
                                 const nodalAnalysis = c.nodalAnalysis
 
                                 return (
-                                    <Section key={block.id} style={breadcrumbContainer}>
-                                        <Section style={breadcrumbHeader}>
+                                    <Section key={block.id} style={breadcrumbContainer} className="foundry-email-surface foundry-email-border">
+                                        <Section style={breadcrumbHeader} className="foundry-email-surface-soft foundry-email-border">
                                             <Row>
                                                 <Column>
-                                                    <Text style={breadcrumbSource}>Source: {source}</Text>
+                                                    <Text style={breadcrumbSource} className="foundry-email-muted">Source: {source}</Text>
                                                 </Column>
                                                 <Column style={breadcrumbImpactCol}>
-                                                    <Text style={breadcrumbImpact}>[ {impactLevel} ]</Text>
+                                                    <Text style={breadcrumbImpact} className="foundry-email-accent">[ {impactLevel} ]</Text>
                                                 </Column>
                                             </Row>
                                         </Section>
                                         <Section style={breadcrumbContent}>
-                                            <Text style={breadcrumbHeadline}>{headline}</Text>
+                                            <Text style={breadcrumbHeadline} className="foundry-email-headline">{headline}</Text>
                                             {nodalAnalysis && (
-                                                <Section style={analysisBox}>
-                                                    <Text style={analysisLabel}>Nodal_Architect_Analysis:</Text>
-                                                    <Text style={analysisText}>"{nodalAnalysis}"</Text>
+                                                <Section style={analysisBox} className="foundry-email-surface">
+                                                    <Text style={analysisLabel} className="foundry-email-muted">Nodal_Architect_Analysis:</Text>
+                                                    <Text style={analysisText} className="foundry-email-copy">"{nodalAnalysis}"</Text>
                                                 </Section>
                                             )}
                                             {url && (
-                                                <Text style={breadcrumbLink}>
-                                                    <a href={url} style={{ color: '#002FA7', textDecoration: 'underline' }}>[ VIEW_FULL_TRANSMISSION ]</a>
+                                                <Text style={breadcrumbLink} className="foundry-email-link">
+                                                    <a href={url} style={{ color: '#002FA7', textDecoration: 'underline' }} className="foundry-email-link">[ VIEW_FULL_TRANSMISSION ]</a>
                                                 </Text>
                                             )}
                                         </Section>
@@ -213,7 +286,7 @@ export default function FoundryTemplate({
                             // VARIABLE_CHIP
                             if (block.type === 'VARIABLE_CHIP') {
                                 return (
-                                    <Text key={block.id} style={variableChip}>
+                                    <Text key={block.id} style={variableChip} className="foundry-email-accent">
                                         {block.content}
                                     </Text>
                                 )
@@ -228,22 +301,22 @@ export default function FoundryTemplate({
                                 const note = c.note
 
                                 return (
-                                    <Section key={block.id} style={gaugeContainer}>
+                                    <Section key={block.id} style={gaugeContainer} className="foundry-email-surface foundry-email-border">
                                         <Row style={gaugeHeader}>
                                             <Column>
-                                                <Text style={gaugeLabel}>{baselineLabel}</Text>
-                                                <Text style={gaugeValue}>${'{{contact.currentRate}}'}/kWh</Text>
+                                                <Text style={gaugeLabel} className="foundry-email-muted">{baselineLabel}</Text>
+                                                <Text style={gaugeValue} className="foundry-email-value">${'{{contact.currentRate}}'}/kWh</Text>
                                             </Column>
                                             <Column style={{ textAlign: 'right' }}>
-                                                <Text style={gaugeRiskLabel}>{status}</Text>
-                                                <Text style={gaugeRiskValue}>{riskLevel}%</Text>
+                                                <Text style={gaugeRiskLabel} className="foundry-email-muted">{status}</Text>
+                                                <Text style={gaugeRiskValue} className="foundry-email-value">{riskLevel}%</Text>
                                             </Column>
                                         </Row>
-                                        <Section style={gaugeTrack}>
+                                        <Section style={gaugeTrack} className="foundry-email-surface-soft">
                                             <Section style={{ ...gaugeFill, width: `${riskLevel}%` }} />
                                         </Section>
                                         {note && (
-                                            <Text style={gaugeNote}>{note}</Text>
+                                            <Text style={gaugeNote} className="foundry-email-muted">{note}</Text>
                                         )}
                                     </Section>
                                 )
@@ -270,7 +343,7 @@ export default function FoundryTemplate({
 
                     {/* FOOTER */}
                     {!skipFooter && (
-                        <Section style={footer}>
+                        <Section style={footer} className="foundry-email-footer">
                             <Section style={footerContent}>
                                 <Row>
                                     {photoUrl && (
@@ -279,28 +352,28 @@ export default function FoundryTemplate({
                                         </Column>
                                     )}
                                     <Column style={footerInfoCol}>
-                                        <Text style={footerName}>{name}</Text>
-                                        <Text style={footerTitle}>{title}</Text>
+                                        <Text style={footerName} className="foundry-email-footer-name">{name}</Text>
+                                        <Text style={footerTitle} className="foundry-email-muted">{title}</Text>
                                     </Column>
                                 </Row>
 
                                 <Section style={footerContact}>
-                                    <Text style={contactLine}>P: {phone}</Text>
-                                    <Text style={contactLine}>{location}</Text>
+                                    <Text style={contactLine} className="foundry-email-muted">P: {phone}</Text>
+                                    <Text style={contactLine} className="foundry-email-muted">{location}</Text>
                                 </Section>
 
                                 <Section style={footerLinksContainer}>
                                     <Row style={{ width: 'auto' }}>
                                         <Column style={linkColumn}>
-                                            <a href={linkedinUrl} style={linkStyle}>LINKEDIN</a>
+                                            <a href={linkedinUrl} style={linkStyle} className="foundry-email-link">LINKEDIN</a>
                                         </Column>
-                                        <Column style={separatorColumn}>//</Column>
+                                        <Column style={separatorColumn} className="foundry-email-muted">//</Column>
                                         <Column style={linkColumn}>
-                                            <a href={website} style={linkStyle}>WEBSITE</a>
+                                            <a href={website} style={linkStyle} className="foundry-email-link">WEBSITE</a>
                                         </Column>
-                                        <Column style={separatorColumn}>//</Column>
+                                        <Column style={separatorColumn} className="foundry-email-muted">//</Column>
                                         <Column style={linkColumn}>
-                                            <a href="https://nodalpoint.io/bill-debugger" style={linkStyle}>[ RUN_AUDIT ]</a>
+                                            <a href="https://nodalpoint.io/bill-debugger" style={linkStyle} className="foundry-email-link">[ RUN_AUDIT ]</a>
                                         </Column>
                                     </Row>
                                 </Section>
@@ -315,7 +388,7 @@ export default function FoundryTemplate({
 
 // STYLES
 const main = {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f5f5f5',
     fontFamily: "'Inter', sans-serif",
     color: '#18181b',
 }
