@@ -132,6 +132,7 @@ export default function AccountDossierPage() {
               handleIngestionComplete={state.handleIngestionComplete}
               updateAccountMutation={state.updateAccountMutation}
               toggleEditing={state.toggleEditing}
+              isSecondaryReady={state.isSecondaryReady}
             />
 
             <AccountNetworkPanel
@@ -141,6 +142,7 @@ export default function AccountDossierPage() {
               calls={state.calls || []}
               isLoadingContacts={state.isLoadingContacts}
               isLoadingCalls={state.isLoadingCalls}
+              isSecondaryReady={state.isSecondaryReady}
             />
           </div>
         </div>

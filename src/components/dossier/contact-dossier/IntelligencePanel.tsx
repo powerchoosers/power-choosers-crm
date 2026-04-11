@@ -1,13 +1,19 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useMemo } from 'react'
 import { format, differenceInCalendarDays } from 'date-fns'
 import { UplinkCard } from '@/components/dossier/UplinkCard'
-import DataIngestionCard from '@/components/dossier/DataIngestionCard'
+import { DossierSectionSkeleton } from '@/components/dossier/DossierSectionSkeleton'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { formatMillValue, millDecimal, millOptions } from '@/lib/mills'
+
+const DataIngestionCard = dynamic(
+    () => import('@/components/dossier/DataIngestionCard'),
+    { ssr: false }
+)
 
 interface IntelligencePanelProps {
     contact: any
@@ -47,6 +53,7 @@ interface IntelligencePanelProps {
     onEmailClick: () => void
     onIngestionComplete: () => void
     toggleEditing: () => void
+    isSecondaryReady?: boolean
 }
 
 export function IntelligencePanel({
@@ -82,7 +89,8 @@ export function IntelligencePanel({
     setEditAnnualUsage,
     onEmailClick,
     onIngestionComplete,
-    toggleEditing
+    toggleEditing,
+    isSecondaryReady = true
 }: IntelligencePanelProps) {
 
     const contractEndDate = useMemo(() => {
@@ -317,10 +325,19 @@ export function IntelligencePanel({
                 </div>
             </div>
 
-            <DataIngestionCard
-                accountId={contact?.accountId}
-                onIngestionComplete={onIngestionComplete}
-            />
+            {isSecondaryReady ? (
+                <DataIngestionCard
+                    accountId={contact?.accountId}
+                    onIngestionComplete={onIngestionComplete}
+                />
+            ) : (
+                <DossierSectionSkeleton
+                    title="Data_Locker"
+                    rows={4}
+                    variant="void"
+                    className="min-h-[420px]"
+                />
+            )}
         </div>
     )
 }

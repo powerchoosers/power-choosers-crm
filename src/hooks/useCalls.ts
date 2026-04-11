@@ -351,13 +351,18 @@ export function useCalls(searchQuery?: string) {
   })
 }
 
-export function useAccountCalls(accountId: string, contactIds?: string[]) {
+interface UseCallsOptions {
+  enabled?: boolean
+}
+
+export function useAccountCalls(accountId: string, contactIds?: string[], options?: UseCallsOptions) {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
+  const isEnabled = options?.enabled ?? true
 
   // Subscribe to real-time updates for calls belonging to this account
   useEffect(() => {
-    if (!accountId || !user || loading) return
+    if (!accountId || !user || loading || !isEnabled) return
 
     const channel = supabase
       .channel(`account-calls-${accountId}`)
@@ -380,9 +385,9 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [accountId, user, loading, queryClient])
+  }, [accountId, user, loading, isEnabled, queryClient])
 
-  return useQuery({
+  const query = useQuery<Call[]>({
     queryKey: ['account-calls', accountId, contactIds?.join(',') ?? '', user?.email ?? 'guest'],
     queryFn: async () => {
       if (!accountId || loading || !user) return []
@@ -443,20 +448,27 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
         }
       }) as Call[]
     },
-    enabled: !!accountId && !loading && !!user,
+    enabled: isEnabled && !!accountId && !loading && !!user,
     staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
-    refetchOnMount: 'always',
+    refetchOnMount: false,
     refetchOnWindowFocus: true,
   })
+
+  return {
+    ...query,
+    data: query.data ?? [],
+    isLoading: !isEnabled || query.isLoading,
+  }
 }
 
-export function useContactCalls(contactId: string, companyPhone?: string, accountId?: string) {
+export function useContactCalls(contactId: string, companyPhone?: string, accountId?: string, options?: UseCallsOptions) {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
+  const isEnabled = options?.enabled ?? true
 
   // Subscribe to real-time updates for calls belonging to this contact
   useEffect(() => {
-    if (!contactId || !user || loading) return
+    if (!contactId || !user || loading || !isEnabled) return
 
     const invalidateContactCalls = () => {
       queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
@@ -509,9 +521,9 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
         supabase.removeChannel(channel)
       })
     }
-  }, [contactId, accountId, user, loading, queryClient])
+  }, [contactId, accountId, user, loading, isEnabled, queryClient])
 
-  return useQuery({
+  const query = useQuery<Call[]>({
     queryKey: ['contact-calls', contactId, companyPhone ?? '', accountId ?? '', user?.email],
     queryFn: async () => {
       if (!contactId || loading || !user) return []
@@ -591,12 +603,18 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
         }
       }) as Call[]
     },
-    enabled: !!contactId && !loading && !!user,
+    enabled: isEnabled && !!contactId && !loading && !!user,
     staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
-    refetchOnMount: 'always',
+    refetchOnMount: false,
     refetchOnWindowFocus: true,
     gcTime: 1000 * 60 * 60, // 1 hour
   })
+
+  return {
+    ...query,
+    data: query.data ?? [],
+    isLoading: !isEnabled || query.isLoading,
+  }
 }
 
 export function useLogCall() {
