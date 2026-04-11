@@ -1,17 +1,31 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { memo, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
-import { StakeholderMap } from '@/components/accounts/StakeholderMap'
-import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
 import type { ComposeContext } from '@/components/emails/ComposeModal'
 import { EngagementLog } from '@/components/dossier/contact-dossier/EngagementLog'
+import { DossierSectionSkeleton } from '@/components/dossier/DossierSectionSkeleton'
 import { AccountHolderCard } from './AccountHolderCard'
-import { AccountHierarchyCard } from './AccountHierarchyCard'
 import { useUIStore } from '@/store/uiStore'
 import { useUpdateAccount } from '@/hooks/useAccounts'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
 import { buildUsableCallContextBlock } from '@/lib/call-context'
+
+const StakeholderMap = dynamic(
+    () => import('@/components/accounts/StakeholderMap').then((mod) => mod.StakeholderMap),
+    { ssr: false }
+)
+
+const AccountHierarchyCard = dynamic(
+    () => import('./AccountHierarchyCard').then((mod) => mod.AccountHierarchyCard),
+    { ssr: false }
+)
+
+const EntityEmailFeed = dynamic(
+    () => import('@/components/emails/EntityEmailFeed').then((mod) => mod.EntityEmailFeed),
+    { ssr: false }
+)
 
 interface AccountNetworkPanelProps {
     id: string
@@ -20,6 +34,7 @@ interface AccountNetworkPanelProps {
     calls: any[]
     isLoadingContacts: boolean
     isLoadingCalls: boolean
+    isSecondaryReady?: boolean
 }
 
 export const AccountNetworkPanel = memo(function AccountNetworkPanel({
@@ -28,7 +43,8 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
     contacts,
     calls,
     isLoadingContacts,
-    isLoadingCalls
+    isLoadingCalls,
+    isSecondaryReady = true
 }: AccountNetworkPanelProps) {
     const { setRightPanelMode, setIngestionContext } = useUIStore()
     const { mutate: updateAccount } = useUpdateAccount()
@@ -117,18 +133,34 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>
-                    <StakeholderMap
-                        contacts={contacts || []}
-                        onAddContact={handleAddContact}
-                        isLoadingContacts={isLoadingContacts}
-                    />
+                    {isSecondaryReady ? (
+                        <StakeholderMap
+                            contacts={contacts || []}
+                            onAddContact={handleAddContact}
+                            isLoadingContacts={isLoadingContacts}
+                        />
+                    ) : (
+                        <DossierSectionSkeleton
+                            title="Command Chain"
+                            rows={4}
+                            className="min-h-[260px]"
+                        />
+                    )}
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>
-                    <AccountHierarchyCard
-                        accountId={id}
-                        account={account}
-                    />
+                    {isSecondaryReady ? (
+                        <AccountHierarchyCard
+                            accountId={id}
+                            account={account}
+                        />
+                    ) : (
+                        <DossierSectionSkeleton
+                            title="Corporate Chain"
+                            rows={5}
+                            className="min-h-[320px]"
+                        />
+                    )}
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>
@@ -147,13 +179,21 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>
-                    <EntityEmailFeed
-                        emails={contacts?.map(c => c.email).filter(Boolean) as string[] || []}
-                        title="Email Intelligence"
-                        density="compact"
-                        layout="transmission"
-                        variant="skinny"
-                    />
+                    {isSecondaryReady ? (
+                        <EntityEmailFeed
+                            emails={contacts?.map(c => c.email).filter(Boolean) as string[] || []}
+                            title="Email Intelligence"
+                            density="compact"
+                            layout="transmission"
+                            variant="skinny"
+                        />
+                    ) : (
+                        <DossierSectionSkeleton
+                            title="Email Intelligence"
+                            rows={4}
+                            className="min-h-[340px]"
+                        />
+                    )}
                 </motion.div>
             </div>
         </div>
