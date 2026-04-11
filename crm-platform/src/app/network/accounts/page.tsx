@@ -134,7 +134,7 @@ export default function AccountsPage() {
   // Defer lastTouch until main list has loaded and stabilized — avoids parallel query storm on mount
   const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useAccountLastTouch(deferredAccountIds)
   // Batch-fetch list memberships for all visible rows in 2 queries instead of 2N
-  const { data: listMemberships } = usePageListMemberships(queryLoading ? [] : accountIds, 'account')
+  const { data: listMemberships, isLoading: listMembershipsLoading } = usePageListMemberships(queryLoading ? [] : accountIds, 'account')
 
   // After handleSelectCount fetches more, apply selection once we have enough accounts
   useEffect(() => {
@@ -206,13 +206,6 @@ export default function AccountsPage() {
     })
     setPage(0)
   }
-
-  useEffect(() => {
-    const needed = (pagination.pageIndex + 2) * PAGE_SIZE
-    if (hasNextPage && !isFetchingNextPage && accounts.length < needed) {
-      fetchNextPage()
-    }
-  }, [pagination.pageIndex, accounts.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const selectedCount = Object.keys(rowSelection).length
 
@@ -562,6 +555,7 @@ export default function AccountsPage() {
               entityId={row.original.id}
               entityType="account"
               preloadedLists={preloadedLists}
+              isLoading={meta?.listMembershipsLoading}
             />
           )
         },
@@ -619,6 +613,7 @@ export default function AccountsPage() {
       lastTouchMap,
       lastTouchLoading,
       listMemberships,
+      listMembershipsLoading,
     },
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),

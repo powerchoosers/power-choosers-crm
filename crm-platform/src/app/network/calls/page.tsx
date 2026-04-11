@@ -405,7 +405,11 @@ export default function CallsPage() {
               ) : (
                 <TableRow>
                   <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                    {queryLoading ? 'Loading calls...' : 'No calls found.'}
+                    {queryLoading
+                      ? 'Loading calls...'
+                      : isError
+                        ? 'Could not load calls. Check your sign-in or the calls query.'
+                        : 'No calls found.'}
                   </TableCell>
                 </TableRow>
               )}
