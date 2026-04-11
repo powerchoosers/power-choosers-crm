@@ -9,33 +9,14 @@ import { mapLocationToZone, ERCOT_ZONES } from '@/lib/market-mapping';
 import { useAuth } from '@/context/AuthContext';
 import { useMarketPulse } from '@/hooks/useMarketPulse';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
-import { normalizeStatusToken } from '@/lib/status-filters';
+import { isActiveLoadAccount, isCustomerStatus } from '@/lib/status-filters';
 
 const HOVER_DELAY_MS = 1000;
 /** Time to keep card open after leaving marker so user can move to card and click Open dossier */
 const CARD_CLOSE_DELAY_MS = 2000;
 
-function isContractActive(contractEnd?: string | null) {
-  if (!contractEnd) return false;
-  const endDate = new Date(contractEnd);
-  if (Number.isNaN(endDate.getTime())) return false;
-  endDate.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return endDate >= today;
-}
-
-function isCustomerStatus(status?: string | null) {
-  return normalizeStatusToken(status) === 'CUSTOMER';
-}
-
-function isTrueActiveLoadAccount(account: { status?: string | null; contract_end_date?: string | null }) {
-  const normalized = normalizeStatusToken(account.status);
-  return normalized === 'ACTIVE_LOAD' || normalized === 'ACTIVE' || isContractActive(account.contract_end_date);
-}
-
 function isInfrastructureEligibleAccount(account: { status?: string | null; contract_end_date?: string | null }) {
-  return isCustomerStatus(account.status) || isTrueActiveLoadAccount(account);
+  return isCustomerStatus(account.status) || isActiveLoadAccount(account);
 }
 
 type MapNode = {
@@ -175,10 +156,10 @@ export default function InfrastructureMap() {
         else { lat = 32.7767 + jitterLat; lng = -96.7970 + jitterLng; }
       }
 
-      // Account status for marker: ACTIVE_LOAD/active = blue (active load), CUSTOMER/customer = green
+      // Account status for marker: ACTIVE_LOAD or active-with-current-contract = blue, CUSTOMER = green
       const rawStatus = (account?.status ?? '').toString().trim();
       const isCustomer = isCustomerStatus(rawStatus);
-      const isActiveLoad = isTrueActiveLoadAccount(account ?? {});
+      const isActiveLoad = isActiveLoadAccount(account ?? {});
 
       const logoUrl = (account as any)?.logo_url ?? (account as any)?.logoUrl ?? null;
       const domain = (account as any)?.domain ?? null;
@@ -216,7 +197,7 @@ export default function InfrastructureMap() {
       const zone = mapLocationToZone(city, state);
       const rawStatus = (acc.status ?? '').toString().trim();
       const isCustomer = isCustomerStatus(rawStatus);
-      const isActiveLoad = isTrueActiveLoadAccount(acc);
+      const isActiveLoad = isActiveLoadAccount(acc);
       let lat = toNum(acc.latitude);
       let lng = toNum(acc.longitude);
       if (lat == null || lng == null) {

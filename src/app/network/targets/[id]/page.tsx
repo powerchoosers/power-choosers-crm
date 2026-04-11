@@ -73,7 +73,7 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { buildPowerDialTargets } from '@/lib/powerDialer'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
-import { normalizeStatusToken } from '@/lib/status-filters'
+import { isActiveLoadAccount, isContractExpired, isCustomerStatus, normalizeStatusToken } from '@/lib/status-filters'
 
 const PAGE_SIZE = 50
 
@@ -660,20 +660,18 @@ export default function TargetDetailPage() {
         header: 'Phone',
         cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums whitespace-nowrap">{row.getValue('companyPhone')}</div>,
     },
-    {
-      id: 'status',
-      header: 'Status',
-      filterFn: () => true, // Server-side filtered
-      cell: ({ row }) => {
-        const account = row.original
-        const hasContract = !!account.contractEnd
-        const isExpired = hasContract && new Date(account.contractEnd) < new Date()
-        const normalizedStatus = normalizeStatusToken(account.status)
-        const isCustomer = normalizedStatus === 'CUSTOMER'
-        const isActiveLoad = (!isExpired && hasContract) || normalizedStatus === 'ACTIVE_LOAD' || normalizedStatus === 'ACTIVE'
-        const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active' : isExpired ? 'Expired' : 'No Contract'
-        const isActive = isCustomer || isActiveLoad
-        return (
+      {
+        id: 'status',
+        header: 'Status',
+        filterFn: () => true, // Server-side filtered
+        cell: ({ row }) => {
+          const account = row.original
+          const isExpired = isContractExpired(account.contractEnd)
+          const isCustomer = isCustomerStatus(account.status)
+          const isActiveLoad = isActiveLoadAccount(account)
+          const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active Load' : isExpired ? 'Expired' : 'No Contract'
+          const isActive = isCustomer || isActiveLoad
+          return (
           <div className="flex items-center gap-2">
             <div className={cn(
               "w-1.5 h-1.5 rounded-full",
