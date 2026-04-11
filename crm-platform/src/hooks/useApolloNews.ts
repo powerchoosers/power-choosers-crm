@@ -17,6 +17,10 @@ interface NewsResponse {
   _resolved?: boolean
 }
 
+interface UseApolloNewsOptions {
+  enabled?: boolean
+}
+
 async function fetchNews(domain: string): Promise<ApolloNewsSignal[]> {
   const params = new URLSearchParams({ domain })
   const { data: { session } } = await supabase.auth.getSession()
@@ -35,11 +39,19 @@ async function fetchNews(domain: string): Promise<ApolloNewsSignal[]> {
  * Fetches Apollo company news for a given domain (e.g. from account.domain or contact website).
  * Use for ComposeModal context and GeminiChat company-news panel when on contact/account dossier.
  */
-export function useApolloNews(domain: string | undefined) {
-  return useQuery({
+export function useApolloNews(domain: string | undefined, options?: UseApolloNewsOptions) {
+  const isEnabled = options?.enabled ?? true
+
+  const query = useQuery<ApolloNewsSignal[]>({
     queryKey: ['apollo-news', domain ?? ''],
     queryFn: () => fetchNews(domain!),
-    enabled: !!domain?.trim(),
+    enabled: isEnabled && !!domain?.trim(),
     staleTime: 1000 * 60 * 5, // 5 min
   })
+
+  return {
+    ...query,
+    data: query.data ?? [],
+    isLoading: !isEnabled || query.isLoading,
+  }
 }

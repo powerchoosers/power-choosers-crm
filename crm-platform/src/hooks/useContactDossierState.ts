@@ -7,6 +7,7 @@ import { useContactCalls } from '@/hooks/useCalls'
 import { useApolloNews } from '@/hooks/useApolloNews'
 import { useEntityTasks } from '@/hooks/useEntityTasks'
 import { useTasks, useAllPendingTasks } from '@/hooks/useTasks'
+import { useDeferredHydration } from '@/hooks/useDeferredHydration'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { buildProtocolContextFromTask } from '@/lib/protocol-context'
@@ -38,6 +39,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
 
     const { data: contact, isLoading, isFetched } = useContact(id)
     const { data: account } = useAccount((contact as any)?.linkedAccountId ?? '')
+    const isSecondaryReady = useDeferredHydration(100)
 
     const domain = account?.domain?.trim() || (() => {
         try {
@@ -50,8 +52,8 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
         }
     })()
 
-    const { data: apolloNewsSignals } = useApolloNews(domain)
-    const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id, account?.companyPhone, account?.id)
+    const { data: apolloNewsSignals } = useApolloNews(domain, { enabled: isSecondaryReady })
+    const { data: recentCalls, isLoading: isLoadingCalls } = useContactCalls(id, account?.companyPhone, account?.id, { enabled: isSecondaryReady })
     const updateContact = useUpdateContact()
     const updateAccount = useUpdateAccount()
     const queryClient = useQueryClient()
@@ -470,6 +472,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
         isLoading: isLoading || (!!id && contact == null && !isFetched),
         isLoadingCalls,
         isFetched,
+        isSecondaryReady,
 
         // UI State
         isEditing,

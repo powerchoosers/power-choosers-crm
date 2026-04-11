@@ -1,5 +1,6 @@
 'use client'
 
+import dynamic from 'next/dynamic'
 import { useState, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { AlertTriangle } from 'lucide-react'
@@ -8,7 +9,7 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { Button } from '@/components/ui/button'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import type { ComposeContext } from '@/components/emails/ComposeModal'
-import { EntityEmailFeed } from '@/components/emails/EntityEmailFeed'
+import { DossierSectionSkeleton } from '@/components/dossier/DossierSectionSkeleton'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { useComposeStore } from '@/store/composeStore'
@@ -22,6 +23,11 @@ import { DossierHeader } from '@/components/dossier/contact-dossier/DossierHeade
 import { IntelligencePanel } from '@/components/dossier/contact-dossier/IntelligencePanel'
 import { AnalystTerminal } from '@/components/dossier/contact-dossier/AnalystTerminal'
 import { EngagementLog } from '@/components/dossier/contact-dossier/EngagementLog'
+
+const EntityEmailFeed = dynamic(
+  () => import('@/components/emails/EntityEmailFeed').then((mod) => mod.EntityEmailFeed),
+  { ssr: false }
+)
 
 export default function ContactDossierPage() {
   const params = useParams()
@@ -154,9 +160,9 @@ export default function ContactDossierPage() {
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#002FA7]/10 blur-[120px] rounded-full pointer-events-none" />
 
         <DossierHeader
-          contact={s.contact}
-          isEditing={s.isEditing}
-          toggleEditing={s.toggleEditing}
+                contact={s.contact}
+                isEditing={s.isEditing}
+                toggleEditing={s.toggleEditing}
           onDelete={handleDelete}
           recentlyUpdatedFields={s.recentlyUpdatedFields}
           showSynced={s.showSynced}
@@ -230,6 +236,7 @@ export default function ContactDossierPage() {
                 onEmailClick={() => openCompose({ to: s.editEmail || '', subject: '', context: composeContext })}
                 onIngestionComplete={handleIngestionComplete}
                 toggleEditing={s.toggleEditing}
+                isSecondaryReady={s.isSecondaryReady}
               />
             </div>
 
@@ -266,12 +273,20 @@ export default function ContactDossierPage() {
                   showRelativeDate={false}
                 />
 
-                <EntityEmailFeed
-                  emails={[s.editEmail].filter(Boolean) as string[]}
-                  title="Email Intelligence"
-                  density="full"
-                  layout="transmission"
-                />
+                {s.isSecondaryReady ? (
+                  <EntityEmailFeed
+                    emails={[s.editEmail].filter(Boolean) as string[]}
+                    title="Email Intelligence"
+                    density="full"
+                    layout="transmission"
+                  />
+                ) : (
+                  <DossierSectionSkeleton
+                    title="Email Intelligence"
+                    rows={4}
+                    className="min-h-[420px]"
+                  />
+                )}
               </div>
             </div>
           </div>
