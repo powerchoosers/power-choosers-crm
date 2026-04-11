@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
+import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { useEffect } from 'react'
 
 export interface Call {
@@ -155,6 +156,8 @@ export function useCallsCount(searchQuery?: string) {
 
 type CallContact = {
   name?: string | null
+  firstName?: string | null
+  lastName?: string | null
   title?: string | null
   avatarUrl?: string | null
   avatar_url?: string | null
@@ -162,6 +165,7 @@ type CallContact = {
   photo_url?: string | null
   accountId?: string | null
   ownerId?: string | null
+  metadata?: Record<string, unknown> | null
   accounts?: CallAccount | CallAccount[] | null
 }
 
@@ -210,6 +214,23 @@ type CallAccount = {
   domain?: string | null
 }
 
+function getPrimaryContact(contact: CallContact | CallContact[] | null | undefined) {
+  return Array.isArray(contact) ? contact[0] : contact
+}
+
+function formatContactName(contact: CallContact | null | undefined) {
+  if (!contact) return 'Unknown'
+
+  const directName = typeof contact.name === 'string' ? contact.name.trim() : ''
+  if (directName) return directName
+
+  const firstName = typeof contact.firstName === 'string' ? contact.firstName.trim() : ''
+  const lastName = typeof contact.lastName === 'string' ? contact.lastName.trim() : ''
+  const combinedName = [firstName, lastName].filter(Boolean).join(' ').trim()
+
+  return combinedName || 'Unknown'
+}
+
 const PAGE_SIZE = 50
 
 export function useCalls(searchQuery?: string) {
@@ -251,7 +272,7 @@ export function useCalls(searchQuery?: string) {
       // Join accounts for company display and contact details; use explicit FK
       let query = supabase
         .from('calls')
-        .select('*, accounts!calls_accountId_fkey(name, city, state, industry, logo_url, domain), contacts!calls_contactId_fkey(name, title, avatarUrl, avatar_url, photoUrl, photo_url, accountId, accounts!contacts_accountId_fkey(name, domain, logo_url))', { count: 'exact' })
+        .select('*, accounts!calls_accountId_fkey(name, city, state, industry, logo_url, domain), contacts!calls_contactId_fkey(name, firstName, lastName, title, accountId, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url))', { count: 'exact' })
 
       if (searchQuery) {
         query = query.or(`summary.ilike.%${searchQuery}%,transcript.ilike.%${searchQuery}%`)
@@ -281,16 +302,17 @@ export function useCalls(searchQuery?: string) {
         const seconds = (item.duration || 0) % 60
         const durationStr = [hours, minutes, seconds].map(v => String(v).padStart(2, '0')).join(':')
 
-        const contact = Array.isArray(item.contacts) ? item.contacts[0] : item.contacts
+        const contact = getPrimaryContact(item.contacts)
         const contactAccount = Array.isArray(contact?.accounts) ? contact.accounts[0] : contact?.accounts
-        const contactName = contact?.name ?? 'Unknown'
+        const contactName = formatContactName(contact)
+        const contactAvatarUrl = resolveContactPhotoUrl(contact, contact?.metadata) || undefined
         const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
 
         return {
           id: item.id,
           contactName,
           contactTitle: contact?.title || undefined,
-          contactAvatarUrl: contact?.avatarUrl || contact?.avatar_url || contact?.photoUrl || contact?.photo_url || undefined,
+          contactAvatarUrl,
           contactCompanyName: contactAccount?.name || undefined,
           contactCompanyDomain: contactAccount?.domain || undefined,
           contactCompanyLogoUrl: contactAccount?.logo_url || undefined,
@@ -600,7 +622,7 @@ export function useLogCall() {
           duration: call.durationSeconds,
           summary: call.note || null,
           timestamp: new Date().toISOString(),
-          ownerId: user?.email || null,
+          ownerId: user?.id || null,
         })
         .select()
         .single()
