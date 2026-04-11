@@ -62,7 +62,7 @@ export function useForensicLog() {
                 return a;
             });
         },
-        refetchInterval: 60000,
+        refetchInterval: 5 * 60 * 1000,
     });
 
     // 2. Fetch recent completed tasks
@@ -80,7 +80,7 @@ export function useForensicLog() {
             return data || [];
         },
         enabled: !!user?.email,
-        refetchInterval: 30000,
+        refetchInterval: 5 * 60 * 1000,
     });
 
     // 3. Fetch recent CRM-verified emails
@@ -154,7 +154,7 @@ export function useForensicLog() {
                 });
         },
         enabled: !!user?.email,
-        refetchInterval: 15000,
+        refetchInterval: 5 * 60 * 1000,
     });
 
     // 4. Fetch recent ingested bills
@@ -184,7 +184,7 @@ export function useForensicLog() {
                 _accountName: idToName.get(d.account_id) || 'Unknown Account'
             }));
         },
-        refetchInterval: 60000,
+        refetchInterval: 5 * 60 * 1000,
     });
 
     // Combine and sort all streams

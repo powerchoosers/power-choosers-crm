@@ -1,13 +1,9 @@
-
-import { useEffect, useCallback, useRef } from 'react';
-import { usePathname } from 'next/navigation';
+import { useCallback, useRef } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useSyncStore } from '@/store/syncStore';
 import { supabase } from '@/lib/supabase';
 import { showInboxEmailToast } from '@/lib/inbox-email-toast';
 import { consumeInboxToastId } from '@/lib/inbox-toast-dedupe';
-
-const CRM_PREFIXES = ['/network', '/market-data'];
 
 const FALLBACK_SHARED_INBOX_OWNERS_BY_USER: Record<string, string[]> = {};
 const shouldLogZohoSync = process.env.NODE_ENV === 'development' && process.env.NEXT_PUBLIC_DEBUG_SYNC === '1'
@@ -44,8 +40,6 @@ async function getOwnerScope(user: { id?: string; email?: string | null }) {
  * Hook for automated Zoho Mail synchronization
  */
 export function useZohoSync() {
-    const pathname = usePathname();
-    const onCrmRoute = CRM_PREFIXES.some(p => pathname?.startsWith(p));
     const { user } = useAuth();
     const { isSyncing, setIsSyncing, setLastSyncTime, syncCount, setSyncCount } = useSyncStore();
     const syncInProgress = useRef(false);
@@ -118,20 +112,6 @@ export function useZohoSync() {
             setIsSyncing(false);
         }
     }, [user, setIsSyncing, setLastSyncTime, setSyncCount, syncCount, showSyncNotifications]);
-
-    useEffect(() => {
-        if (!user || !onCrmRoute) return;
-
-        // Perform initial sync on mount
-        performSync(true);
-
-        // Setup interval for background sync (every 3 minutes)
-        const interval = setInterval(() => {
-            performSync(true);
-        }, 3 * 60 * 1000);
-
-        return () => clearInterval(interval);
-    }, [user, performSync, onCrmRoute]);
 
     return { performSync, isSyncing };
 }

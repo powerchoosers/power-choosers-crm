@@ -6,12 +6,6 @@
             "destination": "/api/posts/:slug"
         }
     ],
-    "crons": [
-        {
-            "path": "/api/cron/refresh-apollo-news",
-            "schedule": "0 9 * * *"
-        }
-    ],
     "github": {
         "silent": false
     }
