@@ -137,7 +137,7 @@ export default function PeoplePage() {
   // Defer lastTouch until main list has loaded and stabilized — avoids parallel query storm on mount
   const { data: lastTouchMap, isLoading: lastTouchLoading, dataUpdatedAt: lastTouchUpdatedAt } = useContactLastTouch(deferredContactIds)
   // Batch-fetch list memberships for all visible rows in 2 queries instead of 2N
-  const { data: listMemberships } = usePageListMemberships(queryLoading ? [] : contactIds, 'contact')
+  const { data: listMemberships, isLoading: listMembershipsLoading } = usePageListMemberships(queryLoading ? [] : contactIds, 'contact')
   const pendingSelectCountRef = useRef<number | null>(null)
 
   // After handleSelectCount fetches more, apply selection once we have enough contacts
@@ -212,14 +212,6 @@ export default function PeoplePage() {
     })
     setPage(0)
   }, [setPage])
-
-  useEffect(() => {
-    const needed = (pagination.pageIndex + 2) * PAGE_SIZE
-    if (hasNextPage && !isFetchingNextPage && contacts.length < needed) {
-
-      fetchNextPage()
-    }
-  }, [pagination.pageIndex, contacts.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const selectedCount = Object.keys(rowSelection).length
 
@@ -512,6 +504,7 @@ export default function PeoplePage() {
               entityId={row.original.id}
               entityType="contact"
               preloadedLists={preloadedLists}
+              isLoading={meta?.listMembershipsLoading}
             />
           )
         },
@@ -599,6 +592,7 @@ export default function PeoplePage() {
       lastTouchMap,
       lastTouchLoading,
       listMemberships,
+      listMembershipsLoading,
     },
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
