@@ -15,7 +15,8 @@ import {
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, Clock, Plus, Phone, Mail, MoreHorizontal, Check, Radar, Users, Building2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { ArrowUpDown, Clock, Plus, MoreHorizontal, Check, Radar, Users, Building2, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -71,11 +72,16 @@ import {
 import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { supabase } from '@/lib/supabase'
+import { useComposeStore } from '@/store/composeStore'
+import { useUIStore } from '@/store/uiStore'
 import { buildPowerDialTargets } from '@/lib/powerDialer'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
 import { isActiveLoadAccount, isContractExpired, isCustomerStatus, normalizeStatusToken } from '@/lib/status-filters'
 
 const PAGE_SIZE = 50
+const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
+const ACCOUNT_TARGET_TYPES = ['account', 'accounts', 'companies', 'company'] as const
 
 export default function TargetDetailPage() {
   const router = useRouter()
@@ -268,6 +274,9 @@ export default function TargetDetailPage() {
     return data.filter((row: any) => selectedIds.has(row.id))
   }, [data, rowSelection])
 
+  const queryClient = useQueryClient()
+  const openCompose = useComposeStore((state) => state.openCompose)
+  const { setRightPanelMode, setTaskContext, setIngestionContext } = useUIStore()
   const handlePowerDial = () => {
     if (!isPeopleList) return
 
@@ -508,6 +517,7 @@ export default function TargetDetailPage() {
       id: "actions",
       cell: ({ row }) => {
         const contact = row.original
+        const hasDialablePhone = buildPowerDialTargets([contact]).length > 0
         return (
           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
             <ClickToCallButton
@@ -518,17 +528,112 @@ export default function TargetDetailPage() {
               logoUrl={contact.logoUrl}
               className="h-8 w-8"
             />
-            <button
-              className="icon-button-forensic h-8 w-8 flex items-center justify-center"
-              title="More Actions"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400"
+                  aria-label="More actions"
+                >
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  disabled={!contact.email}
+                  onClick={() => {
+                    if (!contact.email) return
+                    openCompose({
+                      to: contact.email,
+                      subject: '',
+                      context: {
+                        contactId: contact.id,
+                        contactName: contact.name,
+                        contactTitle: contact.title || undefined,
+                        companyName: contact.company || undefined,
+                        accountId: contact.accountId || undefined,
+                        accountName: contact.company || undefined,
+                        industry: contact.industry || undefined,
+                        contextForAi: (contact.metadata as { notes?: string } | null | undefined)?.notes?.trim() || undefined,
+                      }
+                    })
+                  }}
+                >
+                  Send Email
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => {
+                    setTaskContext({
+                      entityId: contact.id,
+                      entityName: contact.name,
+                      entityType: 'contact',
+                      entityPhotoUrl: contact.avatarUrl || undefined,
+                      entityLogoUrl: contact.logoUrl || undefined,
+                      entityDomain: contact.companyDomain || undefined,
+                      contactId: contact.id,
+                      accountId: contact.accountId || undefined,
+                    })
+                    setRightPanelMode('CREATE_TASK')
+                  }}
+                >
+                  Add Task
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  disabled={!hasDialablePhone}
+                  onClick={() => {
+                    if (!hasDialablePhone) return
+                    openPowerDialer({
+                      contacts: [contact],
+                      selectedCount: 1,
+                      sourceLabel: id,
+                    })
+                  }}
+                >
+                  Add to Power Dialer
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('list_members')
+                      .delete()
+                      .eq('listId', id)
+                      .eq('targetId', contact.id)
+                      .in('targetType', [...CONTACT_TARGET_TYPES])
+
+                    if (error) {
+                      console.error('Error removing contact from target:', error)
+                      toast.error('Failed to remove contact from target')
+                      return
+                    }
+
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['contacts'] }),
+                      queryClient.invalidateQueries({ queryKey: ['contacts-count'] }),
+                      queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] }),
+                      queryClient.invalidateQueries({ queryKey: ['list-memberships'] }),
+                      queryClient.invalidateQueries({ queryKey: ['targets'] }),
+                      queryClient.invalidateQueries({ queryKey: ['target', id] }),
+                    ])
+
+                    toast.success('Contact removed from target')
+                  }}
+                >
+                  Remove from Target
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )
       }
     }
-  ], [pageIndex, pageSize, isPeopleList, getOwner])
+  ], [pageIndex, pageSize, isPeopleList, getOwner, id, openCompose, openPowerDialer, queryClient, setRightPanelMode, setTaskContext])
 
   // Column definitions for Accounts
   const accountColumns = useMemo<ColumnDef<Account>[]>(() => [
@@ -686,6 +791,7 @@ export default function TargetDetailPage() {
       id: "actions",
       cell: ({ row }) => {
         const account = row.original
+        const hasMainNumber = Boolean(account.companyPhone?.trim())
         return (
           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
             <ClickToCallButton
@@ -695,17 +801,102 @@ export default function TargetDetailPage() {
               isCompany={true}
               className="h-8 w-8 text-zinc-400 hover:text-white hover:bg-white/10"
             />
-            <button
-              className="icon-button-forensic h-8 w-8 flex items-center justify-center"
-              title="More Actions"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400"
+                  aria-label="More actions"
+                >
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => {
+                    setIngestionContext({
+                      accountId: account.id,
+                      accountName: account.name,
+                      accountLogoUrl: account.logoUrl,
+                      accountDomain: account.domain,
+                    })
+                    setRightPanelMode('INGEST_CONTACT')
+                  }}
+                >
+                  Add Contact
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  onClick={() => {
+                    setTaskContext({
+                      entityId: account.id,
+                      entityName: account.name,
+                      entityType: 'account',
+                      entityLogoUrl: account.logoUrl || undefined,
+                      entityDomain: account.domain || undefined,
+                      accountId: account.id,
+                    })
+                    setRightPanelMode('CREATE_TASK')
+                  }}
+                >
+                  Add Task
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="hover:bg-white/5 cursor-pointer"
+                  disabled={!hasMainNumber}
+                  onClick={async () => {
+                    if (!hasMainNumber) return
+                    try {
+                      await navigator.clipboard.writeText(account.companyPhone.trim())
+                      toast.success('Main number copied')
+                    } catch (error) {
+                      console.error('Failed to copy main number:', error)
+                      toast.error('Failed to copy main number')
+                    }
+                  }}
+                >
+                  Copy Main Number
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/10" />
+                <DropdownMenuItem
+                  className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                  onClick={async () => {
+                    const { error } = await supabase
+                      .from('list_members')
+                      .delete()
+                      .eq('listId', id)
+                      .eq('targetId', account.id)
+                      .in('targetType', [...ACCOUNT_TARGET_TYPES])
+
+                    if (error) {
+                      console.error('Error removing account from target:', error)
+                      toast.error('Failed to remove account from target')
+                      return
+                    }
+
+                    await Promise.all([
+                      queryClient.invalidateQueries({ queryKey: ['accounts'] }),
+                      queryClient.invalidateQueries({ queryKey: ['accounts-count'] }),
+                      queryClient.invalidateQueries({ queryKey: ['account-list-memberships'] }),
+                      queryClient.invalidateQueries({ queryKey: ['targets'] }),
+                      queryClient.invalidateQueries({ queryKey: ['target', id] }),
+                    ])
+
+                    toast.success('Account removed from target')
+                  }}
+                >
+                  Remove from Target
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )
       }
     }
-  ], [pageIndex, pageSize, router, getOwner])
+  ], [pageIndex, pageSize, router, getOwner, id, queryClient, setIngestionContext, setRightPanelMode, setTaskContext])
 
   const tableColumns = useMemo(() => isPeopleList ? peopleColumns : accountColumns, [isPeopleList, peopleColumns, accountColumns])
 
