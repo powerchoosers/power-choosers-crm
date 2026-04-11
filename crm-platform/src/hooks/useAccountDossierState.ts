@@ -6,6 +6,7 @@ import { useAccountContacts } from '@/hooks/useContacts'
 import { useAccountCalls } from '@/hooks/useCalls'
 import { useEntityTasks } from '@/hooks/useEntityTasks'
 import { useTasks, useAllPendingTasks } from '@/hooks/useTasks'
+import { useDeferredHydration } from '@/hooks/useDeferredHydration'
 import { useUIStore } from '@/store/uiStore'
 import { useGeminiStore } from '@/store/geminiStore'
 import { buildProtocolContextFromTask } from '@/lib/protocol-context'
@@ -127,7 +128,8 @@ export function useAccountDossierState(id: string, taskIdFromUrl?: string | null
     const { data: account, isLoading, isFetched } = useAccount(id)
     const { data: contacts, isLoading: isLoadingContacts } = useAccountContacts(id)
     const contactIds = contacts?.map(c => c.id).filter(Boolean) || []
-    const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds)
+    const isSecondaryReady = useDeferredHydration(100)
+    const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds, { enabled: isSecondaryReady })
     const updateAccount = useUpdateAccount()
     const queryClient = useQueryClient()
 
@@ -537,6 +539,7 @@ export function useAccountDossierState(id: string, taskIdFromUrl?: string | null
     return {
         id, account, contacts, calls, isLoading: isLoading || (!!id && account == null && !isFetched),
         isLoadingContacts, isLoadingCalls, isFetched,
+        isSecondaryReady,
         isEditing, lockWithoutSaving, toggleEditing, isSaving, showSynced, setActiveEditField, activeEditField,
         recentlyUpdatedFields, glowingFields, isRecalibrating,
         editAccountName, setEditAccountName, editNotes, setEditNotes, editAnnualUsage, setEditAnnualUsage,
