@@ -70,7 +70,7 @@ import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { toast } from 'sonner'
-import { normalizeStatusToken, statusMatchesFilter } from '@/lib/status-filters'
+import { isActiveLoadAccount, isContractExpired, isCustomerStatus } from '@/lib/status-filters'
 
 const PAGE_SIZE = 50
 
@@ -414,18 +414,16 @@ export default function AccountsPage() {
       {
         id: 'status',
         header: 'Status',
-        filterFn: (row, id, value) => statusMatchesFilter(row.getValue(id), value),
+        filterFn: () => true, // Server-side filtered
         cell: ({ row }) => {
           const account = row.original
-          const hasContract = !!account.contractEnd
-          const isExpired = hasContract && new Date(account.contractEnd) < new Date()
-          const normalizedStatus = normalizeStatusToken(account.status)
-          const isCustomer = normalizedStatus === 'CUSTOMER'
-          const isActiveLoad = (!isExpired && hasContract) || normalizedStatus === 'ACTIVE_LOAD' || normalizedStatus === 'ACTIVE'
+          const isExpired = isContractExpired(account.contractEnd)
+          const isCustomer = isCustomerStatus(account.status)
+          const isActiveLoad = isActiveLoadAccount(account)
           const displayStatus = isCustomer
             ? 'Customer'
             : isActiveLoad
-              ? 'Active'
+              ? 'Active Load'
               : isExpired
                 ? 'Expired'
                 : 'No Contract'

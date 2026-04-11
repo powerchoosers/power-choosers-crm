@@ -3,7 +3,7 @@
 import { memo, useState, useEffect, useTransition } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { formatDistanceToNow, parseISO, isValid } from 'date-fns'
+import { formatDistanceToNow } from 'date-fns'
 import {
     ArrowLeft, Globe, Linkedin, Lock, Unlock, Clock, Activity, Check, MapPin, Users, Trash2
 } from 'lucide-react'
@@ -14,25 +14,7 @@ import { TaskCommandBar } from '@/components/crm/TaskCommandBar'
 import DestructModal from '@/components/network/DestructModal'
 import { cn } from '@/lib/utils'
 import { domainToClickableUrl } from '@/lib/url'
-import { normalizeStatusToken } from '@/lib/status-filters'
-
-function parseContractEndDate(raw: unknown): Date | null {
-    if (!raw) return null
-    const s = String(raw).trim()
-    if (!s) return null
-    const iso = parseISO(s)
-    if (isValid(iso)) return iso
-    const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
-    if (mdy) {
-        const mm = Number(mdy[1])
-        const dd = Number(mdy[2])
-        const yyyy = Number(mdy[3])
-        const d = new Date(yyyy, mm - 1, dd)
-        return isValid(d) ? d : null
-    }
-    const fallback = new Date(s)
-    return isValid(fallback) ? fallback : null
-}
+import { isActiveLoadAccount, isContractExpired, isCustomerStatus } from '@/lib/status-filters'
 
 interface AccountDossierHeaderProps {
     account: any
@@ -326,12 +308,9 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
 
                                 <motion.div layout className="flex items-center gap-2 overflow-visible">
                                     {(() => {
-                                        const hasContract = !!account.contractEnd
-                                        const contractEnd = parseContractEndDate(account.contractEnd)
-                                        const isExpired = hasContract && contractEnd && contractEnd < new Date()
-                                        const normalizedStatus = normalizeStatusToken(account.status)
-                                        const isCustomer = normalizedStatus === 'CUSTOMER'
-                                        const isActiveLoad = (!isExpired && hasContract) || normalizedStatus === 'ACTIVE_LOAD' || normalizedStatus === 'ACTIVE'
+                                        const isExpired = isContractExpired(account.contractEnd)
+                                        const isCustomer = isCustomerStatus(account.status)
+                                        const isActiveLoad = isActiveLoadAccount(account)
 
                                         const displayStatus = isCustomer ? 'Customer' : isActiveLoad ? 'Active Load' : isExpired ? 'Expired' : 'No Contract'
                                         return (
