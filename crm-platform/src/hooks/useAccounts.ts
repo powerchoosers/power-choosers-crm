@@ -6,7 +6,7 @@ import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
 import { getTexasEnergyContext } from '@/lib/texas-territory'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
-import { buildStatusIlikeClauses } from '@/lib/status-filters'
+import { buildAccountStatusClauses } from '@/lib/status-filters'
 
 export interface Account {
   id: string
@@ -41,7 +41,7 @@ export interface Account {
   electricitySupplier?: string
   currentRate?: string
   mills?: string // the commission/margin mills
-  status?: 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED' | 'CUSTOMER'
+  status?: 'ACTIVE' | 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED' | 'CUSTOMER'
   meters?: Array<{
     id: string
     esiId: string
@@ -337,7 +337,7 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
           query = query.in('industry', filters.industry);
         }
         if (filters?.status && filters.status.length > 0) {
-          const statusConditions = buildStatusIlikeClauses(filters.status)
+          const statusConditions = buildAccountStatusClauses(filters.status)
           if (statusConditions.length > 0) {
             query = query.or(statusConditions.join(','))
           }
@@ -559,7 +559,7 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
         query = query.in('industry', filters.industry);
       }
       if (filters?.status && filters.status.length > 0) {
-        const statusConditions = buildStatusIlikeClauses(filters.status)
+        const statusConditions = buildAccountStatusClauses(filters.status)
         if (statusConditions.length > 0) {
           query = query.or(statusConditions.join(','))
         }
