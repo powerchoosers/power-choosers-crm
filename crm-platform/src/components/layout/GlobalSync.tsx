@@ -9,7 +9,7 @@ import { useEmailTrackingNotifications } from '@/hooks/useEmailTrackingNotificat
 import { useDesktopNotifications } from '@/hooks/useDesktopNotifications'
 import { playPing, playAlert } from '@/lib/audio'
 import { useUIStore } from '@/store/uiStore'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { CheckCircle, Eye, CalendarCheck, CalendarX, Bell, Video } from 'lucide-react'
@@ -73,6 +73,22 @@ function isCrmRoute(pathname: string | null) {
   return CRM_ROUTE_PREFIXES.some(prefix => pathname.startsWith(prefix))
 }
 
+function isRouteVisible(pathname: string | null, prefixes: string[]) {
+  if (!pathname) return false
+  return prefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`))
+}
+
+function invalidateQueryGroup(
+  queryClient: QueryClient,
+  queryKey: readonly unknown[],
+  shouldRefetchNow: boolean,
+) {
+  void queryClient.invalidateQueries({
+    queryKey,
+    refetchType: shouldRefetchNow ? 'active' : 'none',
+  })
+}
+
 export function GlobalSync() {
   const pathname = usePathname()
   const router = useRouter()
@@ -80,9 +96,14 @@ export function GlobalSync() {
   const { user, loading, role } = useAuth()
   const { performSync } = useZohoSync()
   const queryClient = useQueryClient()
+  const pathnameRef = useRef(pathname)
   const ownerScopeRef = useRef<string[]>([])
   const seenInboxSignalIdsRef = useRef<Set<string>>(new Set())
   const soundEnabled = useUIStore(s => s.soundEnabled)
+
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
 
   // Real-time email tracking notifications (opens/clicks) — CRM routes only
   useEmailTrackingNotifications({ enabled: onCrmRoute })
@@ -120,27 +141,11 @@ export function GlobalSync() {
             ? ownerScopeRef.current
             : [String(user.email || '').toLowerCase()]
           const isOwner = scope.includes(ownerEmail) || role === 'admin'
-
-          const invalidateDeals = () => {
-            queryClient.invalidateQueries({ queryKey: ['deals'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-account'] })
-            queryClient.invalidateQueries({ queryKey: ['deals-by-contact'] })
-          }
-
-          const invalidateEmails = () => {
-            queryClient.invalidateQueries({ queryKey: ['emails'] })
-            queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
-            queryClient.invalidateQueries({ queryKey: ['emails-count'] })
-          }
-
-          const invalidateDossierState = async () => {
-            await queryClient.invalidateQueries({ queryKey: ['account'] })
-            await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-            await queryClient.invalidateQueries({ queryKey: ['contact'] })
-            await queryClient.invalidateQueries({ queryKey: ['contacts'] })
-            await queryClient.refetchQueries({ queryKey: ['account'], type: 'active' })
-            await queryClient.refetchQueries({ queryKey: ['contact'], type: 'active' })
-          }
+          const currentPath = pathnameRef.current
+          const refreshDealsNow = isRouteVisible(currentPath, ['/network/contracts', '/network/accounts', '/network/contacts'])
+          const refreshEmailsNow = isRouteVisible(currentPath, ['/network/emails', '/network/accounts', '/network/contacts'])
+          const refreshDossierNow = isRouteVisible(currentPath, ['/network/accounts', '/network/contacts', '/network/targets', '/network/foundry', '/network/protocols'])
+          const refreshVaultNow = isRouteVisible(currentPath, ['/network/vault'])
 
           if (oldRecord.status !== 'completed' && newRecord.status === 'completed') {
             if (isOwner) {
@@ -149,12 +154,19 @@ export function GlobalSync() {
                 icon: <CheckCircle className="w-4 h-4 text-emerald-500" />
               })
             }
-            invalidateDeals()
-            invalidateEmails()
-            void invalidateDossierState()
-            queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
-            queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
-            queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+            invalidateQueryGroup(queryClient, ['deals'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['deals-by-account'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['deals-by-contact'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['emails'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['entity-emails'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['emails-count'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['account'], refreshDossierNow)
+            invalidateQueryGroup(queryClient, ['accounts'], refreshDossierNow)
+            invalidateQueryGroup(queryClient, ['contact'], refreshDossierNow)
+            invalidateQueryGroup(queryClient, ['contacts'], refreshDossierNow)
+            invalidateQueryGroup(queryClient, ['vault-documents'], refreshVaultNow)
+            invalidateQueryGroup(queryClient, ['signature-requests'], onCrmRoute)
+            invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
           } else if (oldRecord.status !== 'opened' && newRecord.status === 'opened') {
             if (isOwner) {
               if (soundEnabled) playPing();
@@ -162,10 +174,14 @@ export function GlobalSync() {
                 icon: <Eye className="w-4 h-4 text-emerald-400" />
               })
             }
-            invalidateDeals()
-            invalidateEmails()
-            queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
-            queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+            invalidateQueryGroup(queryClient, ['deals'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['deals-by-account'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['deals-by-contact'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['emails'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['entity-emails'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['emails-count'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['signature-requests'], onCrmRoute)
+            invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
           } else if (oldRecord.status !== 'viewed' && newRecord.status === 'viewed') {
             if (isOwner) {
               if (soundEnabled) playPing();
@@ -173,10 +189,14 @@ export function GlobalSync() {
                 icon: <Eye className="w-4 h-4 text-emerald-400" />
               })
             }
-            invalidateDeals()
-            invalidateEmails()
-            queryClient.invalidateQueries({ queryKey: ['signature-requests'] })
-            queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+            invalidateQueryGroup(queryClient, ['deals'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['deals-by-account'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['deals-by-contact'], refreshDealsNow)
+            invalidateQueryGroup(queryClient, ['emails'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['entity-emails'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['emails-count'], refreshEmailsNow)
+            invalidateQueryGroup(queryClient, ['signature-requests'], onCrmRoute)
+            invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
           }
         }
       )
@@ -229,14 +249,18 @@ export function GlobalSync() {
 
           // Refresh every inbox query family when a new owned email row lands.
           // This covers sent, received, reminder, sequence, and signature rows without a browser reload.
-          queryClient.invalidateQueries({ queryKey: ['emails'] })
-          queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
-          queryClient.invalidateQueries({ queryKey: ['email'] })
-          queryClient.invalidateQueries({ queryKey: ['email-thread'] })
-          queryClient.invalidateQueries({ queryKey: ['emails-search'] })
-          queryClient.invalidateQueries({ queryKey: ['emails-count'] })
-          queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
-          queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+          const currentPath = pathnameRef.current
+          const refreshEmailListNow = isRouteVisible(currentPath, ['/network/emails'])
+          const refreshEntityEmailNow = isRouteVisible(currentPath, ['/network/accounts', '/network/contacts'])
+          const refreshEmailDetailNow = isRouteVisible(currentPath, ['/network/emails'])
+          invalidateQueryGroup(queryClient, ['emails'], refreshEmailListNow)
+          invalidateQueryGroup(queryClient, ['entity-emails'], refreshEntityEmailNow)
+          invalidateQueryGroup(queryClient, ['email'], refreshEmailDetailNow)
+          invalidateQueryGroup(queryClient, ['email-thread'], refreshEmailDetailNow)
+          invalidateQueryGroup(queryClient, ['emails-search'], refreshEmailListNow)
+          invalidateQueryGroup(queryClient, ['emails-count'], refreshEmailListNow || refreshEntityEmailNow)
+          invalidateQueryGroup(queryClient, ['emails-type-counts'], refreshEmailListNow)
+          invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
         }
       )
       .subscribe((status) => {
@@ -317,7 +341,7 @@ export function GlobalSync() {
                 link: videoUrl || notification.link || null,
                 kind: 'reminder',
               })
-              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+              invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
           } else if (notifType === 'rsvp') {
               const statusStr = String(notification.data?.status || 'UNKNOWN').toUpperCase();
               const isAccepted = statusStr === 'ACCEPTED' ||
@@ -325,9 +349,9 @@ export function GlobalSync() {
                                  notification.message?.toLowerCase().includes('accepted');
 
               // Immediately refresh task data so the badge updates alongside the toast
-              queryClient.invalidateQueries({ queryKey: ['tasks'] })
-              queryClient.invalidateQueries({ queryKey: ['tasks-all-pending'] })
-              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+              invalidateQueryGroup(queryClient, ['tasks'], onCrmRoute)
+              invalidateQueryGroup(queryClient, ['tasks-all-pending'], onCrmRoute)
+              invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
 
               if (useUIStore.getState().soundEnabled) playPing();
 
@@ -345,7 +369,6 @@ export function GlobalSync() {
                   </div>,
                   { duration: 6000 }
               )
-              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
           } else {
               showInboxEmailToast({
                   name,
@@ -363,7 +386,7 @@ export function GlobalSync() {
                 link: notification.link || null,
                 kind: 'email',
               })
-              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+              invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
           }
 
         }
@@ -380,7 +403,7 @@ export function GlobalSync() {
             if (event.type === 'refresh-data') {
               forensicNotify.update('Refreshing data...')
               void performSync(true)
-              queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
+              invalidateQueryGroup(queryClient, ['notification-center-feed'], onCrmRoute)
             }
 
             if (event.type === 'navigate' && event.href) {
