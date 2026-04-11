@@ -57,7 +57,7 @@ export function VelocityTrackerV3() {
         signalEfficiency: Math.floor(connectRate * 0.4),
       };
     },
-    refetchInterval: 10000,
+    refetchInterval: 5 * 60 * 1000,
   });
 
   if (!mounted) return <div className="nodal-void-card p-6 h-full min-h-[380px]" />;

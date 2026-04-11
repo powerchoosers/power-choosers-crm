@@ -99,11 +99,6 @@ export function GlobalSync() {
   useEffect(() => {
     if (loading || !user || !onCrmRoute) return
 
-    // Immediately trigger a sync on load (silent)
-    const timer = setTimeout(() => {
-      performSync(true)
-    }, 1000)
-
     // Listen for signature_requests status changes (toasts + cache busting)
     // Only triggers toasts for the user who initiated the request (or admins)
     const sigChannel = supabase.channel('signature-request-changes')
@@ -395,7 +390,6 @@ export function GlobalSync() {
         : undefined
 
     return () => {
-      clearTimeout(timer)
       supabase.removeChannel(sigChannel)
       supabase.removeChannel(emailChannel)
       supabase.removeChannel(notificationChannel)

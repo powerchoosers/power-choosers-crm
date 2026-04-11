@@ -425,8 +425,6 @@ export function useAccountCalls(accountId: string, contactIds?: string[]) {
     staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
-    refetchInterval: 20_000, // Poll every 20s so new calls show without refresh (fallback if Realtime misses)
-    refetchIntervalInBackground: false,
   })
 }
 
@@ -575,8 +573,6 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
     staleTime: 1000 * 60 * 2, // 2 min – refetch + realtime keep list fresh
     refetchOnMount: 'always',
     refetchOnWindowFocus: true,
-    refetchInterval: 20_000, // Poll every 20s so new calls show without refresh (fallback if Realtime misses)
-    refetchIntervalInBackground: false,
     gcTime: 1000 * 60 * 60, // 1 hour
   })
 }

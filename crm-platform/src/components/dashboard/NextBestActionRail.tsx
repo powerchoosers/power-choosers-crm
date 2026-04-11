@@ -130,7 +130,7 @@ export function NextBestActionRail() {
     },
     enabled: accountIds.length > 0,
     staleTime: 1000 * 60 * 2,
-    refetchInterval: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
   })
 
   const pendingCriticalByAccount = useMemo(() => {
