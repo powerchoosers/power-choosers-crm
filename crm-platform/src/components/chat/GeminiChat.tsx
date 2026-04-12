@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy, Newspaper, ExternalLink, GitBranch, Building2 } from 'lucide-react'
+import { Copy, Send, X, Loader2, User, Bot, Mic, Activity, AlertTriangle, ArrowRight, History, RefreshCw, Phone, Plus, Sparkles, Cpu, Zap, FileText, CheckCircle, Circle, ClipboardCopy, Newspaper, ExternalLink, GitBranch, Building2, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,7 +16,6 @@ import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
-import { NeuralLoader } from '@/components/chat/NeuralLoader'
 import { DecryptionText } from '@/components/chat/DecryptionText'
 import { useTasks } from '@/hooks/useTasks'
 import { buildProtocolTaskMetadata } from '@/lib/protocol-context'
@@ -327,6 +326,46 @@ function Waveform() {
   )
 }
 
+function FrontierLoader() {
+  return (
+    <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl px-4 py-3 shadow-[0_0_40px_rgba(0,47,167,0.08)]">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="relative h-10 w-10 rounded-2xl border border-[#002FA7]/25 bg-[#002FA7]/10 flex items-center justify-center overflow-hidden">
+            <motion.div
+              className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,47,167,0.38),transparent_70%)]"
+              animate={{ opacity: [0.35, 0.9, 0.35], scale: [0.92, 1, 0.92] }}
+              transition={{ duration: 1.8, repeat: Infinity, ease: [0.23, 1, 0.32, 1] }}
+            />
+            <Bot size={18} className="relative z-10 text-white" />
+          </div>
+          <div className="min-w-0">
+            <div className="text-[10px] font-mono uppercase tracking-[0.24em] text-[#002FA7]">Thinking</div>
+            <div className="text-sm text-zinc-300 truncate">Reading context, checking CRM, and preparing the next move.</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {[0, 1, 2].map((i) => (
+            <motion.span
+              key={i}
+              className="h-2 w-2 rounded-full bg-[#002FA7]"
+              animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
+              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
+        <motion.div
+          className="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-[#002FA7] to-transparent"
+          animate={{ x: ['-20%', '240%'] }}
+          transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+    </div>
+  )
+}
+
 function ImageWithSkeleton({ src, alt, className, isLoading: isExternalLoading }: { src: string | null, alt: string, className?: string, isLoading?: boolean }) {
   const [isImageLoaded, setIsImageLoaded] = useState(false)
   const showSkeleton = isExternalLoading || !src || !isImageLoaded
@@ -366,6 +405,19 @@ type ContextInfo = { type: string; id?: string | string[]; label?: string; displ
 type PromptSuggestion = {
   label: string
   prompt: string
+}
+
+type EmailDraftCardData = {
+  to: string
+  subject: string
+  html: string
+  text?: string
+  contactId?: string | null
+  contactName?: string | null
+  accountId?: string | null
+  accountName?: string | null
+  senderEmail?: string | null
+  senderName?: string | null
 }
 
 const NO_RESULT_PATTERN = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don['’]t find|not in crm|need a keyword|please specify|keyword|need more context|not enough information|can['’]t verify|cannot verify|no record|no records)/i
@@ -850,7 +902,114 @@ function BrokenCardFallback({ rawSegment, reason }: { rawSegment: string; reason
   )
 }
 
-function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: string; data: unknown; onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>; contextInfo?: ContextInfo }) {
+function EmailDraftCardView({
+  card,
+  onSend,
+}: {
+  card: EmailDraftCardData
+  onSend?: (draft: EmailDraftCardData) => Promise<void>
+}) {
+  const [isSending, setIsSending] = useState(false)
+  const to = toDisplayString(card.to)
+  const subject = toDisplayString(card.subject)
+  const previewText = toDisplayString(card.text) || card.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+
+  const handleSend = async () => {
+    if (!onSend || isSending) return
+    setIsSending(true)
+    try {
+      await onSend(card)
+    } finally {
+      setIsSending(false)
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/80 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <Mail size={14} className="text-zinc-400 shrink-0" />
+          <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest truncate">Email Draft</span>
+        </div>
+        {card.senderEmail && (
+          <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] whitespace-nowrap">
+            {card.senderEmail}
+          </span>
+        )}
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="rounded-xl bg-black/30 border border-white/5 p-3">
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">To</div>
+            <div className="text-sm text-zinc-200 truncate">{to}</div>
+          </div>
+          <div className="rounded-xl bg-black/30 border border-white/5 p-3">
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Subject</div>
+            <div className="text-sm text-zinc-200 truncate">{subject}</div>
+          </div>
+        </div>
+        <div className="rounded-xl bg-black/30 border border-white/5 p-3">
+          <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-2">Body Preview</div>
+          <div className="text-sm text-zinc-300 whitespace-pre-wrap leading-6 break-words">{previewText}</div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px] uppercase tracking-widest hover:bg-white/[0.06]"
+            onClick={() => navigator.clipboard.writeText([`To: ${to}`, `Subject: ${subject}`, '', previewText].join('\n'))}
+          >
+            Copy draft
+          </Button>
+          {onSend && (
+            <Button
+              type="button"
+              className="h-8 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30"
+              onClick={handleSend}
+              disabled={isSending}
+            >
+              {isSending ? 'Sending...' : 'Send now'}
+            </Button>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+function normalizeEmailDraftDraft(draft: EmailDraftCardData): EmailDraftCardData {
+  return {
+    ...draft,
+    to: toDisplayString(draft.to),
+    subject: toDisplayString(draft.subject),
+    html: String(draft.html || ''),
+    text: toDisplayString(draft.text),
+    contactId: draft.contactId ?? null,
+    contactName: draft.contactName ?? null,
+    accountId: draft.accountId ?? null,
+    accountName: draft.accountName ?? null,
+    senderEmail: draft.senderEmail ?? null,
+    senderName: draft.senderName ?? null,
+  }
+}
+
+function ComponentRenderer({
+  type,
+  data,
+  onCreateTask,
+  contextInfo,
+  onSendEmail,
+}: {
+  type: string
+  data: unknown
+  onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>
+  contextInfo?: ContextInfo
+  onSendEmail?: (draft: EmailDraftCardData) => Promise<void>
+}) {
   const router = useRouter()
 
   switch (type) {
@@ -876,6 +1035,10 @@ function ComponentRenderer({ type, data, onCreateTask, contextInfo }: { type: st
       if (!isRecord(data)) return null
       const items = Array.isArray(data.items) ? data.items : []
       return <FlightCheckBlock items={items} onCreateTask={onCreateTask} />
+    }
+    case 'email_draft': {
+      if (!isRecord(data)) return null
+      return <EmailDraftCardView card={data as EmailDraftCardData} onSend={onSendEmail} />
     }
     case 'interaction_snippet': {
       if (!isRecord(data)) return null
@@ -1566,7 +1729,7 @@ export function GeminiChatPanel() {
       return [
         {
           label: 'Deep Dive',
-          prompt: 'Run deep-dive forensic analysis for this account.'
+          prompt: 'Run a deep-dive forensic analysis for this account using CRM records, Apollo signals, and public web research together. Include recent company news, any other office or location clues, likely decision makers, public-facing phone or contact paths, and the most actionable next steps. Cite the source names in plain language and separate verified facts from likely inferences.'
         },
         {
           label: 'Phone Hunt',
@@ -1582,7 +1745,7 @@ export function GeminiChatPanel() {
       return [
         {
           label: 'Deep Dive',
-          prompt: 'Run deep-dive forensic analysis for this contact.'
+          prompt: 'Run a deep-dive forensic analysis for this contact and their company using CRM records, Apollo signals, and public web research together. Include recent company news, location clues, likely decision makers, alternate office or corporate numbers, and the most actionable next steps. Explain what is verified versus inferred.'
         },
         {
           label: 'Phone Hunt',
@@ -2009,7 +2172,11 @@ SELECT * FROM hybrid_search_accounts(
           context: contextInfo,
           model: selectedModel,
           webSearchMode: internetAssistEnabled ? 'crm_plus_web' : 'crm_only',
-          userProfile: { firstName: profile?.firstName || 'Trey' }
+          userProfile: {
+            firstName: profile?.firstName || 'Trey',
+            name: profile?.name || null,
+            email: profile?.email || auth.user?.email || null
+          }
         })
       })
       const data = await response.json()
@@ -2026,8 +2193,9 @@ SELECT * FROM hybrid_search_accounts(
       const allowedGemini = ['gemini-3-flash-preview', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash', 'openai/gpt-5-nano', 'google/gemini-flash-1.5', 'google/gemini-pro-1.5', 'google/gemini-2.0-flash-001']
       if (typeof data.model === 'string' && data.model.trim() && (allowedGemini.includes(data.model) || data.model.startsWith('sonar') || data.model.includes('/'))) setSelectedModel(data.model)
       const isNewsRequest = /news|company news|give me the news|what'?s the news|latest news|news on|any news|news about|reports? about/i.test(messageText.trim())
+      const isDeepDiveRequest = /deep[-\s]?dive|forensic analysis|forensic brief|intel brief|account intelligence/i.test(messageText.trim())
       const isFirstExchange = messagesForApi.length <= 1
-      const showNewsCard = (contextInfo.type === 'contact' || contextInfo.type === 'account' || contextInfo.type === 'protocol') && (isNewsRequest || isFirstExchange) && apolloNewsSignals && apolloNewsSignals.length > 0
+      const showNewsCard = (contextInfo.type === 'contact' || contextInfo.type === 'account' || contextInfo.type === 'protocol') && (isNewsRequest || isDeepDiveRequest || isFirstExchange) && apolloNewsSignals && apolloNewsSignals.length > 0
       const assistantMetadata = {
         provider: typeof data.provider === 'string' ? data.provider : undefined,
         model: typeof data.model === 'string' ? data.model : undefined,
@@ -2064,6 +2232,42 @@ SELECT * FROM hybrid_search_accounts(
       setIsLoading(false)
     }
   }, [contextInfo, selectedModel, profile?.firstName, apolloNewsSignals, internetAssistEnabled])
+
+  const sendDraftEmail = useCallback(async (draft: EmailDraftCardData) => {
+    const normalized = normalizeEmailDraftDraft(draft)
+    const senderEmail = normalized.senderEmail || profile?.email || auth.user?.email || ''
+    if (!senderEmail) throw new Error('Missing sender email')
+
+    const response = await fetch('/api/email/zoho-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: normalized.to,
+        subject: normalized.subject,
+        content: normalized.html,
+        plainTextContent: normalized.text || normalized.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+        isHtmlEmail: true,
+        userEmail: senderEmail,
+        from: senderEmail,
+        fromName: normalized.senderName || profile?.name || auth.user?.user_metadata?.full_name || undefined,
+        contactId: normalized.contactId || undefined,
+        threadId: undefined
+      })
+    })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data?.error || data?.message || 'Failed to send email')
+    }
+
+    const successText = `Email sent to ${normalized.to}`
+    setMessages((prev) => [...prev, {
+      role: 'assistant',
+      content: successText,
+      id: crypto.randomUUID(),
+      timestamp: Date.now()
+    }])
+  }, [auth.user?.email, auth.user?.user_metadata?.full_name, profile?.email, profile?.name])
 
   const handleSend = async (messageOverride?: string) => {
     const messageText = (messageOverride ?? input).trim()
@@ -2492,7 +2696,7 @@ SELECT * FROM hybrid_search_accounts(
                               return (
                                 <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                                   <div className="w-full overflow-hidden grid grid-cols-1">
-                                    <ComponentRenderer type={parsed.type} data={parsed.data as Record<string, unknown>} onCreateTask={handleCreateTask} contextInfo={contextInfo} />
+                                    <ComponentRenderer type={parsed.type} data={parsed.data as Record<string, unknown>} onCreateTask={handleCreateTask} contextInfo={contextInfo} onSendEmail={sendDraftEmail} />
                                   </div>
                                   {trailingText && (
                                     <div className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
@@ -2549,6 +2753,7 @@ SELECT * FROM hybrid_search_accounts(
                               data={m.componentData as Record<string, unknown>}
                               onCreateTask={handleCreateTask}
                               contextInfo={contextInfo}
+                              onSendEmail={sendDraftEmail}
                             />
                           </div>
                         )
@@ -2583,7 +2788,7 @@ SELECT * FROM hybrid_search_accounts(
           {isLoading && (
             <div className="flex justify-start relative w-full pl-6">
               <div className="absolute left-0 top-0 bottom-0 w-[2px] bg-gradient-to-b from-[#002FA7] to-transparent" />
-              <NeuralLoader />
+              <FrontierLoader />
             </div>
           )}
           <div ref={messagesEndRef} className="h-px" />
