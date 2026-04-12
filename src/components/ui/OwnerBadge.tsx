@@ -1,3 +1,4 @@
+import { Skeleton } from '@/components/ui/skeleton'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { OwnerDirectoryEntry } from '@/types/agents'
@@ -6,10 +7,20 @@ type OwnerBadgeOwner = Pick<OwnerDirectoryEntry, 'displayName' | 'kind'>
 
 interface OwnerBadgeProps {
   owner?: OwnerBadgeOwner | null
+  loading?: boolean
   className?: string
 }
 
-export function OwnerBadge({ owner, className }: OwnerBadgeProps) {
+export function OwnerBadge({ owner, loading = false, className }: OwnerBadgeProps) {
+  if (loading) {
+    return (
+      <Skeleton
+        aria-hidden="true"
+        className={cn('h-6 w-36 rounded-full border border-white/10 bg-white/[0.04]', className)}
+      />
+    )
+  }
+
   const label = owner?.displayName?.trim() || 'Unassigned'
   const isUnassigned = owner?.kind === 'unassigned' || label === 'Unassigned'
 
