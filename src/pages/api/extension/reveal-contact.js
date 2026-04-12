@@ -678,7 +678,7 @@ export default async function handler(req, res) {
       accountId,
     })
 
-    const ownerId = sanitizeText(existing?.ownerId || auth.id || auth.user?.email) || null
+    const ownerId = sanitizeText(existing?.ownerId || auth.email?.toLowerCase() || auth.user?.email?.toLowerCase() || String(auth.id || '').trim().toLowerCase() || String(auth.user?.id || '').trim().toLowerCase()) || null
     const existingMetadata = existing?.metadata && typeof existing.metadata === 'object' ? existing.metadata : {}
     const photoUrl = resolvePhotoUrl(enriched, person, existingMetadata) || ''
     const { patch: phonePatch, extras: overflowPhones } = assignPhones(normalizedPhones)

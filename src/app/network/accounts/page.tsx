@@ -80,7 +80,7 @@ export default function AccountsPage() {
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
-  const { getOwner } = useOwnerDirectory()
+  const { getOwner, isLoading: ownerDirectoryLoading } = useOwnerDirectory()
   const scrollKey = (pathname ?? '/network/accounts') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
 
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
@@ -470,7 +470,7 @@ export default function AccountsPage() {
           const owner = getOwner(row.original.ownerId)
           return (
             <div className="flex items-center min-w-0">
-              <OwnerBadge owner={owner} />
+              <OwnerBadge owner={owner} loading={ownerDirectoryLoading} />
             </div>
           )
         },

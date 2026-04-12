@@ -47,19 +47,28 @@ export default async function handler(req, res) {
     const domain = (prospect.domain || '').toLowerCase().trim() || null;
     const apiKey = getApiKey();
     const enrichedOrg = domain ? await enrichApolloOrganizationByDomain({ domain }, apiKey) : null;
+    const explicitOwnerId = String(req.body?.ownerId || req.body?.ownerEmail || '').trim().toLowerCase() || null;
 
     // Duplicate check: domain first, then name
     let existingId = null;
+    let existingRow = null;
     if (domain) {
-      const { data } = await supabaseAdmin.from('accounts').select('id').eq('domain', domain).maybeSingle();
-      if (data) existingId = data.id;
+      const { data } = await supabaseAdmin.from('accounts').select('id, ownerId').eq('domain', domain).maybeSingle();
+      if (data) {
+        existingId = data.id;
+        existingRow = data;
+      }
     }
     if (!existingId && prospect.name) {
-      const { data } = await supabaseAdmin.from('accounts').select('id').ilike('name', normalizeOrganizationName(prospect.name) || prospect.name).maybeSingle();
-      if (data) existingId = data.id;
+      const { data } = await supabaseAdmin.from('accounts').select('id, ownerId').ilike('name', normalizeOrganizationName(prospect.name) || prospect.name).maybeSingle();
+      if (data) {
+        existingId = data.id;
+        existingRow = data;
+      }
     }
 
     const accountId = existingId || crypto.randomUUID();
+    const ownerId = String(existingRow?.ownerId || '').trim().toLowerCase() || explicitOwnerId || user?.email?.toLowerCase() || String(userId || '').trim().toLowerCase() || null;
 
     const accountName = normalizeOrganizationName(enrichedOrg?.name || prospect.name || '') || prospect.name;
     const accountIndustry = enrichedOrg?.industry || enrichedOrg?.industry_category || (enrichedOrg?.industries || [])[0] || prospect.industry || null;
@@ -112,7 +121,7 @@ export default async function handler(req, res) {
       logo_url: accountLogo,
       phone: accountPhone,
       linkedin_url: accountLinkedIn,
-      ownerId: userId || null,
+      ownerId,
       status: 'active',
       service_addresses: serviceAddresses,
       metadata: { meters, source: 'prospect_radar', apollo_org_id: prospect.apollo_org_id || null },
