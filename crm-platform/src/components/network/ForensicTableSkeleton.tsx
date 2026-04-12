@@ -8,6 +8,7 @@ interface ForensicTableSkeletonProps {
   columns: number;
   rows?: number;
   type?: 'account' | 'people' | 'task' | 'deal';
+  variant?: 'default' | 'target';
 }
 
 const ROW_HEIGHT_BY_TYPE: Record<NonNullable<ForensicTableSkeletonProps['type']>, number> = {
@@ -17,8 +18,15 @@ const ROW_HEIGHT_BY_TYPE: Record<NonNullable<ForensicTableSkeletonProps['type']>
   deal: 58,
 }
 
-export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: ForensicTableSkeletonProps) {
+export function ForensicTableSkeleton({ columns, rows = 10, type = 'account', variant = 'default' }: ForensicTableSkeletonProps) {
   const [autoRows, setAutoRows] = useState(rows)
+  const isTargetVariant = variant === 'target'
+  const peoplePrimaryWidth = isTargetVariant ? 'w-28 2xl:w-36' : 'w-28'
+  const peopleSecondaryWidth = isTargetVariant ? 'w-20 2xl:w-24' : 'w-20'
+  const accountPrimaryWidth = isTargetVariant ? 'w-32 2xl:w-40' : 'w-32'
+  const accountSecondaryWidth = isTargetVariant ? 'w-24 2xl:w-28' : 'w-24'
+  const genericWidth = isTargetVariant ? 'w-20 2xl:w-24' : 'w-20'
+  const ownerWidth = isTargetVariant ? 'w-36 2xl:w-40' : 'w-36'
 
   useEffect(() => {
     const computeRows = () => {
@@ -53,8 +61,8 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
         <div className="flex items-center gap-3 min-w-0">
           <Skeleton className="h-9 w-9 rounded-[14px] shrink-0" />
           <div className="min-w-0 space-y-2">
-            <Skeleton className="h-4 w-28" />
-            <Skeleton className="h-3 w-20" />
+            <Skeleton className={`h-4 ${peoplePrimaryWidth}`} />
+            <Skeleton className={`h-3 ${peopleSecondaryWidth}`} />
           </div>
         </div>
       )
@@ -63,9 +71,12 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
       return (
         <div className="flex items-center gap-2 min-w-0">
           <Skeleton className="h-9 w-9 rounded-[14px] shrink-0" />
-          <Skeleton className="h-4 w-28" />
+          <Skeleton className={`h-4 ${isTargetVariant ? 'w-28 2xl:w-36' : 'w-28'}`} />
         </div>
       )
+    }
+    if (j === 4) {
+      return <Skeleton className={`h-6 rounded-full border border-white/10 bg-white/[0.04] ${ownerWidth}`} />
     }
     if (j === columns - 1) {
       return (
@@ -75,7 +86,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
         </div>
       )
     }
-    return <Skeleton className="h-4 w-20" />
+    return <Skeleton className={`h-4 ${genericWidth}`} />
   }
 
   const renderAccountCell = (j: number) => {
@@ -85,11 +96,14 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
         <div className="flex items-center gap-3 min-w-0">
           <Skeleton className="h-9 w-9 rounded-[14px] shrink-0" />
           <div className="min-w-0 space-y-2">
-            <Skeleton className="h-4 w-32" />
-            <Skeleton className="h-3 w-24" />
+            <Skeleton className={`h-4 ${accountPrimaryWidth}`} />
+            <Skeleton className={`h-3 ${accountSecondaryWidth}`} />
           </div>
         </div>
       )
+    }
+    if (j === 4) {
+      return <Skeleton className={`h-6 rounded-full border border-white/10 bg-white/[0.04] ${ownerWidth}`} />
     }
     if (j === columns - 1) {
       return (
@@ -99,7 +113,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
         </div>
       )
     }
-    return <Skeleton className="h-4 w-20" />
+    return <Skeleton className={`h-4 ${genericWidth}`} />
   }
 
   const renderTaskCell = (j: number) => {
@@ -109,8 +123,8 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
         <div className="flex items-center gap-3">
           <Skeleton className="h-8 w-8 rounded-lg" />
           <div className="space-y-2">
-            <Skeleton className="h-4 w-44" />
-            <Skeleton className="h-3 w-32" />
+            <Skeleton className={`h-4 ${isTargetVariant ? 'w-44 2xl:w-56' : 'w-44'}`} />
+            <Skeleton className={`h-3 ${isTargetVariant ? 'w-32 2xl:w-40' : 'w-32'}`} />
           </div>
         </div>
       )
@@ -132,7 +146,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
         </div>
       )
     }
-    return <Skeleton className="h-4 w-24" />
+    return <Skeleton className={`h-4 ${isTargetVariant ? 'w-24 2xl:w-28' : 'w-24'}`} />
   }
 
   const renderDealCell = (j: number) => {
@@ -140,8 +154,8 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
     if (j === 1) {
       return (
         <div className="space-y-2">
-          <Skeleton className="h-4 w-40" />
-          <Skeleton className="h-3 w-28" />
+          <Skeleton className={`h-4 ${isTargetVariant ? 'w-40 2xl:w-52' : 'w-40'}`} />
+          <Skeleton className={`h-3 ${isTargetVariant ? 'w-28 2xl:w-36' : 'w-28'}`} />
         </div>
       )
     }
@@ -154,7 +168,7 @@ export function ForensicTableSkeleton({ columns, rows = 10, type = 'account' }: 
         </div>
       )
     }
-    return <Skeleton className="h-4 w-20" />
+    return <Skeleton className={`h-4 ${genericWidth}`} />
   }
 
   return (
