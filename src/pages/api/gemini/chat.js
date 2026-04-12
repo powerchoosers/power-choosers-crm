@@ -1198,15 +1198,30 @@ const toolHandlers = {
     if (error) throw error;
     return data;
   },
-  send_email: async ({ to, subject, content, userEmail }) => {
+  send_email: async ({ to, subject, content, userEmail, cc, bcc, fromName }) => {
+    const resolvedUserEmail = String(userEmail || currentUserEmail || '').trim();
+    if (!resolvedUserEmail) {
+      throw new Error('send_email requires a sender email address');
+    }
+    if (!to || !subject || !content) {
+      throw new Error('send_email requires to, subject, and content');
+    }
     const zohoService = new ZohoMailService();
     const result = await zohoService.sendEmail({
       to,
       subject,
       html: content,
-      userEmail
+      userEmail: resolvedUserEmail,
+      cc,
+      bcc,
+      fromName
     });
-    return result;
+    return {
+      ...result,
+      to,
+      subject,
+      sender: resolvedUserEmail
+    };
   },
   search_emails: async ({ query, limit = 10 }) => {
     // Global email search with Hybrid Search
@@ -1526,6 +1541,7 @@ Output rules:
     const historyCandidates = cleanedMessages.slice(0, lastUserIndex);
 
     const firstName = userProfile?.firstName || 'Trey';
+    const currentUserEmail = typeof userProfile?.email === 'string' ? userProfile.email.trim() : '';
     const publicResearchPattern = /\b(search the web|search the internet|internet|online|website|official site|linkedin|owner|owners?|owns|ceo|president|founder|headquarters|hq|address|subsidiary|parent company|revenue|headcount|employee count|employees?|company size|founded|founding|market cap|who works at|who is|who runs|runs the company|leadership|decision maker|decision-makers?|alternate phone|other number|office number|direct phone|public phone|company phone|number on the internet|contact info|check online)\b/i;
     const internalOnlyPattern = /\b(most recent call|recent call|last call|call transcript|transcript|voicemail|he told me|she told me|what did he say|what did she say|email he told me|email he gave me|my inbox|recent email|contract end|contract expiration|bill|invoice|document|file|task|notes?)\b/i;
     const noResultPattern = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don['’]t find|i searched the database|not in crm|limited to apollo|could not locate|can only return contract details|need a keyword|please specify|keyword|need more context|not enough information|can['’]t verify|cannot verify|no record|no records)/i;
@@ -2748,6 +2764,8 @@ Output rules:
           4. Report CRM number vs discovered web number and source.
         - If the user asks "what calls do you see", "my recent calls", "do you have access to my call", or similar: use \`search_interactions({ query: "calls" })\` or \`search_transcripts\` to find call data. Do NOT run \`list_accounts\` for call-related queries.
         - If the user asks about "important emails", "any emails", "my inbox", or "unread emails": use \`search_emails\` or \`search_interactions({ query: "email" })\` to find email data. Do NOT run \`list_accounts\` for email-related queries.
+        - If the user asks to draft, send, or follow up by email, gather the recipient from CRM context first, then use \`send_email\`. If the sender email is not explicitly provided, use the authenticated user's email from the request context.
+        - If the user asks for an email draft, return an \`email_draft\` JSON_DATA card with to, subject, html, and optional text/contactId fields so the UI can let them review and send it.
 
         TOOL_USAGE_PROTOCOL:
         - **Selection by Name**: If the user asks for details about a specific entity (e.g., "Camp Fire First Texas") and you do not have its ID in your immediate context, you MUST first run a search (e.g., \`list_accounts({ search: "Camp Fire First Texas" })\`) to retrieve the ID.
@@ -2856,6 +2874,30 @@ Output rules:
         - If the user asks a simple question, still provide a brief narrative before any data.
         - When presenting tool-backed data (grids, cards), you may add a single phrase in the narrative such as "From CRM" or "Live data" so the user sees it as verified.
         - If the answer is a single decision maker, hierarchy view, or protocol review, prefer a dedicated card over a plain list.
+
+        DEEP_DIVE_FORENSIC_BRIEF:
+        - If the prompt includes "deep-dive", "forensic analysis", "forensic brief", or "intel brief", do not give a generic summary.
+        - Build a usable account-intel brief that merges all available sources:
+          1. CRM records and internal notes
+          2. Apollo enrichment and Apollo news signals
+          3. Public web research when the facts are public-facing
+        - Do not treat these as separate answers. Merge them into one brief.
+        - Build a usable account-intel brief that answers: what changed, who matters, where else they operate, what news is recent, and what call or email angle is most likely to work.
+        - Always check for and call out:
+          1. recent company news or Apollo signals
+          2. alternate offices, locations, or headquarters clues
+          3. likely decision makers or leadership titles
+          4. any new location updates, expansion, closures, or move signals
+          5. public phone or contact paths if available
+        - When evidence exists, name the source plainly and separate verified facts from likely inferences.
+        - If CRM data is present, analyze it. Do not stop at "missing data" unless the missing item is the actual blocker.
+        - If data is present but thin, combine it with public research to produce the best actionable brief possible.
+        - If a public source and CRM disagree, prefer the CRM for internal fields and say the public source only as outside intelligence.
+        - End the narrative with 3-5 bullets labeled like:
+          - What changed
+          - Who matters
+          - Where else to look
+          - Best next move
 
         RICH MEDIA PROTOCOL:
         - The user interface is a "Forensic HUD". Do NOT return Markdown tables. Do NOT respond to list-style queries (e.g. "accounts expiring in 2026", "manufacturers", "accounts with contract end dates", "list accounts") with ONLY a bulleted or numbered list in the narrative. You MUST include at least one JSON_DATA block: either multiple identity_card components (one per account/contact) or one forensic_grid. The user needs clickable cards or a grid to open dossiers.
