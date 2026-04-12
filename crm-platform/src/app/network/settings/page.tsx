@@ -327,7 +327,7 @@ export default function SettingsPage() {
       }
 
       if (result.updateAvailable) {
-        toast.success('Update found. Downloading in the background.', { id: toastId })
+        toast.success('Update found. Downloading now.', { id: toastId })
       } else {
         toast.success('You are already on the latest version', { id: toastId })
       }
