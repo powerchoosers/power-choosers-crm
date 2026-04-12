@@ -64,6 +64,7 @@ export default async function handler(req, res) {
 
     const body = req.body && typeof req.body === 'object' ? req.body : {}
     const snapshot = body.snapshot && typeof body.snapshot === 'object' ? body.snapshot : body
+    const explicitOwnerId = (trimText(body.ownerId || body.ownerEmail || snapshot?.ownerId || snapshot?.ownerEmail || '') || '').toLowerCase() || null
     const domain = extractDomain(snapshot?.origin || snapshot?.url || body.pageUrl || '')
     const apiKey = getApiKey()
     const enrichedOrg = domain ? await enrichApolloOrganizationByDomain({ domain }, apiKey) : null
@@ -184,7 +185,7 @@ export default async function handler(req, res) {
       logo_url: accountLogo,
       phone: accountPhone,
       linkedin_url: accountLinkedIn,
-      ownerId: existingRow?.ownerId || auth.id || auth.user?.id || null,
+      ownerId: String(existingRow?.ownerId || '').trim().toLowerCase() || explicitOwnerId || auth.email?.toLowerCase() || auth.user?.email?.toLowerCase() || String(auth.id || '').trim().toLowerCase() || String(auth.user?.id || '').trim().toLowerCase() || null,
       status: 'active',
       service_addresses: serviceAddresses,
       metadata: nextMetadata,

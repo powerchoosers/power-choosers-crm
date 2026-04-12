@@ -123,7 +123,7 @@ export default function TargetDetailPage() {
   }, [debouncedSearch, setSearch])
 
   const { data: target, isLoading: targetLoading } = useTarget(id)
-  const { getOwner } = useOwnerDirectory()
+  const { getOwner, isLoading: ownerDirectoryLoading } = useOwnerDirectory()
 
   const isPeopleList = target?.kind === 'people' || target?.kind === 'person' || target?.kind === 'contact' || target?.kind === 'contacts'
   const isAccountList = target?.kind === 'account' || target?.kind === 'accounts' || target?.kind === 'company' || target?.kind === 'companies'
@@ -470,7 +470,7 @@ export default function TargetDetailPage() {
         const owner = getOwner(row.original.ownerId)
         return (
           <div className="flex items-center min-w-0">
-            <OwnerBadge owner={owner} />
+            <OwnerBadge owner={owner} loading={ownerDirectoryLoading} />
           </div>
         )
       }
@@ -752,7 +752,7 @@ export default function TargetDetailPage() {
           const owner = getOwner(row.original.ownerId)
           return (
             <div className="flex items-center min-w-0">
-              <OwnerBadge owner={owner} />
+              <OwnerBadge owner={owner} loading={ownerDirectoryLoading} />
             </div>
           )
         }

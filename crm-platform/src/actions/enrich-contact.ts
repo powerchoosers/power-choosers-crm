@@ -5,6 +5,19 @@ import { formatPhoneNumber } from '@/lib/formatPhone';
 
 const APOLLO_BASE_URL = 'https://api.apollo.io/api/v1';
 
+type ResolveIdentityOptions = {
+    ownerId?: string | null;
+};
+
+type UpdateContactManualDataOptions = {
+    ownerId?: string | null;
+};
+
+function normalizeOwnerId(ownerId?: string | null) {
+    const value = String(ownerId || '').trim().toLowerCase();
+    return value || null;
+}
+
 interface IdentityData {
     name: string;
     firstName?: string;
@@ -51,18 +64,37 @@ async function apolloMatchByEmail(email: string) {
 /**
  * Find or Create Account based on Domain/Apollo Data
  */
-async function ensureAccount(domain: string, apolloOrg: any, companyName: string): Promise<string | null> {
+async function ensureAccount(
+    domain: string,
+    apolloOrg: any,
+    companyName: string,
+    ownerId?: string | null
+): Promise<string | null> {
     if (!domain || domain === 'gmail.com' || domain === 'outlook.com' || domain === 'yahoo.com') return null;
+    const resolvedOwnerId = normalizeOwnerId(ownerId);
 
     try {
         // 1. Try to find by domain
         const { data: existing } = await supabaseAdmin
             .from('accounts')
-            .select('id')
+            .select('id, ownerId')
             .eq('domain', domain)
             .maybeSingle();
 
-        if (existing) return existing.id;
+        if (existing) {
+            if (!String(existing.ownerId || '').trim() && resolvedOwnerId) {
+                const { error: ownerUpdateError } = await supabaseAdmin
+                    .from('accounts')
+                    .update({ ownerId: resolvedOwnerId })
+                    .eq('id', existing.id);
+
+                if (ownerUpdateError) {
+                    console.warn('Failed to backfill account ownerId:', ownerUpdateError);
+                }
+            }
+
+            return existing.id;
+        }
 
         // 2. Create new Account
         console.log(`Creating new account for domain: ${domain}`);
@@ -71,6 +103,7 @@ async function ensureAccount(domain: string, apolloOrg: any, companyName: string
             id: crypto.randomUUID(),
             name: apolloOrg?.name || companyName,
             domain: domain,
+            ownerId: resolvedOwnerId,
             industry: apolloOrg?.industry || 'Unknown',
             description: apolloOrg?.short_description || '',
             logo_url: apolloOrg?.logo_url || '',
@@ -110,8 +143,9 @@ async function ensureAccount(domain: string, apolloOrg: any, companyName: string
 /**
  * Resolve Identity: Supabase First -> Apollo Enrichment
  */
-export async function resolveIdentity(email: string): Promise<IdentityData | null> {
+export async function resolveIdentity(email: string, options: ResolveIdentityOptions = {}): Promise<IdentityData | null> {
     if (!email) return null;
+    const resolvedOwnerId = normalizeOwnerId(options.ownerId);
 
     try {
         // 1. Check local DB first (Fastest)
@@ -131,6 +165,17 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
         }
 
         if (existing) {
+            if (!String(existing.ownerId || '').trim() && resolvedOwnerId) {
+                const { error: ownerUpdateError } = await supabaseAdmin
+                    .from('contacts')
+                    .update({ ownerId: resolvedOwnerId })
+                    .eq('id', existing.id);
+
+                if (ownerUpdateError) {
+                    console.warn('Failed to backfill contact ownerId:', ownerUpdateError);
+                }
+            }
+
             console.log('[resolveIdentity] Resolved via Supabase:', email, existing.name);
             return {
                 name: existing.name || 'Unknown Entity',
@@ -155,7 +200,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
         const companyName = apolloPerson?.organization?.name || domain.split('.')[0].toUpperCase();
 
         // 3. Ensure Account Exists
-        const accountId = await ensureAccount(domain, apolloPerson?.organization, companyName);
+        const accountId = await ensureAccount(domain, apolloPerson?.organization, companyName, resolvedOwnerId);
 
         if (!apolloPerson) {
             // Fallback for non-Apollo matches
@@ -174,6 +219,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
                 id: contactId,
                 name: identity.name,
                 email: identity.email,
+                ownerId: resolvedOwnerId,
                 accountId: accountId, // Link to account if created
                 status: 'Active',
                 metadata: { source: 'Bill Debugger (Raw)' }
@@ -210,6 +256,7 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
             lastName: apLastName,
             title: identity.title,
             email: identity.email,
+            ownerId: resolvedOwnerId,
             phone: identity.phone ? formatPhoneNumber(identity.phone) : null,
             linkedinUrl: identity.linkedinUrl,
             city: apolloPerson.city,
@@ -244,9 +291,11 @@ export async function resolveIdentity(email: string): Promise<IdentityData | nul
  */
 export async function updateContactManualData(
     email: string,
-    data: { name?: string; title?: string; phone?: string }
+    data: { name?: string; title?: string; phone?: string },
+    options: UpdateContactManualDataOptions = {}
 ): Promise<void> {
     if (!email) return;
+    const resolvedOwnerId = normalizeOwnerId(options.ownerId);
 
     const updates: Record<string, string | undefined> = {};
     if (data.name) {
@@ -259,6 +308,18 @@ export async function updateContactManualData(
     if (data.phone) updates.phone = data.phone;
 
     if (Object.keys(updates).length === 0) return;
+
+    if (resolvedOwnerId) {
+        const { data: existing } = await supabaseAdmin
+            .from('contacts')
+            .select('id, ownerId')
+            .eq('email', email)
+            .maybeSingle();
+
+        if (existing && !String(existing.ownerId || '').trim()) {
+            updates.ownerId = resolvedOwnerId;
+        }
+    }
 
     const { error } = await supabaseAdmin
         .from('contacts')

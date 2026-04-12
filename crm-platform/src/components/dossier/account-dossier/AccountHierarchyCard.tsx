@@ -351,30 +351,33 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
     const employees = Number.isNaN(employeesRaw) ? null : employeesRaw
     const phone = formatPhoneNumber(merged.phone || '') || null
     const now = new Date().toISOString()
+    const { data: { session } } = await supabase.auth.getSession()
+    const currentOwnerId = session?.user?.email?.toLowerCase() || null
 
-    let existingId: string | null = null
+    let existingAccount: { id: string; ownerId?: string | null } | null = null
     if (domainKey) {
       const { data } = await supabase
         .from('accounts')
-        .select('id')
+        .select('id, ownerId')
         .eq('domain', domainKey)
         .maybeSingle()
-      if (data) existingId = data.id
+      if (data) existingAccount = data
     }
-    if (!existingId && name) {
+    if (!existingAccount && name) {
       const { data } = await supabase
         .from('accounts')
-        .select('id')
+        .select('id, ownerId')
         .ilike('name', name)
         .maybeSingle()
-      if (data) existingId = data.id
+      if (data) existingAccount = data
     }
 
+    const existingId = existingAccount?.id ?? null
     const resolvedId = existingId || crypto.randomUUID()
     if (existingId) {
       const { data: currentRow } = await supabase
         .from('accounts')
-        .select('metadata')
+        .select('metadata, ownerId')
         .eq('id', existingId)
         .maybeSingle()
 
@@ -382,6 +385,7 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
         updatedAt: now,
         status: 'active'
       }
+      const existingOwnerId = String(currentRow?.ownerId || '').trim()
       if (name) updates.name = name
       if (domainKey) updates.domain = domainKey
       if (merged.industry) updates.industry = merged.industry
@@ -403,6 +407,9 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
         : {}
       if (meters.length > 0) {
         updates.metadata = { ...existingMetadata, meters }
+      }
+      if (!existingOwnerId && currentOwnerId) {
+        updates.ownerId = currentOwnerId
       }
 
       const { error } = await supabase
@@ -430,6 +437,7 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
           phone,
           linkedin_url: merged.linkedin || null,
           website: merged.website || null,
+          ownerId: currentOwnerId,
           status: 'active',
           metadata: { meters },
           createdAt: now,

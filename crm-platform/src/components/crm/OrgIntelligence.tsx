@@ -1064,7 +1064,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         title: enriched.jobTitle || person.title,
         email: safeEmail,
         accountId: accountId,
-        ownerId: user?.id || null,
+        ownerId: user?.email?.toLowerCase() || null,
         status: 'Active',
         ...(linkedinUrl ? { linkedinUrl } : {}),
         ...(contactCity ? { city: contactCity } : {}),

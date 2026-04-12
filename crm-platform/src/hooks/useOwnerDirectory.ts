@@ -80,7 +80,7 @@ export function useOwnerDirectory() {
     ownerMap,
     getOwner,
     generatedAt: query.data?.generatedAt ?? null,
-    isLoading: query.isLoading,
+    isLoading: loading || query.isLoading,
     isFetching: query.isFetching,
     error: query.error,
     refetch: query.refetch,

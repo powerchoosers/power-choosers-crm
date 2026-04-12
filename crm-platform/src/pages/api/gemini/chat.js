@@ -891,10 +891,12 @@ const toolHandlers = {
   },
   create_contact: async (contact) => {
     // Ensure we have a valid UUID for the primary key (since DB column is text without default)
-    if (!contact.id) {
-      contact.id = crypto.randomUUID();
-    }
-    const { data, error } = await supabaseAdmin.from('contacts').insert([contact]).select().single();
+    const nextContact = {
+      ...contact,
+      id: contact.id || crypto.randomUUID(),
+      ownerId: String(contact.ownerId || contact.metadata?.ownerId || '').trim().toLowerCase() || null,
+    };
+    const { data, error } = await supabaseAdmin.from('contacts').insert([nextContact]).select().single();
     if (error) throw error;
     return data;
   },

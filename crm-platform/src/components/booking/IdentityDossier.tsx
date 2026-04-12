@@ -5,6 +5,7 @@ import { User, MapPin, ShieldCheck, Loader2, Linkedin, Phone } from 'lucide-reac
 import { resolveIdentity, updateContactManualData } from '@/actions/enrich-contact';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
+import { useAuth } from '@/context/AuthContext';
 
 interface IdentityData {
     name: string;
@@ -39,15 +40,19 @@ export default function IdentityDossier({
     const [isManualEntry, setIsManualEntry] = useState(false);
     const [manualFields, setManualFields] = useState({ name: '', company: '', title: '', phone: '' });
     const [isSavingManual, setIsSavingManual] = useState(false);
+    const { user, loading: authLoading } = useAuth();
 
     useEffect(() => {
         async function fetchIdentity() {
+            if (authLoading) {
+                return;
+            }
             if (!email) {
                 setLoading(false);
                 return;
             }
             try {
-                const result = await resolveIdentity(email);
+                const result = await resolveIdentity(email, { ownerId: user?.email?.toLowerCase() || null });
                 setData(result);
                 const name = result?.name?.trim() ?? '';
                 const isUnknown = !name || name === 'Unknown Entity' || /^null(\s|$)/i.test(name);
@@ -66,7 +71,7 @@ export default function IdentityDossier({
             }
         }
         fetchIdentity();
-    }, [email]);
+    }, [email, authLoading, user?.email]);
 
     const handleManualSubmit = async () => {
         if (!manualFields.name || !manualFields.company) return;
@@ -88,6 +93,8 @@ export default function IdentityDossier({
                     name: manualFields.name,
                     title: manualFields.title,
                     phone: manualFields.phone,
+                }, {
+                    ownerId: user?.email?.toLowerCase() || null,
                 });
             }
             setData(assembled);

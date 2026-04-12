@@ -26,6 +26,11 @@ const getApolloAuthHeaders = async (includeContentType: boolean = false): Promis
   };
 };
 
+const resolveCurrentOwnerId = async (): Promise<string | null> => {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user?.email?.toLowerCase() || null;
+};
+
 const enrichNode = async (identifier: string, type: 'ACCOUNT' | 'CONTACT') => {
   const authHeaders = await getApolloAuthHeaders();
   try {
@@ -478,21 +483,23 @@ export function NodeIngestion() {
     setIsCommitting(true);
     try {
       const now = new Date().toISOString();
+      const currentOwnerId = await resolveCurrentOwnerId();
 
       if (type === 'ACCOUNT') {
         const domainKey = identifier.includes('.') ? identifier : scanResult?.domain;
 
         // --- DUPLICATE CHECK: domain first, then name ---
-        let existingId: string | null = null;
+        let existingAccount: { id: string; ownerId?: string | null } | null = null;
         if (domainKey) {
-          const { data } = await supabase.from('accounts').select('id').eq('domain', domainKey).maybeSingle();
-          if (data) existingId = data.id;
+          const { data } = await supabase.from('accounts').select('id, ownerId').eq('domain', domainKey).maybeSingle();
+          if (data) existingAccount = data;
         }
-        if (!existingId && entityName) {
-          const { data } = await supabase.from('accounts').select('id').ilike('name', entityName).maybeSingle();
-          if (data) existingId = data.id;
+        if (!existingAccount && entityName) {
+          const { data } = await supabase.from('accounts').select('id, ownerId').ilike('name', entityName).maybeSingle();
+          if (data) existingAccount = data;
         }
 
+        const existingId = existingAccount?.id ?? null;
         const id = existingId || crypto.randomUUID();
 
         // Build service_addresses array if we have address data
@@ -532,6 +539,7 @@ export function NodeIngestion() {
           logo_url: scanResult?.logoUrl || scanResult?.logo,
           phone: formatPhoneNumber(phone || scanResult?.phone) || null,
           linkedin_url: scanResult?.linkedin,
+          ownerId: currentOwnerId,
           status: 'active',
           metadata: { meters: meters },
           updatedAt: now,
@@ -540,6 +548,7 @@ export function NodeIngestion() {
         if (existingId) {
           // Only update fields that are actually set — never overwrite existing data with empty form values
           const enrichUpdate: Record<string, any> = { status: 'active', updatedAt: now };
+          const existingOwnerId = String(existingAccount?.ownerId || '').trim();
           if (entityName) enrichUpdate.name = entityName;
           if (domainKey) enrichUpdate.domain = domainKey;
           if (scanResult?.industry) enrichUpdate.industry = scanResult.industry;
@@ -559,6 +568,7 @@ export function NodeIngestion() {
           if (ph) enrichUpdate.phone = ph;
           if (scanResult?.linkedin) enrichUpdate.linkedin_url = scanResult.linkedin;
           if (meters.length > 0) enrichUpdate.metadata = { meters };
+          if (!existingOwnerId && currentOwnerId) enrichUpdate.ownerId = currentOwnerId;
           const { error } = await supabase.from('accounts').update(enrichUpdate).eq('id', existingId);
           if (error) throw error;
         } else {
@@ -592,19 +602,20 @@ export function NodeIngestion() {
 
       } else {
         // --- DUPLICATE CHECK: email first, then full name ---
-        let existingId: string | null = null;
+        let existingContact: { id: string; ownerId?: string | null } | null = null;
         if (email) {
-          const { data } = await supabase.from('contacts').select('id').eq('email', email).maybeSingle();
-          if (data) existingId = data.id;
+          const { data } = await supabase.from('contacts').select('id, ownerId').eq('email', email).maybeSingle();
+          if (data) existingContact = data;
         }
         const trimmedFullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-        if (!existingId && trimmedFullName) {
-          const { data } = await supabase.from('contacts').select('id')
+        if (!existingContact && trimmedFullName) {
+          const { data } = await supabase.from('contacts').select('id, ownerId')
             .ilike('name', trimmedFullName)
             .maybeSingle();
-          if (data) existingId = data.id;
+          if (data) existingContact = data;
         }
 
+        const existingId = existingContact?.id ?? null;
         const id = existingId || crypto.randomUUID();
 
         const fName = firstName.trim();
@@ -614,6 +625,7 @@ export function NodeIngestion() {
         if (existingId) {
           // Only update fields that are actually set — never overwrite existing data with empty form values
           const enrichUpdate: Record<string, any> = { status: 'active', updatedAt: now };
+          const existingOwnerId = String(existingContact?.ownerId || '').trim();
           if (fName) enrichUpdate.firstName = fName;
           if (lName) enrichUpdate.lastName = lName;
           if (fullName) enrichUpdate.name = fullName;
@@ -629,6 +641,7 @@ export function NodeIngestion() {
           else if (scanResult?.linkedin) enrichUpdate.linkedinUrl = scanResult.linkedin;
           if (city) enrichUpdate.city = city;
           if (state) enrichUpdate.state = state;
+          if (!existingOwnerId && currentOwnerId) enrichUpdate.ownerId = currentOwnerId;
           const { error } = await supabase.from('contacts').update(enrichUpdate).eq('id', existingId);
           if (error) throw error;
         } else {
@@ -646,6 +659,7 @@ export function NodeIngestion() {
             linkedinUrl: identifier.includes('linkedin.com') ? identifier : (scanResult?.linkedin || null),
             city,
             state,
+            ownerId: currentOwnerId,
             status: 'active',
             accountId: ingestionContext?.accountId || null,
             createdAt: now,
@@ -1340,6 +1354,3 @@ export function NodeIngestion() {
     </motion.div>
   );
 }
-
-
-
