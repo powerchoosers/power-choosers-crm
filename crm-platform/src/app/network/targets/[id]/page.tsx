@@ -1014,7 +1014,7 @@ export default function TargetDetailPage() {
             </DndContext>
             <TableBody>
               {showTableLoading ? (
-                <ForensicTableSkeleton columns={tableColumns.length} rows={12} type={isPeopleList ? 'people' : 'account'} />
+                <ForensicTableSkeleton columns={tableColumns.length} rows={12} type={isPeopleList ? 'people' : 'account'} variant="target" />
               ) : table.getRowModel().rows?.length ? (
                 table.getRowModel().rows.map((row) => (
                   <TableRow
