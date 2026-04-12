@@ -43,6 +43,7 @@ import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { useDebounce } from '@/hooks/useDebounce'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { OwnerBadge } from '@/components/ui/OwnerBadge'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar, type ContactHealthScore } from '@/components/ui/ContactAvatar'
 import { useContactLastTouch, useAccountLastTouch, computeHealthScore } from '@/hooks/useLastTouch'
@@ -462,16 +463,14 @@ export default function TargetDetailPage() {
         )
       }
     },
-    {
+      {
       id: 'owner',
       header: 'Owner',
       cell: ({ row }) => {
         const owner = getOwner(row.original.ownerId)
         return (
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-zinc-300 font-medium whitespace-nowrap">
-              {owner?.displayName || 'Unassigned'}
-            </span>
+          <div className="flex items-center min-w-0">
+            <OwnerBadge owner={owner} />
           </div>
         )
       }
@@ -752,10 +751,8 @@ export default function TargetDetailPage() {
         cell: ({ row }) => {
           const owner = getOwner(row.original.ownerId)
           return (
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-zinc-300 font-medium whitespace-nowrap">
-                {owner?.displayName || 'Unassigned'}
-              </span>
+            <div className="flex items-center min-w-0">
+              <OwnerBadge owner={owner} />
             </div>
           )
         }
