@@ -10,6 +10,7 @@ export function DesktopUpdateBanner() {
   const [isDesktop, setIsDesktop] = useState(false)
   const [updateState, setUpdateState] = useState<DesktopUpdateState | null>(null)
   const [installing, setInstalling] = useState(false)
+  const [checking, setChecking] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined' || !window.nodalDesktop?.isDesktop) {
@@ -37,18 +38,27 @@ export function DesktopUpdateBanner() {
     void syncInitialState()
 
     const unsubscribe = window.nodalDesktop.onUpdateEvent((nextState) => {
+      if (nextState.phase === 'available') {
+        setInstalling(false)
+        setChecking(false)
+        setUpdateState(nextState)
+        return
+      }
+
       if (nextState.phase === 'downloaded') {
         if (isDismissed(nextState.version)) {
           return
         }
 
         setInstalling(false)
+        setChecking(false)
         setUpdateState(nextState)
         return
       }
 
       if (nextState.phase === 'error') {
         setInstalling(false)
+        setChecking(false)
       }
     })
 
@@ -57,7 +67,7 @@ export function DesktopUpdateBanner() {
     }
   }, [])
 
-  if (!isDesktop || !updateState || updateState.phase !== 'downloaded') {
+  if (!isDesktop || !updateState || (updateState.phase !== 'available' && updateState.phase !== 'downloaded')) {
     return null
   }
 
@@ -86,6 +96,20 @@ export function DesktopUpdateBanner() {
     }
   }
 
+  const downloadNow = async () => {
+    if (!window.nodalDesktop) {
+      return
+    }
+
+    setChecking(true)
+
+    try {
+      await window.nodalDesktop.checkForUpdatesNow()
+    } catch {
+      setChecking(false)
+    }
+  }
+
   return (
     <div className="fixed left-1/2 top-4 z-[1200] w-[min(92vw,48rem)] -translate-x-1/2">
       <div className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-950/95 shadow-[0_24px_80px_rgba(0,0,0,0.65)] backdrop-blur-xl">
@@ -101,20 +125,40 @@ export function DesktopUpdateBanner() {
               <div className="font-mono text-[10px] text-zinc-600">{versionLabel}</div>
             </div>
 
-            <div className="mt-1 text-sm text-zinc-200">A newer desktop build is ready to install.</div>
-            <div className="mt-1 text-xs text-zinc-500">Restart now to load the latest version.</div>
+            <div className="mt-1 text-sm text-zinc-200">
+              {updateState.phase === 'downloaded'
+                ? 'A newer desktop build is ready to install.'
+                : 'A newer desktop build is available to download.'}
+            </div>
+            <div className="mt-1 text-xs text-zinc-500">
+              {updateState.phase === 'downloaded'
+                ? 'Restart now to load the latest version.'
+                : 'Click Download to fetch it, then install it when ready.'}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={installNow}
-              disabled={installing}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#002FA7]/40 bg-[#002FA7]/15 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#c7d6ff] transition-colors hover:bg-[#002FA7]/25 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {installing ? <RotateCw className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-              {installing ? 'Installing' : 'Install'}
-            </button>
+            {updateState.phase === 'available' ? (
+              <button
+                type="button"
+                onClick={downloadNow}
+                disabled={checking}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#002FA7]/40 bg-[#002FA7]/15 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#c7d6ff] transition-colors hover:bg-[#002FA7]/25 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {checking ? <RotateCw className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+                {checking ? 'Downloading' : 'Download'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={installNow}
+                disabled={installing}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[#002FA7]/40 bg-[#002FA7]/15 px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#c7d6ff] transition-colors hover:bg-[#002FA7]/25 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {installing ? <RotateCw className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+                {installing ? 'Installing' : 'Install'}
+              </button>
+            )}
 
             <button
               type="button"
