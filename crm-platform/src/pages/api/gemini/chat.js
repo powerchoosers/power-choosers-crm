@@ -2011,6 +2011,8 @@ Output rules:
       q = q.replace(/^(?:the\s+)?(?:contact|account|company|dossier|page|record|profile)\s+(?:for|of)\s+/i, '');
       q = q.replace(/\s+(?:page|dossier|record|profile|thread)\s*$/i, '');
       q = q.replace(/\s+(?:page|dossier|record|profile|thread)\s+(?:for|of)\s+/i, ' ');
+      q = q.replace(/'s\b/gi, '');
+      q = q.replace(/\s+(?:contact|account|company|dossier|page|record|profile)\s*$/i, '');
       q = q.replace(/\s+/g, ' ').trim();
       return q;
     };
@@ -2040,6 +2042,7 @@ Output rules:
       q = q.replace(/^(?:please\s+)?(?:create|add|make|schedule|set up|set)\s+(?:a|an|the)?\s*(?:task|reminder|note|company|account)\s*(?:to|for|about|on)?\s*/i, '');
       q = q.replace(/^(?:please\s+)?(?:remind me(?:\s+to)?|follow up(?:\s+on)?|add a note(?:\s+to)?|make a note(?:\s+about)?|note that|log a note(?:\s+about)?|save a note(?:\s+about)?)\s*/i, '');
       q = q.replace(/\s+(?:task|reminder|note|company|account)\s*$/i, '');
+      q = q.replace(/'s\b/gi, '');
       q = q.replace(/\s+/g, ' ').trim();
       return q;
     };
@@ -3876,6 +3879,9 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
       const contextId = typeof requestContext?.id === 'string' ? requestContext.id : null;
       const promptText = String(prompt || '').trim();
       const wantsEmail = /\b(?:most recent|latest|last)\s+email\b/i.test(promptText) || /\bemail\b/i.test(promptText);
+      const wantsContact = /\b(?:contact|dossier|person|people|rep|contact page|dossier page)\b/i.test(promptText)
+        || (!/\b(?:company|account)\b/i.test(promptText) && /\b[a-z][a-z'\-]+\s+[a-z][a-z'\-]+\b/i.test(targetQuery || promptText));
+      const wantsCompany = /\b(?:company|account)\b/i.test(promptText);
 
       let targetQuery = stripNavigationPreamble(promptText);
       targetQuery = targetQuery.replace(/^(?:my\s+)?(?:most recent|latest|last)\s+email(?:\s+(?:with|from|to)\s+)?/i, '');
@@ -3924,6 +3930,38 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
       const hasExactAccount = Boolean(exactAccount);
       const chosenContact = exactContact || (contactRecords.length === 1 ? contactRecords[0] : null);
       const chosenAccount = exactAccount || (accountRecords.length === 1 ? accountRecords[0] : null);
+
+      if (wantsContact && chosenContact?.id) {
+        const contactLabel = contactNameText(chosenContact) || chosenContact.name || 'Contact';
+        const accountLabel = chosenContact?.accounts?.name || chosenContact?.company || chosenContact?.accountName || null;
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+        const command = buildNavigationCommand({
+          title: 'Opening contact page',
+          targetType: 'contact',
+          targetId: String(chosenContact.id),
+          path: `/network/contacts/${chosenContact.id}`,
+          targetLabel: contactLabel,
+          subtitle: accountLabel || chosenContact?.title || 'CRM contact',
+          contactId: String(chosenContact.id),
+          contactName: contactLabel,
+          accountId: chosenContact?.accountId || chosenContact?.accounts?.id || null,
+          accountName: accountLabel || null,
+          source: 'CRM contact search',
+          confidence: hasExactContact ? 'high' : 'medium',
+          initials: contactLabel.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+          photoUrl: chosenContact?.photoUrl || chosenContact?.photo_url || undefined,
+        });
+
+        const narrative = `${firstName}, I found the contact and opened the dossier.`;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content: `${narrative} ${command}`,
+          provider: 'grounded',
+          model: 'supabase',
+          diagnostics,
+        }));
+        return true;
+      }
 
       if (wantsEmail) {
         let emailContact = chosenContact;
@@ -3981,7 +4019,7 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
           }
         }
 
-        if (hasExactContact && !hasExactAccount && chosenContact?.id) {
+        if (!wantsCompany && hasExactContact && !hasExactAccount && chosenContact?.id) {
           const contactLabel = contactNameText(chosenContact) || chosenContact.name || 'Contact';
           const accountLabel = chosenContact?.accounts?.name || chosenContact?.company || chosenContact?.accountName || null;
           diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
@@ -4042,7 +4080,7 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
           return true;
         }
 
-        if (chosenContact?.id && !chosenAccount?.id) {
+        if (!wantsCompany && chosenContact?.id && !chosenAccount?.id) {
           const contactLabel = contactNameText(chosenContact) || chosenContact.name || 'Contact';
           const accountLabel = chosenContact?.accounts?.name || chosenContact?.company || chosenContact?.accountName || null;
           diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });

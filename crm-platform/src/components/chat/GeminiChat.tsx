@@ -972,7 +972,7 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
     const canOpen = Boolean(item.id && item.id.trim())
 
     return (
-      <div key={`account-${item.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-start gap-3">
+      <div key={`account-${item.id}`} className="w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-center gap-3 overflow-hidden">
         <div className="shrink-0 w-11 h-11 rounded-[12px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
           {hasIcon ? (
             <CompanyIcon
@@ -986,16 +986,16 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
             <span className="font-mono font-bold text-sm text-zinc-300">{initials}</span>
           )}
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="text-white text-sm font-semibold truncate">{item.name}</div>
               <div className="text-[10px] font-mono text-zinc-500 truncate">
                 {[item.industry, item.location || [item.city, item.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
               </div>
             </div>
             <span className={cn(
-              'shrink-0 text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border',
+              'shrink-0 text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border whitespace-nowrap',
               canOpen ? 'bg-[#002FA7]/15 text-[#7db1ff] border-[#002FA7]/30' : 'bg-white/5 text-zinc-400 border-white/10'
             )}>
               {item.confidence || (canOpen ? 'Matched' : 'New')}
@@ -1006,7 +1006,7 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
+          className="shrink-0 h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
           onClick={(e) => {
             e.stopPropagation()
             if (canOpen) router.push(`/network/accounts/${item.id}`)
@@ -1024,24 +1024,24 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
     const canOpen = Boolean(item.id && item.id.trim())
 
     return (
-      <div key={`contact-${item.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-start gap-3">
+      <div key={`contact-${item.id}`} className="w-full min-w-0 rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-center gap-3 overflow-hidden">
         <ContactAvatar name={item.name} photoUrl={item.photoUrl || null} size={44} className="rounded-[12px]" textClassName="text-sm" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
+        <div className="flex-1 min-w-0 overflow-hidden">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="text-white text-sm font-semibold truncate">{item.name}</div>
               <div className="text-[10px] font-mono text-zinc-500 truncate">
                 {[item.title, item.company, item.location || [item.city, item.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
               </div>
             </div>
             <span className={cn(
-              'shrink-0 text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border',
+              'shrink-0 text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border whitespace-nowrap',
               item.status === 'verified' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-zinc-400 border-white/10'
             )}>
               {item.status || 'contact'}
             </span>
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-zinc-600">
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-zinc-600 min-w-0 overflow-hidden">
             {item.email && <span className="truncate">{item.email}</span>}
             {item.phone && <span className="truncate">{item.phone}</span>}
             {item.source && <span className="truncate">{item.source}</span>}
@@ -1050,7 +1050,7 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
         <Button
           size="sm"
           variant="ghost"
-          className="h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
+          className="shrink-0 h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
           onClick={(e) => {
             e.stopPropagation()
             if (canOpen) router.push(`/network/contacts/${item.id}`)
@@ -1081,7 +1081,9 @@ function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
 
       <div className="p-4 space-y-4">
         {topCompany && (
-          <ApolloCompanyCardView card={topCompany} />
+          <div className="w-full min-w-0 max-w-full overflow-hidden">
+            <ApolloCompanyCardView card={topCompany} />
+          </div>
         )}
 
         {accounts.length > 0 && (
