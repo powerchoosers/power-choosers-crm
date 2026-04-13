@@ -231,6 +231,10 @@ function formatContactName(contact: CallContact | null | undefined) {
   return combinedName || 'Unknown'
 }
 
+function normalizePhoneNumber(value?: string | null) {
+  return String(value || '').replace(/\D/g, '').slice(-10)
+}
+
 const PAGE_SIZE = 50
 
 export function useCalls(searchQuery?: string) {
@@ -355,10 +359,11 @@ interface UseCallsOptions {
   enabled?: boolean
 }
 
-export function useAccountCalls(accountId: string, contactIds?: string[], options?: UseCallsOptions) {
+export function useAccountCalls(accountId: string, contactIds?: string[], companyPhone?: string, options?: UseCallsOptions) {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
   const isEnabled = options?.enabled ?? true
+  const normalizedCompanyPhone = normalizePhoneNumber(companyPhone)
 
   // Subscribe to real-time updates for calls belonging to this account
   useEffect(() => {
@@ -388,24 +393,34 @@ export function useAccountCalls(accountId: string, contactIds?: string[], option
   }, [accountId, user, loading, isEnabled, queryClient])
 
   const query = useQuery<Call[]>({
-    queryKey: ['account-calls', accountId, contactIds?.join(',') ?? '', user?.email ?? 'guest'],
+    queryKey: ['account-calls', accountId, contactIds?.join(',') ?? '', normalizedCompanyPhone, user?.email ?? 'guest'],
     queryFn: async () => {
       if (!accountId || loading || !user) return []
 
-      // Fetch calls: accountId = this account, or contactId in contactIds (two queries then merge to avoid .or() issues)
+      // Fetch calls by account, by linked contacts, and by the account phone number.
+      // Some call rows arrive before the CRM link is filled in, so phone matching keeps the dossier current.
       const [accountRes, contactRes] = await Promise.all([
         supabase.from('calls').select('*, contacts!calls_contactId_fkey(name)').eq('accountId', accountId).order('timestamp', { ascending: false }),
         contactIds && contactIds.length > 0
           ? supabase.from('calls').select('*, contacts!calls_contactId_fkey(name)').in('contactId', contactIds).order('timestamp', { ascending: false })
           : Promise.resolve({ data: [] as CallRow[], error: null })
       ])
+      const phoneRes = normalizedCompanyPhone
+        ? await supabase
+          .from('calls')
+          .select('*, contacts!calls_contactId_fkey(name)')
+          .or(`from.ilike.%${normalizedCompanyPhone}%,to.ilike.%${normalizedCompanyPhone}%`)
+          .order('timestamp', { ascending: false })
+        : { data: [] as CallRow[], error: null }
 
       if (accountRes.error) throw accountRes.error
       if (contactRes.error) throw contactRes.error
+      if (phoneRes.error) throw phoneRes.error
 
       const byId = new Map<string, CallRow>()
       for (const row of accountRes.data || []) byId.set(row.id, row)
       for (const row of contactRes.data || []) if (!byId.has(row.id)) byId.set(row.id, row)
+      for (const row of phoneRes.data || []) if (!byId.has(row.id)) byId.set(row.id, row)
       const data = Array.from(byId.values()).sort((a, b) => {
         const ta = (a.timestamp || a.createdAt || '').toString()
         const tb = (b.timestamp || b.createdAt || '').toString()

@@ -129,7 +129,7 @@ export function useAccountDossierState(id: string, taskIdFromUrl?: string | null
     const { data: contacts, isLoading: isLoadingContacts } = useAccountContacts(id)
     const contactIds = contacts?.map(c => c.id).filter(Boolean) || []
     const isSecondaryReady = useDeferredHydration(100)
-    const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds, { enabled: isSecondaryReady })
+    const { data: calls, isLoading: isLoadingCalls } = useAccountCalls(id, contactIds, account?.companyPhone, { enabled: isSecondaryReady })
     const updateAccount = useUpdateAccount()
     const queryClient = useQueryClient()
 
