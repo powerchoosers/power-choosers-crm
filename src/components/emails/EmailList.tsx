@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import type { RefObject } from 'react'
 import { format, formatDistanceToNow, isAfter, subMonths } from 'date-fns'
 import { motion } from 'framer-motion'
-import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check, Paperclip } from 'lucide-react'
+import { Mail, ArrowUpRight, ArrowDownLeft, RefreshCw, Loader2, Eye, MousePointer2, ChevronLeft, ChevronRight, Clock, Check, Paperclip, MoreHorizontal, PencilLine, Ban, Send, Trash2, CalendarClock } from 'lucide-react'
 import { Email, EmailListFilter } from '@/hooks/useEmails'
 import type { EmailIdentity } from '@/hooks/useEmailIdentityMap'
 import { extractEmailAddress } from '@/hooks/useEmailIdentityMap'
@@ -42,6 +42,10 @@ interface EmailListProps {
   onGenerateScheduled?: (email: Email) => void
   onRegenerateScheduled?: (email: Email) => void
   onAcceptScheduled?: (email: Email) => void
+  onEditScheduled?: (email: Email) => void
+  onSendNowScheduled?: (email: Email) => void
+  onCancelScheduled?: (email: Email) => void
+  onDeleteScheduled?: (email: Email) => void
   scheduledActionState?: Record<string, string>
   scrollContainerRef?: RefObject<HTMLDivElement | null>
   showSkeletonRows?: boolean
@@ -75,6 +79,10 @@ export function EmailList({
   onGenerateScheduled,
   onRegenerateScheduled,
   onAcceptScheduled,
+  onEditScheduled,
+  onSendNowScheduled,
+  onCancelScheduled,
+  onDeleteScheduled,
   scheduledActionState = {},
   scrollContainerRef,
   showSkeletonRows = false,
@@ -890,6 +898,64 @@ export function EmailList({
                             {failedMessage}
                           </div>
                         )}
+                        <div className="mt-1">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button
+                                type="button"
+                                onClick={(e) => e.stopPropagation()}
+                                className="icon-button-forensic h-8 w-8 flex items-center justify-center text-zinc-400"
+                                aria-label="Scheduled email actions"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="bg-zinc-950 nodal-monolith-edge text-zinc-300">
+                              <DropdownMenuLabel>Scheduled actions</DropdownMenuLabel>
+                              <DropdownMenuItem
+                                className="hover:bg-white/5 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onEditScheduled?.(email)
+                                }}
+                              >
+                                <PencilLine className="mr-2 h-4 w-4" />
+                                Edit copy & time
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="hover:bg-white/5 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onSendNowScheduled?.(email)
+                                }}
+                              >
+                                <Send className="mr-2 h-4 w-4" />
+                                Send now
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="hover:bg-white/5 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onCancelScheduled?.(email)
+                                }}
+                              >
+                                <Ban className="mr-2 h-4 w-4" />
+                                Cancel schedule
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-white/10" />
+                              <DropdownMenuItem
+                                className="text-red-400 hover:bg-red-500/10 cursor-pointer"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  onDeleteScheduled?.(email)
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -959,3 +1025,4 @@ export function EmailList({
     </div>
   )
 }
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
