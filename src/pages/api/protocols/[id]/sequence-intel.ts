@@ -20,6 +20,7 @@ type SequenceIntelRow = {
   totalReplies: number;
   executionStatus: string | null;
   executionStepType: string | null;
+  executionErrorMessage: string | null;
   executionScheduledAt: string | null;
   executionLabel: string | null;
   nextActionLabel: string | null;
@@ -198,7 +199,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: executions, error: executionsError } = memberIds.length
       ? await supabaseAdmin
           .from('sequence_executions')
-          .select('id, member_id, step_type, step_index, status, scheduled_at, created_at, metadata')
+          .select('id, member_id, step_type, step_index, status, scheduled_at, created_at, error_message, metadata')
           .eq('sequence_id', sequenceId)
           .in('member_id', memberIds)
           .order('created_at', { ascending: false })
@@ -258,6 +259,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         totalReplies: normalizeNumber(member.total_replies),
         executionStatus: execution?.status || null,
         executionStepType: execution?.step_type || null,
+        executionErrorMessage: execution?.error_message || null,
         executionScheduledAt: execution?.scheduled_at || null,
         executionLabel,
         nextActionLabel: (() => {

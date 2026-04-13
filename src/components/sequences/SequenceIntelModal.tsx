@@ -44,6 +44,7 @@ interface SequenceMemberRow {
   totalReplies: number
   executionStatus: string | null
   executionStepType: string | null
+  executionErrorMessage: string | null
   executionScheduledAt: string | null
   executionLabel: string | null
   nextActionLabel: string | null
@@ -485,7 +486,14 @@ export function SequenceIntelModal({ isOpen, onClose, sequenceId }: SequenceInte
 
                             {/* Exec Status */}
                             <td className="px-4 py-3">
-                              <ExecStatusBadge status={row.executionStatus} />
+                              <div className="space-y-1">
+                                <ExecStatusBadge status={row.executionStatus} />
+                                {row.executionStatus?.toLowerCase() === 'failed' && row.executionErrorMessage && (
+                                  <div className="max-w-[240px] text-[10px] leading-4 font-mono text-red-300/80 break-words">
+                                    {row.executionErrorMessage}
+                                  </div>
+                                )}
+                              </div>
                             </td>
 
                             {/* Scheduled */}
