@@ -905,14 +905,19 @@ function BrokenCardFallback({ rawSegment, reason }: { rawSegment: string; reason
 function EmailDraftCardView({
   card,
   onSend,
+  fallbackRecipient,
+  onSendLater,
 }: {
   card: EmailDraftCardData
   onSend?: (draft: EmailDraftCardData) => Promise<void>
+  fallbackRecipient?: string | null
+  onSendLater?: (draft: EmailDraftCardData) => Promise<void>
 }) {
   const [isSending, setIsSending] = useState(false)
-  const to = toDisplayString(card.to)
+  const to = toDisplayString(card.to) || toDisplayString(fallbackRecipient)
   const subject = toDisplayString(card.subject)
   const previewText = toDisplayString(card.text) || card.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const [confirmVisible, setConfirmVisible] = useState(false)
 
   const handleSend = async () => {
     if (!onSend || isSending) return
@@ -942,6 +947,20 @@ function EmailDraftCardView({
         )}
       </div>
       <div className="p-4 space-y-3">
+        {(card.contactName || card.accountName) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {card.contactName && (
+              <span className="text-[9px] font-mono text-zinc-300 bg-white/[0.04] border border-white/10 px-2 py-1 rounded-full uppercase tracking-widest">
+                Contact: {card.contactName}
+              </span>
+            )}
+            {card.accountName && (
+              <span className="text-[9px] font-mono text-zinc-300 bg-white/[0.04] border border-white/10 px-2 py-1 rounded-full uppercase tracking-widest">
+                Account: {card.accountName}
+              </span>
+            )}
+          </div>
+        )}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-xl bg-black/30 border border-white/5 p-3">
             <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">To</div>
@@ -965,15 +984,54 @@ function EmailDraftCardView({
           >
             Copy draft
           </Button>
-          {onSend && (
+          {onSendLater && (
             <Button
               type="button"
-              className="h-8 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30"
-              onClick={handleSend}
-              disabled={isSending}
+              variant="outline"
+              className="h-8 border-amber-500/20 bg-amber-500/10 text-amber-300 font-mono text-[10px] uppercase tracking-widest hover:bg-amber-500/15"
+              onClick={async () => {
+                const reply = window.prompt('Send later reminder. Enter a due date or number of days from today (example: 2 or 2026-04-15).')
+                if (!reply) return
+                await onSendLater({ ...card, text: `${card.text || ''}\n\nReminder: send this email later on ${reply}` })
+              }}
             >
-              {isSending ? 'Sending...' : 'Send now'}
+              Send later
             </Button>
+          )}
+          {onSend && (
+            <>
+              {!confirmVisible ? (
+                <Button
+                  type="button"
+                  className="h-8 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30"
+                  onClick={() => setConfirmVisible(true)}
+                  disabled={isSending}
+                >
+                  Review send
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2 rounded-xl border border-[#002FA7]/25 bg-[#002FA7]/10 px-2 py-1.5">
+                  <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest">Send this email?</span>
+                  <Button
+                    type="button"
+                    className="h-7 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest border border-[#002FA7]/30"
+                    onClick={handleSend}
+                    disabled={isSending}
+                  >
+                    {isSending ? 'Sending...' : 'Confirm'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-7 border-white/10 bg-white/[0.03] text-zinc-300 font-mono text-[10px] uppercase tracking-widest hover:bg-white/[0.06]"
+                    onClick={() => setConfirmVisible(false)}
+                    disabled={isSending}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -1003,12 +1061,16 @@ function ComponentRenderer({
   onCreateTask,
   contextInfo,
   onSendEmail,
+  fallbackRecipient,
+  onSendLater,
 }: {
   type: string
   data: unknown
   onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>
   contextInfo?: ContextInfo
   onSendEmail?: (draft: EmailDraftCardData) => Promise<void>
+  fallbackRecipient?: string | null
+  onSendLater?: (draft: EmailDraftCardData) => Promise<void>
 }) {
   const router = useRouter()
 
@@ -1038,7 +1100,7 @@ function ComponentRenderer({
     }
     case 'email_draft': {
       if (!isRecord(data)) return null
-      return <EmailDraftCardView card={data as EmailDraftCardData} onSend={onSendEmail} />
+      return <EmailDraftCardView card={data as EmailDraftCardData} onSend={onSendEmail} fallbackRecipient={fallbackRecipient} onSendLater={onSendLater} />
     }
     case 'interaction_snippet': {
       if (!isRecord(data)) return null
@@ -1706,6 +1768,11 @@ export function GeminiChatPanel() {
   const { data: contactForNews } = useContact(contactId)
   const linkedAccountId = (contactForNews as { linkedAccountId?: string })?.linkedAccountId
   const { data: accountForNews } = useAccount(accountIdForAccount || linkedAccountId || '')
+  const fallbackEmailRecipient = useMemo(() => {
+    const contactEmail = isRecord(contactForNews) ? toDisplayString((contactForNews as { email?: unknown }).email) : ''
+    const contextTargetEmail = toDisplayString(contextData?.targetContactEmail || contextData?.decisionMakerEmail || contextData?.email)
+    return contactEmail || contextTargetEmail || null
+  }, [contactForNews, contextData])
   const domainForNews = accountForNews?.domain?.trim()
   const { data: apolloNewsSignals } = useApolloNews(domainForNews)
 
@@ -2236,13 +2303,15 @@ SELECT * FROM hybrid_search_accounts(
   const sendDraftEmail = useCallback(async (draft: EmailDraftCardData) => {
     const normalized = normalizeEmailDraftDraft(draft)
     const senderEmail = normalized.senderEmail || profile?.email || auth.user?.email || ''
+    const recipientEmail = normalized.to || fallbackEmailRecipient || ''
     if (!senderEmail) throw new Error('Missing sender email')
+    if (!recipientEmail) throw new Error('Missing recipient email')
 
     const response = await fetch('/api/email/zoho-send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        to: normalized.to,
+        to: recipientEmail,
         subject: normalized.subject,
         content: normalized.html,
         plainTextContent: normalized.text || normalized.html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
@@ -2260,14 +2329,63 @@ SELECT * FROM hybrid_search_accounts(
       throw new Error(data?.error || data?.message || 'Failed to send email')
     }
 
-    const successText = `Email sent to ${normalized.to}`
+    const followUpTitle = `Follow up: email sent to ${recipientEmail}`
+    const followUpDescription = normalized.subject
+      ? `Check back on the email thread for: ${normalized.subject}`
+      : `Check back on the email thread for ${recipientEmail}`
+
+    try {
+      await addTaskAsync({
+        title: followUpTitle,
+        description: followUpDescription,
+        status: 'Pending',
+        priority: 'Medium',
+        contactId: normalized.contactId || undefined,
+        accountId: normalized.accountId || undefined,
+        dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(),
+        metadata: {
+          source: 'gemini_chat_email_follow_up',
+          email_subject: normalized.subject,
+          email_recipient: recipientEmail
+        }
+      })
+    } catch (taskError) {
+      console.warn('Follow-up task creation failed:', taskError)
+    }
+
+    const successText = `Email sent to ${recipientEmail}`
     setMessages((prev) => [...prev, {
       role: 'assistant',
       content: successText,
       id: crypto.randomUUID(),
       timestamp: Date.now()
     }])
-  }, [auth.user?.email, auth.user?.user_metadata?.full_name, profile?.email, profile?.name])
+  }, [addTaskAsync, auth.user?.email, auth.user?.user_metadata?.full_name, profile?.email, profile?.name, fallbackEmailRecipient])
+
+  const sendLaterDraftEmail = useCallback(async (draft: EmailDraftCardData) => {
+    const normalized = normalizeEmailDraftDraft(draft)
+    const recipientEmail = normalized.to || fallbackEmailRecipient || ''
+    const title = `Send email later: ${normalized.subject || 'Draft'}`
+    const description = recipientEmail
+      ? `Reminder to send the drafted email to ${recipientEmail}`
+      : 'Reminder to send the drafted email'
+
+    await addTaskAsync({
+      title,
+      description,
+      status: 'Pending',
+      priority: 'Medium',
+      contactId: normalized.contactId || undefined,
+      accountId: normalized.accountId || undefined,
+      dueDate: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      metadata: {
+        source: 'gemini_chat_send_later',
+        email_subject: normalized.subject,
+        email_recipient: recipientEmail || null,
+        email_preview: normalized.text || ''
+      }
+    })
+  }, [addTaskAsync, fallbackEmailRecipient])
 
   const handleSend = async (messageOverride?: string) => {
     const messageText = (messageOverride ?? input).trim()
@@ -2696,7 +2814,7 @@ SELECT * FROM hybrid_search_accounts(
                               return (
                                 <div key={partKey} className="flex flex-col gap-4 w-full min-w-0 max-w-full overflow-hidden">
                                   <div className="w-full overflow-hidden grid grid-cols-1">
-                                    <ComponentRenderer type={parsed.type} data={parsed.data as Record<string, unknown>} onCreateTask={handleCreateTask} contextInfo={contextInfo} onSendEmail={sendDraftEmail} />
+                                    <ComponentRenderer type={parsed.type} data={parsed.data as Record<string, unknown>} onCreateTask={handleCreateTask} contextInfo={contextInfo} onSendEmail={sendDraftEmail} onSendLater={sendLaterDraftEmail} fallbackRecipient={fallbackEmailRecipient} />
                                   </div>
                                   {trailingText && (
                                     <div className="max-w-none break-words [word-break:break-word] [overflow-wrap:anywhere]">
@@ -2754,6 +2872,8 @@ SELECT * FROM hybrid_search_accounts(
                               onCreateTask={handleCreateTask}
                               contextInfo={contextInfo}
                               onSendEmail={sendDraftEmail}
+                              onSendLater={sendLaterDraftEmail}
+                              fallbackRecipient={fallbackEmailRecipient}
                             />
                           </div>
                         )
