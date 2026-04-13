@@ -11,7 +11,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useGeminiStore } from '@/store/geminiStore'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { useContact } from '@/hooks/useContacts'
+import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useAccount, useUpdateAccount, useUpsertAccount } from '@/hooks/useAccounts'
 import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
@@ -268,6 +268,35 @@ type NavigationCommandData = {
   accountId?: string | null
   accountName?: string | null
   choices?: NavigationChoice[]
+}
+
+type ActionCommandData = {
+  commandId?: string
+  kind: 'task' | 'company' | 'note'
+  actionMode?: 'create' | 'add' | 'open' | 'append'
+  title?: string
+  subtitle?: string
+  source?: string
+  confidence?: string
+  path?: string
+  task?: {
+    title: string
+    description?: string
+    contactId?: string | null
+    accountId?: string | null
+    dueDate?: string | null
+  }
+  company?: ApolloCompanyCardData
+  note?: {
+    text: string
+    targetType?: 'contact' | 'account'
+    targetId?: string | null
+    targetLabel?: string | null
+    contactId?: string | null
+    contactName?: string | null
+    accountId?: string | null
+    accountName?: string | null
+  }
 }
 
 type ForensicDocument = {
@@ -1254,6 +1283,211 @@ function NavigationCommandView({ card }: { card: NavigationCommandData }) {
   )
 }
 
+function ActionCommandView({
+  card,
+  onCreateTask,
+  contextInfo,
+}: {
+  card: ActionCommandData
+  onCreateTask?: (opts: { title: string; description?: string }) => Promise<unknown>
+  contextInfo?: ContextInfo
+}) {
+  const router = useRouter()
+  const { mutateAsync: upsertAccount } = useUpsertAccount()
+  const { mutateAsync: updateContact } = useUpdateContact()
+  const { mutateAsync: updateAccount } = useUpdateAccount()
+  const [isRunning, setIsRunning] = useState(false)
+  const contextData = contextInfo && isRecord(contextInfo.data) ? contextInfo.data : null
+  const fallbackContactId = contextInfo?.type === 'contact' && typeof contextInfo.id === 'string'
+    ? contextInfo.id
+    : contextInfo?.type === 'protocol'
+      ? toDisplayString(contextData?.targetContactId || contextData?.decisionMakerId)
+      : ''
+  const fallbackAccountId = contextInfo?.type === 'account' && typeof contextInfo.id === 'string'
+    ? contextInfo.id
+    : contextInfo?.type === 'protocol'
+      ? toDisplayString(contextData?.targetAccountId || contextData?.parentAccountId || contextData?.parentCompanyId)
+      : ''
+  const noteTargetType = card.note?.targetType || (fallbackContactId ? 'contact' : fallbackAccountId ? 'account' : undefined)
+  const noteTargetId = card.note?.targetId || (noteTargetType === 'contact' ? fallbackContactId : fallbackAccountId)
+  const noteContactId = noteTargetType === 'contact' ? (noteTargetId || fallbackContactId) : ''
+  const noteAccountId = noteTargetType === 'account' ? (noteTargetId || fallbackAccountId) : ''
+  const { data: noteContact } = useContact(noteContactId)
+  const { data: noteAccount } = useAccount(noteAccountId)
+
+  const actionLabel = card.kind === 'task'
+    ? (card.actionMode === 'create' ? 'Create task' : 'Create')
+    : card.kind === 'note'
+      ? 'Add note'
+      : (card.actionMode === 'open' ? 'Open company' : 'Add company')
+  const title = card.title || (card.kind === 'task' ? 'Task command' : card.kind === 'note' ? 'Note command' : 'Company command')
+  const subtitle = card.subtitle || card.source || 'Approved action'
+
+  const handleRun = async () => {
+    if (isRunning) return
+    setIsRunning(true)
+    try {
+      if (card.kind === 'task' && onCreateTask && card.task?.title) {
+        await onCreateTask({
+          title: card.task.title,
+          description: card.task.description || card.task.title,
+        })
+        return
+      }
+
+      if (card.kind === 'note') {
+        const noteText = String(card.note?.text || '').trim()
+        if (!noteText) return
+
+        const timestamp = new Date().toISOString()
+        const entry = `[Gemini Chat • ${timestamp}] ${noteText}`
+        const targetType = noteTargetType
+
+        if (targetType === 'contact' && noteTargetId) {
+          const existingNotes = String(noteContact?.notes || '').trim()
+          await updateContact({
+            id: noteTargetId,
+            notes: existingNotes ? `${existingNotes}\n\n${entry}` : entry,
+          })
+          return
+        }
+
+        if (targetType === 'account' && noteTargetId) {
+          const existingDescription = String(noteAccount?.description || '').trim()
+          await updateAccount({
+            id: noteTargetId,
+            description: existingDescription ? `${existingDescription}\n\n${entry}` : entry,
+          })
+          return
+        }
+
+        throw new Error('No note target was resolved')
+      }
+
+      if (card.kind === 'company') {
+        const company = card.company
+        if (!company) return
+        if (card.actionMode === 'open' && company.id) {
+          router.push(`/network/accounts/${company.id}`)
+          return
+        }
+
+        const saved = await upsertAccount({
+          ...(company.id ? { id: company.id } : {}),
+          name: company.name,
+          domain: company.domain || '',
+          description: company.description || '',
+          logoUrl: company.logoUrl || '',
+          companyPhone: company.companyPhone || '',
+          employees: company.employees != null ? String(company.employees) : '',
+          revenue: company.revenue || '',
+          location: [company.city, company.state].filter(Boolean).join(', '),
+          city: company.city,
+          state: company.state,
+          linkedinUrl: company.linkedin || '',
+          metadata: {
+            source: 'gemini_chat_action_command',
+            action_command: card,
+          },
+        } as any)
+        if (saved?.id) {
+          router.push(`/network/accounts/${saved.id}`)
+        }
+      }
+    } catch (error) {
+      console.error('Action command failed:', error)
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/90 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden border-[#002FA7]/20"
+    >
+      <div className="p-4 flex items-start gap-4">
+        <div className="shrink-0 w-11 h-11 rounded-[12px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
+          {card.kind === 'task' ? (
+            <FileText size={16} className="text-zinc-300" />
+          ) : (
+            <Building2 size={16} className="text-zinc-300" />
+          )}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em]">Controlled Action</div>
+          <h3 className="text-white font-semibold text-base truncate">{title}</h3>
+          <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">{subtitle}</p>
+        </div>
+
+        <div className="flex flex-col items-end gap-2">
+          <span className={cn(
+            'text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border',
+            card.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-zinc-400 border-white/10'
+          )}>
+            {card.confidence || 'approved'}
+          </span>
+          <Button
+            size="sm"
+            className="h-8 font-mono text-[9px] uppercase tracking-widest px-3 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+            onClick={handleRun}
+            disabled={isRunning}
+          >
+            {isRunning ? <Loader2 size={10} className="animate-spin" /> : actionLabel}
+          </Button>
+        </div>
+      </div>
+
+      {card.kind === 'company' && card.company && (
+        <div className="px-4 pb-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-center gap-3">
+            <div className="shrink-0 w-10 h-10 rounded-[12px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
+              {(card.company.logoUrl || card.company.domain) ? (
+                <CompanyIcon
+                  logoUrl={card.company.logoUrl}
+                  domain={card.company.domain}
+                  name={card.company.name}
+                  size={40}
+                  roundedClassName="rounded-[12px]"
+                />
+              ) : (
+                <span className="font-mono font-bold text-sm text-zinc-300">
+                  {(card.company.initials || card.company.name.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?')}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm text-white font-semibold truncate">{card.company.name}</div>
+              <div className="text-[10px] font-mono text-zinc-500 truncate">
+                {[card.company.industry, [card.company.city, card.company.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {card.kind === 'note' && card.note && (
+        <div className="px-4 pb-4">
+          <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Target Note</div>
+              <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em]">
+                {card.note.targetType || noteTargetType || 'context'}
+              </div>
+            </div>
+            <div className="text-sm text-zinc-200 leading-snug line-clamp-4">{card.note.text}</div>
+            <div className="text-[10px] font-mono text-zinc-500 truncate">
+              {card.note.targetLabel || card.note.contactName || card.note.accountName || title}
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  )
+}
+
 function HierarchyCardView({ card }: { card: HierarchyCardData }) {
   const router = useRouter()
   const subsidiaries = Array.isArray(card.subsidiaryCompanyNames) ? card.subsidiaryCompanyNames : []
@@ -1808,6 +2042,10 @@ function ComponentRenderer({
     case 'navigation_command': {
       if (!isRecord(data)) return null
       return <NavigationCommandView card={data as NavigationCommandData} />
+    }
+    case 'action_command': {
+      if (!isRecord(data)) return null
+      return <ActionCommandView card={data as ActionCommandData} onCreateTask={onCreateTask} contextInfo={contextInfo} />
     }
     case 'decision_maker_card': {
       if (!isRecord(data)) return null
