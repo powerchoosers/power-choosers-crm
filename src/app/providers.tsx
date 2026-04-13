@@ -18,7 +18,7 @@ import { DesktopFolderSyncBridge } from '@/components/layout/DesktopFolderSyncBr
 import { useUIStore } from '@/store/uiStore'
 import { SequenceIntelModal } from '@/components/sequences/SequenceIntelModal'
 
-const PERSISTED_QUERY_FAMILIES = new Set([
+const WEB_PERSISTED_QUERY_FAMILIES = new Set([
   'accounts',
   'account',
   'account-bill-intel',
@@ -41,6 +41,32 @@ const PERSISTED_QUERY_FAMILIES = new Set([
   'eia-retail-tx',
   'scripts',
 ])
+
+const DESKTOP_PERSISTED_QUERY_FAMILIES = new Set([
+  'account',
+  'account-bill-intel',
+  'deals',
+  'deals-by-account',
+  'deals-by-contact',
+  'tasks',
+  'tasks-all-pending',
+  'tasks-count',
+  'tasks-metrics',
+  'targets',
+  'notification-center-feed',
+  'signature-requests',
+  'market-pulse',
+  'eia-retail-tx',
+  'scripts',
+])
+
+function getPersistedQueryFamilies() {
+  if (typeof window !== 'undefined' && Boolean(window.nodalDesktop?.isDesktop)) {
+    return DESKTOP_PERSISTED_QUERY_FAMILIES
+  }
+
+  return WEB_PERSISTED_QUERY_FAMILIES
+}
 
 function GlobalShortcuts() {
   const toggleWarRoom = useWarRoomStore((s) => s.toggle)
@@ -74,6 +100,7 @@ function GlobalShortcuts() {
 }
 
 export default function Providers({ children }: { children: React.ReactNode }) {
+  const persistedQueryFamilies = getPersistedQueryFamilies()
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -100,7 +127,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 if (query.state.fetchStatus === 'fetching') return false
                 const key0 = Array.isArray(query.queryKey) ? query.queryKey[0] : undefined
                 if (typeof key0 !== 'string') return false
-                return PERSISTED_QUERY_FAMILIES.has(key0)
+                return persistedQueryFamilies.has(key0)
               },
             },
           }}
