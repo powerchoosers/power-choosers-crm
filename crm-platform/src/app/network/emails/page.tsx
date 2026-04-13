@@ -19,6 +19,7 @@ import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { useComposeStore } from '@/store/composeStore'
+import { applyOptimisticEmailSend, buildOptimisticEmail } from '@/lib/email-cache'
 
 export default function EmailsPage() {
   const { user } = useAuth()
@@ -279,6 +280,22 @@ export default function EmailsPage() {
 
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data?.error || 'Failed to send email now')
+      const trackingId = String(data?.trackingId || '').trim()
+      const optimisticId = trackingId || `optimistic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const optimisticEmail = buildOptimisticEmail({
+        id: optimisticId,
+        subject: email.subject,
+        from: email.from || user?.email || 'noreply@nodalpoint.io',
+        to: email.to,
+        html: email.html || undefined,
+        text: email.text || '',
+        ownerId: user?.email || undefined,
+        contactId: email.contactId || null,
+        accountId: email.accountId || null,
+        threadId: trackingId || email.threadId || email.id,
+        attachments: (email.metadata as any)?.attachments,
+      })
+      applyOptimisticEmailSend(queryClient, optimisticEmail)
       toast.success('Email sent')
       queryClient.invalidateQueries({ queryKey: ['emails'] })
       queryClient.invalidateQueries({ queryKey: ['emails-count'] })

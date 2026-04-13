@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { toast } from 'sonner'
 import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
+import { applyOptimisticEmailSend, buildOptimisticEmail } from '@/lib/email-cache'
 
 export interface EmailAttachment {
   filename: string
@@ -338,19 +339,35 @@ export function useEmails(searchQuery?: string, typeFilter: EmailListFilter = 'a
 
       return response.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       console.log('[Email Sent] Success:', data);
       toast.success('Email sent successfully');
-      // Invalidate and refetch emails immediately
-      queryClient.invalidateQueries({ queryKey: ['emails'] });
-      queryClient.invalidateQueries({ queryKey: ['emails-count'] });
-      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] });
-      queryClient.invalidateQueries({ queryKey: ['entity-emails'] });
-      // Force refetch after a small delay to ensure backend has processed
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['emails'] });
-        queryClient.refetchQueries({ queryKey: ['entity-emails'] });
-      }, 500);
+
+      const trackingId = String(data?.trackingId || '').trim()
+      const optimisticId = trackingId || `optimistic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const optimisticEmail = buildOptimisticEmail({
+        id: optimisticId,
+        subject: variables.subject,
+        from: user?.email || 'noreply@nodalpoint.io',
+        to: variables.to,
+        html: variables.html || undefined,
+        text: variables.content,
+        ownerId: user?.email || undefined,
+        contactId: variables.contactId ?? null,
+        accountId: null,
+        threadId: trackingId || null,
+        attachments: variables.attachments?.map((att) => ({
+          filename: att.filename,
+          mimeType: att.type,
+          size: att.size,
+        })),
+      })
+      applyOptimisticEmailSend(queryClient, optimisticEmail)
+
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+      queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
     },
     onError: (error: Error) => {
       console.error('[Email Send] Error:', error);

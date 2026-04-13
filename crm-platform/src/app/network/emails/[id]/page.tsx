@@ -24,6 +24,7 @@ import type { Email, EmailAttachment } from '@/hooks/useEmails'
 import { useEmailIdentityMap, extractEmailAddress } from '@/hooks/useEmailIdentityMap'
 import { useContactIdentityMapByIds } from '@/hooks/useContactIdentityMapByIds'
 import { supabase } from '@/lib/supabase'
+import { applyOptimisticEmailSend, buildOptimisticEmail } from '@/lib/email-cache'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { EmailChipField } from '@/components/emails/EmailChipField'
@@ -772,6 +773,10 @@ export default function EmailDetailPage() {
         || [resolvedContact?.firstName, resolvedContact?.lastName].filter(Boolean).join(' ').trim()
         || null
       const resolvedContactCompany = ('accountName' in (resolvedContact || {}) ? (resolvedContact as any)?.accountName : null) || null
+      const resolvedAccountId =
+        (resolvedContact as any)?.accountId
+        || email?.accountId
+        || null
 
       const response = await fetch('/api/email/zoho-send', {
         method: 'POST',
@@ -807,6 +812,27 @@ export default function EmailDetailPage() {
         setPendingFocusMessageId(String(payload.trackingId))
       }
 
+      const trackingId = String(payload?.trackingId || '').trim()
+      const optimisticId = trackingId || `optimistic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const optimisticEmail = buildOptimisticEmail({
+        id: optimisticId,
+        subject: draftSubject.trim(),
+        from: replyFromAccount || user.email,
+        to: toRecipients,
+        html: finalHtml,
+        text: noteText,
+        ownerId: replyFromAccount || user.email,
+        contactId: resolvedContactId,
+        accountId: resolvedAccountId,
+        threadId: composerMode === 'forward' ? null : threadKey,
+        attachments: replyAttachments.map((file) => ({
+          filename: file.name,
+          mimeType: file.type || undefined,
+          size: file.size,
+        })),
+      })
+      applyOptimisticEmailSend(queryClient, optimisticEmail)
+
       playWhoosh()
       toast.success(composerMode === 'forward' ? 'Forward sent' : 'Reply sent')
       setReplyHtml('')
@@ -821,12 +847,6 @@ export default function EmailDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
       queryClient.invalidateQueries({ queryKey: ['email', id] })
       queryClient.invalidateQueries({ queryKey: threadQueryKey })
-      // Force refetch after a short delay so the email list picks up the new row
-      // even if the list page component isn't mounted yet (matches ComposeModal pattern).
-      setTimeout(() => {
-        queryClient.refetchQueries({ queryKey: ['emails'] })
-        queryClient.refetchQueries({ queryKey: threadQueryKey })
-      }, 500)
     } catch (error: any) {
       toast.error(error?.message || `Failed to send ${composerMode === 'forward' ? 'forward' : 'reply'}`)
     } finally {
