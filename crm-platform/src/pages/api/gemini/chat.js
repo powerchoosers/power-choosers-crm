@@ -2766,6 +2766,7 @@ Output rules:
         - If the user asks about "important emails", "any emails", "my inbox", or "unread emails": use \`search_emails\` or \`search_interactions({ query: "email" })\` to find email data. Do NOT run \`list_accounts\` for email-related queries.
         - If the user asks to draft, send, or follow up by email, gather the recipient from CRM context first, then use \`send_email\`. If the sender email is not explicitly provided, use the authenticated user's email from the request context.
         - If the user asks for an email draft, return an \`email_draft\` JSON_DATA card with to, subject, html, and optional text/contactId fields so the UI can let them review and send it.
+        - When you can infer the current contact or account from context, also include contactName and accountName in the \`email_draft\` card so the composer can show who the email is for.
 
         TOOL_USAGE_PROTOCOL:
         - **Selection by Name**: If the user asks for details about a specific entity (e.g., "Camp Fire First Texas") and you do not have its ID in your immediate context, you MUST first run a search (e.g., \`list_accounts({ search: "Camp Fire First Texas" })\`) to retrieve the ID.

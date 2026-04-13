@@ -11,7 +11,7 @@ import { useEmails } from '@/hooks/useEmails'
 import { useAuth } from '@/context/AuthContext'
 import { generateNodalSignature } from '@/lib/signature'
 import { playClick, playWhoosh } from '@/lib/audio'
-import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap, Type, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, Palette } from 'lucide-react'
+import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCcw, Zap, Type, Bold, Italic, Underline as UnderlineIcon, List, ListOrdered, ImageIcon, Palette, CalendarClock, Clock3 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -1119,6 +1119,13 @@ function ComposePanel({
   /** In-modal toggle: when true and type is cold, send as plain text with minimal signature (Option B). */
   const [sendAsPlainText, setSendAsPlainText] = useState(false)
   const [attachments, setAttachments] = useState<File[]>([])
+  const [schedulePopoverOpen, setSchedulePopoverOpen] = useState(false)
+  const [scheduledFor, setScheduledFor] = useState(() => {
+    const nextHour = new Date(Date.now() + 60 * 60 * 1000)
+    const pad = (value: number) => String(value).padStart(2, '0')
+    return `${nextHour.getFullYear()}-${pad(nextHour.getMonth() + 1)}-${pad(nextHour.getDate())}T${pad(nextHour.getHours())}:${pad(nextHour.getMinutes())}`
+  })
+  const [isScheduling, setIsScheduling] = useState(false)
 
   // Formatting panel state
   const [formattingOpen, setFormattingOpen] = useState(false)
@@ -1852,6 +1859,111 @@ Return exactly one subject line.`,
 
   const removeAttachment = (index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index))
+  }
+
+  const handleScheduleSend = async () => {
+    if (!toChips.length || !subject || !content) {
+      toast.error('Please fill in all fields')
+      return
+    }
+
+    const scheduledDate = new Date(scheduledFor)
+    if (Number.isNaN(scheduledDate.getTime())) {
+      toast.error('Pick a valid send time')
+      return
+    }
+
+    if (scheduledDate.getTime() <= Date.now()) {
+      toast.error('Pick a time in the future')
+      return
+    }
+
+    const isColdType = emailTypeId === 'cold_first_touch' || emailTypeId === 'cold_followup'
+    const isColdPlaintext = isColdType && (context?.deliverabilityMode === 'cold_plaintext' || sendAsPlainText)
+    const normalizedEmailBodyHtml = normalizeEditorHtmlForEmail(content)
+    const plainTextContent = typeof document !== 'undefined' ? (() => {
+      const tmp = document.createElement('div')
+      tmp.innerHTML = normalizedEmailBodyHtml
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+      return (tmp.textContent || tmp.innerText || '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    })() : normalizedEmailBodyHtml
+
+    const fullHtml = isColdPlaintext
+      ? undefined
+      : selectedFoundryId
+        ? content
+        : buildComposeEmailDocument(normalizedEmailBodyHtml, outgoingSignatureHtml || '')
+
+    const attachmentsData = await Promise.all(
+      attachments.map(async (file) => {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => {
+            const result = reader.result as string
+            const base64Data = result.split(',')[1] || result
+            resolve(base64Data)
+          }
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+        return {
+          filename: file.name,
+          content: base64,
+          type: file.type,
+          size: file.size
+        }
+      })
+    )
+
+    try {
+      setIsScheduling(true)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      if (!token) {
+        toast.error('You must be signed in to schedule email')
+        return
+      }
+
+      const response = await fetch('/api/email/schedule-send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          to: toChips.join(', '),
+          cc: showCc && ccChips.length ? ccChips.join(', ') : undefined,
+          subject,
+          content: isColdPlaintext ? plainTextContent : plainTextContent,
+          html: fullHtml ?? (isColdPlaintext ? undefined : content),
+          scheduledSendTime: scheduledDate.toISOString(),
+          contactId: context?.contactId || null,
+          accountId: context?.accountId || null,
+          contactName: context?.contactName || null,
+          contactCompany: context?.companyName || context?.accountName || null,
+          from: user?.email || profile.email || undefined,
+          fromName: profile.firstName ? `${profile.firstName} • Nodal Point` : 'Nodal Point',
+          attachments: attachmentsData.length > 0 ? attachmentsData : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}))
+        throw new Error(err.error || err.message || 'Failed to schedule email')
+      }
+
+      toast.success(`Scheduled for ${format(scheduledDate, 'PPP p')}`)
+      playWhoosh()
+      onClose()
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to schedule email')
+    } finally {
+      setIsScheduling(false)
+      setSchedulePopoverOpen(false)
+    }
   }
 
   const handleSend = async () => {
@@ -2598,13 +2710,57 @@ Return exactly one subject line.`,
             <Button variant="ghost" onClick={onClose} className="text-zinc-400 hover:text-white hover:bg-white/5">
               Discard
             </Button>
+            <Popover open={schedulePopoverOpen} onOpenChange={setSchedulePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="border-[#002FA7]/30 bg-[#002FA7]/10 text-zinc-100 hover:bg-[#002FA7]/20 min-w-[124px]"
+                >
+                  <CalendarClock className="w-4 h-4 mr-2 text-[#002FA7]" />
+                  Schedule
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" side="top" className="w-[320px] bg-zinc-950 border-white/10 nodal-monolith-edge p-4">
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">Send time</div>
+                    <Input
+                      type="datetime-local"
+                      value={scheduledFor}
+                      min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                      onChange={(e) => setScheduledFor(e.target.value)}
+                      className="bg-white/5 border-white/10 text-zinc-100"
+                    />
+                  </div>
+                  <div className="flex items-start gap-2 text-[11px] text-zinc-400">
+                    <Clock3 className="w-3.5 h-3.5 mt-0.5 text-[#002FA7] shrink-0" />
+                    <p>
+                      This saves as a scheduled email in the Scheduled tab and the Supabase cron job sends it when the time hits.
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button variant="ghost" onClick={() => setSchedulePopoverOpen(false)} className="text-zinc-400 hover:text-white hover:bg-white/5">
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleScheduleSend}
+                      disabled={isScheduling}
+                      className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white min-w-[124px]"
+                    >
+                      {isScheduling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CalendarClock className="w-4 h-4 mr-2" />}
+                      Confirm
+                    </Button>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             <Button
               onClick={handleSend}
               disabled={isSending}
               className="bg-white text-zinc-950 hover:bg-zinc-200 min-w-[100px]"
             >
               {isSending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-              Send
+              Send now
             </Button>
           </div>
         </div>
