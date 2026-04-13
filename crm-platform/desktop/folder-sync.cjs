@@ -385,11 +385,55 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
   let periodicTimer = null
   let scanTimer = null
   let scanInFlight = null
+  let persistTimer = null
+  let persistInFlight = null
   const suppressedPaths = new Map()
 
-  function persistState() {
-    fs.mkdirSync(path.dirname(stateFilePath), { recursive: true })
-    fs.writeFileSync(stateFilePath, JSON.stringify(state, null, 2), 'utf8')
+  async function writeStateToDisk() {
+    await fs.promises.mkdir(path.dirname(stateFilePath), { recursive: true })
+    await fs.promises.writeFile(stateFilePath, JSON.stringify(state, null, 2), 'utf8')
+  }
+
+  function persistState(immediate = false) {
+    if (persistTimer) {
+      clearTimeout(persistTimer)
+      persistTimer = null
+    }
+
+    const scheduleMs = immediate ? 0 : 250
+    persistTimer = setTimeout(() => {
+      persistTimer = null
+      const nextWrite = writeStateToDisk().catch((error) => {
+        console.error('[Folder Sync] Failed to persist state:', error)
+      })
+      persistInFlight = nextWrite
+      nextWrite.finally(() => {
+        if (persistInFlight === nextWrite) {
+          persistInFlight = null
+        }
+      })
+    }, scheduleMs)
+  }
+
+  async function flushPersistedState() {
+    if (persistTimer) {
+      clearTimeout(persistTimer)
+      persistTimer = null
+      const nextWrite = writeStateToDisk().catch((error) => {
+        console.error('[Folder Sync] Failed to persist state:', error)
+      })
+      persistInFlight = nextWrite
+    }
+
+    if (persistInFlight) {
+      try {
+        await persistInFlight
+      } catch {
+        // handled above
+      } finally {
+        persistInFlight = null
+      }
+    }
   }
 
   function loadState() {
@@ -476,7 +520,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
 
     if (!state.enabled || !state.folderPath) {
       state.watching = false
-      persistState()
+      persistState(true)
       emitState('stopped')
       return
     }
@@ -497,13 +541,13 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
       periodicTimer = setInterval(() => {
         void runScan('interval')
       }, PERIODIC_SCAN_MS)
-      persistState()
+      persistState(true)
       emitState('watching')
     } catch (error) {
       console.error('[Folder Sync] Failed to start watcher:', error)
       state.watching = false
       state.lastError = error instanceof Error ? error.message : String(error)
-      persistState()
+      persistState(true)
       emitState('watch-error')
     }
   }
@@ -647,7 +691,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
       lastError: null,
     }
 
-    persistState()
+    persistState(true)
     startWatchers()
     emitState('connected')
     void runScan('connect')
@@ -664,7 +708,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
     }
 
     clearWatchers()
-    persistState()
+    persistState(true)
     emitState('disconnected')
     return cloneState(state)
   }
@@ -875,6 +919,7 @@ function createFolderSyncManager({ app, ipcMain, getMainWindow }) {
 
   async function dispose() {
     clearWatchers()
+    await flushPersistedState()
     if (scanInFlight) {
       try {
         await scanInFlight

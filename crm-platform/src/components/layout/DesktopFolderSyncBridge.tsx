@@ -336,6 +336,7 @@ export function DesktopFolderSyncBridge() {
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
   const folderSync = useDesktopFolderSync()
+  const { isDesktop, state, scanNow } = folderSync
   const localSyncBusyRef = useRef(false)
   const remoteSyncBusyRef = useRef(false)
   const manualRefreshRunningRef = useRef(false)
@@ -344,11 +345,11 @@ export function DesktopFolderSyncBridge() {
   const recentFolderErrorsRef = useRef(new Map<string, number>())
 
   const isFolderSyncActive = Boolean(
-    folderSync.isDesktop &&
+    isDesktop &&
       !loading &&
       user &&
-      folderSync.state?.enabled &&
-      folderSync.state?.folderPath
+      state?.enabled &&
+      state?.folderPath
   )
 
   const fetchRemoteDocuments = useCallback(async () => {
@@ -750,7 +751,7 @@ export function DesktopFolderSyncBridge() {
         }, 1000)
       }
     }
-  }, [fetchAccountNames, fetchRemoteDocuments, folderSync, markSynced, queryClient])
+  }, [fetchAccountNames, fetchRemoteDocuments, folderSync.state, folderSync.writeFile, folderSync.deleteFile, markSynced, queryClient])
 
   const runManualMirrorRefresh = useCallback(async () => {
     if (!isFolderSyncActive) {
@@ -765,15 +766,15 @@ export function DesktopFolderSyncBridge() {
     manualRefreshRunningRef.current = true
 
     try {
-      await folderSync.scanNow().catch(() => null)
+      await scanNow().catch(() => null)
       await pullRemoteDocs({ force: true })
     } finally {
       manualRefreshRunningRef.current = false
     }
-  }, [folderSync, isFolderSyncActive, pullRemoteDocs])
+  }, [isFolderSyncActive, pullRemoteDocs, scanNow])
 
   useEffect(() => {
-    if (!folderSync.isDesktop || loading || !user) {
+    if (!isDesktop || loading || !user) {
       return
     }
 
@@ -794,8 +795,9 @@ export function DesktopFolderSyncBridge() {
         if (manualRefreshRunningRef.current) {
           return
         }
-        console.log('[Folder Sync Bridge] Scan complete, pulling remote docs (force)')
-        void pullRemoteDocs({ force: true })
+        const forcePull = event.reason === 'connect' || event.reason === 'tray'
+        console.log('[Folder Sync Bridge] Scan complete, pulling remote docs', forcePull ? '(force)' : '')
+        void pullRemoteDocs(forcePull ? { force: true } : undefined)
       }
 
       if (event.type === 'scan-complete' && event.reason === 'startup') {
@@ -824,7 +826,7 @@ export function DesktopFolderSyncBridge() {
     return () => {
       unsubscribe()
     }
-  }, [folderSync.isDesktop, loading, pullRemoteDocs, pushLocalFiles, user])
+  }, [isDesktop, loading, pullRemoteDocs, pushLocalFiles, user])
 
   useEffect(() => {
     const handleRefreshNow = () => {
@@ -843,24 +845,18 @@ export function DesktopFolderSyncBridge() {
       return
     }
 
-    console.log('[Folder Sync Bridge] Interval effect: starting, folderSync.state:', folderSync.state?.enabled, folderSync.state?.folderPath)
-    void folderSync.scanNow().catch(() => null)
-    const kickoffTimer = window.setTimeout(() => {
-      console.log('[Folder Sync Bridge] Kickoff timer firing')
-      void pullRemoteDocs()
-    }, 4000)
+    console.log('[Folder Sync Bridge] Interval effect: starting, folder sync active')
+    void scanNow().catch(() => null)
 
     const timer = window.setInterval(() => {
       console.log('[Folder Sync Bridge] Interval timer firing')
-      void folderSync.scanNow().catch(() => null)
-      void pullRemoteDocs()
+      void scanNow().catch(() => null)
     }, 5 * 60 * 1000)
 
     return () => {
-      window.clearTimeout(kickoffTimer)
       window.clearInterval(timer)
     }
-  }, [folderSync, isFolderSyncActive, pullRemoteDocs])
+  }, [isFolderSyncActive, scanNow])
 
   return null
 }
