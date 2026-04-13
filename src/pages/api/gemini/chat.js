@@ -2030,6 +2030,47 @@ Output rules:
       ...data,
     });
 
+    const buildActionCommand = (data) => buildJsonBlock('action_command', {
+      commandId: crypto.randomUUID(),
+      ...data,
+    });
+
+    const stripActionPreamble = (text) => {
+      let q = normalizeSearchText(text);
+      q = q.replace(/^(?:please\s+)?(?:create|add|make|schedule|set up|set)\s+(?:a|an|the)?\s*(?:task|reminder|note|company|account)\s*(?:to|for|about|on)?\s*/i, '');
+      q = q.replace(/^(?:please\s+)?(?:remind me(?:\s+to)?|follow up(?:\s+on)?|add a note(?:\s+to)?|make a note(?:\s+about)?|note that|log a note(?:\s+about)?|save a note(?:\s+about)?)\s*/i, '');
+      q = q.replace(/\s+(?:task|reminder|note|company|account)\s*$/i, '');
+      q = q.replace(/\s+/g, ' ').trim();
+      return q;
+    };
+
+    const parseRelativeDueDate = (text) => {
+      const s = String(text || '');
+      const lower = s.toLowerCase();
+      const now = new Date();
+      const inDays = (days, hour = 9) => {
+        const date = new Date(now);
+        date.setDate(date.getDate() + days);
+        date.setHours(hour, 0, 0, 0);
+        return date.toISOString();
+      };
+
+      if (/\btomorrow\b/.test(lower)) return inDays(1);
+      if (/\bnext week\b/.test(lower)) return inDays(7);
+      if (/\bthis afternoon\b/.test(lower)) return inDays(0, 15);
+
+      const dateMatch = s.match(/\b(20\d{2}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)\b/);
+      if (dateMatch) {
+        const parsed = new Date(dateMatch[1]);
+        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+      }
+
+      return null;
+    };
+
+    const isControlledActionIntent = /\b(?:create|add|make|schedule|remind|note|memo|follow up|follow-up|set up|set)\b/i.test(prompt || '')
+      && /\b(?:task|reminder|note|company|account)\b/i.test(prompt || '');
+
     const parseYear = (text) => {
       const s = String(text || '');
       const m = s.match(/\b(19|20)\d{2}\b/);
@@ -2926,6 +2967,9 @@ Output rules:
         - When the answer is about a protocol or sequence, return \`protocol_card\` with the step summary, target contact/account, and selected node.
         - \`sequence_card\` is accepted as a backwards-compatible alias for \`protocol_card\`.
         - When the user explicitly asks to open, go to, jump to, or pull up a specific contact, account, or email page, return a \`navigation_command\` JSON_DATA block with the resolved \`path\`, \`targetType\`, and \`targetId\`. If the match is ambiguous, return cards instead of guessing.
+        - When the user asks to create a task, add a note, or add/open a company, return an \`action_command\` JSON_DATA block with a clear \`kind\` (task/company/note), the resolved target fields, and one primary button label. Keep it constrained to approved actions only.
+        - For task commands, include a \`dueDate\` when the user mentions tomorrow, next week, or a specific date.
+        - For note commands, include the note text and the target contact/account so the UI can append it to the right record.
         - If you are unsure of the data, DO NOT trigger a component. Provide a text summary instead.
         - DO NOT put conversational text INSIDE the JSON block.
 
@@ -3574,6 +3618,253 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
       || (/\bshow me\b/i.test(prompt || '') && /\b(page|dossier|record|profile|thread)\b/i.test(prompt || ''))
       || /\b(?:most recent|latest|last)\s+email\b/i.test(prompt || '');
 
+    const buildControlledAction = async () => {
+      const diagnostics = [
+        { model: 'supabase', provider: 'grounded', status: 'attempting', reason: 'CONTROLLED_ACTION' }
+      ];
+
+      const requestContext = req.body?.context || {};
+      const contextData = requestContext && typeof requestContext.data === 'object' && requestContext.data !== null ? requestContext.data : {};
+      const contextType = requestContext?.type || 'general';
+      const contextId = typeof requestContext?.id === 'string' ? requestContext.id : null;
+      const promptText = String(prompt || '').trim();
+
+      const wantsNote = /\b(?:note|memo|add a note|make a note|log a note|save a note)\b/i.test(promptText);
+      const wantsTask = /\b(?:task|remind|reminder|follow up|follow-up)\b/i.test(promptText);
+      const wantsCompany = /\b(?:company|account)\b/i.test(promptText) && /\b(?:add|create|make|save|open)\b/i.test(promptText);
+
+      if (!isControlledActionIntent && !wantsCompany && !wantsNote && !wantsTask) return false;
+
+      let targetQuery = stripActionPreamble(promptText);
+      targetQuery = targetQuery.replace(/\b(?:page|dossier|record|profile|thread)\b/gi, ' ');
+      targetQuery = targetQuery.replace(/\b(?:my|the)\b/gi, ' ');
+      targetQuery = targetQuery.replace(/\s+/g, ' ').trim();
+
+      let contextContactId = contextType === 'contact' && contextId ? String(contextId) : null;
+      let contextAccountId = contextType === 'account' && contextId ? String(contextId) : null;
+      if (!contextAccountId && contextContactId) {
+        try {
+          const contactContext = await toolHandlers.get_contact_details({ contact_id: contextContactId });
+          contextAccountId = contactContext?.accountId || contactContext?.account_id || contactContext?.linked_account_id || contactContext?.linkedAccountId || contactContext?.accounts?.id || null;
+        } catch (error) {
+          console.warn('[ControlledAction] Failed to resolve context account from contact:', error?.message || error);
+        }
+      }
+
+      const baseQuery = targetQuery || String(contextData.contactName || contextData.accountName || contextData.name || '').trim();
+      if (!baseQuery && !contextContactId && !contextAccountId) return false;
+
+      const [contactRes, accountRes] = await Promise.all([
+        toolHandlers.list_contacts({
+          search: baseQuery || undefined,
+          accountId: contextAccountId || undefined,
+          limit: 5
+        }),
+        toolHandlers.list_accounts({
+          search: baseQuery || undefined,
+          limit: 5
+        })
+      ]);
+
+      const contactRecords = Array.isArray(contactRes?.data) ? contactRes.data : Array.isArray(contactRes) ? contactRes : [];
+      const accountRecords = Array.isArray(accountRes?.data) ? accountRes.data : Array.isArray(accountRes) ? accountRes : [];
+
+      const contactNameText = (contact) => [
+        contact?.name,
+        [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim(),
+      ].find(Boolean) || '';
+
+      const exactContact = contactRecords.find((contact) => matchesLookupKey(contactNameText(contact), baseQuery));
+      const exactAccount = accountRecords.find((account) => matchesLookupKey(account?.name || '', baseQuery));
+      const chosenContact = exactContact || (contactRecords.length === 1 ? contactRecords[0] : null);
+      const chosenAccount = exactAccount || (accountRecords.length === 1 ? accountRecords[0] : null);
+
+      const respondWithStack = (title, summary, nextMove) => {
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+        const contacts = contactRecords.map((contact) => ({
+          kind: 'contact',
+          id: String(contact.id),
+          name: contactNameText(contact) || contact.name || 'Unknown contact',
+          title: contact.title || contact.jobTitle || undefined,
+          company: contact?.accounts?.name || contact.company || contextData.accountName || undefined,
+          location: [contact.city, contact.state].filter(Boolean).join(', ') || undefined,
+          photoUrl: contact.photoUrl || contact.photo_url || undefined,
+          status: 'matched',
+          source: 'CRM contact search',
+        })).filter((item) => item.id);
+
+        const accounts = accountRecords.map((account) => ({
+          kind: 'account',
+          id: String(account.id),
+          name: account.name || 'Unknown account',
+          city: account.city || undefined,
+          state: account.state || undefined,
+          location: [account.city, account.state].filter(Boolean).join(', ') || undefined,
+          industry: account.industry || undefined,
+          domain: account.domain || undefined,
+          logoUrl: account.logo_url || account.logoUrl || undefined,
+          confidence: 'matched',
+        }));
+
+        const stack = buildJsonBlock('apollo_result_stack', {
+          title,
+          summary,
+          accounts,
+          contacts,
+          nextMove,
+        });
+
+        const narrative = `${firstName}, I found multiple possible records, so I am showing the cards instead of guessing.`;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content: `${narrative} ${stack}`,
+          provider: 'grounded',
+          model: 'supabase',
+          diagnostics,
+        }));
+        return true;
+      };
+
+      if (wantsCompany) {
+        if (!chosenAccount && !chosenContact && (contactRecords.length > 1 || accountRecords.length > 1 || (contactRecords.length > 0 && accountRecords.length > 0))) {
+          return respondWithStack(
+            'Multiple matches',
+            'I found more than one possible company. Pick the one you want and I will open or add it.',
+            'Choose the correct company or contact to continue.'
+          );
+        }
+
+        const companySource = chosenAccount || chosenContact || null;
+        const companyName = companySource?.name || String(contextData.accountName || contextData.contactCompany || contextData.company || baseQuery || '').trim();
+        const companyId = companySource?.id ? String(companySource.id) : null;
+        const command = buildActionCommand({
+          kind: 'company',
+          actionMode: companyId ? 'open' : 'add',
+          title: companyId ? `Open ${companyName}` : `Add ${companyName || 'company'}`,
+          subtitle: companyId ? 'Open the existing company record' : 'Add the company record to the CRM',
+          source: 'Controlled action',
+          confidence: companyId ? 'high' : 'medium',
+          company: {
+            id: companyId || undefined,
+            name: companyName || baseQuery || 'Company',
+            domain: companySource?.domain || contextData.domain || '',
+            logoUrl: companySource?.logo_url || companySource?.logoUrl || undefined,
+            industry: companySource?.industry || contextData.industry || undefined,
+            description: companySource?.description || contextData.description || undefined,
+            city: companySource?.city || contextData.city || undefined,
+            state: companySource?.state || contextData.state || undefined,
+            employees: companySource?.employees || contextData.employees || undefined,
+            revenue: companySource?.revenue || contextData.revenue || undefined,
+            companyPhone: companySource?.phone || companySource?.companyPhone || contextData.companyPhone || undefined,
+            website: companySource?.website || contextData.website || undefined,
+            linkedin: companySource?.linkedin || contextData.linkedin || undefined,
+            initials: companyName.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+            source: 'CRM search',
+            confidence: companyId ? 'high' : 'medium',
+          },
+        });
+
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content: `${firstName}, I prepared the company action. ${command}`,
+          provider: 'grounded',
+          model: 'supabase',
+          diagnostics,
+        }));
+        return true;
+      }
+
+      if (wantsNote) {
+        if (!chosenContact && !chosenAccount && (contactRecords.length > 1 || accountRecords.length > 1 || (contactRecords.length > 0 && accountRecords.length > 0))) {
+          return respondWithStack(
+            'Multiple matches',
+            'I found more than one possible record for that note. Pick one and I will attach it there.',
+            'Choose the exact record to attach the note to.'
+          );
+        }
+
+        const noteTarget = chosenContact || chosenAccount || null;
+        const targetType = chosenContact ? 'contact' : 'account';
+        if (!noteTarget?.id && !contextContactId && !contextAccountId) return false;
+        const noteText = stripActionPreamble(promptText) || baseQuery || promptText;
+        const targetLabel = noteTarget?.name || String(contextData.contactName || contextData.accountName || baseQuery || 'target');
+        const command = buildActionCommand({
+          kind: 'note',
+          actionMode: 'append',
+          title: `Add note to ${targetLabel}`,
+          subtitle: targetType === 'contact' ? 'Append this note to the contact record' : 'Append this note to the account record',
+          source: 'Controlled action',
+          confidence: noteTarget ? 'high' : 'medium',
+          note: {
+            text: noteText,
+            targetType,
+            targetId: noteTarget?.id ? String(noteTarget.id) : (targetType === 'contact' ? contextContactId : contextAccountId),
+            targetLabel,
+            contactId: chosenContact?.id ? String(chosenContact.id) : contextContactId,
+            contactName: contactNameText(chosenContact) || contextData.contactName || null,
+            accountId: chosenAccount?.id ? String(chosenAccount.id) : contextAccountId,
+            accountName: chosenAccount?.name || contextData.accountName || null,
+          },
+        });
+
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content: `${firstName}, I prepared the note action. ${command}`,
+          provider: 'grounded',
+          model: 'supabase',
+          diagnostics,
+        }));
+        return true;
+      }
+
+      if (wantsTask) {
+        if (!chosenContact && !chosenAccount && (contactRecords.length > 1 || accountRecords.length > 1 || (contactRecords.length > 0 && accountRecords.length > 0))) {
+          return respondWithStack(
+            'Multiple matches',
+            'I found more than one possible record for that task. Pick one and I will attach the task there.',
+            'Choose the exact record to attach the task to.'
+          );
+        }
+
+        const taskTarget = chosenContact || chosenAccount || null;
+        const taskTitle = chosenContact
+          ? `Follow up with ${contactNameText(chosenContact) || chosenContact.name || 'contact'}`
+          : chosenAccount
+            ? `Follow up with ${chosenAccount.name || 'account'}`
+            : stripActionPreamble(promptText) || promptText;
+        const dueDate = parseRelativeDueDate(promptText);
+        const command = buildActionCommand({
+          kind: 'task',
+          actionMode: 'create',
+          title: `Create task: ${taskTitle}`,
+          subtitle: dueDate ? `Due ${new Date(dueDate).toLocaleDateString()}` : 'Create a follow-up task',
+          source: 'Controlled action',
+          confidence: taskTarget ? 'high' : 'medium',
+          task: {
+            title: taskTitle,
+            description: promptText,
+            dueDate,
+            contactId: chosenContact?.id ? String(chosenContact.id) : contextContactId,
+            accountId: chosenAccount?.id ? String(chosenAccount.id) : contextAccountId,
+          },
+        });
+
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content: `${firstName}, I prepared the task action. ${command}`,
+          provider: 'grounded',
+          model: 'supabase',
+          diagnostics,
+        }));
+        return true;
+      }
+
+      return false;
+    };
+
     const buildAgenticNavigation = async () => {
       const diagnostics = [
         { model: 'supabase', provider: 'grounded', status: 'attempting', reason: 'AGENTIC_NAVIGATION' }
@@ -3878,6 +4169,13 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
       } catch (error) {
         console.error('[AI Router] Deep dive workflow failed:', error);
       }
+    }
+
+    try {
+      const handled = await buildControlledAction();
+      if (handled) return;
+    } catch (error) {
+      console.error('[AI Router] Controlled action workflow failed:', error);
     }
 
     if (isNavigationIntent) {
