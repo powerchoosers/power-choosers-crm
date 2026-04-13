@@ -168,15 +168,18 @@ export function DesktopFileIngestModal({
         return scope === 'account-bill-intel' && accountKey === selectedAccountId
       }
 
-      await queryClient.invalidateQueries({ predicate: accountKeyMatches })
-      await queryClient.refetchQueries({ predicate: accountKeyMatches })
-      await queryClient.invalidateQueries({ predicate: accountBillKeyMatches })
-      await queryClient.refetchQueries({ predicate: accountBillKeyMatches })
-      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
-      await queryClient.invalidateQueries({ queryKey: ['targets'] })
-      await queryClient.invalidateQueries({ queryKey: ['deals'] })
-      await queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ predicate: accountKeyMatches }),
+        queryClient.refetchQueries({ predicate: accountKeyMatches }),
+        queryClient.invalidateQueries({ predicate: accountBillKeyMatches }),
+        queryClient.refetchQueries({ predicate: accountBillKeyMatches }),
+      ])
+
+      void queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      void queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      void queryClient.invalidateQueries({ queryKey: ['targets'] })
+      void queryClient.invalidateQueries({ queryKey: ['deals'] })
+      void queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
 
       if (successCount > 0) {
         const analysisLabel = analysisTypes.has('SIGNED_CONTRACT') || analysisTypes.has('CONTRACT')

@@ -364,46 +364,6 @@ function patchContactDetailCache(cached: any, contactPatch: Partial<ContactDetai
   }
 }
 
-function patchContactListCache(old: any, contactPatch: Partial<ContactDetail> & { id: string }) {
-  if (!old?.pages) return old
-  return {
-    ...old,
-    pages: old.pages.map((page: any) => {
-      if (!page || !Array.isArray(page.contacts)) return page
-      return {
-        ...page,
-        contacts: page.contacts.map((contact: Contact) =>
-          contact.id === contactPatch.id
-            ? {
-                ...contact,
-                ...contactPatch,
-                name: contactPatch.name ?? contact.name,
-                accountId: contactPatch.accountId ?? contact.accountId,
-                company: contactPatch.companyName ?? contact.company,
-                companyPhone: contactPatch.companyPhone ?? contact.companyPhone,
-                workDirectPhone: contactPatch.workDirectPhone ?? contact.workDirectPhone,
-                location: contactPatch.location ?? contact.location,
-              }
-            : contact
-        ),
-      }
-    }),
-  }
-}
-
-function patchAccountContactsCache(old: any, contactPatch: Partial<ContactDetail> & { id: string }) {
-  if (!Array.isArray(old)) return old
-  return old.map((contact: Contact) =>
-    contact.id === contactPatch.id
-      ? {
-          ...contact,
-          ...contactPatch,
-          name: contactPatch.name ?? contact.name,
-        }
-      : contact
-  )
-}
-
 export function useAccountContacts(accountId: string) {
   const { user, loading } = useAuth()
 
@@ -1270,14 +1230,8 @@ export function useUpdateContact() {
     },
     onSuccess: (_, variables) => {
       const contactPredicate = queryPredicateById('contact', variables.id)
-      queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) =>
-        patchContactListCache(old, variables)
-      )
       queryClient.setQueriesData({ predicate: contactPredicate }, (cached: any) =>
         patchContactDetailCache(cached, variables)
-      )
-      queryClient.setQueriesData({ queryKey: ['account-contacts'] }, (old: any) =>
-        patchAccountContactsCache(old, variables)
       )
 
       if (variables.accountId || variables.linkedAccountId) {
@@ -1295,31 +1249,11 @@ export function useUpdateContact() {
             serviceAddresses: variables.serviceAddresses ?? cached.serviceAddresses,
           }
         })
-        queryClient.setQueriesData({ queryKey: ['accounts'] }, (old: any) => {
-          if (!old?.pages) return old
-          return {
-            ...old,
-            pages: old.pages.map((page: any) => {
-              if (!page || !Array.isArray(page.accounts)) return page
-              return {
-                ...page,
-                accounts: page.accounts.map((account: any) =>
-                  account.id === linkedAccountId
-                    ? {
-                        ...account,
-                        name: variables.companyName ?? account.name,
-                        companyPhone: variables.companyPhone ?? account.companyPhone,
-                        annualUsage: variables.annualUsage ?? account.annualUsage,
-                        currentRate: variables.currentRate ?? account.currentRate,
-                        contractEnd: variables.contractEnd ?? account.contractEnd,
-                      }
-                    : account
-                ),
-              }
-            }),
-          }
-        })
+        queryClient.invalidateQueries({ queryKey: ['account-contacts', linkedAccountId] })
       }
+
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
     }
   })
 }
