@@ -269,6 +269,33 @@ export function GlobalSync() {
         }
       })
 
+    const callChannel = supabase.channel('call-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'calls' },
+        (payload) => {
+          const call = payload.new as { id?: string; contactId?: string | null; accountId?: string | null; contact_id?: string | null; account_id?: string | null }
+          if (!call?.id) return
+
+          const contactId = call.contactId || call.contact_id || null
+          const accountId = call.accountId || call.account_id || null
+          const currentPath = pathnameRef.current
+          const refreshCallsNow = isRouteVisible(currentPath, ['/network/calls'])
+          const refreshAccountNow = isRouteVisible(currentPath, ['/network/accounts'])
+          const refreshContactNow = isRouteVisible(currentPath, ['/network/contacts'])
+
+          invalidateQueryGroup(queryClient, ['calls'], refreshCallsNow)
+          invalidateQueryGroup(queryClient, ['calls-count'], refreshCallsNow)
+          if (contactId) invalidateQueryGroup(queryClient, ['contact-calls', contactId], refreshContactNow)
+          if (accountId) invalidateQueryGroup(queryClient, ['account-calls', accountId], refreshAccountNow)
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.info('[Realtime] calls channel connected')
+        }
+      })
+
     const notificationChannel = supabase.channel('email-notification-inserts')
       .on(
         'postgres_changes',
@@ -415,6 +442,7 @@ export function GlobalSync() {
     return () => {
       supabase.removeChannel(sigChannel)
       supabase.removeChannel(emailChannel)
+      supabase.removeChannel(callChannel)
       supabase.removeChannel(notificationChannel)
       desktopUiUnsubscribe?.()
     }

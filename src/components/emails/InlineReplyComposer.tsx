@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { playWhoosh } from '@/lib/audio'
 import type { Email } from '@/hooks/useEmails'
 import type { Editor } from '@tiptap/react'
+import { applyOptimisticEmailSend, buildOptimisticEmail } from '@/lib/email-cache'
 
 function extractEmailAddress(value: string): string {
     const raw = String(value || '').trim()
@@ -197,6 +198,28 @@ export function InlineReplyComposer({ email, variant, onClose, onSent }: InlineR
                 throw new Error(err?.error || err?.message || 'Failed to send reply')
             }
 
+            const payload = await response.json().catch(() => ({}))
+            const trackingId = String(payload?.trackingId || '').trim()
+            const optimisticId = trackingId || `optimistic_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+            const optimisticEmail = buildOptimisticEmail({
+                id: optimisticId,
+                subject,
+                from: replyFromAccount || user.email,
+                to: targetTo,
+                html: finalHtml,
+                text: noteText,
+                ownerId: replyFromAccount || user.email,
+                contactId: email.contactId || null,
+                accountId: (email as any)?.accountId || null,
+                threadId: email.threadId || email.id,
+                attachments: replyAttachments.map((file) => ({
+                    filename: file.name,
+                    mimeType: file.type || undefined,
+                    size: file.size,
+                })),
+            })
+            applyOptimisticEmailSend(queryClient, optimisticEmail)
+
             playWhoosh()
             toast.success('Reply sent')
             setReplyHtml('')
@@ -207,10 +230,6 @@ export function InlineReplyComposer({ email, variant, onClose, onSent }: InlineR
             queryClient.invalidateQueries({ queryKey: ['emails'] })
             queryClient.invalidateQueries({ queryKey: ['emails-count'] })
             queryClient.invalidateQueries({ queryKey: ['entity-emails'] })
-            setTimeout(() => {
-                queryClient.refetchQueries({ queryKey: ['emails'] })
-                queryClient.refetchQueries({ queryKey: ['entity-emails'] })
-            }, 500)
 
             onSent?.()
             onClose()
