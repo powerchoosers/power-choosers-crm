@@ -2883,22 +2883,28 @@ Output rules:
           2. Apollo enrichment and Apollo news signals
           3. Public web research when the facts are public-facing
         - Do not treat these as separate answers. Merge them into one brief.
-        - Build a usable account-intel brief that answers: what changed, who matters, where else they operate, what news is recent, and what call or email angle is most likely to work.
+        - Build a usable account-intel brief that answers: what changed, who matters, where else they operate, what news is recent, whether there are multiple locations, and what call or email angle is most likely to work.
         - Always check for and call out:
           1. recent company news or Apollo signals
           2. alternate offices, locations, or headquarters clues
           3. likely decision makers or leadership titles
           4. any new location updates, expansion, closures, or move signals
           5. public phone or contact paths if available
+          6. if there are multiple locations, say how that changes the sales approach
         - When evidence exists, name the source plainly and separate verified facts from likely inferences.
         - If CRM data is present, analyze it. Do not stop at "missing data" unless the missing item is the actual blocker.
         - If data is present but thin, combine it with public research to produce the best actionable brief possible.
         - If a public source and CRM disagree, prefer the CRM for internal fields and say the public source only as outside intelligence.
+        - Explicitly include a "sales angles" section that recommends the most useful outreach angles based on the evidence. Examples: renewal timing, multi-site complexity, HQ-vs-local decision making, recent expansion, recent move, demand or load shape risk, or missing contact coverage.
         - End the narrative with 3-5 bullets labeled like:
           - What changed
           - Who matters
           - Where else to look
           - Best next move
+          - Sales angles
+        - After the narrative, emit a JSON_DATA block for a sales angles card when you have enough evidence to be actionable:
+          JSON_DATA:{"type":"sales_angles","data":{"title":"Sales Angles","accountName":"...","contactName":"...","hasMultipleLocations":true,"locationSummary":"HQ in Dallas with 4 Texas branches","primaryAngle":"Portfolio standardization across all locations","angleReason":"Multiple sites suggest the best pitch is cost control across locations, not a single-site rate review.","angles":[{"label":"Multi-site angle","angle":"Use a portfolio-wide benchmark and ask who owns rates across locations.","whenToUse":"Best when the company has multiple offices, stores, plants, or sites."},{"label":"HQ angle","angle":"Start with finance or procurement at HQ, then loop in local ops.","whenToUse":"Best when decision making is centralized."},{"label":"Expansion angle","angle":"Tie new locations to rate consistency and rollout speed.","whenToUse":"Best when recent growth or relocation is visible."}],"sources":[{"label":"Apollo news","url":"..."},{"label":"Company website","url":"..."}],"nextMove":"Call the HQ contact, then validate site-level ops contacts."}}END_JSON
+        - If there is only one obvious angle, you can still emit the card with one or two angles.
 
         RICH MEDIA PROTOCOL:
         - The user interface is a "Forensic HUD". Do NOT return Markdown tables. Do NOT respond to list-style queries (e.g. "accounts expiring in 2026", "manufacturers", "accounts with contract end dates", "list accounts") with ONLY a bulleted or numbered list in the narrative. You MUST include at least one JSON_DATA block: either multiple identity_card components (one per account/contact) or one forensic_grid. The user needs clickable cards or a grid to open dossiers.
@@ -3144,6 +3150,9 @@ Output rules:
       const fallbackReason = typeof fallbackOptions?.reason === 'string' && fallbackOptions.reason.trim()
         ? fallbackOptions.reason.trim()
         : '';
+      const overridePrompt = typeof fallbackOptions?.prompt === 'string' && fallbackOptions.prompt.trim()
+        ? fallbackOptions.prompt.trim()
+        : null;
 
       const lastFailure = diagnostics.findLast(d => d.status === 'failed');
       const failureContext = lastFailure ? `(Reason: Previous attempt with ${lastFailure.model} failed: ${lastFailure.error})` : '';
@@ -3154,7 +3163,7 @@ Output rules:
       let lastRole = null;
 
       // Slice the last 10 messages but ensure we don't break mid-conversation if possible
-      const candidates = cleanedMessages.slice(-10);
+      const candidates = overridePrompt ? [{ role: 'user', content: overridePrompt }] : cleanedMessages.slice(-10);
 
       for (const m of candidates) {
         const role = m.role === 'user' ? 'user' : 'assistant';
@@ -3231,10 +3240,179 @@ Output rules:
       return content;
     };
 
+    const isDeepDiveIntent = /\b(deep[-\s]?dive|forensic analysis|forensic brief|intel brief|account intelligence)\b/i.test(prompt || '');
+
+    const buildDeepDiveBrief = async () => {
+      const diagnostics = [
+        { model: 'supabase', provider: 'grounded', status: 'attempting', reason: 'DEEP_DIVE_WORKFLOW' }
+      ];
+
+      const requestContext = req.body?.context;
+      const contextData = requestContext && typeof requestContext.data === 'object' && requestContext.data !== null ? requestContext.data : {};
+      const contextType = requestContext?.type || 'general';
+      const contextId = typeof requestContext?.id === 'string' ? requestContext.id : null;
+
+      const findAccountByPrompt = async () => {
+        const searchText = stripSearchPreamble(prompt || '');
+        const searchResult = await toolHandlers.list_accounts({ search: searchText, limit: 5 });
+        const records = Array.isArray(searchResult?.data) ? searchResult.data : Array.isArray(searchResult) ? searchResult : [];
+        if (records.length > 0) return records[0];
+        return null;
+      };
+
+      const resolveAccount = async () => {
+        if (contextType === 'account' && contextId) {
+          return await toolHandlers.get_account_details({ account_id: contextId });
+        }
+        if (contextType === 'contact' && contextId) {
+          const contact = await toolHandlers.get_contact_details({ contact_id: contextId });
+          const linkedAccountId = contact?.accountId || contact?.account_id || contact?.linked_account_id || contact?.linkedAccountId || contact?.accounts?.id || null;
+          if (linkedAccountId) return await toolHandlers.get_account_details({ account_id: String(linkedAccountId) });
+        }
+        const fromPrompt = await findAccountByPrompt();
+        if (fromPrompt?.id) return await toolHandlers.get_account_details({ account_id: String(fromPrompt.id) });
+        return null;
+      };
+
+      const account = await resolveAccount();
+      if (!account) {
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'failed', error: 'ACCOUNT_NOT_FOUND' });
+        const message = `${firstName}, I could not confidently resolve the account for this deep dive. Give me the company name or open the account first so I can pull CRM, Apollo, and public-web evidence together.`;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ content: message, provider: 'grounded', model: 'supabase', diagnostics }));
+        return true;
+      }
+
+      const accountId = String(account.id || contextId || '');
+      const accountName = String(account.name || contextData.accountName || contextData.name || 'Unknown account');
+      const accountDomain = normalizeDomain(account.domain || account.metadata?.domain || account.metadata?.website || '');
+      const accountCity = account.city || account.metadata?.city || '';
+      const accountState = account.state || account.metadata?.state || '';
+
+      const [contactsRes, interactionsRes, apolloNewsRes, orgEnrichmentRes, publicPhoneRes] = await Promise.allSettled([
+        toolHandlers.list_contacts({ accountId, limit: 10 }),
+        toolHandlers.search_interactions({ query: accountName, account_id: accountId, limit: 5 }),
+        accountDomain ? supabaseAdmin.from('apollo_news_articles').select('id, title, snippet, published_at, domain, url').eq('domain', accountDomain).order('published_at', { ascending: false }).limit(5) : Promise.resolve({ data: [] }),
+        accountDomain ? toolHandlers.enrich_organization({ domain: accountDomain }) : Promise.resolve(null),
+        toolHandlers.find_public_company_phone({ company_name: accountName, domain: accountDomain || undefined, city: accountCity || undefined, state: accountState || undefined, account_id: accountId, limit: 5 })
+      ]);
+
+      const contacts = contactsRes.status === 'fulfilled' ? contactsRes.value : null;
+      const interactions = interactionsRes.status === 'fulfilled' ? interactionsRes.value : null;
+      const apolloNews = apolloNewsRes.status === 'fulfilled' ? (apolloNewsRes.value?.data || []) : [];
+      const orgEnrichment = orgEnrichmentRes.status === 'fulfilled' ? orgEnrichmentRes.value : null;
+      const publicPhone = publicPhoneRes.status === 'fulfilled' ? publicPhoneRes.value : null;
+
+      let webBrief = '';
+      if (perplexityApiKey) {
+        try {
+          const webPrompt = `
+Search the public web for this company and return a concise intelligence brief.
+Company: ${accountName}
+Domain: ${accountDomain || 'unknown'}
+City: ${accountCity || 'unknown'}
+State: ${accountState || 'unknown'}
+
+I need:
+1. headquarters or other office locations
+2. recent public news
+3. likely decision makers or leadership titles
+4. any location updates, expansions, closures, or move signals
+5. public contact paths if available
+
+Only use public-facing facts. Separate verified facts from inferences. Keep it concise and practical.
+          `.trim();
+        webBrief = await callPerplexity(perplexityModel, diagnostics, {
+          mode: 'web_fallback',
+          reason: 'deep_dive_public_web',
+          prompt: webPrompt,
+        });
+        } catch (error) {
+          diagnostics.push({ model: 'perplexity', provider: 'perplexity', status: 'failed', error: error?.message || 'PUBLIC_WEB_RESEARCH_FAILED' });
+        }
+      }
+
+      const contactList = Array.isArray(contacts?.data) ? contacts.data : Array.isArray(contacts) ? contacts : [];
+      const interactionList = Array.isArray(interactions?.results) ? interactions.results : Array.isArray(interactions?.data) ? interactions.data : [];
+      const newsList = Array.isArray(apolloNews) ? apolloNews : [];
+      const publicCandidates = Array.isArray(publicPhone?.candidates) ? publicPhone.candidates : [];
+      const orgPhone = orgEnrichment?.phone || orgEnrichment?.raw_phone_number || null;
+
+      const topContacts = contactList.slice(0, 5).map((c) => {
+        const fullName = c?.name || [c?.firstName, c?.lastName].filter(Boolean).join(' ').trim();
+        const title = c?.title || c?.jobTitle || '';
+        const phone = c?.mobile || c?.workDirectPhone || c?.otherPhone || c?.companyPhone || c?.phone || '';
+        return [fullName, title, phone].filter(Boolean).join(' · ');
+      }).filter(Boolean);
+
+      const topInteractions = interactionList.slice(0, 3).map((item) => {
+        const text = item?.summary || item?.insightsSummary || item?.snippet || item?.transcriptSnippet || '';
+        return String(text).trim().slice(0, 220);
+      }).filter(Boolean);
+
+      const topNews = newsList.slice(0, 5).map((item) => {
+        const title = item?.title || 'Untitled';
+        const snippet = item?.snippet ? String(item.snippet).slice(0, 160) : '';
+        return snippet ? `- ${title}: ${snippet}` : `- ${title}`;
+      });
+
+      const topPhones = publicCandidates.slice(0, 3).map((item) => `${item.phone}${item.source ? ` (${item.source})` : ''}`);
+      const primaryPhone = topPhones[0] || orgPhone || 'Not found';
+      const companyLabel = account.name || accountName;
+
+      const narrative = [
+        `${firstName}, here is the deep-dive brief for ${companyLabel}.`,
+        account.contract_end_date ? `CRM shows the contract end date as **${account.contract_end_date}**.` : 'CRM does not currently show a contract end date.',
+        account.electricity_supplier ? `CRM supplier: **${account.electricity_supplier}**.` : 'CRM supplier is not populated.',
+        account.domain ? `CRM domain: **${account.domain}**.` : '',
+        contactList.length ? `CRM contacts found: **${contactList.length}**.` : 'CRM contacts are missing.',
+        newsList.length ? `Apollo news is available and has been folded into the brief.` : 'No Apollo news surfaced for this account.',
+        webBrief ? `Public-web research was completed and merged into the brief.` : '',
+        '',
+        'What changed:',
+        account.contract_end_date ? `- Contract data is present.` : `- Contract data is still missing.`,
+        newsList.length ? `- Recent Apollo signals show activity around this account.` : `- Apollo signals are thin right now.`,
+        topInteractions.length ? `- CRM interactions suggest: ${topInteractions[0]}` : `- CRM interaction history is thin.`,
+        '',
+        'Who matters:',
+        topContacts.length ? topContacts.map((line) => `- ${line}`).join('\n') : '- No usable CRM contacts were found.',
+        '',
+        'Where else to look:',
+        account.metadata?.parentCompanyName ? `- Parent company clue: ${account.metadata.parentCompanyName}` : '',
+        account.metadata?.subsidiaryCompanyNames ? `- Subsidiaries: ${Array.isArray(account.metadata.subsidiaryCompanyNames) ? account.metadata.subsidiaryCompanyNames.join(', ') : String(account.metadata.subsidiaryCompanyNames)}` : '',
+        topPhones.length ? `- Public phone paths: ${topPhones.join(' | ')}` : `- Public phone paths were not confidently found.`,
+        accountCity || accountState ? `- Location clue: ${[accountCity, accountState].filter(Boolean).join(', ')}` : '',
+        '',
+        'Best next move:',
+        webBrief ? `- Use the web signals to validate office/location changes and open with a specific, recent trigger.` : `- Use the strongest CRM contact and ask for the current decision-maker or billing owner.`,
+      ].filter(Boolean).join('\n');
+
+      const brief = `${narrative}\n\nPublic web brief:\n${webBrief || 'No public-web brief returned.'}\n\nApollo news:\n${topNews.length ? topNews.join('\n') : '- No Apollo news found.'}\n\nCRM summary:\n- Account: ${companyLabel}\n- Contacts: ${contactList.length}\n- Interactions: ${interactionList.length}\n- Public phone candidate: ${primaryPhone}`;
+
+      diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        content: brief,
+        provider: 'grounded',
+        model: 'supabase',
+        diagnostics,
+      }));
+      return true;
+    };
+
     const routingDiagnostics = [];
     let lastErr = null;
     const bodyModel = (req.body.model || '').trim();
     console.log(`[AI Router] Incoming request - bodyModel: "${bodyModel}"`);
+
+    if (isDeepDiveIntent) {
+      try {
+        const handled = await buildDeepDiveBrief();
+        if (handled) return;
+      } catch (error) {
+        console.error('[AI Router] Deep dive workflow failed:', error);
+      }
+    }
 
     // 1. Determine target model and provider
     let targetModel = bodyModel;
