@@ -372,40 +372,32 @@ function FrontierLoader() {
   const status = thinkingStates[stateIndex] || thinkingStates[0]
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl px-4 py-4 shadow-[0_0_40px_rgba(0,47,167,0.08)]">
-      <div className="flex items-start gap-3 min-w-0">
-        <div className="relative h-12 w-12 rounded-[16px] border border-[#002FA7]/25 bg-[#002FA7]/10 flex items-center justify-center overflow-hidden shrink-0">
+    <div className="w-full max-w-lg rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl px-5 py-5 shadow-[0_0_40px_rgba(0,47,167,0.08)]">
+      <div className="flex items-center gap-4 min-w-0">
+        <div className="relative h-[72px] w-[72px] rounded-[20px] border border-[#002FA7]/25 bg-[#002FA7]/10 flex items-center justify-center overflow-hidden shrink-0">
           <motion.div
-            className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,47,167,0.38),transparent_68%)]"
-            animate={{ opacity: [0.2, 0.95, 0.2], scale: [0.92, 1, 0.92] }}
-            transition={{ duration: 1.7, repeat: Infinity, ease: [0.23, 1, 0.32, 1] }}
+            className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,47,167,0.34),transparent_72%)]"
+            animate={{ opacity: [0.28, 0.92, 0.28], scale: [0.92, 1, 0.92] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: [0.23, 1, 0.32, 1] }}
           />
           <motion.div
-            className="absolute h-2.5 w-2.5 rounded-sm bg-[#8fb3ff]"
-            animate={{ rotate: [0, 45, 90, 135, 180], scale: [1, 0.85, 1, 0.85, 1], opacity: [0.6, 1, 0.75, 1, 0.6] }}
-            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+            className="absolute inset-[10px] rounded-[16px] border border-white/10"
+            animate={{ rotate: [0, 12, 0, -12, 0], scale: [1, 1.01, 1, 1.01, 1] }}
+            transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
           />
-          {[0, 1, 2, 3].map((i) => (
-            <motion.span
-              key={i}
-              className="absolute h-1.5 w-1.5 rounded-[2px] bg-[#002FA7]"
-              style={{
-                top: i < 2 ? 6 : 'auto',
-                bottom: i >= 2 ? 6 : 'auto',
-                left: i % 2 === 0 ? 6 : 'auto',
-                right: i % 2 === 1 ? 6 : 'auto',
-              }}
-              animate={{
-                scale: [0.85, 1.2, 0.85],
-                opacity: [0.35, 1, 0.35],
-                y: i % 2 === 0 ? [0, -1, 0] : [0, 1, 0],
-              }}
-              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.12, ease: 'easeInOut' }}
-            />
-          ))}
+          <motion.div
+            className="absolute inset-[16px] rounded-[14px] border border-[#6ea0ff]/15"
+            animate={{ rotate: [0, -12, 0, 12, 0], scale: [1, 0.985, 1, 0.985, 1] }}
+            transition={{ duration: 4.5, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          <motion.div
+            className="absolute h-[22px] w-[22px] rounded-full bg-gradient-to-b from-[#9cbcff] to-[#002FA7] shadow-[0_0_0_0_rgba(0,47,167,0.5)]"
+            animate={{ boxShadow: ['0 0 0 0 rgba(0,47,167,0.45)', '0 0 0 18px rgba(0,47,167,0)', '0 0 0 0 rgba(0,47,167,0.45)'] }}
+            transition={{ duration: 1.7, repeat: Infinity, ease: 'easeOut' }}
+          />
         </div>
-        <div className="min-w-0">
-          <div className="text-[10px] font-mono uppercase tracking-[0.28em] text-[#002FA7]">{status.label}</div>
+        <div className="min-w-0 flex-1">
+          <div className="text-[10px] font-mono uppercase tracking-[0.3em] text-[#002FA7]">{status.label}</div>
           <div className="text-sm text-zinc-300 truncate">{status.line}</div>
         </div>
       </div>
