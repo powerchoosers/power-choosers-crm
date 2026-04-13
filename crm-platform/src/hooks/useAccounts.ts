@@ -163,56 +163,6 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
   }
 }
 
-function patchAccountListCache(old: any, accountPatch: Partial<Account> & { id: string }) {
-  if (!old?.pages) return old
-  return {
-    ...old,
-    pages: old.pages.map((page: any) => {
-      if (!page || !Array.isArray(page.accounts)) return page
-      return {
-        ...page,
-        accounts: page.accounts.map((account: Account) =>
-          account.id === accountPatch.id
-            ? { ...account, ...accountPatch }
-            : account
-        ),
-      }
-    }),
-  }
-}
-
-function patchLinkedAccountInContactCache(contact: any, accountPatch: Partial<Account> & { id: string }) {
-  if (!contact) return contact
-  const linkedAccountId = contact.linkedAccountId || contact.accountId
-  if (linkedAccountId !== accountPatch.id) return contact
-
-  const location = accountPatch.city || accountPatch.state
-    ? [accountPatch.city, accountPatch.state].filter(Boolean).join(', ')
-    : accountPatch.address
-
-  return {
-    ...contact,
-    company: accountPatch.name ?? contact.company,
-    companyName: accountPatch.name ?? contact.companyName,
-    companyDomain: accountPatch.domain ?? contact.companyDomain,
-    logoUrl: accountPatch.logoUrl ?? contact.logoUrl,
-    companyPhone: accountPatch.companyPhone ?? contact.companyPhone,
-    industry: accountPatch.industry ?? contact.industry,
-    website: accountPatch.domain ?? contact.website,
-    location: location || contact.location,
-    city: accountPatch.city ?? contact.city,
-    state: accountPatch.state ?? contact.state,
-    linkedAccountId: accountPatch.id,
-    accountId: accountPatch.id,
-    electricitySupplier: accountPatch.electricitySupplier ?? contact.electricitySupplier,
-    annualUsage: accountPatch.annualUsage ?? contact.annualUsage,
-    currentRate: accountPatch.currentRate ?? contact.currentRate,
-    contractEnd: accountPatch.contractEnd ?? contact.contractEnd,
-    serviceAddresses: accountPatch.serviceAddresses ?? contact.serviceAddresses,
-    accountDescription: accountPatch.description ?? contact.accountDescription,
-  }
-}
-
 function shouldInvalidateDealCaches(updates: Partial<Account>) {
   return Boolean(
     updates.name !== undefined ||
@@ -876,27 +826,12 @@ export function useUpdateAccount() {
       return { id, ...updates }
     },
     onSuccess: (data) => {
-      queryClient.setQueriesData({ queryKey: ['accounts'] }, (old: any) =>
-        patchAccountListCache(old, data)
-      )
       queryClient.setQueriesData({ predicate: queryPredicateById('account', data.id) }, (cached: any) =>
         cached?.id === data.id ? { ...cached, ...data } : cached
       )
-      queryClient.setQueriesData({ queryKey: ['contacts'] }, (old: any) => {
-        if (!old?.pages) return old
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => {
-            if (!page || !Array.isArray(page.contacts)) return page
-            return {
-              ...page,
-              contacts: page.contacts.map((contact: any) =>
-                patchLinkedAccountInContactCache(contact, data)
-              ),
-            }
-          }),
-        }
-      })
+      queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts', data.id] })
       // Avoid traversing all individual contact caches - only target contacts we know about if possible
       // queryClient.setQueriesData({ queryKey: ['contact'] }, ...)
 

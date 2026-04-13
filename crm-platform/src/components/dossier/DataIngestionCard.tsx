@@ -233,21 +233,23 @@ export default function DataIngestionCard({ accountId, onIngestionComplete }: Da
               }
             }, scanInterval);
 
-            // 3. Invalidate AND refetch account so dossier (meters, energy, docs, status) updates immediately
-            await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
-            await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId });
-            await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account-bill-intel' && q.queryKey[1] === accountId });
-            await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account-bill-intel' && q.queryKey[1] === accountId });
+            // 3. Refresh the current dossier first, then mark the broader lists stale without waiting on each one.
+            await Promise.all([
+              queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId }),
+              queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === accountId }),
+              queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account-bill-intel' && q.queryKey[1] === accountId }),
+              queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'account-bill-intel' && q.queryKey[1] === accountId }),
+            ])
 
-            // Refresh lists so Accounts and People tables show Customer/Client immediately
-            await queryClient.invalidateQueries({ queryKey: ['accounts'] });
-            await queryClient.invalidateQueries({ queryKey: ['contacts'] });
-            await queryClient.invalidateQueries({ queryKey: ['contact'] }); // invalidate single contact dossier
-            await queryClient.invalidateQueries({ queryKey: ['targets'] });
-            await queryClient.invalidateQueries({ queryKey: ['vault-documents'] });
+            // Refresh the wider lists in the background. These do not need to block the UI.
+            void queryClient.invalidateQueries({ queryKey: ['accounts'] })
+            void queryClient.invalidateQueries({ queryKey: ['contacts'] })
+            void queryClient.invalidateQueries({ queryKey: ['contact'] }) // invalidate single contact dossier
+            void queryClient.invalidateQueries({ queryKey: ['targets'] })
+            void queryClient.invalidateQueries({ queryKey: ['vault-documents'] })
             // Keep the signing dropdown in sync with the analyzed document tag.
-            await queryClient.invalidateQueries({ queryKey: ['signature-documents', accountId] });
-            await queryClient.invalidateQueries({ queryKey: ['deals'] });
+            void queryClient.invalidateQueries({ queryKey: ['signature-documents', accountId] })
+            void queryClient.invalidateQueries({ queryKey: ['deals'] })
 
             // Refresh document list again after AI (in case realtime was slow)
             await fetchDocuments();
