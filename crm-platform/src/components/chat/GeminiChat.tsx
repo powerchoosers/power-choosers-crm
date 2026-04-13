@@ -348,40 +348,66 @@ function Waveform() {
 }
 
 function FrontierLoader() {
+  const thinkingStates = useMemo(() => [
+    { label: 'Thinking', line: 'Reading context' },
+    { label: 'Coalescing', line: 'Pulling signals together' },
+    { label: 'Cross-checking', line: 'Verifying CRM and web data' },
+    { label: 'Reconciling', line: 'Sorting facts from inference' },
+    { label: 'Tracing', line: 'Following locations and people' },
+    { label: 'Mapping', line: 'Lining up the decision path' },
+    { label: 'Synthesizing', line: 'Shaping the brief' },
+    { label: 'Weighing', line: 'Choosing the strongest angle' },
+    { label: 'Drafting', line: 'Assembling the response' },
+    { label: 'Finalizing', line: 'Cleaning the last pass' },
+  ], [])
+  const [stateIndex, setStateIndex] = useState(() => Math.floor(Math.random() * thinkingStates.length))
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setStateIndex((current) => (current + 1) % thinkingStates.length)
+    }, 1100)
+    return () => window.clearInterval(timer)
+  }, [thinkingStates.length])
+
+  const status = thinkingStates[stateIndex] || thinkingStates[0]
+
   return (
-    <div className="w-full max-w-2xl rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl px-4 py-3 shadow-[0_0_40px_rgba(0,47,167,0.08)]">
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="relative h-10 w-10 rounded-2xl border border-[#002FA7]/25 bg-[#002FA7]/10 flex items-center justify-center overflow-hidden">
-            <motion.div
-              className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,47,167,0.38),transparent_70%)]"
-              animate={{ opacity: [0.35, 0.9, 0.35], scale: [0.92, 1, 0.92] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: [0.23, 1, 0.32, 1] }}
-            />
-            <Bot size={18} className="relative z-10 text-white" />
-          </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-mono uppercase tracking-[0.24em] text-[#002FA7]">Thinking</div>
-            <div className="text-sm text-zinc-300 truncate">Reading context, checking CRM, and preparing the next move.</div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {[0, 1, 2].map((i) => (
+    <div className="w-full max-w-md rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl px-4 py-4 shadow-[0_0_40px_rgba(0,47,167,0.08)]">
+      <div className="flex items-start gap-3 min-w-0">
+        <div className="relative h-12 w-12 rounded-[16px] border border-[#002FA7]/25 bg-[#002FA7]/10 flex items-center justify-center overflow-hidden shrink-0">
+          <motion.div
+            className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,47,167,0.38),transparent_68%)]"
+            animate={{ opacity: [0.2, 0.95, 0.2], scale: [0.92, 1, 0.92] }}
+            transition={{ duration: 1.7, repeat: Infinity, ease: [0.23, 1, 0.32, 1] }}
+          />
+          <motion.div
+            className="absolute h-2.5 w-2.5 rounded-sm bg-[#8fb3ff]"
+            animate={{ rotate: [0, 45, 90, 135, 180], scale: [1, 0.85, 1, 0.85, 1], opacity: [0.6, 1, 0.75, 1, 0.6] }}
+            transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+          {[0, 1, 2, 3].map((i) => (
             <motion.span
               key={i}
-              className="h-2 w-2 rounded-full bg-[#002FA7]"
-              animate={{ opacity: [0.25, 1, 0.25], y: [0, -2, 0] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+              className="absolute h-1.5 w-1.5 rounded-[2px] bg-[#002FA7]"
+              style={{
+                top: i < 2 ? 6 : 'auto',
+                bottom: i >= 2 ? 6 : 'auto',
+                left: i % 2 === 0 ? 6 : 'auto',
+                right: i % 2 === 1 ? 6 : 'auto',
+              }}
+              animate={{
+                scale: [0.85, 1.2, 0.85],
+                opacity: [0.35, 1, 0.35],
+                y: i % 2 === 0 ? [0, -1, 0] : [0, 1, 0],
+              }}
+              transition={{ duration: 1.4, repeat: Infinity, delay: i * 0.12, ease: 'easeInOut' }}
             />
           ))}
         </div>
-      </div>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/5">
-        <motion.div
-          className="h-full w-1/3 rounded-full bg-gradient-to-r from-transparent via-[#002FA7] to-transparent"
-          animate={{ x: ['-20%', '240%'] }}
-          transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-        />
+        <div className="min-w-0">
+          <div className="text-[10px] font-mono uppercase tracking-[0.28em] text-[#002FA7]">{status.label}</div>
+          <div className="text-sm text-zinc-300 truncate">{status.line}</div>
+        </div>
       </div>
     </div>
   )
