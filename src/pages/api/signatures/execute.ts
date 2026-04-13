@@ -8,6 +8,7 @@ import {
   inferSignatureRequestKindFromDocument,
   normalizeSignatureRequestKind,
 } from '@/lib/signature-request'
+import { signPdfDocument } from '@/lib/pdf-signing'
 
 export const config = {
     api: {
@@ -15,6 +16,157 @@ export const config = {
             sizeLimit: '10mb'
         }
     }
+}
+
+function getContactFullName(request: any) {
+    const contactFirstName = request.contact?.firstName || request.contact?.name?.split(' ')[0] || ''
+    const contactLastName = request.contact?.lastName || ''
+    return [contactFirstName, contactLastName].filter(Boolean).join(' ') || request.contact?.email || 'Contact'
+}
+
+async function applySignatureAppearance(
+    pdfDoc: PDFDocument,
+    request: any,
+    signatureBase64: string,
+    textValues: Record<string, string> | undefined
+) {
+    const pages = pdfDoc.getPages()
+    const lastPage = pages[pages.length - 1]
+    const base64Data = signatureBase64.replace(/^data:image\/(png|jpeg);base64,/, '')
+    const signatureImageBytes = Buffer.from(base64Data, 'base64')
+    const signatureImage = signatureBase64.includes('image/jpeg')
+        ? await pdfDoc.embedJpg(signatureImageBytes)
+        : await pdfDoc.embedPng(signatureImageBytes)
+    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
+
+    if (request.signature_fields && request.signature_fields.length > 0) {
+        request.signature_fields.forEach((field: any, index: number) => {
+            const targetPage = pages[field.pageIndex]
+            if (!targetPage) return
+
+            const pdfWidth = targetPage.getWidth()
+            const pdfHeight = targetPage.getHeight()
+            const scale = pdfWidth / 800
+
+            const scaledWidth = field.width * scale
+            const scaledHeight = field.height * scale
+            const scaledX = field.x * scale
+            const scaledY = field.y * scale
+            const pdfY = pdfHeight - scaledY - scaledHeight
+
+            if (field.type === 'text') {
+                const textKey = field.fieldId ?? String(index)
+                const textContent = (textValues && textValues[textKey]) ? textValues[textKey] : ''
+                targetPage.drawText(textContent, {
+                    x: scaledX + 5,
+                    y: pdfY + (scaledHeight / 3),
+                    size: 11,
+                    font: helvetica,
+                    color: rgb(0, 0, 0)
+                })
+            } else {
+                try {
+                    targetPage.drawImage(signatureImage, {
+                        x: scaledX,
+                        y: pdfY,
+                        width: scaledWidth,
+                        height: scaledHeight,
+                    })
+                } catch (err) {
+                    console.error('Failed to draw image field', err)
+                }
+            }
+        })
+        return
+    }
+
+    const sigDims = signatureImage.scaleToFit(200, 100)
+    lastPage.drawImage(signatureImage, {
+        x: 50,
+        y: 50,
+        width: sigDims.width,
+        height: sigDims.height,
+    })
+    lastPage.drawText(`Signed by: ${getContactFullName(request)}`, {
+        x: 50,
+        y: 40,
+        size: 10,
+        font: helvetica,
+        color: rgb(0, 0, 0)
+    })
+    lastPage.drawText(`Date: ${new Date().toUTCString()}`, {
+        x: 50,
+        y: 28,
+        size: 10,
+        font: helvetica,
+        color: rgb(0, 0, 0)
+    })
+}
+
+async function appendForensicAuditCertificate(
+    pdfDoc: PDFDocument,
+    request: any,
+    telemetries: any[] | undefined,
+    originalHash: string
+) {
+    const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
+    const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+    const certPage = pdfDoc.addPage([595.28, 841.89])
+    const certHeight = certPage.getHeight()
+
+    certPage.drawText('NODAL POINT | FORENSIC AUDIT CERTIFICATE', {
+        x: 50,
+        y: certHeight - 50,
+        size: 16,
+        font: helveticaBold,
+        color: rgb(0, 0.184, 0.655)
+    })
+
+    certPage.drawText(`Document ID: ${request.document.id}`, { x: 50, y: certHeight - 90, size: 10, font: helvetica })
+    certPage.drawText(`Original SHA-256 Hash: ${originalHash}`, { x: 50, y: certHeight - 110, size: 10, font: helvetica })
+    certPage.drawText(`Signer: ${request.contact?.email || 'Unknown'}`, { x: 50, y: certHeight - 130, size: 10, font: helvetica })
+
+    let activeCertPage = certPage
+    const CERT_LEFT = 50
+    const CERT_MIN_Y = 80
+    const CERT_ENTRY_HEIGHT = 52
+
+    let currentY = certHeight - 170
+    activeCertPage.drawText('TELEMETRY TIMELINE:', { x: CERT_LEFT, y: currentY, size: 12, font: helveticaBold })
+    currentY -= 20
+
+    if (telemetries) {
+        telemetries.forEach((t) => {
+            if (currentY < CERT_MIN_Y + CERT_ENTRY_HEIGHT) {
+                activeCertPage = pdfDoc.addPage([595.28, 841.89])
+                const contHeight = activeCertPage.getHeight()
+                activeCertPage.drawText('NODAL POINT | FORENSIC AUDIT CERTIFICATE (continued)', {
+                    x: CERT_LEFT,
+                    y: contHeight - 50,
+                    size: 10,
+                    font: helveticaBold,
+                    color: rgb(0, 0.184, 0.655)
+                })
+                currentY = contHeight - 80
+            }
+
+            activeCertPage.drawText(`[${new Date(t.created_at).toISOString()}] ACTION: ${t.action.toUpperCase()}`, { x: CERT_LEFT, y: currentY, size: 10, font: helveticaBold })
+            currentY -= 15
+            activeCertPage.drawText(`IP Address: ${t.ip_address || 'Unknown'}`, { x: CERT_LEFT + 20, y: currentY, size: 9, font: helvetica })
+            currentY -= 12
+            activeCertPage.drawText(`Device/OS: ${t.user_agent ? t.user_agent.substring(0, 80) : 'Unknown'}`, { x: CERT_LEFT + 20, y: currentY, size: 9, font: helvetica })
+            currentY -= 25
+        })
+    }
+
+    activeCertPage.drawText('This document is electronically signed and secured by Nodal Point.', {
+        x: CERT_LEFT,
+        y: 50,
+        size: 9,
+        font: helvetica,
+        color: rgb(0.4, 0.4, 0.4)
+    })
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -91,162 +243,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const pdfBuffer = await pdfData.arrayBuffer();
         const originalHash = crypto.createHash('sha256').update(Buffer.from(pdfBuffer)).digest('hex');
 
-        // 4. Modify PDF with pdf-lib
-        const pdfDoc = await PDFDocument.load(pdfBuffer);
-        const pages = pdfDoc.getPages();
-        const lastPage = pages[pages.length - 1];
-
         // File naming — hoisted early so customerFileName is available before cert pages are added
         const originalExt = request.document.name.split('.').pop();
         const originalNameNoExt = request.document.name.replace(`.${originalExt}`, '');
         const finalFileName = `${originalNameNoExt}_Signed_${Date.now()}.${originalExt}`;
         const customerFileName = `${originalNameNoExt}_Executed.${originalExt}`;
+        const executionTimestamp = new Date()
 
-        // 4a. Embed the signature image
-        const base64Data = signatureBase64.replace(/^data:image\/(png|jpeg);base64,/, "");
-        const signatureImageBytes = Buffer.from(base64Data, 'base64');
-        let signatureImage;
-        if (signatureBase64.includes('image/jpeg')) {
-            signatureImage = await pdfDoc.embedJpg(signatureImageBytes);
-        } else {
-            signatureImage = await pdfDoc.embedPng(signatureImageBytes);
-        }
+        const customerPdfDoc = await PDFDocument.load(pdfBuffer)
+        await applySignatureAppearance(customerPdfDoc, request, signatureBase64, textValues)
+        const customerPdfBytes = await signPdfDocument(customerPdfDoc, {
+            name: getContactFullName(request),
+            contactInfo: request.contact?.email || 'Unknown',
+            reason: `Customer executed ${kindConfig.documentLabel} through the Nodal Point secure portal`,
+            location: 'Texas, USA',
+            signingTime: executionTimestamp,
+            appName: 'Nodal Point CRM',
+        })
 
-        const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        const internalPdfDoc = await PDFDocument.load(pdfBuffer)
+        await applySignatureAppearance(internalPdfDoc, request, signatureBase64, textValues)
+        await appendForensicAuditCertificate(internalPdfDoc, request, telemetries || [], originalHash)
+        const finalPdfBytes = await signPdfDocument(internalPdfDoc, {
+            name: getContactFullName(request),
+            contactInfo: request.contact?.email || 'Unknown',
+            reason: `Forensic audit copy for ${kindConfig.documentLabel} execution`,
+            location: 'Texas, USA',
+            signingTime: executionTimestamp,
+            appName: 'Nodal Point CRM',
+        })
 
-        // Render signature according to all signature_fields if they exist, otherwise fallback to last page default
-        if (request.signature_fields && request.signature_fields.length > 0) {
-            request.signature_fields.forEach((field: any, index: number) => {
-                const targetPage = pages[field.pageIndex];
-                if (!targetPage) return;
-
-                const pdfWidth = targetPage.getWidth();
-                const pdfHeight = targetPage.getHeight();
-                const scale = pdfWidth / 800;
-
-                const scaledWidth = field.width * scale;
-                const scaledHeight = field.height * scale;
-                const scaledX = field.x * scale;
-                const scaledY = field.y * scale;
-                const pdfY = pdfHeight - scaledY - scaledHeight;
-
-                if (field.type === 'text') {
-                    const textKey = field.fieldId ?? String(index);
-                    const textContent = (textValues && textValues[textKey]) ? textValues[textKey] : '';
-                    targetPage.drawText(textContent, {
-                        x: scaledX + 5,
-                        y: pdfY + (scaledHeight / 3),
-                        size: 11,
-                        font: helvetica,
-                        color: rgb(0, 0, 0)
-                    });
-                } else {
-                    try {
-                        targetPage.drawImage(signatureImage, {
-                            x: scaledX,
-                            y: pdfY,
-                            width: scaledWidth,
-                            height: scaledHeight,
-                        });
-                    } catch (err) {
-                        console.error('Failed to draw image field', err);
-                    }
-                }
-            });
-        } else {
-            // Fallback for requests made before Phase 2
-            const sigDims = signatureImage.scaleToFit(200, 100);
-            lastPage.drawImage(signatureImage, {
-                x: 50,
-                y: 50,
-                width: sigDims.width,
-                height: sigDims.height,
-            });
-            lastPage.drawText(`Signed by: ${request.contact?.firstName || ''} ${request.contact?.lastName || request.contact?.name || ''}`, {
-                x: 50,
-                y: 40,
-                size: 10,
-                font: helvetica,
-                color: rgb(0, 0, 0)
-            });
-            lastPage.drawText(`Date: ${new Date().toUTCString()}`, {
-                x: 50,
-                y: 28,
-                size: 10,
-                font: helvetica,
-                color: rgb(0, 0, 0)
-            });
-        }
-
-        // 4b. Save customer copy BEFORE appending cert pages.
-        //     Customer receives a clean signed PDF — no forensic audit trail.
-        const customerPdfBytes = await pdfDoc.save();
-
-        // 4c. Create the Forensic Audit Certificate (internal copy only)
-        const certPage = pdfDoc.addPage([595.28, 841.89]);
-        const certWidth = certPage.getWidth();
-        const certHeight = certPage.getHeight();
-
-        certPage.drawText('NODAL POINT | FORENSIC AUDIT CERTIFICATE', {
-            x: 50,
-            y: certHeight - 50,
-            size: 16,
-            font: helveticaBold,
-            color: rgb(0, 0.184, 0.655)
-        });
-
-        certPage.drawText(`Document ID: ${request.document.id}`, { x: 50, y: certHeight - 90, size: 10, font: helvetica });
-        certPage.drawText(`Original SHA-256 Hash: ${originalHash}`, { x: 50, y: certHeight - 110, size: 10, font: helvetica });
-        certPage.drawText(`Signer: ${request.contact?.email || 'Unknown'}`, { x: 50, y: certHeight - 130, size: 10, font: helvetica });
-
-        let activeCertPage = certPage;
-        const CERT_LEFT = 50;
-        const CERT_MIN_Y = 80;
-        const CERT_ENTRY_HEIGHT = 52;
-
-        let currentY = certHeight - 170;
-        activeCertPage.drawText('TELEMETRY TIMELINE:', { x: CERT_LEFT, y: currentY, size: 12, font: helveticaBold });
-        currentY -= 20;
-
-        if (telemetries) {
-            telemetries.forEach((t) => {
-                if (currentY < CERT_MIN_Y + CERT_ENTRY_HEIGHT) {
-                    activeCertPage = pdfDoc.addPage([595.28, 841.89]);
-                    const contHeight = activeCertPage.getHeight();
-                    activeCertPage.drawText('NODAL POINT | FORENSIC AUDIT CERTIFICATE (continued)', {
-                        x: CERT_LEFT,
-                        y: contHeight - 50,
-                        size: 10,
-                        font: helveticaBold,
-                        color: rgb(0, 0.184, 0.655)
-                    });
-                    currentY = contHeight - 80;
-                }
-
-                activeCertPage.drawText(`[${new Date(t.created_at).toISOString()}] ACTION: ${t.action.toUpperCase()}`, { x: CERT_LEFT, y: currentY, size: 10, font: helveticaBold });
-                currentY -= 15;
-                activeCertPage.drawText(`IP Address: ${t.ip_address || 'Unknown'}`, { x: CERT_LEFT + 20, y: currentY, size: 9, font: helvetica });
-                currentY -= 12;
-                activeCertPage.drawText(`Device/OS: ${t.user_agent ? t.user_agent.substring(0, 80) : 'Unknown'}`, { x: CERT_LEFT + 20, y: currentY, size: 9, font: helvetica });
-                currentY -= 25;
-            });
-        }
-
-        activeCertPage.drawText('This document is electronically signed and secured by Nodal Point.', {
-            x: CERT_LEFT,
-            y: 50,
-            size: 9,
-            font: helvetica,
-            color: rgb(0.4, 0.4, 0.4)
-        });
-
-        // 5. Save final PDF (with cert) — this is the authoritative vault record
-        const finalPdfBytes = await pdfDoc.save();
-
-        // 6. Upload final PDF (with cert) to Supabase Storage
+        // 6. Upload both PDFs to Supabase Storage
         const accountFolder = request.account_id ?? 'unassigned';
-        const finalStoragePath = `accounts/${accountFolder}/${finalFileName}`;
+        const customerStoragePath = `accounts/${accountFolder}/${customerFileName}`;
+        const finalStoragePath = `accounts/${accountFolder}/audit/${finalFileName}`;
+
+        const { error: customerUploadError } = await supabaseAdmin.storage
+            .from('vault')
+            .upload(customerStoragePath, customerPdfBytes, { contentType: 'application/pdf' });
+
+        if (customerUploadError) {
+            throw new Error(`Failed to save executed document: ${customerUploadError.message}`);
+        }
 
         const { error: finalUploadError } = await supabaseAdmin.storage
             .from('vault')
@@ -256,15 +294,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             throw new Error(`Failed to save executed document: ${finalUploadError.message}`);
         }
 
-        // Insert new document record
+        // Insert new document record for the customer-facing signed PDF
         const { data: newDoc, error: docError } = await supabaseAdmin
             .from('documents')
             .insert({
                 account_id: request.account_id,
-                name: finalFileName,
-                size: `${(finalPdfBytes.length / 1024 / 1024).toFixed(2)} MB`,
+                name: customerFileName,
+                size: `${(customerPdfBytes.length / 1024 / 1024).toFixed(2)} MB`,
                 type: 'application/pdf',
-                storage_path: finalStoragePath,
+                storage_path: customerStoragePath,
                 url: ''
             })
             .select()
@@ -279,7 +317,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             .from('signature_requests')
             .update({
                 status: 'completed',
-                signed_document_path: finalStoragePath,
+                signed_document_path: customerStoragePath,
+                metadata: {
+                    ...(request.metadata || {}),
+                    auditDocumentPath: finalStoragePath,
+                    customerDocumentPath: customerStoragePath,
+                },
                 updated_at: new Date().toISOString()
             })
             .eq('id', request.id);
