@@ -12,10 +12,11 @@ import { useGeminiStore } from '@/store/geminiStore'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
 import { useContact } from '@/hooks/useContacts'
-import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
+import { useAccount, useUpdateAccount, useUpsertAccount } from '@/hooks/useAccounts'
 import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { DecryptionText } from '@/components/chat/DecryptionText'
 import { useTasks } from '@/hooks/useTasks'
 import { buildProtocolTaskMetadata } from '@/lib/protocol-context'
@@ -168,6 +169,105 @@ type SalesAnglesCardData = {
     url?: string
   }>
   nextMove?: string
+}
+
+type ApolloCompanyCardData = {
+  id?: string
+  name: string
+  domain?: string
+  logoUrl?: string
+  industry?: string
+  description?: string
+  city?: string
+  state?: string
+  country?: string
+  employees?: string | number
+  revenue?: string
+  companyPhone?: string
+  website?: string
+  linkedin?: string
+  initials?: string
+  status?: 'active' | 'risk' | 'new'
+  source?: string
+  confidence?: string
+  multipleLocations?: boolean
+  locationSummary?: string
+  accountCount?: number
+  contactCount?: number
+  sources?: Array<{
+    label?: string
+    url?: string
+  }>
+}
+
+type ApolloResultItem = {
+  kind: 'account' | 'contact'
+  id: string
+  name: string
+  title?: string
+  company?: string
+  domain?: string
+  logoUrl?: string
+  photoUrl?: string
+  initials?: string
+  city?: string
+  state?: string
+  location?: string
+  industry?: string
+  email?: string
+  phone?: string
+  linkedin?: string
+  confidence?: string
+  source?: string
+  status?: 'verified' | 'unverified' | 'matched' | 'new'
+}
+
+type ApolloResultStackData = {
+  title?: string
+  query?: string
+  summary?: string
+  company?: ApolloCompanyCardData
+  accounts?: ApolloResultItem[]
+  contacts?: ApolloResultItem[]
+  nextMove?: string
+  sources?: Array<{
+    label?: string
+    url?: string
+  }>
+}
+
+type NavigationChoice = {
+  kind?: 'contact' | 'account' | 'email'
+  id: string
+  label: string
+  path: string
+  subtitle?: string
+  initials?: string
+  logoUrl?: string
+  domain?: string
+  photoUrl?: string
+}
+
+type NavigationCommandData = {
+  commandId?: string
+  title?: string
+  targetType?: 'contact' | 'account' | 'email'
+  targetId?: string
+  targetLabel?: string
+  path?: string
+  subtitle?: string
+  source?: string
+  confidence?: string
+  autoOpen?: boolean
+  initials?: string
+  logoUrl?: string
+  domain?: string
+  photoUrl?: string
+  contactId?: string | null
+  contactName?: string | null
+  accountId?: string | null
+  accountName?: string | null
+  choices?: NavigationChoice[]
 }
 
 type ForensicDocument = {
@@ -675,6 +775,481 @@ function IdentityCardView({ card }: { card: IdentityCardData }) {
         {secondLine && <span className="text-[10px] font-mono text-zinc-500 truncate">{secondLine}</span>}
         <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Open dossier →</span>
       </div>
+    </motion.div>
+  )
+}
+
+function ApolloCompanyCardView({ card }: { card: ApolloCompanyCardData }) {
+  const router = useRouter()
+  const { mutateAsync: upsertAccount } = useUpsertAccount()
+  const [isSaving, setIsSaving] = useState(false)
+
+  const initials = card.initials ?? (card.name.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?')
+  const hasIcon = Boolean((card.logoUrl && card.logoUrl.trim()) || (card.domain && card.domain.trim()))
+  const subtitle = [
+    card.industry,
+    [card.city, card.state].filter(Boolean).join(', ') || card.locationSummary,
+    card.companyPhone,
+  ].filter(Boolean).join(' · ')
+  const sourceLabel = card.source || (card.confidence ? `Apollo ${card.confidence}` : 'Apollo')
+
+  const handleOpen = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+
+    if (isSaving) return
+
+    setIsSaving(true)
+    try {
+      const accountPayload = {
+        name: card.name,
+        domain: card.domain || '',
+        description: card.description || '',
+        logoUrl: card.logoUrl || '',
+        companyPhone: card.companyPhone || '',
+        employees: card.employees != null ? String(card.employees) : '',
+        revenue: card.revenue || '',
+        location: [card.city, card.state].filter(Boolean).join(', '),
+        city: card.city,
+        state: card.state,
+        linkedinUrl: card.linkedin || '',
+        metadata: {
+          source: 'gemini_chat_apollo',
+          apollo_company_card: card,
+        },
+      }
+
+      const saved = await upsertAccount({
+        ...(card.id ? { id: card.id } : {}),
+        ...(accountPayload as any),
+      })
+      if (saved?.id) {
+        router.push(`/network/accounts/${saved.id}`)
+      }
+    } catch (error) {
+      console.error('Apollo company add/open failed:', error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/90 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden border-[#002FA7]/20 hover:border-[#002FA7]/50 transition-colors"
+    >
+      <button
+        type="button"
+        onClick={handleOpen}
+        className="w-full text-left block"
+      >
+        <div className="p-4 flex items-start gap-4">
+          <div className="shrink-0 w-14 h-14 rounded-[14px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
+            {hasIcon ? (
+              <CompanyIcon
+                logoUrl={card.logoUrl}
+                domain={card.domain}
+                name={card.name}
+                size={56}
+                roundedClassName="rounded-[14px]"
+              />
+            ) : (
+              <span className="font-mono font-bold text-lg text-zinc-300">{initials}</span>
+            )}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em]">Apollo Company</div>
+                <h3 className="text-white font-semibold text-base truncate">{card.name}</h3>
+                {subtitle && <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">{subtitle}</p>}
+              </div>
+              <span className={cn(
+                'shrink-0 text-[9px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border',
+                card.multipleLocations ? 'bg-[#002FA7]/15 text-[#7db1ff] border-[#002FA7]/30' : 'bg-white/5 text-zinc-400 border-white/10'
+              )}>
+                {card.multipleLocations ? 'Multi-site' : 'Single site'}
+              </span>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {card.domain && (
+                <div className="rounded-xl border border-white/5 bg-black/30 p-2.5">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-zinc-500">Domain</div>
+                  <div className="mt-1 text-xs text-zinc-200 truncate">{card.domain}</div>
+                </div>
+              )}
+              {card.companyPhone && (
+                <div className="rounded-xl border border-white/5 bg-black/30 p-2.5">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-zinc-500">Phone</div>
+                  <div className="mt-1 text-xs text-zinc-200 truncate">{card.companyPhone}</div>
+                </div>
+              )}
+              {card.employees != null && String(card.employees).trim() && (
+                <div className="rounded-xl border border-white/5 bg-black/30 p-2.5">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-zinc-500">Employees</div>
+                  <div className="mt-1 text-xs text-zinc-200 truncate">{String(card.employees)}</div>
+                </div>
+              )}
+              {card.revenue && (
+                <div className="rounded-xl border border-white/5 bg-black/30 p-2.5">
+                  <div className="text-[8px] font-mono uppercase tracking-widest text-zinc-500">Revenue</div>
+                  <div className="mt-1 text-xs text-zinc-200 truncate">{card.revenue}</div>
+                </div>
+              )}
+            </div>
+
+            {card.description && (
+              <div className="mt-3 text-sm text-zinc-300 leading-snug line-clamp-3">
+                {card.description}
+              </div>
+            )}
+          </div>
+        </div>
+      </button>
+
+      <div className="px-4 py-3 border-t border-white/5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 truncate">{sourceLabel}</div>
+          <div className="text-[10px] font-mono text-zinc-600 truncate">
+            {card.locationSummary || [card.city, card.state].filter(Boolean).join(', ') || 'Location not resolved'}
+          </div>
+        </div>
+
+        <Button
+          size="sm"
+          className="h-8 font-mono text-[9px] uppercase tracking-widest px-3 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+          onClick={handleOpen}
+          disabled={isSaving}
+        >
+          {isSaving ? <Loader2 size={10} className="animate-spin" /> : 'Enrich & open'}
+        </Button>
+      </div>
+    </motion.div>
+  )
+}
+
+function ApolloResultStackView({ card }: { card: ApolloResultStackData }) {
+  const router = useRouter()
+  const accounts = Array.isArray(card.accounts) ? card.accounts : []
+  const contacts = Array.isArray(card.contacts) ? card.contacts : []
+  const total = accounts.length + contacts.length
+  const topCompany = card.company
+
+  const renderAccountRow = (item: ApolloResultItem) => {
+    const initials = item.initials ?? ((item.name.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()) || '?')
+    const hasIcon = Boolean((item.logoUrl && item.logoUrl.trim()) || (item.domain && item.domain.trim()))
+    const canOpen = Boolean(item.id && item.id.trim())
+
+    return (
+      <div key={`account-${item.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-start gap-3">
+        <div className="shrink-0 w-11 h-11 rounded-[12px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
+          {hasIcon ? (
+            <CompanyIcon
+              logoUrl={item.logoUrl}
+              domain={item.domain}
+              name={item.name}
+              size={44}
+              roundedClassName="rounded-[12px]"
+            />
+          ) : (
+            <span className="font-mono font-bold text-sm text-zinc-300">{initials}</span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-white text-sm font-semibold truncate">{item.name}</div>
+              <div className="text-[10px] font-mono text-zinc-500 truncate">
+                {[item.industry, item.location || [item.city, item.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+              </div>
+            </div>
+            <span className={cn(
+              'shrink-0 text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border',
+              canOpen ? 'bg-[#002FA7]/15 text-[#7db1ff] border-[#002FA7]/30' : 'bg-white/5 text-zinc-400 border-white/10'
+            )}>
+              {item.confidence || (canOpen ? 'Matched' : 'New')}
+            </span>
+          </div>
+          {item.source && <div className="mt-1 text-[10px] font-mono text-zinc-600 truncate">{item.source}</div>}
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (canOpen) router.push(`/network/accounts/${item.id}`)
+          }}
+          disabled={!canOpen}
+        >
+          Open
+        </Button>
+      </div>
+    )
+  }
+
+  const renderContactRow = (item: ApolloResultItem) => {
+    const initials = item.initials ?? ((item.name.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()) || '?')
+    const canOpen = Boolean(item.id && item.id.trim())
+
+    return (
+      <div key={`contact-${item.id}`} className="rounded-xl border border-white/10 bg-white/[0.03] p-3 flex items-start gap-3">
+        <ContactAvatar name={item.name} photoUrl={item.photoUrl || null} size={44} className="rounded-[12px]" textClassName="text-sm" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-white text-sm font-semibold truncate">{item.name}</div>
+              <div className="text-[10px] font-mono text-zinc-500 truncate">
+                {[item.title, item.company, item.location || [item.city, item.state].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
+              </div>
+            </div>
+            <span className={cn(
+              'shrink-0 text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border',
+              item.status === 'verified' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-zinc-400 border-white/10'
+            )}>
+              {item.status || 'contact'}
+            </span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-mono text-zinc-600">
+            {item.email && <span className="truncate">{item.email}</span>}
+            {item.phone && <span className="truncate">{item.phone}</span>}
+            {item.source && <span className="truncate">{item.source}</span>}
+          </div>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 px-3 font-mono text-[9px] uppercase tracking-widest text-zinc-300 hover:text-white hover:bg-white/5"
+          onClick={(e) => {
+            e.stopPropagation()
+            if (canOpen) router.push(`/network/contacts/${item.id}`)
+          }}
+          disabled={!canOpen}
+        >
+          Open
+        </Button>
+      </div>
+    )
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/90 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em]">Apollo Results</div>
+          <h4 className="text-sm font-semibold text-zinc-100 truncate">{card.title || card.summary || 'Matched Companies and Contacts'}</h4>
+        </div>
+        <div className="text-[9px] font-mono uppercase tracking-widest text-zinc-500 shrink-0">
+          {total} result{total === 1 ? '' : 's'}
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {topCompany && (
+          <ApolloCompanyCardView card={topCompany} />
+        )}
+
+        {accounts.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Accounts</div>
+            <div className="grid gap-2">
+              {accounts.map(renderAccountRow)}
+            </div>
+          </div>
+        )}
+
+        {contacts.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Contacts</div>
+            <div className="grid gap-2">
+              {contacts.map(renderContactRow)}
+            </div>
+          </div>
+        )}
+
+        {(card.summary || card.nextMove) && (
+          <div className="grid gap-3 md:grid-cols-2">
+            {card.summary && (
+              <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Summary</div>
+                <div className="text-sm text-zinc-200 leading-snug">{card.summary}</div>
+              </div>
+            )}
+            {card.nextMove && (
+              <div className="rounded-xl border border-[#002FA7]/20 bg-[#002FA7]/5 p-3">
+                <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest mb-1">Next Move</div>
+                <div className="text-sm text-zinc-200 leading-snug">{card.nextMove}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {card.sources && card.sources.length > 0 && (
+          <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-2">Sources</div>
+            <div className="space-y-1">
+              {card.sources.map((source, index) => (
+                <div key={`${source.label || source.url || index}`} className="text-[11px] text-zinc-300 truncate">
+                  {source.url ? (
+                    <a href={source.url} target="_blank" rel="noreferrer" className="underline decoration-white/20 underline-offset-2 hover:text-white">
+                      {source.label || source.url}
+                    </a>
+                  ) : (
+                    source.label || 'Source'
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
+function NavigationCommandView({ card }: { card: NavigationCommandData }) {
+  const router = useRouter()
+  const [isOpening, setIsOpening] = useState(false)
+  const openedRef = useRef(false)
+  const targetPath = typeof card.path === 'string' ? card.path.trim() : ''
+  const choices = Array.isArray(card.choices) ? card.choices : []
+  const choiceCount = choices.length
+  const targetLabel = card.targetLabel || card.title || 'Open record'
+  const autoKey = `nav-command:${card.commandId || [card.targetType, card.targetId, targetPath].filter(Boolean).join(':')}`
+
+  const runOpen = (path: string) => {
+    if (!path) return
+    router.push(path)
+  }
+
+  useEffect(() => {
+    if (!card.autoOpen || !targetPath || openedRef.current) return
+    if (typeof window === 'undefined') return
+    if (window.sessionStorage.getItem(autoKey) === '1') return
+
+    openedRef.current = true
+    window.sessionStorage.setItem(autoKey, '1')
+    setIsOpening(true)
+    runOpen(targetPath)
+  }, [autoKey, card.autoOpen, targetPath])
+
+  const icon = (() => {
+    if (card.targetType === 'email') {
+      return <Mail size={16} className="text-zinc-300" />
+    }
+    if (card.targetType === 'contact') {
+      return (
+        <ContactAvatar
+          name={card.contactName || targetLabel}
+          photoUrl={card.photoUrl || null}
+          size={34}
+          className="rounded-xl"
+          textClassName="text-[10px]"
+        />
+      )
+    }
+    if (card.targetType === 'account') {
+      const initials = card.initials || (targetLabel.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase() || '?')
+      if (card.logoUrl || card.domain) {
+        return (
+          <CompanyIcon
+            logoUrl={card.logoUrl}
+            domain={card.domain}
+            name={targetLabel}
+            size={34}
+            roundedClassName="rounded-xl"
+          />
+        )
+      }
+      return <span className="font-mono font-bold text-xs text-zinc-300">{initials}</span>
+    }
+    return <ArrowRight size={16} className="text-zinc-300" />
+  })()
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/90 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden border-[#002FA7]/20"
+    >
+      <div className="p-4 flex items-start gap-4">
+        <div className="shrink-0 w-11 h-11 rounded-[12px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
+          {icon}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em]">Agent Command</div>
+          <h3 className="text-white font-semibold text-base truncate">{card.title || `Open ${targetLabel}`}</h3>
+          <p className="text-zinc-500 text-xs font-mono truncate mt-0.5">
+            {card.subtitle || card.source || (card.autoOpen ? 'Opening now' : 'Ready to open')}
+          </p>
+        </div>
+
+        <div className="flex flex-col items-end gap-2">
+          <span className={cn(
+            'text-[8px] font-mono uppercase tracking-[0.22em] px-2 py-1 rounded-full border',
+            card.confidence === 'high' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-white/5 text-zinc-400 border-white/10'
+          )}>
+            {card.confidence || 'matched'}
+          </span>
+          {targetPath && !card.autoOpen && (
+            <Button
+              size="sm"
+              className="h-8 font-mono text-[9px] uppercase tracking-widest px-3 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+              onClick={() => runOpen(targetPath)}
+            >
+              Open
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {choiceCount > 0 && (
+        <div className="px-4 pb-4 space-y-2">
+          <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Choices</div>
+          <div className="grid gap-2">
+            {choices.map((choice) => {
+              const choiceIcon = choice.kind === 'email'
+                ? <Mail size={14} className="text-zinc-300" />
+                : choice.kind === 'contact'
+                  ? <ContactAvatar name={choice.label} photoUrl={choice.photoUrl || null} size={28} className="rounded-lg" textClassName="text-[9px]" />
+                  : (choice.logoUrl || choice.domain)
+                    ? <CompanyIcon logoUrl={choice.logoUrl} domain={choice.domain} name={choice.label} size={28} roundedClassName="rounded-lg" />
+                    : <span className="font-mono font-bold text-[10px] text-zinc-300">{choice.initials || choice.label.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase()}</span>
+
+              return (
+                <button
+                  key={choice.id}
+                  type="button"
+                  onClick={() => runOpen(choice.path)}
+                  className="w-full rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.06] hover:border-[#002FA7]/30 transition-colors p-3 flex items-center gap-3 text-left"
+                >
+                  <div className="shrink-0 w-8 h-8 rounded-lg bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
+                    {choiceIcon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm text-white font-medium truncate">{choice.label}</div>
+                    {choice.subtitle && <div className="text-[10px] font-mono text-zinc-500 truncate">{choice.subtitle}</div>}
+                  </div>
+                  <ArrowRight size={14} className="text-zinc-500 shrink-0" />
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {isOpening && (
+        <div className="px-4 pb-4 text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+          Opening in background...
+        </div>
+      )}
     </motion.div>
   )
 }
@@ -1221,6 +1796,18 @@ function ComponentRenderer({
     case 'identity_card': {
       if (!isRecord(data)) return null
       return <IdentityCardView card={data as IdentityCardData} />
+    }
+    case 'apollo_company_card': {
+      if (!isRecord(data)) return null
+      return <ApolloCompanyCardView card={data as ApolloCompanyCardData} />
+    }
+    case 'apollo_result_stack': {
+      if (!isRecord(data)) return null
+      return <ApolloResultStackView card={data as ApolloResultStackData} />
+    }
+    case 'navigation_command': {
+      if (!isRecord(data)) return null
+      return <NavigationCommandView card={data as NavigationCommandData} />
     }
     case 'decision_maker_card': {
       if (!isRecord(data)) return null
