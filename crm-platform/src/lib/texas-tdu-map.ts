@@ -320,6 +320,7 @@ export const TEXAS_TDU_BY_CITY: Record<string, readonly string[]> = {
   'honey grove': ['Oncor'],
   'hooks': ['CenterPoint'],
   'howe': ['Oncor'],
+  'houston': ['CenterPoint'],
   'hudson': ['CenterPoint'],
   'hughes springs': ['CenterPoint'],
   'huntsville': ['CenterPoint'],
