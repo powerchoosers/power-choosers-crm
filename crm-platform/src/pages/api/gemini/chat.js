@@ -2005,6 +2005,31 @@ Output rules:
       return `JSON_DATA:${JSON.stringify({ type, data })}END_JSON`;
     };
 
+    const stripNavigationPreamble = (text) => {
+      let q = normalizeSearchText(text);
+      q = q.replace(/^(?:please\s+)?(?:open|go to|take me to|show me|pull up|jump to|navigate to|visit)\s+/i, '');
+      q = q.replace(/^(?:the\s+)?(?:contact|account|company|dossier|page|record|profile)\s+(?:for|of)\s+/i, '');
+      q = q.replace(/\s+(?:page|dossier|record|profile|thread)\s*$/i, '');
+      q = q.replace(/\s+(?:page|dossier|record|profile|thread)\s+(?:for|of)\s+/i, ' ');
+      q = q.replace(/\s+/g, ' ').trim();
+      return q;
+    };
+
+    const normalizeLookupKey = (text) => normalizeSearchText(text).toLowerCase();
+
+    const matchesLookupKey = (name, query) => {
+      const n = normalizeLookupKey(name);
+      const q = normalizeLookupKey(query);
+      if (!n || !q) return false;
+      return n === q || n.startsWith(q) || q.startsWith(n) || n.includes(q) || q.includes(n);
+    };
+
+    const buildNavigationCommand = (data) => buildJsonBlock('navigation_command', {
+      commandId: crypto.randomUUID(),
+      autoOpen: true,
+      ...data,
+    });
+
     const parseYear = (text) => {
       const s = String(text || '');
       const m = s.match(/\b(19|20)\d{2}\b/);
@@ -2062,6 +2087,27 @@ Output rules:
             return { id: String(b.data.id), name: b.data.name ? String(b.data.name) : null };
           }
 
+          if (b.type === 'apollo_company_card' && b.data && b.data.id) {
+            return { id: String(b.data.id), name: b.data.name ? String(b.data.name) : null };
+          }
+
+          if (b.type === 'apollo_result_stack') {
+            const company = b.data && typeof b.data.company === 'object' ? b.data.company : null;
+            if (company && company.id) {
+              return { id: String(company.id), name: company.name ? String(company.name) : null };
+            }
+            const accounts = Array.isArray(b.data?.accounts) ? b.data.accounts : [];
+            if (accounts.length > 0 && accounts[0]?.id) {
+              return { id: String(accounts[0].id), name: accounts[0].name ? String(accounts[0].name) : null };
+            }
+          }
+
+          if (b.type === 'navigation_command' && b.data && typeof b.data === 'object') {
+            if (b.data.targetType === 'account' && b.data.accountId) {
+              return { id: String(b.data.accountId), name: b.data.accountName ? String(b.data.accountName) : (b.data.targetLabel ? String(b.data.targetLabel) : null) };
+            }
+          }
+
           if (b.type === 'hierarchy_card' && b.data && b.data.accountId) {
             return { id: String(b.data.accountId), name: b.data.accountName ? String(b.data.accountName) : null };
           }
@@ -2093,6 +2139,33 @@ Output rules:
               id: String(data.id),
               name: data.name ? String(data.name) : null,
               title: data.title ? String(data.title) : null,
+            };
+          }
+
+          if (b.type === 'apollo_result_stack') {
+            const contacts = Array.isArray(data.contacts) ? data.contacts : [];
+            if (contacts.length > 0 && contacts[0]?.id) {
+              return {
+                id: String(contacts[0].id),
+                name: contacts[0].name ? String(contacts[0].name) : null,
+                title: contacts[0].title ? String(contacts[0].title) : null,
+              };
+            }
+          }
+
+          if (b.type === 'navigation_command' && data.targetType === 'contact' && data.contactId) {
+            return {
+              id: String(data.contactId),
+              name: data.contactName ? String(data.contactName) : null,
+              title: null,
+            };
+          }
+
+          if (b.type === 'navigation_command' && data.targetType === 'email' && data.contactId) {
+            return {
+              id: String(data.contactId),
+              name: data.contactName ? String(data.contactName) : null,
+              title: null,
             };
           }
 
@@ -2390,20 +2463,27 @@ Output rules:
           return true;
         }
 
-        const rows = (records || []).map((r) => ({
-          id: r.id,
-          name: r.name,
-          location: `${r.city || ''}, ${r.state || ''}`.trim().replace(/^,/, '').trim() || 'Unknown',
+        const accounts = (records || []).map((r) => ({
+          kind: 'account',
+          id: String(r.id),
+          name: r.name || 'Unknown account',
+          city: r.city || undefined,
+          state: r.state || undefined,
+          location: `${r.city || ''}, ${r.state || ''}`.trim().replace(/^,/, '').trim() || undefined,
+          industry: r.industry || undefined,
+          domain: r.domain || undefined,
+          logoUrl: r.logo_url || r.logoUrl || undefined,
+          confidence: 'Matched',
         }));
 
-        const narrative = `${firstName}, I searched your CRM for accounts in ${city || ''}${state ? ' ' + state : ''}. These are the matching nodes.`;
-        const grid = buildJsonBlock('forensic_grid', {
+        const narrative = `${firstName}, I searched your CRM for accounts in ${city || ''}${state ? ' ' + state : ''}. I turned the matches into clickable cards.`;
+        const stack = buildJsonBlock('apollo_result_stack', {
           title: `Accounts in ${city || 'Location'}`,
-          columns: ['id', 'name', 'location'],
-          rows,
+          summary: accounts.length ? `Showing ${accounts.length} account${accounts.length === 1 ? '' : 's'} in this location.` : 'No matching accounts found.',
+          accounts,
         });
 
-        respondGrounded(`${narrative} ${grid}`, diagnostics);
+        respondGrounded(`${narrative} ${stack}`, diagnostics);
         return true;
       }
 
@@ -2413,20 +2493,27 @@ Output rules:
         const records = expRes?.data ?? expRes ?? [];
         diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
 
-        const rows = (records || []).map((r) => ({
-          id: r.id,
-          name: r.name,
-          expiration: r.contract_end_date || 'Unknown',
+        const accounts = (records || []).map((r) => ({
+          kind: 'account',
+          id: String(r.id),
+          name: r.name || 'Unknown account',
+          city: r.city || undefined,
+          state: r.state || undefined,
+          location: `${r.city || ''}, ${r.state || ''}`.trim().replace(/^,/, '').trim() || undefined,
+          industry: r.industry || undefined,
+          domain: r.domain || undefined,
+          logoUrl: r.logo_url || r.logoUrl || undefined,
+          confidence: 'Matched',
         }));
 
-        const narrative = `${firstName}, I pulled accounts with contract expirations in ${year} directly from your CRM. If an expiration is missing in the record, it is labeled Unknown.`;
-        const grid = buildJsonBlock('forensic_grid', {
+        const narrative = `${firstName}, I pulled accounts with contract expirations in ${year} directly from your CRM. I grouped them into cards so you can open each record.`;
+        const stack = buildJsonBlock('apollo_result_stack', {
           title: `Accounts Expiring in ${year}`,
-          columns: ['id', 'name', 'expiration'],
-          rows,
+          summary: accounts.length ? `Showing ${accounts.length} account${accounts.length === 1 ? '' : 's'} with a contract end year of ${year}.` : `No accounts matched ${year}.`,
+          accounts,
         });
 
-        respondGrounded(`${narrative} ${grid}`, diagnostics);
+        respondGrounded(`${narrative} ${stack}`, diagnostics);
         return true;
       }
 
@@ -2589,14 +2676,25 @@ Output rules:
         }
 
         diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
-        const rows = records.map((r) => ({ id: r.id, name: r.name }));
-        const narrative = `${firstName}, I ran a grounded account search in your CRM for "${usedQuery}". Multiple accounts match; select one and ask for contract details.`;
-        const grid = buildJsonBlock('forensic_grid', {
+        const accounts = records.map((r) => ({
+          kind: 'account',
+          id: String(r.id),
+          name: r.name || 'Unknown account',
+          city: r.city || undefined,
+          state: r.state || undefined,
+          location: [r.city, r.state].filter(Boolean).join(', ') || undefined,
+          industry: r.industry || undefined,
+          domain: r.domain || undefined,
+          logoUrl: r.logo_url || r.logoUrl || undefined,
+          confidence: 'Matched',
+        }));
+        const narrative = `${firstName}, I ran a grounded account search in your CRM for "${usedQuery}". Multiple accounts match, so I grouped them into clickable cards instead of a plain list.`;
+        const stack = buildJsonBlock('apollo_result_stack', {
           title: `Accounts Matching "${usedQuery}"`,
-          columns: ['id', 'name'],
-          rows,
+          summary: `Showing ${accounts.length} matching account${accounts.length === 1 ? '' : 's'} from CRM.`,
+          accounts,
         });
-        respondGrounded(`${narrative} ${grid}`, diagnostics);
+        respondGrounded(`${narrative} ${stack}`, diagnostics);
         return true;
       }
 
@@ -2827,6 +2925,7 @@ Output rules:
         - When the answer is about parent/subsidiary relationships, return \`hierarchy_card\`.
         - When the answer is about a protocol or sequence, return \`protocol_card\` with the step summary, target contact/account, and selected node.
         - \`sequence_card\` is accepted as a backwards-compatible alias for \`protocol_card\`.
+        - When the user explicitly asks to open, go to, jump to, or pull up a specific contact, account, or email page, return a \`navigation_command\` JSON_DATA block with the resolved \`path\`, \`targetType\`, and \`targetId\`. If the match is ambiguous, return cards instead of guessing.
         - If you are unsure of the data, DO NOT trigger a component. Provide a text summary instead.
         - DO NOT put conversational text INSIDE the JSON block.
 
@@ -2908,6 +3007,10 @@ Output rules:
 
         RICH MEDIA PROTOCOL:
         - The user interface is a "Forensic HUD". Do NOT return Markdown tables. Do NOT respond to list-style queries (e.g. "accounts expiring in 2026", "manufacturers", "accounts with contract end dates", "list accounts") with ONLY a bulleted or numbered list in the narrative. You MUST include at least one JSON_DATA block: either multiple identity_card components (one per account/contact) or one forensic_grid. The user needs clickable cards or a grid to open dossiers.
+        - When a single company or strongest Apollo match should be presented as a rich company container, use:
+          JSON_DATA:{"type":"apollo_company_card","data":{"id":"...","name":"...","initials":"NP","domain":"...","logoUrl":"...","industry":"...","description":"...","city":"...","state":"...","employees":"...","revenue":"...","companyPhone":"...","multipleLocations":true,"locationSummary":"...","source":"Apollo + CRM","confidence":"high","sources":[{"label":"Apollo company","url":"..."}]}}END_JSON
+        - When multiple accounts or contacts come back and the user should see all of them as clickable cards, use:
+          JSON_DATA:{"type":"apollo_result_stack","data":{"title":"...","summary":"...","company":{"id":"...","name":"...","initials":"NP","domain":"...","logoUrl":"...","industry":"..."},"accounts":[{"kind":"account","id":"...","name":"...","initials":"NP","industry":"...","domain":"...","city":"...","state":"...","location":"...","logoUrl":"...","confidence":"matched"}],"contacts":[{"kind":"contact","id":"...","name":"...","initials":"NP","title":"...","company":"...","location":"...","photoUrl":"...","status":"verified","source":"..."}],"nextMove":"...","sources":[{"label":"...","url":"..."}]}}END_JSON
         - When providing energy news, use:
           JSON_DATA:{"type": "news_ticker", "data": {"items": [{"title": "...", "source": "...", "trend": "up|down", "volatility": "..."}]}}END_JSON
         - When providing prospect/person details (Dossier), use:
@@ -3285,6 +3388,7 @@ Output rules:
 
       const accountId = String(account.id || contextId || '');
       const accountName = String(account.name || contextData.accountName || contextData.name || 'Unknown account');
+      const accountMetadata = account.metadata || {};
       const accountDomain = normalizeDomain(account.domain || account.metadata?.domain || account.metadata?.website || '');
       const accountCity = account.city || account.metadata?.city || '';
       const accountState = account.state || account.metadata?.state || '';
@@ -3345,6 +3449,25 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
         return [fullName, title, phone].filter(Boolean).join(' · ');
       }).filter(Boolean);
 
+      const contactCards = contactList.slice(0, 5).map((c) => {
+        const fullName = c?.name || [c?.firstName, c?.lastName].filter(Boolean).join(' ').trim() || 'Unknown contact';
+        const companyName = c?.accounts?.name || c?.company || accountName;
+        const location = [c?.city, c?.state].filter(Boolean).join(', ') || undefined;
+        return {
+          kind: 'contact',
+          id: String(c?.id || ''),
+          name: fullName,
+          title: c?.title || c?.jobTitle || undefined,
+          company: companyName || undefined,
+          location,
+          photoUrl: c?.photoUrl || c?.photo_url || undefined,
+          status: c?.status === 'verified' ? 'verified' : 'matched',
+          email: c?.email || undefined,
+          phone: c?.mobile || c?.workDirectPhone || c?.otherPhone || c?.companyPhone || c?.phone || undefined,
+          source: 'CRM contact',
+        };
+      }).filter((item) => item.id);
+
       const topInteractions = interactionList.slice(0, 3).map((item) => {
         const text = item?.summary || item?.insightsSummary || item?.snippet || item?.transcriptSnippet || '';
         return String(text).trim().slice(0, 220);
@@ -3359,6 +3482,51 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
       const topPhones = publicCandidates.slice(0, 3).map((item) => `${item.phone}${item.source ? ` (${item.source})` : ''}`);
       const primaryPhone = topPhones[0] || orgPhone || 'Not found';
       const companyLabel = account.name || accountName;
+
+      const apolloCompanyCard = {
+        id: accountId || undefined,
+        name: companyLabel,
+        domain: accountDomain || undefined,
+        logoUrl: account.logo_url || account.logoUrl || accountMetadata?.logoUrl || undefined,
+        industry: account.industry || accountMetadata.industry || undefined,
+        description: account.description || accountMetadata.description || undefined,
+        city: accountCity || undefined,
+        state: accountState || undefined,
+        employees: account.employees || accountMetadata.employees || undefined,
+        revenue: account.revenue || accountMetadata.revenue || undefined,
+        companyPhone: orgPhone || primaryPhone || account.phone || undefined,
+        website: account.website || accountMetadata.website || undefined,
+        linkedin: account.linkedin_url || accountMetadata.linkedinUrl || undefined,
+        initials: String(companyLabel).split(/\s+/).map((n) => n[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+        multipleLocations: contactList.length > 1 || (Array.isArray(account?.metadata?.serviceAddresses) && account.metadata.serviceAddresses.length > 1),
+        locationSummary: [accountCity, accountState].filter(Boolean).join(', ') || undefined,
+        accountCount: 1,
+        contactCount: contactList.length,
+        source: orgEnrichment?.source || 'CRM + Apollo',
+        confidence: accountId ? 'high' : 'medium',
+        sources: [
+          accountDomain ? { label: 'CRM account', url: `https://${accountDomain}` } : null,
+          webBrief ? { label: 'Public web brief' } : null,
+          newsList.length > 0 ? { label: 'Apollo news signals' } : null,
+        ].filter(Boolean),
+      };
+
+      const apolloResultStack = {
+        title: `${companyLabel} intelligence`,
+        summary: [
+          account.contract_end_date ? `CRM contract end: ${account.contract_end_date}` : 'CRM contract end date is missing.',
+          contactCards.length ? `CRM contacts found: ${contactCards.length}` : 'No usable CRM contacts were found.',
+          topNews.length ? `Recent news exists for this account.` : 'No recent Apollo news surfaced.',
+        ].join(' '),
+        company: apolloCompanyCard,
+        contacts: contactCards,
+        nextMove: webBrief ? 'Use the public location and leadership signals to open with a concrete operating trigger.' : 'Use the strongest CRM contact and ask who owns the decision and the bill.',
+        sources: [
+          accountDomain ? { label: 'Company domain', url: `https://${accountDomain}` } : null,
+          orgPhone ? { label: `Apollo phone: ${orgPhone}` } : null,
+          publicCandidates[0]?.source ? { label: `Public source: ${publicCandidates[0].source}` } : null,
+        ].filter(Boolean),
+      };
 
       const narrative = [
         `${firstName}, here is the deep-dive brief for ${companyLabel}.`,
@@ -3388,16 +3556,314 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
       ].filter(Boolean).join('\n');
 
       const brief = `${narrative}\n\nPublic web brief:\n${webBrief || 'No public-web brief returned.'}\n\nApollo news:\n${topNews.length ? topNews.join('\n') : '- No Apollo news found.'}\n\nCRM summary:\n- Account: ${companyLabel}\n- Contacts: ${contactList.length}\n- Interactions: ${interactionList.length}\n- Public phone candidate: ${primaryPhone}`;
+      const stackBlock = buildJsonBlock('apollo_result_stack', apolloResultStack);
+      const companyBlock = buildJsonBlock('apollo_company_card', apolloCompanyCard);
 
       diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
-        content: brief,
+        content: `${brief}\n\n${companyBlock}\n${stackBlock}`,
         provider: 'grounded',
         model: 'supabase',
         diagnostics,
       }));
       return true;
+    };
+
+    const isNavigationIntent = /\b(open|go to|take me to|jump to|navigate to|pull up|visit)\b/i.test(prompt || '')
+      || (/\bshow me\b/i.test(prompt || '') && /\b(page|dossier|record|profile|thread)\b/i.test(prompt || ''))
+      || /\b(?:most recent|latest|last)\s+email\b/i.test(prompt || '');
+
+    const buildAgenticNavigation = async () => {
+      const diagnostics = [
+        { model: 'supabase', provider: 'grounded', status: 'attempting', reason: 'AGENTIC_NAVIGATION' }
+      ];
+
+      const requestContext = req.body?.context || {};
+      const contextData = requestContext && typeof requestContext.data === 'object' && requestContext.data !== null ? requestContext.data : {};
+      const contextType = requestContext?.type || 'general';
+      const contextId = typeof requestContext?.id === 'string' ? requestContext.id : null;
+      const promptText = String(prompt || '').trim();
+      const wantsEmail = /\b(?:most recent|latest|last)\s+email\b/i.test(promptText) || /\bemail\b/i.test(promptText);
+
+      let targetQuery = stripNavigationPreamble(promptText);
+      targetQuery = targetQuery.replace(/^(?:my\s+)?(?:most recent|latest|last)\s+email(?:\s+(?:with|from|to)\s+)?/i, '');
+      targetQuery = targetQuery.replace(/^email(?:\s+(?:with|from|to)\s+)?/i, '');
+      targetQuery = targetQuery.replace(/\b(?:page|dossier|record|profile|thread)\b/gi, ' ');
+      targetQuery = targetQuery.replace(/\b(?:my|the)\b/gi, ' ');
+      targetQuery = targetQuery.replace(/\s+/g, ' ').trim();
+
+      let contextContactId = contextType === 'contact' && contextId ? String(contextId) : null;
+      let contextAccountId = contextType === 'account' && contextId ? String(contextId) : null;
+      if (!contextAccountId && contextContactId) {
+        try {
+          const contactContext = await toolHandlers.get_contact_details({ contact_id: contextContactId });
+          contextAccountId = contactContext?.accountId || contactContext?.account_id || contactContext?.linked_account_id || contactContext?.linkedAccountId || contactContext?.accounts?.id || null;
+        } catch (error) {
+          console.warn('[Navigation] Failed to resolve context account from contact:', error?.message || error);
+        }
+      }
+
+      const baseQuery = targetQuery || String(contextData.contactName || contextData.accountName || contextData.name || '').trim();
+      if (!baseQuery && !contextContactId && !contextAccountId) return false;
+
+      const [contactRes, accountRes] = await Promise.all([
+        toolHandlers.list_contacts({
+          search: baseQuery || undefined,
+          accountId: contextAccountId || undefined,
+          limit: 5
+        }),
+        toolHandlers.list_accounts({
+          search: baseQuery || undefined,
+          limit: 5
+        })
+      ]);
+
+      const contactRecords = Array.isArray(contactRes?.data) ? contactRes.data : Array.isArray(contactRes) ? contactRes : [];
+      const accountRecords = Array.isArray(accountRes?.data) ? accountRes.data : Array.isArray(accountRes) ? accountRes : [];
+
+      const contactNameText = (contact) => [
+        contact?.name,
+        [contact?.firstName, contact?.lastName].filter(Boolean).join(' ').trim(),
+      ].find(Boolean) || '';
+
+      const exactContact = contactRecords.find((contact) => matchesLookupKey(contactNameText(contact), baseQuery));
+      const exactAccount = accountRecords.find((account) => matchesLookupKey(account?.name || '', baseQuery));
+      const hasExactContact = Boolean(exactContact);
+      const hasExactAccount = Boolean(exactAccount);
+      const chosenContact = exactContact || (contactRecords.length === 1 ? contactRecords[0] : null);
+      const chosenAccount = exactAccount || (accountRecords.length === 1 ? accountRecords[0] : null);
+
+      if (wantsEmail) {
+        let emailContact = chosenContact;
+
+        if (!emailContact && contextContactId) {
+          try {
+            emailContact = await toolHandlers.get_contact_details({ contact_id: contextContactId });
+          } catch (error) {
+            console.warn('[Navigation] Failed to resolve contact for email jump:', error?.message || error);
+          }
+        }
+
+        if (!emailContact && contactRecords.length === 1) {
+          emailContact = contactRecords[0];
+        }
+
+        if (emailContact?.id) {
+          const interactionRes = await toolHandlers.search_interactions({ contact_id: String(emailContact.id), limit: 1 });
+          const latestEmail = Array.isArray(interactionRes?.emails) ? interactionRes.emails[0] : null;
+
+          if (latestEmail?.id) {
+            const contactLabel = contactNameText(emailContact) || emailContact.name || 'Contact';
+            const accountLabel = emailContact?.accounts?.name || emailContact?.company || emailContact?.accountName || null;
+            const emailLabel = latestEmail.subject || `Email ${String(latestEmail.id).slice(0, 8)}`;
+            const emailDate = latestEmail.timestamp || latestEmail.createdAt || latestEmail.sentAt
+              ? new Date(latestEmail.timestamp || latestEmail.createdAt || latestEmail.sentAt).toLocaleDateString()
+              : '';
+
+            diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+            const command = buildNavigationCommand({
+              title: 'Opening latest email',
+              targetType: 'email',
+              targetId: String(latestEmail.id),
+              path: `/network/emails/${latestEmail.id}`,
+              targetLabel: emailLabel,
+              subtitle: [contactLabel, accountLabel, emailDate].filter(Boolean).join(' · '),
+              contactId: String(emailContact.id),
+              contactName: contactLabel,
+              accountId: emailContact?.accountId || emailContact?.accounts?.id || null,
+              accountName: accountLabel || null,
+              source: 'CRM email thread',
+              confidence: 'high',
+              initials: contactLabel.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+            });
+
+            const narrative = `${firstName}, I found the latest email and opened it in the background.`;
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+              content: `${narrative} ${command}`,
+              provider: 'grounded',
+              model: 'supabase',
+              diagnostics,
+            }));
+            return true;
+          }
+        }
+
+        if (hasExactContact && !hasExactAccount && chosenContact?.id) {
+          const contactLabel = contactNameText(chosenContact) || chosenContact.name || 'Contact';
+          const accountLabel = chosenContact?.accounts?.name || chosenContact?.company || chosenContact?.accountName || null;
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+          const command = buildNavigationCommand({
+            title: 'Opening contact page',
+            targetType: 'contact',
+            targetId: String(chosenContact.id),
+            path: `/network/contacts/${chosenContact.id}`,
+            targetLabel: contactLabel,
+            subtitle: accountLabel || chosenContact?.title || 'CRM contact',
+            contactId: String(chosenContact.id),
+            contactName: contactLabel,
+            accountId: chosenContact?.accountId || chosenContact?.accounts?.id || null,
+            accountName: accountLabel || null,
+            source: 'CRM contact search',
+            confidence: exactContact ? 'high' : 'medium',
+            initials: contactLabel.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+          });
+
+          const narrative = `${firstName}, I found the contact and opened the dossier.`;
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            content: `${narrative} ${command}`,
+            provider: 'grounded',
+            model: 'supabase',
+            diagnostics,
+          }));
+          return true;
+        }
+
+        if (hasExactAccount && !hasExactContact && chosenAccount?.id) {
+          const accountLabel = chosenAccount.name || 'Account';
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+          const command = buildNavigationCommand({
+            title: 'Opening account page',
+            targetType: 'account',
+            targetId: String(chosenAccount.id),
+            path: `/network/accounts/${chosenAccount.id}`,
+            targetLabel: accountLabel,
+            subtitle: [chosenAccount.industry, [chosenAccount.city, chosenAccount.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+            accountId: String(chosenAccount.id),
+            accountName: accountLabel,
+            source: 'CRM account search',
+            confidence: exactAccount ? 'high' : 'medium',
+            initials: String(accountLabel).split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+            logoUrl: chosenAccount.logo_url || chosenAccount.logoUrl || undefined,
+            domain: chosenAccount.domain || undefined,
+          });
+
+          const narrative = `${firstName}, I found the account and opened the page.`;
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            content: `${narrative} ${command}`,
+            provider: 'grounded',
+            model: 'supabase',
+            diagnostics,
+          }));
+          return true;
+        }
+
+        if (chosenContact?.id && !chosenAccount?.id) {
+          const contactLabel = contactNameText(chosenContact) || chosenContact.name || 'Contact';
+          const accountLabel = chosenContact?.accounts?.name || chosenContact?.company || chosenContact?.accountName || null;
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+          const command = buildNavigationCommand({
+            title: 'Opening contact page',
+            targetType: 'contact',
+            targetId: String(chosenContact.id),
+            path: `/network/contacts/${chosenContact.id}`,
+            targetLabel: contactLabel,
+            subtitle: accountLabel || chosenContact?.title || 'CRM contact',
+            contactId: String(chosenContact.id),
+            contactName: contactLabel,
+            accountId: chosenContact?.accountId || chosenContact?.accounts?.id || null,
+            accountName: accountLabel || null,
+            source: 'CRM contact search',
+            confidence: exactContact ? 'high' : 'medium',
+            initials: contactLabel.split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+          });
+
+          const narrative = `${firstName}, I found the contact and opened the dossier.`;
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            content: `${narrative} ${command}`,
+            provider: 'grounded',
+            model: 'supabase',
+            diagnostics,
+          }));
+          return true;
+        }
+
+        if (chosenAccount?.id && !chosenContact?.id) {
+          const accountLabel = chosenAccount.name || 'Account';
+          diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+          const command = buildNavigationCommand({
+            title: 'Opening account page',
+            targetType: 'account',
+            targetId: String(chosenAccount.id),
+            path: `/network/accounts/${chosenAccount.id}`,
+            targetLabel: accountLabel,
+            subtitle: [chosenAccount.industry, [chosenAccount.city, chosenAccount.state].filter(Boolean).join(', ')].filter(Boolean).join(' · '),
+            accountId: String(chosenAccount.id),
+            accountName: accountLabel,
+            source: 'CRM account search',
+            confidence: exactAccount ? 'high' : 'medium',
+            initials: String(accountLabel).split(/\s+/).map((part) => part[0]).filter(Boolean).join('').slice(0, 2).toUpperCase(),
+            logoUrl: chosenAccount.logo_url || chosenAccount.logoUrl || undefined,
+            domain: chosenAccount.domain || undefined,
+          });
+
+          const narrative = `${firstName}, I found the account and opened the page.`;
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            content: `${narrative} ${command}`,
+            provider: 'grounded',
+            model: 'supabase',
+            diagnostics,
+          }));
+          return true;
+        }
+      }
+
+      if (contactRecords.length > 1 || accountRecords.length > 1 || (contactRecords.length > 0 && accountRecords.length > 0)) {
+        diagnostics.push({ model: 'supabase', provider: 'grounded', status: 'success' });
+        const contacts = contactRecords.map((contact) => ({
+          kind: 'contact',
+          id: String(contact.id),
+          name: contactNameText(contact) || contact.name || 'Unknown contact',
+          title: contact.title || contact.jobTitle || undefined,
+          company: contact?.accounts?.name || contact.company || contextData.accountName || undefined,
+          location: [contact.city, contact.state].filter(Boolean).join(', ') || undefined,
+          photoUrl: contact.photoUrl || contact.photo_url || undefined,
+          status: 'matched',
+          source: 'CRM contact search',
+        })).filter((item) => item.id);
+
+        const accounts = accountRecords.map((account) => ({
+          kind: 'account',
+          id: String(account.id),
+          name: account.name || 'Unknown account',
+          city: account.city || undefined,
+          state: account.state || undefined,
+          location: [account.city, account.state].filter(Boolean).join(', ') || undefined,
+          industry: account.industry || undefined,
+          domain: account.domain || undefined,
+          logoUrl: account.logo_url || account.logoUrl || undefined,
+          confidence: 'matched',
+        }));
+
+        const stack = buildJsonBlock('apollo_result_stack', {
+          title: wantsEmail ? 'Choose a contact to open the latest email' : 'Multiple matches',
+          summary: wantsEmail
+            ? 'I found more than one person who could match that email request. Pick the right one and I will open the latest thread.'
+            : 'I found more than one possible record. Pick the one you want and I will open it.',
+          accounts,
+          contacts,
+          nextMove: wantsEmail
+            ? 'Choose the correct person or company to open the latest email thread.'
+            : 'Choose one record to open its page.',
+        });
+
+        const narrative = `${firstName}, I found multiple matches, so I am showing the cards instead of guessing.`;
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content: `${narrative} ${stack}`,
+          provider: 'grounded',
+          model: 'supabase',
+          diagnostics,
+        }));
+        return true;
+      }
+
+      return false;
     };
 
     const routingDiagnostics = [];
@@ -3411,6 +3877,15 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
         if (handled) return;
       } catch (error) {
         console.error('[AI Router] Deep dive workflow failed:', error);
+      }
+    }
+
+    if (isNavigationIntent) {
+      try {
+        const handled = await buildAgenticNavigation();
+        if (handled) return;
+      } catch (error) {
+        console.error('[AI Router] Agentic navigation workflow failed:', error);
       }
     }
 
