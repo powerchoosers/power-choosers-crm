@@ -8,6 +8,7 @@ import { useContactIdentityMapByIds } from '@/hooks/useContactIdentityMapByIds'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { EmailList } from '@/components/emails/EmailList'
+import { ScheduledEmailEditorModal } from '@/components/emails/ScheduledEmailEditorModal'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
 import { Plus } from 'lucide-react'
@@ -31,6 +32,8 @@ export default function EmailsPage() {
   const [scheduledActionState, setScheduledActionState] = useState<Record<string, string>>({})
   const [showTabSkeletonRows, setShowTabSkeletonRows] = useState(false)
   const [tabSkeletonFetchStarted, setTabSkeletonFetchStarted] = useState(false)
+  const [editingScheduledEmail, setEditingScheduledEmail] = useState<Email | null>(null)
+  const [isSavingScheduledEdit, setIsSavingScheduledEdit] = useState(false)
   const previousFilterRef = useRef(emailFilter)
 
   // Debounce search query
@@ -175,6 +178,145 @@ export default function EmailsPage() {
     }
   }
 
+  const saveScheduledEmailEdit = async (payload: { subject: string; html: string; text: string; scheduledSendTime: string }) => {
+    if (!editingScheduledEmail) return
+    setIsSavingScheduledEdit(true)
+    try {
+      const response = await fetch('/api/email/schedule-send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-email-id': editingScheduledEmail.id,
+        },
+        body: JSON.stringify({
+          to: Array.isArray(editingScheduledEmail.to) ? editingScheduledEmail.to.join(', ') : String(editingScheduledEmail.to || ''),
+          subject: payload.subject,
+          content: payload.text,
+          html: payload.html,
+          scheduledSendTime: payload.scheduledSendTime,
+          contactId: editingScheduledEmail.contactId || null,
+          accountId: editingScheduledEmail.accountId || null,
+          contactName: editingScheduledEmail?.metadata?.contactName || null,
+          contactCompany: editingScheduledEmail?.metadata?.contactCompany || null,
+          from: editingScheduledEmail.from || user?.email || undefined,
+          fromName: editingScheduledEmail?.metadata?.fromName || undefined,
+          attachments: editingScheduledEmail?.metadata?.attachments || [],
+          metadata: editingScheduledEmail?.metadata || {},
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to save scheduled email')
+      }
+
+      toast.success('Scheduled email updated')
+      setEditingScheduledEmail(null)
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save scheduled email')
+    } finally {
+      setIsSavingScheduledEdit(false)
+    }
+  }
+
+  const cancelScheduledEmail = async (email: Email) => {
+    setScheduledActionState(prev => ({ ...prev, [email.id]: 'cancel' }))
+    try {
+      const { error } = await supabase
+        .from('emails')
+        .update({
+          status: 'cancelled',
+          is_deleted: true,
+          updatedAt: new Date().toISOString(),
+          metadata: {
+            ...(email.metadata || {}),
+            cancelledAt: new Date().toISOString(),
+            cancelledBy: user?.email || null,
+          }
+        })
+        .eq('id', email.id)
+
+      if (error) throw error
+      toast.success('Schedule cancelled')
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to cancel schedule')
+    } finally {
+      setScheduledActionState(prev => {
+        const next = { ...prev }
+        delete next[email.id]
+        return next
+      })
+    }
+  }
+
+  const sendScheduledEmailNow = async (email: Email) => {
+    setScheduledActionState(prev => ({ ...prev, [email.id]: 'send_now' }))
+    try {
+      const response = await fetch('/api/email/zoho-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: Array.isArray(email.to) ? email.to.join(', ') : String(email.to || ''),
+          subject: email.subject,
+          content: email.html || email.text || '',
+          plainTextContent: email.text || '',
+          isHtmlEmail: Boolean(email.html),
+          userEmail: user?.email,
+          from: email.from || user?.email,
+          fromName: email?.metadata?.fromName || undefined,
+          contactId: email.contactId || undefined,
+          contactName: email?.metadata?.contactName || undefined,
+          contactCompany: email?.metadata?.contactCompany || undefined,
+          attachments: email?.metadata?.attachments || [],
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data?.error || 'Failed to send email now')
+      toast.success('Email sent')
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to send email now')
+    } finally {
+      setScheduledActionState(prev => {
+        const next = { ...prev }
+        delete next[email.id]
+        return next
+      })
+    }
+  }
+
+  const deleteScheduledEmail = async (email: Email) => {
+    setScheduledActionState(prev => ({ ...prev, [email.id]: 'delete' }))
+    try {
+      const { error } = await supabase
+        .from('emails')
+        .update({ is_deleted: true, updatedAt: new Date().toISOString() })
+        .eq('id', email.id)
+      if (error) throw error
+      toast.success('Scheduled email deleted')
+      queryClient.invalidateQueries({ queryKey: ['emails'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-count'] })
+      queryClient.invalidateQueries({ queryKey: ['emails-type-counts'] })
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to delete scheduled email')
+    } finally {
+      setScheduledActionState(prev => {
+        const next = { ...prev }
+        delete next[email.id]
+        return next
+      })
+    }
+  }
+
   const handleSelectionChange = (ids: Set<string>) => setSelectedIds(ids)
   const handleSelectCount = (count: number) => {
     const all = emails.slice(0, count).map(e => e.id)
@@ -296,6 +438,10 @@ export default function EmailsPage() {
           onGenerateScheduled={(email) => runScheduledReviewAction(email, 'generate')}
           onRegenerateScheduled={(email) => runScheduledReviewAction(email, 'regenerate')}
           onAcceptScheduled={(email) => runScheduledReviewAction(email, 'accept')}
+          onEditScheduled={(email) => setEditingScheduledEmail(email)}
+          onSendNowScheduled={sendScheduledEmailNow}
+          onCancelScheduled={cancelScheduledEmail}
+          onDeleteScheduled={deleteScheduledEmail}
           scheduledActionState={scheduledActionState}
           showSkeletonRows={showTabSkeletonRows}
           scrollContainerRef={scrollContainerRef}
@@ -315,6 +461,16 @@ export default function EmailsPage() {
         onClose={() => setIsDestructModalOpen(false)}
         onConfirm={handleConfirmDelete}
         count={selectedIds.size}
+      />
+
+      <ScheduledEmailEditorModal
+        email={editingScheduledEmail}
+        open={!!editingScheduledEmail}
+        saving={isSavingScheduledEdit}
+        onClose={() => setEditingScheduledEmail(null)}
+        onSave={saveScheduledEmailEdit}
+        onSendNow={() => editingScheduledEmail && sendScheduledEmailNow(editingScheduledEmail)}
+        onCancel={() => editingScheduledEmail && cancelScheduledEmail(editingScheduledEmail)}
       />
     </div>
   )

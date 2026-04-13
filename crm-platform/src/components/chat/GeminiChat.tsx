@@ -149,6 +149,27 @@ type ForensicGrid = {
   sourceLabel?: string
 }
 
+type SalesAnglesCardData = {
+  title?: string
+  accountName?: string
+  contactName?: string
+  hasMultipleLocations?: boolean
+  locationSummary?: string
+  primaryAngle?: string
+  angleReason?: string
+  angles?: Array<{
+    label?: string
+    angle?: string
+    why?: string
+    whenToUse?: string
+  }>
+  sources?: Array<{
+    label?: string
+    url?: string
+  }>
+  nextMove?: string
+}
+
 type ForensicDocument = {
   id: string
   name: string
@@ -859,6 +880,110 @@ function ProtocolCardView({ card }: { card: ProtocolCardData }) {
   )
 }
 
+function SalesAnglesCardView({ card }: { card: SalesAnglesCardData }) {
+  const title = card.title || 'Sales Angles'
+  const angles = Array.isArray(card.angles) ? card.angles : []
+  const sources = Array.isArray(card.sources) ? card.sources : []
+  const hasMulti = card.hasMultipleLocations === true
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="w-full max-w-2xl bg-zinc-950/80 nodal-module-glass nodal-monolith-edge rounded-2xl overflow-hidden"
+    >
+      <div className="px-4 py-3 border-b border-white/5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em]">Fieldwork Brief</div>
+          <h4 className="text-sm font-semibold text-zinc-100 truncate">{title}</h4>
+        </div>
+        <div className={cn(
+          'px-2 py-1 rounded-full text-[9px] font-mono uppercase tracking-widest border shrink-0',
+          hasMulti ? 'bg-[#002FA7]/15 text-[#7db1ff] border-[#002FA7]/30' : 'bg-white/5 text-zinc-400 border-white/10'
+        )}>
+          {hasMulti ? 'Multi-site' : 'Single site'}
+        </div>
+      </div>
+
+      <div className="p-4 space-y-4">
+        {(card.locationSummary || card.primaryAngle || card.angleReason) && (
+          <div className="grid gap-3 md:grid-cols-3">
+            {card.locationSummary && (
+              <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Locations</div>
+                <div className="text-sm text-zinc-200 leading-snug">{card.locationSummary}</div>
+              </div>
+            )}
+            {card.primaryAngle && (
+              <div className="rounded-xl border border-[#002FA7]/20 bg-[#002FA7]/5 p-3">
+                <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest mb-1">Best Angle</div>
+                <div className="text-sm text-zinc-100 leading-snug">{card.primaryAngle}</div>
+              </div>
+            )}
+            {card.angleReason && (
+              <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-1">Why It Fits</div>
+                <div className="text-sm text-zinc-300 leading-snug">{card.angleReason}</div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {angles.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">Recommended Angles</div>
+            <div className="grid gap-2">
+              {angles.map((angle, index) => (
+                <div key={index} className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest">
+                    {angle.label || `Angle ${index + 1}`}
+                  </div>
+                  <div className="text-sm text-zinc-100 mt-1">{angle.angle || angle.why || 'Use the evidence that is available.'}</div>
+                  {(angle.whenToUse || angle.why) && (
+                    <div className="mt-2 text-[11px] text-zinc-400 leading-snug">
+                      {angle.whenToUse ? <span className="text-zinc-300">When to use: </span> : null}
+                      {angle.whenToUse || angle.why}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(card.nextMove || sources.length > 0) && (
+          <div className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
+            {card.nextMove && (
+              <div className="rounded-xl border border-[#002FA7]/20 bg-[#002FA7]/5 p-3">
+                <div className="text-[9px] font-mono text-[#002FA7] uppercase tracking-widest mb-1">Next Move</div>
+                <div className="text-sm text-zinc-200 leading-snug">{card.nextMove}</div>
+              </div>
+            )}
+            {sources.length > 0 && (
+              <div className="rounded-xl border border-white/10 bg-black/30 p-3">
+                <div className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mb-2">Sources</div>
+                <div className="space-y-1">
+                  {sources.map((source, index) => (
+                    <div key={index} className="text-[11px] text-zinc-300 truncate">
+                      {source.url ? (
+                        <a href={source.url} target="_blank" rel="noreferrer" className="hover:text-white underline decoration-white/20 underline-offset-2">
+                          {source.label || source.url}
+                        </a>
+                      ) : (
+                        source.label || 'Source'
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  )
+}
+
 function BrokenCardFallback({ rawSegment, reason }: { rawSegment: string; reason?: string }) {
   const rawToCopy = `JSON_DATA:${rawSegment}END_JSON`
   const summary = summarizeBrokenCardPayload(rawSegment)
@@ -1092,6 +1217,10 @@ function ComponentRenderer({
     case 'sequence_card': {
       if (!isRecord(data)) return null
       return <ProtocolCardView card={data as ProtocolCardData} />
+    }
+    case 'sales_angles': {
+      if (!isRecord(data)) return null
+      return <SalesAnglesCardView card={data as SalesAnglesCardData} />
     }
     case 'flight_check': {
       if (!isRecord(data)) return null
@@ -1796,7 +1925,7 @@ export function GeminiChatPanel() {
       return [
         {
           label: 'Deep Dive',
-          prompt: 'Run a deep-dive forensic analysis for this account using CRM records, Apollo signals, and public web research together. Include recent company news, any other office or location clues, likely decision makers, public-facing phone or contact paths, and the most actionable next steps. Cite the source names in plain language and separate verified facts from likely inferences.'
+          prompt: 'Run a deep-dive forensic analysis for this account using CRM records, Apollo signals, and public web research together. Include recent company news, multiple locations or HQ clues, likely decision makers, public-facing phone or contact paths, and the most actionable next steps. Also tell me which sales angles are strongest based on the data, such as renewal timing, multi-site complexity, recent expansion, or HQ-vs-local decision making. Put the strongest recommendation into a dedicated sales angles card. Cite the source names in plain language and separate verified facts from likely inferences.'
         },
         {
           label: 'Phone Hunt',
@@ -1812,7 +1941,7 @@ export function GeminiChatPanel() {
       return [
         {
           label: 'Deep Dive',
-          prompt: 'Run a deep-dive forensic analysis for this contact and their company using CRM records, Apollo signals, and public web research together. Include recent company news, location clues, likely decision makers, alternate office or corporate numbers, and the most actionable next steps. Explain what is verified versus inferred.'
+          prompt: 'Run a deep-dive forensic analysis for this contact and their company using CRM records, Apollo signals, and public web research together. Include recent company news, multiple location or HQ clues, likely decision makers, alternate office or corporate numbers, and the most actionable next steps. Also recommend the strongest sales angles based on the evidence, such as renewal timing, multi-site complexity, recent expansion, or missing decision-maker coverage. Put the strongest recommendation into a dedicated sales angles card. Explain what is verified versus inferred.'
         },
         {
           label: 'Phone Hunt',

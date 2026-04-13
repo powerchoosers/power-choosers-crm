@@ -35,6 +35,7 @@ export default async function handler(req, res) {
   try {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : (req.body || {})
     const {
+      id: bodyId = null,
       to,
       cc,
       bcc,
@@ -52,6 +53,8 @@ export default async function handler(req, res) {
       attachments = [],
       metadata = {},
     } = body
+    const headerEditId = req.headers['x-email-id']
+    const editId = String(bodyId || headerEditId || '').trim() || null
 
     const sendAt = new Date(String(scheduledSendTime || '')).toISOString()
     if (!to || !subject || !(content || html)) {
@@ -60,7 +63,7 @@ export default async function handler(req, res) {
       return
     }
 
-    const id = crypto.randomUUID()
+    const id = editId || crypto.randomUUID()
     const nowIso = new Date().toISOString()
     const payload = {
       id,
