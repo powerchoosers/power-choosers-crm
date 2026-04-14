@@ -53,20 +53,20 @@ export default async function handler(req, res) {
     };
 
     let saved = false;
-    const now = new Date();
-    const hour = now.getHours();
-    const isAM = hour < 12;
-    const startOfBlock = new Date(now);
-    startOfBlock.setHours(isAM ? 0 : 12, 0, 0, 0);
-
+    
+    // Check if we already have a snapshot in the last 2 hours (avoid duplicates from cron)
+    const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+    
     const { data: existing } = await supabaseAdmin
       .from('market_telemetry')
-      .select('id')
-      .gte('created_at', startOfBlock.toISOString())
+      .select('id, created_at, metadata')
+      .gte('created_at', twoHoursAgo.toISOString())
+      .order('created_at', { ascending: false })
       .limit(1);
 
+    // Only save if no recent snapshot exists
     if (!existing || existing.length === 0) {
-      console.log('[ERCOT Snapshot] No existing block for today. Inserting...');
+      console.log('[ERCOT Snapshot] No recent snapshot found. Inserting...');
       const { error: insertError } = await supabaseAdmin.from('market_telemetry').insert({
         timestamp: combinedData.timestamp,
         prices: combinedData.prices,
@@ -78,9 +78,11 @@ export default async function handler(req, res) {
         throw insertError;
       }
       saved = true;
-      logger.info(`[ERCOT Snapshot] Logged market_telemetry for ${isAM ? 'AM' : 'PM'} block`, 'MarketData');
+      logger.info('[ERCOT Snapshot] Logged market_telemetry (manual trigger)', 'MarketData');
     } else {
-      console.log('[ERCOT Snapshot] Block already exists for today. Skipping insert.');
+      const lastSnapshot = existing[0];
+      const minutesAgo = Math.floor((now.getTime() - new Date(lastSnapshot.created_at).getTime()) / 60000);
+      console.log(`[ERCOT Snapshot] Recent snapshot exists from ${minutesAgo} minutes ago. Skipping insert.`);
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
