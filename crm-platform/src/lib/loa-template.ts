@@ -65,6 +65,22 @@ function getServiceRows(account: AnyRecord | null | undefined): LoaResolvedServi
       }))
     : []
 
+  const dedupeRows = (rows: LoaResolvedServiceRow[]) => {
+    const seen = new Set<string>()
+    return rows.filter((row) => {
+      const key = `${row.serviceAddress.toLowerCase()}|${row.esiId.toLowerCase()}`
+      if (!row.serviceAddress && !row.esiId) return false
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  }
+
+  const meterRows = dedupeRows(fromMeters)
+  if (meterRows.length > 0) {
+    return meterRows.slice(0, 3)
+  }
+
   const fromServiceAddresses = Array.isArray(account?.serviceAddresses)
     ? account.serviceAddresses.map((entry: AnyRecord) => ({
         serviceAddress: firstNonEmpty([
@@ -81,11 +97,7 @@ function getServiceRows(account: AnyRecord | null | undefined): LoaResolvedServi
       }))
     : []
 
-  const rows = [...fromMeters, ...fromServiceAddresses].filter(
-    (row) => row.serviceAddress || row.esiId
-  )
-
-  return rows.slice(0, 3)
+  return dedupeRows(fromServiceAddresses).slice(0, 3)
 }
 
 function resolveTdspChoice(account: AnyRecord | null | undefined, city: string, state: string, rawLocation: string): string {
