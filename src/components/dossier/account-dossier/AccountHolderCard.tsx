@@ -214,30 +214,30 @@ export function AccountHolderCard({
               {heroPhone && (
                 <button
                   onClick={handleCall}
-                  className="relative w-full group overflow-hidden text-left p-3.5 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_24px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
+                  className="relative w-full group overflow-hidden text-left px-3.5 py-3 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_24px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
                 >
-                  <div className="pointer-events-none absolute right-3 top-3 z-10">
-                    <SignalStrengthBadge score={heroPhoneSignal?.score} />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-start gap-3 min-w-0">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3 gap-y-0 items-start">
+                    <div className="col-start-1 row-start-1 flex items-start gap-3 min-w-0">
                       <heroPhoneInfo.icon className="w-4 h-4 text-white/70 group-hover:text-white transition-colors shrink-0 mt-0.5" />
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest leading-none">
-                          {heroPhoneInfo.label}
-                        </span>
-                        <div className="mt-0.5 flex items-center justify-between gap-3 min-w-0 w-full">
-                          <ForensicDataPoint
-                            value={formatPhoneNumber(heroPhone)}
-                            copyValue={heroPhone}
-                            valueClassName="text-[13px] font-mono tabular-nums text-white tracking-tight whitespace-nowrap leading-none"
-                            compact
-                            compactFill
-                            inline
-                          />
-                          <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
-                        </div>
-                      </div>
+                      <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest leading-none">
+                        {heroPhoneInfo.label}
+                      </span>
+                    </div>
+                    <div className="col-start-1 row-start-2 min-w-0">
+                      <ForensicDataPoint
+                        value={formatPhoneNumber(heroPhone)}
+                        copyValue={heroPhone}
+                        valueClassName="text-[13px] font-mono tabular-nums text-white tracking-tight whitespace-nowrap leading-none"
+                        compact
+                        compactFill
+                        inline
+                      />
+                    </div>
+                    <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
+                      <SignalStrengthBadge score={heroPhoneSignal?.score} />
+                    </div>
+                    <div className="col-start-2 row-start-2 justify-self-end self-center">
+                      <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
                     </div>
                   </div>
                 </button>
@@ -247,28 +247,28 @@ export function AccountHolderCard({
               {holder.email && (
                 <button
                   onClick={handleEmail}
-                  className="relative w-full group overflow-hidden text-left p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
+                  className="relative w-full group overflow-hidden text-left px-3 py-2.5 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
                 >
-                  <div className="pointer-events-none absolute right-3 top-3 z-10">
-                    <SignalStrengthBadge score={emailSignal?.score} />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-start gap-3 min-w-0">
+                  <div className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3 gap-y-0 items-start">
+                    <div className="col-start-1 row-start-1 flex items-start gap-3 min-w-0">
                       <Mail className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest leading-none">Email</span>
-                        <div className="mt-0.5 flex items-center justify-between gap-3 min-w-0 w-full">
-                          <ForensicDataPoint
-                            value={holder.email}
-                            copyValue={holder.email}
-                            valueClassName="text-xs text-zinc-400 group-hover:text-zinc-200 whitespace-nowrap leading-none"
-                            compact
-                            compactFill
-                            inline
-                          />
-                          <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
-                        </div>
-                      </div>
+                      <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest leading-none">Email</span>
+                    </div>
+                    <div className="col-start-1 row-start-2 min-w-0">
+                      <ForensicDataPoint
+                        value={holder.email}
+                        copyValue={holder.email}
+                        valueClassName="text-xs text-zinc-400 group-hover:text-zinc-200 whitespace-nowrap leading-none"
+                        compact
+                        compactFill
+                        inline
+                      />
+                    </div>
+                    <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
+                      <SignalStrengthBadge score={emailSignal?.score} />
+                    </div>
+                    <div className="col-start-2 row-start-2 justify-self-end self-center">
+                      <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                     </div>
                   </div>
                 </button>
