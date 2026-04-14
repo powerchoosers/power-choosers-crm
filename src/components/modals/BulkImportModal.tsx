@@ -18,6 +18,7 @@ import { formatPhoneNumber } from '@/lib/formatPhone';
 import { normalizeWebsiteForImport } from '@/lib/url';
 import { ForensicClose } from '@/components/ui/ForensicClose';
 import { isCsvFile } from '@/lib/file-ingestion';
+import { buildImportCommunicationSignals, pickBestSignal } from '@/lib/contact-signals';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -37,6 +38,7 @@ const CONTACT_FIELDS = [
   { id: 'mobile_phone', label: 'Mobile Phone', required: false },
   { id: 'work_direct', label: 'Work Direct', required: false },
   { id: 'other_phone', label: 'Other Phone', required: false },
+  { id: 'company_phone', label: 'Company Phone', required: false },
   { id: 'job_title', label: 'Position / Title', required: false },
   { id: 'city', label: 'City', required: false },
   { id: 'state', label: 'State', required: false },
@@ -424,6 +426,9 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           // Look up existing account by company name; if none, create a new account
           let linkedAccountId: string | undefined = undefined;
           const companyName = mappedData.company_name?.trim();
+          const communicationSignals = buildImportCommunicationSignals(row);
+          const bestEmail = pickBestSignal(communicationSignals.emails);
+          const bestPhone = pickBestSignal(communicationSignals.phones);
           
           if (companyName) {
             // Resolve domain from mapped field if available
@@ -550,11 +555,12 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             name: `${mappedData.first_name || ''} ${mappedData.last_name || ''}`.trim(),
             firstName: mappedData.first_name || '',
             lastName: mappedData.last_name || '',
-            email: mappedData.email || '',
-            phone: formatPhoneNumber(mappedData.phone) || '',
+            email: mappedData.email || bestEmail?.value || '',
+            phone: formatPhoneNumber(mappedData.phone || bestPhone?.value || '') || '',
             mobile: formatPhoneNumber(mappedData.mobile_phone) || '',
             workPhone: formatPhoneNumber(mappedData.work_direct) || '',
             otherPhone: formatPhoneNumber(mappedData.other_phone) || '',
+            companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
             status: 'Lead',
             company: companyName || '',
             accountId: linkedAccountId, // Link to existing account if found
@@ -566,10 +572,12 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
               linkedin_url: mappedData.linkedin_url,
               import_batch: new Date().toISOString(),
               enriched: isEnriching,
+              communicationSignals,
               // Keep original field names in metadata for backup
               mobile_phone: mappedData.mobile_phone,
               work_direct: mappedData.work_direct,
-              other_phone: mappedData.other_phone
+              other_phone: mappedData.other_phone,
+              company_phone: mappedData.company_phone,
             }
           };
 
@@ -1168,7 +1176,6 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
     </Dialog>
   );
 }
-
 
 
 
