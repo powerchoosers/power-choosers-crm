@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   PenTool,
@@ -11,6 +11,7 @@ import {
 } from 'lucide-react'
 import { useUIStore } from '@/store/uiStore'
 import { useAuth } from '@/context/AuthContext'
+import { useAccount } from '@/hooks/useAccounts'
 import { useAccountContacts, Contact } from '@/hooks/useContacts'
 import { useDealsByAccount } from '@/hooks/useDeals'
 import { supabase } from '@/lib/supabase'
@@ -21,6 +22,7 @@ import dynamic from 'next/dynamic'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
+import { buildLoaTemplateData, getLoaSignatureFieldDefaults } from '@/lib/loa-template'
 import {
   documentMatchesSignatureRequestKind,
   getSignatureRequestKindConfig,
@@ -51,6 +53,7 @@ export function SignatureRequestPanel() {
     useUIStore()
   const { user } = useAuth()
   const queryClient = useQueryClient()
+  const loaTemplateSeededRef = useRef<string | null>(null)
 
   const [selectedContactId, setSelectedContactId] = useState<string>('')
   const [selectedDealId, setSelectedDealId] = useState<string>('')
@@ -78,6 +81,7 @@ export function SignatureRequestPanel() {
     [requestKind]
   )
 
+  const { data: account } = useAccount(accountId)
   const { data: contacts, isLoading: loadingContacts } = useAccountContacts(accountId)
   const { data: deals, isLoading: loadingDeals } = useDealsByAccount(accountId)
 
@@ -102,9 +106,42 @@ export function SignatureRequestPanel() {
     },
   })
 
+  const selectedContact = useMemo(() => {
+    if (!contacts || contacts.length === 0) return null
+    return contacts.find((c) => c.id === selectedContactId) ?? contacts[0] ?? null
+  }, [contacts, selectedContactId])
+
+  const loaTemplateData = useMemo(() => {
+    if (requestKind !== 'LOE') return null
+    return buildLoaTemplateData({
+      account,
+      contact: selectedContact,
+      executionDate: new Date(),
+    })
+  }, [account, requestKind, selectedContact])
+
+  const prepInitialFields = useMemo(
+    () => (requestKind === 'LOE' ? getLoaSignatureFieldDefaults() : []),
+    [requestKind]
+  )
+
+  const prepInitialFieldValues = useMemo(() => {
+    if (!loaTemplateData) return {}
+    return {
+      ...loaTemplateData.fieldValues,
+      __tdspChoice: loaTemplateData.tdspChoice,
+    }
+  }, [loaTemplateData])
+
   const selectedDocument = useMemo(
-    () => signatureDocuments.find((d) => d.id === selectedDocumentId) ?? null,
-    [selectedDocumentId, signatureDocuments]
+    () => {
+      if (requestKind === 'LOE') {
+        const template = signatureDocuments.find((d) => d.metadata?.isLoaTemplate)
+        if (template) return template
+      }
+      return signatureDocuments.find((d) => d.id === selectedDocumentId) ?? null
+    },
+    [requestKind, selectedDocumentId, signatureDocuments]
   )
 
   useEffect(() => {
@@ -137,9 +174,73 @@ export function SignatureRequestPanel() {
 
     const selectedStillExists = signatureDocuments.some((doc) => doc.id === selectedDocumentId)
     if (!selectedStillExists) {
-      setSelectedDocumentId(signatureDocuments[0].id)
+      const template = signatureDocuments.find((doc) => doc.metadata?.isLoaTemplate)
+      setSelectedDocumentId((template || signatureDocuments[0]).id)
     }
   }, [selectedDocumentId, signatureDocuments])
+
+  useEffect(() => {
+    if (requestKind !== 'LOE' || !accountId) return
+    const template = signatureDocuments.find((doc) => doc.metadata?.isLoaTemplate)
+    if (template) {
+      setSelectedDocumentId(template.id)
+      return
+    }
+
+    if (loaTemplateSeededRef.current === accountId) return
+    loaTemplateSeededRef.current = accountId
+
+    void (async () => {
+      try {
+        setUploadingDocument(true)
+        const response = await fetch('/templates/texas_ercot_loa.pdf')
+        if (!response.ok) {
+          throw new Error('Built-in LOA template is missing from the app.')
+        }
+
+        const blob = await response.blob()
+        const file = new File([blob], 'TEXAS_Ercot_LOA.pdf', { type: 'application/pdf' })
+        const filePath = `accounts/${accountId}/templates/texas_ercot_loa.pdf`
+
+        const { error: uploadError } = await supabase.storage
+          .from('vault')
+          .upload(filePath, file, {
+            contentType: 'application/pdf',
+            upsert: true,
+          })
+
+        if (uploadError) throw uploadError
+
+        const { data: insertedDoc, error: insertError } = await supabase
+          .from('documents')
+          .insert({
+            account_id: accountId,
+            name: 'TEXAS_Ercot_LOA.pdf',
+            size: `${Math.max(file.size / 1024, 0.1).toFixed(1)} KB`,
+            type: 'application/pdf',
+            storage_path: filePath,
+            url: '',
+            document_type: 'LOE',
+            metadata: {
+              isLoaTemplate: true,
+              templateKey: 'texas_ercot_loa',
+              templateLabel: 'Texas ERCOT LOA',
+            },
+          })
+          .select('id, name, storage_path, created_at, document_type, metadata')
+          .single()
+
+        if (insertError || !insertedDoc) throw insertError
+        setSelectedDocumentId(insertedDoc.id)
+        setSignatureRequestContext(buildNextSignatureContext(insertedDoc as SignatureDocument))
+        await refetchDocuments()
+      } catch (error: any) {
+        toast.error(error?.message || 'Failed to seed LOA template')
+      } finally {
+        setUploadingDocument(false)
+      }
+    })()
+  }, [accountId, refetchDocuments, requestKind, selectedDocumentId, signatureDocuments, setSignatureRequestContext])
 
   const handleRequestKindChange = (kind: SignatureRequestKind) => {
     setRequestKind(kind)
@@ -287,7 +388,11 @@ export function SignatureRequestPanel() {
   const handleInitialSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!selectedDocument) {
+    const doc = requestKind === 'LOE'
+      ? (signatureDocuments.find((d) => d.metadata?.isLoaTemplate) || selectedDocument)
+      : selectedDocument
+
+    if (!doc) {
       toast.error('Please select a document first')
       return
     }
@@ -298,7 +403,7 @@ export function SignatureRequestPanel() {
 
     setIsPreparingDocument(true)
     try {
-      await hydrateDocumentUrl(selectedDocument)
+      await hydrateDocumentUrl(doc)
       setShowPrepModal(true)
     } catch (error: any) {
       toast.error(error?.message || 'Failed to prepare document for signing')
@@ -307,7 +412,7 @@ export function SignatureRequestPanel() {
     }
   }
 
-  const executeDispatch = async (signatureFields: any[]) => {
+  const executeDispatch = async (payload: { fields: any[]; values: Record<string, string> }) => {
     if (!signatureRequestContext?.documentId) {
       toast.error('No document selected')
       return
@@ -328,14 +433,15 @@ export function SignatureRequestPanel() {
           dealId: selectedDealId || undefined,
           userEmail: user?.email || 'test@nodalpoint.io',
           message,
-          signatureFields,
+          signatureFields: payload.fields,
+          signatureValues: payload.values,
           documentKind: requestKind,
         }),
       })
 
-      const result = await res.json()
+      const responseData = await res.json()
       if (!res.ok) {
-        throw new Error(result.error || 'Failed to dispatch request')
+        throw new Error(responseData.error || 'Failed to dispatch request')
       }
 
       toast.success(`${requestKindConfig.uiLabel} request dispatched successfully`, { id: toastId })
@@ -369,6 +475,8 @@ export function SignatureRequestPanel() {
         onComplete={executeDispatch}
         pdfUrl={signatureRequestContext?.documentUrl || ''}
         documentKind={requestKind}
+        initialFields={prepInitialFields}
+        initialFieldValues={prepInitialFieldValues}
       />
 
       <div className={panelTheme.header}>
@@ -448,7 +556,9 @@ export function SignatureRequestPanel() {
                   </Select>
                 ) : (
                   <div className="text-xs font-mono text-zinc-600">
-                    No {requestKindConfig.uiLabel} documents found for this account yet.
+                    {requestKind === 'LOE'
+                      ? 'Loading built-in LOA template...'
+                      : `No ${requestKindConfig.uiLabel} documents found for this account yet.`}
                   </div>
                 )}
 

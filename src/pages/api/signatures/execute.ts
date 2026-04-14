@@ -55,7 +55,7 @@ async function applySignatureAppearance(
 
             if (field.type === 'text') {
                 const textKey = field.fieldId ?? String(index)
-                const textContent = (textValues && textValues[textKey]) ? textValues[textKey] : ''
+                const textContent = field.value || (textValues && textValues[textKey]) || ''
                 targetPage.drawText(textContent, {
                     x: scaledX + 5,
                     y: pdfY + (scaledHeight / 3),
@@ -166,6 +166,61 @@ async function appendForensicAuditCertificate(
         font: helvetica,
         color: rgb(0.4, 0.4, 0.4)
     })
+}
+
+async function fillLoaTemplateFields(
+    pdfDoc: PDFDocument,
+    values: Record<string, string>,
+    selectedTdsp?: string | null
+) {
+    const form = pdfDoc.getForm()
+    const safeSetText = (name: string, value?: string | null) => {
+        const text = (value || '').trim()
+        try {
+            form.getTextField(name).setText(text)
+        } catch (error) {
+            console.warn(`[LOA] Missing text field: ${name}`)
+        }
+    }
+
+    const safeCheck = (name: string, shouldCheck: boolean) => {
+        try {
+            const field = form.getCheckBox(name)
+            if (shouldCheck) field.check()
+            else field.uncheck()
+        } catch (error) {
+            console.warn(`[LOA] Missing checkbox field: ${name}`)
+        }
+    }
+
+    safeSetText('Date', values.Date)
+    safeSetText('Text11', values.Text11)
+    safeSetText('Name printed', values['Name printed'])
+    safeSetText('Title', values.Title)
+    safeSetText('Email', values.Email)
+    safeSetText('Company', values.Company)
+    safeSetText('Billing Street Address', values['Billing Street Address'])
+    safeSetText('City, State, Zip', values['City, State, Zip'])
+    safeSetText('Telephone', values.Telephone)
+    safeSetText('Service Address', values['Service Address'])
+    safeSetText('ESI ID Number', values['ESI ID Number'])
+    safeSetText('Service Address 2', values['Service Address 2'])
+    safeSetText('ESI ID Number 2', values['ESI ID Number 2'])
+    safeSetText('Service Address 3', values['Service Address 3'])
+    safeSetText('ESI ID Number 3', values['ESI ID Number 3'])
+
+    safeCheck('Oncor', selectedTdsp === 'Oncor')
+    safeCheck('CenterPoint Energy', selectedTdsp === 'CenterPoint Energy')
+    safeCheck('Sharyland', selectedTdsp === 'Sharyland')
+    safeCheck('AEP', selectedTdsp === 'AEP')
+    safeCheck('TNMP', selectedTdsp === 'TNMP')
+    safeCheck('Nueces', selectedTdsp === 'Nueces')
+
+    try {
+        form.updateFieldAppearances()
+    } catch (error) {
+        console.warn('[LOA] Failed to update form appearances')
+    }
 }
 
 async function addExecutionSummaryPage(
@@ -323,28 +378,61 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
         const pdfBuffer = await pdfData.arrayBuffer();
         const originalHash = crypto.createHash('sha256').update(Buffer.from(pdfBuffer)).digest('hex');
+        const storedValues: Record<string, string> = {
+            ...((request.metadata?.signatureValues || {}) as Record<string, string>),
+            ...((textValues || {}) as Record<string, string>),
+        }
+        const executionTimestamp = new Date()
 
         // File naming — hoisted early so customerFileName is available before cert pages are added
         const originalExt = request.document.name.split('.').pop();
         const originalNameNoExt = request.document.name.replace(`.${originalExt}`, '');
         const finalFileName = `${originalNameNoExt}_Signed_${Date.now()}.${originalExt}`;
         const customerFileName = `${originalNameNoExt}_Executed.${originalExt}`;
-        const executionTimestamp = new Date()
+        const isLoeExecution = signatureKind === 'LOE'
 
         const customerPdfDoc = await PDFDocument.load(pdfBuffer)
-        await applySignatureAppearance(customerPdfDoc, request, signatureBase64, textValues)
-        await addExecutionSummaryPage(
-            customerPdfDoc,
-            request,
-            telemetries || [],
-            originalHash,
-            executionTimestamp,
-            kindConfig.documentLabel
-        )
+        if (isLoeExecution) {
+            await fillLoaTemplateFields(
+                customerPdfDoc,
+                storedValues,
+                storedValues.__tdspChoice || null
+            )
+            const customerForm = customerPdfDoc.getForm()
+            try {
+                customerForm.flatten()
+            } catch (error) {
+                console.warn('[LOA] Failed to flatten customer copy form')
+            }
+        }
+        await applySignatureAppearance(customerPdfDoc, request, signatureBase64, storedValues)
+        if (!isLoeExecution) {
+            await addExecutionSummaryPage(
+                customerPdfDoc,
+                request,
+                telemetries || [],
+                originalHash,
+                executionTimestamp,
+                kindConfig.documentLabel
+            )
+        }
         const customerPdfBytes = await customerPdfDoc.save({ useObjectStreams: false })
 
         const internalPdfDoc = await PDFDocument.load(pdfBuffer)
-        await applySignatureAppearance(internalPdfDoc, request, signatureBase64, textValues)
+        if (isLoeExecution) {
+            await fillLoaTemplateFields(
+                internalPdfDoc,
+                storedValues,
+                storedValues.__tdspChoice || null
+            )
+            const internalForm = internalPdfDoc.getForm()
+            try {
+                internalForm.flatten()
+            } catch (error) {
+                console.warn('[LOA] Failed to flatten internal copy form')
+            }
+        }
+        await applySignatureAppearance(internalPdfDoc, request, signatureBase64, storedValues)
         await appendForensicAuditCertificate(internalPdfDoc, request, telemetries || [], originalHash)
         const finalPdfBytes = await internalPdfDoc.save({ useObjectStreams: false })
 

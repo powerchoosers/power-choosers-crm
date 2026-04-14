@@ -11,6 +11,7 @@ import { DottedEmptyState } from '@/components/dossier/DottedEmptyState'
 import { supabase } from '@/lib/supabase'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { cn } from '@/lib/utils'
+import { parseAddressParts } from '@/lib/address'
 
 type RelationshipMode = 'PARENT' | 'SUBSIDIARY'
 
@@ -171,13 +172,20 @@ function mapAccountRow(row: any): RelatedAccount {
 
 function parseCityState(location?: string | null): { city: string; state: string } {
   if (!location) return { city: '', state: '' }
+  const parsed = parseAddressParts(location)
+  if (parsed.city || parsed.state) {
+    return {
+      city: parsed.city,
+      state: parsed.state,
+    }
+  }
+
   const parts = location.split(',').map((part) => part.trim()).filter(Boolean)
   if (parts.length === 0) return { city: '', state: '' }
   if (parts.length === 1) return { city: parts[0], state: '' }
-  const stateToken = parts[1].split(/\s+/)[0] || parts[1]
   return {
     city: parts[0],
-    state: stateToken
+    state: (parts[1].split(/\s+/)[0] || parts[1]).toUpperCase()
   }
 }
 
