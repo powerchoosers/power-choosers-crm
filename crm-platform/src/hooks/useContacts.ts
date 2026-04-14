@@ -7,9 +7,12 @@ import { queryPredicateById } from '@/lib/queryKeys'
 import { buildStatusIlikeClauses } from '@/lib/status-filters'
 import {
   type ContactAdditionalPhone,
+  type ContactPhoneBucket,
   type ContactSignalCollection,
   type ContactSignalEntry,
+  formatPhoneBucketLabel,
   getSignalForValue,
+  inferPhoneBucketFromText,
   normalizeSignalScore,
 } from '@/lib/contact-signals'
 
@@ -363,6 +366,12 @@ function extractAdditionalPhones(
 ): ContactAdditionalPhone[] {
   const out: ContactAdditionalPhone[] = []
   const seen = new Set<string>()
+  const bucketCounts: Record<ContactPhoneBucket, number> = {
+    mobile: 0,
+    workDirectPhone: 0,
+    otherPhone: 0,
+    companyPhone: 0,
+  }
 
   const addPhone = (number: string, type?: string, signal?: ContactSignalEntry | null) => {
     const cleanedNumber = cleanText(number)
@@ -370,9 +379,13 @@ function extractAdditionalPhones(
     const key = cleanedNumber
     if (seen.has(key)) return
     seen.add(key)
+    const bucket = inferPhoneBucketFromText(type, signal?.field, signal?.label, signal?.source)
+    bucketCounts[bucket] += 1
     out.push({
       number: cleanedNumber,
       type,
+      label: formatPhoneBucketLabel(bucket, bucketCounts[bucket]),
+      bucket,
       signalScore: signal?.score,
       signalLabel: signal?.label,
       signalSource: signal?.source,
