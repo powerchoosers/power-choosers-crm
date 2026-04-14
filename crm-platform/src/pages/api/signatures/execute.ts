@@ -398,12 +398,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 storedValues,
                 storedValues.__tdspChoice || null
             )
-            const customerForm = customerPdfDoc.getForm()
-            try {
-                customerForm.flatten()
-            } catch (error) {
-                console.warn('[LOA] Failed to flatten customer copy form')
-            }
         }
         await applySignatureAppearance(customerPdfDoc, request, signatureBase64, storedValues)
         if (!isLoeExecution) {
@@ -425,12 +419,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 storedValues,
                 storedValues.__tdspChoice || null
             )
-            const internalForm = internalPdfDoc.getForm()
-            try {
-                internalForm.flatten()
-            } catch (error) {
-                console.warn('[LOA] Failed to flatten internal copy form')
-            }
         }
         await applySignatureAppearance(internalPdfDoc, request, signatureBase64, storedValues)
         await appendForensicAuditCertificate(internalPdfDoc, request, telemetries || [], originalHash)
