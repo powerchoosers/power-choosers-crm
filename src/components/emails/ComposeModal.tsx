@@ -45,6 +45,9 @@ const TOOLBAR_COLORS = [
   '#002FA7',
 ]
 
+const CIRCLE_ICON_BUTTON_CLASS =
+  'h-8 w-8 shrink-0 rounded-full border border-white/20 bg-transparent text-white transition-all duration-300 hover:border-white/30 hover:bg-white/5 hover:text-white'
+
 export type EmailTypeId = 'cold_first_touch' | 'cold_followup' | 'professional' | 'followup' | 'post_call' | 'internal' | 'support'
 
 function EmailIframePreview({ content }: { content: string }) {
@@ -1141,7 +1144,7 @@ function ComposePanel({
     }
   }, [])
 
-  // Hidden file input for inserting images via the floating toolbar
+  // Hidden file input for inserting images from the footer button
   const toolbarImageInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -2467,22 +2470,50 @@ Return exactly one subject line.`,
                   </PopoverContent>
                 </Popover>
 
-                <div className="w-px h-4 bg-white/10 mx-1" />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-                <button
-                  onMouseDown={(e) => { e.preventDefault(); toolbarImageInputRef.current?.click() }}
-                  className="p-1.5 rounded-md hover:bg-white/10 text-zinc-400 transition-colors"
-                  title="Insert Image"
-                >
-                  <ImageIcon className="w-4 h-4" />
-                </button>
-                <input
-                  type="file"
-                  ref={toolbarImageInputRef}
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handleToolbarImageChange}
-                />
+        <AnimatePresence>
+          {schedulePopoverOpen && (
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="absolute left-4 right-4 md:left-auto md:right-4 md:w-[360px] bottom-[calc(4rem+8px)] z-50 backdrop-blur-xl bg-zinc-950/90 border border-white/10 rounded-lg shadow-2xl overflow-visible"
+            >
+              <div className="p-3 space-y-3">
+                <div>
+                  <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">Send time</div>
+                  <Input
+                    type="datetime-local"
+                    value={scheduledFor}
+                    min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                    onChange={(e) => setScheduledFor(e.target.value)}
+                    className="bg-white/5 border-white/10 text-zinc-100"
+                  />
+                </div>
+                <div className="flex items-start gap-2 text-[11px] text-zinc-400">
+                  <Clock3 className="w-3.5 h-3.5 mt-0.5 text-[#002FA7] shrink-0" />
+                  <p>
+                    This saves as a scheduled email in the Scheduled tab and the Supabase cron job sends it when the time hits.
+                  </p>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="ghost" onClick={() => setSchedulePopoverOpen(false)} className="text-zinc-400 hover:text-white hover:bg-white/5">
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleScheduleSend}
+                    disabled={isScheduling}
+                    className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white min-w-[124px]"
+                  >
+                    {isScheduling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CalendarClock className="w-4 h-4 mr-2" />}
+                    Schedule email
+                  </Button>
+                </div>
               </div>
             </motion.div>
           )}
@@ -2632,7 +2663,7 @@ Return exactly one subject line.`,
               variant="outline"
               size="icon"
               asChild
-              className="h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300"
+              className={CIRCLE_ICON_BUTTON_CLASS}
             >
               <label htmlFor="email-attachment-input" title="Attach Files" className="cursor-pointer">
                 <Paperclip className="w-4 h-4" />
@@ -2641,11 +2672,28 @@ Return exactly one subject line.`,
             <Button
               variant="outline"
               size="icon"
+              className={CIRCLE_ICON_BUTTON_CLASS}
+              onClick={() => toolbarImageInputRef.current?.click()}
+              title="Insert Image"
+              aria-label="Insert Image"
+            >
+              <ImageIcon className="w-4 h-4" />
+            </Button>
+            <input
+              type="file"
+              ref={toolbarImageInputRef}
+              className="hidden"
+              accept="image/*"
+              onChange={handleToolbarImageChange}
+            />
+            <Button
+              variant="outline"
+              size="icon"
               className={cn(
-                "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
+                CIRCLE_ICON_BUTTON_CLASS,
                 formattingOpen && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
               )}
-              onClick={() => { setFormattingOpen(f => !f); setAiRailOpen(false) }}
+              onClick={() => { setFormattingOpen(f => !f); setAiRailOpen(false); setSchedulePopoverOpen(false) }}
               title="Text Formatting"
             >
               <Type className={cn("h-4 w-4", formattingOpen && "fill-current")} />
@@ -2654,10 +2702,10 @@ Return exactly one subject line.`,
               variant="outline"
               size="icon"
               className={cn(
-                "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
+                CIRCLE_ICON_BUTTON_CLASS,
                 aiRailOpen && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
               )}
-              onClick={() => { setAiRailOpen(r => !r); setFormattingOpen(false) }}
+              onClick={() => { setAiRailOpen(r => !r); setFormattingOpen(false); setSchedulePopoverOpen(false) }}
               title="AI Assistant (Spark)"
             >
               <Sparkles className={cn("h-4 w-4", aiRailOpen && "fill-current")} />
@@ -2669,7 +2717,7 @@ Return exactly one subject line.`,
                   variant="outline"
                   size="icon"
                   className={cn(
-                    "h-8 w-8 rounded-full border-zinc-200 hover:bg-zinc-50 hover:text-[#002FA7] transition-all duration-300",
+                    CIRCLE_ICON_BUTTON_CLASS,
                     selectedFoundryId && "bg-zinc-50 text-[#002FA7] border-[#002FA7]/30 shadow-[0_0_10px_rgba(0,47,167,0.1)]"
                   )}
                   title="Foundry Template (Zap)"
@@ -2704,56 +2752,29 @@ Return exactly one subject line.`,
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
+            <Button
+              variant="outline"
+              size="icon"
+              className={cn(
+                CIRCLE_ICON_BUTTON_CLASS,
+                schedulePopoverOpen && "bg-white/5 border-white/40 shadow-[0_0_10px_rgba(255,255,255,0.08)]"
+              )}
+              onClick={() => {
+                setSchedulePopoverOpen((open) => !open)
+                setFormattingOpen(false)
+                setAiRailOpen(false)
+              }}
+              title="Schedule Email"
+              aria-label="Schedule Email"
+            >
+              <CalendarClock className="h-4 w-4" />
+            </Button>
             {isLoadingTemplate && <Loader2 className="w-4 h-4 animate-spin text-[#002FA7]" />}
           </div>
           <div className="flex items-center gap-2">
             <Button variant="ghost" onClick={onClose} className="text-zinc-400 hover:text-white hover:bg-white/5">
               Discard
             </Button>
-            <Popover open={schedulePopoverOpen} onOpenChange={setSchedulePopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="border-[#002FA7]/30 bg-[#002FA7]/10 text-zinc-100 hover:bg-[#002FA7]/20 min-w-[124px]"
-                >
-                  <CalendarClock className="w-4 h-4 mr-2 text-[#002FA7]" />
-                  Schedule
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" side="top" className="w-[320px] bg-zinc-950 border-white/10 nodal-monolith-edge p-4">
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 mb-1">Send time</div>
-                    <Input
-                      type="datetime-local"
-                      value={scheduledFor}
-                      min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
-                      onChange={(e) => setScheduledFor(e.target.value)}
-                      className="bg-white/5 border-white/10 text-zinc-100"
-                    />
-                  </div>
-                  <div className="flex items-start gap-2 text-[11px] text-zinc-400">
-                    <Clock3 className="w-3.5 h-3.5 mt-0.5 text-[#002FA7] shrink-0" />
-                    <p>
-                      This saves as a scheduled email in the Scheduled tab and the Supabase cron job sends it when the time hits.
-                    </p>
-                  </div>
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" onClick={() => setSchedulePopoverOpen(false)} className="text-zinc-400 hover:text-white hover:bg-white/5">
-                      Cancel
-                    </Button>
-                    <Button
-                      onClick={handleScheduleSend}
-                      disabled={isScheduling}
-                      className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white min-w-[124px]"
-                    >
-                      {isScheduling ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CalendarClock className="w-4 h-4 mr-2" />}
-                      Confirm
-                    </Button>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
             <Button
               onClick={handleSend}
               disabled={isSending}
