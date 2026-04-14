@@ -212,7 +212,7 @@ export default function TelemetryPage() {
           ERCOT Price History
         </h2>
         <p className="text-[9px] font-mono text-zinc-600 max-w-xl">
-          Historic settlement prices from stored snapshots. Data is logged when market pulse is saved (e.g. via Gemini, up to 2× per day). More points appear as snapshots accumulate.
+          Historic settlement prices captured automatically 4× daily at peak demand hours (7am, 12pm, 5pm, 10pm CT). Each snapshot represents actual real-time prices during critical market periods.
         </p>
         <div className="nodal-void-card overflow-hidden">
           {ercotHistoryError ? (
