@@ -214,24 +214,26 @@ export function AccountHolderCard({
               {heroPhone && (
                 <button
                   onClick={handleCall}
-                  className="w-full group flex items-center justify-between p-3.5 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_24px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
+                  className="w-full group flex items-start justify-between gap-3 p-3.5 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_24px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <heroPhoneInfo.icon className="w-4 h-4 text-white/70 group-hover:text-white transition-colors shrink-0" />
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <heroPhoneInfo.icon className="w-4 h-4 text-white/70 group-hover:text-white transition-colors shrink-0 mt-0.5" />
                     <div className="flex flex-col items-start min-w-0 flex-1">
-                      <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
-                        {heroPhoneInfo.label}
-                      </span>
-                      <div className="flex items-center gap-2 min-w-0 w-full">
+                      <div className="flex items-start justify-between gap-3 min-w-0 w-full">
+                        <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
+                          {heroPhoneInfo.label}
+                        </span>
+                        <SignalStrengthBadge score={heroPhoneSignal?.score} />
+                      </div>
+                      <div className="mt-1 min-w-0 w-full">
                         <ForensicDataPoint
                           value={formatPhoneNumber(heroPhone)}
                           copyValue={heroPhone}
-                          valueClassName="text-[13px] font-mono tabular-nums text-white tracking-tight truncate w-full"
+                          valueClassName="text-[13px] font-mono tabular-nums text-white tracking-tight whitespace-nowrap"
                           compact
                           compactFill
                           inline
                         />
-                        <SignalStrengthBadge score={heroPhoneSignal?.score} />
                       </div>
                     </div>
                   </div>
@@ -243,22 +245,24 @@ export function AccountHolderCard({
               {holder.email && (
                 <button
                   onClick={handleEmail}
-                  className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
+                  className="w-full group flex items-start justify-between gap-3 p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Mail className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
+                  <div className="flex items-start gap-3 min-w-0 flex-1">
+                    <Mail className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
                     <div className="flex flex-col items-start min-w-0 flex-1">
-                      <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">Email</span>
-                      <div className="flex items-center gap-2 min-w-0 w-full">
+                      <div className="flex items-start justify-between gap-3 min-w-0 w-full">
+                        <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">Email</span>
+                        <SignalStrengthBadge score={emailSignal?.score} />
+                      </div>
+                      <div className="mt-1 min-w-0 w-full">
                         <ForensicDataPoint
                           value={holder.email}
                           copyValue={holder.email}
-                          valueClassName="text-xs text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                          valueClassName="text-xs text-zinc-400 group-hover:text-zinc-200 whitespace-nowrap"
                           compact
                           compactFill
                           inline
                         />
-                        <SignalStrengthBadge score={emailSignal?.score} />
                       </div>
                     </div>
                   </div>
