@@ -8,6 +8,8 @@ import { useCallStore } from '@/store/callStore'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
+import { SignalStrengthBadge } from '@/components/ui/SignalStrengthBadge'
+import { type ContactSignalCollection, getSignalForValue } from '@/lib/contact-signals'
 
 interface UplinkCardProps {
   contact: ContactDetail
@@ -27,6 +29,9 @@ interface PhoneEntry {
   label: string
   value: string
   icon: typeof Smartphone
+  signalScore?: number
+  signalLabel?: string
+  signalSource?: string
 }
 
 interface AdditionalPhoneEntry {
@@ -34,6 +39,9 @@ interface AdditionalPhoneEntry {
   label: string
   value: string
   icon: typeof Smartphone
+  signalScore?: number
+  signalLabel?: string
+  signalSource?: string
 }
 
 export const UplinkCard: React.FC<UplinkCardProps> = ({
@@ -52,6 +60,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
   const [primaryField, setPrimaryField] = useState<PrimaryPhoneType>(contact.primaryPhoneField || 'mobile')
   const [email, setEmail] = useState(contact.email || '')
   const [localTime, setLocalTime] = useState('')
+  const communicationSignals = contact.communicationSignals as ContactSignalCollection | null | undefined
 
   // Update local time every minute (client-side only to avoid hydration mismatch)
   useEffect(() => {
@@ -111,20 +120,50 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
 
     // Add existing phones if they have values (Uplink shows mobile, workDirect, other, company)
     if (contact.mobile) {
-      phoneEntries.push({ id: 'mobile', label: 'Mobile', value: contact.mobile, icon: Smartphone })
+      phoneEntries.push({
+        id: 'mobile',
+        label: 'Mobile',
+        value: contact.mobile,
+        icon: Smartphone,
+        signalScore: getSignalForValue(communicationSignals, contact.mobile, 'phone')?.score,
+      })
     }
     if (contact.workDirectPhone) {
-      phoneEntries.push({ id: 'workDirectPhone', label: 'Work Direct', value: contact.workDirectPhone, icon: Landmark })
+      phoneEntries.push({
+        id: 'workDirectPhone',
+        label: 'Work Direct',
+        value: contact.workDirectPhone,
+        icon: Landmark,
+        signalScore: getSignalForValue(communicationSignals, contact.workDirectPhone, 'phone')?.score,
+      })
     }
     if (contact.otherPhone) {
-      phoneEntries.push({ id: 'otherPhone', label: 'Other', value: contact.otherPhone, icon: Phone })
+      phoneEntries.push({
+        id: 'otherPhone',
+        label: 'Other',
+        value: contact.otherPhone,
+        icon: Phone,
+        signalScore: getSignalForValue(communicationSignals, contact.otherPhone, 'phone')?.score,
+      })
     }
     if (contact.companyPhone) {
-      phoneEntries.push({ id: 'companyPhone', label: 'Company', value: contact.companyPhone, icon: Building2 })
+      phoneEntries.push({
+        id: 'companyPhone',
+        label: 'Company',
+        value: contact.companyPhone,
+        icon: Building2,
+        signalScore: getSignalForValue(communicationSignals, contact.companyPhone, 'phone')?.score,
+      })
     }
     // Fallback: contact.phone (e.g. from Org Intelligence before we set mobile) so Uplink always shows it
     if (phoneEntries.length === 0 && contact.phone) {
-      phoneEntries.push({ id: 'mobile', label: 'Phone', value: contact.phone, icon: Smartphone })
+      phoneEntries.push({
+        id: 'mobile',
+        label: 'Phone',
+        value: contact.phone,
+        icon: Smartphone,
+        signalScore: getSignalForValue(communicationSignals, contact.phone, 'phone')?.score,
+      })
     }
 
     // Ensure we have at least one entry for editing if empty
@@ -147,7 +186,10 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
           id: `extra-${idx}-${p.number}`,
           label: isMobile ? `Mobile ${idx + 2}` : isWork ? `Work Direct ${idx + 2}` : `Other ${idx + 2}`,
           value: p.number,
-          icon: isMobile ? Smartphone : isWork ? Landmark : Phone
+          icon: isMobile ? Smartphone : isWork ? Landmark : Phone,
+          signalScore: p.signalScore,
+          signalLabel: p.signalLabel,
+          signalSource: p.signalSource,
         } as AdditionalPhoneEntry
       })
 
@@ -217,6 +259,8 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
 
   // Get Hero Number (Primary)
   const heroPhone = phones.find(p => p.id === primaryField) || phones[0]
+  const heroPhoneSignal = heroPhone ? (heroPhone.value ? getSignalForValue(communicationSignals, heroPhone.value, 'phone') : null) : null
+  const emailSignal = email ? getSignalForValue(communicationSignals, email, 'email') : null
 
   return (
     <div className={`nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg ${isEditing ? 'border-[#002FA7]/30 ring-1 ring-[#002FA7]/20' : ''}`}>
@@ -333,11 +377,11 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                 onClick={() => handleCallClick(heroPhone)}
                 disabled={!heroPhone.value}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="relative">
-                    <heroPhone.icon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
-                    <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
-                  </div>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="relative">
+                  <heroPhone.icon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+                  <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
+                </div>
               <div className="flex flex-col items-start min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label}</span>
@@ -345,12 +389,17 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                         <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
                       )}
                     </div>
-                    <ForensicDataPoint
-                      value={heroPhone.value || 'No phone'}
-                      copyValue={heroPhone.value || undefined}
-                      valueClassName="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full"
-                      inline
-                    />
+                    <div className="flex items-center gap-2 min-w-0 w-full">
+                      <ForensicDataPoint
+                        value={heroPhone.value || 'No phone'}
+                        copyValue={heroPhone.value || undefined}
+                        valueClassName="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full"
+                        compact
+                        compactFill
+                        inline
+                      />
+                      <SignalStrengthBadge score={heroPhoneSignal?.score} />
+                    </div>
                   </div>
                 </div>
                 <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
@@ -384,12 +433,19 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                       <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                       <div className="flex flex-col items-start min-w-0 flex-1">
                         <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
-                        <ForensicDataPoint
-                          value={phone.value}
-                          copyValue={phone.value}
-                          valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
-                          inline
-                        />
+                        <div className="flex items-center gap-2 min-w-0 w-full">
+                          <ForensicDataPoint
+                            value={phone.value}
+                            copyValue={phone.value}
+                            valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                            compact
+                            compactFill
+                            inline
+                          />
+                          <SignalStrengthBadge
+                            score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
+                          />
+                        </div>
                       </div>
                     </div>
                     <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
@@ -406,12 +462,19 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                       <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                       <div className="flex flex-col items-start min-w-0 flex-1">
                         <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
-                        <ForensicDataPoint
-                          value={phone.value}
-                          copyValue={phone.value}
-                          valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
-                          inline
-                        />
+                        <div className="flex items-center gap-2 min-w-0 w-full">
+                          <ForensicDataPoint
+                            value={formatPhoneNumber(phone.value) || phone.value}
+                            copyValue={phone.value}
+                            valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                            compact
+                            compactFill
+                            inline
+                          />
+                          <SignalStrengthBadge
+                            score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
+                          />
+                        </div>
                       </div>
                     </div>
                     <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
@@ -440,12 +503,17 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                 <Mail className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                 <div className="flex flex-col items-start min-w-0 flex-1">
                   <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Electronic Mail</span>
-                  <ForensicDataPoint
-                    value={email || 'No email'}
-                    copyValue={email || undefined}
-                    valueClassName="text-sm text-zinc-400 group-hover:text-zinc-200 truncate w-full"
-                    inline
-                  />
+                  <div className="flex items-center gap-2 min-w-0 w-full">
+                    <ForensicDataPoint
+                      value={email || 'No email'}
+                      copyValue={email || undefined}
+                      valueClassName="text-sm text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                      compact
+                      compactFill
+                      inline
+                    />
+                    <SignalStrengthBadge score={emailSignal?.score} />
+                  </div>
                 </div>
               </div>
             </button>

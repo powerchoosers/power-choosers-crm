@@ -5,6 +5,13 @@ import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
 import { buildStatusIlikeClauses } from '@/lib/status-filters'
+import {
+  type ContactAdditionalPhone,
+  type ContactSignalCollection,
+  type ContactSignalEntry,
+  getSignalForValue,
+  normalizeSignalScore,
+} from '@/lib/contact-signals'
 
 export interface Contact {
   id: string
@@ -31,7 +38,8 @@ export interface Contact {
   otherPhone?: string
   companyPhone?: string
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
-  additionalPhones?: Array<{ number: string; type?: string }>
+  additionalPhones?: ContactAdditionalPhone[]
+  communicationSignals?: ContactSignalCollection | null
   metadata?: any
 }
 
@@ -66,7 +74,8 @@ export type ContactDetail = Contact & {
   otherPhone?: string
   companyPhone?: string
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone'
-  additionalPhones?: Array<{ number: string; type?: string }>
+  additionalPhones?: ContactAdditionalPhone[]
+  communicationSignals?: ContactSignalCollection | null
 }
 
 export function useDeleteContacts() {
@@ -191,6 +200,8 @@ type ContactMetadata = {
     avatarUrl?: string
     avatar_url?: string
   }
+  communicationSignals?: ContactSignalCollection | null
+  importCommunicationSignals?: ContactSignalCollection | null
 }
 
 type AccountJoin = {
@@ -301,30 +312,93 @@ function normalizeMetadata(value: ContactMetadata | string | null | undefined): 
   return value
 }
 
-function extractAdditionalPhones(metadata: ContactMetadata | null): Array<{ number: string; type?: string }> {
-  if (!metadata || !Array.isArray(metadata.apollo_revealed_phones)) return []
-  const out: Array<{ number: string; type?: string }> = []
+function normalizeSignalCollection(raw: unknown): ContactSignalCollection | null {
+  if (!raw || typeof raw !== 'object') return null
+
+  const source = raw as {
+    emails?: unknown
+    phones?: unknown
+  }
+
+  const normalizeEntry = (entry: unknown, kind: 'email' | 'phone'): ContactSignalEntry | null => {
+    if (!entry || typeof entry !== 'object') return null
+    const typed = entry as Record<string, unknown>
+    const value = cleanText(typed.value)
+    if (!value) return null
+    const score = normalizeSignalScore(typed.score)
+    return {
+      kind,
+      value,
+      key: kind === 'phone' ? value.replace(/\D/g, '') : value.toLowerCase(),
+      score: score ?? 0,
+      label: cleanText(typed.label) || undefined,
+      source: cleanText(typed.source) || undefined,
+      field: cleanText(typed.field) || undefined,
+      validation: cleanText(typed.validation) || undefined,
+      derived: typeof typed.derived === 'boolean' ? typed.derived : score == null,
+    }
+  }
+
+  const emails = Array.isArray(source.emails)
+    ? source.emails.map((entry) => normalizeEntry(entry, 'email')).filter((entry): entry is ContactSignalEntry => !!entry)
+    : []
+
+  const phones = Array.isArray(source.phones)
+    ? source.phones.map((entry) => normalizeEntry(entry, 'phone')).filter((entry): entry is ContactSignalEntry => !!entry)
+    : []
+
+  if (emails.length === 0 && phones.length === 0) return null
+
+  return { emails, phones }
+}
+
+function getContactSignals(metadata: ContactMetadata | null | undefined): ContactSignalCollection | null {
+  if (!metadata) return null
+  return normalizeSignalCollection(metadata.communicationSignals || metadata.importCommunicationSignals)
+}
+
+function extractAdditionalPhones(
+  metadata: ContactMetadata | null,
+  signals?: ContactSignalCollection | null
+): ContactAdditionalPhone[] {
+  const out: ContactAdditionalPhone[] = []
   const seen = new Set<string>()
 
-  metadata.apollo_revealed_phones.forEach((entry) => {
-    if (typeof entry === 'string') {
-      const number = cleanText(entry)
-      if (!number) return
-      const key = `${number}|`
-      if (seen.has(key)) return
-      seen.add(key)
-      out.push({ number })
-      return
-    }
-    if (!entry || typeof entry !== 'object') return
-    const number = cleanText(entry.number)
-    const type = cleanText(entry.type) || undefined
-    if (!number) return
-    const key = `${number}|${type || ''}`
+  const addPhone = (number: string, type?: string, signal?: ContactSignalEntry | null) => {
+    const cleanedNumber = cleanText(number)
+    if (!cleanedNumber) return
+    const key = cleanedNumber
     if (seen.has(key)) return
     seen.add(key)
-    out.push({ number, type })
-  })
+    out.push({
+      number: cleanedNumber,
+      type,
+      signalScore: signal?.score,
+      signalLabel: signal?.label,
+      signalSource: signal?.source,
+      signalKind: signal?.kind === 'phone' ? 'phone' : undefined,
+      signalDerived: signal?.derived,
+    })
+  }
+
+  if (metadata && Array.isArray(metadata.apollo_revealed_phones)) {
+    metadata.apollo_revealed_phones.forEach((entry) => {
+      if (typeof entry === 'string') {
+        addPhone(entry)
+        return
+      }
+      if (!entry || typeof entry !== 'object') return
+      const number = cleanText(entry.number)
+      const type = cleanText(entry.type) || undefined
+      addPhone(number, type)
+    })
+  }
+
+  if (signals?.phones?.length) {
+    signals.phones.forEach((entry) => {
+      addPhone(entry.value, entry.label || entry.field, entry)
+    })
+  }
 
   return out
 }
@@ -387,6 +461,7 @@ export function useAccountContacts(accountId: string) {
 
       return (data || []).map(row => {
         const metadata = normalizeMetadata((row as ContactRow).metadata)
+        const signals = getContactSignals(metadata)
         const fName = row.firstName || ''
         const lName = row.lastName || ''
         return {
@@ -407,7 +482,8 @@ export function useAccountContacts(accountId: string) {
           companyPhone: row.companyPhone || '',
           ownerId: row.ownerId || null,
           primaryPhoneField: normalizePrimaryPhoneField(row.primaryPhoneField),
-          additionalPhones: extractAdditionalPhones(metadata),
+          additionalPhones: extractAdditionalPhones(metadata, signals),
+          communicationSignals: signals,
           avatarUrl: resolveContactPhotoUrl(row, metadata),
           title: row.title || '',
           accountId: row.accountId,
@@ -593,6 +669,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         const contacts = (data as ContactRow[]).map(item => {
           const account = Array.isArray(item.accounts) ? item.accounts[0] : item.accounts
           const metadata = normalizeMetadata(item.metadata)
+          const signals = getContactSignals(metadata)
 
           const fName = item.firstName
             || item.first_name
@@ -638,7 +715,8 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             otherPhone: item.otherPhone || metadata?.otherPhone || '',
             companyPhone: item.companyPhone || '',
             primaryPhoneField: normalizePrimaryPhoneField(item.primaryPhoneField),
-            additionalPhones: extractAdditionalPhones(metadata),
+            additionalPhones: extractAdditionalPhones(metadata, signals),
+            communicationSignals: signals,
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.general?.company || '',
             companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
@@ -801,6 +879,7 @@ export function useContact(id: string) {
 
       let account = Array.isArray(typedData.accounts) ? typedData.accounts[0] : typedData.accounts
       const metadata = normalizeMetadata(typedData.metadata)
+      const signals = getContactSignals(metadata)
 
       // Fallback: If no account linked but metadata has company name, try to find it
       if (!account) {
@@ -878,7 +957,8 @@ export function useContact(id: string) {
         otherPhone: typedData.otherPhone || '',
         companyPhone: typedData.companyPhone || account?.phone || '',
         primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField),
-        additionalPhones: extractAdditionalPhones(metadata),
+        additionalPhones: extractAdditionalPhones(metadata, signals),
+        communicationSignals: signals,
         metadata
       } as ContactDetail
     },
