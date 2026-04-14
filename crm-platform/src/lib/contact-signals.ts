@@ -1,4 +1,5 @@
 export type ContactSignalKind = 'email' | 'phone'
+export type ContactPhoneBucket = 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
 
 export interface ContactSignalEntry {
   kind: ContactSignalKind
@@ -20,6 +21,8 @@ export interface ContactSignalCollection {
 export interface ContactAdditionalPhone {
   number: string
   type?: string
+  label?: string
+  bucket?: ContactPhoneBucket
   signalScore?: number
   signalLabel?: string
   signalSource?: string
@@ -116,6 +119,27 @@ function derivePhoneScore(args: {
   if (digits.length >= 15) score -= 12
 
   return clampScore(score)
+}
+
+export function inferPhoneBucketFromText(...parts: Array<string | null | undefined>): ContactPhoneBucket {
+  const combined = parts
+    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+    .join(' ')
+    .toLowerCase()
+
+  if (combined.includes('mobile')) return 'mobile'
+  if (combined.includes('company')) return 'companyPhone'
+  if (combined.includes('work') || combined.includes('direct')) return 'workDirectPhone'
+  return 'otherPhone'
+}
+
+export function formatPhoneBucketLabel(bucket: ContactPhoneBucket, index: number) {
+  const safeIndex = Math.max(1, Math.round(index))
+
+  if (bucket === 'mobile') return `Mobile ${safeIndex}`
+  if (bucket === 'workDirectPhone') return `Work Direct ${safeIndex}`
+  if (bucket === 'companyPhone') return `Company ${safeIndex}`
+  return `Other ${safeIndex}`
 }
 
 function parseSourceScore(source: unknown) {

@@ -9,7 +9,13 @@ import { formatPhoneNumber } from '@/lib/formatPhone'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { FieldSyncIndicator } from '@/components/ui/FieldSyncIndicator'
 import { SignalStrengthBadge } from '@/components/ui/SignalStrengthBadge'
-import { type ContactSignalCollection, getSignalForValue } from '@/lib/contact-signals'
+import {
+  type ContactPhoneBucket,
+  type ContactSignalCollection,
+  formatPhoneBucketLabel,
+  getSignalForValue,
+  inferPhoneBucketFromText,
+} from '@/lib/contact-signals'
 
 interface UplinkCardProps {
   contact: ContactDetail
@@ -39,6 +45,7 @@ interface AdditionalPhoneEntry {
   label: string
   value: string
   icon: typeof Smartphone
+  bucket?: ContactPhoneBucket
   signalScore?: number
   signalLabel?: string
   signalSource?: string
@@ -179,14 +186,20 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
       .filter((p) => p && typeof p.number === 'string' && p.number.trim())
       .filter((p) => !canonicalValues.has(p.number))
       .map((p, idx) => {
-        const rawType = String(p.type || '').toLowerCase()
-        const isMobile = rawType.includes('mobile')
-        const isWork = rawType.includes('work') || rawType.includes('direct')
+        const bucket = p.bucket ?? inferPhoneBucketFromText(p.type, p.label, p.signalLabel, p.signalSource)
+        const icon = bucket === 'mobile'
+          ? Smartphone
+          : bucket === 'workDirectPhone'
+            ? Landmark
+            : bucket === 'companyPhone'
+              ? Building2
+              : Phone
         return {
           id: `extra-${idx}-${p.number}`,
-          label: isMobile ? `Mobile ${idx + 2}` : isWork ? `Work Direct ${idx + 2}` : `Other ${idx + 2}`,
+          label: p.label || formatPhoneBucketLabel(bucket, idx + 1),
           value: p.number,
-          icon: isMobile ? Smartphone : isWork ? Landmark : Phone,
+          icon,
+          bucket,
           signalScore: p.signalScore,
           signalLabel: p.signalLabel,
           signalSource: p.signalSource,
