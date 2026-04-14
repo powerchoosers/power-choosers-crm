@@ -245,12 +245,13 @@ function buildReplyFirstDirective(stage) {
   const map = {
     first_touch: [
       'REPLY-FIRST NOTE: Keep the body at 60-90 words in 2-3 short paragraphs.',
-      'Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations = demand spikes or delivery charges; owner/GM = leverage or timing. Use one lane only.',
+      'Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations/real estate = summer rate pressure, demand spikes, occupancy swings, common-area spend, or contract timing; owner/GM = leverage or timing. Use one lane only.',
+      'Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
       'Use one concrete company or location fact and make the payoff explicit without asking for a bill: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
       'First-touch tone should be thoughtful and specific. Prefer a low-friction CTA like "Worth seeing where the extra cost is likely coming from?" or "Okay if I send the one-page cost view?" Never ask for a bill in first touch.',
       'If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.',
-      'Subject line: 1-4 words, plain, specific, and value-led. Finance examples: budget drift, fixed cost. Ops examples: load timing, delivery charges. Purchasing examples: renewal timing, vendor fit. Owner examples: simple cost check, timing before renewal.',
+      'Subject line: 1-4 words, plain, specific, and value-led. Finance examples: budget drift, fixed cost. Ops examples: summer rate check, load timing, delivery charges. Purchasing examples: renewal timing, vendor fit. Owner examples: simple cost check, timing before renewal.',
       'Never mention LinkedIn, profiles, or how you found them.'
     ].join('\n'),
     follow_up: [
