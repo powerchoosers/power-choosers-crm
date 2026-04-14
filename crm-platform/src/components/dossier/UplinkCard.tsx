@@ -272,7 +272,9 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
 
   // Get Hero Number (Primary)
   const heroPhone = phones.find(p => p.id === primaryField) || phones[0]
-  const heroPhoneSignal = heroPhone ? (heroPhone.value ? getSignalForValue(communicationSignals, heroPhone.value, 'phone') : null) : null
+  const heroPhoneSignal = heroPhone
+    ? (heroPhone.signalScore ?? (heroPhone.value ? getSignalForValue(communicationSignals, heroPhone.value, 'phone')?.score : null))
+    : null
   const emailSignal = email ? getSignalForValue(communicationSignals, email, 'email') : null
 
   return (
@@ -386,36 +388,45 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
             <div className="space-y-3">
               <button
                 type="button"
-                className="w-full group flex items-center justify-between p-4 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
+                className="w-full group p-4 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_30px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5 text-left"
                 onClick={() => handleCallClick(heroPhone)}
                 disabled={!heroPhone.value}
               >
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="relative">
-                  <heroPhone.icon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
-                  <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
-                </div>
-              <div className="flex flex-col items-start min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label}</span>
-                      {!isEditing && recentlyUpdatedFields?.has('phone') && (
-                        <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
-                      )}
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start justify-between gap-3 min-w-0">
+                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                      <div className="relative shrink-0">
+                        <heroPhone.icon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+                        <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
+                      </div>
+                      <div className="flex flex-col items-start min-w-0 flex-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">{heroPhone.label}</span>
+                          {!isEditing && recentlyUpdatedFields?.has('phone') && (
+                            <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
+                          )}
+                        </div>
+                        <div className="mt-1 min-w-0 w-full">
+                          <ForensicDataPoint
+                            value={heroPhone.value || 'No phone'}
+                            copyValue={heroPhone.value || undefined}
+                            valueClassName="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white whitespace-nowrap"
+                            compact
+                            compactFill
+                            inline
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 min-w-0 w-full">
-                      <ForensicDataPoint
-                        value={heroPhone.value || 'No phone'}
-                        copyValue={heroPhone.value || undefined}
-                        valueClassName="font-mono tabular-nums text-[13px] tracking-tight text-white group-hover:text-white truncate w-full"
-                        compact
-                        compactFill
-                        inline
-                      />
-                      <SignalStrengthBadge score={heroPhoneSignal?.score} />
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <div />
+                    <div className="flex items-center gap-2">
+                      <SignalStrengthBadge score={heroPhoneSignal} />
+                      <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
                     </div>
                   </div>
                 </div>
-                <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
               </button>
 
               <div className="px-1">
@@ -439,58 +450,70 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                   <button
                     key={phone.id}
                     type="button"
-                    className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
+                    className="w-full group p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5 text-left"
                     onClick={() => handleCallClick(phone)}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
-                        <div className="flex items-center gap-2 min-w-0 w-full">
-                          <ForensicDataPoint
-                            value={phone.value}
-                            copyValue={phone.value}
-                            valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
-                            compact
-                            compactFill
-                            inline
-                          />
-                          <SignalStrengthBadge
-                            score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
-                          />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-start justify-between gap-3 min-w-0">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
+                          <div className="flex flex-col items-start min-w-0 flex-1">
+                            <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
+                            <div className="mt-1 min-w-0 w-full">
+                              <ForensicDataPoint
+                                value={phone.value}
+                                copyValue={phone.value}
+                                valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 whitespace-nowrap"
+                                compact
+                                compactFill
+                                inline
+                              />
+                            </div>
+                          </div>
                         </div>
+                        <SignalStrengthBadge
+                          score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                       </div>
                     </div>
-                    <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                   </button>
                 ))}
                 {additionalPhones.map((phone) => (
                   <button
                     key={phone.id}
                     type="button"
-                    className="w-full group flex items-center justify-between p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
+                    className="w-full group p-3 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5 text-left"
                     onClick={() => handleCallClick({ ...phone, id: 'otherPhone' as PhoneType })}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-                      <div className="flex flex-col items-start min-w-0 flex-1">
-                        <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
-                        <div className="flex items-center gap-2 min-w-0 w-full">
-                          <ForensicDataPoint
-                            value={formatPhoneNumber(phone.value) || phone.value}
-                            copyValue={phone.value}
-                            valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 truncate w-full"
-                            compact
-                            compactFill
-                            inline
-                          />
-                          <SignalStrengthBadge
-                            score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
-                          />
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-start justify-between gap-3 min-w-0">
+                        <div className="flex items-start gap-3 min-w-0 flex-1">
+                          <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
+                          <div className="flex flex-col items-start min-w-0 flex-1">
+                            <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">{phone.label}</span>
+                            <div className="mt-1 min-w-0 w-full">
+                              <ForensicDataPoint
+                                value={formatPhoneNumber(phone.value) || phone.value}
+                                copyValue={phone.value}
+                                valueClassName="font-mono tabular-nums text-xs tracking-tight text-zinc-400 group-hover:text-zinc-200 whitespace-nowrap"
+                                compact
+                                compactFill
+                                inline
+                              />
+                            </div>
+                          </div>
                         </div>
+                        <SignalStrengthBadge
+                          score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
+                        />
+                      </div>
+                      <div className="flex justify-end">
+                        <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                       </div>
                     </div>
-                    <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                   </button>
                 ))}
               </div>
@@ -501,7 +524,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
           <div className="pt-2">
             <button
               type="button"
-              className="w-full group flex items-center justify-between p-4 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5"
+              className="w-full group p-4 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5 text-left"
               onClick={() => {
                 if (!email) return
                 if (onEmailClick) {
@@ -512,22 +535,24 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
               }}
               disabled={!email}
             >
-              <div className="flex items-center gap-3 min-w-0">
-                <Mail className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-                <div className="flex flex-col items-start min-w-0 flex-1">
-                  <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Electronic Mail</span>
-                  <div className="flex items-center gap-2 min-w-0 w-full">
-                    <ForensicDataPoint
-                      value={email || 'No email'}
-                      copyValue={email || undefined}
-                      valueClassName="text-sm text-zinc-400 group-hover:text-zinc-200 truncate w-full"
-                      compact
-                      compactFill
-                      inline
-                    />
-                    <SignalStrengthBadge score={emailSignal?.score} />
+              <div className="flex items-start justify-between gap-3 min-w-0">
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  <Mail className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
+                  <div className="flex flex-col items-start min-w-0 flex-1">
+                    <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider">Electronic Mail</span>
+                    <div className="mt-1 min-w-0 w-full">
+                      <ForensicDataPoint
+                        value={email || 'No email'}
+                        copyValue={email || undefined}
+                        valueClassName="text-sm text-zinc-400 group-hover:text-zinc-200 whitespace-nowrap"
+                        compact
+                        compactFill
+                        inline
+                      />
+                    </div>
                   </div>
                 </div>
+                <SignalStrengthBadge score={emailSignal?.score} />
               </div>
             </button>
           </div>
