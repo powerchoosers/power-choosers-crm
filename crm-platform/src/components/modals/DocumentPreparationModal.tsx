@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, LayoutTemplate, ArrowRight } from 'lucide-react'
@@ -8,6 +8,7 @@ import { ForensicClose } from '@/components/ui/ForensicClose'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Rnd } from 'react-rnd'
 import type { SignatureRequestKind } from '@/lib/signature-request'
+import { getLoaFieldDefinitions, getLoaSignatureFieldDefaults, getLoaTdsFields } from '@/lib/loa-template'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
 
@@ -24,25 +25,51 @@ export interface SignatureField {
     width: number
     height: number
     type: FieldType
+    label?: string
+    value?: string
+}
+
+export interface SignaturePreparationResult {
+    fields: SignatureField[]
+    values: Record<string, string>
 }
 
 interface DocumentPreparationModalProps {
     isOpen: boolean
     onClose: () => void
-    onComplete: (fields: SignatureField[]) => void
+    onComplete: (result: SignaturePreparationResult) => void
     pdfUrl: string
     documentKind?: SignatureRequestKind
+    initialFields?: SignatureField[]
+    initialFieldValues?: Record<string, string>
 }
 
-export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl, documentKind = 'CONTRACT' }: DocumentPreparationModalProps) {
+export function DocumentPreparationModal({
+    isOpen,
+    onClose,
+    onComplete,
+    pdfUrl,
+    documentKind = 'CONTRACT',
+    initialFields = [],
+    initialFieldValues = {},
+}: DocumentPreparationModalProps) {
     const [numPages, setNumPages] = useState<number>(0)
     const [pageNumber, setPageNumber] = useState(1)
     const [fields, setFields] = useState<SignatureField[]>([])
+    const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
     const [currentTool, setCurrentTool] = useState<FieldType>('signature')
     const containerRef = useRef<HTMLDivElement>(null)
     // mounted: ensures createPortal only runs client-side (document is available)
     const [mounted, setMounted] = useState(false)
     useEffect(() => { setMounted(true) }, [])
+
+    useEffect(() => {
+        if (!isOpen) return
+        setFields(initialFields.length > 0 ? initialFields : [])
+        setFieldValues(initialFieldValues || {})
+        setPageNumber(1)
+        setCurrentTool('signature')
+    }, [isOpen, initialFields, initialFieldValues, pdfUrl])
 
     const handleDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
         setNumPages(numPages)
@@ -53,6 +80,7 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl, 
         const x = e.clientX - rect.left
         const y = e.clientY - rect.top
 
+        const isText = currentTool === 'text'
         setFields([
             ...fields,
             {
@@ -62,7 +90,9 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl, 
                 y,
                 width: 200,
                 height: 40,
-                type: currentTool
+                type: currentTool,
+                label: isText ? 'Text Field' : 'Signature',
+                value: isText ? '' : undefined,
             }
         ])
     }
@@ -71,9 +101,16 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl, 
         setFields(fields.map((f, i) => i === index ? { ...f, ...updates } : f))
     }
 
+    const updateFieldValue = (key: string, value: string) => {
+        setFieldValues((prev) => ({ ...prev, [key]: value }))
+    }
+
     const removeField = (index: number) => {
         setFields(fields.filter((_, i) => i !== index))
     }
+
+    const loaFieldDefinitions = useMemo(() => getLoaFieldDefinitions(), [])
+    const loaTdspOptions = useMemo(() => getLoaTdsFields(), [])
 
     // Portal renders directly into document.body — this breaks out of any parent
     // stacking contexts (framer-motion transforms on the right panel, z-50 containers,
@@ -191,9 +228,16 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl, 
                                                     }}
                                                     className={`absolute z-20 border-2 shadow-sm ${field.type === 'signature' ? 'border-[#002FA7] bg-[#002FA7]/20' : 'border-emerald-500 bg-emerald-500/20'} cursor-move flex items-center justify-center group`}
                                                 >
-                                                    <span className="text-[10px] font-mono text-white tracking-widest uppercase truncate px-2">
-                                                        {field.type === 'signature' ? 'Sign Here' : 'Text Input'}
-                                                    </span>
+                                                    <div className="flex flex-col items-center gap-1 px-2 text-center">
+                                                        <span className="text-[10px] font-mono text-white tracking-widest uppercase truncate">
+                                                            {field.label || (field.type === 'signature' ? 'Sign Here' : 'Text Input')}
+                                                        </span>
+                                                        {field.type === 'text' && field.value && (
+                                                            <span className="text-[9px] font-mono text-white/80 truncate max-w-full">
+                                                                {field.value}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); removeField(originalIndex) }}
                                                         onPointerDown={(e) => e.stopPropagation()} // Prevent dragging when clicking the X
@@ -256,20 +300,76 @@ export function DocumentPreparationModal({ isOpen, onClose, onComplete, pdfUrl, 
                                 ) : (
                                     <div className="space-y-2">
                                         {fields.map((f, i) => (
-                                            <div key={i} className="flex items-center justify-between bg-white/5 p-2 rounded text-[10px] font-mono text-zinc-300">
-                                                <span>Page {f.pageIndex + 1}</span>
-                                                <button onClick={() => removeField(i)} className="text-rose-500 hover:text-rose-400">
-                                                    Remove
-                                                </button>
+                                            <div key={i} className="bg-white/5 p-2 rounded text-[10px] font-mono text-zinc-300 space-y-2">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <span className="truncate">{f.label || (f.type === 'signature' ? 'Signature' : 'Text Input')}</span>
+                                                    <span className="text-zinc-600">Pg {f.pageIndex + 1}</span>
+                                                </div>
+                                                {f.type === 'text' && (
+                                                    <input
+                                                        value={f.value || ''}
+                                                        onChange={(e) => updateField(i, { value: e.target.value })}
+                                                        placeholder="Enter value"
+                                                        className="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-[10px] font-mono text-white placeholder:text-zinc-700 focus:outline-none focus:border-[#002FA7]/50"
+                                                    />
+                                                )}
+                                                <div className="flex items-center justify-between text-[9px]">
+                                                    <span className="text-zinc-600">X {Math.round(f.x)} Y {Math.round(f.y)}</span>
+                                                    <button onClick={() => removeField(i)} className="text-rose-500 hover:text-rose-400">
+                                                        Remove
+                                                    </button>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
                                 )}
                             </div>
 
+                            {documentKind === 'LOE' && (
+                                <div className="border-t border-white/5 p-4 space-y-3">
+                                    <h3 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">LOA Values</h3>
+                                    <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+                                        <div className="space-y-1">
+                                            <label className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest flex items-center justify-between">
+                                                <span>TDSP</span>
+                                                <span className="text-zinc-700">Auto-picks utility</span>
+                                            </label>
+                                            <div className="grid grid-cols-2 gap-1">
+                                                {loaTdspOptions.map((option) => {
+                                                    const active = fieldValues.__tdspChoice === option
+                                                    return (
+                                                        <button
+                                                            key={option}
+                                                            type="button"
+                                                            onClick={() => updateFieldValue('__tdspChoice', option)}
+                                                            className={`rounded-md border px-2 py-1 text-[9px] font-mono uppercase tracking-widest transition-colors ${active ? 'border-[#002FA7] bg-[#002FA7]/20 text-white' : 'border-white/10 bg-black/20 text-zinc-500 hover:text-zinc-300'}`}
+                                                        >
+                                                            {option}
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {loaFieldDefinitions.map((field) => (
+                                            <div key={field.key} className="space-y-1">
+                                                <label className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                                                    {field.label}
+                                                </label>
+                                                <input
+                                                    value={fieldValues[field.key] || ''}
+                                                    onChange={(e) => updateFieldValue(field.key, e.target.value)}
+                                                    className="w-full bg-black/40 border border-white/10 rounded-md px-2 py-1.5 text-[10px] font-mono text-white placeholder:text-zinc-700 focus:outline-none focus:border-[#002FA7]/50"
+                                                />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="p-4 border-t border-white/5 bg-zinc-950">
                                 <button
-                                    onClick={() => onComplete(fields)}
+                                    onClick={() => onComplete({ fields, values: fieldValues })}
                                     disabled={fields.length === 0}
                                     className="group w-full h-10 bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-[10px] uppercase tracking-widest rounded-md flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                                 >
