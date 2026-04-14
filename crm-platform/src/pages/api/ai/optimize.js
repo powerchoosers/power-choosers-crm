@@ -338,12 +338,13 @@ function buildReplyStageDirective(stage) {
   const directives = {
     first_touch: [
       '- FIRST TOUCH: 60-90 words, 2-3 short paragraphs.',
-      '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget variance, renewal timing, or approval pressure; facilities/operations/warehouse/logistics/manufacturing = demand spikes, delivery charges, or load timing; purchasing/contracts/procurement/asset management = renewal timing and vendor coordination; owner/CEO/president/GM/VP = leverage, timing, and simplicity; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
+      '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget variance, renewal timing, or approval pressure; facilities/operations/real estate/warehouse/logistics/manufacturing = summer rate pressure, demand spikes, occupancy swings, delivery charges, or load timing; purchasing/contracts/procurement/asset management = renewal timing and vendor coordination; owner/CEO/president/GM/VP = leverage, timing, and simplicity; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
+      '- Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
       '- Start with one concrete company, role, city, or operating fact.',
       '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
       '- First-touch tone should be thoughtful and specific, not pushy. First-touch CTA must stay low-friction. Good patterns: "Worth seeing where the extra cost is likely coming from?" "Okay if I send the one-page cost view?" "Am I barking up the right tree on this?"',
       '- Never ask for a utility bill, statement, or invoice in first touch.',
-      '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = load timing / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: budget drift, fixed cost check, load timing, renewal timing, simple cost check.',
+      '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = summer rate check / load timing / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: budget drift, fixed cost check, summer rate check, renewal timing, simple cost check.',
       '- Never mention LinkedIn, a profile, or how the person was found.',
     ].join('\n'),
     follow_up: [
