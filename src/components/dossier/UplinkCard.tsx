@@ -418,7 +418,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                     />
                   </div>
                   <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
-                    <SignalStrengthBadge score={heroPhoneSignal} />
+                    <SignalStrengthBadge score={heroPhoneSignal} compact />
                   </div>
                   <div className="col-start-2 row-start-2 justify-self-end self-center">
                     <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
@@ -467,6 +467,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                       </div>
                       <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
                         <SignalStrengthBadge
+                          compact
                           score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
                         />
                       </div>
@@ -500,6 +501,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                       </div>
                       <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
                         <SignalStrengthBadge
+                          compact
                           score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
                         />
                       </div>
@@ -544,7 +546,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                   />
                 </div>
                 <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
-                  <SignalStrengthBadge score={emailSignal?.score} />
+                  <SignalStrengthBadge score={emailSignal?.score} compact />
                 </div>
                 <div className="col-start-2 row-start-2 justify-self-end self-center">
                   <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />

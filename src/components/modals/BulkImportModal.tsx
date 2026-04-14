@@ -555,6 +555,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             name: `${mappedData.first_name || ''} ${mappedData.last_name || ''}`.trim(),
             firstName: mappedData.first_name || '',
             lastName: mappedData.last_name || '',
+            title: mappedData.job_title || '',
             email: mappedData.email || bestEmail?.value || '',
             phone: formatPhoneNumber(mappedData.phone || bestPhone?.value || '') || '',
             mobile: formatPhoneNumber(mappedData.mobile_phone) || '',
@@ -569,6 +570,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             // Add metadata fields
             metadata: {
               job_title: mappedData.job_title,
+              title: mappedData.job_title,
               linkedin_url: mappedData.linkedin_url,
               import_batch: new Date().toISOString(),
               enriched: isEnriching,
@@ -1176,7 +1178,6 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
     </Dialog>
   );
 }
-
 
 
 

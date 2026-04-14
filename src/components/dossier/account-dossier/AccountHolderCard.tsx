@@ -234,7 +234,7 @@ export function AccountHolderCard({
                       />
                     </div>
                     <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
-                      <SignalStrengthBadge score={heroPhoneSignal?.score} />
+                      <SignalStrengthBadge score={heroPhoneSignal?.score} compact />
                     </div>
                     <div className="col-start-2 row-start-2 justify-self-end self-center">
                       <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
@@ -265,7 +265,7 @@ export function AccountHolderCard({
                       />
                     </div>
                     <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
-                      <SignalStrengthBadge score={emailSignal?.score} />
+                      <SignalStrengthBadge score={emailSignal?.score} compact />
                     </div>
                     <div className="col-start-2 row-start-2 justify-self-end self-center">
                       <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
