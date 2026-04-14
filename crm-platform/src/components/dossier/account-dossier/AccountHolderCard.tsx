@@ -9,8 +9,11 @@ import { useComposeStore } from '@/store/composeStore'
 import type { ComposeContext } from '@/components/emails/ComposeModal'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { DottedEmptyState } from '@/components/dossier/DottedEmptyState'
+import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
+import { SignalStrengthBadge } from '@/components/ui/SignalStrengthBadge'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { cn } from '@/lib/utils'
+import { type ContactSignalCollection, getSignalForValue } from '@/lib/contact-signals'
 
 interface HolderContact {
   id: string
@@ -24,6 +27,7 @@ interface HolderContact {
   phone?: string
   avatarUrl?: string
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone' | 'companyPhone'
+  communicationSignals?: ContactSignalCollection | null
 }
 
 interface AccountHolderCardProps {
@@ -90,6 +94,8 @@ export function AccountHolderCard({
 
   const heroPhoneInfo = holder ? getHeroPhoneInfo(holder) : { phone: '', label: 'Phone', icon: Smartphone }
   const heroPhone = heroPhoneInfo.phone
+  const heroPhoneSignal = holder ? getSignalForValue(holder.communicationSignals, heroPhone, 'phone') : null
+  const emailSignal = holder?.email ? getSignalForValue(holder.communicationSignals, holder.email, 'email') : null
 
   const filtered = contacts.filter(c =>
     c.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -212,13 +218,21 @@ export function AccountHolderCard({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <heroPhoneInfo.icon className="w-4 h-4 text-white/70 group-hover:text-white transition-colors shrink-0" />
-                    <div className="flex flex-col items-start min-w-0">
+                    <div className="flex flex-col items-start min-w-0 flex-1">
                       <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest">
                         {heroPhoneInfo.label}
                       </span>
-                      <span className="text-[13px] font-mono tabular-nums text-white tracking-tight truncate w-full">
-                        {formatPhoneNumber(heroPhone)}
-                      </span>
+                      <div className="flex items-center gap-2 min-w-0 w-full">
+                        <ForensicDataPoint
+                          value={formatPhoneNumber(heroPhone)}
+                          copyValue={heroPhone}
+                          valueClassName="text-[13px] font-mono tabular-nums text-white tracking-tight truncate w-full"
+                          compact
+                          compactFill
+                          inline
+                        />
+                        <SignalStrengthBadge score={heroPhoneSignal?.score} />
+                      </div>
                     </div>
                   </div>
                   <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
@@ -233,9 +247,19 @@ export function AccountHolderCard({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <Mail className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
-                    <div className="flex flex-col items-start min-w-0">
+                    <div className="flex flex-col items-start min-w-0 flex-1">
                       <span className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">Email</span>
-                      <span className="text-xs text-zinc-400 group-hover:text-zinc-200 truncate w-full">{holder.email}</span>
+                      <div className="flex items-center gap-2 min-w-0 w-full">
+                        <ForensicDataPoint
+                          value={holder.email}
+                          copyValue={holder.email}
+                          valueClassName="text-xs text-zinc-400 group-hover:text-zinc-200 truncate w-full"
+                          compact
+                          compactFill
+                          inline
+                        />
+                        <SignalStrengthBadge score={emailSignal?.score} />
+                      </div>
                     </div>
                   </div>
                   <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
