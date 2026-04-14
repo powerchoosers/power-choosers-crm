@@ -392,22 +392,18 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                 onClick={() => handleCallClick(heroPhone)}
                 disabled={!heroPhone.value}
               >
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3 gap-y-0 items-start">
-                  <div className="col-start-1 row-start-1 flex items-start gap-3 min-w-0">
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest leading-none">{heroPhone.label}</span>
+                    {!isEditing && recentlyUpdatedFields?.has('phone') && (
+                      <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 min-w-0">
                     <div className="relative shrink-0">
                       <heroPhone.icon className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
                       <Star className="w-2 h-2 fill-yellow-500 text-yellow-500 absolute -top-1 -right-1" />
                     </div>
-                    <div className="flex flex-col items-start min-w-0 flex-1">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest leading-none">{heroPhone.label}</span>
-                        {!isEditing && recentlyUpdatedFields?.has('phone') && (
-                          <FieldSyncIndicator active isSaving={isSaving} severity="secondary" />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="col-start-1 row-start-2 min-w-0">
                     <ForensicDataPoint
                       value={heroPhone.value || 'No phone'}
                       copyValue={heroPhone.value || undefined}
@@ -415,12 +411,9 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                       compact
                       compactFill
                       inline
+                      className="flex-1 min-w-0"
                     />
-                  </div>
-                  <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
                     <SignalStrengthBadge score={heroPhoneSignal} compact />
-                  </div>
-                  <div className="col-start-2 row-start-2 justify-self-end self-center">
                     <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
                   </div>
                 </div>
@@ -450,12 +443,10 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                     className="relative w-full group overflow-hidden px-3 py-2.5 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5 text-left"
                     onClick={() => handleCallClick(phone)}
                   >
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3 gap-y-0 items-start">
-                      <div className="col-start-1 row-start-1 flex items-start gap-3 min-w-0">
-                        <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
-                        <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider leading-none">{phone.label}</span>
-                      </div>
-                      <div className="col-start-1 row-start-2 min-w-0">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider leading-none">{phone.label}</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                         <ForensicDataPoint
                           value={phone.value}
                           copyValue={phone.value}
@@ -463,15 +454,12 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                           compact
                           compactFill
                           inline
+                          className="flex-1 min-w-0"
                         />
-                      </div>
-                      <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
                         <SignalStrengthBadge
                           compact
                           score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
                         />
-                      </div>
-                      <div className="col-start-2 row-start-2 justify-self-end self-center">
                         <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                       </div>
                     </div>
@@ -484,12 +472,10 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                     className="relative w-full group overflow-hidden px-3 py-2.5 nodal-glass nodal-glass-hover rounded-xl transition-all border border-white/5 text-left"
                     onClick={() => handleCallClick({ ...phone, id: 'otherPhone' as PhoneType })}
                   >
-                    <div className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3 gap-y-0 items-start">
-                      <div className="col-start-1 row-start-1 flex items-start gap-3 min-w-0">
-                        <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
-                        <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider leading-none">{phone.label}</span>
-                      </div>
-                      <div className="col-start-1 row-start-2 min-w-0">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider leading-none">{phone.label}</span>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <phone.icon className="w-4 h-4 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                         <ForensicDataPoint
                           value={formatPhoneNumber(phone.value) || phone.value}
                           copyValue={phone.value}
@@ -497,15 +483,12 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                           compact
                           compactFill
                           inline
+                          className="flex-1 min-w-0"
                         />
-                      </div>
-                      <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
                         <SignalStrengthBadge
                           compact
                           score={phone.signalScore ?? getSignalForValue(communicationSignals, phone.value, 'phone')?.score}
                         />
-                      </div>
-                      <div className="col-start-2 row-start-2 justify-self-end self-center">
                         <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                       </div>
                     </div>
@@ -530,12 +513,10 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
               }}
               disabled={!email}
             >
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_auto] gap-x-3 gap-y-0 items-start">
-                <div className="col-start-1 row-start-1 flex items-start gap-3 min-w-0">
-                  <Mail className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0 mt-0.5" />
-                  <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider leading-none">Electronic Mail</span>
-                </div>
-                <div className="col-start-1 row-start-2 min-w-0">
+              <div className="flex flex-col gap-1">
+                <span className="text-[8px] font-mono text-zinc-600 uppercase tracking-wider leading-none">Electronic Mail</span>
+                <div className="flex items-center gap-3 min-w-0">
+                  <Mail className="w-5 h-5 text-zinc-500 group-hover:text-zinc-300 transition-colors shrink-0" />
                   <ForensicDataPoint
                     value={email || 'No email'}
                     copyValue={email || undefined}
@@ -543,12 +524,9 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                     compact
                     compactFill
                     inline
+                    className="flex-1 min-w-0"
                   />
-                </div>
-                <div className="col-start-2 row-start-1 justify-self-end self-start -mt-1">
                   <SignalStrengthBadge score={emailSignal?.score} compact />
-                </div>
-                <div className="col-start-2 row-start-2 justify-self-end self-center">
                   <ArrowUpRight className="w-3 h-3 text-zinc-700 group-hover:text-zinc-400 transition-colors shrink-0" />
                 </div>
               </div>
