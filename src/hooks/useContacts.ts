@@ -498,7 +498,7 @@ export function useAccountContacts(accountId: string) {
           additionalPhones: extractAdditionalPhones(metadata, signals),
           communicationSignals: signals,
           avatarUrl: resolveContactPhotoUrl(row, metadata),
-          title: row.title || '',
+          title: row.title || metadata?.job_title || metadata?.title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
           accountId: row.accountId,
           company: '', // Default for required field
           status: 'Lead', // Default for required field
@@ -990,6 +990,7 @@ export function useCreateContact() {
       const dbContact = {
         id: newContact.id || crypto.randomUUID(),
         name: newContact.name,
+        title: newContact.title || null,
         email: newContact.email,
         phone: newContact.phone,
         mobile: newContact.mobile,
@@ -1118,6 +1119,7 @@ export function useUpsertContact() {
         name: contact.name,
         firstName: contact.firstName,
         lastName: contact.lastName,
+        title: contact.title,
         email: contact.email,
         phone: contact.phone,
         mobile: contact.mobile,
