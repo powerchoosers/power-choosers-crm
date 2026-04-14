@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import {
   PenTool,
   CheckCircle,
@@ -74,6 +75,7 @@ export function SignatureRequestPanel() {
   const [isPreparingDocument, setIsPreparingDocument] = useState(false)
   const [uploadingDocument, setUploadingDocument] = useState(false)
   const [showPrepModal, setShowPrepModal] = useState(false)
+  const [preparedPdfUrl, setPreparedPdfUrl] = useState<string>('')
 
   const accountId = signatureRequestContext?.accountId || ''
   const requestKindConfig = useMemo(
@@ -125,13 +127,21 @@ export function SignatureRequestPanel() {
     [requestKind]
   )
 
-  const prepInitialFieldValues = useMemo(() => {
+  const prepInitialFieldValues = useMemo<Record<string, string>>(() => {
     if (!loaTemplateData) return {}
     return {
       ...loaTemplateData.fieldValues,
       __tdspChoice: loaTemplateData.tdspChoice,
     }
   }, [loaTemplateData])
+
+  useEffect(() => {
+    return () => {
+      if (preparedPdfUrl) {
+        URL.revokeObjectURL(preparedPdfUrl)
+      }
+    }
+  }, [preparedPdfUrl])
 
   const selectedDocument = useMemo(
     () => {
@@ -290,6 +300,83 @@ export function SignatureRequestPanel() {
   })
 
   const hydrateDocumentUrl = async (document: SignatureDocument) => {
+    if (requestKind === 'LOE') {
+      const response = await fetch('/templates/texas_ercot_loa.pdf')
+      if (!response.ok) {
+        throw new Error('Built-in LOA template is missing from the app.')
+      }
+
+      const bytes = await response.arrayBuffer()
+      const pdfDoc = await PDFDocument.load(bytes)
+      const form = pdfDoc.getForm()
+      const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
+
+      const safeSetText = (name: string, value?: string | null) => {
+        const text = (value || '').trim()
+        try {
+          form.getTextField(name).setText(text)
+        } catch {
+          // Template field missing or changed; keep going so the flow still works.
+        }
+      }
+
+      const safeCheck = (name: string, shouldCheck: boolean) => {
+        try {
+          const field = form.getCheckBox(name)
+          if (shouldCheck) field.check()
+          else field.uncheck()
+        } catch {
+          // Same as above: don't break the preview for a single missing checkbox.
+        }
+      }
+
+      const values: Record<string, string> = loaTemplateData?.fieldValues || prepInitialFieldValues
+      const initialFieldValues = prepInitialFieldValues as Record<string, string>
+      const tdspChoice = String(loaTemplateData?.tdspChoice || initialFieldValues.__tdspChoice || '')
+
+      safeSetText('Date', values.Date)
+      safeSetText('Text11', values.Text11)
+      safeSetText('Name printed', values['Name printed'])
+      safeSetText('Title', values.Title)
+      safeSetText('Email', values.Email)
+      safeSetText('Company', values.Company)
+      safeSetText('Billing Street Address', values['Billing Street Address'])
+      safeSetText('City, State, Zip', values['City, State, Zip'])
+      safeSetText('Telephone', values.Telephone)
+      safeSetText('Service Address', values['Service Address'])
+      safeSetText('ESI ID Number', values['ESI ID Number'])
+      safeSetText('Service Address 2', values['Service Address 2'])
+      safeSetText('ESI ID Number 2', values['ESI ID Number 2'])
+      safeSetText('Service Address 3', values['Service Address 3'])
+      safeSetText('ESI ID Number 3', values['ESI ID Number 3'])
+
+      safeCheck('Oncor', tdspChoice === 'Oncor')
+      safeCheck('CenterPoint Energy', tdspChoice === 'CenterPoint Energy')
+      safeCheck('Sharyland', tdspChoice === 'Sharyland')
+      safeCheck('AEP', tdspChoice === 'AEP')
+      safeCheck('TNMP', tdspChoice === 'TNMP')
+      safeCheck('Nueces', tdspChoice === 'Nueces')
+
+      try {
+        form.updateFieldAppearances(helvetica)
+      } catch {
+        // If the template changes, we still want the modal to open.
+      }
+
+      const previewBytes = await pdfDoc.save({ useObjectStreams: false })
+      const previewArrayBuffer = previewBytes.buffer.slice(
+        previewBytes.byteOffset,
+        previewBytes.byteOffset + previewBytes.byteLength
+      ) as ArrayBuffer
+      const previewUrl = URL.createObjectURL(new Blob([previewArrayBuffer], { type: 'application/pdf' }))
+      if (preparedPdfUrl) {
+        URL.revokeObjectURL(preparedPdfUrl)
+      }
+      setPreparedPdfUrl(previewUrl)
+      setSignatureRequestContext(buildNextSignatureContext(document, previewUrl))
+      return
+    }
+
     const { data, error } = await supabase.storage
       .from('vault')
       .createSignedUrl(document.storage_path, 3600)
@@ -473,7 +560,7 @@ export function SignatureRequestPanel() {
         isOpen={showPrepModal}
         onClose={() => setShowPrepModal(false)}
         onComplete={executeDispatch}
-        pdfUrl={signatureRequestContext?.documentUrl || ''}
+        pdfUrl={preparedPdfUrl || signatureRequestContext?.documentUrl || ''}
         documentKind={requestKind}
         initialFields={prepInitialFields}
         initialFieldValues={prepInitialFieldValues}
