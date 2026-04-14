@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { documentId, contactId, accountId, dealId, userEmail, message, signatureFields, documentKind } = req.body;
+  const { documentId, contactId, accountId, dealId, userEmail, message, signatureFields, signatureValues, documentKind } = req.body;
 
   if (!documentId || !contactId || !userEmail) {
     return res.status(400).json({ error: 'Missing required parameters: documentId, contactId, userEmail' });
@@ -167,7 +167,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         deal_id: dealId || null,
         access_token: token,
         signature_fields: signatureFields || [],
-        metadata: { agentEmail: userEmail, ownerId: userEmail, documentKind: requestKind },
+        metadata: {
+          agentEmail: userEmail,
+          ownerId: userEmail,
+          documentKind: requestKind,
+          signatureValues: signatureValues || {},
+        },
         status: 'pending',
         expires_at: expiresAt
       })
