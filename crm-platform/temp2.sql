@@ -1,0 +1,1 @@
+SELECT account_id, id, esid, service_address, rate, end_date, metadataFROM metersWHERE account_id IN (  SELECT id FROM accounts WHERE name ILIKE '%Duncanville ISD%' OR name ILIKE '%Duncanville%')ORDER BY created_at ASC;

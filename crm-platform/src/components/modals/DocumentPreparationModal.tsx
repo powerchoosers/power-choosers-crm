@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { PDFDocument, StandardFonts } from 'pdf-lib'
 import { X, LayoutTemplate, ArrowRight } from 'lucide-react'
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { Document, Page, pdfjs } from 'react-pdf'
@@ -57,8 +58,11 @@ export function DocumentPreparationModal({
     const [pageNumber, setPageNumber] = useState(1)
     const [fields, setFields] = useState<SignatureField[]>([])
     const [fieldValues, setFieldValues] = useState<Record<string, string>>({})
+    const [previewPdfUrl, setPreviewPdfUrl] = useState<string>('')
     const [currentTool, setCurrentTool] = useState<FieldType>('signature')
     const containerRef = useRef<HTMLDivElement>(null)
+    const basePdfBytesRef = useRef<ArrayBuffer | null>(null)
+    const [templateReady, setTemplateReady] = useState(0)
     // mounted: ensures createPortal only runs client-side (document is available)
     const [mounted, setMounted] = useState(false)
     useEffect(() => { setMounted(true) }, [])
@@ -69,7 +73,123 @@ export function DocumentPreparationModal({
         setFieldValues(initialFieldValues || {})
         setPageNumber(1)
         setCurrentTool('signature')
+        setPreviewPdfUrl('')
+        basePdfBytesRef.current = null
+        setTemplateReady(0)
     }, [isOpen, initialFields, initialFieldValues, pdfUrl])
+
+    useEffect(() => {
+        if (!isOpen || documentKind !== 'LOE') return
+        let cancelled = false
+
+        const loadTemplate = async () => {
+            const response = await fetch(pdfUrl)
+            if (!response.ok) {
+                throw new Error('Built-in LOA template is missing from the app.')
+            }
+            const bytes = await response.arrayBuffer()
+            if (!cancelled) {
+                basePdfBytesRef.current = bytes
+                setTemplateReady((value) => value + 1)
+            }
+        }
+
+        void loadTemplate().catch(() => {
+            basePdfBytesRef.current = null
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [documentKind, isOpen, pdfUrl])
+
+    useEffect(() => {
+        if (!isOpen || documentKind !== 'LOE' || !basePdfBytesRef.current) return
+        let cancelled = false
+
+        const regeneratePreview = async () => {
+            const pdfDoc = await PDFDocument.load(basePdfBytesRef.current as ArrayBuffer)
+            const form = pdfDoc.getForm()
+            const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica)
+
+            const safeSetText = (name: string, value?: string | null) => {
+                const text = (value || '').trim()
+                try {
+                    form.getTextField(name).setText(text)
+                } catch {
+                    // Keep going when the template changes.
+                }
+            }
+
+            const safeCheck = (name: string, shouldCheck: boolean) => {
+                try {
+                    const checkbox = form.getCheckBox(name)
+                    if (shouldCheck) checkbox.check()
+                    else checkbox.uncheck()
+                } catch {
+                    // Keep going when the template changes.
+                }
+            }
+
+            safeSetText('Date', fieldValues.Date)
+            safeSetText('Text11', fieldValues.Text11)
+            safeSetText('Name printed', fieldValues['Name printed'])
+            safeSetText('Title', fieldValues.Title)
+            safeSetText('Email', fieldValues.Email)
+            safeSetText('Company', fieldValues.Company)
+            safeSetText('Billing Street Address', fieldValues['Billing Street Address'])
+            safeSetText('City, State, Zip', fieldValues['City, State, Zip'])
+            safeSetText('Telephone', fieldValues.Telephone)
+            safeSetText('Service Address', fieldValues['Service Address'])
+            safeSetText('ESI ID Number', fieldValues['ESI ID Number'])
+            safeSetText('Service Address 2', fieldValues['Service Address 2'])
+            safeSetText('ESI ID Number 2', fieldValues['ESI ID Number 2'])
+            safeSetText('Service Address 3', fieldValues['Service Address 3'])
+            safeSetText('ESI ID Number 3', fieldValues['ESI ID Number 3'])
+
+            const tdspChoice = fieldValues.__tdspChoice || ''
+            safeCheck('Oncor', tdspChoice === 'Oncor')
+            safeCheck('CenterPoint Energy', tdspChoice === 'CenterPoint Energy')
+            safeCheck('Sharyland', tdspChoice === 'Sharyland')
+            safeCheck('AEP', tdspChoice === 'AEP')
+            safeCheck('TNMP', tdspChoice === 'TNMP')
+            safeCheck('Nueces', tdspChoice === 'Nueces')
+
+            try {
+                form.updateFieldAppearances(helvetica)
+            } catch {
+                // Ignore appearance failures; the values are still in the form.
+            }
+
+            const bytes = await pdfDoc.save({ useObjectStreams: false })
+            if (cancelled) return
+
+            const previewArrayBuffer = bytes.buffer.slice(
+                bytes.byteOffset,
+                bytes.byteOffset + bytes.byteLength
+            ) as ArrayBuffer
+            const nextUrl = URL.createObjectURL(new Blob([previewArrayBuffer], { type: 'application/pdf' }))
+            setPreviewPdfUrl((current) => {
+                if (current) URL.revokeObjectURL(current)
+                return nextUrl
+            })
+        }
+
+        void regeneratePreview().catch(() => {
+          // If preview generation fails, keep showing the base document.
+          if (!cancelled) setPreviewPdfUrl('')
+        })
+
+        return () => {
+            cancelled = true
+        }
+    }, [documentKind, fieldValues, isOpen, pdfUrl, templateReady])
+
+    useEffect(() => {
+        return () => {
+            if (previewPdfUrl) URL.revokeObjectURL(previewPdfUrl)
+        }
+    }, [previewPdfUrl])
 
     const handleDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
         setNumPages(numPages)
@@ -150,7 +270,7 @@ export function DocumentPreparationModal({
                         <div className="flex-1 overflow-y-auto np-scroll bg-zinc-900 p-8 flex justify-center" ref={containerRef}>
                             {pdfUrl ? (
                                 <Document
-                                    file={pdfUrl}
+                                    file={previewPdfUrl || pdfUrl}
                                     onLoadSuccess={handleDocumentLoadSuccess}
                                     className="border border-white/10 shadow-2xl"
                                     loading={
