@@ -731,7 +731,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             additionalPhones: extractAdditionalPhones(metadata, signals),
             communicationSignals: signals,
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
-            company: account?.name || metadata?.company || metadata?.general?.company || '',
+            company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
             companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
             logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
             status: item.status || 'Lead',
@@ -940,7 +940,7 @@ export function useContact(id: string) {
         firstName: fName,
         lastName: lName,
         title: typedData.title || metadata?.job_title || metadata?.title || undefined,
-        companyName: account?.name,
+        companyName: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName,
         city: typedData.city || account?.city,
         state: typedData.state || account?.state,
         location: typedData.city ? `${typedData.city}, ${typedData.state || ''}` : (account?.city ? `${account.city}, ${account.state || ''}` : (account?.address || '')),
@@ -1004,6 +1004,7 @@ export function useCreateContact() {
         state: (newContact as any).state || null,
         metadata: {
           company: newContact.company, // Fallback if no account ID
+          companyName: newContact.company,
           domain: newContact.companyDomain,
           ...newContact.metadata
         }
@@ -1139,6 +1140,7 @@ export function useUpsertContact() {
         dbContact.ownerId = user?.email || null;
         dbContact.metadata = {
           company: contact.company,
+          companyName: contact.company,
           domain: contact.companyDomain,
           ...contact.metadata
         };
@@ -1205,6 +1207,7 @@ export function useUpsertContact() {
         dbContact.metadata = {
           ...(current?.metadata || {}),
           company: contact.company || current?.metadata?.company,
+          companyName: contact.company || current?.metadata?.companyName || current?.metadata?.company,
           domain: contact.companyDomain || current?.metadata?.domain,
           ...contact.metadata
         };
