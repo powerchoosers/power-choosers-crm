@@ -132,7 +132,7 @@ ${SIGNATURE_THEME_STYLES}
       <div class="np-signature__meta" style="margin-bottom: 16px; font-size: 12px; line-height: 1.6; color: ${secondaryTextColor};">
         <span style="font-family: 'Courier New', Courier, monospace;">E:</span> ${esc(email)} <br>
         <span style="font-family: 'Courier New', Courier, monospace;">P:</span> ${esc(phone)}<br>
-        ${locationLine ? ` <br><span style="font-family: 'Courier New', Courier, monospace;">${esc(locationLine)}</span>` : ''}
+        ${locationLine ? `<span style="font-family: 'Courier New', Courier, monospace;">${esc(locationLine)}</span>` : ''}
       </div>
 
       <!-- COMMAND DECK (Links) -->

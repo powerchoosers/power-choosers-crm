@@ -521,9 +521,9 @@ function aiBodyToEditorHtml(body: string): string {
 function normalizeEditorHtmlForEmail(html: string): string {
   if (!html) return html
 
-  // Email clients apply large default paragraph margins; flatten them so one
-  // editor line break renders as one visual line break after send.
-  return html.replace(/<p([^>]*)>/gi, (_match, rawAttrs: string = '') => {
+  // Email clients often ignore paragraph margins, so keep paragraph blocks flat
+  // and insert explicit spacer rows between them.
+  const normalizedParagraphs = html.replace(/<p([^>]*)>/gi, (_match, rawAttrs: string = '') => {
     const attrs = rawAttrs || ''
     const styleMatch = attrs.match(/\sstyle=(['"])(.*?)\1/i)
 
@@ -533,16 +533,26 @@ function normalizeEditorHtmlForEmail(html: string): string {
       const hasMargin = /(^|;)\s*margin\s*:/i.test(styleValue)
       const needsSemicolon = styleValue.trim() !== '' && !styleValue.trim().endsWith(';')
       let mergedStyle = hasMargin
-        ? styleValue.replace(/margin\s*:[^;]+;/i, 'margin:0 0 0.75rem;')
-        : `${styleValue}${needsSemicolon ? ';' : ''} margin:0 0 0.75rem;`
+        ? styleValue.replace(/margin\s*:[^;]+;?/i, 'margin:0;')
+        : `${styleValue}${needsSemicolon ? ';' : ''} margin:0;`
       if (!/line-height\s*:/i.test(mergedStyle)) {
         mergedStyle += `${mergedStyle.trim().endsWith(';') ? '' : ';'} line-height:1.45;`
       }
       return `<p${attrs.replace(styleMatch[0], ` style=${quote}${mergedStyle}${quote}`)}>`
     }
 
-    return `<p${attrs} style="margin:0 0 0.75rem; line-height:1.45;">`
+    return `<p${attrs} style="margin:0; line-height:1.45;">`
   })
+
+  return normalizedParagraphs
+    .replace(
+      /<p([^>]*)>(?:\s|&nbsp;|<br\s*\/?>)*<\/p>/gi,
+      '<div class="compose-email-paragraph-spacer" style="line-height:12px; font-size:12px;">&nbsp;</div>'
+    )
+    .replace(
+      /<\/p>\s*<p/gi,
+      '</p><div class="compose-email-paragraph-spacer" style="line-height:12px; font-size:12px;">&nbsp;</div><p'
+    )
 }
 
 function buildComposeEmailDocument(bodyHtml: string, signatureHtml: string): string {
@@ -578,6 +588,11 @@ function buildComposeEmailDocument(bodyHtml: string, signatureHtml: string): str
       .compose-email-body {
         margin: 0 0 24px 0;
         color: #18181b;
+      }
+
+      .compose-email-paragraph-spacer {
+        line-height: 12px;
+        font-size: 12px;
       }
 
       .compose-email-body p,
