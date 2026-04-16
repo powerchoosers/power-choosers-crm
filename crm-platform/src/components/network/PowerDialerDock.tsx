@@ -550,7 +550,7 @@ function TargetCard({
               <ContactAvatar
                 name={target.name}
                 photoUrl={target.photoUrl}
-                size="sm"
+                size={40}
                 className="shrink-0"
               />
             ) : (
