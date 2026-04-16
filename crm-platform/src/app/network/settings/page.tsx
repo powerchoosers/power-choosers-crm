@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu, Mic, Square, Loader2, Volume2, Download } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, PhoneOutgoing, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu, Mic, Square, Loader2, Volume2, Download } from 'lucide-react'
 import { useSyncStore } from '@/store/syncStore'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
@@ -181,6 +181,19 @@ export default function SettingsPage() {
   const voicemailTimerRef = useRef<number | null>(null)
   const voicemailPreviewUrlRef = useRef<string | null>(null)
   const voicemailPlaybackSrc = voicemailPreviewUrl || voicemailGreeting?.publicUrl || null
+
+  // Outbound Voicemail Drop State
+  const [outboundVoicemailDrop, setOutboundVoicemailDrop] = useState<VoicemailGreeting | null>(null)
+  const [outboundVoicemailPreviewUrl, setOutboundVoicemailPreviewUrl] = useState<string | null>(null)
+  const [isRecordingOutboundVoicemail, setIsRecordingOutboundVoicemail] = useState(false)
+  const [outboundVoicemailRecordingSeconds, setOutboundVoicemailRecordingSeconds] = useState(0)
+  const [isSavingOutboundVoicemail, setIsSavingOutboundVoicemail] = useState(false)
+  const [outboundVoicemailError, setOutboundVoicemailError] = useState<string | null>(null)
+  const [pendingOutboundVoicemailBlob, setPendingOutboundVoicemailBlob] = useState<Blob | null>(null)
+  const outboundRecorderRef = useRef<VoicemailRecorderState | null>(null)
+  const outboundVoicemailTimerRef = useRef<number | null>(null)
+  const outboundVoicemailPreviewUrlRef = useRef<string | null>(null)
+  const outboundVoicemailPlaybackSrc = outboundVoicemailPreviewUrl || outboundVoicemailDrop?.publicUrl || null
 
   const resolveVoicemailGreetingForLine = (
     identifier: string | null | undefined,
@@ -387,8 +400,34 @@ export default function SettingsPage() {
   }, [isRecordingVoicemail])
 
   useEffect(() => {
+    if (outboundVoicemailTimerRef.current !== null) {
+      window.clearInterval(outboundVoicemailTimerRef.current)
+      outboundVoicemailTimerRef.current = null
+    }
+
+    if (!isRecordingOutboundVoicemail) {
+      return
+    }
+
+    outboundVoicemailTimerRef.current = window.setInterval(() => {
+      setOutboundVoicemailRecordingSeconds((value) => value + 1)
+    }, 1000)
+
+    return () => {
+      if (outboundVoicemailTimerRef.current !== null) {
+        window.clearInterval(outboundVoicemailTimerRef.current)
+        outboundVoicemailTimerRef.current = null
+      }
+    }
+  }, [isRecordingOutboundVoicemail])
+
+  useEffect(() => {
     voicemailPreviewUrlRef.current = voicemailPreviewUrl
   }, [voicemailPreviewUrl])
+
+  useEffect(() => {
+    outboundVoicemailPreviewUrlRef.current = outboundVoicemailPreviewUrl
+  }, [outboundVoicemailPreviewUrl])
 
   useEffect(() => {
     return () => {
@@ -408,6 +447,24 @@ export default function SettingsPage() {
 
       if (voicemailPreviewUrlRef.current?.startsWith('blob:')) {
         URL.revokeObjectURL(voicemailPreviewUrlRef.current)
+      }
+
+      if (outboundVoicemailTimerRef.current !== null) {
+        window.clearInterval(outboundVoicemailTimerRef.current)
+        outboundVoicemailTimerRef.current = null
+      }
+
+      if (outboundRecorderRef.current) {
+        outboundRecorderRef.current.processor.disconnect()
+        outboundRecorderRef.current.source.disconnect()
+        outboundRecorderRef.current.zeroGain.disconnect()
+        outboundRecorderRef.current.stream.getTracks().forEach((track) => track.stop())
+        outboundRecorderRef.current.audioContext.close().catch(() => { })
+        outboundRecorderRef.current = null
+      }
+
+      if (outboundVoicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(outboundVoicemailPreviewUrlRef.current)
       }
     }
   }, [])
@@ -798,6 +855,264 @@ export default function SettingsPage() {
       toast.error(error?.message || 'Failed to remove voicemail')
     } finally {
       setIsSavingVoicemail(false)
+    }
+  }
+
+  // Outbound Voicemail Drop Functions
+  const releaseOutboundVoicemailRecorder = () => {
+    const recorder = outboundRecorderRef.current
+    if (!recorder) return
+
+    recorder.processor.onaudioprocess = null
+    recorder.processor.disconnect()
+    recorder.source.disconnect()
+    recorder.zeroGain.disconnect()
+    recorder.stream.getTracks().forEach((track) => track.stop())
+    recorder.audioContext.close().catch(() => { })
+    outboundRecorderRef.current = null
+  }
+
+  const startOutboundVoicemailRecording = async () => {
+    if (typeof window === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      toast.error('Your browser cannot record audio')
+      return
+    }
+
+    if (isRecordingOutboundVoicemail) return
+
+    try {
+      setOutboundVoicemailError(null)
+      setPendingOutboundVoicemailBlob(null)
+
+      if (outboundVoicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(outboundVoicemailPreviewUrlRef.current)
+      }
+      setOutboundVoicemailPreviewUrl(null)
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const AudioCtor = window.AudioContext || (window as any).webkitAudioContext
+      if (!AudioCtor) {
+        stream.getTracks().forEach((track) => track.stop())
+        throw new Error('Audio recording is not supported in this browser.')
+      }
+
+      const audioContext: AudioContext = new AudioCtor()
+      await audioContext.resume()
+
+      const source = audioContext.createMediaStreamSource(stream)
+      const processor = audioContext.createScriptProcessor(4096, 1, 1)
+      const zeroGain = audioContext.createGain()
+      const chunks: Float32Array[] = []
+
+      zeroGain.gain.value = 0
+
+      processor.onaudioprocess = (event) => {
+        const input = event.inputBuffer.getChannelData(0)
+        chunks.push(new Float32Array(input))
+      }
+
+      source.connect(processor)
+      processor.connect(zeroGain)
+      zeroGain.connect(audioContext.destination)
+
+      outboundRecorderRef.current = {
+        audioContext,
+        source,
+        processor,
+        zeroGain,
+        stream,
+        chunks,
+        sampleRate: audioContext.sampleRate,
+      }
+
+      setOutboundVoicemailRecordingSeconds(0)
+      setIsRecordingOutboundVoicemail(true)
+      toast.info('Recording outbound voicemail drop')
+    } catch (error: any) {
+      setIsRecordingOutboundVoicemail(false)
+      setOutboundVoicemailError(error?.message || 'Unable to start recording')
+      toast.error(error?.message || 'Unable to start recording')
+      releaseOutboundVoicemailRecorder()
+    }
+  }
+
+  const stopOutboundVoicemailRecording = () => {
+    const recorder = outboundRecorderRef.current
+    if (!recorder) {
+      setIsRecordingOutboundVoicemail(false)
+      return
+    }
+
+    const samples = mergeFloat32Chunks(recorder.chunks)
+    const sampleRate = recorder.sampleRate
+    const durationSeconds = Math.max(1, Math.round(samples.length / sampleRate))
+
+    releaseOutboundVoicemailRecorder()
+    setIsRecordingOutboundVoicemail(false)
+    setOutboundVoicemailRecordingSeconds(durationSeconds)
+
+    if (!samples.length) {
+      setOutboundVoicemailRecordingSeconds(0)
+      setOutboundVoicemailError('No audio was captured. Try again.')
+      toast.error('No audio was captured. Try again.')
+      return
+    }
+
+    const wavBlob = encodeWavBlob(samples, sampleRate)
+    const previewUrl = URL.createObjectURL(wavBlob)
+
+    if (outboundVoicemailPreviewUrlRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(outboundVoicemailPreviewUrlRef.current)
+    }
+
+    setPendingOutboundVoicemailBlob(wavBlob)
+    setOutboundVoicemailPreviewUrl(previewUrl)
+    setOutboundVoicemailError(null)
+    toast.success('Outbound voicemail draft ready')
+  }
+
+  const discardOutboundVoicemailDraft = () => {
+    if (outboundVoicemailPreviewUrlRef.current?.startsWith('blob:')) {
+      URL.revokeObjectURL(outboundVoicemailPreviewUrlRef.current)
+    }
+
+    setPendingOutboundVoicemailBlob(null)
+    setOutboundVoicemailPreviewUrl(null)
+    setOutboundVoicemailRecordingSeconds(0)
+    setOutboundVoicemailError(null)
+  }
+
+  const saveOutboundVoicemailDrop = async () => {
+    if (!user?.email) {
+      toast.error('You must be logged in to save outbound voicemail')
+      return
+    }
+
+    if (!pendingOutboundVoicemailBlob) {
+      toast.error('Record an outbound voicemail drop first')
+      return
+    }
+
+    setIsSavingOutboundVoicemail(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const audioDataUrl = await blobToDataUrl(pendingOutboundVoicemailBlob)
+      const selectedEntry = selectedIdx !== null ? twilioNumbers[selectedIdx] || null : null
+
+      const response = await fetch('/api/settings/outbound-voicemail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          audioDataUrl,
+          fileName: 'outbound-drop.wav',
+          selectedPhoneNumber: selectedEntry?.number || selectedPhoneNumber,
+          twilioNumberSid: selectedEntry?.sid || null,
+          twilioNumberName: selectedEntry?.name || null,
+          source: 'settings-page'
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error || 'Failed to save outbound voicemail')
+      }
+
+      const payload = await response.json()
+      const nextDrop = payload?.outboundVoicemailDrop || null
+      const nextDropNumber = nextDrop?.twilioNumber || selectedEntry?.number || selectedPhoneNumber || null
+      const nextDropSid = nextDrop?.twilioNumberSid || selectedEntry?.sid || null
+      const nextDropName = nextDrop?.twilioNumberName || selectedEntry?.name || null
+
+      if (selectedIdx !== null) {
+        setTwilioNumbers((current) =>
+          current.map((entry, index) => {
+            if (index !== selectedIdx) return entry
+            return {
+              ...entry,
+              name: nextDropName || entry.name,
+              number: nextDropNumber || entry.number,
+              sid: nextDropSid || entry.sid || null,
+              outboundVoicemailDrop: nextDrop,
+            }
+          })
+        )
+      }
+
+      if (outboundVoicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(outboundVoicemailPreviewUrlRef.current)
+      }
+
+      setOutboundVoicemailDrop(nextDrop)
+      setPendingOutboundVoicemailBlob(null)
+      setOutboundVoicemailPreviewUrl(null)
+      setOutboundVoicemailError(null)
+      await refreshProfile()
+      toast.success('Outbound voicemail drop saved')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save outbound voicemail')
+    } finally {
+      setIsSavingOutboundVoicemail(false)
+    }
+  }
+
+  const deleteOutboundVoicemailDrop = async () => {
+    if (!outboundVoicemailDrop) return
+
+    const confirmed = window.confirm('Remove your saved outbound voicemail drop?')
+    if (!confirmed) return
+
+    setIsSavingOutboundVoicemail(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      const selectedEntry = selectedIdx !== null ? twilioNumbers[selectedIdx] || null : null
+      const response = await fetch('/api/settings/outbound-voicemail', {
+        method: 'DELETE',
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          selectedPhoneNumber: selectedEntry?.number || selectedPhoneNumber,
+          twilioNumberSid: selectedEntry?.sid || null,
+        }),
+      })
+
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({}))
+        throw new Error(payload?.error || 'Failed to remove outbound voicemail')
+      }
+
+      if (outboundVoicemailPreviewUrlRef.current?.startsWith('blob:')) {
+        URL.revokeObjectURL(outboundVoicemailPreviewUrlRef.current)
+      }
+
+      if (selectedIdx !== null) {
+        setTwilioNumbers((current) =>
+          current.map((entry, index) => {
+            if (index !== selectedIdx) return entry
+            return {
+              ...entry,
+              outboundVoicemailDrop: null,
+            }
+          })
+        )
+      }
+      setOutboundVoicemailDrop(null)
+      setPendingOutboundVoicemailBlob(null)
+      setOutboundVoicemailPreviewUrl(null)
+      setOutboundVoicemailRecordingSeconds(0)
+      setOutboundVoicemailError(null)
+      await refreshProfile()
+      toast.success('Outbound voicemail drop removed')
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to remove outbound voicemail')
+    } finally {
+      setIsSavingOutboundVoicemail(false)
     }
   }
 
@@ -1468,6 +1783,167 @@ export default function SettingsPage() {
                           className="border-white/10 text-zinc-400 hover:text-red-300 hover:bg-red-500/10 font-mono uppercase tracking-widest text-[10px] h-10"
                         >
                           Remove Saved Greeting
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <Separator className="bg-white/5" />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-medium text-zinc-100 flex items-center gap-2">
+                          <PhoneOutgoing className="w-4 h-4 text-zinc-400" />
+                          Outbound Voicemail Drop
+                        </h4>
+                        <p className="text-xs text-zinc-500">
+                          Automatically leave this message when power dialer reaches a voicemail.
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="border-white/10 bg-white/[0.02] text-[9px] font-mono uppercase tracking-widest text-zinc-400">
+                        {selectedPhoneNumber ? `Line ${selectedPhoneNumber}` : 'No line selected'}
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                      <div className="rounded-2xl bg-black/30 border border-white/5 p-4 space-y-4">
+                        <div className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500">Recording State</p>
+                            <p className="text-sm text-zinc-200 mt-1">
+                              {isRecordingOutboundVoicemail
+                                ? 'Recording now'
+                                : pendingOutboundVoicemailBlob
+                                  ? 'Draft ready to save'
+                                  : outboundVoicemailDrop
+                                    ? 'Saved and live'
+                                    : 'No drop saved'}
+                            </p>
+                          </div>
+                          <div className="font-mono text-xs text-zinc-400 tabular-nums">
+                            {formatVoicemailDuration(outboundVoicemailRecordingSeconds)}
+                          </div>
+                        </div>
+
+                        <div className="flex items-end gap-2 h-12">
+                          {[18, 28, 12, 24, 16].map((baseHeight, idx) => (
+                            <motion.div
+                              key={`outbound-${idx}`}
+                              className={cn(
+                                'w-2 rounded-full origin-bottom',
+                                isRecordingOutboundVoicemail ? 'bg-[#002FA7]' : 'bg-white/10'
+                              )}
+                              style={{ height: `${baseHeight}px` }}
+                              initial={false}
+                              animate={{
+                                scaleY: isRecordingOutboundVoicemail ? [0.55, 1.15, 0.7, 1.05, 0.6] : 0.7
+                              }}
+                              transition={{
+                                duration: isRecordingOutboundVoicemail ? 0.75 + idx * 0.05 : 0.2,
+                                repeat: isRecordingOutboundVoicemail ? Infinity : 0,
+                                repeatType: 'mirror',
+                                delay: idx * 0.08,
+                                ease: [0.23, 1, 0.32, 1]
+                              }}
+                            />
+                          ))}
+                        </div>
+
+                        {outboundVoicemailError && (
+                          <p className="text-xs text-red-400 font-mono tracking-wide">{outboundVoicemailError}</p>
+                        )}
+
+                        {outboundVoicemailDrop?.updatedAt && (
+                          <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-[0.18em]">
+                            Last saved {new Date(outboundVoicemailDrop.updatedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="rounded-2xl bg-white/[0.02] border border-white/5 p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 flex items-center gap-2">
+                            <Volume2 className="w-3.5 h-3.5 text-zinc-400" />
+                            Voicemail Playback
+                          </p>
+                          <Badge variant="outline" className="border-white/10 text-[9px] font-mono uppercase tracking-widest text-zinc-500">
+                            {outboundVoicemailPreviewUrl ? 'Draft Preview' : outboundVoicemailDrop ? 'Live WAV' : 'Public WAV'}
+                          </Badge>
+                        </div>
+
+                        {outboundVoicemailPlaybackSrc ? (
+                          <NodalAudioScrubber
+                            src={outboundVoicemailPlaybackSrc}
+                            durationHint={outboundVoicemailPreviewUrl ? outboundVoicemailRecordingSeconds : undefined}
+                            onClear={outboundVoicemailPreviewUrl ? discardOutboundVoicemailDraft : undefined}
+                            clearLabel="Discard draft"
+                          />
+                        ) : (
+                          <div className="rounded-xl border border-dashed border-white/10 bg-black/20 px-4 py-5">
+                            <p className="text-sm text-zinc-400">No outbound voicemail drop saved yet.</p>
+                          </div>
+                        )}
+
+                        <p className="text-[10px] text-zinc-500 leading-relaxed">
+                          When AMD detects a voicemail, this message plays automatically after the beep.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-3">
+                      <Button
+                        type="button"
+                        onClick={isRecordingOutboundVoicemail ? stopOutboundVoicemailRecording : startOutboundVoicemailRecording}
+                        className={cn(
+                          'font-mono uppercase tracking-widest text-[10px] h-10',
+                          isRecordingOutboundVoicemail
+                            ? 'bg-rose-500 hover:bg-rose-400 text-white'
+                            : 'bg-white text-zinc-950 hover:bg-zinc-200'
+                        )}
+                      >
+                        {isRecordingOutboundVoicemail ? (
+                          <Square className="w-4 h-4 mr-2" />
+                        ) : (
+                          <Mic className="w-4 h-4 mr-2" />
+                        )}
+                        {isRecordingOutboundVoicemail ? 'Stop Recording' : pendingOutboundVoicemailBlob ? 'Record Again' : 'Record Drop'}
+                      </Button>
+
+                      <Button
+                        type="button"
+                        onClick={saveOutboundVoicemailDrop}
+                        disabled={!pendingOutboundVoicemailBlob || isSavingOutboundVoicemail || isRecordingOutboundVoicemail}
+                        className="bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-mono uppercase tracking-widest text-[10px] h-10"
+                      >
+                        {isSavingOutboundVoicemail ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                        )}
+                        Save Drop
+                      </Button>
+
+                      {pendingOutboundVoicemailBlob && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={discardOutboundVoicemailDraft}
+                          className="border-white/10 text-zinc-400 hover:text-white hover:bg-white/5 font-mono uppercase tracking-widest text-[10px] h-10"
+                        >
+                          Discard Draft
+                        </Button>
+                      )}
+
+                      {outboundVoicemailDrop && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={deleteOutboundVoicemailDrop}
+                          disabled={isSavingOutboundVoicemail}
+                          className="border-white/10 text-zinc-400 hover:text-red-300 hover:bg-red-500/10 font-mono uppercase tracking-widest text-[10px] h-10"
+                        >
+                          Remove Saved Drop
                         </Button>
                       )}
                     </div>

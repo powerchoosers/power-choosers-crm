@@ -424,7 +424,7 @@ export default async function handler(req, res) {
                 answerOnBridge: true,
                 action: `${base}/api/twilio/dial-complete${cbq}`,
                 record: 'record-from-answer-dual',
-                recordingStatusCallback: `${base}/api/twilio/recording${cbq}`,
+                recordingStatusCallback: `${base}/api/twilio/recording-status${cbq}`,
                 recordingStatusCallbackMethod: 'POST'
             });
             twiml.say({ voice: 'alice' }, 'Please hold while we try to connect you.');
@@ -454,7 +454,7 @@ export default async function handler(req, res) {
                 answerOnBridge: true,
                 action: `${base}/api/twilio/dial-complete${cbq}`,
                 record: 'record-from-answer-dual',
-                recordingStatusCallback: `${base}/api/twilio/recording${cbq}`,
+                recordingStatusCallback: `${base}/api/twilio/recording-status${cbq}`,
                 recordingStatusCallbackMethod: 'POST'
             });
 
@@ -494,7 +494,7 @@ export default async function handler(req, res) {
                 answerOnBridge: true,
                 action: `${base}/api/twilio/dial-complete${cbq}`,
                 record: 'record-from-answer-dual',
-                recordingStatusCallback: `${base}/api/twilio/recording${cbq}`,
+                recordingStatusCallback: `${base}/api/twilio/recording-status${cbq}`,
                 recordingStatusCallbackMethod: 'POST'
             });
 
