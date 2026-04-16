@@ -429,9 +429,8 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           // Look up existing account by company name; if none, create a new account
           let linkedAccountId: string | undefined = undefined;
           const companyName = mappedData.company_name?.trim();
+          // Build communication signals for metadata only - don't use as fallback
           const communicationSignals = buildImportCommunicationSignals(row);
-          const bestEmail = pickBestSignal(communicationSignals.emails);
-          const bestPhone = pickBestSignal(communicationSignals.phones);
           
           if (companyName) {
             // Resolve domain from mapped field if available
@@ -559,8 +558,8 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             firstName: mappedData.first_name || '',
             lastName: mappedData.last_name || '',
             title: mappedData.job_title || '',
-            email: mappedData.email || bestEmail?.value || '',
-            phone: formatPhoneNumber(mappedData.phone || bestPhone?.value || '') || '',
+            email: mappedData.email || '',
+            phone: formatPhoneNumber(mappedData.phone) || '',
             mobile: formatPhoneNumber(mappedData.mobile_phone) || '',
             workPhone: formatPhoneNumber(mappedData.work_direct) || '',
             otherPhone: formatPhoneNumber(mappedData.other_phone) || '',
