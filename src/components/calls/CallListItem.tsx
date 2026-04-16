@@ -16,7 +16,8 @@ import {
   MessageSquare,
   Sparkles,
   Building2,
-  Zap
+  Zap,
+  Voicemail
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { format, isValid, formatDistanceToNow } from 'date-fns'
@@ -102,6 +103,7 @@ export function CallListItem({
 
   const isProcessed = !!(call.transcript || call.aiInsights)
   const currentStatus = isProcessed ? 'ready' : status
+  const isVoicemail = call.metadata?.isVoicemail || call.outcome === 'Voicemail'
 
   // Parse AI Insights if they exist
   const insights = typeof call.aiInsights === 'string'
@@ -350,17 +352,21 @@ export function CallListItem({
               <>
                 <div className="text-[11px] font-semibold text-white flex items-center gap-1.5 flex-nowrap">
                   <div className="flex items-center gap-1 shrink-0">
-                    <Phone className="w-3.5 h-3.5 text-white" />
+                    {isVoicemail ? (
+                      <Voicemail className="w-3.5 h-3.5 text-amber-400" />
+                    ) : (
+                      <Phone className="w-3.5 h-3.5 text-white" />
+                    )}
                     {showDirectionLabel && (
                       <span className="text-[10px] font-mono text-white font-bold uppercase tracking-widest mx-1.5 shrink-0">
-                        {call.type}
+                        {isVoicemail ? 'VOICEMAIL' : call.type}
                       </span>
                     )}
-                    {call.type === 'Inbound' ? (
+                    {!isVoicemail && (call.type === 'Inbound' ? (
                       <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
                     ) : (
                       <ArrowUpRight className="w-3.5 h-3.5 text-white" />
-                    )}
+                    ))}
                   </div>
                   <div className="w-px h-2.5 bg-white/10 shrink-0 mx-0.5" />
                   <span className="font-mono tabular-nums text-zinc-400 shrink-0">{compactDuration}</span>
@@ -385,7 +391,14 @@ export function CallListItem({
               <>
                 <div className="text-sm font-semibold text-white flex items-center justify-between gap-4 w-full">
                   <div className="flex items-center gap-3">
-                    {call.type} Call
+                    {isVoicemail ? (
+                      <>
+                        <Voicemail className="w-4 h-4 text-amber-400" />
+                        <span>Voicemail</span>
+                      </>
+                    ) : (
+                      <>{call.type} Call</>
+                    )}
                     {isProcessed && (
                       <span className="px-2 py-0.5 rounded border border-white/10 text-[9px] font-mono text-zinc-500 uppercase tracking-widest bg-transparent">
                         [ STATUS: DECRYPTED ]
