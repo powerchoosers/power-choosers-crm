@@ -594,7 +594,7 @@ function TargetCard({
                 domain={target.domain || ''}
                 logoUrl={target.logoUrl}
                 name={target.accountName}
-                size="xs"
+                size={14}
               />
             ) : (
               <Building2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
