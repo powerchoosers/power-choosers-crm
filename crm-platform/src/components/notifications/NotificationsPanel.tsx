@@ -272,7 +272,7 @@ export function NotificationsPanel() {
                                   type="button"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    toggleVoicemailPlay(item.id, item.metadata.recordingUrl)
+                                    toggleVoicemailPlay(item.id, item.metadata?.recordingUrl || '')
                                   }}
                                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 hover:bg-amber-500/20 transition-colors text-[10px] font-mono uppercase tracking-widest"
                                 >
