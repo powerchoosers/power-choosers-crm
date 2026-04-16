@@ -12,7 +12,7 @@ import {
   ColumnFiltersState,
   RowSelectionState,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, PhoneIncoming, PhoneOutgoing, Plus, MoreHorizontal, Check } from 'lucide-react'
+import { ArrowUpDown, ChevronLeft, ChevronRight, Clock, PhoneIncoming, PhoneOutgoing, Plus, MoreHorizontal, Check, Play, Voicemail } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
@@ -297,6 +297,40 @@ export default function CallsPage() {
         } catch (e) {
           return <span className="text-zinc-600 font-mono text-xs">{val}</span>
         }
+      },
+    },
+    {
+      id: 'recording',
+      header: 'Recording',
+      cell: ({ row }) => {
+        const call = row.original
+        if (!call.recordingUrl) return <span className="text-zinc-600 text-xs">—</span>
+        
+        const isVoicemail = call.metadata?.isVoicemail || call.status === 'Voicemail'
+        
+        return (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              // Navigate to call detail or open player
+              router.push(`/network/calls?highlight=${call.id}`)
+            }}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 transition-colors text-xs text-zinc-400 hover:text-white"
+          >
+            {isVoicemail ? (
+              <>
+                <Voicemail className="w-3.5 h-3.5 text-amber-400" />
+                <span className="font-mono uppercase tracking-wider text-amber-400">VM</span>
+              </>
+            ) : (
+              <>
+                <Play className="w-3.5 h-3.5" />
+                <span className="font-mono uppercase tracking-wider">Play</span>
+              </>
+            )}
+          </button>
+        )
       },
     },
     {
