@@ -1259,7 +1259,7 @@ export default function SettingsPage() {
   const handleAddNumber = () => {
     if (!newNumber || !newNumberName) return
     const formatted = strictFormat(newNumber)
-    const updated = [...twilioNumbers, { name: newNumberName, number: formatted, sid: null, selected: false, voicemailGreeting: null }]
+    const updated = [...twilioNumbers, { name: newNumberName, number: formatted, sid: null, selected: false, voicemailGreeting: null, outboundVoicemailDrop: null }]
     setTwilioNumbers(updated)
     // If it's the first number or we want to switch to new one immediately
     if (updated.length === 1 || !selectedPhoneNumber) {
