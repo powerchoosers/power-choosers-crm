@@ -10,12 +10,25 @@ export type VoicemailGreeting = {
   twilioNumberName: string | null
 }
 
+export type OutboundVoicemailDrop = {
+  enabled: boolean
+  publicUrl: string | null
+  storagePath: string | null
+  fileName: string | null
+  mimeType: string | null
+  updatedAt: string | null
+  twilioNumberSid: string | null
+  twilioNumber: string | null
+  twilioNumberName: string | null
+}
+
 export type TwilioNumberEntry = {
   name: string
   number: string
   sid: string | null
   selected: boolean
   voicemailGreeting: VoicemailGreeting | null
+  outboundVoicemailDrop: OutboundVoicemailDrop | null
 }
 
 type NumberLike =
@@ -39,10 +52,12 @@ type SettingsLike = {
   twilioNumbers?: NumberLike[]
   voicemailGreeting?: unknown
   voicemail?: unknown
+  outboundVoicemailDrop?: unknown
 }
 
 export const VOICEMAIL_BUCKET = 'voicemail-greetings'
 export const VOICEMAIL_FILE_NAME = 'greeting.wav'
+export const OUTBOUND_VOICEMAIL_FILE_NAME = 'outbound-drop.wav'
 
 export function digitsOnly(value: unknown): string {
   return (value == null ? '' : String(value)).replace(/\D/g, '')
@@ -136,6 +151,7 @@ export function normalizeTwilioNumberEntry(value: NumberLike): TwilioNumberEntry
       sid: null,
       selected: false,
       voicemailGreeting: null,
+      outboundVoicemailDrop: null,
     }
   }
 
@@ -165,6 +181,9 @@ export function normalizeTwilioNumberEntry(value: NumberLike): TwilioNumberEntry
   const voicemailGreeting = normalizeVoicemailGreeting(
     raw.voicemailGreeting || raw.voicemail_greeting || raw.voicemail || null
   )
+  const outboundVoicemailDrop = normalizeOutboundVoicemailDrop(
+    raw.outboundVoicemailDrop || raw.outbound_voicemail_drop || null
+  )
 
   return {
     name: name || 'Primary',
@@ -172,6 +191,7 @@ export function normalizeTwilioNumberEntry(value: NumberLike): TwilioNumberEntry
     sid: sid || null,
     selected,
     voicemailGreeting,
+    outboundVoicemailDrop,
   }
 }
 
@@ -357,4 +377,136 @@ export function buildVoicemailStoragePath(identifier: string) {
     .replace(/[^a-zA-Z0-9_-]/g, '')
 
   return `twilio-numbers/${safeIdentifier || 'unknown'}/${VOICEMAIL_FILE_NAME}`
+}
+
+export function normalizeOutboundVoicemailDrop(value: unknown): OutboundVoicemailDrop | null {
+  if (!value || typeof value !== 'object') return null
+
+  const raw = value as Record<string, any>
+  const publicUrl = typeof raw.publicUrl === 'string'
+    ? raw.publicUrl.trim()
+    : typeof raw.public_url === 'string'
+      ? raw.public_url.trim()
+      : ''
+  const storagePath = typeof raw.storagePath === 'string'
+    ? raw.storagePath.trim()
+    : typeof raw.storage_path === 'string'
+      ? raw.storage_path.trim()
+      : ''
+  const fileName = typeof raw.fileName === 'string'
+    ? raw.fileName.trim()
+    : typeof raw.file_name === 'string'
+      ? raw.file_name.trim()
+      : ''
+  const mimeType = typeof raw.mimeType === 'string'
+    ? raw.mimeType.trim()
+    : typeof raw.mime_type === 'string'
+      ? raw.mime_type.trim()
+      : ''
+  const updatedAt = typeof raw.updatedAt === 'string'
+    ? raw.updatedAt.trim()
+    : typeof raw.updated_at === 'string'
+      ? raw.updated_at.trim()
+      : ''
+  const twilioNumberSid = typeof raw.twilioNumberSid === 'string'
+    ? raw.twilioNumberSid.trim()
+    : typeof raw.twilio_number_sid === 'string'
+      ? raw.twilio_number_sid.trim()
+      : typeof raw.twilioNumberSID === 'string'
+        ? raw.twilioNumberSID.trim()
+        : ''
+  const twilioNumber = typeof raw.twilioNumber === 'string'
+    ? raw.twilioNumber.trim()
+    : typeof raw.twilio_number === 'string'
+      ? raw.twilio_number.trim()
+      : ''
+  const twilioNumberName = typeof raw.twilioNumberName === 'string'
+    ? raw.twilioNumberName.trim()
+    : typeof raw.twilio_number_name === 'string'
+      ? raw.twilio_number_name.trim()
+      : ''
+  const enabledValue = raw.enabled
+  const enabled = enabledValue === undefined ? true : Boolean(enabledValue)
+
+  if (!publicUrl && !storagePath) return null
+
+  return {
+    enabled,
+    publicUrl: publicUrl || null,
+    storagePath: storagePath || null,
+    fileName: fileName || null,
+    mimeType: mimeType || null,
+    updatedAt: updatedAt || null,
+    twilioNumberSid: twilioNumberSid || null,
+    twilioNumber: twilioNumber || null,
+    twilioNumberName: twilioNumberName || null,
+  }
+}
+
+export function getOutboundVoicemailDrop(settings: SettingsLike | null | undefined): OutboundVoicemailDrop | null {
+  if (!settings || typeof settings !== 'object') return null
+  const selectedEntry = getSelectedTwilioNumberEntry(settings)
+  if (selectedEntry) {
+    const selectedDrop = getOutboundVoicemailDropForTwilioNumber(settings, selectedEntry.sid || selectedEntry.number)
+    if (selectedDrop) return selectedDrop
+  }
+
+  const legacyDrop = normalizeOutboundVoicemailDrop(settings.outboundVoicemailDrop || null)
+  if (!legacyDrop) return null
+
+  const entries = getTwilioNumberEntries(settings)
+  if (!entries.length || entries.length === 1) {
+    return legacyDrop
+  }
+
+  return null
+}
+
+export function getOutboundVoicemailDropForTwilioNumber(settings: SettingsLike | null | undefined, identifier: unknown): OutboundVoicemailDrop | null {
+  if (!settings || typeof settings !== 'object') return getOutboundVoicemailDrop(settings)
+
+  const matchingEntry = getTwilioNumberEntryForIdentifier(settings, identifier)
+  const entries = getTwilioNumberEntries(settings)
+  const selectedEntry = getSelectedTwilioNumberEntry(settings)
+  const selectedPhoneNumber = normalizePhoneNumber(
+    typeof settings?.selectedPhoneNumber === 'string'
+      ? settings.selectedPhoneNumber
+      : typeof settings?.selectedPhoneNumber === 'object' && settings.selectedPhoneNumber?.number
+        ? settings.selectedPhoneNumber.number
+        : ''
+  )
+  const matchingEntryNumber = normalizePhoneNumber(matchingEntry?.number)
+  const selectedEntryNumber = normalizePhoneNumber(selectedEntry?.number)
+
+  const entryDrop = normalizeOutboundVoicemailDrop(matchingEntry?.outboundVoicemailDrop || null)
+  if (entryDrop) return entryDrop
+
+  const legacyDrop = normalizeOutboundVoicemailDrop(settings.outboundVoicemailDrop || null)
+  if (!legacyDrop) return null
+
+  if (voicemailGreetingMatchesIdentifier(legacyDrop, identifier)) {
+    return legacyDrop
+  }
+
+  if (matchingEntry && selectedEntryNumber && matchingEntryNumber && matchingEntryNumber === selectedEntryNumber) {
+    return legacyDrop
+  }
+
+  if (matchingEntry && selectedPhoneNumber && matchingEntryNumber && matchingEntryNumber === selectedPhoneNumber) {
+    return legacyDrop
+  }
+
+  if (!entries.length || entries.length === 1) {
+    return legacyDrop
+  }
+
+  return null
+}
+
+export function buildOutboundVoicemailStoragePath(identifier: string) {
+  const safeIdentifier = String(identifier || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+
+  return `twilio-numbers/${safeIdentifier || 'unknown'}/${OUTBOUND_VOICEMAIL_FILE_NAME}`
 }
