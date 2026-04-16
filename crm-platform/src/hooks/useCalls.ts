@@ -15,7 +15,8 @@ export interface Call {
   contactCompanyLogoUrl?: string
   phoneNumber: string
   type: 'Inbound' | 'Outbound'
-  status: 'Completed' | 'Busy' | 'No-answer' | 'Failed' | 'Canceled'
+  status: 'Completed' | 'Busy' | 'No-answer' | 'Failed' | 'Canceled' | 'Voicemail'
+  outcome?: string
   duration: string
   date: string
   note?: string
@@ -34,6 +35,12 @@ export interface Call {
   accountIndustry?: string;
   accountLogoUrl?: string;
   accountDomain?: string;
+  metadata?: {
+    isVoicemail?: boolean;
+    recordingDuration?: number;
+    recordingChannels?: number;
+    [key: string]: any;
+  };
 }
 
 export function useSearchCalls(queryTerm: string) {

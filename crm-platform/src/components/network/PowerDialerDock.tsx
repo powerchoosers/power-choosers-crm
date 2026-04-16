@@ -2,16 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { PhoneCall, Play, Pause, Square, X, Info, Users } from 'lucide-react'
+import { PhoneCall, Play, Pause, Square, X, Info, Users, Phone, Voicemail, CheckCircle2, Building2, Briefcase, Mail } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { useCallStore } from '@/store/callStore'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
-import { buildPowerDialTargets, chunkPowerDialTargets } from '@/lib/powerDialer'
+import { buildPowerDialTargets, chunkPowerDialTargets, type PowerDialTarget } from '@/lib/powerDialer'
 import { cn, formatToE164 } from '@/lib/utils'
 import { useVoice } from '@/context/VoiceContext'
+import { ContactAvatar } from '@/components/ui/ContactAvatar'
+import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
 type SessionMode = 'idle' | 'running' | 'paused' | 'complete'
+type TargetCallState = 'queued' | 'ringing' | 'connected' | 'voicemail' | 'completed' | 'no-answer'
 
 function makeSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -43,6 +46,7 @@ export function PowerDialerDock() {
   const [currentBatchIndex, setCurrentBatchIndex] = useState(0)
   const [isStarting, setIsStarting] = useState(false)
   const [sessionNote, setSessionNote] = useState<string | null>(null)
+  const [targetStates, setTargetStates] = useState<Map<string, TargetCallState>>(new Map())
 
   const runIdRef = useRef<string | null>(null)
   const nextBatchIndexRef = useRef(0)
@@ -73,6 +77,7 @@ export function PowerDialerDock() {
     setCurrentBatchIndex(0)
     setIsStarting(false)
     setSessionNote(null)
+    setTargetStates(new Map())
     runIdRef.current = null
     nextBatchIndexRef.current = 0
   }, [sessionId])
@@ -99,6 +104,15 @@ export function PowerDialerDock() {
     }
 
     setIsStarting(true)
+
+    // Mark all targets in batch as ringing
+    setTargetStates((prev) => {
+      const next = new Map(prev)
+      batch.forEach((target) => {
+        next.set(target.phoneNumber, 'ringing')
+      })
+      return next
+    })
 
     if (!runIdRef.current || mode === 'idle' || mode === 'complete') {
       runIdRef.current = makeSessionId()
@@ -146,6 +160,14 @@ export function PowerDialerDock() {
     if (!started) {
       setMode('paused')
       setSessionNote('Voice is not ready yet. You can resume when the system is ready.')
+      // Reset targets to queued
+      setTargetStates((prev) => {
+        const next = new Map(prev)
+        batch.forEach((target) => {
+          next.set(target.phoneNumber, 'queued')
+        })
+        return next
+      })
       return false
     }
 
@@ -190,6 +212,7 @@ export function PowerDialerDock() {
     runIdRef.current = null
     setIsStarting(false)
     setSessionNote('Power dial stopped.')
+    setTargetStates(new Map())
 
     if (isVoiceBusy) {
       disconnect()
@@ -203,12 +226,43 @@ export function PowerDialerDock() {
     runIdRef.current = null
     setIsStarting(false)
     setSessionNote(null)
+    setTargetStates(new Map())
     clearPowerDialer()
 
     if (isVoiceBusy) {
       disconnect()
     }
   }, [clearPowerDialer, disconnect, isVoiceBusy])
+
+  // Track call status changes to update target states
+  useEffect(() => {
+    if (mode !== 'running') return
+    
+    const currentPhone = useCallStore.getState().phoneNumber
+    if (!currentPhone) return
+
+    if (callStatus === 'connected') {
+      setTargetStates((prev) => {
+        const next = new Map(prev)
+        next.set(currentPhone, 'connected')
+        // Mark others in batch as no-answer or voicemail
+        currentBatch.forEach((target) => {
+          if (target.phoneNumber !== currentPhone && prev.get(target.phoneNumber) === 'ringing') {
+            next.set(target.phoneNumber, 'no-answer')
+          }
+        })
+        return next
+      })
+    } else if (callStatus === 'ended') {
+      setTargetStates((prev) => {
+        const next = new Map(prev)
+        if (prev.get(currentPhone) === 'connected') {
+          next.set(currentPhone, 'completed')
+        }
+        return next
+      })
+    }
+  }, [callStatus, mode, currentBatch])
 
   useEffect(() => {
     const previous = previousCallStatusRef.current
@@ -364,32 +418,19 @@ export function PowerDialerDock() {
               </div>
             )}
 
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-              {currentBatch.length > 0 ? currentBatch.map((target, index) => (
-                <div
-                  key={`${target.contactId}-${target.phoneNumber}-${index}`}
-                  className="rounded-2xl border border-white/5 bg-white/[0.02] px-3 py-3"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-medium text-zinc-100">
-                        {target.name}
-                      </div>
-                      <div className="truncate text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                        {target.accountName || sourceLabel || 'CONTACT'}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-[10px] font-mono uppercase tracking-widest text-zinc-600">
-                        {String(index + 1).padStart(2, '0')}
-                      </div>
-                      <div className="text-xs font-mono tabular-nums text-zinc-300">
-                        {target.phoneNumber}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {currentBatch.length > 0 ? currentBatch.map((target, index) => {
+                const state = targetStates.get(target.phoneNumber) || 'queued'
+                return (
+                  <TargetCard
+                    key={`${target.contactId}-${target.phoneNumber}-${index}`}
+                    target={target}
+                    index={index}
+                    state={state}
+                    isActive={callStatus === 'connected' && useCallStore.getState().phoneNumber === target.phoneNumber}
+                  />
+                )
+              }) : (
                 <div className="rounded-2xl border border-white/5 bg-white/[0.02] px-3 py-4 text-xs text-zinc-500 sm:col-span-2 xl:col-span-3">
                   No dialable contacts in the current batch.
                 </div>
@@ -420,5 +461,174 @@ function SummaryTile({
         {value}
       </div>
     </div>
+  )
+}
+
+function TargetCard({
+  target,
+  index,
+  state,
+  isActive,
+}: {
+  target: PowerDialTarget
+  index: number
+  state: TargetCallState
+  isActive: boolean
+}) {
+  const stateConfig = {
+    queued: {
+      label: 'QUEUED',
+      color: 'text-zinc-500',
+      bgColor: 'bg-zinc-500/10',
+      borderColor: 'border-zinc-500/20',
+      icon: Phone,
+      pulseColor: null,
+    },
+    ringing: {
+      label: 'RINGING',
+      color: 'text-[#002FA7]',
+      bgColor: 'bg-[#002FA7]/10',
+      borderColor: 'border-[#002FA7]/30',
+      icon: Phone,
+      pulseColor: 'shadow-[0_0_20px_rgba(0,47,167,0.4)]',
+    },
+    connected: {
+      label: 'LIVE',
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/10',
+      borderColor: 'border-emerald-500/30',
+      icon: Phone,
+      pulseColor: 'shadow-[0_0_20px_rgba(52,211,153,0.4)]',
+    },
+    voicemail: {
+      label: 'VM DROPPED',
+      color: 'text-amber-400',
+      bgColor: 'bg-amber-500/10',
+      borderColor: 'border-amber-500/20',
+      icon: Voicemail,
+      pulseColor: null,
+    },
+    completed: {
+      label: 'COMPLETED',
+      color: 'text-emerald-400',
+      bgColor: 'bg-emerald-500/10',
+      borderColor: 'border-emerald-500/20',
+      icon: CheckCircle2,
+      pulseColor: null,
+    },
+    'no-answer': {
+      label: 'NO ANSWER',
+      color: 'text-zinc-500',
+      bgColor: 'bg-zinc-500/5',
+      borderColor: 'border-zinc-500/10',
+      icon: Phone,
+      pulseColor: null,
+    },
+  }
+
+  const config = stateConfig[state]
+  const StateIcon = config.icon
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.2, delay: index * 0.05 }}
+      className={cn(
+        'relative rounded-2xl border transition-all duration-300',
+        config.borderColor,
+        isActive ? 'bg-white/[0.04] ring-2 ring-emerald-500/30' : 'bg-white/[0.02]',
+        state === 'ringing' && 'animate-pulse',
+        config.pulseColor
+      )}
+    >
+      <div className="p-4 space-y-3">
+        {/* Header with avatar and status */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {target.photoUrl ? (
+              <ContactAvatar
+                name={target.name}
+                photoUrl={target.photoUrl}
+                size="sm"
+                className="shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#002FA7]/20 to-white/5 border border-white/10 flex items-center justify-center shrink-0">
+                <span className="text-sm font-semibold text-white">
+                  {target.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-semibold text-white">
+                {target.name}
+              </div>
+              {target.title && (
+                <div className="truncate text-[10px] text-zinc-500 mt-0.5 flex items-center gap-1">
+                  <Briefcase className="w-2.5 h-2.5" />
+                  {target.title}
+                </div>
+              )}
+            </div>
+          </div>
+          
+          {/* Status badge */}
+          <div className={cn(
+            'flex items-center gap-1.5 px-2 py-1 rounded-lg border shrink-0',
+            config.bgColor,
+            config.borderColor
+          )}>
+            <StateIcon className={cn('w-3 h-3', config.color)} />
+            <span className={cn('text-[9px] font-mono uppercase tracking-widest', config.color)}>
+              {config.label}
+            </span>
+          </div>
+        </div>
+
+        {/* Company info */}
+        {target.accountName && (
+          <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-white/[0.02] border border-white/5">
+            {target.logoUrl ? (
+              <CompanyIcon
+                domain={target.domain || ''}
+                logoUrl={target.logoUrl}
+                name={target.accountName}
+                size="xs"
+              />
+            ) : (
+              <Building2 className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+            )}
+            <span className="text-[10px] text-zinc-400 truncate">
+              {target.accountName}
+            </span>
+          </div>
+        )}
+
+        {/* Phone number */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
+          <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500">
+            <Phone className="w-3 h-3" />
+            <span className="tabular-nums">{target.phoneNumber}</span>
+          </div>
+          <div className="text-[10px] font-mono text-zinc-600">
+            #{String(index + 1).padStart(2, '0')}
+          </div>
+        </div>
+      </div>
+
+      {/* Active call indicator */}
+      {isActive && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 rounded-2xl border-2 border-emerald-500/50 pointer-events-none"
+        >
+          <div className="absolute top-2 right-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
+        </motion.div>
+      )}
+    </motion.div>
   )
 }
