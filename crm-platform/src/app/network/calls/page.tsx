@@ -48,6 +48,7 @@ import { ContactAvatar } from '@/components/ui/ContactAvatar'
 const PAGE_SIZE = 50
 
 export default function CallsPage() {
+  const router = useRouter()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
