@@ -584,12 +584,6 @@ async function processJob(job) {
     if (!execution) throw new Error(`Execution ${execution_id} not found`)
     const statusBefore = execution.status;
 
-    if (execution.status === 'processing' || execution.status === 'completed' || execution.status === 'waiting') {
-        console.log('[DEBUG] Job already handled, status:', execution.status);
-        await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
-        return;
-    }
-
     const metadata = normalizeMetadata(execution.metadata);
 
     // Keep DB row metadata in normalized object form for downstream logic.
@@ -606,6 +600,36 @@ async function processJob(job) {
     const effectiveType = execution.step_type === 'protocolNode'
         ? (metadata.type || 'delay')
         : execution.step_type;
+
+    const manualGateTypes = new Set(['call', 'linkedin']);
+    if (execution.status === 'processing' || execution.status === 'completed') {
+        console.log('[DEBUG] Job already handled, status:', execution.status);
+        await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
+        return;
+    }
+
+    if (execution.status === 'waiting' && !manualGateTypes.has(effectiveType)) {
+        console.log('[DEBUG] Job already handled, status:', execution.status);
+        await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
+        return;
+    }
+
+    if (execution.status === 'waiting' && manualGateTypes.has(effectiveType)) {
+        const [existingGateTask] = await sql`
+            SELECT id
+            FROM tasks
+            WHERE metadata->>'sequenceExecutionId' = ${execution.id}
+               OR metadata->>'execution_id' = ${execution.id}
+            ORDER BY "createdAt" DESC
+            LIMIT 1
+        `;
+        if (existingGateTask?.id) {
+            console.log('[DEBUG] Job already handled, status:', execution.status, 'task:', existingGateTask.id);
+            await sql`SELECT pgmq.delete(${QUEUE_NAME}, ${jobId}::bigint)`
+            return;
+        }
+        console.warn(`[DEBUG] Recovering waiting ${effectiveType} execution ${execution.id} with no task`);
+    }
 
     if (effectiveType === 'email') {
         const existingBody = String(execution.metadata?.body || execution.metadata?.aiBody || '').trim();
@@ -1101,9 +1125,13 @@ async function handleSend(execution, job) {
           error_message = 'Missing sender email',
           updated_at = NOW()
       WHERE id = ${execution.id}
-    `;
+        `;
         return;
     }
+
+    const senderDomain = fromEmail.includes('@')
+        ? fromEmail.split('@')[1]
+        : null;
 
     const emailRecordId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
     const [existingEmailRecord] = await sql`
@@ -1234,6 +1262,7 @@ async function handleLinkedInTask(execution, job) {
     }
 
     const hasLinkedIn = Boolean(String(member.contact_linkedin_url || '').trim());
+    const taskOwnerId = resolveTaskOwnerId(member);
 
 
     const existingTasks = await sql`
@@ -1256,7 +1285,7 @@ async function handleLinkedInTask(execution, job) {
         if (!hasLinkedIn) {
             prompt = `[MANUAL SEARCH REQUIRED] No LinkedIn URL found in dossier. Please search for and connect with this contact.\n\n${prompt}`;
         }
-        const ownerEmail = member.owner_email || (String(member.owner_id || '').includes('@') ? member.owner_id : null);
+        const ownerEmail = taskOwnerId;
 
         const inserted = await sql`
       INSERT INTO tasks (
@@ -1314,54 +1343,18 @@ async function handleLinkedInTask(execution, job) {
   `;
 }
 
+function resolveTaskOwnerId(member) {
+    const rawOwnerId = String(member?.owner_id || '').trim();
+    const ownerEmail = String(member?.owner_email || '').trim();
+    if (ownerEmail) return ownerEmail;
+    if (rawOwnerId) return rawOwnerId;
+    return null;
+}
+
 async function handleCallTask(execution, job) {
     const metadata = normalizeMetadata(execution.metadata);
 
-    // Fix 2 — Idempotency: re-check DB status before creating the call task to prevent
-    // duplicate task creation when two PGMQ messages race for the same execution.
     const [freshExecCall] = await sql`SELECT status FROM sequence_executions WHERE id = ${execution.id}`;
-    if (freshExecCall?.status === 'waiting' || freshExecCall?.status === 'completed') {
-        console.log(`[DEBUG] handleCallTask: execution ${execution.id} already ${freshExecCall.status} — skipping duplicate task creation`);
-        return;
-    }
-
-    // Fix 2 (strict): if another waiting call execution already exists for this member
-    // at this call node, mark this execution as deduplicated and skip creating any task.
-    const currentNodeId = String(metadata?.nodeId || metadata?.id || '').trim();
-    const siblingWaitingCall = currentNodeId
-        ? (await sql`
-      SELECT id
-      FROM sequence_executions
-      WHERE member_id = ${execution.member_id}
-        AND id <> ${execution.id}
-        AND status = 'waiting'
-        AND lower(coalesce(metadata->>'type', CASE WHEN step_type = 'protocolNode' THEN NULL ELSE step_type END, '')) = 'call'
-        AND coalesce(metadata->>'nodeId', metadata->>'id', '') = ${currentNodeId}
-      LIMIT 1
-    `)?.[0]
-        : (await sql`
-      SELECT id
-      FROM sequence_executions
-      WHERE member_id = ${execution.member_id}
-        AND id <> ${execution.id}
-        AND status = 'waiting'
-        AND lower(coalesce(metadata->>'type', CASE WHEN step_type = 'protocolNode' THEN NULL ELSE step_type END, '')) = 'call'
-      LIMIT 1
-    `)?.[0];
-    if (siblingWaitingCall?.id) {
-        await sql`
-      UPDATE sequence_executions
-      SET status = 'completed',
-          outcome = 'deduplicated',
-          completed_at = NOW(),
-          error_message = ${`Deduplicated: waiting call execution ${siblingWaitingCall.id} already exists for this member/node`},
-          updated_at = NOW()
-      WHERE id = ${execution.id}
-        AND status NOT IN ('waiting', 'completed')
-    `;
-        console.log(`[DEBUG] handleCallTask: deduplicated execution ${execution.id}; waiting execution ${siblingWaitingCall.id} already exists`);
-        return;
-    }
 
     const [member] = await sql`
     SELECT m.id,
@@ -1395,12 +1388,74 @@ async function handleCallTask(execution, job) {
 
     let taskId = existingTasks?.[0]?.id || null;
 
+    if (freshExecCall?.status === 'completed') {
+        if (taskId) {
+            console.log(`[DEBUG] handleCallTask: execution ${execution.id} already completed with task ${taskId}`);
+        }
+        return;
+    }
+
+    if (freshExecCall?.status === 'waiting' && taskId) {
+        console.log(`[DEBUG] handleCallTask: execution ${execution.id} already waiting with task ${taskId}`);
+        return;
+    }
+
+    const currentNodeId = String(metadata?.nodeId || metadata?.id || '').trim();
+    const siblingWaitingCall = currentNodeId
+        ? (await sql`
+      SELECT id
+      FROM sequence_executions
+      WHERE member_id = ${execution.member_id}
+        AND id <> ${execution.id}
+        AND status = 'waiting'
+        AND lower(coalesce(metadata->>'type', CASE WHEN step_type = 'protocolNode' THEN NULL ELSE step_type END, '')) = 'call'
+        AND coalesce(metadata->>'nodeId', metadata->>'id', '') = ${currentNodeId}
+      LIMIT 1
+    `)?.[0]
+        : (await sql`
+      SELECT id
+      FROM sequence_executions
+      WHERE member_id = ${execution.member_id}
+        AND id <> ${execution.id}
+        AND status = 'waiting'
+        AND lower(coalesce(metadata->>'type', CASE WHEN step_type = 'protocolNode' THEN NULL ELSE step_type END, '')) = 'call'
+      LIMIT 1
+    `)?.[0];
+
+    if (siblingWaitingCall?.id) {
+        const [siblingTask] = await sql`
+        SELECT id
+        FROM tasks
+        WHERE metadata->>'sequenceExecutionId' = ${siblingWaitingCall.id}
+           OR metadata->>'execution_id' = ${siblingWaitingCall.id}
+        ORDER BY "createdAt" DESC
+        LIMIT 1
+      `;
+
+        if (siblingTask?.id) {
+            await sql`
+          UPDATE sequence_executions
+          SET status = 'completed',
+              outcome = 'deduplicated',
+              completed_at = NOW(),
+              error_message = ${`Deduplicated: waiting call execution ${siblingWaitingCall.id} already exists for this member/node`},
+              updated_at = NOW()
+          WHERE id = ${execution.id}
+            AND status NOT IN ('waiting', 'completed')
+        `;
+            console.log(`[DEBUG] handleCallTask: deduplicated execution ${execution.id}; waiting execution ${siblingWaitingCall.id} already exists`);
+            return;
+        }
+
+        console.warn(`[DEBUG] handleCallTask: waiting call execution ${siblingWaitingCall.id} has no task; continuing to create one for ${execution.id}`);
+    }
+
     if (!taskId) {
         const firstName = (member.firstName || '').trim();
         const lastName = (member.lastName || '').trim();
         const contactName = `${firstName} ${lastName}`.trim() || 'Contact';
         const label = (metadata?.label || 'Call Step').trim();
-        const ownerEmail = member.owner_email || (String(member.owner_id || '').includes('@') ? member.owner_id : null);
+        const taskOwnerId = resolveTaskOwnerId(member);
 
         const inserted = await sql`
       INSERT INTO tasks (
@@ -1425,7 +1480,7 @@ async function handleCallTask(execution, job) {
         NOW(),
         ${member.contact_id},
         ${member.account_id},
-        ${ownerEmail},
+        ${taskOwnerId},
         NOW(),
         NOW(),
         jsonb_build_object(
