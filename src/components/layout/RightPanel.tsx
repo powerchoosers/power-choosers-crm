@@ -21,6 +21,7 @@ import { DealCreationPanel } from '../right-panel/DealCreationPanel'
 import { SignatureRequestPanel } from '@/components/right-panel/SignatureRequestPanel'
 import { PortalAccessPanel } from '@/components/right-panel/PortalAccessPanel'
 import { ProposalBuilderPanel } from '@/components/right-panel/ProposalBuilderPanel'
+import { TargetSearchPanel } from '@/components/right-panel/TargetSearchPanel'
 
 /** When on dossier: 'context' = Active Context widgets, 'scanning' = Scanning Mode widgets. Only used when isActiveContext. */
 type DossierPanelView = 'context' | 'scanning'
@@ -44,7 +45,7 @@ import { useWeather } from '@/hooks/useWeather'
 import { isTodayOrOverdue } from '@/lib/task-date'
 
 export function RightPanel() {
-  const { rightPanelMode, setRightPanelMode, setTaskContext } = useUIStore()
+  const { rightPanelMode, setRightPanelMode, setTaskContext, ingestionContext } = useUIStore()
   const pathname = usePathname()
   const params = useParams()
 
@@ -239,6 +240,13 @@ export function RightPanel() {
           <ProposalBuilderPanel key="proposal" />
         ) : rightPanelMode === 'SEND_PORTAL_ACCESS' ? (
           <PortalAccessPanel key="portal-access" />
+        ) : rightPanelMode === 'TARGET_SEARCH' && ingestionContext?.listId ? (
+          <TargetSearchPanel
+            key="target-search"
+            listId={ingestionContext.listId}
+            listName={ingestionContext.listName || 'Target'}
+            listKind={ingestionContext.listKind || 'people'}
+          />
         ) : rightPanelMode !== 'DEFAULT' ? (
           <NodeIngestion key="ingest" />
         ) : (
