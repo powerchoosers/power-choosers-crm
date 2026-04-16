@@ -213,11 +213,9 @@ export function buildImportCommunicationSignals(row: Record<string, unknown>): C
 
   const phoneSources = [
     { field: 'Contact Phone 1', label: 'Contact Phone 1' },
-    { field: 'Company Phone 1', label: 'Company Phone 1' },
+    { field: 'Company Phone 1', label: 'Company Phone' },
     { field: 'Contact Phone 2', label: 'Contact Phone 2' },
-    { field: 'Company Phone 2', label: 'Company Phone 2' },
     { field: 'Contact Phone 3', label: 'Contact Phone 3' },
-    { field: 'Company Phone 3', label: 'Company Phone 3' },
     { field: 'Contact Mobile Phone', label: 'Contact Mobile Phone', score: 'Contact Mobile Phone 1 Total AI' },
     { field: 'Contact Mobile Phone 2', label: 'Contact Mobile Phone 2', score: 'Contact Mobile Phone 2 Total AI' },
     { field: 'Contact Mobile Phone 3', label: 'Contact Mobile Phone 3', score: 'Contact Mobile Phone 3 Total AI' },
