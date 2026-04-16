@@ -92,7 +92,10 @@ export default async function handler(req, res) {
       const errorText = await imgurResponse.text();
       logger.error('[SignatureUpload] Imgur upload failed:', imgurResponse.status, errorText);
       res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Failed to upload image to hosting service' }));
+      res.end(JSON.stringify({
+        error: 'Failed to upload image to hosting service',
+        details: errorText,
+      }));
       return;
     }
 
@@ -115,6 +118,7 @@ export default async function handler(req, res) {
 
     const responsePayload = {
       success: true,
+      url: imageUrl,
       imageUrl: imageUrl,
       message: 'Signature image uploaded successfully'
     };
@@ -131,7 +135,8 @@ export default async function handler(req, res) {
     
     const errorPayload = { 
       error: 'Internal server error', 
-      message: error.message 
+      message: error.message,
+      details: error.stack || error.message,
     };
     
     logger.debug('[SignatureUpload] Sending error response:', errorPayload);
@@ -141,4 +146,3 @@ export default async function handler(req, res) {
     return;
   }
 }
-

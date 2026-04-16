@@ -1150,12 +1150,33 @@ function ComposePanel({
   useEffect(() => {
     setSelectedGenerationDirective('')
   }, [emailTypeId])
+
+  const readFileAsBase64 = useCallback((file: File) => {
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => {
+        const result = reader.result
+        if (typeof result !== 'string') {
+          reject(new Error('Failed to read image file'))
+          return
+        }
+        const base64 = result.split(',')[1] || ''
+        if (!base64) {
+          reject(new Error('Failed to read image file'))
+          return
+        }
+        resolve(base64)
+      }
+      reader.onerror = () => reject(new Error('Failed to read image file'))
+      reader.readAsDataURL(file)
+    })
+  }, [])
+
   const uploadToolbarImage = async (file: File) => {
     const { toast } = await import('sonner')
     const toastId = toast.loading('Uploading image...')
     try {
-      const buffer = await file.arrayBuffer()
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)))
+      const base64 = await readFileAsBase64(file)
 
       const response = await fetch('/api/upload/signature-image', {
         method: 'POST',
@@ -1165,15 +1186,21 @@ function ComposePanel({
           type: 'template-image',
         }),
       })
-      if (!response.ok) throw new Error('Failed to upload image')
-      const data = await response.json()
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.details || data?.error || `Failed to upload image (${response.status})`)
+      }
       const url = data?.url || data?.imageUrl
+      if (!url) {
+        throw new Error('Upload succeeded, but no image URL was returned')
+      }
       if (editorRef.current && url) {
         editorRef.current.chain().focus().setImage({ src: url }).run()
       }
       toast.success('Image uploaded', { id: toastId })
-    } catch {
-      toast.error('Failed to upload image', { id: toastId })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to upload image'
+      toast.error(message, { id: toastId })
     }
   }
   const handleToolbarImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
