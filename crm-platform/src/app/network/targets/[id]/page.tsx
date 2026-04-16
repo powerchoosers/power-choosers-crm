@@ -974,7 +974,14 @@ export default function TargetDetailPage() {
         isFilterActive={isFilterOpen || columnFilters.length > 0}
         primaryAction={{
           label: "Initialize Node",
-          onClick: () => { },
+          onClick: () => {
+            setRightPanelMode('TARGET_SEARCH')
+            setIngestionContext({
+              listId: id,
+              listName: target?.name || 'Target',
+              listKind: target?.kind || (isPeopleList ? 'people' : 'account')
+            })
+          },
           icon: <Plus size={18} />
         }}
       />

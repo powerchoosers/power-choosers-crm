@@ -101,6 +101,9 @@ export function useAddAccountToList() {
       queryClient.invalidateQueries({ queryKey: ['targets'] })
       queryClient.invalidateQueries({ queryKey: ['target', variables.listId] })
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === variables.accountId })
+      // Invalidate accounts list queries so the target page shows the new account immediately
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'accounts' })
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'accounts-count' })
     },
     onError: (error: Error) => {
       console.error('Error adding account to list:', error)
@@ -129,6 +132,9 @@ export function useRemoveAccountFromList() {
       queryClient.invalidateQueries({ queryKey: ['targets'] })
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account' && q.queryKey[1] === variables.accountId })
       queryClient.invalidateQueries({ queryKey: ['target'] })
+      // Invalidate accounts list queries so the target page updates immediately
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'accounts' })
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'accounts-count' })
     },
     onError: (error: Error) => {
       console.error('Error removing account from list:', error)

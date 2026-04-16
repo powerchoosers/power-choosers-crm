@@ -106,6 +106,9 @@ export function useAddContactToList() {
       queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
       // Contact dossier header badge (listName)
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === variables.contactId })
+      // Invalidate contacts list queries so the target page shows the new contact immediately
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contacts' })
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contacts-count' })
     },
     onError: (error: Error) => {
       console.error('Error adding contact to list:', error)
@@ -135,6 +138,9 @@ export function useRemoveContactFromList() {
       queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
       queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === variables.contactId })
       queryClient.invalidateQueries({ queryKey: ['target'] })
+      // Invalidate contacts list queries so the target page updates immediately
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contacts' })
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contacts-count' })
     },
     onError: (error: Error) => {
       console.error('Error removing contact from list:', error)
