@@ -32,6 +32,15 @@ export interface NotificationFeedItem {
   read: boolean
   link?: string | null
   source: 'notifications' | 'derived'
+  metadata?: {
+    hasVoicemail?: boolean
+    recordingUrl?: string
+    callSid?: string
+    contactId?: string
+    accountId?: string
+    duration?: number
+    [key: string]: any
+  }
 }
 
 async function resolveOwnerScope(user: { id?: string; email?: string | null }): Promise<string[]> {
