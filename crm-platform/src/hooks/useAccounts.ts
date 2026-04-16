@@ -24,6 +24,8 @@ export interface Account {
   location: string
   city?: string
   state?: string
+  country?: string
+  zip?: string
   /** Account HQ coords for map/weather; may be null if not set */
   latitude?: number | null
   longitude?: number | null
@@ -138,6 +140,8 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
     location,
     city,
     state,
+    country: data.country || data.metadata?.country || '',
+    zip: data.zip || data.metadata?.postal_code || data.metadata?.zip || '',
     latitude: data.latitude != null ? Number(data.latitude) : null,
     longitude: data.longitude != null ? Number(data.longitude) : null,
     serviceAddresses: data.service_addresses || [],
@@ -558,8 +562,16 @@ export function useCreateAccount() {
         service_addresses: newAccount.serviceAddresses,
         contract_end_date: newAccount.contractEnd || null,
         employees: parseInt(newAccount.employees) || null,
+        revenue: newAccount.revenue || null,
         city: newAccount.city || newAccount.location?.split(',')[0]?.trim(),
         state: newAccount.state || newAccount.location?.split(',')[1]?.trim(),
+        country: newAccount.country || null,
+        zip: newAccount.zip || null,
+        address: newAccount.address || null,
+        annual_usage: newAccount.annualUsage || null,
+        electricity_supplier: newAccount.electricitySupplier || null,
+        current_rate: newAccount.currentRate || null,
+        status: newAccount.status || 'PROSPECT',
         description: newAccount.description || '',
         ownerId: user?.email || null,
         metadata: {
@@ -637,9 +649,16 @@ export function useUpsertAccount() {
         updatedAt: new Date().toISOString()
       };
 
-      if (account.address) dbAccount.address = account.address;
-      if (account.city) dbAccount.city = account.city;
-      if (account.state) dbAccount.state = account.state;
+      if (account.address !== undefined) dbAccount.address = account.address || null;
+      if (account.city !== undefined) dbAccount.city = account.city || null;
+      if (account.state !== undefined) dbAccount.state = account.state || null;
+      if (account.country !== undefined) dbAccount.country = account.country || null;
+      if (account.zip !== undefined) dbAccount.zip = account.zip || null;
+      if (account.revenue) dbAccount.revenue = account.revenue;
+      if (account.annualUsage) dbAccount.annual_usage = account.annualUsage;
+      if (account.electricitySupplier) dbAccount.electricity_supplier = account.electricitySupplier;
+      if (account.currentRate) dbAccount.current_rate = account.currentRate;
+      if (account.status !== undefined) dbAccount.status = account.status || 'PROSPECT';
 
       if (!existingId) {
         dbAccount.id = crypto.randomUUID();
