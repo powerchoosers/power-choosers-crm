@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { PhoneCall, Play, Pause, Square, X, Info, Users, Phone, Voicemail, CheckCircle2, Building2, Briefcase, Mail } from 'lucide-react'
+import { PhoneCall, Play, Pause, Square, X, Info, Users, Phone, Voicemail, CheckCircle2, Building2, Briefcase } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { useCallStore } from '@/store/callStore'
@@ -34,6 +34,7 @@ export function PowerDialerDock() {
   const { profile } = useAuth()
   const callStatus = useCallStore((state) => state.status)
   const isCallActive = useCallStore((state) => state.isActive)
+  const currentDialedPhone = useCallStore((state) => state.phoneNumber)
 
   const contacts = usePowerDialerStore((state) => state.contacts)
   const selectedCount = usePowerDialerStore((state) => state.selectedCount)
@@ -51,6 +52,7 @@ export function PowerDialerDock() {
   const runIdRef = useRef<string | null>(null)
   const nextBatchIndexRef = useRef(0)
   const previousCallStatusRef = useRef(callStatus)
+  const lastResolvedPhoneRef = useRef('')
 
   const dialTargets = useMemo(() => buildPowerDialTargets(contacts), [contacts])
   const batches = useMemo(() => chunkPowerDialTargets(dialTargets, batchSize), [dialTargets, batchSize])
@@ -81,6 +83,12 @@ export function PowerDialerDock() {
     runIdRef.current = null
     nextBatchIndexRef.current = 0
   }, [sessionId])
+
+  useEffect(() => {
+    if (currentDialedPhone) {
+      lastResolvedPhoneRef.current = currentDialedPhone
+    }
+  }, [currentDialedPhone])
 
   const startBatch = useCallback(async (batchIndex: number) => {
     const batch = batches[batchIndex]
@@ -121,16 +129,18 @@ export function PowerDialerDock() {
     const runId = runIdRef.current
     const batchId = `${runId}:${batchIndex}`
     const batchLead = batch[0]
+    const isMultiTargetBatch = batch.length > 1
     const metadata = {
-      name: batchLead?.name || sourceLabel || 'Power Dial',
-      account: batchLead?.accountName || sourceLabel || 'Power Dial',
-      title: batchLead?.title || undefined,
-      photoUrl: batchLead?.photoUrl || undefined,
-      logoUrl: batchLead?.logoUrl || undefined,
-      domain: batchLead?.domain || undefined,
-      accountId: batchLead?.accountId || undefined,
-      contactId: batchLead?.contactId || undefined,
+      name: isMultiTargetBatch ? `${batch.length} Targets` : (batchLead?.name || sourceLabel || 'Power Dial'),
+      account: sourceLabel || batchLead?.accountName || 'Power Dial',
+      title: isMultiTargetBatch ? 'Power Dial Batch' : (batchLead?.title || undefined),
+      photoUrl: isMultiTargetBatch ? undefined : (batchLead?.photoUrl || undefined),
+      logoUrl: isMultiTargetBatch ? undefined : (batchLead?.logoUrl || undefined),
+      domain: isMultiTargetBatch ? undefined : (batchLead?.domain || undefined),
+      accountId: isMultiTargetBatch ? undefined : (batchLead?.accountId || undefined),
+      contactId: isMultiTargetBatch ? undefined : (batchLead?.contactId || undefined),
       isAccountOnly: false,
+      isPowerDialBatch: isMultiTargetBatch,
       powerDialSessionId: runId,
       powerDialBatchId: batchId,
       powerDialBatchIndex: batchIndex,
@@ -237,32 +247,34 @@ export function PowerDialerDock() {
   // Track call status changes to update target states
   useEffect(() => {
     if (mode !== 'running') return
-    
-    const currentPhone = useCallStore.getState().phoneNumber
-    if (!currentPhone) return
+    const currentPhone = currentDialedPhone || lastResolvedPhoneRef.current
 
     if (callStatus === 'connected') {
+      if (!currentPhone) return
       setTargetStates((prev) => {
         const next = new Map(prev)
-        next.set(currentPhone, 'connected')
-        // Mark others in batch as no-answer or voicemail
         currentBatch.forEach((target) => {
-          if (target.phoneNumber !== currentPhone && prev.get(target.phoneNumber) === 'ringing') {
-            next.set(target.phoneNumber, 'no-answer')
-          }
+          next.set(target.phoneNumber, target.phoneNumber === currentPhone ? 'connected' : 'no-answer')
         })
         return next
       })
     } else if (callStatus === 'ended') {
       setTargetStates((prev) => {
         const next = new Map(prev)
-        if (prev.get(currentPhone) === 'connected') {
-          next.set(currentPhone, 'completed')
-        }
+        currentBatch.forEach((target) => {
+          const existing = next.get(target.phoneNumber)
+          if (currentPhone && target.phoneNumber === currentPhone && existing === 'connected') {
+            next.set(target.phoneNumber, 'completed')
+            return
+          }
+          if (existing === 'ringing') {
+            next.set(target.phoneNumber, 'no-answer')
+          }
+        })
         return next
       })
     }
-  }, [callStatus, mode, currentBatch])
+  }, [callStatus, currentBatch, currentDialedPhone, mode])
 
   useEffect(() => {
     const previous = previousCallStatusRef.current
@@ -274,11 +286,9 @@ export function PowerDialerDock() {
 
     const nextIndex = nextBatchIndexRef.current
     if (nextIndex < totalBatches) {
-      const timer = window.setTimeout(() => {
-        void startBatch(nextIndex)
-      }, 500)
-
-      return () => window.clearTimeout(timer)
+      setMode('paused')
+      setSessionNote(`Call finished. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`)
+      return
     }
 
     setMode('complete')
@@ -286,7 +296,7 @@ export function PowerDialerDock() {
     toast.success('Power dial complete', {
       description: sourceLabel ? `Queue finished for ${sourceLabel}.` : 'Queue finished.',
     })
-  }, [callStatus, dialableCount, mode, sourceLabel, startBatch, totalBatches])
+  }, [callStatus, dialableCount, mode, sourceLabel, totalBatches])
 
   const statusLabel = useMemo(() => {
     if (mode === 'running') return isVoiceBusy ? 'CALL ACTIVE' : 'RUNNING'
@@ -427,7 +437,7 @@ export function PowerDialerDock() {
                     target={target}
                     index={index}
                     state={state}
-                    isActive={callStatus === 'connected' && useCallStore.getState().phoneNumber === target.phoneNumber}
+                    isActive={callStatus === 'connected' && currentDialedPhone === target.phoneNumber}
                   />
                 )
               }) : (

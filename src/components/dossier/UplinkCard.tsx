@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Phone, Mail, Clock, Plus, Sparkles, Star, Building2, Smartphone, Landmark, Trash2, ArrowUpRight } from 'lucide-react'
 import { format } from 'date-fns'
-import { ContactDetail } from '@/hooks/useContacts'
+import { ContactDetail, type ContactAdditionalPhone } from '@/hooks/useContacts'
 import { useCallStore } from '@/store/callStore'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
@@ -49,6 +49,12 @@ interface AdditionalPhoneEntry {
   signalScore?: number
   signalLabel?: string
   signalSource?: string
+  signalKind?: 'phone'
+  signalDerived?: boolean
+}
+
+function normalizePhoneDigits(value: string) {
+  return value.replace(/\D/g, '')
 }
 
 export const UplinkCard: React.FC<UplinkCardProps> = ({
@@ -181,10 +187,13 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
     const firstNonCompany = phoneEntries.find((p) => p.id !== 'companyPhone')
     const nextPrimary = (contact.primaryPhoneField || (firstNonCompany?.id ?? 'mobile')) as PrimaryPhoneType
     const nextEmail = contact.email || ''
-    const canonicalValues = new Set(phoneEntries.map((p) => p.value))
+    const canonicalValues = new Set(phoneEntries.map((p) => normalizePhoneDigits(p.value)))
     const extras = (Array.isArray(contact.additionalPhones) ? contact.additionalPhones : [])
       .filter((p) => p && typeof p.number === 'string' && p.number.trim())
-      .filter((p) => !canonicalValues.has(p.number))
+      .filter((p) => {
+        const digits = normalizePhoneDigits(p.number)
+        return digits ? !canonicalValues.has(digits) : true
+      })
       .map((p, idx) => {
         const bucket = p.bucket ?? inferPhoneBucketFromText(p.type, p.label, p.signalLabel, p.signalSource)
         const icon = bucket === 'mobile'
@@ -268,6 +277,59 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
     else if (id === 'otherPhone') updates.otherPhone = ''
     else if (id === 'companyPhone') updates.companyPhone = ''
     onUpdate(updates)
+  }
+
+  const persistAdditionalPhones = (entries: AdditionalPhoneEntry[]): ContactAdditionalPhone[] => {
+    return entries
+      .map((entry) => {
+        const digits = normalizePhoneDigits(entry.value)
+        if (!digits) return null
+        const number = formatPhoneNumber(entry.value)
+        if (!number) return null
+        const phone: ContactAdditionalPhone = {
+          number,
+          type: entry.bucket || entry.label || undefined,
+          label: entry.label || undefined,
+          bucket: entry.bucket,
+          signalScore: entry.signalScore,
+          signalLabel: entry.signalLabel,
+          signalSource: entry.signalSource,
+          signalKind: entry.signalKind,
+          signalDerived: entry.signalDerived,
+        }
+        return phone
+      })
+      .filter((entry): entry is ContactAdditionalPhone => !!entry)
+  }
+
+  const syncAdditionalPhones = (nextEntries: AdditionalPhoneEntry[]) => {
+    setAdditionalPhones(nextEntries)
+    onUpdate({ additionalPhones: persistAdditionalPhones(nextEntries) })
+  }
+
+  const handleAdditionalPhoneChange = (id: string, value: string) => {
+    const formattedValue = formatPhoneNumber(value)
+    const updated = additionalPhones.map((phone) =>
+      phone.id === id ? { ...phone, value: formattedValue || value } : phone
+    )
+    syncAdditionalPhones(updated)
+  }
+
+  const addAdditionalPhone = () => {
+    const nextIndex = additionalPhones.length + 1
+    const newEntry: AdditionalPhoneEntry = {
+      id: `extra-${crypto.randomUUID()}`,
+      label: `Other ${nextIndex}`,
+      value: '',
+      icon: Phone,
+      bucket: 'otherPhone',
+    }
+    syncAdditionalPhones([...additionalPhones, newEntry])
+  }
+
+  const removeAdditionalPhone = (id: string) => {
+    const updated = additionalPhones.filter((phone) => phone.id !== id)
+    syncAdditionalPhones(updated)
   }
 
   // Get Hero Number (Primary)
@@ -361,6 +423,55 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
                 >
                   <Plus className="w-2.5 h-2.5" /> Company
                 </button>
+              )}
+            </div>
+
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between px-2">
+                <span className="text-[10px] font-mono text-zinc-600 uppercase tracking-widest">Phone Candidates</span>
+                <button
+                  onClick={addAdditionalPhone}
+                  className="text-[9px] font-mono uppercase tracking-wider text-zinc-500 hover:text-zinc-200 transition-colors flex items-center gap-1"
+                >
+                  <Plus className="w-2.5 h-2.5" />
+                  Add Candidate
+                </button>
+              </div>
+
+              {additionalPhones.length > 0 ? (
+                <div className="space-y-3">
+                  {additionalPhones.map((phone) => (
+                    <div key={phone.id} className="group relative">
+                      <div className="flex items-center gap-2 mb-1 px-2">
+                        <phone.icon className="w-3 h-3 text-zinc-500" />
+                        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">{phone.label}</span>
+                        <span className="ml-auto text-[9px] font-mono uppercase tracking-wider text-zinc-600">
+                          Candidate
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={phone.value}
+                          onChange={(e) => handleAdditionalPhoneChange(phone.id, e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && onEnter?.()}
+                          className="flex-1 bg-black/40 border border-white/5 rounded-xl px-4 py-3 text-sm font-mono tabular-nums text-white focus:outline-none focus:border-[#002FA7]/50 focus:ring-1 focus:ring-[#002FA7]/30 transition-all"
+                          placeholder="+1 (000) 000-0000"
+                        />
+                        <button
+                          onClick={() => removeAdditionalPhone(phone.id)}
+                          className="p-2 text-zinc-600 hover:text-red-400 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="px-2 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                  No extra candidates saved.
+                </div>
               )}
             </div>
           </div>

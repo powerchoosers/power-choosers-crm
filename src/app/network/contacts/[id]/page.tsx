@@ -221,6 +221,8 @@ export default function ContactDossierPage() {
                 setEditOther={s.setEditOther}
                 editCompanyPhone={s.editCompanyPhone}
                 setEditCompanyPhone={s.setEditCompanyPhone}
+                editAdditionalPhones={s.editAdditionalPhones}
+                setEditAdditionalPhones={s.setEditAdditionalPhones}
                 editPrimaryField={s.editPrimaryField}
                 setEditPrimaryField={s.setEditPrimaryField}
                 editContractEnd={s.editContractEnd}
