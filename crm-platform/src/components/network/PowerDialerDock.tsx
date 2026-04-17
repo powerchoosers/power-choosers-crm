@@ -397,83 +397,85 @@ export function PowerDialerDock() {
         transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
         className="fixed left-1/2 bottom-24 z-[70] w-[min(94vw,52rem)] -translate-x-1/2 pointer-events-none lg:bottom-28"
       >
-        <div className="pointer-events-auto relative flex max-h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/90 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.45)] nodal-monolith-edge">
+        <div className="pointer-events-auto relative flex max-h-[calc(100vh-10rem)] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/90 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.45)] nodal-monolith-edge">
           <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/10 via-transparent to-white/5 pointer-events-none" />
 
           <div className="relative z-10 flex min-h-0 flex-1 flex-col">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-500">
-                  <PhoneCall className="w-3.5 h-3.5 text-zinc-300" />
-                  Power_Dial
+            <div className="px-4 pt-4 sm:px-5 sm:pt-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-500">
+                    <PhoneCall className="h-3.5 w-3.5 text-zinc-300" />
+                    Power_Dial
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center gap-2">
+                    <h2 className="text-lg font-semibold tracking-tight text-white sm:text-xl">
+                      {sourceLabel || 'Selected Contacts'}
+                    </h2>
+                    <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                      {statusLabel}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Call up to {batchSize} contacts at once. The first person to answer gets connected.
+                  </p>
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                    <span className="text-zinc-600">From:</span>
+                    <span className="text-zinc-300">{selectedCallerName}</span>
+                    <span className="text-zinc-600">•</span>
+                    <span className="tabular-nums">{selectedCallerNumber || 'No caller ID'}</span>
+                  </div>
                 </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <h2 className="text-lg sm:text-xl font-semibold tracking-tight text-white">
-                    {sourceLabel || 'Selected Contacts'}
-                  </h2>
-                  <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                    {statusLabel}
-                  </span>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleStartOrResume}
+                    disabled={!canStart}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-mono uppercase tracking-widest transition-all',
+                      canStart
+                        ? 'bg-[#002FA7] text-white shadow-[0_0_24px_rgba(0,47,167,0.35)] hover:bg-[#002FA7]/90'
+                        : 'cursor-not-allowed border border-white/10 bg-white/5 text-zinc-500'
+                    )}
+                  >
+                    <Play className="h-3.5 w-3.5" />
+                    {isStarting ? 'Starting' : startButtonLabel}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handlePause}
+                    disabled={mode !== 'running'}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-mono uppercase tracking-widest transition-all',
+                      mode === 'running'
+                        ? 'border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] hover:text-white'
+                        : 'cursor-not-allowed border-white/5 bg-white/[0.02] text-zinc-600'
+                    )}
+                  >
+                    <Pause className="h-3.5 w-3.5" />
+                    Pause
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-mono uppercase tracking-widest text-zinc-300 transition-all hover:bg-white/[0.06] hover:text-white"
+                  >
+                    <Square className="h-3.5 w-3.5" />
+                    Stop
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/20 p-2 text-zinc-500 transition-all hover:bg-white/[0.04] hover:text-white"
+                    aria-label="Clear power dial selection"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Call up to {batchSize} contacts at once. The first person to answer gets connected.
-                </p>
-                <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-white/5 bg-white/[0.03] px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                  <span className="text-zinc-600">From:</span>
-                  <span className="text-zinc-300">{selectedCallerName}</span>
-                  <span className="text-zinc-600">•</span>
-                  <span className="tabular-nums">{selectedCallerNumber || 'No caller ID'}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleStartOrResume}
-                  disabled={!canStart}
-                  className={cn(
-                    'inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-mono uppercase tracking-widest transition-all',
-                    canStart
-                      ? 'bg-[#002FA7] text-white shadow-[0_0_24px_rgba(0,47,167,0.35)] hover:bg-[#002FA7]/90'
-                      : 'bg-white/5 text-zinc-500 border border-white/10 cursor-not-allowed'
-                  )}
-                >
-                  <Play className="w-3.5 h-3.5" />
-                  {isStarting ? 'Starting' : startButtonLabel}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handlePause}
-                  disabled={mode !== 'running'}
-                  className={cn(
-                    'inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-xs font-mono uppercase tracking-widest transition-all',
-                    mode === 'running'
-                      ? 'border-white/10 bg-white/[0.03] text-zinc-300 hover:bg-white/[0.06] hover:text-white'
-                      : 'border-white/5 bg-white/[0.02] text-zinc-600 cursor-not-allowed'
-                  )}
-                >
-                  <Pause className="w-3.5 h-3.5" />
-                  Pause
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleStop}
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-xs font-mono uppercase tracking-widest text-zinc-300 transition-all hover:bg-white/[0.06] hover:text-white"
-                >
-                  <Square className="w-3.5 h-3.5" />
-                  Stop
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  className="inline-flex items-center justify-center rounded-xl border border-white/10 bg-black/20 p-2 text-zinc-500 transition-all hover:text-white hover:bg-white/[0.04]"
-                  aria-label="Clear power dial selection"
-                >
-                  <X className="w-4 h-4" />
-                </button>
               </div>
             </div>
 

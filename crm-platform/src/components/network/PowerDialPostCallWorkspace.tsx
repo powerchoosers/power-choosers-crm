@@ -777,62 +777,62 @@ export function PowerDialPostCallWorkspace({ snapshot, onContinueDialing }: Powe
 
   return (
     <div className="rounded-[24px] border border-[#002FA7]/20 bg-[#002FA7]/[0.05] p-4 shadow-[0_0_40px_rgba(0,47,167,0.12)] sm:p-5">
-      <div className="sticky top-0 z-20 border-b border-white/10 bg-[#020308]/90 px-4 py-4 sm:px-5">
+      <div className="sticky top-3 z-20 rounded-[22px] border border-white/10 bg-[#020308]/70 px-4 py-4 shadow-[0_18px_48px_rgba(0,0,0,0.35)] backdrop-blur-2xl sm:px-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 space-y-2">
-          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.24em] text-[#7aa3ff]">
-            <Save className="h-3.5 w-3.5" />
-            Post_Call_Workspace
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-sm font-semibold text-white">
-              <User2 className="h-4 w-4 text-zinc-400" />
-              <span className="truncate">{entityName}</span>
+          <div className="min-w-0 space-y-2">
+            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.24em] text-[#7aa3ff]">
+              <Save className="h-3.5 w-3.5" />
+              Post_Call_Workspace
             </div>
-            {companyName && (
-              <div className="flex items-center gap-2 text-xs text-zinc-400">
-                <Building2 className="h-3.5 w-3.5" />
-                <span className="truncate">{companyName}</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                <User2 className="h-4 w-4 text-zinc-400" />
+                <span className="truncate">{entityName}</span>
               </div>
-            )}
-            {entityPhone && (
-              <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
-                <Phone className="h-3.5 w-3.5" />
-                <span className="tabular-nums">{entityPhone}</span>
-              </div>
-            )}
+              {companyName && (
+                <div className="flex items-center gap-2 text-xs text-zinc-400">
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span className="truncate">{companyName}</span>
+                </div>
+              )}
+              {entityPhone && (
+                <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+                  <Phone className="h-3.5 w-3.5" />
+                  <span className="tabular-nums">{entityPhone}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
+              {entityTitle && <span>{entityTitle}</span>}
+              <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-zinc-400">
+                {dossierDestination}
+              </span>
+              {currentCallSid && (
+                <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-emerald-200">
+                  Call Linked
+                </span>
+              )}
+              {isVoicemailAnsweredBy(snapshot.answeredBy) && (
+                <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-sky-200">
+                  Voicemail
+                </span>
+              )}
+              {isUnknownAnsweredBy(snapshot.answeredBy) && (
+                <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-amber-200">
+                  AMD Unknown
+                </span>
+              )}
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-500">
-            {entityTitle && <span>{entityTitle}</span>}
-            <span className="rounded-full border border-white/10 bg-black/20 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-zinc-400">
-              {dossierDestination}
-            </span>
-            {currentCallSid && (
-              <span className="rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-emerald-200">
-                Call Linked
-              </span>
-            )}
-            {isVoicemailAnsweredBy(snapshot.answeredBy) && (
-              <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-sky-200">
-                Voicemail
-              </span>
-            )}
-            {isUnknownAnsweredBy(snapshot.answeredBy) && (
-              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-amber-200">
-                AMD Unknown
-              </span>
-            )}
-          </div>
-        </div>
 
-        {!resolvedContactId && !resolvedAccountId && (
-          <div className="flex max-w-sm items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
-            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <span>
-              This call is not linked to a CRM record yet. Notes cannot be saved until the contact or account is resolved.
-            </span>
-          </div>
-        )}
+          {!resolvedContactId && !resolvedAccountId && (
+            <div className="flex max-w-sm items-start gap-2 rounded-xl border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-[11px] text-amber-100">
+              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                This call is not linked to a CRM record yet. Notes cannot be saved until the contact or account is resolved.
+              </span>
+            </div>
+          )}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <ActionButton
