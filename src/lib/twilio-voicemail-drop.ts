@@ -64,7 +64,9 @@ export async function triggerOutboundVoicemailDrop({
     }
   }
 
-  const matchedUser = resolveUserForBusinessNumber(users, primaryIdentifier)
+  const matchedUser = identifiers
+    .map((identifier) => resolveUserForBusinessNumber(users, identifier))
+    .find(Boolean) || null
   const settings = matchedUser?.settings || {}
   let outboundVoicemailDrop = null
 
