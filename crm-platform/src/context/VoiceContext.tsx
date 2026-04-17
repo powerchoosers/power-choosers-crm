@@ -1004,6 +1004,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       // Ported from legacy phone.js: Set audio devices before connecting
       if (device.audio) {
         try {
+          // Power dial uses our custom ringback; suppress Twilio's default outgoing
+          // tone so the caller only hears one waiting sound.
+          device.audio.outgoing(!isPowerDial)
+
           // Set input device
           const inputDevices = device.audio.availableInputDevices
           let inputDeviceId = 'default'
@@ -1121,6 +1125,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       call.on('disconnect', () => {
         stopPowerDialRingback()
         clearPowerDialWinnerSubscription()
+        if (deviceRef.current?.audio) {
+          try {
+            deviceRef.current.audio.outgoing(true)
+          } catch (audioError) {
+            console.warn('[Voice] Failed to restore outgoing sound after disconnect:', audioError)
+          }
+        }
         isCallSessionActiveRef.current = false
         setCurrentCall(null)
         setStatus('ended')
@@ -1133,6 +1144,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       call.on('error', (error) => {
         stopPowerDialRingback()
         clearPowerDialWinnerSubscription()
+        if (deviceRef.current?.audio) {
+          try {
+            deviceRef.current.audio.outgoing(true)
+          } catch (audioError) {
+            console.warn('[Voice] Failed to restore outgoing sound after error:', audioError)
+          }
+        }
         console.error('[Voice] Call error:', error)
         toast.error('Call failed', { description: error.message })
         isCallSessionActiveRef.current = false
@@ -1155,6 +1173,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       stopPowerDialRingback()
       clearPowerDialWinnerSubscription()
+      if (deviceRef.current?.audio) {
+        try {
+          deviceRef.current.audio.outgoing(true)
+        } catch (audioError) {
+          console.warn('[Voice] Failed to restore outgoing sound after connect error:', audioError)
+        }
+      }
       console.error('[Voice] Connect failed:', error)
       toast.error('Could not initiate call', {
         description: error?.message || 'Check your internet connection and Twilio configuration.'
@@ -1169,6 +1194,13 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       stopPowerDialRingback()
       clearPowerDialWinnerSubscription()
       currentCall.disconnect()
+      if (deviceRef.current?.audio) {
+        try {
+          deviceRef.current.audio.outgoing(true)
+        } catch (audioError) {
+          console.warn('[Voice] Failed to restore outgoing sound on manual disconnect:', audioError)
+        }
+      }
       isCallSessionActiveRef.current = false
       setCurrentCall(null)
       setStatus('ended')
