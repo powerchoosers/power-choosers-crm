@@ -16,12 +16,13 @@ const playSynth = (
   freqStart: number,
   freqEnd: number,
   duration: number,
-  vol: number = 0.5
+  vol: number = 0.5,
+  force = false
 ) => {
   if (typeof window === 'undefined' || !window.AudioContext) return;
   
   // Check global master toggle
-  if (!useUIStore.getState().soundEnabled) return;
+  if (!force && !useUIStore.getState().soundEnabled) return;
 
   try {
     const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
@@ -208,12 +209,11 @@ function clearRingbackFallback() {
 
 function startRingbackFallback() {
   if (typeof window === 'undefined') return;
-  if (!useUIStore.getState().soundEnabled) return;
   if (ringbackFallbackTimer != null) return;
 
   const playStep = () => {
-    playSynth('sine', 440, 420, 0.18, 0.03);
-    window.setTimeout(() => playSynth('sine', 520, 500, 0.18, 0.025), 190);
+    playSynth('sine', 440, 420, 0.18, 0.03, true);
+    window.setTimeout(() => playSynth('sine', 520, 500, 0.18, 0.025, true), 190);
   };
 
   playStep();
@@ -222,7 +222,6 @@ function startRingbackFallback() {
 
 export const startPowerDialRingback = () => {
   if (typeof window === 'undefined') return;
-  if (!useUIStore.getState().soundEnabled) return;
 
   stopPowerDialRingback();
 
