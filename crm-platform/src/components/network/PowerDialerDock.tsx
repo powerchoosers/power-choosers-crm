@@ -8,8 +8,10 @@ import { useAuth } from '@/context/AuthContext'
 import { useCallStore } from '@/store/callStore'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
 import { buildPowerDialTargets, chunkPowerDialTargets, type PowerDialTarget } from '@/lib/powerDialer'
+import { isVoicemailAnsweredBy } from '@/lib/voice-outcomes'
 import { cn, formatToE164 } from '@/lib/utils'
 import { useVoice } from '@/context/VoiceContext'
+import { PowerDialPostCallWorkspace, type PowerDialPostCallSnapshot } from '@/components/network/PowerDialPostCallWorkspace'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
@@ -30,7 +32,7 @@ function formatSessionIndex(current: number, total: number) {
 }
 
 export function PowerDialerDock() {
-  const { connect, disconnect } = useVoice()
+  const { connect, disconnect, metadata: voiceMetadata } = useVoice()
   const { profile } = useAuth()
   const callStatus = useCallStore((state) => state.status)
   const isCallActive = useCallStore((state) => state.isActive)
@@ -48,11 +50,13 @@ export function PowerDialerDock() {
   const [isStarting, setIsStarting] = useState(false)
   const [sessionNote, setSessionNote] = useState<string | null>(null)
   const [targetStates, setTargetStates] = useState<Map<string, TargetCallState>>(new Map())
+  const [postCallSnapshot, setPostCallSnapshot] = useState<PowerDialPostCallSnapshot | null>(null)
 
   const runIdRef = useRef<string | null>(null)
   const nextBatchIndexRef = useRef(0)
   const previousCallStatusRef = useRef(callStatus)
   const lastResolvedPhoneRef = useRef('')
+  const lastPostCallSnapshotRef = useRef<PowerDialPostCallSnapshot | null>(null)
 
   const dialTargets = useMemo(() => buildPowerDialTargets(contacts), [contacts])
   const batches = useMemo(() => chunkPowerDialTargets(dialTargets, batchSize), [dialTargets, batchSize])
@@ -80,8 +84,10 @@ export function PowerDialerDock() {
     setIsStarting(false)
     setSessionNote(null)
     setTargetStates(new Map())
+    setPostCallSnapshot(null)
     runIdRef.current = null
     nextBatchIndexRef.current = 0
+    lastPostCallSnapshotRef.current = null
   }, [sessionId])
 
   useEffect(() => {
@@ -89,6 +95,25 @@ export function PowerDialerDock() {
       lastResolvedPhoneRef.current = currentDialedPhone
     }
   }, [currentDialedPhone])
+
+  useEffect(() => {
+    if (!voiceMetadata || voiceMetadata.isPowerDialBatch) return
+
+    const resolvedPhone = currentDialedPhone || lastResolvedPhoneRef.current
+    const matchingTarget = currentBatch.find((target) => target.phoneNumber === resolvedPhone) || currentBatch[0]
+
+    lastPostCallSnapshotRef.current = {
+      contactId: voiceMetadata.contactId || matchingTarget?.contactId || '',
+      accountId: voiceMetadata.accountId || matchingTarget?.accountId || '',
+      name: voiceMetadata.name || matchingTarget?.name || 'Unknown Contact',
+      accountName: voiceMetadata.account || matchingTarget?.accountName || sourceLabel || '',
+      title: voiceMetadata.title || matchingTarget?.title || '',
+      phoneNumber: resolvedPhone || matchingTarget?.phoneNumber || '',
+      callSid: voiceMetadata.callSid || '',
+      answeredBy: voiceMetadata.answeredBy || '',
+      voicemailDropStatus: voiceMetadata.voicemailDropStatus || '',
+    }
+  }, [currentBatch, currentDialedPhone, sourceLabel, voiceMetadata])
 
   const startBatch = useCallback(async (batchIndex: number) => {
     const batch = batches[batchIndex]
@@ -112,6 +137,8 @@ export function PowerDialerDock() {
     }
 
     setIsStarting(true)
+    setPostCallSnapshot(null)
+    lastPostCallSnapshotRef.current = null
 
     // Mark all targets in batch as ringing
     setTargetStates((prev) => {
@@ -223,6 +250,8 @@ export function PowerDialerDock() {
     setIsStarting(false)
     setSessionNote('Power dial stopped.')
     setTargetStates(new Map())
+    setPostCallSnapshot(null)
+    lastPostCallSnapshotRef.current = null
 
     if (isVoiceBusy) {
       disconnect()
@@ -237,6 +266,8 @@ export function PowerDialerDock() {
     setIsStarting(false)
     setSessionNote(null)
     setTargetStates(new Map())
+    setPostCallSnapshot(null)
+    lastPostCallSnapshotRef.current = null
     clearPowerDialer()
 
     if (isVoiceBusy) {
@@ -248,6 +279,7 @@ export function PowerDialerDock() {
   useEffect(() => {
     if (mode !== 'running') return
     const currentPhone = currentDialedPhone || lastResolvedPhoneRef.current
+    const machineAnswered = isVoicemailAnsweredBy(lastPostCallSnapshotRef.current?.answeredBy)
 
     if (callStatus === 'connected') {
       if (!currentPhone) return
@@ -264,7 +296,7 @@ export function PowerDialerDock() {
         currentBatch.forEach((target) => {
           const existing = next.get(target.phoneNumber)
           if (currentPhone && target.phoneNumber === currentPhone && existing === 'connected') {
-            next.set(target.phoneNumber, 'completed')
+            next.set(target.phoneNumber, machineAnswered ? 'voicemail' : 'completed')
             return
           }
           if (existing === 'ringing') {
@@ -284,10 +316,34 @@ export function PowerDialerDock() {
     if (previous === callStatus) return
     if (callStatus !== 'ended') return
 
+    if (previous === 'connected') {
+      const resolvedPhone = currentDialedPhone || lastResolvedPhoneRef.current
+      const matchingTarget = currentBatch.find((target) => target.phoneNumber === resolvedPhone) || currentBatch[0]
+      const fallbackSnapshot = matchingTarget ? {
+        contactId: matchingTarget.contactId || '',
+        accountId: matchingTarget.accountId || '',
+        name: matchingTarget.name || 'Unknown Contact',
+        accountName: matchingTarget.accountName || sourceLabel || '',
+        title: matchingTarget.title || '',
+        phoneNumber: resolvedPhone || matchingTarget.phoneNumber || '',
+        callSid: '',
+        answeredBy: '',
+        voicemailDropStatus: '',
+      } : null
+
+      setPostCallSnapshot(lastPostCallSnapshotRef.current || fallbackSnapshot)
+    }
+
+    const lastSnapshot = lastPostCallSnapshotRef.current
+    const endedOnVoicemail = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
     const nextIndex = nextBatchIndexRef.current
     if (nextIndex < totalBatches) {
       setMode('paused')
-      setSessionNote(`Call finished. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`)
+      setSessionNote(
+        endedOnVoicemail
+          ? `Voicemail handled. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+          : `Call finished. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+      )
       return
     }
 
@@ -426,6 +482,10 @@ export function PowerDialerDock() {
                   {skippedCount} selected contact{skippedCount === 1 ? '' : 's'} do not have a dialable number and were skipped.
                 </span>
               </div>
+            )}
+
+            {postCallSnapshot && (mode === 'paused' || mode === 'complete') && (
+              <PowerDialPostCallWorkspace snapshot={postCallSnapshot} />
             )}
 
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
