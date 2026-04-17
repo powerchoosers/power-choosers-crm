@@ -29,6 +29,32 @@ function normalizeBody(req) {
 // In-memory call storage (replace with database in production)
 const callStore = new Map();
 
+function getChildCallPriority(call) {
+    if (!call) return -1;
+
+    const status = String(call.status || '').toLowerCase();
+    const answeredBy = String(call.answeredBy || '').toLowerCase();
+    const duration = Number.parseInt(call.duration, 10) || 0;
+    const startTime = call.startTime ? new Date(call.startTime).getTime() : 0;
+
+    let score = 0;
+
+    if (answeredBy && answeredBy !== 'unknown') score += 100;
+    if (duration > 0) score += 50 + Math.min(duration, 300);
+    if (status === 'in-progress') score += 25;
+    if (status === 'completed') score += 20;
+    if (status === 'ringing') score += 10;
+
+    return score + Math.floor(startTime / 1000);
+}
+
+function pickBestChildCall(childCalls) {
+    if (!Array.isArray(childCalls) || childCalls.length === 0) return null;
+
+    return [...childCalls]
+        .sort((a, b) => getChildCallPriority(b) - getChildCallPriority(a))[0] || null;
+}
+
 export default async function handler(req, res) {
     if (cors(req, res)) return; // handle OPTIONS
 
@@ -121,10 +147,16 @@ export default async function handler(req, res) {
                     const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
                     const childCalls = await client.calls.list({ parentCallSid: finalCallSid, limit: 5 });
                     if (childCalls && childCalls.length > 0) {
-                        // Use the first child call (the PSTN leg) as the target for recording
-                        const childSid = childCalls[0].sid;
-                        logger.log(`[Recording] Mapping recording from parent ${finalCallSid} to child ${childSid}`);
-                        finalCallSid = childSid;
+                        const selectedChild = pickBestChildCall(childCalls);
+                        if (selectedChild?.sid) {
+                            logger.log(`[Recording] Mapping recording from parent ${finalCallSid} to child ${selectedChild.sid}`, {
+                                selectedStatus: selectedChild.status || null,
+                                selectedDuration: selectedChild.duration || null,
+                                selectedAnsweredBy: selectedChild.answeredBy || null,
+                                childCount: childCalls.length
+                            });
+                            finalCallSid = selectedChild.sid;
+                        }
                     } else {
                         // No child calls found — check if this CallSid already exists in Supabase
                         // If not, check if there's a recent call record that matches by timing
