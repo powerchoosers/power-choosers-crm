@@ -399,13 +399,13 @@ export default async function handler(req, res) {
         if (powerDialSourceLabel) callbackParams.append('powerDialSourceLabel', powerDialSourceLabel);
         if (powerDialSelectedCount !== '') callbackParams.append('powerDialSelectedCount', String(powerDialSelectedCount));
         if (powerDialDialableCount !== '') callbackParams.append('powerDialDialableCount', String(powerDialDialableCount));
+        if (businessNumber) callbackParams.append('businessPhone', businessNumber);
+        if (businessPhoneDetails?.sid) callbackParams.append('businessPhoneSid', businessPhoneDetails.sid);
+        if (businessPhoneDetails?.name) callbackParams.append('businessPhoneName', businessPhoneDetails.name);
         if (!isPowerDialBatch) {
             if (contactId) callbackParams.append('contactId', contactId);
             if (accountId) callbackParams.append('accountId', accountId);
             if (targetPhone) callbackParams.append('targetPhone', targetPhone);
-            if (businessNumber) callbackParams.append('businessPhone', businessNumber);
-            if (businessPhoneDetails?.sid) callbackParams.append('businessPhoneSid', businessPhoneDetails.sid);
-            if (businessPhoneDetails?.name) callbackParams.append('businessPhoneName', businessPhoneDetails.name);
         }
         const cbq = callbackParams.toString() ? `?${callbackParams.toString()}` : '';
 
@@ -462,7 +462,7 @@ export default async function handler(req, res) {
                 const targetParams = new URLSearchParams(callbackParams);
                 if (target.contactId) targetParams.append('contactId', target.contactId);
                 if (target.accountId) targetParams.append('accountId', target.accountId);
-                if (target.contactName) targetParams.append('contactName', target.contactName);
+                if (target.name) targetParams.append('contactName', target.name);
                 if (target.accountName) targetParams.append('accountName', target.accountName);
                 if (target.phoneNumber) targetParams.append('targetPhone', target.phoneNumber);
                 if (target.title) targetParams.append('contactTitle', target.title);
