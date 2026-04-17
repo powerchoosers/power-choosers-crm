@@ -21,7 +21,7 @@ export default async function handler(req, res) {
         if (ct.includes('application/json')) {
           body = JSON.parse(body);
         }
-      } catch (_) { }
+      } catch { }
 
       if (typeof body === 'string') {
         try {
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
           const obj = {};
           for (const [key, value] of params.entries()) obj[key] = value;
           body = obj;
-        } catch (_) { }
+        } catch { }
       }
     }
 
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
       powerDialSourceLabel = requestUrl.searchParams.get('powerDialSourceLabel') || '';
       powerDialSelectedCount = parseOptionalInt(requestUrl.searchParams.get('powerDialSelectedCount'));
       powerDialDialableCount = parseOptionalInt(requestUrl.searchParams.get('powerDialDialableCount'));
-    } catch (_) { }
+    } catch { }
 
     // --- Parse event details ---
     const event = (body.DialCallStatus || body.CallStatus || '').toLowerCase();
@@ -126,7 +126,7 @@ export default async function handler(req, res) {
                 if (d > resolvedDuration) resolvedDuration = d;
               }
             }
-          } catch (_) { }
+          } catch { }
         }
 
         // Last resort: use targetPhone from query string
@@ -163,6 +163,18 @@ export default async function handler(req, res) {
           source: 'dial-status-v3'
         };
 
+        if (event === 'busy') {
+          payload.outcome = 'Busy';
+        } else if (event === 'no-answer') {
+          payload.outcome = 'No Answer';
+        } else if (event === 'failed') {
+          payload.outcome = 'Failed';
+        } else if (event === 'canceled') {
+          payload.outcome = 'Canceled';
+        } else if (event === 'completed' && isVoicemailAnsweredBy(answeredBy)) {
+          payload.outcome = 'Voicemail';
+        }
+
         // If it's a completion event, mark it as completed
         if (['completed', 'busy', 'no-answer', 'failed', 'canceled'].includes(event)) {
           payload.status = 'completed';
@@ -178,7 +190,7 @@ export default async function handler(req, res) {
         const voicemailDetected = isVoicemailAnsweredBy(answeredBy);
         const shouldTriggerVoicemailDrop =
           voicemailDetected &&
-          !['dropped', 'missing-config', 'failed'].includes(existingVoicemailDropStatus);
+          !['dropped', 'missing-config'].includes(existingVoicemailDropStatus);
 
         if (shouldTriggerVoicemailDrop) {
           const dropResult = await triggerOutboundVoicemailDrop({
@@ -297,7 +309,7 @@ export default async function handler(req, res) {
     try {
       res.writeHead(200, { 'Content-Type': 'text/plain' });
       res.end('OK');
-    } catch (_) { }
+    } catch { }
     return;
   }
 }
