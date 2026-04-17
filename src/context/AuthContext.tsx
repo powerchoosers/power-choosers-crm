@@ -4,7 +4,14 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { getTwilioNumberEntries, getVoicemailGreeting, type TwilioNumberEntry, type VoicemailGreeting } from '@/lib/voicemail'
+import {
+  DEFAULT_MACHINE_DETECTION_TIMEOUT,
+  getMachineDetectionTimeout,
+  getTwilioNumberEntries,
+  getVoicemailGreeting,
+  type TwilioNumberEntry,
+  type VoicemailGreeting,
+} from '@/lib/voicemail'
 import { resolveUserRole } from '@/lib/auth/roles'
 
 export type UserProfile = {
@@ -23,6 +30,7 @@ export type UserProfile = {
   selectedPhoneNumber: string | null
   bridgeToMobile: boolean | null
   voicemailGreeting: VoicemailGreeting | null
+  machineDetectionTimeout: number | null
 }
 
 interface AuthContextType {
@@ -52,7 +60,8 @@ const AuthContext = createContext<AuthContextType>({
     twilioNumbers: null,
     selectedPhoneNumber: null,
     bridgeToMobile: null,
-    voicemailGreeting: null
+    voicemailGreeting: null,
+    machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
   },
   refreshProfile: async () => { },
 })
@@ -76,7 +85,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     twilioNumbers: null,
     selectedPhoneNumber: null,
     bridgeToMobile: null,
-    voicemailGreeting: null
+    voicemailGreeting: null,
+    machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
   })
   const router = useRouter()
 
@@ -163,7 +173,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         twilioNumbers: getTwilioNumberEntries(settings),
         selectedPhoneNumber: settings.selectedPhoneNumber || null,
         bridgeToMobile: settings.bridgeToMobile || false,
-        voicemailGreeting: getVoicemailGreeting(settings)
+        voicemailGreeting: getVoicemailGreeting(settings),
+        machineDetectionTimeout: getMachineDetectionTimeout(settings)
       })
 
       // If user has no hosted URL, fetch it natively from Zoho contacts sync.
@@ -203,23 +214,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: 'authenticated',
       } as unknown as User)
       setRole('admin')
-      setProfile({
-        email: 'dev@nodalpoint.io',
-        name: 'Dev User',
-        firstName: 'Dev',
-        lastName: 'User',
-        bio: 'System Administrator (Bypass)',
-        jobTitle: 'Principal Market Architect',
-        linkedinUrl: 'https://linkedin.com/in/nodalpoint',
-        website: 'nodalpoint.io',
-        city: null,
-        state: null,
-        hostedPhotoUrl: null,
-        twilioNumbers: [],
-        selectedPhoneNumber: null,
-        bridgeToMobile: false,
-        voicemailGreeting: null
-      })
+        setProfile({
+          email: 'dev@nodalpoint.io',
+          name: 'Dev User',
+          firstName: 'Dev',
+          lastName: 'User',
+          bio: 'System Administrator (Bypass)',
+          jobTitle: 'Principal Market Architect',
+          linkedinUrl: 'https://linkedin.com/in/nodalpoint',
+          website: 'nodalpoint.io',
+          city: null,
+          state: null,
+          hostedPhotoUrl: null,
+          twilioNumbers: [],
+          selectedPhoneNumber: null,
+          bridgeToMobile: false,
+          voicemailGreeting: null,
+          machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
+        })
       setLoading(false)
     }
 
@@ -242,7 +254,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           twilioNumbers: null,
           selectedPhoneNumber: null,
           bridgeToMobile: null,
-          voicemailGreeting: null
+          voicemailGreeting: null,
+          machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
         })
         document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
         setLoading(false)
@@ -285,7 +298,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           twilioNumbers: [],
           selectedPhoneNumber: null,
           bridgeToMobile: false,
-          voicemailGreeting: null
+          voicemailGreeting: null,
+          machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
         })
         setLoading(false)
 
@@ -351,7 +365,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 twilioNumbers: getTwilioNumberEntries(settings),
                 selectedPhoneNumber: settings.selectedPhoneNumber || null,
                 bridgeToMobile: settings.bridgeToMobile || false,
-                voicemailGreeting: getVoicemailGreeting(settings)
+                voicemailGreeting: getVoicemailGreeting(settings),
+                machineDetectionTimeout: getMachineDetectionTimeout(settings)
               })
             } else {
               const resolvedRole = resolveEffectiveRole(null, emailLower)
@@ -371,7 +386,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   selectedPhoneNumber: null,
                   bridgeToMobile: false,
                   voicemailGreeting: null,
-                  website: null
+                  website: null,
+                  machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
                 }
               }
 
@@ -392,7 +408,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 twilioNumbers: [],
                 selectedPhoneNumber: null,
                 bridgeToMobile: false,
-                voicemailGreeting: null
+                voicemailGreeting: null,
+                machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
               })
             }
           }
@@ -440,7 +457,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           twilioNumbers: null,
           selectedPhoneNumber: null,
           bridgeToMobile: null,
-          voicemailGreeting: null
+          voicemailGreeting: null,
+          machineDetectionTimeout: DEFAULT_MACHINE_DETECTION_TIMEOUT
         })
         // Clear session cookie
         document.cookie = 'np_session=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;'
