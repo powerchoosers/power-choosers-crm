@@ -48,7 +48,7 @@ import { useProtocols } from '@/hooks/useProtocols'
 import { useTargets } from '@/hooks/useTargets'
 import { useTasks, type Task } from '@/hooks/useTasks'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
-import { isVoicemailAnsweredBy } from '@/lib/voice-outcomes'
+import { isUnknownAnsweredBy, isVoicemailAnsweredBy } from '@/lib/voice-outcomes'
 import { cn } from '@/lib/utils'
 import { useComposeStore } from '@/store/composeStore'
 
@@ -60,6 +60,7 @@ type DispositionId =
   | 'send_info'
   | 'call_back'
   | 'voicemail_dropped'
+  | 'amd_unknown'
   | 'gatekeeper'
   | 'bad_number'
   | 'do_not_contact'
@@ -127,6 +128,18 @@ const DISPOSITIONS: DispositionDefinition[] = [
     reminderMinutes: [60],
     icon: Voicemail,
     tone: 'border-sky-500/25 bg-sky-500/10 text-sky-200',
+  },
+  {
+    id: 'amd_unknown',
+    label: 'AMD Unknown',
+    summary: 'Twilio could not classify the answer. Review the number and retry with a longer timeout if needed.',
+    priority: 'High',
+    createTaskDefault: true,
+    openEmailDefault: false,
+    duePreset: '15m',
+    reminderMinutes: [15, 60],
+    icon: TriangleAlert,
+    tone: 'border-amber-500/25 bg-amber-500/10 text-amber-200',
   },
   {
     id: 'gatekeeper',
@@ -215,6 +228,8 @@ function buildDispositionTaskTitle(dispositionId: DispositionId, entityName: str
       return `Call back ${displayName}`
     case 'voicemail_dropped':
       return `Retry ${displayName} after voicemail`
+    case 'amd_unknown':
+      return `Review AMD result for ${displayName}`
     case 'gatekeeper':
       return `Find alternate route into ${displayCompany}`
     case 'bad_number':
@@ -419,7 +434,9 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
 
     const defaultDispositionId = isVoicemailAnsweredBy(snapshot?.answeredBy)
       ? 'voicemail_dropped'
-      : null
+      : isUnknownAnsweredBy(snapshot?.answeredBy)
+        ? 'amd_unknown'
+        : null
 
     applyDispositionDefaults(defaultDispositionId)
   }, [
@@ -757,6 +774,11 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
             {isVoicemailAnsweredBy(snapshot.answeredBy) && (
               <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-sky-200">
                 Voicemail
+              </span>
+            )}
+            {isUnknownAnsweredBy(snapshot.answeredBy) && (
+              <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 font-mono uppercase tracking-widest text-[10px] text-amber-200">
+                AMD Unknown
               </span>
             )}
           </div>

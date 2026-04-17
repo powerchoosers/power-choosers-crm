@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, PhoneOutgoing, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, AlertCircle, Fingerprint, Network, Globe, ExternalLink, Cpu, Mic, Square, Loader2, Volume2, Download } from 'lucide-react'
+import { Bell, Shield, Palette, Database, Trash2, Plus, Phone, PhoneOutgoing, User as UserIcon, Lock, Mail, RefreshCw, Zap, Brain, Radio, Activity, CheckCircle, Fingerprint, Network, Globe, ExternalLink, Cpu, Mic, Square, Loader2, Volume2, Download } from 'lucide-react'
 import { useSyncStore } from '@/store/syncStore'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
@@ -19,7 +19,15 @@ import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useUIStore } from '@/store/uiStore'
-import { getVoicemailGreetingForTwilioNumber, normalizePhoneNumber, type TwilioNumberEntry, type VoicemailGreeting } from '@/lib/voicemail'
+import {
+  DEFAULT_MACHINE_DETECTION_TIMEOUT,
+  getMachineDetectionTimeout,
+  getVoicemailGreetingForTwilioNumber,
+  normalizeMachineDetectionTimeout,
+  normalizePhoneNumber,
+  type TwilioNumberEntry,
+  type VoicemailGreeting,
+} from '@/lib/voicemail'
 import { NodalAudioScrubber } from '@/components/audio/NodalAudioScrubber'
 import type { DesktopUpdateCheckResult, DesktopUpdateState } from '@/types/desktop'
 
@@ -167,6 +175,7 @@ export default function SettingsPage() {
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null)
   const [selectedPhoneNumber, setSelectedPhoneNumber] = useState<string | null>(null)
   const [bridgeToMobile, setBridgeToMobile] = useState(false)
+  const [machineDetectionTimeout, setMachineDetectionTimeout] = useState(DEFAULT_MACHINE_DETECTION_TIMEOUT)
   const [newNumber, setNewNumber] = useState('')
   const [newNumberName, setNewNumberName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -1147,6 +1156,7 @@ export default function SettingsPage() {
     setSelectedIdx(idx)
     setSelectedPhoneNumber(profile.selectedPhoneNumber || (twilioList.length > 0 ? twilioList[0].number : null))
     setBridgeToMobile(profile.bridgeToMobile || false)
+    setMachineDetectionTimeout(getMachineDetectionTimeout(profile))
     const selectedEntry = idx !== null ? twilioList[idx] || null : null
     const selectedGreeting = selectedEntry
       ? getVoicemailGreetingForTwilioNumber(
@@ -1201,6 +1211,11 @@ export default function SettingsPage() {
 
     setIsSaving(true)
     try {
+      const normalizedMachineDetectionTimeout = normalizeMachineDetectionTimeout(
+        machineDetectionTimeout,
+        DEFAULT_MACHINE_DETECTION_TIMEOUT
+      )
+
       const emailLower = user.email.toLowerCase().trim()
       const targetEmail = localEmail.toLowerCase().trim()
 
@@ -1221,11 +1236,13 @@ export default function SettingsPage() {
             name: computedName || null,
             twilioNumbers: twilioNumbers.map((num, i) => ({
               ...num,
-              selected: i === selectedIdx
+              selected: i === selectedIdx,
+              machineDetectionTimeout: normalizedMachineDetectionTimeout,
             })),
             selectedPhoneNumber: selectedIdx !== null ? twilioNumbers[selectedIdx]?.number : selectedPhoneNumber,
             bridgeToMobile: bridgeToMobile,
             voicemailGreeting: voicemailGreeting,
+            machineDetectionTimeout: normalizedMachineDetectionTimeout,
             role: role || 'employee', // Preserve role
             website: website.trim() || null,
             city: city.trim() || null,
@@ -1259,7 +1276,15 @@ export default function SettingsPage() {
   const handleAddNumber = () => {
     if (!newNumber || !newNumberName) return
     const formatted = strictFormat(newNumber)
-    const updated = [...twilioNumbers, { name: newNumberName, number: formatted, sid: null, selected: false, voicemailGreeting: null, outboundVoicemailDrop: null }]
+    const updated = [...twilioNumbers, {
+      name: newNumberName,
+      number: formatted,
+      sid: null,
+      selected: false,
+      voicemailGreeting: null,
+      outboundVoicemailDrop: null,
+      machineDetectionTimeout: normalizeMachineDetectionTimeout(machineDetectionTimeout, DEFAULT_MACHINE_DETECTION_TIMEOUT),
+    }]
     setTwilioNumbers(updated)
     // If it's the first number or we want to switch to new one immediately
     if (updated.length === 1 || !selectedPhoneNumber) {
@@ -1643,6 +1668,36 @@ export default function SettingsPage() {
                       <Badge variant="outline" className="border-white/10 bg-white/[0.02] text-[9px] font-mono uppercase tracking-widest text-zinc-400">
                         {selectedPhoneNumber ? `Line ${selectedPhoneNumber}` : 'No line selected'}
                       </Badge>
+                    </div>
+
+                    <div className="rounded-2xl border border-white/5 bg-black/20 p-4 space-y-3">
+                      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="space-y-1">
+                          <Label htmlFor="machineDetectionTimeout" className="text-xs font-mono uppercase tracking-[0.22em] text-zinc-500">
+                            AMD Timeout
+                          </Label>
+                          <p className="text-xs text-zinc-500">
+                            Twilio waits this many seconds for a voicemail greeting before it decides the call is still a machine. Long business greetings often need 45 seconds or more.
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <Input
+                            id="machineDetectionTimeout"
+                            type="number"
+                            min={3}
+                            max={60}
+                            step={1}
+                            value={machineDetectionTimeout}
+                            onChange={(event) => {
+                              const next = Number.parseInt(event.target.value, 10)
+                              if (!Number.isFinite(next)) return
+                              setMachineDetectionTimeout(Math.max(3, Math.min(60, next)))
+                            }}
+                            className="w-28 bg-transparent border-white/10 text-zinc-200 font-mono tabular-nums focus-visible:ring-[#002FA7]"
+                          />
+                          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">seconds</span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

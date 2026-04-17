@@ -4,7 +4,7 @@ import { cors } from './_cors.js';
 import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
 import logger from './_logger.js';
-import { isVoicemailAnsweredBy } from '@/lib/voice-outcomes';
+import { isUnknownAnsweredBy, isVoicemailAnsweredBy } from '@/lib/voice-outcomes';
 
 // In-memory fallback store (for local/dev when Supabase isn't configured)
 const memoryStore = new Map();
@@ -55,6 +55,9 @@ function deriveOutcome(call) {
   if (status === 'answered' || status === 'completed') {
     if (isVoicemailAnsweredBy(answeredBy)) {
       return 'Voicemail';
+    }
+    if (isUnknownAnsweredBy(answeredBy)) {
+      return 'Unknown';
     }
     if (status === 'answered') return 'Connected';
     return duration > 0 ? 'Connected' : 'No Answer';

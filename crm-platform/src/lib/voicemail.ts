@@ -29,6 +29,7 @@ export type TwilioNumberEntry = {
   selected: boolean
   voicemailGreeting: VoicemailGreeting | null
   outboundVoicemailDrop: OutboundVoicemailDrop | null
+  machineDetectionTimeout?: number | null
 }
 
 type NumberLike =
@@ -49,15 +50,18 @@ type NumberLike =
 
 type SettingsLike = {
   selectedPhoneNumber?: NumberLike
-  twilioNumbers?: NumberLike[]
+  twilioNumbers?: NumberLike[] | null
   voicemailGreeting?: unknown
   voicemail?: unknown
   outboundVoicemailDrop?: unknown
+  machineDetectionTimeout?: unknown
+  machine_detection_timeout?: unknown
 }
 
 export const VOICEMAIL_BUCKET = 'voicemail-greetings'
 export const VOICEMAIL_FILE_NAME = 'greeting.wav'
 export const OUTBOUND_VOICEMAIL_FILE_NAME = 'outbound-drop.wav'
+export const DEFAULT_MACHINE_DETECTION_TIMEOUT = 45
 
 export function digitsOnly(value: unknown): string {
   return (value == null ? '' : String(value)).replace(/\D/g, '')
@@ -73,6 +77,12 @@ export function normalizePhoneNumber(value: unknown): string | null {
   if (cleaned.length === 11 && cleaned.startsWith('1')) return `+${cleaned}`
   if (str.startsWith('+') && cleaned.length > 0) return `+${cleaned}`
   return null
+}
+
+export function normalizeMachineDetectionTimeout(value: unknown, fallback = DEFAULT_MACHINE_DETECTION_TIMEOUT): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(3, Math.min(60, parsed))
 }
 
 export function normalizeVoicemailGreeting(value: unknown): VoicemailGreeting | null {
@@ -184,6 +194,7 @@ export function normalizeTwilioNumberEntry(value: NumberLike): TwilioNumberEntry
   const outboundVoicemailDrop = normalizeOutboundVoicemailDrop(
     raw.outboundVoicemailDrop || raw.outbound_voicemail_drop || null
   )
+  const machineDetectionTimeout = raw.machineDetectionTimeout ?? raw.machine_detection_timeout
 
   return {
     name: name || 'Primary',
@@ -192,6 +203,7 @@ export function normalizeTwilioNumberEntry(value: NumberLike): TwilioNumberEntry
     selected,
     voicemailGreeting,
     outboundVoicemailDrop,
+    machineDetectionTimeout: normalizeMachineDetectionTimeout(machineDetectionTimeout, DEFAULT_MACHINE_DETECTION_TIMEOUT),
   }
 }
 
@@ -229,6 +241,14 @@ export function getSelectedTwilioNumberEntry(settings: SettingsLike | null | und
   if (selectedByFlag) return selectedByFlag
 
   return entries[0] || null
+}
+
+export function getMachineDetectionTimeout(settings: SettingsLike | null | undefined): number {
+  const selectedEntry = getSelectedTwilioNumberEntry(settings)
+  return normalizeMachineDetectionTimeout(
+    settings?.machineDetectionTimeout ?? settings?.machine_detection_timeout ?? selectedEntry?.machineDetectionTimeout ?? DEFAULT_MACHINE_DETECTION_TIMEOUT,
+    DEFAULT_MACHINE_DETECTION_TIMEOUT
+  )
 }
 
 export function getTwilioNumberEntryForIdentifier(settings: SettingsLike | null | undefined, identifier: unknown): TwilioNumberEntry | null {
