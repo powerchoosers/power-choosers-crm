@@ -41,6 +41,7 @@ interface VoiceMetadata {
   powerDialSelectedCount?: number
   powerDialDialableCount?: number
   powerDialTargetCount?: number
+  machineDetectionTimeout?: number
   callSid?: string
   answeredBy?: string
   machineDetectionDuration?: number | null

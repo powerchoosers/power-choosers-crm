@@ -2,13 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { PhoneCall, Play, Pause, Square, X, Info, Users, Phone, Voicemail, CheckCircle2, Building2, Briefcase } from 'lucide-react'
+import { PhoneCall, Play, Pause, Square, X, Info, Users, Phone, Voicemail, CheckCircle2, Building2, Briefcase, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { useCallStore } from '@/store/callStore'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
 import { buildPowerDialTargets, chunkPowerDialTargets, type PowerDialTarget } from '@/lib/powerDialer'
-import { isVoicemailAnsweredBy } from '@/lib/voice-outcomes'
+import { isUnknownAnsweredBy, isVoicemailAnsweredBy } from '@/lib/voice-outcomes'
 import { cn, formatToE164 } from '@/lib/utils'
 import { useVoice } from '@/context/VoiceContext'
 import { PowerDialPostCallWorkspace, type PowerDialPostCallSnapshot } from '@/components/network/PowerDialPostCallWorkspace'
@@ -16,7 +16,7 @@ import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
 type SessionMode = 'idle' | 'running' | 'paused' | 'complete'
-type TargetCallState = 'queued' | 'ringing' | 'connected' | 'voicemail' | 'completed' | 'no-answer'
+type TargetCallState = 'queued' | 'ringing' | 'connected' | 'voicemail' | 'completed' | 'no-answer' | 'unknown'
 const EMPTY_BATCH: PowerDialTarget[] = []
 
 function makeSessionId() {
@@ -177,6 +177,7 @@ export function PowerDialerDock() {
       powerDialSelectedCount: selectedCount,
       powerDialDialableCount: dialableCount,
       powerDialTargetCount: batch.length,
+      machineDetectionTimeout: profile?.machineDetectionTimeout ?? undefined,
     }
 
     const started = await connect({
@@ -214,7 +215,7 @@ export function PowerDialerDock() {
     setMode('running')
     setSessionNote(`Batch ${formatSessionIndex(batchIndex, totalBatches)} started.`)
     return true
-  }, [batchSize, batches, connect, dialableCount, isVoiceBusy, mode, selectedCallerNumber, selectedCount, sourceLabel, totalBatches])
+  }, [batchSize, batches, connect, dialableCount, isVoiceBusy, mode, profile?.machineDetectionTimeout, selectedCallerNumber, selectedCount, sourceLabel, totalBatches])
 
   const handleStartOrResume = useCallback(async () => {
     if (isStarting) return
@@ -282,6 +283,7 @@ export function PowerDialerDock() {
     const lastSnapshot = lastPostCallSnapshotRef.current
     const currentPhone = currentDialedPhone || lastResolvedPhoneRef.current || lastSnapshot?.phoneNumber || ''
     const machineAnswered = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
+    const unknownAnswered = isUnknownAnsweredBy(lastSnapshot?.answeredBy)
     const hasResolvedWinner = Boolean(lastSnapshot?.callSid || lastSnapshot?.answeredBy || lastSnapshot?.voicemailDropStatus)
 
     if (callStatus === 'connected') {
@@ -299,7 +301,7 @@ export function PowerDialerDock() {
         currentBatch.forEach((target) => {
           const existing = next.get(target.phoneNumber)
           if (currentPhone && target.phoneNumber === currentPhone && (existing === 'connected' || hasResolvedWinner)) {
-            next.set(target.phoneNumber, machineAnswered ? 'voicemail' : 'completed')
+            next.set(target.phoneNumber, machineAnswered ? 'voicemail' : (unknownAnswered ? 'unknown' : 'completed'))
             return
           }
           if (existing === 'ringing') {
@@ -321,7 +323,8 @@ export function PowerDialerDock() {
 
     const lastSnapshot = lastPostCallSnapshotRef.current
     const endedOnVoicemail = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
-    const shouldOpenPostCallWorkspace = previous === 'connected' || endedOnVoicemail || Boolean(lastSnapshot?.callSid)
+    const endedOnUnknown = isUnknownAnsweredBy(lastSnapshot?.answeredBy)
+    const shouldOpenPostCallWorkspace = previous === 'connected' || endedOnVoicemail || endedOnUnknown || Boolean(lastSnapshot?.callSid)
 
     if (shouldOpenPostCallWorkspace) {
       const resolvedPhone = currentDialedPhone || lastResolvedPhoneRef.current
@@ -347,6 +350,8 @@ export function PowerDialerDock() {
       setSessionNote(
         endedOnVoicemail
           ? `Voicemail handled. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+          : endedOnUnknown
+            ? `Twilio could not classify the answer. Review the number, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
           : `Call finished. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
       )
       return
@@ -581,6 +586,14 @@ function TargetCard({
       bgColor: 'bg-amber-500/10',
       borderColor: 'border-amber-500/20',
       icon: Voicemail,
+      pulseColor: null,
+    },
+    unknown: {
+      label: 'AMD UNKNOWN',
+      color: 'text-amber-300',
+      bgColor: 'bg-amber-500/10',
+      borderColor: 'border-amber-500/20',
+      icon: TriangleAlert,
       pulseColor: null,
     },
     completed: {
