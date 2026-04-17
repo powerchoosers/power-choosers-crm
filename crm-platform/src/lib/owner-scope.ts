@@ -5,6 +5,26 @@ type OwnerScopeUser = {
   email?: string | null
 }
 
+const OWNER_EMAIL_ALIASES: Record<string, string[]> = {
+  'nodalpoint.io': ['getnodalpoint.com'],
+  'getnodalpoint.com': ['nodalpoint.io'],
+}
+
+function addEmailAliases(values: Set<string>, email?: string | null) {
+  const normalized = normalizeEmail(email)
+  if (!normalized) return
+
+  values.add(normalized)
+
+  const [localPart = '', domain = ''] = normalized.split('@')
+  const aliases = OWNER_EMAIL_ALIASES[domain] || []
+  for (const aliasDomain of aliases) {
+    if (localPart && aliasDomain) {
+      values.add(`${localPart}@${aliasDomain}`)
+    }
+  }
+}
+
 export function buildOwnerScopeValues(user?: OwnerScopeUser | null) {
   const values = new Set<string>()
 
@@ -13,14 +33,12 @@ export function buildOwnerScopeValues(user?: OwnerScopeUser | null) {
     if (id) values.add(id)
   }
 
-  const email = normalizeEmail(user?.email)
-  if (email) {
-    values.add(email)
-  }
+  addEmailAliases(values, user?.email)
 
   const rawEmail = String(user?.email || '').trim().toLowerCase()
   if (rawEmail) {
     values.add(rawEmail)
+    addEmailAliases(values, rawEmail)
   }
 
   return Array.from(values)
