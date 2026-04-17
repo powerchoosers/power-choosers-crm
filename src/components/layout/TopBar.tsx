@@ -102,12 +102,9 @@ export function TopBar() {
   const {
     isActive,
     status,
-    setActive,
-    setStatus,
     phoneNumber,
     setPhoneNumber,
     metadata: storeMetadata,
-    setMetadata: setStoreMetadata,
     callTriggered,
     clearCallTrigger,
     isCallHUDOpen,
@@ -203,12 +200,20 @@ export function TopBar() {
     const s = (storeMetadata || {}) as any;
     const v = (voiceMetadata || {}) as any;
     const c = (storeContext?.data || {}) as any;
+    const preferVoice = isActive;
 
-    // Coalesce: Dossier Props (s) > Active Context (c) > Voice API (v)
-    const logoUrl = s.logoUrl || c.logoUrl || v.logoUrl || s.logo_url || c.logo_url || v.logo_url || '';
-    const domain = s.domain || c.domain || v.domain || '';
-    const accountId = s.accountId || c.id || v.accountId || '';
-    const isAccountOnly = v.isAccountOnly ?? s.isAccountOnly ?? (storeContext?.type === 'account');
+    const logoUrl = preferVoice
+      ? (v.logoUrl || v.logo_url || s.logoUrl || s.logo_url || c.logoUrl || c.logo_url || '')
+      : (s.logoUrl || s.logo_url || c.logoUrl || c.logo_url || v.logoUrl || v.logo_url || '');
+    const domain = preferVoice
+      ? (v.domain || s.domain || c.domain || '')
+      : (s.domain || c.domain || v.domain || '');
+    const accountId = preferVoice
+      ? (v.accountId || s.accountId || c.id || '')
+      : (s.accountId || c.id || v.accountId || '');
+    const isAccountOnly = preferVoice
+      ? (v.isAccountOnly ?? s.isAccountOnly ?? (storeContext?.type === 'account'))
+      : (s.isAccountOnly ?? v.isAccountOnly ?? (storeContext?.type === 'account'));
 
     return {
       ...s,
@@ -219,7 +224,7 @@ export function TopBar() {
       isAccountOnly,
       metadata: { ...(c.metadata || {}), ...(s.metadata || {}), ...(v.metadata || {}) }
     };
-  }, [voiceMetadata, storeMetadata, storeContext]);
+  }, [isActive, voiceMetadata, storeMetadata, storeContext]);
 
   // Contextual Intel Logic
   const contextInfo = useMemo(() => {
@@ -280,6 +285,9 @@ export function TopBar() {
   const callbarDomain = callbarAccount?.domain || displayMetadata?.domain || ''
   const activeCallContactId = displayMetadata?.contactId || displayMetadata?.metadata?.contactId || ''
   const activeCallAccountId = displayMetadata?.accountId || displayMetadata?.metadata?.accountId || ''
+  const activeCallName = displayMetadata?.isPowerDialBatch
+    ? (displayMetadata?.powerDialTargetCount ? `${displayMetadata.powerDialTargetCount} Targets Ringing` : 'Power Dial Ringing')
+    : (displayMetadata?.name || phoneNumber || 'Unknown Caller')
 
 
   // Listen for scroll on the main content container (passive + rAF throttle for smooth scroll)
@@ -479,10 +487,6 @@ export function TopBar() {
 
   const handleHangup = () => {
     disconnect()
-    setActive(false)
-    setStatus('ended')
-    setPhoneNumber('')
-    setStoreMetadata(null)
   }
 
   const handleOpenContactDossier = useCallback(() => {
@@ -620,8 +624,8 @@ export function TopBar() {
                       key={`callbar-icon-${callSessionId}`}
                       logoUrl={callbarLogoUrl || undefined}
                       domain={callbarDomain || undefined}
-                      name={displayMetadata?.account || displayMetadata?.name || phoneNumber || 'Caller'}
-                      contactName={displayMetadata?.name || undefined}
+                      name={displayMetadata?.account || activeCallName || 'Caller'}
+                      contactName={displayMetadata?.isPowerDialBatch ? undefined : (displayMetadata?.name || undefined)}
                       photoUrl={
                         displayMetadata?.photoUrl ||
                         displayMetadata?.avatarUrl ||
@@ -640,10 +644,10 @@ export function TopBar() {
                             className="truncate text-left transition-transform duration-200 hover:scale-[1.04] origin-left"
                             aria-label={activeCallContactId ? "Open contact dossier" : "Open account dossier"}
                           >
-                            {displayMetadata?.name || phoneNumber || "Unknown Caller"}
+                            {activeCallName}
                           </button>
                         ) : (
-                          <span className="truncate">{displayMetadata?.name || phoneNumber || "Unknown Caller"}</span>
+                          <span className="truncate">{activeCallName}</span>
                         )}
                       </div>
                       <div className="text-[10px] text-zinc-500 lowercase truncate">
