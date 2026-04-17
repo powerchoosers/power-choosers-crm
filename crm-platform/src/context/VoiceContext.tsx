@@ -507,17 +507,8 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
               }
             }
 
-            if (newDevice.audio.isOutputSelectionSupported) {
-              const outputDevices = newDevice.audio.availableOutputDevices
-              if (outputDevices && outputDevices.size > 0) {
-                const deviceIds = Array.from(outputDevices.keys())
-                let outputDeviceId = 'default'
-                if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                  outputDeviceId = deviceIds[0] as string
-                }
-                newDevice.audio.speakerDevices.set(outputDeviceId)
-              }
-            }
+            // Do not auto-pick a speaker here. Twilio/browser default output is safer
+            // unless the user explicitly chooses a device.
           }
 
           // Run audio setup but don't block registration on it
@@ -656,17 +647,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
               }
               await newDevice.audio.setInputDevice(inputDeviceId)
 
-              if (newDevice.audio.isOutputSelectionSupported) {
-                const outputDevices = newDevice.audio.availableOutputDevices
-                let outputDeviceId = 'default'
-                if (outputDevices && outputDevices.size > 0) {
-                  const deviceIds = Array.from(outputDevices.keys())
-                  if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                    outputDeviceId = deviceIds[0] as string
-                  }
-                }
-                newDevice.audio.speakerDevices.set(outputDeviceId)
-              }
+              // Keep the browser's default speaker routing for inbound calls.
             } catch (audioError) {
               console.warn('[Voice] Audio setup failed for incoming call:', audioError)
             }
@@ -1040,18 +1021,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
             await device.audio.unsetInputDevice()
           }
 
-          // Set speaker devices if supported
-          if (device.audio.isOutputSelectionSupported) {
-            const outputDevices = device.audio.availableOutputDevices
-            let outputDeviceId = 'default'
-            if (outputDevices && outputDevices.size > 0) {
-              const deviceIds = Array.from(outputDevices.keys())
-              if (!deviceIds.includes('default') && deviceIds.length > 0) {
-                outputDeviceId = deviceIds[0] as string
-              }
-            }
-            device.audio.speakerDevices.set(outputDeviceId)
-          }
+          // Leave output selection alone so calls stay on the browser's default speaker.
         } catch (audioError) {
           console.warn('[Voice] Audio device setup failed:', audioError)
         }
