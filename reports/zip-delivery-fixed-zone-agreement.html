@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zip Delivery ENGIE Quote | Nodal Point</title>
+    <style>
+      :root {
+        --blue: #002fa7;
+        --blue-2: #2d6bff;
+        --ink: #101828;
+        --muted: #667085;
+        --soft: #f7f9fc;
+        --soft-blue: #eef4ff;
+        --border: #d8e0ed;
+        --border-2: #e7ebf3;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: #dfe6f2;
+        color: var(--ink);
+        font-family: "Segoe UI", Arial, sans-serif;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      @page {
+        size: letter;
+        margin: 0;
+      }
+
+      body {
+        min-height: 100vh;
+        padding: 24px;
+      }
+
+      .sheet {
+        width: 8.5in;
+        height: 11in;
+        position: relative;
+        overflow: hidden;
+        padding: 0.34in;
+        border: 1px solid #cfd8e6;
+        border-radius: 0;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+      }
+
+      .sheet::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 8px;
+        background: linear-gradient(90deg, var(--blue), var(--blue-2));
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        gap: 18px;
+        align-items: flex-start;
+      }
+
+      .brand {
+        display: grid;
+        grid-template-columns: 64px 1fr;
+        gap: 14px;
+        align-items: start;
+      }
+
+      .logo {
+        width: 64px;
+        height: 64px;
+        padding: 8px;
+        border-radius: 16px;
+        border: 1px solid #d6deeb;
+        background: #fff;
+      }
+
+      .logo img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+
+      .eyebrow {
+        margin-top: 3px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--blue);
+      }
+
+      h1,
+      h2,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        margin-top: 8px;
+        font-size: 31px;
+        line-height: 1.02;
+        letter-spacing: -0.04em;
+      }
+
+      .subhead {
+        margin-top: 9px;
+        max-width: 470px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: var(--muted);
+      }
+
+      .meta {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: flex-end;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 208px;
+        padding: 9px 14px;
+        border-radius: 999px;
+        border: 1px solid #cddaff;
+        background: var(--soft-blue);
+        color: var(--blue);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+
+      .pill.secondary {
+        background: #f8fafc;
+        border-color: #d6dce5;
+        color: #344054;
+      }
+
+      .hero {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: 1.15fr 0.85fr;
+        gap: 12px;
+      }
+
+      .hero-main,
+      .hero-side,
+      .box,
+      .stat {
+        border: 1px solid var(--border);
+        border-radius: 22px;
+        background: #fff;
+      }
+
+      .hero-main {
+        padding: 18px;
+        background: linear-gradient(180deg, #f6f9ff 0%, #eff4ff 100%);
+        border-left: 6px solid var(--blue);
+      }
+
+      .section-label {
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #475467;
+      }
+
+      .hero-title {
+        margin-top: 10px;
+        max-width: 410px;
+        font-size: 22px;
+        line-height: 1.12;
+        letter-spacing: -0.03em;
+      }
+
+      .hero-copy {
+        margin-top: 10px;
+        max-width: 485px;
+        font-size: 13px;
+        line-height: 1.55;
+        color: #344054;
+      }
+
+      .hero-note {
+        margin-top: 12px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 12px;
+        border-radius: 14px;
+        background: rgba(0, 47, 167, 0.08);
+        color: #274cae;
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 700;
+      }
+
+      .hero-points {
+        margin: 10px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 7px;
+        max-width: 485px;
+      }
+
+      .hero-points li {
+        display: flex;
+        gap: 8px;
+        align-items: flex-start;
+        font-size: 11px;
+        line-height: 1.35;
+        color: #344054;
+      }
+
+      .hero-points .dot {
+        width: 8px;
+        height: 8px;
+        margin-top: 4px;
+        border-radius: 999px;
+        background: var(--blue);
+        flex: 0 0 auto;
+        box-shadow: 0 0 0 3px rgba(0, 47, 167, 0.1);
+      }
+
+      .hero-points strong {
+        color: var(--ink);
+      }
+
+      .hero-side {
+        padding: 16px;
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcff 100%);
+      }
+
+      .quote-head {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 12px;
+        border-bottom: 1px solid #e8edf5;
+      }
+
+      .engie-logo {
+        width: 90px;
+        height: 42px;
+        padding: 2px 0;
+        object-fit: contain;
+        display: block;
+      }
+
+      .quote-kicker {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .quote-title {
+        margin-top: 8px;
+        font-size: 19px;
+        line-height: 1.08;
+        letter-spacing: -0.03em;
+      }
+
+      .quote-rate {
+        margin-top: 12px;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+      }
+
+      .quote-rate .value {
+        font-size: 35px;
+        line-height: 1;
+        font-weight: 900;
+        letter-spacing: -0.05em;
+        color: var(--blue);
+      }
+
+      .quote-rate .unit {
+        font-size: 14px;
+        font-weight: 800;
+        color: #475467;
+      }
+
+      .quote-desc {
+        margin-top: 10px;
+        font-size: 12px;
+        line-height: 1.55;
+        color: #344054;
+      }
+
+      .mini-grid {
+        margin-top: 14px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px 12px;
+      }
+
+      .mini {
+        min-height: 68px;
+        padding: 11px 12px;
+        border-radius: 16px;
+        background: var(--soft);
+        border: 1px solid var(--border-2);
+      }
+
+      .mini .label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .mini .value {
+        margin-top: 7px;
+        font-size: 15px;
+        line-height: 1.25;
+        font-weight: 800;
+        color: var(--ink);
+      }
+
+      .mini .value.small {
+        font-size: 13px;
+      }
+
+      .quote-detail-grid {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .quote-detail {
+        padding: 10px 11px;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e6ebf2;
+      }
+
+      .quote-detail .label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .quote-detail .value {
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 800;
+        color: var(--ink);
+      }
+
+      .stats {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .stat {
+        padding: 12px 12px 11px;
+        background: #fff;
+      }
+
+      .stat .label {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .stat .value {
+        margin-top: 7px;
+        font-size: 17px;
+        line-height: 1.15;
+        font-weight: 800;
+        color: var(--ink);
+      }
+
+      .stat .sub {
+        margin-top: 6px;
+        font-size: 11px;
+        line-height: 1.35;
+        color: var(--muted);
+      }
+
+      .content {
+        margin-top: 12px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+
+      .box {
+        padding: 16px;
+        min-height: 236px;
+      }
+
+      .box .section-label {
+        margin-bottom: 10px;
+      }
+
+      .company-strip {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        margin-bottom: 12px;
+        border-radius: 16px;
+        background: #f8fafc;
+        border: 1px solid #e6ebf2;
+      }
+
+      .company-strip img {
+        width: 76px;
+        height: 34px;
+        object-fit: contain;
+        display: block;
+      }
+
+      .company-strip .copy {
+        font-size: 11px;
+        line-height: 1.45;
+        color: #475467;
+      }
+
+      .list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+      }
+
+      .list li {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        font-size: 13px;
+        line-height: 1.5;
+        color: #344054;
+      }
+
+      .dot {
+        width: 9px;
+        height: 9px;
+        margin-top: 5px;
+        border-radius: 999px;
+        background: var(--blue);
+        flex: 0 0 auto;
+        box-shadow: 0 0 0 4px rgba(0, 47, 167, 0.1);
+      }
+
+      .quote-tiles {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .quote-tile {
+        padding: 10px 11px;
+        border-radius: 14px;
+        background: #f8fafc;
+        border: 1px solid #e6ebf2;
+      }
+
+      .quote-tile .k {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .quote-tile .v {
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.35;
+        font-weight: 800;
+        color: var(--ink);
+      }
+
+      .quote-note {
+        margin-top: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(0, 47, 167, 0.08);
+        border: 1px solid rgba(0, 47, 167, 0.16);
+        font-size: 12px;
+        line-height: 1.45;
+        color: #274cae;
+        font-weight: 700;
+      }
+
+      .footer {
+        position: absolute;
+        left: 0.34in;
+        right: 0.34in;
+        bottom: 0.28in;
+        padding-top: 10px;
+        border-top: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        gap: 14px;
+        align-items: flex-end;
+      }
+
+      .footer .note {
+        max-width: 500px;
+        font-size: 10px;
+        line-height: 1.45;
+        color: var(--muted);
+      }
+
+      .footer .source {
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: #344054;
+        text-align: right;
+      }
+
+      .mono {
+        font-family: Consolas, "SFMono-Regular", monospace;
+        font-variant-numeric: tabular-nums;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="sheet">
+      <header class="header">
+        <div class="brand">
+          <div class="logo">
+            <img src="../public/images/nodalpoint-webicon.png" alt="Nodal Point" />
+          </div>
+          <div>
+            <div class="eyebrow">Quote Summary</div>
+            <h1>Zip Delivery ENGIE Quote</h1>
+            <p class="subhead">
+              Joseph, this one-pager shows your actual offer and the account facts that support it.
+            </p>
+          </div>
+        </div>
+
+        <div class="meta">
+          <div class="pill">6.682¢ / kWh</div>
+          <div class="pill secondary">36 months fixed all-in</div>
+        </div>
+      </header>
+
+      <section class="hero">
+        <div class="hero-main">
+          <div class="section-label">Offer structure</div>
+          <h2 class="hero-title">
+            Joseph, your 36-month fixed zone quote is <span class="mono">6.682¢ / kWh</span>.
+          </h2>
+          <p class="hero-copy">
+            This is your fully fixed all-in zone offer, not a hub structure, so there are no added nodal congestion
+            charges. The agreement also carries a $0 termination fee if you no longer occupy the facility.
+          </p>
+          <div class="hero-note">
+            Your contract starts December 1, 2026. Your current term ends November 30, 2026.
+          </div>
+          <div class="section-label" style="margin-top: 12px">What this means for you</div>
+          <ul class="hero-points">
+            <li>
+              <span class="dot"></span>
+              <span><strong>Fully fixed</strong> means your rate stays the same for the full term.</span>
+            </li>
+            <li>
+              <span class="dot"></span>
+              <span><strong>100% swing</strong> means usage changes do not change your rate.</span>
+            </li>
+            <li>
+              <span class="dot"></span>
+              <span><strong>Blend and extend</strong> means if market pricing drops later, we can move you to the lower rate.</span>
+            </li>
+            <li>
+              <span class="dot"></span>
+              <span>You still keep the <strong>$0 termination fee</strong> if you leave the facility.</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="hero-side">
+          <div class="quote-head">
+            <img class="engie-logo" src="../public/images/engie.png" alt="ENGIE Resources" />
+            <div>
+              <div class="quote-kicker">Supplier quote</div>
+              <div class="quote-title">Fixed All-In 36 Months</div>
+            </div>
+          </div>
+
+          <div class="quote-rate">
+            <div class="value mono">6.682¢</div>
+            <div class="unit">per kWh</div>
+          </div>
+
+          <div class="quote-desc">
+            Your supplier on this quote is ENGIE Resources, a licensed retail energy provider for commercial and
+            industrial customers in the U.S. It has served business customers since 2002 and offers electricity and
+            renewable energy solutions.
+          </div>
+
+          <div class="quote-detail-grid">
+            <div class="quote-detail">
+              <div class="label">Billing method</div>
+              <div class="value">Single bill from supplier</div>
+            </div>
+            <div class="quote-detail">
+              <div class="label">Bandwidth</div>
+              <div class="value">100%</div>
+            </div>
+          </div>
+
+          <div class="mini-grid">
+            <div class="mini">
+              <div class="label">Est savings</div>
+              <div class="value">--</div>
+            </div>
+            <div class="mini">
+              <div class="label">Term start</div>
+              <div class="value small">Dec 1, 2026</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="stat">
+          <div class="label">Annual usage</div>
+          <div class="value mono">58,528 kWh</div>
+          <div class="sub">Your current planning figure on file.</div>
+        </div>
+        <div class="stat">
+          <div class="label">Contract start</div>
+          <div class="value">Dec 1, 2026</div>
+          <div class="sub">It starts after your current term ends.</div>
+        </div>
+        <div class="stat">
+          <div class="label">Quote term</div>
+          <div class="value">36 months</div>
+          <div class="sub">Your fixed term length.</div>
+        </div>
+      </section>
+
+      <section class="content">
+        <div class="box">
+          <div class="section-label">Account details</div>
+          <ul class="list">
+            <li><span class="dot"></span><span>Your account record lists you, <strong>Joseph Azzaro</strong>, as the primary contact.</span></li>
+            <li><span class="dot"></span><span>You have <strong>2 active meters</strong> on file for Zip Delivery.</span></li>
+            <li><span class="dot"></span><span>Your meter at <span class="mono">10610 NEWKIRK ST STE 206 DALLAS, TX 75220-2306</span> is on file.</span></li>
+            <li><span class="dot"></span><span>Your meter at <span class="mono">10610 NEWKIRK ST STE 207 DALLAS, TX 75220-2332</span> is on file.</span></li>
+            <li><span class="dot"></span><span>Your ESIDs are <span class="mono">10443720008635185</span> and <span class="mono">10443720004066467</span>.</span></li>
+          </ul>
+        </div>
+
+        <div class="box">
+          <div class="section-label">Quote details</div>
+          <div class="company-strip">
+            <img src="../public/images/engie.png" alt="ENGIE logo" />
+            <div class="copy">
+              Your quoted supplier is ENGIE Resources. The offer is fixed all-in, so you see one simple rate instead
+              of a layered price stack.
+            </div>
+          </div>
+          <div class="quote-tiles">
+            <div class="quote-tile">
+              <div class="k">Rate</div>
+              <div class="v mono">6.682¢ / kWh</div>
+            </div>
+            <div class="quote-tile">
+              <div class="k">Term</div>
+              <div class="v">36 months</div>
+            </div>
+            <div class="quote-tile">
+              <div class="k">Effective date</div>
+              <div class="v">Dec 1, 2026</div>
+            </div>
+            <div class="quote-tile">
+              <div class="k">Termination fee</div>
+              <div class="v">$0 if vacated</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer">
+        <div class="note">Commercial quote prepared for you on April 17, 2026.</div>
+        <div class="source">For Joseph Azzaro · Zip Delivery · ENGIE Resources</div>
+      </footer>
+    </main>
+  </body>
+</html>
