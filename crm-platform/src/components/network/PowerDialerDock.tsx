@@ -277,6 +277,12 @@ export function PowerDialerDock() {
     }
   }, [clearPowerDialer, disconnect, isVoiceBusy])
 
+  const handleContinueAfterDisposition = useCallback(() => {
+    if (mode !== 'paused') return
+    if (nextBatchIndexRef.current >= totalBatches) return
+    void handleStartOrResume()
+  }, [handleStartOrResume, mode, totalBatches])
+
   // Track call status changes to update target states
   useEffect(() => {
     if (mode !== 'running') return
@@ -349,10 +355,10 @@ export function PowerDialerDock() {
       setMode('paused')
       setSessionNote(
         endedOnVoicemail
-          ? `Voicemail handled. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+          ? `Voicemail handled. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
           : endedOnUnknown
-            ? `Twilio could not classify the answer. Review the number, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
-          : `Call finished. Review notes, then resume for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+            ? `Twilio could not classify the answer. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+          : `Call finished. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
       )
       return
     }
@@ -391,10 +397,10 @@ export function PowerDialerDock() {
         transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
         className="fixed left-1/2 bottom-24 z-[70] w-[min(94vw,52rem)] -translate-x-1/2 pointer-events-none lg:bottom-28"
       >
-        <div className="pointer-events-auto relative overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/90 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.45)] nodal-monolith-edge">
+        <div className="pointer-events-auto relative flex max-h-[calc(100vh-7rem)] flex-col overflow-hidden rounded-[28px] border border-white/10 bg-zinc-950/90 backdrop-blur-2xl shadow-[0_24px_80px_rgba(0,0,0,0.45)] nodal-monolith-edge">
           <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/10 via-transparent to-white/5 pointer-events-none" />
 
-          <div className="relative z-10 p-4 sm:p-5 space-y-4">
+          <div className="relative z-10 flex min-h-0 flex-1 flex-col">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.24em] text-zinc-500">
@@ -471,50 +477,55 @@ export function PowerDialerDock() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <SummaryTile label="Selected" value={String(selectedCount).padStart(2, '0')} />
-              <SummaryTile label="Dialable" value={String(dialableCount).padStart(2, '0')} accent="text-emerald-400" />
-              <SummaryTile label="Skipped" value={String(skippedCount).padStart(2, '0')} accent={skippedCount > 0 ? 'text-amber-400' : 'text-zinc-400'} />
-              <SummaryTile label="Batch" value={totalBatches > 0 ? formatSessionIndex(currentBatchIndex, totalBatches) : '00/00'} accent="text-white" />
-            </div>
-
-            {sessionNote && (
-              <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 text-[11px] text-zinc-400">
-                <Info className="h-3.5 w-3.5 text-zinc-300" />
-                <span>{sessionNote}</span>
+            <div className="flex-1 min-h-0 overflow-y-auto np-scroll scroll-smooth p-4 sm:p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <SummaryTile label="Selected" value={String(selectedCount).padStart(2, '0')} />
+                <SummaryTile label="Dialable" value={String(dialableCount).padStart(2, '0')} accent="text-emerald-400" />
+                <SummaryTile label="Skipped" value={String(skippedCount).padStart(2, '0')} accent={skippedCount > 0 ? 'text-amber-400' : 'text-zinc-400'} />
+                <SummaryTile label="Batch" value={totalBatches > 0 ? formatSessionIndex(currentBatchIndex, totalBatches) : '00/00'} accent="text-white" />
               </div>
-            )}
 
-            {skippedCount > 0 && (
-              <div className="flex items-center gap-2 rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200">
-                <Users className="h-3.5 w-3.5" />
-                <span>
-                  {skippedCount} selected contact{skippedCount === 1 ? '' : 's'} do not have a dialable number and were skipped.
-                </span>
-              </div>
-            )}
-
-            {postCallSnapshot && (mode === 'paused' || mode === 'complete') && (
-              <PowerDialPostCallWorkspace snapshot={postCallSnapshot} />
-            )}
-
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {currentBatch.length > 0 ? currentBatch.map((target, index) => {
-                const state = targetStates.get(target.phoneNumber) || 'queued'
-                return (
-                  <TargetCard
-                    key={`${target.contactId}-${target.phoneNumber}-${index}`}
-                    target={target}
-                    index={index}
-                    state={state}
-                    isActive={callStatus === 'connected' && currentDialedPhone === target.phoneNumber}
-                  />
-                )
-              }) : (
-                <div className="rounded-2xl border border-white/5 bg-white/[0.02] px-3 py-4 text-xs text-zinc-500 sm:col-span-2 xl:col-span-3">
-                  No dialable contacts in the current batch.
+              {sessionNote && (
+                <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 text-[11px] text-zinc-400">
+                  <Info className="h-3.5 w-3.5 text-zinc-300" />
+                  <span>{sessionNote}</span>
                 </div>
               )}
+
+              {skippedCount > 0 && (
+                <div className="flex items-center gap-2 rounded-xl border border-amber-500/15 bg-amber-500/5 px-3 py-2 text-[11px] text-amber-200">
+                  <Users className="h-3.5 w-3.5" />
+                  <span>
+                    {skippedCount} selected contact{skippedCount === 1 ? '' : 's'} do not have a dialable number and were skipped.
+                  </span>
+                </div>
+              )}
+
+              {postCallSnapshot && (mode === 'paused' || mode === 'complete') && (
+                <PowerDialPostCallWorkspace
+                  snapshot={postCallSnapshot}
+                  onContinueDialing={handleContinueAfterDisposition}
+                />
+              )}
+
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {currentBatch.length > 0 ? currentBatch.map((target, index) => {
+                  const state = targetStates.get(target.phoneNumber) || 'queued'
+                  return (
+                    <TargetCard
+                      key={`${target.contactId}-${target.phoneNumber}-${index}`}
+                      target={target}
+                      index={index}
+                      state={state}
+                      isActive={callStatus === 'connected' && currentDialedPhone === target.phoneNumber}
+                    />
+                  )
+                }) : (
+                  <div className="rounded-2xl border border-white/5 bg-white/[0.02] px-3 py-4 text-xs text-zinc-500 sm:col-span-2 xl:col-span-3">
+                    No dialable contacts in the current batch.
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

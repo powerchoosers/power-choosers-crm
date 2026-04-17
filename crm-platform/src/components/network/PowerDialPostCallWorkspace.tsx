@@ -283,9 +283,10 @@ export interface PowerDialPostCallSnapshot {
 
 interface PowerDialPostCallWorkspaceProps {
   snapshot: PowerDialPostCallSnapshot | null
+  onContinueDialing?: () => void
 }
 
-export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorkspaceProps) {
+export function PowerDialPostCallWorkspace({ snapshot, onContinueDialing }: PowerDialPostCallWorkspaceProps) {
   const openCompose = useComposeStore((state) => state.openCompose)
   const contactId = snapshot?.contactId || ''
   const { data: contact } = useContact(contactId)
@@ -611,12 +612,15 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
     }
   }, [currentCallSid, duePreset, reminderMinutes, selectedDisposition])
 
-  const handleApplyDisposition = useCallback(async () => {
-    if (!selectedDisposition) {
-      toast.error('Choose a post-call disposition first.')
-      return
-    }
-
+  const applyDispositionCore = useCallback(async ({
+    disposition,
+    useDefaults = false,
+    continueDialing = true,
+  }: {
+    disposition: DispositionDefinition
+    useDefaults?: boolean
+    continueDialing?: boolean
+  }) => {
     setIsApplyingDisposition(true)
 
     try {
@@ -625,27 +629,34 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
       if (noteForDisposition) {
         const noteSaved = await saveDraftToDossier()
         if (!noteSaved) {
-          setIsApplyingDisposition(false)
           return
         }
       }
 
-      const dueDate = createFollowUpTask ? resolveDueDate(duePreset) : null
+      const effectiveCreateTask = useDefaults ? disposition.createTaskDefault : createFollowUpTask
+      const effectiveOpenEmail = useDefaults ? disposition.openEmailDefault : openEmailAfterDisposition
+      const effectiveDuePreset = useDefaults ? disposition.duePreset : duePreset
+      const effectiveReminderMinutes = useDefaults ? disposition.reminderMinutes : reminderMinutes
+      const effectiveTaskTitle = useDefaults
+        ? buildDispositionTaskTitle(disposition.id, entityName, companyName)
+        : (dispositionTaskTitle.trim() || buildDispositionTaskTitle(disposition.id, entityName, companyName))
+      const effectiveProtocolId = useDefaults ? '' : selectedDispositionProtocolId
+      const dueDate = effectiveCreateTask ? resolveDueDate(effectiveDuePreset) : null
       let createdTask: Task | null = null
 
-      if (createFollowUpTask) {
+      if (effectiveCreateTask) {
         createdTask = await addTaskAsync({
-          title: dispositionTaskTitle.trim() || buildDispositionTaskTitle(selectedDisposition.id, entityName, companyName),
+          title: effectiveTaskTitle,
           description: buildDispositionDescription({
-            dispositionLabel: selectedDisposition.label,
+            dispositionLabel: disposition.label,
             note: noteForDisposition,
             phoneNumber: entityPhone,
             companyName,
           }),
-          priority: selectedDisposition.priority,
+          priority: disposition.priority,
           status: 'Pending',
           dueDate: dueDate?.toISOString(),
-          reminders: reminderMinutes.length > 0 ? reminderMinutes : null,
+          reminders: effectiveReminderMinutes.length > 0 ? effectiveReminderMinutes : null,
           contactId: resolvedContactId || undefined,
           accountId: resolvedAccountId || undefined,
           relatedTo: entityName || companyName,
@@ -653,31 +664,35 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
           metadata: {
             source: 'power_dial_disposition',
             callSid: currentCallSid || null,
-            disposition: selectedDisposition.id,
-            dispositionLabel: selectedDisposition.label,
-            reminderPreset: duePreset,
+            disposition: disposition.id,
+            dispositionLabel: disposition.label,
+            reminderPreset: effectiveDuePreset,
           },
         })
       }
 
-      if (selectedDispositionProtocolId && resolvedContactId) {
+      if (effectiveProtocolId && resolvedContactId) {
         await addContactToProtocol.mutateAsync({
           contactId: resolvedContactId,
-          sequenceId: selectedDispositionProtocolId,
+          sequenceId: effectiveProtocolId,
         })
       }
 
       await persistDispositionToCall({
         taskId: createdTask?.id,
         dueDate: dueDate?.toISOString(),
-        protocolId: selectedDispositionProtocolId || undefined,
+        protocolId: effectiveProtocolId || undefined,
       })
 
-      if (openEmailAfterDisposition) {
+      if (effectiveOpenEmail) {
         openFollowUpEmail()
       }
 
-      toast.success(`${selectedDisposition.label} applied`)
+      toast.success(`${disposition.label} applied`)
+
+      if (continueDialing) {
+        onContinueDialing?.()
+      }
     } catch (error) {
       console.error('Failed to apply disposition:', error)
       toast.error(error instanceof Error ? error.message : 'Could not apply the disposition')
@@ -690,11 +705,11 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
     companyName,
     createFollowUpTask,
     currentCallSid,
-    dispositionTaskTitle,
     duePreset,
     entityName,
     entityPhone,
     noteDraft,
+    onContinueDialing,
     openEmailAfterDisposition,
     openFollowUpEmail,
     persistDispositionToCall,
@@ -702,9 +717,34 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
     resolvedAccountId,
     resolvedContactId,
     saveDraftToDossier,
-    selectedDisposition,
     selectedDispositionProtocolId,
+    dispositionTaskTitle,
   ])
+
+  const handleApplyDisposition = useCallback(async () => {
+    if (!selectedDisposition) {
+      toast.error('Choose a post-call disposition first.')
+      return
+    }
+
+    await applyDispositionCore({
+      disposition: selectedDisposition,
+      useDefaults: false,
+      continueDialing: true,
+    })
+  }, [applyDispositionCore, selectedDisposition])
+
+  const handleQuickVoicemailDrop = useCallback(async () => {
+    const voicemailDisposition = DISPOSITIONS.find((item) => item.id === 'voicemail_dropped')
+    if (!voicemailDisposition) return
+
+    applyDispositionDefaults('voicemail_dropped')
+    await applyDispositionCore({
+      disposition: voicemailDisposition,
+      useDefaults: true,
+      continueDialing: true,
+    })
+  }, [applyDispositionCore, applyDispositionDefaults])
 
   const toggleReminderMinute = useCallback((value: number) => {
     setReminderMinutes((current) => {
@@ -737,7 +777,8 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
 
   return (
     <div className="rounded-[24px] border border-[#002FA7]/20 bg-[#002FA7]/[0.05] p-4 shadow-[0_0_40px_rgba(0,47,167,0.12)] sm:p-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+      <div className="sticky top-0 z-20 border-b border-white/10 bg-[#020308]/90 px-4 py-4 sm:px-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-2">
           <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.24em] text-[#7aa3ff]">
             <Save className="h-3.5 w-3.5" />
@@ -792,6 +833,15 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
             </span>
           </div>
         )}
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <ActionButton
+            icon={Voicemail}
+            label="Voicemail Drop"
+            onClick={() => void handleQuickVoicemailDrop()}
+            disabled={isApplyingDisposition}
+          />
+        </div>
       </div>
 
       <div className="mt-4 space-y-3">
@@ -1014,7 +1064,7 @@ export function PowerDialPostCallWorkspace({ snapshot }: PowerDialPostCallWorksp
 
               <ActionButton
                 icon={CalendarClock}
-                label={isApplyingDisposition ? 'Applying' : 'Apply Disposition'}
+                label={isApplyingDisposition ? 'Applying' : 'Apply & Continue'}
                 onClick={handleApplyDisposition}
                 disabled={isApplyingDisposition || isSavingNote}
                 tone="primary"
