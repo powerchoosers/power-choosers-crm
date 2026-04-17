@@ -6,6 +6,10 @@
 
 import { useUIStore } from '@/store/uiStore';
 
+const CUSTOM_RINGBACK_URL = '/audio/power-dial-ringback.mp3';
+let ringbackAudio: HTMLAudioElement | null = null;
+let ringbackFallbackTimer: number | null = null;
+
 // Synthesizer utility
 const playSynth = (
   type: OscillatorType,
@@ -192,4 +196,62 @@ export const playWhoosh = () => {
   } catch (e) {
     console.warn('Audio generation failed or blocked by browser:', e);
   }
+};
+
+function clearRingbackFallback() {
+  if (typeof window === 'undefined') return;
+  if (ringbackFallbackTimer != null) {
+    window.clearInterval(ringbackFallbackTimer);
+    ringbackFallbackTimer = null;
+  }
+}
+
+function startRingbackFallback() {
+  if (typeof window === 'undefined') return;
+  if (!useUIStore.getState().soundEnabled) return;
+  if (ringbackFallbackTimer != null) return;
+
+  const playStep = () => {
+    playSynth('sine', 440, 420, 0.18, 0.03);
+    window.setTimeout(() => playSynth('sine', 520, 500, 0.18, 0.025), 190);
+  };
+
+  playStep();
+  ringbackFallbackTimer = window.setInterval(playStep, 1800);
+}
+
+export const startPowerDialRingback = () => {
+  if (typeof window === 'undefined') return;
+  if (!useUIStore.getState().soundEnabled) return;
+
+  stopPowerDialRingback();
+
+  const audio = new Audio(CUSTOM_RINGBACK_URL);
+  ringbackAudio = audio;
+  audio.loop = true;
+  audio.preload = 'auto';
+  audio.volume = 0.35;
+
+  const fallback = () => {
+    if (ringbackAudio !== audio) return;
+    ringbackAudio = null;
+    startRingbackFallback();
+  };
+
+  audio.onerror = fallback;
+  const playPromise = audio.play();
+  if (playPromise && typeof playPromise.catch === 'function') {
+    playPromise.catch(() => fallback());
+  }
+};
+
+export const stopPowerDialRingback = () => {
+  clearRingbackFallback();
+
+  if (!ringbackAudio) return;
+
+  ringbackAudio.pause();
+  ringbackAudio.currentTime = 0;
+  ringbackAudio.onerror = null;
+  ringbackAudio = null;
 };

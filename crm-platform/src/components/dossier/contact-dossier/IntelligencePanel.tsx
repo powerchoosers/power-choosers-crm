@@ -9,6 +9,7 @@ import { ForensicDataPoint } from '@/components/ui/ForensicDataPoint'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { formatMillValue, millDecimal, millOptions } from '@/lib/mills'
+import type { ContactAdditionalPhone } from '@/hooks/useContacts'
 
 const DataIngestionCard = dynamic(
     () => import('@/components/dossier/DataIngestionCard'),
@@ -36,6 +37,8 @@ interface IntelligencePanelProps {
     setEditOther: (v: string) => void
     editCompanyPhone: string
     setEditCompanyPhone: (v: string) => void
+    editAdditionalPhones: ContactAdditionalPhone[]
+    setEditAdditionalPhones: (v: ContactAdditionalPhone[]) => void
     editPrimaryField: 'mobile' | 'workDirectPhone' | 'otherPhone'
     setEditPrimaryField: (v: 'mobile' | 'workDirectPhone' | 'otherPhone') => void
     editContractEnd: string
@@ -75,6 +78,8 @@ export function IntelligencePanel({
     setEditOther,
     editCompanyPhone,
     setEditCompanyPhone,
+    editAdditionalPhones,
+    setEditAdditionalPhones,
     editPrimaryField,
     setEditPrimaryField,
     editContractEnd,
@@ -134,6 +139,7 @@ export function IntelligencePanel({
                         workDirectPhone: editWorkDirect,
                         otherPhone: editOther,
                         companyPhone: editCompanyPhone,
+                        additionalPhones: editAdditionalPhones,
                         primaryPhoneField: editPrimaryField
                     }}
                     isEditing={isEditing}
@@ -153,6 +159,7 @@ export function IntelligencePanel({
                             if (editPrimaryField === 'otherPhone') setEditPhone(updates.otherPhone)
                         }
                         if (updates.companyPhone !== undefined) setEditCompanyPhone(updates.companyPhone)
+                        if (updates.additionalPhones !== undefined) setEditAdditionalPhones(updates.additionalPhones)
                         if (updates.primaryPhoneField !== undefined) {
                             setEditPrimaryField(updates.primaryPhoneField)
                             if (updates.primaryPhoneField === 'mobile') setEditPhone(editMobile)

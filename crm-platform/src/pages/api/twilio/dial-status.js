@@ -88,8 +88,9 @@ export default async function handler(req, res) {
     // ================================================================
     const terminalEvents = ['completed', 'busy', 'no-answer', 'failed', 'canceled'];
     const isTerminal = terminalEvents.includes(event);
+    const shouldPersistIntermediateAnswer = event === 'answered' && Boolean(powerDialBatchId || powerDialSessionId);
 
-    if (!isTerminal) {
+    if (!isTerminal && !shouldPersistIntermediateAnswer) {
       logger.log(`[Dial-Status] Skipping non-terminal event "${event}" for ${logCallSid}`);
       res.writeHead(200, { 'Content-Type': 'text/plain' });
       res.end('OK');

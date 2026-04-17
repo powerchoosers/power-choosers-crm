@@ -83,6 +83,16 @@ function normalizeCallForResponse(call) {
     accountName: call.accountName || '',
     contactId: call.contactId || '',
     contactName: call.contactName || '',
+    contactTitle: call.contactTitle || '',
+    powerDialSessionId: call.powerDialSessionId || '',
+    powerDialBatchId: call.powerDialBatchId || '',
+    powerDialBatchIndex: call.powerDialBatchIndex ?? null,
+    powerDialBatchSize: call.powerDialBatchSize ?? null,
+    powerDialTargetIndex: call.powerDialTargetIndex ?? null,
+    powerDialTargetCount: call.powerDialTargetCount ?? null,
+    powerDialSourceLabel: call.powerDialSourceLabel || '',
+    powerDialSelectedCount: call.powerDialSelectedCount ?? null,
+    powerDialDialableCount: call.powerDialDialableCount ?? null,
 
     // Ownership fields (required for client-side scoping + KPI widget)
     // IMPORTANT: ownerId must be a UUID (auth.uid()), never an email.
@@ -125,12 +135,22 @@ function mapSupabaseToCall(row) {
     outcome: meta.outcome,
     accountName: meta.accountName,
     contactName: meta.contactName,
+    contactTitle: meta.contactTitle,
     targetPhone: meta.targetPhone,
     businessPhone: meta.businessPhone,
     recordingChannels: meta.recordingChannels,
     recordingTrack: meta.recordingTrack,
     recordingSource: meta.recordingSource,
     conversationalIntelligence: meta.conversationalIntelligence,
+    powerDialSessionId: meta.powerDialSessionId,
+    powerDialBatchId: meta.powerDialBatchId,
+    powerDialBatchIndex: meta.powerDialBatchIndex,
+    powerDialBatchSize: meta.powerDialBatchSize,
+    powerDialTargetIndex: meta.powerDialTargetIndex,
+    powerDialTargetCount: meta.powerDialTargetCount,
+    powerDialSourceLabel: meta.powerDialSourceLabel,
+    powerDialSelectedCount: meta.powerDialSelectedCount,
+    powerDialDialableCount: meta.powerDialDialableCount,
     source: meta.source,
     agentEmail: meta.agentEmail,
     userEmail: meta.userEmail,
@@ -217,7 +237,7 @@ function pickBusinessAndTarget({ to, from, targetPhone, businessPhone }) {
   return { businessPhone: biz || '', targetPhone: tgt || '', direction };
 }
 
-async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null, ownerId = null) {
+async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null, ownerId = null, powerDialBatchId = null) {
   if (!isSupabaseEnabled) return null;
 
   let query = supabaseAdmin
@@ -227,6 +247,10 @@ async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null, owner
 
   if (callSid) {
     query = query.eq('id', callSid);
+  }
+
+  if (powerDialBatchId) {
+    query = query.contains('metadata', { powerDialBatchId });
   }
 
   if (ownerId) {
@@ -446,6 +470,7 @@ export default async function handler(req, res) {
       // Optional filter by Call SID
       const urlObj = new URL(req.url, `http://${req.headers.host}`);
       const callSid = urlObj.searchParams.get('callSid');
+      const powerDialBatchId = urlObj.searchParams.get('powerDialBatchId');
       const limit = parseInt(urlObj.searchParams.get('limit')) || 0;
       const offset = parseInt(urlObj.searchParams.get('offset')) || 0;
 
@@ -459,7 +484,7 @@ export default async function handler(req, res) {
         }
 
         // Support pagination
-        const calls = await getCallsFromSupabase(limit || 50, offset, null, ownerId);
+        const calls = await getCallsFromSupabase(limit || 50, offset, null, ownerId, powerDialBatchId);
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ ok: true, calls, hasMore: calls.length === limit }));

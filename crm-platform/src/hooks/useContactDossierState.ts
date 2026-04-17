@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
-import { useContact, useUpdateContact } from '@/hooks/useContacts'
+import { useContact, useUpdateContact, type ContactAdditionalPhone } from '@/hooks/useContacts'
 import { useAccount, useUpdateAccount } from '@/hooks/useAccounts'
 import { useContactCalls } from '@/hooks/useCalls'
 import { useApolloNews } from '@/hooks/useApolloNews'
@@ -114,6 +114,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
     const [editWorkDirect, setEditWorkDirect] = useState('')
     const [editOther, setEditOther] = useState('')
     const [editCompanyPhone, setEditCompanyPhone] = useState('')
+    const [editAdditionalPhones, setEditAdditionalPhones] = useState<ContactAdditionalPhone[]>([])
     const [editPrimaryField, setEditPrimaryField] = useState<'mobile' | 'workDirectPhone' | 'otherPhone'>('mobile')
     const [editContractEnd, setEditContractEnd] = useState('')
     const [editMills, setEditMills] = useState('')
@@ -184,6 +185,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
             setEditWorkDirect(contact.workDirectPhone || '')
             setEditOther(contact.otherPhone || '')
             setEditCompanyPhone(contact.companyPhone || '')
+            setEditAdditionalPhones(Array.isArray(contact.additionalPhones) ? contact.additionalPhones : [])
             setEditPrimaryField(contact.primaryPhoneField || 'mobile')
             setEditServiceAddresses(Array.isArray(contact.serviceAddresses) ? contact.serviceAddresses : [])
 
@@ -333,6 +335,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                 if ((account?.contractEnd ? String(account.contractEnd).slice(0, 10) : '') !== (editContractEnd || '')) changedFields.add('contractEnd')
                 if ((contact?.companyPhone || '') !== (editCompanyPhone || '')) changedFields.add('companyPhone')
                 if ((contact?.phone || '') !== (editPhone || '')) changedFields.add('phone')
+                if (JSON.stringify(contact?.additionalPhones || []) !== JSON.stringify(editAdditionalPhones || [])) changedFields.add('additionalPhones')
 
                 if (changedFields.size) {
                     setRecentlyUpdatedFields(changedFields)
@@ -363,6 +366,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                         workDirectPhone: editWorkDirect,
                         otherPhone: editOther,
                         companyPhone: editCompanyPhone,
+                        additionalPhones: editAdditionalPhones,
                         primaryPhoneField: editPrimaryField,
                     }
                 })
@@ -404,6 +408,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                             workDirectPhone: editWorkDirect,
                             otherPhone: editOther,
                             companyPhone: editCompanyPhone,
+                            additionalPhones: editAdditionalPhones,
                             primaryPhoneField: editPrimaryField,
                         })
                     ]
@@ -446,7 +451,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
             }
             triggerSave()
         }
-    }, [isEditing, id, editFirstName, editLastName, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editMills, editAnnualUsage, editLocation, editLogoUrl, editWebsite, editLinkedinUrl, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editPrimaryField, editContractEnd, updateContact, updateAccount, contact])
+    }, [isEditing, id, editFirstName, editLastName, editName, editTitle, editCompany, editPhone, editEmail, editNotes, editSupplier, editStrikePrice, editMills, editAnnualUsage, editLocation, editLogoUrl, editWebsite, editLinkedinUrl, editServiceAddresses, editMobile, editWorkDirect, editOther, editCompanyPhone, editAdditionalPhones, editPrimaryField, editContractEnd, updateContact, updateAccount, contact])
 
     const lockWithoutSaving = () => {
         if (!isEditing) return
@@ -511,6 +516,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
         editWorkDirect,
         editOther,
         editCompanyPhone,
+        editAdditionalPhones,
         editPrimaryField,
         editContractEnd,
         editServiceAddresses,
@@ -535,6 +541,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
         setEditWorkDirect,
         setEditOther,
         setEditCompanyPhone,
+        setEditAdditionalPhones,
         setEditPrimaryField,
         setEditContractEnd,
         setEditServiceAddresses,

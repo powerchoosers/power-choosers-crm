@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
+import { formatPhoneNumber } from '@/lib/formatPhone'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
 import { buildStatusIlikeClauses } from '@/lib/status-filters'
@@ -15,6 +16,8 @@ import {
   inferPhoneBucketFromText,
   normalizeSignalScore,
 } from '@/lib/contact-signals'
+
+export type { ContactAdditionalPhone } from '@/lib/contact-signals'
 
 export interface Contact {
   id: string
@@ -157,7 +160,7 @@ type ContactMetadata = {
   mobile?: string
   otherPhone?: string
   primaryPhoneField?: string
-  apollo_revealed_phones?: Array<{ number?: string; type?: string } | string>
+  apollo_revealed_phones?: Array<ContactAdditionalPhone | string>
   email?: string
   notes?: string
   avatarUrl?: string
@@ -360,12 +363,22 @@ function getContactSignals(metadata: ContactMetadata | null | undefined): Contac
   return normalizeSignalCollection(metadata.communicationSignals || metadata.importCommunicationSignals)
 }
 
+function normalizePhoneDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '')
+}
+
 function extractAdditionalPhones(
   metadata: ContactMetadata | null,
-  signals?: ContactSignalCollection | null
+  signals?: ContactSignalCollection | null,
+  excludedNumbers: Array<string | null | undefined> = []
 ): ContactAdditionalPhone[] {
   const out: ContactAdditionalPhone[] = []
   const seen = new Set<string>()
+  const excludedDigits = new Set(
+    excludedNumbers
+      .map((value) => normalizePhoneDigits(value))
+      .filter(Boolean)
+  )
   const bucketCounts: Record<ContactPhoneBucket, number> = {
     mobile: 0,
     workDirectPhone: 0,
@@ -373,18 +386,27 @@ function extractAdditionalPhones(
     companyPhone: 0,
   }
 
-  const addPhone = (number: string, type?: string, signal?: ContactSignalEntry | null) => {
+  const addPhone = (
+    number: string,
+    type?: string,
+    signal?: ContactSignalEntry | null,
+    label?: string,
+    bucketHint?: ContactPhoneBucket | null,
+  ) => {
     const cleanedNumber = cleanText(number)
-    if (!cleanedNumber) return
-    const key = cleanedNumber
+    const digits = normalizePhoneDigits(cleanedNumber)
+    if (!digits) return
+    const formattedNumber = formatPhoneNumber(cleanedNumber) || cleanedNumber
+    const key = digits
     if (seen.has(key)) return
+    if (excludedDigits.has(digits)) return
     seen.add(key)
-    const bucket = inferPhoneBucketFromText(type, signal?.field, signal?.label, signal?.source)
+    const bucket = bucketHint || inferPhoneBucketFromText(type, label, signal?.field, signal?.label, signal?.source)
     bucketCounts[bucket] += 1
     out.push({
-      number: cleanedNumber,
+      number: formattedNumber,
       type,
-      label: formatPhoneBucketLabel(bucket, bucketCounts[bucket]),
+      label: cleanText(label) || formatPhoneBucketLabel(bucket, bucketCounts[bucket]),
       bucket,
       signalScore: signal?.score,
       signalLabel: signal?.label,
@@ -401,19 +423,43 @@ function extractAdditionalPhones(
         return
       }
       if (!entry || typeof entry !== 'object') return
-      const number = cleanText(entry.number)
-      const type = cleanText(entry.type) || undefined
-      addPhone(number, type)
+      const typed = entry as ContactAdditionalPhone
+      const number = cleanText(typed.number)
+      const type = cleanText(typed.type) || undefined
+      addPhone(number, type, null, typed.label, typed.bucket || null)
     })
+    return out
   }
 
   if (signals?.phones?.length) {
     signals.phones.forEach((entry) => {
-      addPhone(entry.value, entry.label || entry.field, entry)
+      addPhone(entry.value, entry.label || entry.field, entry, entry.label, inferPhoneBucketFromText(entry.field, entry.label, entry.source))
     })
   }
 
   return out
+}
+
+function serializeAdditionalPhones(phones: ContactAdditionalPhone[] | null | undefined): ContactAdditionalPhone[] | undefined {
+  if (!Array.isArray(phones)) return undefined
+
+  return phones
+    .map((phone) => {
+      const number = formatPhoneNumber(phone.number)
+      if (!number) return null
+      return {
+        number,
+        type: cleanText(phone.type) || undefined,
+        label: cleanText(phone.label) || undefined,
+        bucket: phone.bucket,
+        signalScore: phone.signalScore,
+        signalLabel: cleanText(phone.signalLabel) || undefined,
+        signalSource: cleanText(phone.signalSource) || undefined,
+        signalKind: phone.signalKind,
+        signalDerived: phone.signalDerived,
+      } as ContactAdditionalPhone
+    })
+    .filter((phone): phone is ContactAdditionalPhone => !!phone)
 }
 
 function buildContactName(args: {
@@ -495,7 +541,7 @@ export function useAccountContacts(accountId: string) {
           companyPhone: row.companyPhone || '',
           ownerId: row.ownerId || null,
           primaryPhoneField: normalizePrimaryPhoneField(row.primaryPhoneField),
-          additionalPhones: extractAdditionalPhones(metadata, signals),
+          additionalPhones: extractAdditionalPhones(metadata, signals, [row.phone, row.mobile, row.workPhone, row.otherPhone, row.companyPhone]),
           communicationSignals: signals,
           avatarUrl: resolveContactPhotoUrl(row, metadata),
           title: row.title || metadata?.job_title || metadata?.title || (metadata as any)?.jobTitle || (metadata as any)?.general?.title || '',
@@ -728,7 +774,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             otherPhone: item.otherPhone || metadata?.otherPhone || '',
             companyPhone: item.companyPhone || '',
             primaryPhoneField: normalizePrimaryPhoneField(item.primaryPhoneField),
-            additionalPhones: extractAdditionalPhones(metadata, signals),
+            additionalPhones: extractAdditionalPhones(metadata, signals, [item.phone, item.mobile, item.workPhone, item.otherPhone, item.companyPhone]),
             communicationSignals: signals,
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
@@ -970,7 +1016,7 @@ export function useContact(id: string) {
         otherPhone: typedData.otherPhone || '',
         companyPhone: typedData.companyPhone || account?.phone || '',
         primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField),
-        additionalPhones: extractAdditionalPhones(metadata, signals),
+        additionalPhones: extractAdditionalPhones(metadata, signals, [typedData.phone, typedData.mobile, typedData.workPhone, typedData.otherPhone, typedData.companyPhone]),
         communicationSignals: signals,
         metadata
       } as ContactDetail
@@ -1007,7 +1053,12 @@ export function useCreateContact() {
           companyName: newContact.company,
           domain: newContact.companyDomain,
           ...newContact.metadata
-        }
+        } as ContactMetadata
+      }
+
+      const serializedNewPhones = serializeAdditionalPhones(newContact.additionalPhones)
+      if (serializedNewPhones !== undefined) {
+        dbContact.metadata.apollo_revealed_phones = serializedNewPhones
       }
 
       const { data, error } = await supabase
@@ -1145,6 +1196,11 @@ export function useUpsertContact() {
           ...contact.metadata
         };
 
+        const serializedPhones = serializeAdditionalPhones(contact.additionalPhones)
+        if (serializedPhones !== undefined) {
+          dbContact.metadata.apollo_revealed_phones = serializedPhones
+        }
+
         const { data, error } = await supabase
           .from('contacts')
           .insert(dbContact)
@@ -1212,6 +1268,11 @@ export function useUpsertContact() {
           ...contact.metadata
         };
 
+        const serializedPhones = serializeAdditionalPhones(contact.additionalPhones)
+        if (serializedPhones !== undefined) {
+          dbContact.metadata.apollo_revealed_phones = serializedPhones
+        }
+
         const { data, error } = await supabase
           .from('contacts')
           .update(dbContact)
@@ -1268,6 +1329,17 @@ export function useUpdateContact() {
       if (updates.otherPhone !== undefined) dbUpdates.otherPhone = updates.otherPhone
       if (updates.companyPhone !== undefined) dbUpdates.companyPhone = updates.companyPhone
       if (updates.primaryPhoneField !== undefined) dbUpdates.primaryPhoneField = updates.primaryPhoneField
+      if (updates.additionalPhones !== undefined) {
+        const { data: currentContact } = await supabase
+          .from('contacts')
+          .select('metadata')
+          .eq('id', id)
+          .single()
+
+        const nextMetadata = normalizeMetadata(currentContact?.metadata) || {}
+        nextMetadata.apollo_revealed_phones = serializeAdditionalPhones(updates.additionalPhones) || []
+        dbUpdates.metadata = nextMetadata
+      }
       if (updates.city !== undefined) dbUpdates.city = updates.city
       if (updates.state !== undefined) dbUpdates.state = updates.state
       if (updates.firstName !== undefined) dbUpdates.firstName = updates.firstName
