@@ -2,6 +2,8 @@
 import twilio from 'twilio';
 import logger from '../_logger.js';
 import { upsertCallInSupabase } from '../calls.js';
+import { isVoicemailAnsweredBy } from '../../../lib/voice-outcomes.ts';
+import { triggerOutboundVoicemailDrop } from '../../../lib/twilio-voicemail-drop.ts';
 
 export default async function handler(req, res) {
   try {
@@ -68,6 +70,8 @@ export default async function handler(req, res) {
 
     // --- Parse event details ---
     const event = (body.DialCallStatus || body.CallStatus || '').toLowerCase();
+    const answeredBy = String(body.AnsweredBy || '').trim();
+    const machineDetectionDuration = parseOptionalInt(body.MachineDetectionDuration);
     const callSidFromBody = body.CallSid || '';
     const dialCallSid = body.DialCallSid || '';
     const parentCallSid = body.ParentCallSid || '';
@@ -88,7 +92,9 @@ export default async function handler(req, res) {
     // ================================================================
     const terminalEvents = ['completed', 'busy', 'no-answer', 'failed', 'canceled'];
     const isTerminal = terminalEvents.includes(event);
-    const shouldPersistIntermediateAnswer = event === 'answered' && Boolean(powerDialBatchId || powerDialSessionId);
+    const shouldPersistIntermediateAnswer =
+      (event === 'answered' || event === 'in-progress') &&
+      Boolean(answeredBy || powerDialBatchId || powerDialSessionId);
 
     if (!isTerminal && !shouldPersistIntermediateAnswer) {
       logger.log(`[Dial-Status] Skipping non-terminal event "${event}" for ${logCallSid}`);
@@ -152,6 +158,8 @@ export default async function handler(req, res) {
           powerDialSourceLabel: powerDialSourceLabel || null,
           powerDialSelectedCount,
           powerDialDialableCount,
+          answeredBy: answeredBy || null,
+          machineDetectionDuration,
           source: 'dial-status-v3'
         };
 
@@ -161,9 +169,57 @@ export default async function handler(req, res) {
           // Store the actual outcome in metadata if needed, though deriveOutcome handles it
         }
 
-        await upsertCallInSupabase(payload).catch(err => {
+        const savedCall = await upsertCallInSupabase(payload).catch(err => {
           logger.error('[Dial-Status] upsertCallInSupabase failed:', err?.message);
+          return null;
         });
+
+        const existingVoicemailDropStatus = String(savedCall?.metadata?.voicemailDropStatus || '').toLowerCase();
+        const voicemailDetected = isVoicemailAnsweredBy(answeredBy);
+        const shouldTriggerVoicemailDrop =
+          voicemailDetected &&
+          !['dropped', 'missing-config', 'failed'].includes(existingVoicemailDropStatus);
+
+        if (shouldTriggerVoicemailDrop) {
+          const dropResult = await triggerOutboundVoicemailDrop({
+            callSid: logCallSid,
+            businessNumber: businessPhoneFromQuery || resolvedFrom || body.From || '',
+            candidateIdentifiers: [
+              businessPhoneFromQuery,
+              resolvedFrom,
+              body.From,
+              body.To,
+            ],
+          }).catch((dropError) => ({
+            status: 'failed',
+            reason: dropError?.message || 'twilio-update-failed',
+          }));
+
+          await upsertCallInSupabase({
+            callSid: logCallSid,
+            source: 'dial-status-voicemail-drop',
+            answeredBy: answeredBy || null,
+            machineDetectionDuration,
+            voicemailDropStatus: dropResult?.status || 'failed',
+            voicemailDropAt: new Date().toISOString(),
+            voicemailDropUrl: dropResult?.playUrl || null,
+            metadata: {
+              voicemailDropReason: dropResult?.reason || null,
+            },
+          }).catch(err => {
+            logger.error('[Dial-Status] voicemail drop metadata update failed:', err?.message);
+          });
+
+          if (dropResult?.status === 'dropped') {
+            logger.log('[Dial-Status] Voicemail drop initiated for call:', logCallSid);
+          } else {
+            logger.warn('[Dial-Status] Voicemail drop skipped:', {
+              callSid: logCallSid,
+              status: dropResult?.status,
+              reason: dropResult?.reason,
+            });
+          }
+        }
 
         logger.log(`[Dial-Status] ✅ Call state [${event}] logged:`, logCallSid);
       } catch (logErr) {
@@ -182,7 +238,7 @@ export default async function handler(req, res) {
     // ================================================================
     // STEP 2: Start dual-channel recording (fire-and-forget AFTER response)
     // ================================================================
-    if ((event === 'answered' || event === 'in-progress') && (childSid || parentSid)) {
+    if ((event === 'answered' || event === 'in-progress') && (childSid || parentSid) && !isVoicemailAnsweredBy(answeredBy)) {
       const targetSid = childSid || parentSid;
       const accountSid = process.env.TWILIO_ACCOUNT_SID;
       const authToken = process.env.TWILIO_AUTH_TOKEN;

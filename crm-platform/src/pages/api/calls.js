@@ -4,26 +4,59 @@ import { cors } from './_cors.js';
 import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
 import logger from './_logger.js';
+import { isVoicemailAnsweredBy } from '@/lib/voice-outcomes';
 
 // In-memory fallback store (for local/dev when Supabase isn't configured)
 const memoryStore = new Map();
 
 const isSupabaseEnabled = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
+const SUPPLEMENTAL_CALL_METADATA_FIELDS = [
+  'contactTitle',
+  'powerDialSessionId',
+  'powerDialBatchId',
+  'powerDialBatchIndex',
+  'powerDialBatchSize',
+  'powerDialTargetIndex',
+  'powerDialTargetCount',
+  'powerDialSourceLabel',
+  'powerDialSelectedCount',
+  'powerDialDialableCount',
+  'answeredBy',
+  'machineDetectionDuration',
+  'voicemailDropStatus',
+  'voicemailDropAt',
+  'voicemailDropUrl',
+  'disposition',
+  'dispositionLabel',
+  'dispositionAppliedAt',
+  'dispositionTaskId',
+  'dispositionProtocolId',
+  'dispositionReminderMinutes',
+  'dispositionReminderLabel',
+  'dispositionDueDate',
+];
+
+function readCallMetadata(call) {
+  return (call && call.metadata && typeof call.metadata === 'object') ? call.metadata : {};
+}
+
 // Derive outcome from call status and duration
 function deriveOutcome(call) {
   const status = (call.status || '').toLowerCase();
   const duration = call.durationSec || call.duration || 0;
-  const answeredBy = (call.answeredBy || '').toLowerCase();
+  const metadata = readCallMetadata(call);
+  const answeredBy = String(call.answeredBy || metadata.answeredBy || '').toLowerCase();
 
   // If we have an explicit outcome, use it
   if (call.outcome) return call.outcome;
 
   // Derive from status
-  if (status === 'completed') {
-    if (answeredBy === 'machine_start' || answeredBy === 'machine_end_beep' || answeredBy === 'machine_end_silence') {
+  if (status === 'answered' || status === 'completed') {
+    if (isVoicemailAnsweredBy(answeredBy)) {
       return 'Voicemail';
     }
+    if (status === 'answered') return 'Connected';
     return duration > 0 ? 'Connected' : 'No Answer';
   }
 
@@ -50,6 +83,7 @@ async function readJson(req) {
 }
 
 function normalizeCallForResponse(call) {
+  const metadata = readCallMetadata(call);
   // Normalize to the shape expected by front-end pages while preserving IDs for mapping
   return {
     id: call.id || call.callSid || call.twilioSid || '',
@@ -93,6 +127,19 @@ function normalizeCallForResponse(call) {
     powerDialSourceLabel: call.powerDialSourceLabel || '',
     powerDialSelectedCount: call.powerDialSelectedCount ?? null,
     powerDialDialableCount: call.powerDialDialableCount ?? null,
+    answeredBy: call.answeredBy || metadata.answeredBy || '',
+    machineDetectionDuration: call.machineDetectionDuration ?? metadata.machineDetectionDuration ?? null,
+    voicemailDropStatus: call.voicemailDropStatus || metadata.voicemailDropStatus || '',
+    voicemailDropAt: call.voicemailDropAt || metadata.voicemailDropAt || '',
+    disposition: call.disposition || metadata.disposition || '',
+    dispositionLabel: call.dispositionLabel || metadata.dispositionLabel || '',
+    dispositionAppliedAt: call.dispositionAppliedAt || metadata.dispositionAppliedAt || '',
+    dispositionTaskId: call.dispositionTaskId || metadata.dispositionTaskId || '',
+    dispositionProtocolId: call.dispositionProtocolId || metadata.dispositionProtocolId || '',
+    dispositionReminderMinutes: call.dispositionReminderMinutes ?? metadata.dispositionReminderMinutes ?? null,
+    dispositionReminderLabel: call.dispositionReminderLabel || metadata.dispositionReminderLabel || '',
+    dispositionDueDate: call.dispositionDueDate || metadata.dispositionDueDate || '',
+    metadata: Object.keys(metadata).length > 0 ? metadata : null,
 
     // Ownership fields (required for client-side scoping + KPI widget)
     // IMPORTANT: ownerId must be a UUID (auth.uid()), never an email.
@@ -138,6 +185,7 @@ function mapSupabaseToCall(row) {
     contactTitle: meta.contactTitle,
     targetPhone: meta.targetPhone,
     businessPhone: meta.businessPhone,
+    metadata: meta,
     recordingChannels: meta.recordingChannels,
     recordingTrack: meta.recordingTrack,
     recordingSource: meta.recordingSource,
@@ -151,6 +199,19 @@ function mapSupabaseToCall(row) {
     powerDialSourceLabel: meta.powerDialSourceLabel,
     powerDialSelectedCount: meta.powerDialSelectedCount,
     powerDialDialableCount: meta.powerDialDialableCount,
+    answeredBy: meta.answeredBy,
+    machineDetectionDuration: meta.machineDetectionDuration,
+    voicemailDropStatus: meta.voicemailDropStatus,
+    voicemailDropAt: meta.voicemailDropAt,
+    voicemailDropUrl: meta.voicemailDropUrl,
+    disposition: meta.disposition,
+    dispositionLabel: meta.dispositionLabel,
+    dispositionAppliedAt: meta.dispositionAppliedAt,
+    dispositionTaskId: meta.dispositionTaskId,
+    dispositionProtocolId: meta.dispositionProtocolId,
+    dispositionReminderMinutes: meta.dispositionReminderMinutes,
+    dispositionReminderLabel: meta.dispositionReminderLabel,
+    dispositionDueDate: meta.dispositionDueDate,
     source: meta.source,
     agentEmail: meta.agentEmail,
     userEmail: meta.userEmail,
@@ -161,6 +222,7 @@ function mapSupabaseToCall(row) {
 
 // Map camelCase object to Supabase snake_case row
 function mapCallToSupabase(call) {
+  const baseMetadata = (call.metadata && typeof call.metadata === 'object') ? call.metadata : {};
   const metadata = { ...call };
   // Remove core fields from metadata to avoid duplication
   const coreFields = [
@@ -168,9 +230,10 @@ function mapCallToSupabase(call) {
     'timestamp', 'callTime', 'outcome', 'transcript', 'formattedTranscript', 'aiSummary',
     'aiInsights', 'recordingUrl', 'recordingChannels', 'recordingTrack', 'recordingSource',
     'conversationalIntelligence', 'accountId', 'accountName', 'contactId', 'contactName',
-    'targetPhone', 'businessPhone', 'source', 'ownerId', 'assignedTo', 'createdBy',
-    'agentEmail', 'userEmail', 'updatedAt', 'createdAt'
+    'targetPhone', 'businessPhone', 'direction', 'source', 'ownerId', 'assignedTo', 'createdBy',
+    'agentEmail', 'userEmail', 'updatedAt', 'createdAt', 'metadata'
   ];
+  coreFields.push(...SUPPLEMENTAL_CALL_METADATA_FIELDS);
   coreFields.forEach(field => delete metadata[field]);
 
   return {
@@ -193,15 +256,39 @@ function mapCallToSupabase(call) {
     ownerId: call.ownerId || null,
     createdAt: call.createdAt || call.timestamp || new Date().toISOString(),
     metadata: {
+      ...baseMetadata,
       outcome: call.outcome || deriveOutcome(call),
       accountName: call.accountName,
       contactName: call.contactName,
+      contactTitle: call.contactTitle,
       targetPhone: call.targetPhone,
       businessPhone: call.businessPhone,
       recordingChannels: call.recordingChannels,
       recordingTrack: call.recordingTrack,
       recordingSource: call.recordingSource,
       conversationalIntelligence: call.conversationalIntelligence,
+      powerDialSessionId: call.powerDialSessionId,
+      powerDialBatchId: call.powerDialBatchId,
+      powerDialBatchIndex: call.powerDialBatchIndex,
+      powerDialBatchSize: call.powerDialBatchSize,
+      powerDialTargetIndex: call.powerDialTargetIndex,
+      powerDialTargetCount: call.powerDialTargetCount,
+      powerDialSourceLabel: call.powerDialSourceLabel,
+      powerDialSelectedCount: call.powerDialSelectedCount,
+      powerDialDialableCount: call.powerDialDialableCount,
+      answeredBy: call.answeredBy,
+      machineDetectionDuration: call.machineDetectionDuration,
+      voicemailDropStatus: call.voicemailDropStatus,
+      voicemailDropAt: call.voicemailDropAt,
+      voicemailDropUrl: call.voicemailDropUrl,
+      disposition: call.disposition,
+      dispositionLabel: call.dispositionLabel,
+      dispositionAppliedAt: call.dispositionAppliedAt,
+      dispositionTaskId: call.dispositionTaskId,
+      dispositionProtocolId: call.dispositionProtocolId,
+      dispositionReminderMinutes: call.dispositionReminderMinutes,
+      dispositionReminderLabel: call.dispositionReminderLabel,
+      dispositionDueDate: call.dispositionDueDate,
       source: call.source,
       ...metadata
     }
@@ -254,8 +341,7 @@ async function getCallsFromSupabase(limit = 0, offset = 0, callSid = null, owner
   }
 
   if (ownerId) {
-    // Filter by ownerId, assignedTo, or createdBy for Agents
-    query = query.or(`ownerId.eq.${ownerId},assignedTo.eq.${ownerId},createdBy.eq.${ownerId}`);
+    query = query.eq('ownerId', ownerId);
   }
 
   if (limit > 0) {
@@ -319,6 +405,20 @@ export async function upsertCallInSupabase(payload) {
     .single();
 
   const current = currentData ? mapSupabaseToCall(currentData) : {};
+  const currentMetadata = readCallMetadata(current);
+  const payloadMetadata = (payload.metadata && typeof payload.metadata === 'object') ? payload.metadata : {};
+  const mergedSupplementalMetadata = {
+    ...currentMetadata,
+    ...payloadMetadata,
+  };
+
+  for (const field of SUPPLEMENTAL_CALL_METADATA_FIELDS) {
+    if (payload[field] != null) {
+      mergedSupplementalMetadata[field] = payload[field];
+    } else if (current[field] != null && mergedSupplementalMetadata[field] == null) {
+      mergedSupplementalMetadata[field] = current[field];
+    }
+  }
 
   const primaryId = callId;
 
@@ -406,10 +506,34 @@ export async function upsertCallInSupabase(payload) {
     accountName: payload.accountName != null ? payload.accountName : current.accountName,
     contactId: finalContactId,
     contactName: finalContactName,
+    contactTitle: payload.contactTitle != null ? payload.contactTitle : current.contactTitle,
     targetPhone: (payload.targetPhone != null ? payload.targetPhone : (current.targetPhone || context.targetPhone)) || '',
     businessPhone: (payload.businessPhone != null ? payload.businessPhone : (current.businessPhone || context.businessPhone)) || '',
-    direction: current.direction || payload.direction || context.direction || 'outbound',
+    direction: payload.direction != null ? payload.direction : (current.direction || context.direction || 'outbound'),
     source: payload.source || current.source || 'unknown',
+    powerDialSessionId: payload.powerDialSessionId != null ? payload.powerDialSessionId : current.powerDialSessionId,
+    powerDialBatchId: payload.powerDialBatchId != null ? payload.powerDialBatchId : current.powerDialBatchId,
+    powerDialBatchIndex: payload.powerDialBatchIndex != null ? payload.powerDialBatchIndex : current.powerDialBatchIndex,
+    powerDialBatchSize: payload.powerDialBatchSize != null ? payload.powerDialBatchSize : current.powerDialBatchSize,
+    powerDialTargetIndex: payload.powerDialTargetIndex != null ? payload.powerDialTargetIndex : current.powerDialTargetIndex,
+    powerDialTargetCount: payload.powerDialTargetCount != null ? payload.powerDialTargetCount : current.powerDialTargetCount,
+    powerDialSourceLabel: payload.powerDialSourceLabel != null ? payload.powerDialSourceLabel : current.powerDialSourceLabel,
+    powerDialSelectedCount: payload.powerDialSelectedCount != null ? payload.powerDialSelectedCount : current.powerDialSelectedCount,
+    powerDialDialableCount: payload.powerDialDialableCount != null ? payload.powerDialDialableCount : current.powerDialDialableCount,
+    answeredBy: payload.answeredBy != null ? payload.answeredBy : current.answeredBy,
+    machineDetectionDuration: payload.machineDetectionDuration != null ? payload.machineDetectionDuration : current.machineDetectionDuration,
+    voicemailDropStatus: payload.voicemailDropStatus != null ? payload.voicemailDropStatus : current.voicemailDropStatus,
+    voicemailDropAt: payload.voicemailDropAt != null ? payload.voicemailDropAt : current.voicemailDropAt,
+    voicemailDropUrl: payload.voicemailDropUrl != null ? payload.voicemailDropUrl : current.voicemailDropUrl,
+    disposition: payload.disposition != null ? payload.disposition : current.disposition,
+    dispositionLabel: payload.dispositionLabel != null ? payload.dispositionLabel : current.dispositionLabel,
+    dispositionAppliedAt: payload.dispositionAppliedAt != null ? payload.dispositionAppliedAt : current.dispositionAppliedAt,
+    dispositionTaskId: payload.dispositionTaskId != null ? payload.dispositionTaskId : current.dispositionTaskId,
+    dispositionProtocolId: payload.dispositionProtocolId != null ? payload.dispositionProtocolId : current.dispositionProtocolId,
+    dispositionReminderMinutes: payload.dispositionReminderMinutes != null ? payload.dispositionReminderMinutes : current.dispositionReminderMinutes,
+    dispositionReminderLabel: payload.dispositionReminderLabel != null ? payload.dispositionReminderLabel : current.dispositionReminderLabel,
+    dispositionDueDate: payload.dispositionDueDate != null ? payload.dispositionDueDate : current.dispositionDueDate,
+    metadata: mergedSupplementalMetadata,
 
     updatedAt: nowIso,
     createdAt: current.createdAt || nowIso
