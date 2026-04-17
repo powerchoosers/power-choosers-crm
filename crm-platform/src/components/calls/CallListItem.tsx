@@ -104,6 +104,7 @@ export function CallListItem({
   const isProcessed = !!(call.transcript || call.aiInsights)
   const currentStatus = isProcessed ? 'ready' : status
   const isVoicemail = call.metadata?.isVoicemail || call.outcome === 'Voicemail'
+  const isUnknownOutcome = call.outcome === 'Unknown'
 
   // Parse AI Insights if they exist
   const insights = typeof call.aiInsights === 'string'
@@ -354,15 +355,17 @@ export function CallListItem({
                   <div className="flex items-center gap-1 shrink-0">
                     {isVoicemail ? (
                       <Voicemail className="w-3.5 h-3.5 text-amber-400" />
+                    ) : isUnknownOutcome ? (
+                      <AlertCircle className="w-3.5 h-3.5 text-amber-300" />
                     ) : (
                       <Phone className="w-3.5 h-3.5 text-white" />
                     )}
                     {showDirectionLabel && (
                       <span className="text-[10px] font-mono text-white font-bold uppercase tracking-widest mx-1.5 shrink-0">
-                        {isVoicemail ? 'VOICEMAIL' : call.type}
+                        {isVoicemail ? 'VOICEMAIL' : isUnknownOutcome ? 'AMD UNKNOWN' : call.type}
                       </span>
                     )}
-                    {!isVoicemail && (call.type === 'Inbound' ? (
+                    {!isVoicemail && !isUnknownOutcome && (call.type === 'Inbound' ? (
                       <ArrowDownLeft className="w-3.5 h-3.5 text-emerald-500" />
                     ) : (
                       <ArrowUpRight className="w-3.5 h-3.5 text-white" />
@@ -395,6 +398,11 @@ export function CallListItem({
                       <>
                         <Voicemail className="w-4 h-4 text-amber-400" />
                         <span>Voicemail</span>
+                      </>
+                    ) : isUnknownOutcome ? (
+                      <>
+                        <AlertCircle className="w-4 h-4 text-amber-300" />
+                        <span>AMD Unknown</span>
                       </>
                     ) : (
                       <>{call.type} Call</>

@@ -1,6 +1,6 @@
 import logger from '../_logger.js';
 import { upsertCallInSupabase } from '../calls.js';
-import { isVoicemailAnsweredBy } from '../../../lib/voice-outcomes.ts';
+import { isUnknownAnsweredBy, isVoicemailAnsweredBy } from '../../../lib/voice-outcomes.ts';
 import { triggerOutboundVoicemailDrop } from '../../../lib/twilio-voicemail-drop.ts';
 
 export default async function handler(req, res) {
@@ -28,18 +28,23 @@ export default async function handler(req, res) {
       From
     });
 
+    const isVoicemail = isVoicemailAnsweredBy(AnsweredBy);
+    const isUnknown = isUnknownAnsweredBy(AnsweredBy);
+    const nextOutcome = isVoicemail
+      ? 'Voicemail'
+      : (isUnknown ? 'Unknown' : null);
+
     const savedCall = await upsertCallInSupabase({
       callSid: CallSid,
       answeredBy: AnsweredBy || null,
       machineDetectionDuration: MachineDetectionDuration || null,
+      outcome: nextOutcome || undefined,
       source: 'amd-status',
     }).catch((updateError) => {
       logger.error('[AMD] Failed to update call with AMD result:', updateError);
       return null;
     });
 
-    // If it's a voicemail, automatically drop the voicemail
-    const isVoicemail = isVoicemailAnsweredBy(AnsweredBy);
     const existingDropStatus = String(savedCall?.metadata?.voicemailDropStatus || '').toLowerCase();
 
     if (isVoicemail && !['dropped', 'missing-config'].includes(existingDropStatus)) {

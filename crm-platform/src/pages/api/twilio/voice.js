@@ -1,5 +1,11 @@
 import twilio from 'twilio';
 import logger from '../_logger.js';
+import {
+    DEFAULT_MACHINE_DETECTION_TIMEOUT,
+    extractNormalizedUserNumbers,
+    getMachineDetectionTimeout,
+    normalizeMachineDetectionTimeout,
+} from '../../../lib/voicemail.ts';
 const VoiceResponse = twilio.twiml.VoiceResponse;
 
 const DEFAULT_TWILIO_BUSINESS_NUMBER = '+18176630380';
@@ -141,34 +147,6 @@ async function resolveInboundPhoneDetails(businessNumber) {
     }) || null;
 }
 
-function extractNormalizedUserNumbers(settings) {
-    if (!settings || typeof settings !== 'object') return [];
-
-    const numbers = [];
-
-    if (settings.selectedPhoneNumber) {
-        numbers.push(settings.selectedPhoneNumber);
-    }
-
-    if (Array.isArray(settings.twilioNumbers)) {
-        settings.twilioNumbers.forEach((entry) => {
-            if (!entry) return;
-            if (typeof entry === 'string') {
-                numbers.push(entry);
-                return;
-            }
-            if (typeof entry === 'object' && entry.number) {
-                numbers.push(entry.number);
-            }
-        });
-    }
-
-    return numbers
-        .map((num) => normalizePhoneNumber(num) || num)
-        .map((num) => digitsOnly(num))
-        .filter(Boolean);
-}
-
 function resolveFallbackAgentIdentity() {
     if (process.env.TWILIO_DEFAULT_AGENT_IDENTITY) {
         return process.env.TWILIO_DEFAULT_AGENT_IDENTITY;
@@ -216,6 +194,53 @@ async function resolveInboundTargetIdentity(businessNumber) {
     } catch (err) {
         logger.warn('[Voice] Failed inbound identity resolution, using fallback identity:', err?.message || err);
         return fallbackIdentity;
+    }
+}
+
+async function resolveMachineDetectionTimeout(agentId, agentEmail, requestedTimeout) {
+    if (requestedTimeout !== undefined && requestedTimeout !== null && String(requestedTimeout).trim() !== '') {
+        return normalizeMachineDetectionTimeout(requestedTimeout, DEFAULT_MACHINE_DETECTION_TIMEOUT);
+    }
+
+    try {
+        const { supabaseAdmin } = await import('../../../lib/supabase.ts');
+        const normalizedEmail = String(agentEmail || '').trim().toLowerCase();
+        const normalizedAgentId = String(agentId || '').trim();
+
+        let userRow = null;
+
+        if (normalizedEmail) {
+            const { data, error } = await supabaseAdmin
+                .from('users')
+                .select('settings')
+                .eq('email', normalizedEmail)
+                .maybeSingle();
+
+            if (error) {
+                logger.warn('[Voice] Failed to load user settings for AMD timeout:', error.message);
+            } else if (data) {
+                userRow = data;
+            }
+        }
+
+        if (!userRow && normalizedAgentId) {
+            const { data, error } = await supabaseAdmin
+                .from('users')
+                .select('settings')
+                .eq('id', normalizedAgentId)
+                .maybeSingle();
+
+            if (error) {
+                logger.warn('[Voice] Failed to resolve agent settings for AMD timeout:', error.message);
+            } else if (data) {
+                userRow = data;
+            }
+        }
+
+        return getMachineDetectionTimeout(userRow?.settings || null);
+    } catch (err) {
+        logger.warn('[Voice] Falling back to default AMD timeout:', err?.message || err);
+        return DEFAULT_MACHINE_DETECTION_TIMEOUT;
     }
 }
 
@@ -335,6 +360,14 @@ export default async function handler(req, res) {
         const accountId = meta.accountId || '';
         const agentId = meta.agentId || meta.userId || '';
         const agentEmail = meta.agentEmail || '';
+        let machineDetectionTimeout = DEFAULT_MACHINE_DETECTION_TIMEOUT;
+        if (isBrowserCall && To) {
+            machineDetectionTimeout = await resolveMachineDetectionTimeout(
+                agentId,
+                agentEmail,
+                meta.machineDetectionTimeout ?? src.machineDetectionTimeout
+            );
+        }
         const targetPhone = To || meta.targetPhone || '';
 
         logger.log('[Voice] Resolved:', {
@@ -481,7 +514,8 @@ export default async function handler(req, res) {
                 dial.number({
                     statusCallback: `${base}/api/twilio/dial-status?${targetParams.toString()}`,
                     statusCallbackEvent: 'initiated ringing answered completed',
-                    machineDetection: 'DetectMessageEnd'
+                    machineDetection: 'DetectMessageEnd',
+                    machineDetectionTimeout,
                 }, target.phoneNumber);
             });
 
@@ -502,7 +536,8 @@ export default async function handler(req, res) {
             dial.number({
                 statusCallback: `${base}/api/twilio/dial-status${cbq}`,
                 statusCallbackEvent: 'initiated ringing answered completed',
-                machineDetection: 'DetectMessageEnd'
+                machineDetection: 'DetectMessageEnd',
+                machineDetectionTimeout,
             }, To);
 
         } else {

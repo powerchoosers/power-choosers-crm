@@ -7,6 +7,7 @@ import {
   getSelectedTwilioNumberEntry,
   getTwilioNumberEntries,
   getTwilioNumberEntryForIdentifier,
+  getMachineDetectionTimeout,
   getOutboundVoicemailDrop,
   getOutboundVoicemailDropForTwilioNumber,
   normalizePhoneNumber,
@@ -390,6 +391,7 @@ export default async function handler(req, res) {
         ),
         voicemailGreeting: null,
         outboundVoicemailDrop,
+        machineDetectionTimeout: getMachineDetectionTimeout(settings),
       })
     } else if (targetIndex !== -1) {
       nextTwilioNumbers[targetIndex] = {

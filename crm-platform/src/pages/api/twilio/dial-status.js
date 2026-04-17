@@ -2,7 +2,7 @@
 import twilio from 'twilio';
 import logger from '../_logger.js';
 import { upsertCallInSupabase } from '../calls.js';
-import { isVoicemailAnsweredBy } from '../../../lib/voice-outcomes.ts';
+import { isUnknownAnsweredBy, isVoicemailAnsweredBy } from '../../../lib/voice-outcomes.ts';
 import { triggerOutboundVoicemailDrop } from '../../../lib/twilio-voicemail-drop.ts';
 
 export default async function handler(req, res) {
@@ -163,7 +163,11 @@ export default async function handler(req, res) {
           source: 'dial-status-v3'
         };
 
-        if (event === 'busy') {
+        if (isVoicemailAnsweredBy(answeredBy)) {
+          payload.outcome = 'Voicemail';
+        } else if (isUnknownAnsweredBy(answeredBy) && (event === 'answered' || event === 'completed' || event === 'in-progress')) {
+          payload.outcome = 'Unknown';
+        } else if (event === 'busy') {
           payload.outcome = 'Busy';
         } else if (event === 'no-answer') {
           payload.outcome = 'No Answer';
@@ -171,8 +175,6 @@ export default async function handler(req, res) {
           payload.outcome = 'Failed';
         } else if (event === 'canceled') {
           payload.outcome = 'Canceled';
-        } else if (event === 'completed' && isVoicemailAnsweredBy(answeredBy)) {
-          payload.outcome = 'Voicemail';
         }
 
         // If it's a completion event, mark it as completed
