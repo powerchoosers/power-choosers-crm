@@ -12,6 +12,7 @@ export interface Task {
   status: 'Pending' | 'In Progress' | 'Completed'
   dueDate?: string // ISO date string
   dueTime?: string
+  reminders?: number[] | null
   assignedTo?: string
   relatedTo?: string // Name of person or account
   relatedType?: 'Person' | 'Account'
@@ -170,6 +171,7 @@ export function useTasks(searchQuery?: string) {
         status,
         priority,
         dueDate: newTask.dueDate ?? null,
+        reminders: Array.isArray(newTask.reminders) ? newTask.reminders : null,
         contactId: newTask.contactId ?? null,
         accountId: newTask.accountId ?? null,
         ownerId: user?.email ?? null,

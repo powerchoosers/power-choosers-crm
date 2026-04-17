@@ -1,9 +1,7 @@
-import twilio from 'twilio';
 import logger from '../_logger.js';
-import { supabaseAdmin } from '../../../lib/supabase.ts';
-import { getOutboundVoicemailDropForTwilioNumber, resolveUserForBusinessNumber } from '../../../lib/voicemail.ts';
-
-const VoiceResponse = twilio.twiml.VoiceResponse;
+import { upsertCallInSupabase } from '../calls.js';
+import { isVoicemailAnsweredBy } from '../../../lib/voice-outcomes.ts';
+import { triggerOutboundVoicemailDrop } from '../../../lib/twilio-voicemail-drop.ts';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -30,73 +28,53 @@ export default async function handler(req, res) {
       From
     });
 
-    // Update call record with AMD result
-    const { error: updateError } = await supabaseAdmin
-      .from('calls')
-      .update({
-        answeredBy: AnsweredBy,
-        metadata: supabaseAdmin.raw(`
-          COALESCE(metadata, '{}'::jsonb) || 
-          jsonb_build_object(
-            'answeredBy', $1::text,
-            'machineDetectionDuration', $2::text
-          )
-        `, [AnsweredBy, String(MachineDetectionDuration || '')])
-      })
-      .eq('callSid', CallSid);
-
-    if (updateError) {
+    const savedCall = await upsertCallInSupabase({
+      callSid: CallSid,
+      answeredBy: AnsweredBy || null,
+      machineDetectionDuration: MachineDetectionDuration || null,
+      source: 'amd-status',
+    }).catch((updateError) => {
       logger.error('[AMD] Failed to update call with AMD result:', updateError);
-    }
+      return null;
+    });
 
     // If it's a voicemail, automatically drop the voicemail
-    const isVoicemail = AnsweredBy && (
-      AnsweredBy === 'machine_start' ||
-      AnsweredBy === 'machine_end_beep' ||
-      AnsweredBy === 'machine_end_silence' ||
-      AnsweredBy === 'machine_end_other'
-    );
+    const isVoicemail = isVoicemailAnsweredBy(AnsweredBy);
+    const existingDropStatus = String(savedCall?.metadata?.voicemailDropStatus || '').toLowerCase();
 
-    if (isVoicemail) {
-      // Get the voicemail drop for this user's business number
-      const businessNumber = From; // The Twilio number used to make the call
-      
-      const { data: users } = await supabaseAdmin
-        .from('users')
-        .select('id, email, settings')
-        .limit(1000);
+    if (isVoicemail && !['dropped', 'missing-config', 'failed'].includes(existingDropStatus)) {
+      const dropResult = await triggerOutboundVoicemailDrop({
+        callSid: CallSid,
+        businessNumber: From,
+        candidateIdentifiers: [From, Called],
+      }).catch((dropError) => ({
+        status: 'failed',
+        reason: dropError?.message || 'twilio-update-failed',
+      }));
 
-      const matchedUser = resolveUserForBusinessNumber(users, businessNumber);
-      const outboundVoicemailDrop = matchedUser 
-        ? getOutboundVoicemailDropForTwilioNumber(matchedUser.settings, businessNumber)
-        : null;
+      await upsertCallInSupabase({
+        callSid: CallSid,
+        answeredBy: AnsweredBy || null,
+        machineDetectionDuration: MachineDetectionDuration || null,
+        voicemailDropStatus: dropResult?.status || 'failed',
+        voicemailDropAt: new Date().toISOString(),
+        voicemailDropUrl: dropResult?.playUrl || null,
+        metadata: {
+          voicemailDropReason: dropResult?.reason || null,
+        },
+        source: 'amd-status-voicemail-drop',
+      }).catch((updateError) => {
+        logger.error('[AMD] Failed to persist voicemail drop result:', updateError);
+      });
 
-      if (outboundVoicemailDrop?.publicUrl && outboundVoicemailDrop.enabled) {
-        // Use Twilio API to update the call with voicemail drop
-        const accountSid = process.env.TWILIO_ACCOUNT_SID;
-        const authToken = process.env.TWILIO_AUTH_TOKEN;
-        
-        if (accountSid && authToken) {
-          const client = twilio(accountSid, authToken);
-          
-          // Create TwiML to play voicemail
-          const twiml = new VoiceResponse();
-          const playUrl = outboundVoicemailDrop.publicUrl + 
-            (outboundVoicemailDrop.publicUrl.includes('?') ? '&' : '?') + 
-            'cb=' + Date.now();
-          
-          twiml.play(playUrl);
-          twiml.hangup();
-
-          // Update the call to play the voicemail
-          await client.calls(CallSid).update({
-            twiml: twiml.toString()
-          });
-
-          logger.log('[AMD] Outbound voicemail drop initiated for call:', CallSid);
-        }
+      if (dropResult?.status === 'dropped') {
+        logger.log('[AMD] Outbound voicemail drop initiated for call:', CallSid);
       } else {
-        logger.warn('[AMD] No outbound voicemail drop found for business number:', businessNumber);
+        logger.warn('[AMD] Voicemail drop skipped:', {
+          callSid: CallSid,
+          status: dropResult?.status,
+          reason: dropResult?.reason,
+        });
       }
     }
 
