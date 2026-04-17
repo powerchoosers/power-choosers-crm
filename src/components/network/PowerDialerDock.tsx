@@ -17,6 +17,7 @@ import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
 type SessionMode = 'idle' | 'running' | 'paused' | 'complete'
 type TargetCallState = 'queued' | 'ringing' | 'connected' | 'voicemail' | 'completed' | 'no-answer'
+const EMPTY_BATCH: PowerDialTarget[] = []
 
 function makeSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -74,7 +75,7 @@ export function PowerDialerDock() {
 
   const dialableCount = dialTargets.length
   const skippedCount = Math.max(0, selectedCount - dialableCount)
-  const currentBatch = batches[currentBatchIndex] || []
+  const currentBatch = useMemo(() => batches[currentBatchIndex] ?? EMPTY_BATCH, [batches, currentBatchIndex])
   const totalBatches = batches.length
   const isVoiceBusy = isCallActive || callStatus === 'dialing' || callStatus === 'connected'
 
@@ -278,8 +279,10 @@ export function PowerDialerDock() {
   // Track call status changes to update target states
   useEffect(() => {
     if (mode !== 'running') return
-    const currentPhone = currentDialedPhone || lastResolvedPhoneRef.current
-    const machineAnswered = isVoicemailAnsweredBy(lastPostCallSnapshotRef.current?.answeredBy)
+    const lastSnapshot = lastPostCallSnapshotRef.current
+    const currentPhone = currentDialedPhone || lastResolvedPhoneRef.current || lastSnapshot?.phoneNumber || ''
+    const machineAnswered = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
+    const hasResolvedWinner = Boolean(lastSnapshot?.callSid || lastSnapshot?.answeredBy || lastSnapshot?.voicemailDropStatus)
 
     if (callStatus === 'connected') {
       if (!currentPhone) return
@@ -295,7 +298,7 @@ export function PowerDialerDock() {
         const next = new Map(prev)
         currentBatch.forEach((target) => {
           const existing = next.get(target.phoneNumber)
-          if (currentPhone && target.phoneNumber === currentPhone && existing === 'connected') {
+          if (currentPhone && target.phoneNumber === currentPhone && (existing === 'connected' || hasResolvedWinner)) {
             next.set(target.phoneNumber, machineAnswered ? 'voicemail' : 'completed')
             return
           }
@@ -316,7 +319,11 @@ export function PowerDialerDock() {
     if (previous === callStatus) return
     if (callStatus !== 'ended') return
 
-    if (previous === 'connected') {
+    const lastSnapshot = lastPostCallSnapshotRef.current
+    const endedOnVoicemail = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
+    const shouldOpenPostCallWorkspace = previous === 'connected' || endedOnVoicemail || Boolean(lastSnapshot?.callSid)
+
+    if (shouldOpenPostCallWorkspace) {
       const resolvedPhone = currentDialedPhone || lastResolvedPhoneRef.current
       const matchingTarget = currentBatch.find((target) => target.phoneNumber === resolvedPhone) || currentBatch[0]
       const fallbackSnapshot = matchingTarget ? {
@@ -331,11 +338,9 @@ export function PowerDialerDock() {
         voicemailDropStatus: '',
       } : null
 
-      setPostCallSnapshot(lastPostCallSnapshotRef.current || fallbackSnapshot)
+      setPostCallSnapshot(lastSnapshot || fallbackSnapshot)
     }
 
-    const lastSnapshot = lastPostCallSnapshotRef.current
-    const endedOnVoicemail = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
     const nextIndex = nextBatchIndexRef.current
     if (nextIndex < totalBatches) {
       setMode('paused')
@@ -352,7 +357,7 @@ export function PowerDialerDock() {
     toast.success('Power dial complete', {
       description: sourceLabel ? `Queue finished for ${sourceLabel}.` : 'Queue finished.',
     })
-  }, [callStatus, dialableCount, mode, sourceLabel, totalBatches])
+  }, [callStatus, currentBatch, currentDialedPhone, dialableCount, mode, sourceLabel, totalBatches])
 
   const statusLabel = useMemo(() => {
     if (mode === 'running') return isVoiceBusy ? 'CALL ACTIVE' : 'RUNNING'

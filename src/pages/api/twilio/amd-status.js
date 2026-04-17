@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const isVoicemail = isVoicemailAnsweredBy(AnsweredBy);
     const existingDropStatus = String(savedCall?.metadata?.voicemailDropStatus || '').toLowerCase();
 
-    if (isVoicemail && !['dropped', 'missing-config', 'failed'].includes(existingDropStatus)) {
+    if (isVoicemail && !['dropped', 'missing-config'].includes(existingDropStatus)) {
       const dropResult = await triggerOutboundVoicemailDrop({
         callSid: CallSid,
         businessNumber: From,
