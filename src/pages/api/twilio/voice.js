@@ -480,7 +480,8 @@ export default async function handler(req, res) {
 
                 dial.number({
                     statusCallback: `${base}/api/twilio/dial-status?${targetParams.toString()}`,
-                    statusCallbackEvent: 'initiated ringing answered completed'
+                    statusCallbackEvent: 'initiated ringing answered completed',
+                    machineDetection: 'DetectMessageEnd'
                 }, target.phoneNumber);
             });
 
@@ -500,7 +501,8 @@ export default async function handler(req, res) {
 
             dial.number({
                 statusCallback: `${base}/api/twilio/dial-status${cbq}`,
-                statusCallbackEvent: 'initiated ringing answered completed'
+                statusCallbackEvent: 'initiated ringing answered completed',
+                machineDetection: 'DetectMessageEnd'
             }, To);
 
         } else {
