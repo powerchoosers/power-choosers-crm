@@ -8,9 +8,10 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Plug, Zap, ShieldCheck, Target } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
+import { isHumanAnsweredBy } from '@/lib/voice-outcomes';
 
 export function VelocityTrackerV3() {
-  const { status, sentiment } = useCallStore();
+  const { status } = useCallStore();
   const [mounted, setMounted] = useState(false);
   const queryClient = useQueryClient();
   const { data: dashboardMetrics } = useDashboardMetrics();
@@ -40,14 +41,16 @@ export function VelocityTrackerV3() {
       const { count: dialsCount } = await supabase
         .from('calls')
         .select('id', { count: 'exact', head: true })
-        .gte('timestamp', startOfDay.toISOString());
+        .gte('timestamp', startOfDay.toISOString())
+        .contains('metadata', { source: 'dial-status-v3' });
 
       const { data: calls } = await supabase
         .from('calls')
-        .select('status, duration')
-        .gte('timestamp', startOfDay.toISOString());
+        .select('status, duration, metadata')
+        .gte('timestamp', startOfDay.toISOString())
+        .contains('metadata', { source: 'dial-status-v3' });
 
-      const connects = calls?.filter(c => (c.duration || 0) > 30).length || 0;
+      const connects = calls?.filter((call) => isHumanAnsweredBy(call?.metadata?.answeredBy)).length || 0;
       const currentDials = dialsCount || 0;
       const connectRate = currentDials ? Math.round((connects / currentDials) * 100) : 0;
 
@@ -81,7 +84,7 @@ export function VelocityTrackerV3() {
             Velocity_Tracker_v3
           </h3>
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider mt-1">
-            100-Dial Quota Engine // Active Intervention
+            Target dials with real human answers only
           </p>
         </div>
 
@@ -134,7 +137,7 @@ export function VelocityTrackerV3() {
             <Plug size={16} />
           </div>
           <div>
-            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-0.5">Connect Rate</div>
+            <div className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider mb-0.5">Human Connect Rate</div>
             <div className="text-xl font-mono text-white tabular-nums leading-none tracking-tight">{metrics?.connectRate || 0}%</div>
           </div>
         </div>

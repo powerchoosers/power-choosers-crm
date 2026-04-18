@@ -4,7 +4,7 @@ import { cors } from './_cors.js';
 import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import { resolveToCallSid, isCallSid } from './_twilio-ids.js';
 import logger from './_logger.js';
-import { isUnknownAnsweredBy, isVoicemailAnsweredBy } from '@/lib/voice-outcomes';
+import { isHumanAnsweredBy, isUnknownAnsweredBy, isVoicemailAnsweredBy } from '@/lib/voice-outcomes';
 
 // In-memory fallback store (for local/dev when Supabase isn't configured)
 const memoryStore = new Map();
@@ -47,18 +47,25 @@ function deriveOutcome(call) {
   const duration = call.durationSec || call.duration || 0;
   const metadata = readCallMetadata(call);
   const answeredBy = String(call.answeredBy || metadata.answeredBy || '').toLowerCase();
+  const explicitOutcome = call.outcome || metadata.outcome || '';
 
-  // If we have an explicit outcome, use it
-  if (call.outcome) return call.outcome;
+  if (isVoicemailAnsweredBy(answeredBy)) {
+    return 'Voicemail';
+  }
+  if (isUnknownAnsweredBy(answeredBy)) {
+    return 'Unknown';
+  }
+  if (isHumanAnsweredBy(answeredBy)) {
+    return 'Connected';
+  }
+
+  // If Twilio did not classify the answer, fall back to any manual outcome.
+  if (explicitOutcome) {
+    return explicitOutcome;
+  }
 
   // Derive from status
   if (status === 'answered' || status === 'completed') {
-    if (isVoicemailAnsweredBy(answeredBy)) {
-      return 'Voicemail';
-    }
-    if (isUnknownAnsweredBy(answeredBy)) {
-      return 'Unknown';
-    }
     if (status === 'answered') return 'Connected';
     return duration > 0 ? 'Connected' : 'No Answer';
   }
@@ -99,7 +106,7 @@ function normalizeCallForResponse(call) {
     timestamp: call.timestamp || call.callTime || new Date().toISOString(),
     callTime: call.callTime || call.timestamp || new Date().toISOString(),
     durationSec: call.durationSec != null ? call.durationSec : (call.duration || 0),
-    outcome: call.outcome || deriveOutcome(call),
+    outcome: deriveOutcome(call),
     transcript: call.transcript || '',
     formattedTranscript: call.formattedTranscript || call.formatted_transcript || '',
     aiSummary: (call.aiInsights && call.aiInsights.summary) || call.aiSummary || '',

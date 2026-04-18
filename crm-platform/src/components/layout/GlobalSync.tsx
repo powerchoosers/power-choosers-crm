@@ -281,13 +281,14 @@ export function GlobalSync() {
           const accountId = call.accountId || call.account_id || null
           const currentPath = pathnameRef.current
           const refreshCallsNow = isRouteVisible(currentPath, ['/network/calls'])
-          const refreshAccountNow = isRouteVisible(currentPath, ['/network/accounts'])
-          const refreshContactNow = isRouteVisible(currentPath, ['/network/contacts'])
+          const refreshDossierNow = isRouteVisible(currentPath, ['/network/accounts', '/network/contacts'])
 
           invalidateQueryGroup(queryClient, ['calls'], refreshCallsNow)
           invalidateQueryGroup(queryClient, ['calls-count'], refreshCallsNow)
-          if (contactId) invalidateQueryGroup(queryClient, ['contact-calls', contactId], refreshContactNow)
-          if (accountId) invalidateQueryGroup(queryClient, ['account-calls', accountId], refreshAccountNow)
+          invalidateQueryGroup(queryClient, ['contact-calls'], refreshDossierNow)
+          invalidateQueryGroup(queryClient, ['account-calls'], refreshDossierNow)
+          if (contactId) invalidateQueryGroup(queryClient, ['contact-calls', contactId], refreshDossierNow)
+          if (accountId) invalidateQueryGroup(queryClient, ['account-calls', accountId], refreshDossierNow)
         }
       )
       .subscribe((status) => {

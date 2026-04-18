@@ -1,6 +1,7 @@
 import { cors } from '../../_cors.js';
 import { supabaseAdmin, requireUser } from '@/lib/supabase';
 import logger from '../../_logger.js';
+import { isHumanAnsweredBy, isUnknownAnsweredBy, isVoicemailAnsweredBy } from '../../../../lib/voice-outcomes.ts';
 
 // Normalize phone number to last 10 digits
 function normalizePhone(phone) {
@@ -19,7 +20,9 @@ function deriveOutcome(call) {
 
   // Derive from status
   if (status === 'completed') {
-    if (answeredBy.includes('machine')) return 'Voicemail';
+    if (isVoicemailAnsweredBy(answeredBy)) return 'Voicemail';
+    if (isUnknownAnsweredBy(answeredBy)) return 'Unknown';
+    if (isHumanAnsweredBy(answeredBy)) return 'Connected';
     return duration > 0 ? 'Connected' : 'No Answer';
   }
 
