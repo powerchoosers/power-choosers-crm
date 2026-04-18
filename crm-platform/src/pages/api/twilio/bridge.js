@@ -139,7 +139,6 @@ export default async function handler(req, res) {
         logger.log(`[Bridge] Using callerId: ${dynamicCallerId} (source: ${callerId ? 'query param' : From ? 'body From' : 'env/fallback'})`);
 
         // Seed the Calls API with correct phone context for this CallSid
-        const apiCallStart = Date.now();
         try {
             // [REMOVED] Initial creation to match "only post on completion" requirement
             logger.log(`[Bridge] Call context for ${CallSid} ready (posting deferred to completion)`);
@@ -240,7 +239,9 @@ export default async function handler(req, res) {
         try {
             dial.number({
                 statusCallback: dialStatusUrl,
-                statusCallbackEvent: 'initiated ringing answered completed'
+                statusCallbackEvent: 'initiated ringing answered completed',
+                machineDetection: 'DetectMessageEnd',
+                machineDetectionTimeout: 45,
             }, normalizedTarget);
             logger.log(`[Bridge] Successfully added number ${normalizedTarget} to dial with callerId ${dynamicCallerId}`);
         } catch (dialError) {
