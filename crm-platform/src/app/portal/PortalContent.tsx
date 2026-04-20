@@ -365,7 +365,7 @@ export default function PortalContent() {
                                 <div className="flex items-center gap-3">
                                     <CalendarDays className="w-4 h-4 text-white shrink-0" />
                                     <div>
-                                        <p className="text-sm font-semibold">Book a Briefing</p>
+                                        <p className="text-sm font-semibold">Book a Strategy Call</p>
                                         <p className="font-mono text-[9px] text-zinc-500 uppercase tracking-wider">Strategy session · No commitment</p>
                                     </div>
                                 </div>

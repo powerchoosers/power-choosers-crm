@@ -24,8 +24,8 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   metadataBase: new URL(BASE_URL),
-  title: 'Nodal Point | Commercial Energy Bill Review',
-  description: 'Review electricity bills, contract terms, and market risk for Texas businesses. Nodal Point shows the biggest cost drivers and the next step.',
+  title: 'Nodal Point | Commercial Energy Procurement',
+  description: 'Review bills, compare supplier offers, negotiate rates, and handle paperwork for Texas businesses. Nodal Point shows the biggest cost drivers and the next step.',
   icons: {
     icon: '/images/nodalpoint-webicon.png',
     apple: '/images/nodalpoint-webicon.png',
@@ -34,22 +34,22 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Nodal Point',
-    title: 'Nodal Point | Commercial Energy Bill Review',
-    description: 'Review electricity bills, contract terms, and market risk for Texas businesses. No guesswork. No noise.',
+    title: 'Nodal Point | Commercial Energy Procurement',
+    description: 'Review bills, compare supplier offers, negotiate rates, and handle paperwork for Texas businesses. No guesswork. No noise.',
     url: BASE_URL,
     images: [
       {
         url: '/images/og-card.jpg',
         width: 1200,
         height: 630,
-        alt: 'Nodal Point — Commercial Energy Bill Review',
+        alt: 'Nodal Point — Commercial Energy Procurement',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Nodal Point | Commercial Energy Bill Review',
-    description: 'Review electricity bills, contract terms, and market risk for Texas businesses. No guesswork. No noise.',
+    title: 'Nodal Point | Commercial Energy Procurement',
+    description: 'Review bills, compare supplier offers, negotiate rates, and handle paperwork for Texas businesses. No guesswork. No noise.',
     images: ['/images/og-card.jpg'],
   },
   alternates: {},
@@ -62,7 +62,7 @@ const SCHEMA_ORG = {
   url: BASE_URL,
   logo: `${BASE_URL}/images/nodalpoint.png`,
   description:
-    'Commercial energy bill review platform for businesses in the ERCOT market. We help Texas companies understand the main cost drivers and what to do next.',
+    'Commercial energy procurement, supplier negotiation, and bill analysis for businesses in the ERCOT market. We help Texas companies compare supplier offers, negotiate terms, and understand the main cost drivers.',
   sameAs: ['https://www.linkedin.com/company/nodal-point/'],
   contactPoint: {
     '@type': 'ContactPoint',
@@ -80,9 +80,12 @@ const SCHEMA_ORG = {
   knowsAbout: [
     'ERCOT',
     'Texas energy market',
+    'commercial energy procurement',
     'commercial energy tariffs',
     'demand charges',
     '4CP peaks',
+    'supplier negotiation',
+    'contract management',
     'energy bill review',
     'scarcity adders',
   ],
