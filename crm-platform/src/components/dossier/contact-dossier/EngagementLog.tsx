@@ -46,18 +46,20 @@ export function EngagementLog({
     useEffect(() => {
         const topId = recentCalls?.[0]?.id
         if (topId && prevTopId.current && topId !== prevTopId.current) {
-            if (safeCurrentPage === 1) {
-                const firstNode = document.getElementById(`call-node-${topId}`)
-                if (firstNode) {
-                    const scrollContainer = firstNode.closest('.np-scroll')
-                    if (scrollContainer) {
-                        scrollContainer.scrollTo({ top: 0, behavior: 'smooth' })
-                    }
+            if (safeCurrentPage !== 1) {
+                setCurrentPage(1)
+            }
+
+            const firstNode = document.getElementById(`call-node-${topId}`)
+            if (firstNode) {
+                const scrollContainer = firstNode.closest('.np-scroll')
+                if (scrollContainer) {
+                    scrollContainer.scrollTo({ top: 0, behavior: 'smooth' })
                 }
             }
         }
         prevTopId.current = topId
-    }, [recentCalls, safeCurrentPage])
+    }, [recentCalls, safeCurrentPage, setCurrentPage])
 
     return (
         <div className={cn(

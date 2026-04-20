@@ -8,7 +8,17 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Plug, Zap, ShieldCheck, Target } from 'lucide-react';
 import { useDashboardMetrics } from '@/hooks/useDashboardMetrics';
-import { isHumanAnsweredBy } from '@/lib/voice-outcomes';
+import { isHumanConnectCall } from '@/lib/voice-outcomes';
+
+type VelocityCallRow = {
+  id: string
+  status?: string | null
+  duration?: number | null
+  metadata?: {
+    answeredBy?: unknown
+    [key: string]: unknown
+  } | null
+}
 
 export function VelocityTrackerV3() {
   const { status } = useCallStore();
@@ -30,32 +40,48 @@ export function VelocityTrackerV3() {
     };
   }, [queryClient]);
 
-  // Fetch real-time metrics
   const { data: metrics } = useQuery({
     queryKey: ['velocity-metrics'],
     queryFn: async () => {
-      // Dials Today
       const startOfDay = new Date();
       startOfDay.setHours(0, 0, 0, 0);
+      const startIso = startOfDay.toISOString();
+      const selectFields = 'id, status, duration, metadata, timestamp, createdAt';
 
-      const { count: dialsCount } = await supabase
-        .from('calls')
-        .select('id', { count: 'exact', head: true })
-        .gte('timestamp', startOfDay.toISOString())
-        .contains('metadata', { source: 'dial-status-v3' });
+      const [timestampRes, createdAtRes] = await Promise.all([
+        supabase
+          .from('calls')
+          .select(selectFields)
+          .gte('timestamp', startIso),
+        supabase
+          .from('calls')
+          .select(selectFields)
+          .gte('createdAt', startIso),
+      ]);
 
-      const { data: calls } = await supabase
-        .from('calls')
-        .select('status, duration, metadata')
-        .gte('timestamp', startOfDay.toISOString())
-        .contains('metadata', { source: 'dial-status-v3' });
+      if (timestampRes.error && createdAtRes.error) {
+        console.error('Error fetching velocity metrics:', timestampRes.error || createdAtRes.error);
+        return {
+          totalCalls: 0,
+          connectRate: 0,
+          signalEfficiency: 0,
+        };
+      }
 
-      const connects = calls?.filter((call) => isHumanAnsweredBy(call?.metadata?.answeredBy)).length || 0;
-      const currentDials = dialsCount || 0;
-      const connectRate = currentDials ? Math.round((connects / currentDials) * 100) : 0;
+      const merged = new Map<string, VelocityCallRow>();
+      for (const row of [...(timestampRes.data ?? []), ...(createdAtRes.data ?? [])]) {
+        if (row?.id && !merged.has(row.id)) {
+          merged.set(row.id, row as VelocityCallRow);
+        }
+      }
+
+      const allCalls = Array.from(merged.values());
+      const totalCalls = allCalls.length;
+      const humanConnects = allCalls.filter(isHumanConnectCall).length;
+      const connectRate = totalCalls ? Math.round((humanConnects / totalCalls) * 100) : 0;
 
       return {
-        dials: currentDials,
+        totalCalls,
         connectRate,
         signalEfficiency: Math.floor(connectRate * 0.4),
       };
@@ -65,10 +91,10 @@ export function VelocityTrackerV3() {
 
   if (!mounted) return <div className="nodal-void-card p-6 h-full min-h-[380px]" />;
 
-  const currentDials = Math.min(metrics?.dials || 0, 100);
-  const isCold = currentDials <= 33;
-  const isTracing = currentDials > 33 && currentDials <= 66;
-  const isLocked = currentDials > 66;
+  const currentCalls = Math.min(metrics?.totalCalls || 0, 100);
+  const isCold = currentCalls <= 33;
+  const isTracing = currentCalls > 33 && currentCalls <= 66;
+  const isLocked = currentCalls > 66;
 
   const barColor = isLocked ? 'bg-emerald-500' : isTracing ? 'bg-[#002FA7]' : 'bg-zinc-500';
   const barShadow = isLocked ? 'shadow-[0_0_20px_rgba(16,185,129,0.8)]' : isTracing ? 'shadow-[0_0_20px_rgba(0,47,167,0.8)]' : 'shadow-[0_0_10px_rgba(113,113,122,0.5)]';
@@ -84,7 +110,7 @@ export function VelocityTrackerV3() {
             Velocity_Tracker_v3
           </h3>
           <p className="text-[10px] text-zinc-500 font-mono uppercase tracking-wider mt-1">
-            Target dials with real human answers only
+            Total calls today across all dial flows
           </p>
         </div>
 
@@ -105,7 +131,7 @@ export function VelocityTrackerV3() {
             isLocked ? "text-emerald-400 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" :
               isTracing ? "text-[#002FA7] drop-shadow-[0_0_15px_rgba(0,47,167,0.5)]" : "text-white"
           )}>
-            {currentDials.toString().padStart(2, '0')}
+            {currentCalls.toString().padStart(2, '0')}
           </span>
           <span className="text-[32px] xl:text-[40px] text-zinc-700 tracking-widest transition-colors group-hover/velocity:text-zinc-600">/100</span>
         </motion.div>
@@ -114,7 +140,7 @@ export function VelocityTrackerV3() {
           <div className="h-4 w-full bg-zinc-900/80 rounded-full overflow-hidden border border-white/10 nodal-glass relative">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${currentDials}%` }}
+              animate={{ width: `${currentCalls}%` }}
               transition={{ duration: 1, ease: "easeOut" }}
               className={cn("h-full rounded-full transition-colors duration-1000 ease-in-out", barColor, barShadow)}
             />
@@ -131,7 +157,7 @@ export function VelocityTrackerV3() {
         </div>
       </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/5 pt-6 mt-auto relative z-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-white/5 pt-6 mt-auto relative z-10">
         <div className="flex gap-3 items-center p-3 rounded-lg bg-transparent border border-white/5 relative overflow-hidden transition-colors hover:border-white/10">
           <div className="p-2 rounded-md bg-[#002FA7]/10 text-[#002FA7] border border-[#002FA7]/20">
             <Plug size={16} />
