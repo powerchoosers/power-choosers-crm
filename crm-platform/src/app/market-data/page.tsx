@@ -90,7 +90,7 @@ export default function MarketData() {
               className="hidden md:flex items-center gap-2 border border-white/15 text-zinc-200 px-5 py-2.5 rounded-full text-sm font-medium hover:border-white/30 hover:bg-white/5 transition-all"
             >
               <CalendarDays className="w-4 h-4" />
-              <span>Book a Briefing</span>
+              <span>Book a Strategy Call</span>
             </Link>
             <a
               href="/bill-debugger"
@@ -135,7 +135,7 @@ export default function MarketData() {
               className="inline-flex items-center justify-center gap-2 border border-white/15 text-zinc-200 px-6 py-3 rounded-full text-base font-medium hover:border-white/30 hover:bg-white/5 transition-all"
             >
               <CalendarDays className="w-4 h-4" />
-              Book a Briefing
+              Book a Strategy Call
             </Link>
             <a
               href="/bill-debugger"
@@ -290,7 +290,7 @@ export default function MarketData() {
                   className="inline-flex items-center gap-3 border border-white/20 text-white px-8 py-4 rounded-full font-bold text-lg hover:border-white/40 transition-all"
                 >
                   <CalendarDays className="w-5 h-5" />
-                  Book a Briefing
+                  Book a Strategy Call
                 </Link>
               </div>
             </div>

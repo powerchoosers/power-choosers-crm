@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { PageReveal } from '@/components/motion/PageReveal';
 
 export const metadata: Metadata = {
-    title: 'Nodal Point | Schedule a Review',
-    description: 'Schedule a 30-minute review with the Nodal Point team. We will walk through your bill live and show the biggest cost drivers.',
+    title: 'Nodal Point | Schedule a Strategy Call',
+    description: 'Schedule a 30-minute strategy call with the Nodal Point team. We will review your bill or supplier offer live, compare options, and show the biggest cost drivers.',
     alternates: { canonical: 'https://nodalpoint.io/book' },
 };
 

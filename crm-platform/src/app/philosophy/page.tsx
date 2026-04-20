@@ -94,7 +94,7 @@ export default function Philosophy() {
               href="/book"
               className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-white/20 text-white rounded-full text-base md:text-lg font-medium hover:border-white/40 transition-all duration-300 whitespace-nowrap"
             >
-              <span>Book a Briefing</span>
+              <span>Book a Strategy Call</span>
             </Link>
           </div>
         </motion.div>

@@ -84,15 +84,15 @@ export default function BookingInterface({ email }: { email: string }) {
                     <div className="flex items-center gap-2 mb-6">
                         <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="font-mono text-[10px] text-zinc-500 uppercase tracking-widest">
-                            SCHEDULE_A_REVIEW // ACCESS
+                            SCHEDULE_A_STRATEGY_CALL // ACCESS
                         </span>
                     </div>
-                    <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Schedule a review</h2>
+                    <h2 className="text-3xl font-bold text-white tracking-tight mb-2">Schedule a strategy call</h2>
                     <p className="text-zinc-500 text-sm mb-4 leading-relaxed">
-                        A 30-minute call with the Nodal Point team. We&apos;ll review your bill live and point out the biggest cost drivers before you commit to anything.
+                        A 30-minute call with the Nodal Point team. Bring a bill, a supplier offer, or both. We&apos;ll review the numbers live, compare the options, and point out the biggest cost drivers before you commit to anything.
                     </p>
                     <div className="flex flex-col gap-1.5 mb-8">
-                        {['No sales script. We keep it practical.', 'You see the numbers before we discuss next steps.', 'You can cancel up to 2 hours before.'].map(line => (
+                        {['No sales script. We keep it practical.', 'Bring a bill, supplier offer, or both.', 'You can cancel up to 2 hours before.'].map(line => (
                             <div key={line} className="flex items-center gap-2 text-xs text-zinc-500">
                                 <div className="w-1 h-1 rounded-full bg-[#002FA7] shrink-0" />
                                 <span>{line}</span>
