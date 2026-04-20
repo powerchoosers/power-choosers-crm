@@ -210,7 +210,7 @@ export default function MarketOutlookContent() {
                 href="/book"
                 className="w-full md:w-auto inline-flex items-center justify-center gap-3 border border-white/20 text-white px-8 py-4 rounded-full font-bold text-lg hover:border-white/40 transition-all"
               >
-                Book a Briefing
+                Book a Strategy Call
               </Link>
             </div>
           </div>

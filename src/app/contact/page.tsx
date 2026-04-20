@@ -71,7 +71,7 @@ export default function Contact() {
               className="hidden md:flex items-center gap-2 border border-white/15 text-zinc-200 px-5 py-2.5 rounded-full text-sm font-medium hover:border-white/30 hover:bg-white/5 transition-all"
             >
               <CalendarDays className="w-4 h-4" />
-              <span>Book a Briefing</span>
+              <span>Book a Strategy Call</span>
             </Link>
             <a
               href="/bill-debugger"
@@ -116,7 +116,7 @@ export default function Contact() {
               className="inline-flex items-center justify-center gap-2 border border-white/15 text-zinc-200 px-6 py-3 rounded-full text-base font-medium hover:border-white/30 hover:bg-white/5 transition-all"
             >
               <CalendarDays className="w-4 h-4" />
-              Book a Briefing
+              Book a Strategy Call
             </Link>
             <a
               href="/bill-debugger"

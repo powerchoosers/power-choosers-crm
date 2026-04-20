@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Nodal Point | Contact',
-  description: 'Reach Nodal Point directly. Talk to the team that reviews bills and helps businesses understand the next step.',
+  description: 'Reach Nodal Point directly. Talk to the team that reviews bills, compares supplier offers, and helps businesses understand the next step.',
   alternates: { canonical: 'https://nodalpoint.io/contact' },
 }
 

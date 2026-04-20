@@ -3,10 +3,10 @@ import Link from 'next/link'
 
 const NAV_GROUPS = [
   {
-    label: 'Platform',
+    label: 'Start Here',
     links: [
       { label: 'Review My Bill', href: '/bill-debugger' },
-      { label: 'Book a Briefing', href: '/book' },
+      { label: 'Book a Strategy Call', href: '/book' },
       { label: 'Sign In', href: '/portal' },
     ],
   },
@@ -14,6 +14,7 @@ const NAV_GROUPS = [
     label: 'Company',
     links: [
       { label: 'Philosophy', href: '/philosophy' },
+      { label: 'Who we serve', href: '/who-we-serve' },
       { label: 'How it works', href: '/technical-docs' },
       { label: 'Market Data', href: '/market-data' },
       { label: 'Market Outlook', href: '/market-outlook' },
@@ -49,7 +50,7 @@ export function LandingFooter() {
               />
             </div>
             <p className="text-sm text-zinc-500 leading-relaxed mb-6 max-w-[200px]">
-              Commercial energy bill review platform for Texas businesses.
+              Commercial energy procurement, supplier negotiation, and bill analysis for Texas businesses.
             </p>
             {/* LinkedIn */}
             <a
