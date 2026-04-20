@@ -43,7 +43,7 @@ export function NextStepsCard({ email }: NextStepsCardProps) {
                         className="group px-12 py-6 bg-black text-white rounded-full font-bold text-xl hover:scale-105 transition-all flex items-center gap-4 shadow-[#000]/20 shadow-2xl hover:shadow-black/30 active:scale-95"
                     >
                         <Calendar className="w-6 h-6" />
-                        Book a Briefing
+                        Book a Strategy Call
                         <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                     </Link>
 
