@@ -118,7 +118,7 @@ export function Sidebar() {
     }
   }
 
-  // suppressHydrationWarning: browser extensions (e.g. Cursor) can inject data-cursor-ref onto <a> tags
+  // suppressHydrationWarning: browser extensions can inject data attributes onto <a> tags
   // after SSR, causing server/client attribute mismatch. Suppress only for this sidebar subtree.
   return (
     <motion.aside
