@@ -1505,31 +1505,44 @@ export default function EmailDetailPage() {
           </motion.div>
         </motion.div>
 
-        <div className="p-4 border-t border-white/5 nodal-recessed">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => openComposerForMessage('reply')}
-              className="inline-flex items-center justify-center gap-2.5 bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-medium h-11 px-6 rounded-xl transition-all shadow-[0_0_20px_-5px_#002FA7] hover:shadow-[0_0_30px_-2px_#002FA7]/50 active:scale-[0.98]"
+        <AnimatePresence initial={false}>
+          {!isReplyOpen && (
+            <motion.div
+              key="email-detail-footer-actions"
+              initial={{ opacity: 0, y: 28, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: 28, height: 0 }}
+              transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+              className="overflow-hidden"
             >
-              <Reply className="w-4 h-4" />
-              Reply
-            </button>
-            <button
-              onClick={() => openComposerForMessage('reply_all')}
-              className="inline-flex items-center justify-center gap-2 nodal-glass hover:bg-white/5 text-zinc-200 font-medium h-11 px-5 rounded-xl transition-all active:scale-[0.98]"
-            >
-              <ReplyAll className="w-4 h-4" />
-              Reply all
-            </button>
-            <button
-              onClick={() => openComposerForMessage('forward')}
-              className="inline-flex items-center justify-center gap-2 nodal-glass hover:bg-white/5 text-zinc-200 font-medium h-11 px-5 rounded-xl transition-all active:scale-[0.98]"
-            >
-              <Forward className="w-4 h-4" />
-              Forward
-            </button>
-          </div>
-        </div>
+              <div className="p-4 border-t border-white/5 nodal-recessed">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => openComposerForMessage('reply')}
+                    className="inline-flex items-center justify-center gap-2.5 bg-[#002FA7] text-white hover:bg-[#002FA7]/90 font-medium h-11 px-6 rounded-xl transition-all shadow-[0_0_20px_-5px_#002FA7] hover:shadow-[0_0_30px_-2px_#002FA7]/50 active:scale-[0.98]"
+                  >
+                    <Reply className="w-4 h-4" />
+                    Reply
+                  </button>
+                  <button
+                    onClick={() => openComposerForMessage('reply_all')}
+                    className="inline-flex items-center justify-center gap-2 nodal-glass hover:bg-white/5 text-zinc-200 font-medium h-11 px-5 rounded-xl transition-all active:scale-[0.98]"
+                  >
+                    <ReplyAll className="w-4 h-4" />
+                    Reply all
+                  </button>
+                  <button
+                    onClick={() => openComposerForMessage('forward')}
+                    className="inline-flex items-center justify-center gap-2 nodal-glass hover:bg-white/5 text-zinc-200 font-medium h-11 px-5 rounded-xl transition-all active:scale-[0.98]"
+                  >
+                    <Forward className="w-4 h-4" />
+                    Forward
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {isMounted && createPortal(
