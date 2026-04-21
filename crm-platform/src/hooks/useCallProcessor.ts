@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -17,10 +17,23 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
   const [status, setStatus] = useState<ProcessingStatus>('idle')
   const [error, setError] = useState<string | null>(null)
   const queryClient = useQueryClient()
+  const recordingReadyRef = useRef(Boolean(recordingUrl || recordingSid))
+
+  useEffect(() => {
+    recordingReadyRef.current = Boolean(recordingUrl || recordingSid)
+  }, [recordingSid, recordingUrl])
 
   // Subscribe to changes for this specific call (calls table uses camelCase: callSid, aiInsights)
   useEffect(() => {
     if (!callSid) return
+
+    const invalidateLinkedQueries = () => {
+      if (contactId) queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
+      queryClient.invalidateQueries({ queryKey: ['calls'] })
+      if (accountId) {
+        queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
+      }
+    }
 
     const channel = supabase
       .channel(`call-updates-${callSid}`)
@@ -34,15 +47,16 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
         },
         (payload: { new: Record<string, unknown> }) => {
           const row = payload.new || {}
+          const hasRecording = Boolean(row.recordingUrl ?? row.recording_url ?? row.recordingSid ?? row.recording_sid)
           const hasInsights = !!(row.aiInsights ?? row.ai_insights)
           const hasTranscript = !!(row.transcript)
+          if (hasRecording && !recordingReadyRef.current) {
+            recordingReadyRef.current = true
+            invalidateLinkedQueries()
+          }
           if (hasInsights || hasTranscript) {
             setStatus('ready')
-            if (contactId) queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId] })
-            queryClient.invalidateQueries({ queryKey: ['calls'] })
-            if (accountId) {
-              queryClient.invalidateQueries({ queryKey: ['account-calls', accountId] })
-            }
+            invalidateLinkedQueries()
             if (typeof window !== 'undefined') {
               window.dispatchEvent(new CustomEvent('nodal:call-processed', {
                 detail: { callSid, contactId, accountId }
@@ -57,7 +71,7 @@ export function useCallProcessor({ callSid, recordingUrl, recordingSid, contactI
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [callSid, contactId, accountId, queryClient])
+  }, [accountId, callSid, contactId, queryClient])
 
   const processCall = useCallback(async () => {
     if (!callSid) return
