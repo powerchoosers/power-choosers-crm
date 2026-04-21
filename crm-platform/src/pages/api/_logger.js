@@ -1,10 +1,11 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const LOG_FILE = path.join(__dirname, '../.cursor/debug.log');
+const LOG_FILE = path.join(os.tmpdir(), 'nodal-point-crm', 'debug.log');
 
 // Shared logger for all API files
 // Respects production settings to reduce Cloud Run costs
@@ -83,4 +84,3 @@ export const logger = {
 };
 
 export default logger;
-
