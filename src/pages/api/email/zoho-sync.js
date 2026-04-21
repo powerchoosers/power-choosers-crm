@@ -1023,6 +1023,33 @@ export default async function handler(req, res) {
                     emailDoc.accountId = fallbackIdentity.accountId;
                 }
 
+                // Zoho sometimes gives us only the sender's display name for inbound rows.
+                // If the CRM contact is already known, rebuild a proper address string so
+                // the dossier feed and reply composer do not depend on name-only data.
+                if (!senderEmail && emailDoc.contactId) {
+                    const { data: linkedContact } = await supabaseAdmin
+                        .from('contacts')
+                        .select('email, name, firstName, lastName')
+                        .eq('id', emailDoc.contactId)
+                        .maybeSingle();
+
+                    const linkedEmail = extractEmailAddress(linkedContact?.email || '');
+                    if (linkedEmail) {
+                        const linkedName = String(
+                            linkedContact?.name
+                            || [linkedContact?.firstName, linkedContact?.lastName].filter(Boolean).join(' ').trim()
+                            || extractDisplayName(emailDoc.from)
+                            || ''
+                        ).trim();
+
+                        emailDoc.from = linkedName ? `${linkedName} <${linkedEmail}>` : linkedEmail;
+                        emailDoc.metadata = {
+                            ...emailDoc.metadata,
+                            fromAddress: linkedEmail,
+                        };
+                    }
+                }
+
                 // 5. Ensure thread exists (Must be before email insert due to FK constraint)
                 await updateThread(emailDoc);
 
