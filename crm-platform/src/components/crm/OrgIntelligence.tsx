@@ -885,11 +885,16 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         : null;
 
       // Pull existing account shape so Apollo enrichment can merge instead of replace.
-      const { data: existingAccount } = await supabase
+      const { data: existingAccount, error: existingAccountError } = await supabase
         .from('accounts')
         .select('service_addresses, metadata')
         .eq('id', accountId)
         .single();
+
+      if (existingAccountError) {
+        console.error('Failed to load existing account before Apollo enrichment:', existingAccountError);
+        throw existingAccountError;
+      }
 
       const currentMetadata = isRecord(existingAccount?.metadata) ? existingAccount.metadata : {};
       const fullAddress = buildApolloFullAddress(companySummary);
