@@ -31,7 +31,7 @@ import { ArrowUpRight, ArrowDownLeft } from 'lucide-react'
 
 interface CallListItemProps {
   call: Call
-  contactId: string
+  contactId?: string
   accountId?: string
   /** Account logo/domain/name for customer avatar (logoUrl or favicon fallback) */
   accountLogoUrl?: string
@@ -105,6 +105,7 @@ export function CallListItem({
   const currentStatus = isProcessed ? 'ready' : status
   const isVoicemail = call.metadata?.isVoicemail || call.outcome === 'Voicemail'
   const isUnknownOutcome = call.outcome === 'Unknown'
+  const hasRecording = Boolean(call.recordingUrl || call.recordingSid)
 
   // Parse AI Insights if they exist
   const insights = typeof call.aiInsights === 'string'
@@ -244,7 +245,7 @@ export function CallListItem({
   }, [user?.user_metadata?.avatar_url, profile.hostedPhotoUrl])
 
   const openPlayerAndPlay = () => {
-    if (!call.recordingUrl) return
+    if (!hasRecording) return
     setIsPlayerOpen(true)
     setDuration(fallbackDuration > 0 ? fallbackDuration : 0)
     setCurrentTime(0)
@@ -330,7 +331,7 @@ export function CallListItem({
       isMinimal ? "py-3 px-2" : "p-4",
       isExpanded ? "bg-zinc-950/90 border-white/10 shadow-2xl" : "bg-zinc-950/40 border-white/5 hover:bg-zinc-950/80 hover:border-white/10"
     )}>
-      {call.recordingUrl && (
+      {hasRecording && (
         <audio ref={audioRef} preload="metadata" className="hidden" />
       )}
       <div className="flex items-center justify-between gap-2">
@@ -434,7 +435,7 @@ export function CallListItem({
 
         <div className="flex items-center gap-1 shrink-0">
           <AnimatePresence mode="wait">
-            {call.recordingUrl && (
+            {hasRecording && (
               <motion.div
                 key="play-call"
                 initial={{ opacity: 0, scale: 0.8 }}
@@ -536,7 +537,7 @@ export function CallListItem({
       </div>
 
       <AnimatePresence>
-        {isPlayerOpen && call.recordingUrl && (
+        {isPlayerOpen && hasRecording && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
