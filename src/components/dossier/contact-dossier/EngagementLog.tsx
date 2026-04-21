@@ -90,6 +90,10 @@ export function EngagementLog({
                                     const companyPhone = account?.companyPhone?.replace(/\D/g, '').slice(-10)
                                     const callToPhone = (call.phoneNumber || '').replace(/\D/g, '').slice(-10)
                                     const isCompanyCall = Boolean(companyPhone && callToPhone && companyPhone === callToPhone)
+                                    const resolvedContactId = contact ? id : (call.contactId || undefined)
+                                    const resolvedAccountId = contact
+                                        ? (contact?.linkedAccountId || account?.id || call.accountId || undefined)
+                                        : (call.accountId || account?.id || id)
                                     return (
                                         <motion.div
                                             key={call.id}
@@ -110,8 +114,8 @@ export function EngagementLog({
                                                  </div>
                                                 <CallListItem
                                                     call={call}
-                                                    contactId={id}
-                                                    accountId={contact?.linkedAccountId}
+                                                    contactId={resolvedContactId}
+                                                    accountId={resolvedAccountId}
                                                     accountLogoUrl={account?.logoUrl}
                                                     accountDomain={account?.domain}
                                                     accountName={account?.name}
