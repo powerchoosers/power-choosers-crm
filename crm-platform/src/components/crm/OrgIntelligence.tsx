@@ -249,6 +249,25 @@ interface RevealState {
   phoneWarned: boolean;
 }
 
+type MeterRecord = {
+  id: string;
+  esiId: string;
+  address: string;
+  rate: string;
+  endDate: string;
+  [key: string]: unknown;
+};
+
+type ServiceAddressRecord = {
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  type: string;
+  isPrimary: boolean;
+  [key: string]: unknown;
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
@@ -260,6 +279,171 @@ function sanitizeContactText(value: unknown): string {
   const lowered = trimmed.toLowerCase();
   if (lowered === 'null' || lowered === 'undefined' || lowered === 'n/a') return '';
   return trimmed;
+}
+
+function coerceString(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+function normalizeAddressKey(value: unknown): string {
+  return coerceString(value)
+    .toLowerCase()
+    .replace(/[,\s]+/g, ' ')
+    .trim();
+}
+
+function buildApolloFullAddress(company: ApolloCompany): string {
+  const explicitAddress = coerceString(company.address);
+  if (explicitAddress) return explicitAddress;
+
+  return [company.city, company.state, company.country]
+    .map(coerceString)
+    .filter(Boolean)
+    .join(', ');
+}
+
+function normalizeMeters(value: unknown): MeterRecord[] {
+  if (!Array.isArray(value)) return [];
+
+  return value.flatMap((entry) => {
+    if (typeof entry === 'string') {
+      const address = coerceString(entry);
+      if (!address) return [];
+      return [{
+        id: crypto.randomUUID(),
+        esiId: '',
+        address,
+        rate: '',
+        endDate: ''
+      }];
+    }
+
+    if (!isRecord(entry)) return [];
+
+    return [{
+      ...entry,
+      id: coerceString(entry.id) || crypto.randomUUID(),
+      esiId: coerceString(entry.esiId ?? entry.esid),
+      address: coerceString(entry.address ?? entry.service_address),
+      rate: coerceString(entry.rate),
+      endDate: coerceString(entry.endDate ?? entry.end_date)
+    }];
+  });
+}
+
+function mergeApolloAddressIntoMeters(existingMeters: MeterRecord[], fullAddress: string): MeterRecord[] {
+  const addressKey = normalizeAddressKey(fullAddress);
+  if (!addressKey) return existingMeters;
+
+  const alreadyPresent = existingMeters.some((meter) => normalizeAddressKey(meter.address) === addressKey);
+  if (alreadyPresent) return existingMeters;
+
+  const blankAddressIndex = existingMeters.findIndex((meter) => !normalizeAddressKey(meter.address));
+  if (blankAddressIndex >= 0) {
+    return existingMeters.map((meter, index) =>
+      index === blankAddressIndex
+        ? { ...meter, address: fullAddress }
+        : meter
+    );
+  }
+
+  return [
+    ...existingMeters,
+    {
+      id: crypto.randomUUID(),
+      esiId: '',
+      address: fullAddress,
+      rate: '',
+      endDate: ''
+    }
+  ];
+}
+
+function normalizeServiceAddresses(value: unknown): ServiceAddressRecord[] {
+  if (!Array.isArray(value)) return [];
+
+  const normalized = value.flatMap((entry, index) => {
+    if (typeof entry === 'string') {
+      const address = coerceString(entry);
+      if (!address) return [];
+      return [{
+        address,
+        city: '',
+        state: '',
+        country: '',
+        type: index === 0 ? 'headquarters' : 'service',
+        isPrimary: index === 0
+      }];
+    }
+
+    if (!isRecord(entry)) return [];
+
+    const address = coerceString(entry.address);
+    const city = coerceString(entry.city);
+    const state = coerceString(entry.state);
+    const country = coerceString(entry.country);
+    const fallbackAddress = address || [city, state, country].filter(Boolean).join(', ');
+
+    if (!fallbackAddress && !city && !state && !country) return [];
+
+    return [{
+      ...entry,
+      address: fallbackAddress,
+      city,
+      state,
+      country,
+      type: coerceString(entry.type) || (index === 0 ? 'headquarters' : 'service'),
+      isPrimary: typeof entry.isPrimary === 'boolean' ? entry.isPrimary : index === 0
+    }];
+  });
+
+  if (normalized.length > 0 && !normalized.some((entry) => entry.isPrimary)) {
+    normalized[0] = { ...normalized[0], isPrimary: true };
+  }
+
+  return normalized;
+}
+
+function mergeApolloAddressIntoServiceAddresses(
+  existingServiceAddresses: ServiceAddressRecord[],
+  fullAddress: string,
+  company: ApolloCompany
+): ServiceAddressRecord[] {
+  const addressKey = normalizeAddressKey(fullAddress);
+  if (!addressKey) return existingServiceAddresses;
+
+  const apolloEntry: ServiceAddressRecord = {
+    address: fullAddress,
+    city: coerceString(company.city),
+    state: coerceString(company.state),
+    country: coerceString(company.country),
+    type: existingServiceAddresses.length === 0 ? 'headquarters' : 'service',
+    isPrimary: existingServiceAddresses.length === 0
+  };
+
+  const existingIndex = existingServiceAddresses.findIndex(
+    (entry) => normalizeAddressKey(entry.address) === addressKey
+  );
+
+  if (existingIndex >= 0) {
+    return existingServiceAddresses.map((entry, index) =>
+      index === existingIndex
+        ? {
+          ...entry,
+          address: entry.address || apolloEntry.address,
+          city: entry.city || apolloEntry.city,
+          state: entry.state || apolloEntry.state,
+          country: entry.country || apolloEntry.country,
+          type: entry.type || apolloEntry.type,
+          isPrimary: entry.isPrimary || apolloEntry.isPrimary
+        }
+        : entry
+    );
+  }
+
+  return [...existingServiceAddresses, apolloEntry];
 }
 
 function buildIdentityName(input: { name?: unknown; firstName?: unknown; lastName?: unknown }) {
@@ -700,46 +884,24 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           : parseInt(String(companySummary.employees).replace(/[^0-9]/g, ''), 10) || null)
         : null;
 
-      // Get existing account data to preserve service_addresses if they exist
+      // Pull existing account shape so Apollo enrichment can merge instead of replace.
       const { data: existingAccount } = await supabase
         .from('accounts')
-        .select('service_addresses')
+        .select('service_addresses, metadata')
         .eq('id', accountId)
         .single();
 
-      // Build service_addresses array - preserve existing or create new with HQ address
-      let serviceAddresses = existingAccount?.service_addresses || [];
-
-      // If we have address data from Apollo and no existing service addresses, add it as HQ
-      if (serviceAddresses.length === 0 && (companySummary.address || companySummary.city || companySummary.state)) {
-        serviceAddresses = [{
-          address: companySummary.address || '', // Full street address from Apollo
-          city: companySummary.city || '',
-          state: companySummary.state || '',
-          country: companySummary.country || '',
-          type: 'headquarters',
-          isPrimary: true
-        }];
-      }
-
-      // Get existing metadata to preserve other fields
-      const { data: currentData } = await supabase
-        .from('accounts')
-        .select('metadata')
-        .eq('id', accountId)
-        .single();
-
-      const currentMetadata = currentData?.metadata || {};
-
-      // Build meters array with service address if we have address data
-      const fullAddress = companySummary.address || [companySummary.city, companySummary.state, companySummary.country].filter(Boolean).join(', ');
-      const meters = fullAddress ? [{
-        id: crypto.randomUUID(),
-        esiId: '',
-        address: fullAddress,
-        rate: '',
-        endDate: ''
-      }] : (currentMetadata.meters || []);
+      const currentMetadata = isRecord(existingAccount?.metadata) ? existingAccount.metadata : {};
+      const fullAddress = buildApolloFullAddress(companySummary);
+      const serviceAddresses = mergeApolloAddressIntoServiceAddresses(
+        normalizeServiceAddresses(existingAccount?.service_addresses),
+        fullAddress,
+        companySummary
+      );
+      const meters = mergeApolloAddressIntoMeters(
+        normalizeMeters(currentMetadata.meters),
+        fullAddress
+      );
 
       // Use the existing companySummary from Apollo to update the CRM account
       const { data, error } = await supabase
