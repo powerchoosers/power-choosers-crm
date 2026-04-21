@@ -320,9 +320,9 @@ export default function EmailDetailPage() {
   const toList = email ? (Array.isArray(email.to) ? email.to : [email.to]) : []
   const fromMailbox = parseMailbox(fromValue)
   const threadAddressPool: Array<string | null | undefined> = threadEmails.length
-    ? threadEmails.flatMap((message: { from?: string | null; to?: string | string[] | null }) => {
+    ? threadEmails.flatMap((message: Email) => {
         const toCollection = Array.isArray(message.to) ? message.to : [message.to]
-        return [message.from, ...toCollection]
+        return [message.from, message.metadata?.fromAddress, message.metadata?.replyToAddress, ...toCollection]
       })
     : [fromValue, ...toList]
   const identityAddresses: string[] = Array.from(
@@ -339,7 +339,7 @@ export default function EmailDetailPage() {
       .filter(Boolean)
   ))
   const { data: contactById = {} } = useContactIdentityMapByIds(threadContactIds)
-  const fromAddressKey = extractValidAddress(fromValue)
+  const fromAddressKey = extractValidAddress(fromValue) || extractValidAddress(email?.metadata?.fromAddress)
   const isOutboundEmail = email?.type === 'sent' || email?.type === 'scheduled'
   // For outbound emails contactId is the RECIPIENT's contact, not the sender's.
   // Using it for fromContact would label the recipient as the sender in the header.
@@ -368,6 +368,7 @@ export default function EmailDetailPage() {
     || fromValue
   const displayFromAddress =
     extractValidAddress(isOutboundEmail ? fromValue : fromMailbox.address || fromValue)
+    || extractValidAddress(email?.metadata?.fromAddress)
     // Outbound: fall back to the owning inbox address when from-field is a display name only
     || (isOutboundEmail ? extractValidAddress(email?.ownerId || '') || null : null)
     // Inbound: fall back to the linked contact's stored email when from-field has no address
@@ -397,6 +398,14 @@ export default function EmailDetailPage() {
       || []
     return normalizeRecipients(ccRaw)
   }
+  const getMessageReplyTo = (message?: Email | null) =>
+    extractValidAddress(message?.metadata?.replyToAddress)
+    || extractValidAddress((message?.metadata as any)?.['reply-to'])
+    || extractValidAddress((message?.metadata as any)?.replyTo)
+  const getMessageSenderAddress = (message?: Email | null) =>
+    extractValidAddress(message?.from || '')
+    || extractValidAddress(message?.metadata?.fromAddress)
+    || (message?.contactId ? extractValidAddress(contactById[message.contactId]?.email || '') : '')
   const toRecipientsText = (values: string[]) => values.join(', ')
   const addPrefix = (subject: string | undefined, prefix: 'Re:' | 'Fwd:') => {
     const clean = String(subject || '').trim()
@@ -405,11 +414,9 @@ export default function EmailDetailPage() {
   }
   const inferredCounterparty = threadEmails
     .flatMap((message: Email) => {
-      const fromCandidate = extractValidAddress(message.from)
+      const fromCandidate = getMessageSenderAddress(message)
       const toCandidates = (Array.isArray(message.to) ? message.to : [message.to]).map((addr: string | null | undefined) => extractValidAddress(String(addr || '')))
-      const replyToCandidate = extractValidAddress((message as any)?.metadata?.['reply-to'] || (message as any)?.metadata?.replyTo)
-      
-      // NEW: Look up contact email if raw sender address is missing or is just a name
+      const replyToCandidate = getMessageReplyTo(message)
       const contactCandidate = message.contactId ? extractValidAddress(contactById[message.contactId]?.email) : ''
       
       return [replyToCandidate, fromCandidate, contactCandidate, ...toCandidates]
@@ -417,12 +424,7 @@ export default function EmailDetailPage() {
     .find((address: string) => Boolean(address) && !ownedEmailAddresses.has(address.toLowerCase())) || ''
 
   const resolveReplyDefaults = (mode: ComposerMode, message: Email) => {
-    const rawReplyTo = (message as any)?.metadata?.['reply-to'] || (message as any)?.metadata?.replyTo
-    
-    // Primary resolution: metadata reply-to -> from string -> contact database -> metadata fromAddress
-    const fromAddress = extractValidAddress(rawReplyTo || message.from)
-      || (message.contactId ? extractValidAddress(contactById[message.contactId]?.email) : '')
-      || extractValidAddress((message as any)?.metadata?.fromAddress)
+    const fromAddress = getMessageReplyTo(message) || getMessageSenderAddress(message)
     
     // Safety check: if fromAddress is us (either account), we need to look at who we sent it to
     const isFromUs = fromAddress && ownedEmailAddresses.has(fromAddress.toLowerCase())
@@ -479,7 +481,8 @@ export default function EmailDetailPage() {
       if (!email || email.type !== 'received') return
       if (
         extractValidAddress(fromMailbox.address || fromValue)
-        || extractValidAddress((email as any)?.metadata?.fromAddress)
+        || getMessageReplyTo(email)
+        || getMessageSenderAddress(email)
         || extractValidAddress(fromContact?.email)
         || inferredCounterparty
       ) return
@@ -549,17 +552,40 @@ export default function EmailDetailPage() {
     fromValue,
     displayFromName,
     fromMailbox.address,
+    contactById,
     fromContact?.email,
     inferredCounterparty
   ])
 
-  // Backfill To chips if the composer opened before async address lookups resolved
+  // Backfill reply recipients after identity lookups finish. This only fills empty chips,
+  // so it never overwrites what the user has already typed.
   useEffect(() => {
     if (!isReplyOpen || composerMode === 'forward' || toChips.length > 0) return
-    const candidate = resolvedReplyAddress || inferredCounterparty
-    if (candidate) setToChips(chipify(candidate))
+    const target =
+      (composeTargetId ? threadEmails.find((threadEmail: Email) => threadEmail.id === composeTargetId) : null)
+      || (expandedThreadId ? threadEmails.find((threadEmail: Email) => threadEmail.id === expandedThreadId) : null)
+      || threadEmails[0]
+      || email
+    if (!target) return
+
+    const defaults = resolveReplyDefaults(composerMode, target)
+    if (defaults.to) {
+      setToChips(chipify(defaults.to))
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resolvedReplyAddress, inferredCounterparty, isReplyOpen, composerMode, toChips.length])
+  }, [
+    contactByEmail,
+    contactById,
+    composeTargetId,
+    composerMode,
+    email,
+    expandedThreadId,
+    inferredCounterparty,
+    isReplyOpen,
+    resolvedReplyAddress,
+    threadEmails,
+    toChips.length,
+  ])
 
   // Parse a comma-separated address string into chip array
   const chipify = (val: string | string[]) =>
@@ -742,7 +768,7 @@ export default function EmailDetailPage() {
       const recipientAddr = extractEmailAddress(toRecipients[0] || '')
       const messageMatchesRecipient = (message: Email) => {
         if (!recipientAddr) return false
-        const fromAddr = extractEmailAddress(message.from || '')
+        const fromAddr = getMessageSenderAddress(message)
         const toAddrList = (Array.isArray(message.to) ? message.to : String(message.to || '').split(','))
           .map((addr: string) => extractEmailAddress(String(addr || '')))
           .filter(Boolean)
