@@ -97,6 +97,20 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const wasOfflineRef = useRef(false)
   const isCallSessionActiveRef = useRef(false)
 
+  const emitCallFinished = useCallback((callMeta: VoiceMetadata | null, rawPhoneNumber?: string | null) => {
+    if (typeof window === 'undefined') return
+
+    const normalizedPhone = formatToE164(rawPhoneNumber || '') || String(rawPhoneNumber || '').trim()
+    window.dispatchEvent(new CustomEvent('nodal:call-finished', {
+      detail: {
+        contactId: callMeta?.contactId || null,
+        accountId: callMeta?.accountId || null,
+        phoneNumber: normalizedPhone || null,
+        isAccountOnly: Boolean(callMeta?.isAccountOnly),
+      }
+    }))
+  }, [])
+
   const hasLiveCall = useCallback((call: Call | null) => {
     if (!call) return false
     const status = call.status()
@@ -740,6 +754,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           clearNativeNotification()
           console.log('[Voice] Call cancelled by caller')
           isCallSessionActiveRef.current = false
+          emitCallFinished(meta, from)
           toast.dismiss(toastId)
           toast.error('Missed Call', {
             description: `from ${meta?.name || from}`,
@@ -756,6 +771,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         call.on('disconnect', () => {
           clearNativeNotification()
           isCallSessionActiveRef.current = false
+          emitCallFinished(meta, from)
           toast.dismiss(toastId)
           setCurrentCall(null)
           setActive(false)
@@ -786,7 +802,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
     } finally {
       isInitializing.current = false
     }
-  }, [currentCall, requestMicrophonePermission, resolvePhoneMeta, setActive, setCallHealth, setPhoneNumber, setStatus, user, isCallSessionProtected])
+  }, [currentCall, emitCallFinished, requestMicrophonePermission, resolvePhoneMeta, setActive, setCallHealth, setPhoneNumber, setStatus, user, isCallSessionProtected])
 
   useEffect(() => {
     initDevice()
@@ -1133,6 +1149,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
           }
         }
         isCallSessionActiveRef.current = false
+        emitCallFinished(meta, targetNumber)
         setCurrentCall(null)
         setStatus('ended')
         setActive(false)
@@ -1187,7 +1204,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       setStatus('error')
       return false
     }
-  }, [clearPowerDialWinnerSubscription, device, initDevice, isCallSessionProtected, isReady, requestMicrophonePermission, resolvePhoneMeta, setActive, setCallHealth, setPhoneNumber, setStatus, subscribeToPowerDialWinner, user])
+  }, [clearPowerDialWinnerSubscription, device, emitCallFinished, initDevice, isCallSessionProtected, isReady, requestMicrophonePermission, resolvePhoneMeta, setActive, setCallHealth, setPhoneNumber, setStatus, subscribeToPowerDialWinner, user])
 
   const disconnect = useCallback(() => {
     if (currentCall) {

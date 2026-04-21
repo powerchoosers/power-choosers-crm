@@ -242,6 +242,14 @@ function normalizePhoneNumber(value?: string | null) {
   return String(value || '').replace(/\D/g, '').slice(-10)
 }
 
+type FinishedCallDetail = {
+  contactId?: string | null
+  accountId?: string | null
+  phoneNumber?: string | null
+}
+
+const POST_CALL_REFRESH_DELAYS_MS = [0, 1200, 3000, 6000, 10000]
+
 const PAGE_SIZE = 50
 
 export function useCalls(searchQuery?: string) {
@@ -371,6 +379,47 @@ export function useAccountCalls(accountId: string, contactIds?: string[], compan
   const queryClient = useQueryClient()
   const isEnabled = options?.enabled ?? true
   const normalizedCompanyPhone = normalizePhoneNumber(companyPhone)
+  const contactIdsKey = contactIds?.join(',') ?? ''
+
+  useEffect(() => {
+    if (!accountId || !user || loading || !isEnabled || typeof window === 'undefined') return
+
+    const scheduled = new Set<number>()
+    const invalidateAccountCalls = () => {
+      void queryClient.invalidateQueries({ queryKey: ['account-calls', accountId], refetchType: 'active' })
+      if (contactIds?.length) {
+        contactIds.forEach((contactId) => {
+          void queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId], refetchType: 'active' })
+        })
+      }
+    }
+
+    const handleFinishedCall = (event: Event) => {
+      const detail = (event as CustomEvent<FinishedCallDetail>).detail || {}
+      const matchesAccount =
+        String(detail.accountId || '') === accountId ||
+        (String(detail.contactId || '') !== '' && Boolean(contactIds?.includes(String(detail.contactId)))) ||
+        (Boolean(normalizedCompanyPhone) && normalizePhoneNumber(detail.phoneNumber) === normalizedCompanyPhone)
+
+      if (!matchesAccount) return
+
+      POST_CALL_REFRESH_DELAYS_MS.forEach((delay) => {
+        const timerId = window.setTimeout(() => {
+          scheduled.delete(timerId)
+          invalidateAccountCalls()
+        }, delay)
+        scheduled.add(timerId)
+      })
+    }
+
+    window.addEventListener('nodal:call-finished', handleFinishedCall as EventListener)
+
+    return () => {
+      window.removeEventListener('nodal:call-finished', handleFinishedCall as EventListener)
+      scheduled.forEach((timerId) => window.clearTimeout(timerId))
+      scheduled.clear()
+    }
+  }, [accountId, contactIds, contactIdsKey, isEnabled, loading, normalizedCompanyPhone, queryClient, user])
 
   // Subscribe to real-time updates for calls belonging to this account
   useEffect(() => {
@@ -487,6 +536,46 @@ export function useContactCalls(contactId: string, companyPhone?: string, accoun
   const { user, loading } = useAuth()
   const queryClient = useQueryClient()
   const isEnabled = options?.enabled ?? true
+  const normalizedCompanyPhone = normalizePhoneNumber(companyPhone)
+
+  useEffect(() => {
+    if (!contactId || !user || loading || !isEnabled || typeof window === 'undefined') return
+
+    const scheduled = new Set<number>()
+    const invalidateContactCalls = () => {
+      void queryClient.invalidateQueries({ queryKey: ['contact-calls', contactId], refetchType: 'active' })
+      void queryClient.invalidateQueries({ queryKey: ['calls'], refetchType: 'active' })
+      if (accountId) {
+        void queryClient.invalidateQueries({ queryKey: ['account-calls', accountId], refetchType: 'active' })
+      }
+    }
+
+    const handleFinishedCall = (event: Event) => {
+      const detail = (event as CustomEvent<FinishedCallDetail>).detail || {}
+      const matchesContact =
+        String(detail.contactId || '') === contactId ||
+        (Boolean(accountId) && String(detail.accountId || '') === accountId) ||
+        (Boolean(normalizedCompanyPhone) && normalizePhoneNumber(detail.phoneNumber) === normalizedCompanyPhone)
+
+      if (!matchesContact) return
+
+      POST_CALL_REFRESH_DELAYS_MS.forEach((delay) => {
+        const timerId = window.setTimeout(() => {
+          scheduled.delete(timerId)
+          invalidateContactCalls()
+        }, delay)
+        scheduled.add(timerId)
+      })
+    }
+
+    window.addEventListener('nodal:call-finished', handleFinishedCall as EventListener)
+
+    return () => {
+      window.removeEventListener('nodal:call-finished', handleFinishedCall as EventListener)
+      scheduled.forEach((timerId) => window.clearTimeout(timerId))
+      scheduled.clear()
+    }
+  }, [accountId, contactId, isEnabled, loading, normalizedCompanyPhone, queryClient, user])
 
   // Subscribe to real-time updates for calls belonging to this contact
   useEffect(() => {
@@ -675,4 +764,3 @@ export function useLogCall() {
     },
   })
 }
-
