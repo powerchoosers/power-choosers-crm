@@ -232,6 +232,7 @@ export function useEmailThread(threadKey?: string) {
             openCount: item.openCount,
             clickCount: item.clickCount,
             attachments: normalizeAttachments(item.metadata?.attachments || item.attachments),
+            metadata: item.metadata || {},
             sentAt,
             scheduledSendTime: item.scheduledSendTime || null,
             threadId: item.threadId || item.metadata?.threadId || null,

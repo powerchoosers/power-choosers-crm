@@ -278,6 +278,7 @@ export default function ContactDossierPage() {
                 {s.isSecondaryReady ? (
                   <EntityEmailFeed
                     emails={[s.editEmail].filter(Boolean) as string[]}
+                    contactId={id}
                     title="Email Intelligence"
                     density="full"
                     layout="transmission"

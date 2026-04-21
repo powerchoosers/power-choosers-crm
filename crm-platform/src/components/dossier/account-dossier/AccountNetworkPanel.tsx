@@ -182,6 +182,7 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                     {isSecondaryReady ? (
                         <EntityEmailFeed
                             emails={contacts?.map(c => c.email).filter(Boolean) as string[] || []}
+                            accountId={id}
                             title="Email Intelligence"
                             density="compact"
                             layout="transmission"

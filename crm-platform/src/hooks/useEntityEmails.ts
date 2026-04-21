@@ -23,54 +23,68 @@ function chunk<T>(arr: T[], size: number): T[][] {
     return out
 }
 
-export function useEntityEmails(emailAddresses: string[]) {
+interface UseEntityEmailsParams {
+    emailAddresses?: string[]
+    contactId?: string | null
+    accountId?: string | null
+}
+
+export function useEntityEmails({
+    emailAddresses = [],
+    contactId,
+    accountId,
+}: UseEntityEmailsParams) {
     const { user, role, loading } = useAuth()
 
     return useQuery({
-        queryKey: ['entity-emails', emailAddresses, user?.email ?? 'guest', role],
+        queryKey: ['entity-emails', emailAddresses, contactId ?? null, accountId ?? null, user?.email ?? 'guest', role],
         queryFn: async () => {
-            // Filter out empty or invalid emails
-            const validEmails = (emailAddresses || []).filter(e => e && e.trim().length > 0)
-            if (validEmails.length === 0) return []
+            const normalizedContactId = String(contactId || '').trim()
+            const normalizedAccountId = String(accountId || '').trim()
+            const validEmails = Array.from(new Set(
+                (emailAddresses || [])
+                    .map((value) => String(value || '').trim().toLowerCase())
+                    .filter((value) => value.length > 0)
+            ))
+
+            if (validEmails.length === 0 && !normalizedContactId && !normalizedAccountId) return []
             if (loading) return []
-            // We still want to let users load things if they are valid
             if (!user?.email && role !== 'admin') return []
 
             try {
-                let query = supabase
-                    .from('emails')
-                    .select('*')
+                const scopedOwners = role !== 'admin' && user?.email
+                    ? await resolveEmailOwnerScope(user)
+                    : []
 
-                // Default security check based on how `useEmails` works
-                if (role !== 'admin' && user?.email) {
-                    const owners = await resolveEmailOwnerScope(user)
-                    query = applyEmailOwnerScope(query, owners.length > 0 ? owners : [user.email.toLowerCase()])
+                const buildScopedQuery = () => {
+                    let query = supabase
+                        .from('emails')
+                        .select('*')
+
+                    if (role !== 'admin' && user?.email) {
+                        query = applyEmailOwnerScope(query, scopedOwners.length > 0 ? scopedOwners : [user.email.toLowerCase()])
+                    }
+
+                    return query
+                        .not('subject', 'ilike', '%mailwarming%')
+                        .not('subject', 'ilike', '%mail warming%')
+                        .not('subject', 'ilike', '%test email%')
+                        .not('from', 'ilike', '%apollo.io%')
+                        .not('from', 'ilike', '%mailwarm%')
+                        .not('from', 'ilike', '%lemwarm%')
+                        .not('from', 'ilike', '%warmup%')
+                        .not('type', 'eq', 'tracking')
                 }
 
-                // Filter out noise
-                query = query
-                    .not('subject', 'ilike', '%mailwarming%')
-                    .not('subject', 'ilike', '%mail warming%')
-                    .not('subject', 'ilike', '%test email%')
-                    .not('from', 'ilike', '%apollo.io%')
-                    .not('from', 'ilike', '%mailwarm%')
-                    .not('from', 'ilike', '%lemwarm%')
-                    .not('from', 'ilike', '%warmup%')
-                    .not('type', 'eq', 'tracking')
+                const collectRows = async (conditions: string[], limit: number) => {
+                    if (conditions.length === 0) return []
 
-                const batches = chunk(validEmails, 25)
-                const emailMap = new Map<string, any>()
-
-                for (const batch of batches) {
-                    const orConditions = batch.map(email =>
-                        `from.ilike.%${email}%,to.cs.["${email}"]`
-                    ).join(',')
-
+                    const query = buildScopedQuery()
                     const { data, error } = await query
-                        .or(orConditions)
+                        .or(conditions.join(','))
                         .order('timestamp', { ascending: false, nullsFirst: false })
                         .order('createdAt', { ascending: false, nullsFirst: false })
-                        .limit(50)
+                        .limit(limit)
 
                     if (error) {
                         if (error.message === 'FetchUserError: Request was aborted' || error.message?.includes('abort')) {
@@ -79,7 +93,33 @@ export function useEntityEmails(emailAddresses: string[]) {
                         throw error
                     }
 
-                    for (const item of data || []) {
+                    return data || []
+                }
+
+                const emailMap = new Map<string, any>()
+                const directConditions = [
+                    normalizedContactId ? `contactId.eq.${normalizedContactId}` : '',
+                    normalizedAccountId ? `accountId.eq.${normalizedAccountId}` : '',
+                ].filter(Boolean)
+
+                const directRows = await collectRows(directConditions, normalizedAccountId ? 150 : 100)
+                for (const item of directRows) {
+                    emailMap.set(item.id, item)
+                }
+
+                const batches = chunk(validEmails, 25)
+                for (const batch of batches) {
+                    const addressConditions = batch.flatMap((email) => ([
+                        `from.ilike.%${email}%`,
+                        `to.cs.["${email}"]`,
+                        `cc.cs.["${email}"]`,
+                        `bcc.cs.["${email}"]`,
+                        `metadata->>fromAddress.ilike.%${email}%`,
+                        `metadata->>replyToAddress.ilike.%${email}%`,
+                    ]))
+
+                    const rows = await collectRows(addressConditions, 50)
+                    for (const item of rows) {
                         emailMap.set(item.id, item)
                     }
                 }
@@ -123,6 +163,7 @@ export function useEntityEmails(emailAddresses: string[]) {
                         openCount: item.openCount,
                         clickCount: item.clickCount,
                         attachments: item.attachments || item.metadata?.attachments,
+                        metadata: item.metadata || {},
                         sentAt,
                         scheduledSendTime: item.scheduledSendTime || null,
                         threadId: item.threadId || item.metadata?.threadId || null,
@@ -139,7 +180,10 @@ export function useEntityEmails(emailAddresses: string[]) {
                 return []
             }
         },
-        enabled: emailAddresses && emailAddresses.length > 0 && !loading && !!(user?.email || role === 'admin'),
-        staleTime: 1000 * 60 * 2, // 2 minutes
+        enabled: (!!contactId || !!accountId || emailAddresses.length > 0) && !loading && !!(user?.email || role === 'admin'),
+        staleTime: 1000 * 15,
+        refetchOnMount: 'always',
+        refetchOnWindowFocus: true,
+        placeholderData: (previousData) => previousData,
     })
 }

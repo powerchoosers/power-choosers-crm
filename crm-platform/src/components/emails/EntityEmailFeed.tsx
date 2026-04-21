@@ -17,6 +17,8 @@ import { stripTrackedEmailPreviewHtml } from '@/lib/email-preview-html'
 
 interface EntityEmailFeedProps {
     emails: string[]
+    contactId?: string
+    accountId?: string
     title?: string
     density?: 'compact' | 'full'
     layout?: 'default' | 'transmission'
@@ -151,12 +153,18 @@ function EmailActionBar({ email, variant, onReply, isReplying }: { email: Email;
 
 export function EntityEmailFeed({ 
     emails, 
+    contactId,
+    accountId,
     title = 'Email Intelligence', 
     density = 'full', 
     layout = 'default',
     variant = 'default' 
 }: EntityEmailFeedProps) {
-    const { data: fetchEmails, isLoading } = useEntityEmails(emails)
+    const { data: fetchEmails, isLoading } = useEntityEmails({
+        emailAddresses: emails,
+        contactId,
+        accountId,
+    })
     const [expandedId, setExpandedId] = useState<string | null>(null)
     const [currentPage, setCurrentPage] = useState(1)
     const [replyingToId, setReplyingToId] = useState<string | null>(null)

@@ -105,6 +105,7 @@ export function useEmail(id: string) {
           openCount: emailRow.openCount,
           clickCount: emailRow.clickCount,
           attachments: normalizedAttachments,
+          metadata: emailRow.metadata || {},
           contact: emailRow.contact
             ? {
                 ...emailRow.contact,
