@@ -235,16 +235,16 @@ function cleanSequenceCopy(input) {
     .replace(/\bI could (?:take a look|have a look|look at it|look it over|review it)\b/gi, 'I can take a look')
     .replace(/\bI could quickly\b/gi, 'I can quickly')
     .replace(/\bI could (?:highlight|share|give|provide|point out)\b/gi, (m) => m.replace('could', 'can'))
-    .replace(/\bWould that be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a one-page cost view. ")
-    .replace(/\bWould that quick review be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a one-page cost view. ")
-    .replace(/\bWould you be open to me reviewing it\?\s*/gi, "If you'd like, I'll send a one-page cost view first. ")
-    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "If useful, I'll send a short cost breakdown first. ")
-    .replace(/\bWant me to take a look\?\s*/gi, "If useful, I'll send a short cost breakdown first. ")
-    .replace(/\bWorth a quick check\?\s*/gi, "If useful, I'll send a short cost breakdown first. ")
-    .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll send a short cost breakdown")
-    .replace(/\bI can reply with 2-3 observations\b/gi, "I'll send a short cost breakdown")
-    .replace(/\b2-3 specific observations\b/gi, "a short cost breakdown")
-    .replace(/\bshort breakdown of what stands out\b/gi, 'a short view of what is driving cost')
+    .replace(/\bWould that be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a short read. ")
+    .replace(/\bWould that quick review be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a short read. ")
+    .replace(/\bWould you be open to me reviewing it\?\s*/gi, "If you'd like, I'll send a short read first. ")
+    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "If useful, I'll send a rate-vs-delivery read first. ")
+    .replace(/\bWant me to take a look\?\s*/gi, "If useful, I'll send a rate-vs-delivery read first. ")
+    .replace(/\bWorth a quick check\?\s*/gi, "If useful, I'll send a rate-vs-delivery read first. ")
+    .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll send a short read")
+    .replace(/\bI can reply with 2-3 observations\b/gi, "I'll send a short read")
+    .replace(/\b2-3 specific observations\b/gi, "a short read")
+    .replace(/\bshort breakdown of what stands out\b/gi, 'a short read on the cost side')
     .replace(/\bI review electricity statements for Nodal Point\b/gi, 'I review commercial electricity costs')
     .replace(/\bMy company, Nodal Point, helps businesses understand their energy bills better\.?\s*/gi, 'I review commercial electricity costs for Nodal Point. ')
     .replace(/\bI review these bills\b/gi, 'I review these electricity costs')
@@ -290,11 +290,11 @@ function enforceStageSpecificCTA(input, replyStage) {
 
   if (stage === 'first_touch') {
     for (const pattern of billAskPatterns) {
-      text = text.replace(pattern, "reply and I'll send a one-page cost view");
+      text = text.replace(pattern, "reply and I'll send a short read");
     }
   } else if (stage === 'follow_up') {
     for (const pattern of billAskPatterns) {
-      text = text.replace(pattern, "reply and I'll send a short cost breakdown");
+      text = text.replace(pattern, "reply and I'll send a rate-vs-delivery read");
     }
   } else if (stage === 'no_reply') {
     for (const pattern of billAskPatterns) {
@@ -337,38 +337,38 @@ function detectReplyStage(prompt, draft) {
 function buildReplyStageDirective(stage) {
   const directives = {
     first_touch: [
-      '- FIRST TOUCH: 60-90 words, 2-3 short paragraphs.',
-      '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget variance, renewal timing, or approval pressure; facilities/operations/real estate/warehouse/logistics/manufacturing = summer rate pressure, demand spikes, occupancy swings, delivery charges, or load timing; purchasing/contracts/procurement/asset management = renewal timing and vendor coordination; owner/CEO/president/GM/VP = leverage, timing, and simplicity; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
+      '- FIRST TOUCH: 50-80 words, 2 short paragraphs.',
+      '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget drift or renewal timing; facilities/operations/real estate/warehouse/logistics/manufacturing = demand spikes, delivery charges, load timing, or summer rate pressure; purchasing/contracts/procurement/asset management = renewal timing or vendor fit; owner/CEO/president/GM/VP = leverage or timing; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
       '- Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
-      '- Start with one concrete company, role, city, or operating fact.',
-      '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
-      '- First-touch tone should be thoughtful and specific, not pushy. First-touch CTA must stay low-friction. Good patterns: "Worth seeing where the extra cost is likely coming from?" "Okay if I send the one-page cost view?" "Am I barking up the right tree on this?"',
+      '- Start with one concrete company, role, city, or operating fact. Make the first sentence sound like a real observation, not a template. Avoid the phrase "the useful question is."',
+      '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a short read, a rate-vs-delivery read, or a simple yes/no reply.',
+      '- First-touch tone should be direct but calm. First-touch CTA must stay low-friction. Good patterns: "Reply and I\'ll send the short read." "Okay if I send the rate-vs-delivery read?" "Am I barking up the right tree on this?"',
       '- Never ask for a utility bill, statement, or invoice in first touch.',
-      '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = summer rate check / load timing / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: budget drift, fixed cost check, summer rate check, renewal timing, simple cost check.',
+      '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = load timing / delivery gap / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: budget drift, fixed cost check, load timing, delivery gap, renewal timing, simple cost check.',
       '- Never mention LinkedIn, a profile, or how the person was found.',
     ].join('\n'),
     follow_up: [
-      '- FOLLOW-UP: 50-80 words, 2-3 short paragraphs.',
+      '- FOLLOW-UP: 45-75 words, 2-3 short paragraphs.',
       '- Add one new fact or angle. Reference prior contact by topic only, never opens/clicks.',
-      '- Reinforce one concrete output that does not require document sharing yet: a cost breakdown, a rate-vs-delivery view, a short call, or a routing reply.',
+      '- Reinforce one concrete output that does not require document sharing yet: a short read, a rate-vs-delivery read, a short call, or a routing reply.',
       '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
-      '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the cost breakdown." "Want the rate-vs-delivery view?" "Is this worth a quick look?"',
+      '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the short read." "Want the rate-vs-delivery read?" "Is this worth a quick look?"',
       '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
       '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: rate vs delivery, demand adds cost, timing check.',
     ].join('\n'),
     no_reply: [
-      '- NO REPLY: 35-55 words, maximum 2 sentences.',
+      '- NO REPLY: 30-50 words, maximum 2 sentences.',
       '- Assume you already reached the right person. Do not ask who owns electricity review.',
       '- Sentence 1 should state the value in plain English and name one likely leak area.',
-      '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short cost view.',
-      '- No-reply tone should be sharper and cleaner than prior touches.',
+      '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short read.',
+      '- No-reply tone should be sharper and cleaner than prior touches. Do not be soft here.',
       '- Never ask for a bill, statement, or invoice in this branch.',
-      '- Subject line should be the sharpest and simplest one in the sequence. Examples: short cost view, quick yes/no, close the loop.',
+      '- Subject line should be the sharpest and simplest one in the sequence. Examples: short read, quick yes/no, close the loop.',
     ].join('\n'),
     general: [
       '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
       '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
-      '- Use a plain subject line with 1-4 words, but vary it by title and stage.',
+      '- Use a plain subject line with 1-4 words, but vary it by title and stage. Do not keep reusing the same cost-view phrasing.',
       '- One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
       '- As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
     ].join('\n')
@@ -631,9 +631,9 @@ export default async function handler(req, res) {
             - Do NOT fall back to the same formula every time (avoid always writing "[City] bill check").
             - Never use "Quick question", "Following up", "Just checking in", or "Reaching out" as subject openers.
             - Keep it problem-based and specific. Persona examples:
-              - Finance: "budget drift at {{company}}", "before renewal timing slips", "fixed cost check for {{city}}"
-              - Operations: "load timing at {{company}}", "delivery charges in {{city}}", "where demand is adding cost"
-              - Purchasing: "renewal timing for {{company}}", "vendor fit on power costs", "who owns contract timing?"
+              - Finance: "budget drift", "before renewal slips", "fixed cost check"
+              - Operations: "load timing", "delivery gap", "where demand adds cost"
+              - Purchasing: "renewal timing", "vendor fit", "who owns contract timing?"
               - Owner/VP: "simple cost check", "timing before renewal", "where the extra cost sits"
             - Keep the subject line plain enough to feel manual, not clever enough to feel templated. Favor short, literal phrases over marketing language.
           11. JARGON TRANSLATION RULE:

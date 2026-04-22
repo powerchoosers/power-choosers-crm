@@ -392,43 +392,43 @@ function detectReplyStage(prompt: any, draft: any): 'first_touch' | 'follow_up' 
 function buildReplyStageDirective(stage: string): string {
     const directives: Record<string, string> = {
         first_touch: [
-            '- FIRST TOUCH: 60-90 words, 2-3 short paragraphs.',
-            '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget variance, renewal timing, or approval pressure; facilities/operations/warehouse/logistics/manufacturing = demand spikes, delivery charges, or load timing; purchasing/contracts/procurement/asset management = renewal timing and vendor coordination; owner/CEO/president/GM/VP = leverage, timing, and simplicity; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
+            '- FIRST TOUCH: 50-80 words, 2 short paragraphs.',
+            '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget drift or renewal timing; facilities/operations/warehouse/logistics/manufacturing = demand spikes, delivery charges, load timing, or summer rate pressure; purchasing/contracts/procurement/asset management = renewal timing or vendor fit; owner/CEO/president/GM/VP = leverage or timing; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
             '- Start with one concrete company, role, city, or operating fact.',
-            '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
-            '- First-touch tone should be thoughtful and specific, not pushy. First-touch CTA must stay low-friction. Good patterns: "Worth seeing where the extra cost is likely coming from?" "Okay if I send the one-page cost view?" "Am I barking up the right tree on this?"',
+            '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a short read, a rate-vs-delivery read, or a simple yes/no reply.',
+            '- First-touch tone should be direct but calm. First-touch CTA must stay low-friction. Good patterns: "Reply and I\'ll send the short read." "Okay if I send the rate-vs-delivery read?" "Am I barking up the right tree on this?"',
             '- Never ask for a utility bill, statement, or invoice in first touch.',
             '- If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
             '- If the site is in Texas and utility territory is known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. Do not use market shorthand.',
-            '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = utility territory / delivery / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: "budget drift", "fixed cost", "load timing", "renewal timing", "simple cost check".',
+            '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = load timing / delivery gap / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: "budget drift", "fixed cost", "load timing", "delivery gap", "renewal timing", "simple cost check".',
             '- Never mention LinkedIn, a profile, or how you found them.',
         ].join('\n'),
         follow_up: [
-            '- FOLLOW-UP: 50-80 words, 2-3 short paragraphs.',
+            '- FOLLOW-UP: 45-75 words, 2-3 short paragraphs.',
             '- Add one new fact or angle. Reference prior contact by topic only, never opens or clicks.',
-            '- Reinforce one concrete output that does not require document sharing yet: a cost breakdown, a rate-vs-delivery view, a short call, or a routing reply.',
+            '- Reinforce one concrete output that does not require document sharing yet: a short read, a rate-vs-delivery read, a short call, or a routing reply.',
             '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
             '- If the account is a subsidiary, keep the operating company and parent company separate. Anchor the note to the site or local location, not the corporate HQ unless that is the actual site.',
             '- If the site is in Texas and utility territory is known, use the plain name once naturally. Keep it as a location cue, not jargon.',
-            '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the cost breakdown." "Want the rate-vs-delivery view?" "Is this worth a quick look?"',
+            '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the short read." "Want the rate-vs-delivery read?" "Is this worth a quick look?"',
             '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
             '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: "rate vs delivery", "demand adds cost", "timing check".',
         ].join('\n'),
         no_reply: [
-            '- NO REPLY: 35-55 words, maximum 2 sentences.',
+            '- NO REPLY: 30-50 words, maximum 2 sentences.',
             '- Assume you already reached the right person. Do not ask who owns electricity review.',
             '- Sentence 1 should state the value in plain English and name one likely leak area.',
-            '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short cost view.',
-            '- No-reply tone should be sharper and cleaner than prior touches.',
+            '- Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short read.',
+            '- No-reply tone should be sharper and cleaner than prior touches. Do not be soft here.',
             '- Never ask for a bill, statement, or invoice in this branch.',
             '- If the account is outside Texas, keep the market framing broad enough for a deregulated market and do not imply Texas-only coverage.',
             '- If the site is in Texas and utility territory is known, use the plain name once naturally, but keep the message short.',
-            '- Subject line should be the sharpest and simplest one in the sequence. Examples: "short cost view", "quick yes/no", "close the loop".',
+            '- Subject line should be the sharpest and simplest one in the sequence. Examples: "short read", "quick yes/no", "close the loop".',
         ].join('\n'),
         general: [
             '- Keep the note short, but never vague. Give one real observation and one concrete reason to reply.',
             '- Make the value explicit: the recipient should know exactly what you will tell them back and why it matters.',
-            '- Use a plain subject line with 1-4 words, but vary it by title and stage. Finance should sound like budget/timing; operations like utility territory, delivery, or demand; purchasing like renewal/vendor; owner like simple check/leverage.',
+            '- Use a plain subject line with 1-4 words, but vary it by title and stage. Finance should sound like budget/timing; operations like utility territory, delivery, or demand; purchasing like renewal/vendor; owner like simple check/leverage. Do not keep reusing the same cost-view phrasing.',
             '- One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
             '- As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
             '- Do not confuse a parent company with the operating company. If there is a subsidiary relationship, keep the local site and operating entity in view.',
@@ -478,18 +478,18 @@ function buildContextualFallbackBody(member: any, replyStage: string, location?:
     const valueLane = pickValueLane(member);
 
     if (stage === 'no_reply') {
-        return `${opener}I'm probably already with the right person, and the useful question is whether ${companyPhrase} is leaking margin through ${valueLane}.\n\nIf you want the short cost view, reply yes and I'll send it.`;
+        return `${opener}I think I have the right person. For ${companyPhrase}, the first place I'd check is ${valueLane}.\n\nReply yes and I'll send the short read.`;
     }
 
     if (stage === 'follow_up') {
-        return `${opener}I was looking back at ${companyPhrase}, and the useful question is whether the drift is coming from ${valueLane}.\n\nReply and I'll send the short cost breakdown.`;
+        return `${opener}I was looking back at ${companyPhrase}. The next place I'd check is ${valueLane}.\n\nReply and I'll send the rate-vs-delivery read.`;
     }
 
     if (stage === 'first_touch') {
-        return `${opener}I was looking at ${companyPhrase}, and the useful question is whether the spend drift sits in ${valueLane}.\n\nOkay if I send the one-page cost view?`;
+        return `${opener}I was looking at ${companyPhrase}. The first place I'd check is ${valueLane}.\n\nIf useful, I'll send a short read.`;
     }
 
-    return `${opener}I was looking at ${companyPhrase}, and the useful question is whether the spend drift sits in ${valueLane}.\n\nI can send the cost view first, and if you want hard numbers after that, I can review the latest statement.`;
+    return `${opener}I was looking at ${companyPhrase}. The first place I'd check is ${valueLane}.\n\nI can send the short read first, and if you want hard numbers after that, I can review the latest statement.`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -1007,6 +1007,7 @@ async function handleSend(execution, job) {
         metadata?.sequenceStage ||
         detectReplyStage(metadata?.prompt || metadata?.label || metadata?.name || '', metadata?.body || metadata?.aiBody || '')
     );
+    const generationPrompt = String(metadata?.prompt || metadata?.label || metadata?.name || 'Draft a personalized follow-up').trim();
     const htmlBody = String(metadata?.body || metadata?.aiBody || '').trim() ||
         buildContextualFallbackBody(member, replyStage, member.account_city || null, utilityTerritory);
 
@@ -1019,6 +1020,9 @@ async function handleSend(execution, job) {
             subject: metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point',
             html: htmlBody,
             email_id: emailRecordId,
+            aiPrompt: generationPrompt,
+            generatedBody: String(metadata?.body || metadata?.aiBody || '').trim() || null,
+            generatedSubject: String(metadata?.subject || metadata?.aiSubject || 'Message from Nodal Point').trim(),
             contactId: member.contact_id || undefined,
             metadata: {
                 source: 'sequence',

@@ -67,6 +67,9 @@ export default async function handler(req, res) {
             subject,
             html,
             text,
+            aiPrompt,
+            generatedBody,
+            generatedSubject,
             replyTo,
             personalization,
             tags,
@@ -255,6 +258,7 @@ export default async function handler(req, res) {
                     subject,
                     html: htmlContent || '',
                     text: textContent || '',
+                    aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
                     timestamp: sentAt,
                     sentAt,
                     updatedAt: sentAt,
@@ -263,7 +267,10 @@ export default async function handler(req, res) {
                         messageId: result.messageId,
                         sentAt,
                         zohoMessageId: result.messageId,
-                        trackingId: trackingId
+                        trackingId: trackingId,
+                        aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
+                        generatedBody: String(generatedBody || htmlContent || '').trim() || null,
+                        generatedSubject: String(generatedSubject || subject || '').trim() || null
                     }
                 })
                 .eq('id', email_id);
@@ -285,6 +292,7 @@ export default async function handler(req, res) {
                     to: [toEmail],
                     subject,
                     from: fromEmail,
+                    aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
                     // Tracking-only record for pixel/click handlers. Keep out of outbound UI lists.
                     type: 'tracking',
                     status: 'sent',
@@ -305,7 +313,10 @@ export default async function handler(req, res) {
                         messageId: result.messageId,
                         isTrackingOnly: true,
                         isSequenceEmail: true,
-                        provider: 'zoho'
+                        provider: 'zoho',
+                        aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
+                        generatedBody: String(generatedBody || htmlContent || '').trim() || null,
+                        generatedSubject: String(generatedSubject || subject || '').trim() || null
                     }
                 });
 
@@ -325,6 +336,7 @@ export default async function handler(req, res) {
                     html: htmlContent || '',
                     text: textContent || '',
                     from: fromEmail,
+                    aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
                     type: 'sent',
                     status: 'sent',
                     openCount: 0,
@@ -348,6 +360,9 @@ export default async function handler(req, res) {
                         zohoMessageId: result.messageId,
                         sentAt,
                         trackingId,
+                        aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
+                        generatedBody: String(generatedBody || htmlContent || '').trim() || null,
+                        generatedSubject: String(generatedSubject || subject || '').trim() || null,
                         ...((body.metadata && typeof body.metadata === 'object') ? body.metadata : {})
                     }
                 });
