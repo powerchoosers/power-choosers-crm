@@ -91,6 +91,7 @@ export function RightPanel() {
   // Always use account address for the map, fall back to contact address only if no account
   const entityAddress = account?.address || contact?.address || ''
   const entityName = contact?.name || account?.name
+  const satelliteUplinkKey = `${isContactPage ? 'contact' : 'account'}-${entityId || 'unknown'}`
 
   // Weather: always use account location (not contact). On contact dossier we still show weather for the account's city.
   const accountLocationForWeather = useMemo(() => {
@@ -455,6 +456,7 @@ export function RightPanel() {
                       <div className="space-y-3">
                         <h3 className="text-[10px] font-mono uppercase tracking-[0.2em] text-zinc-500">Satellite_Uplink</h3>
                         <SatelliteUplink
+                          key={satelliteUplinkKey}
                           address={entityAddress}
                           name={entityName}
                           entityId={entityId}
