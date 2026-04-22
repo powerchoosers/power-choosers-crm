@@ -244,35 +244,35 @@ function isLikelyUuid(value) {
 function buildReplyFirstDirective(stage) {
   const map = {
     first_touch: [
-      'REPLY-FIRST NOTE: Keep the body at 60-90 words in 2-3 short paragraphs.',
-      'Pick one primary value lane based on the role: controller/CFO = budget variance or renewal timing; facilities/operations/real estate = summer rate pressure, demand spikes, occupancy swings, common-area spend, or contract timing; owner/GM = leverage or timing. Use one lane only.',
+      'REPLY-FIRST NOTE: Keep the body at 50-80 words in 2 short paragraphs.',
+      'Pick one primary value lane based on the role: controller/CFO = budget drift or renewal timing; facilities/operations/real estate = demand spikes, delivery charges, load timing, or summer rate pressure; owner/GM = leverage or timing. Use one lane only.',
       'Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
-      'Use one concrete company or location fact and make the payoff explicit without asking for a bill: a one-page cost view, a short breakdown of where cost is coming from, or a simple yes/no reply.',
-      'First-touch tone should be thoughtful and specific. Prefer a low-friction CTA like "Worth seeing where the extra cost is likely coming from?" or "Okay if I send the one-page cost view?" Never ask for a bill in first touch.',
+      'Use one concrete company or location fact and make the payoff explicit without asking for a bill: a short read, a rate-vs-delivery read, or a simple yes/no reply.',
+      'First-touch tone should be direct but calm. Prefer a low-friction CTA like "Reply and I\'ll send the short read." or "Okay if I send the rate-vs-delivery read?" Never ask for a bill in first touch.',
       'If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.',
-      'Subject line: 1-4 words, plain, specific, and value-led. Finance examples: budget drift, fixed cost. Ops examples: summer rate check, load timing, delivery charges. Purchasing examples: renewal timing, vendor fit. Owner examples: simple cost check, timing before renewal.',
+      'Subject line: 1-4 words, plain, specific, and value-led. Finance examples: budget drift, fixed cost check. Ops examples: load timing, delivery gap. Purchasing examples: renewal timing, vendor fit. Owner examples: simple cost check, timing before renewal.',
       'Never mention LinkedIn, profiles, or how you found them.'
     ].join('\n'),
     follow_up: [
-      'REPLY-FIRST NOTE: Keep the body at 50-80 words.',
+      'REPLY-FIRST NOTE: Keep the body at 45-75 words.',
       'Add one new fact or angle. Reference prior contact by topic only, never opens or clicks.',
-      'Reinforce one concrete output that does not require document sharing yet: a cost breakdown, a rate-vs-delivery view, a short call, or a routing reply.',
+      'Reinforce one concrete output that does not require document sharing yet: a short read, a rate-vs-delivery read, a short call, or a routing reply.',
       'Follow-up tone should be more diagnostic and a little more direct than first touch. Prefer one direct CTA only, and do not ask for a bill unless this is clearly a later, high-intent step.',
       'If the account is a subsidiary, keep the operating company and parent company separate. Anchor the note to the site or local location, not the corporate HQ unless that is the actual site.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally. Keep it as a location cue, not jargon.',
       'Subject line: 1-4 words, specific and plain. Slightly more diagnostic than Day 1. Examples: rate vs delivery, demand adds cost, timing check.'
     ].join('\n'),
     no_reply: [
-      'REPLY-FIRST NOTE: Keep the body at 35-55 words and max 2 sentences.',
+      'REPLY-FIRST NOTE: Keep the body at 30-50 words and max 2 sentences.',
       'Assume you already reached the right person. Do not ask who owns electricity review.',
       'Sentence 1 should state the value in plain English and name one likely leak area.',
-      'Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short cost view.',
-      'No-reply tone should be sharper and cleaner than prior touches.',
+      'Sentence 2 should use a tiny reply ask: a routing reply, a yes/no, or permission to send a short read.',
+      'No-reply tone should be sharper and cleaner than prior touches. Do not be soft here.',
       'Never ask for a bill, statement, or invoice in this branch.',
       'If the account is outside Texas, keep the market framing broad enough for a deregulated market and do not imply Texas-only coverage.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally, but keep the message short.',
-      'Subject line: 1-4 words, direct and sharp. Make it the cleanest in the sequence. Examples: short cost view, quick yes/no, close the loop.'
+      'Subject line: 1-4 words, direct and sharp. Make it the cleanest in the sequence. Examples: short read, quick yes/no, close the loop.'
     ].join('\n'),
     general: [
       'REPLY-FIRST NOTE: Use the shortest draft that still gives one real observation and a concrete reason to reply.',
@@ -280,7 +280,7 @@ function buildReplyFirstDirective(stage) {
       'One CTA only. Early stages use low-friction asks. Later/high-intent stages may optionally ask for a bill only to confirm hard numbers.',
       'As the sequence progresses, the tone should move from thoughtful, to diagnostic, to direct, to clean closure.',
       'Do not confuse a parent company with the operating company. If there is a subsidiary relationship, keep the local site and operating entity in view.',
-      'Subject line: 1-4 words, but vary it by title and stage.'
+      'Subject line: 1-4 words, but vary it by title and stage. Do not keep reusing the same cost-view phrasing.'
     ].join('\n')
   };
 
@@ -726,7 +726,10 @@ export default async function handler(req, res) {
       previewGeneratedAt: nowIso,
       emailRecordId: targetEmailId,
       status: 'pending_send',
-      sentAt: null
+      sentAt: null,
+      aiPrompt: String(executionMeta?.prompt || '').trim() || null,
+      generatedBody: generatedBody,
+      generatedSubject: generatedSubject
     };
     // Always use the sequence-configured fromEmail (from bgvector.settings.senderEmail).
     // Keep the ownership metadata, but do not let an older placeholder `from` win here.
@@ -741,6 +744,7 @@ export default async function handler(req, res) {
       subject: generatedSubject,
       html: finalBody,
       text: finalBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
+      aiPrompt: String(executionMeta?.prompt || '').trim() || null,
       status: 'pending_send',
       type: 'scheduled',
       is_read: true,
