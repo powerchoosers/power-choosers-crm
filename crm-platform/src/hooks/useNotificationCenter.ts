@@ -5,6 +5,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/context/AuthContext'
 import { getSignatureRequestKindConfig, normalizeSignatureRequestKind } from '@/lib/signature-request'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 
 const FALLBACK_SHARED_INBOX_OWNERS: Record<string, string[]> = {
   'l.patterson@nodalpoint.io': ['signal@nodalpoint.io'],
@@ -46,6 +47,7 @@ export interface NotificationFeedItem {
 async function resolveOwnerScope(user: { id?: string; email?: string | null }): Promise<string[]> {
   const primary = String(user.email || '').toLowerCase().trim()
   if (!primary) return []
+  await ensureFreshSupabaseSession()
   const shared = FALLBACK_SHARED_INBOX_OWNERS[primary] || []
   const owners = new Set<string>([primary, ...shared])
   if (user.id) {
@@ -283,6 +285,7 @@ export function useNotificationCenter() {
 
   const markItemRead = async (item: NotificationFeedItem) => {
     if (item.read) return
+    await ensureFreshSupabaseSession()
     if (item.source === 'notifications') {
       await supabase.from('notifications').update({ read: true }).eq('id', item.id)
       await queryClient.invalidateQueries({ queryKey: ['notification-center-feed'] })
@@ -294,6 +297,7 @@ export function useNotificationCenter() {
   }
 
   const markAllRead = async () => {
+    await ensureFreshSupabaseSession()
     const allItems = items
     const dbUnreadIds = allItems
       .filter((item) => item.source === 'notifications' && !item.read)

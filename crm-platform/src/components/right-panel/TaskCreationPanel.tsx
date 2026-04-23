@@ -29,6 +29,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { getFreshSupabaseAccessToken } from '@/lib/auth/supabase-session'
 import { useQueryClient } from '@tanstack/react-query'
 import { ForensicClose } from '@/components/ui/ForensicClose'
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme'
@@ -297,10 +298,8 @@ export function TaskCreationPanel() {
             }
 
             if (sendCalendarInvite) {
-                const { data: { session } } = await supabase.auth.getSession()
-
                 // Dev Bypass Logic
-                let token = session?.access_token
+                let token = await getFreshSupabaseAccessToken()
                 const isDev = process.env.NODE_ENV === 'development'
                 if (!token && isDev) {
                     token = 'dev-bypass-token'

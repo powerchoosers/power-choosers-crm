@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { type Deal, type DealStage, type CreateDealInput, type UpdateDealInput } from '@/types/deals'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
@@ -273,6 +274,7 @@ export function useCreateDeal() {
 
   return useMutation({
     mutationFn: async (input: CreateDealInput) => {
+      await ensureFreshSupabaseSession()
       const { data, error } = await supabase
         .from('deals')
         .insert({
@@ -294,6 +296,7 @@ export function useCreateDeal() {
         queryClient.invalidateQueries({ queryKey: ['deal', QUERY_BUSTER, data.id] })
       }
       if (data?.accountId) {
+        await ensureFreshSupabaseSession()
         queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
         queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
 
@@ -330,6 +333,7 @@ export function useUpdateDeal() {
 
   return useMutation({
     mutationFn: async ({ id, ...updates }: UpdateDealInput) => {
+      await ensureFreshSupabaseSession()
       const { data, error } = await supabase
         .from('deals')
         .update({
@@ -360,6 +364,7 @@ export function useUpdateDeal() {
       queryClient.invalidateQueries({ queryKey: ['deal'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       if (data?.accountId) {
+        await ensureFreshSupabaseSession()
         queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
         queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
 
@@ -400,6 +405,7 @@ export function useDeleteDeal() {
 
   return useMutation({
     mutationFn: async (id: string) => {
+      await ensureFreshSupabaseSession()
       const { error } = await supabase
         .from('deals')
         .delete()

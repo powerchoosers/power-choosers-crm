@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { useUIStore } from '@/store/uiStore';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { ensureFreshSupabaseSession, getFreshSupabaseAccessToken } from '@/lib/auth/supabase-session';
 import { useRouter } from 'next/navigation';
 import { formatPhoneNumber } from '@/lib/formatPhone';
 import { useQueryClient } from '@tanstack/react-query';
@@ -19,15 +20,15 @@ import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme';
 
 // REAL API ENRICHMENT
 const getApolloAuthHeaders = async (includeContentType: boolean = false): Promise<Record<string, string>> => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const token = await getFreshSupabaseAccessToken();
   return {
     ...(includeContentType ? { 'Content-Type': 'application/json' } : {}),
-    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 };
 
 const resolveCurrentOwnerId = async (): Promise<string | null> => {
-  const { data: { session } } = await supabase.auth.getSession();
+  const session = await ensureFreshSupabaseSession();
   return session?.user?.email?.toLowerCase() || null;
 };
 
@@ -482,6 +483,7 @@ export function NodeIngestion() {
   const handleCommit = async () => {
     setIsCommitting(true);
     try {
+      await ensureFreshSupabaseSession(true);
       const now = new Date().toISOString();
       const currentOwnerId = await resolveCurrentOwnerId();
 

@@ -5,6 +5,7 @@ import { resolveContactPhotoUrl } from '@/lib/contactAvatar'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { buildStatusIlikeClauses } from '@/lib/status-filters'
 import {
   type ContactAdditionalPhone,
@@ -89,6 +90,7 @@ export function useDeleteContacts() {
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
+      await ensureFreshSupabaseSession()
       // Remove list memberships first so targets list counts stay correct
       await supabase
         .from('list_members')
@@ -1032,6 +1034,7 @@ export function useCreateContact() {
   const { user } = useAuth()
   return useMutation({
     mutationFn: async (newContact: Omit<Contact, 'id'> & { id?: string }) => {
+      await ensureFreshSupabaseSession()
       // Basic insert - handling linked account is more complex in UI, assuming ID provided if linked
       const dbContact = {
         id: newContact.id || crypto.randomUUID(),
@@ -1084,6 +1087,7 @@ export function useUpsertContact() {
   const { user } = useAuth()
   return useMutation({
     mutationFn: async (contact: Omit<Contact, 'id'> & { id?: string }) => {
+      await ensureFreshSupabaseSession()
       // 1. Try to find existing contact by email or name+company if ID is missing
       let existingId = contact.id;
 
@@ -1313,6 +1317,7 @@ export function useUpdateContact() {
       }
     },
     mutationFn: async ({ id, ...updates }: Partial<ContactDetail> & { id: string }) => {
+      await ensureFreshSupabaseSession()
       const dbUpdates: Record<string, unknown> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.email !== undefined) dbUpdates.email = updates.email
@@ -1432,6 +1437,7 @@ export function useDeleteContact() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
+      await ensureFreshSupabaseSession()
       const { error } = await supabase.from('contacts').delete().eq('id', id)
       if (error) throw error
       return id

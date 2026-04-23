@@ -21,6 +21,7 @@ import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader
 import { useVaultDocuments, useVaultDocumentsInvalidate, type VaultDocument, type DocumentTypeFilter } from '@/hooks/useVaultDocuments'
 import { useSearchAccounts } from '@/hooks/useAccounts'
 import { supabase } from '@/lib/supabase'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { formatDistanceToNow } from 'date-fns'
@@ -170,6 +171,7 @@ export default function VaultPage() {
     setUploading(true)
     const toastId = toast.loading('Ingesting data packets...')
     try {
+      await ensureFreshSupabaseSession()
       for (const file of ingestionFiles) {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
@@ -253,6 +255,7 @@ export default function VaultPage() {
   const handleDeleteDoc = useCallback(
     async (doc: VaultDocument) => {
       try {
+        await ensureFreshSupabaseSession()
         await supabase.storage.from('vault').remove([doc.storage_path])
         await supabase.from('documents').delete().eq('id', doc.id)
         toast.success('Document purged')
