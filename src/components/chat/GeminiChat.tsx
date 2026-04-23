@@ -15,6 +15,7 @@ import { useContact, useUpdateContact } from '@/hooks/useContacts'
 import { useAccount, useUpdateAccount, useUpsertAccount } from '@/hooks/useAccounts'
 import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { DecryptionText } from '@/components/chat/DecryptionText'
@@ -2898,6 +2899,7 @@ export function GeminiChatPanel() {
     if (pendingSessionPromiseRef.current) return pendingSessionPromiseRef.current
 
     pendingSessionPromiseRef.current = (async () => {
+      await ensureFreshSupabaseSession()
       const contextId = typeof contextInfo.id === 'string' ? contextInfo.id : null
       const title = buildSessionTitle(seedText)
       const { data, error } = await supabase.from('chat_sessions').insert({
@@ -2927,6 +2929,7 @@ export function GeminiChatPanel() {
 
   const saveMessageToDb = async (role: 'user' | 'model', content: string, metadata?: Record<string, unknown>) => {
     try {
+      await ensureFreshSupabaseSession()
       const sessionId = await ensureSessionId(content)
       if (sessionId) {
         const payload: {
