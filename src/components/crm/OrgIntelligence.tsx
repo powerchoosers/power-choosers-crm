@@ -25,6 +25,7 @@ import { useComposeStore } from '@/store/composeStore';
 import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
+import { getFreshSupabaseAccessToken } from '@/lib/auth/supabase-session';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -123,6 +124,14 @@ function assignRevealedPhonesToContactFields(phones: RevealedPhone[]) {
   }
 
   return { patch, extras };
+}
+
+async function getApolloBearerToken(forceRefresh = false): Promise<string> {
+  const token = await getFreshSupabaseAccessToken(forceRefresh);
+  if (!token) {
+    throw new Error('Authentication session expired. Please refresh.');
+  }
+  return token;
 }
 
 const PHONE_REVEAL_WARNING_MS = 60_000;
@@ -1147,14 +1156,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getApolloBearerToken(true);
 
       // 1. Reveal & Enrich (Consume Apollo Credits)
       const enrichResp = await fetch('/api/apollo/enrich', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           contactIds: [person.id],  // Array of Apollo person IDs
@@ -1463,8 +1472,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           }
           attempts += 1;
           try {
+            const pollToken = await getApolloBearerToken();
             const res = await fetch(`/api/apollo/phone-retrieve?personId=${encodeURIComponent(apolloPersonId)}`, {
-              headers: { ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}) },
+              headers: { Authorization: `Bearer ${pollToken}` },
             });
             if (!res.ok) return;
             const json = await res.json();
@@ -1606,7 +1616,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     setScanStatus('scanning');
     const previousData = data;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getApolloBearerToken(true);
 
       // 1. Fetch Company Summary
       let currentSummary: ApolloCompany | null = null;
@@ -1616,7 +1626,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
       try {
         const summaryResp = await fetch(`/api/apollo/company?${summaryParams.toString()}`, {
-          headers: { 'Authorization': `Bearer ${session?.access_token}` }
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (summaryResp.ok) {
@@ -1633,7 +1643,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           page: 1,
@@ -1779,7 +1789,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     setContactsLoading(true);
     const previousData = data;
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const token = await getApolloBearerToken(true);
       const hasDomainScope = Boolean(domain && domain.trim());
 
       // Domain-first query avoids false negatives when CRM account name differs from Apollo org name.
@@ -1788,7 +1798,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session?.access_token}`
+            'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
             page: 1,
