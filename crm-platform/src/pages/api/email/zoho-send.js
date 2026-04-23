@@ -13,6 +13,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, sanitizeExistingTracking } from './tracking-helper.js';
 import { generateNodalSignature } from '@/lib/signature';
+import { appendHtmlFragment } from '@/lib/email-html';
 import logger from '../_logger.js';
 
 function extractValidEmail(value) {
@@ -428,7 +429,7 @@ export default async function handler(req, res) {
                         }, { email: ownerEmail }, false);
 
                         if (composeSig) {
-                            trackedContent = `${trackedContent}${composeSig}`;
+                            trackedContent = appendHtmlFragment(trackedContent, composeSig);
                             logger.info(`[Zoho] Injected Compose Signature for ${ownerEmail} (via ${lookupEmail})`, 'zoho-send');
                         }
                     } else {

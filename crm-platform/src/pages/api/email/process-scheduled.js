@@ -43,11 +43,13 @@ export default async function handler(req, res) {
 
       try {
         const ownerEmail = row.from || row.ownerId || row.metadata?.scheduledBy || ''
+        const rawHtml = row.html || row.content || ''
+        const rawText = row.text || ''
         const sendResult = await zohoService.sendEmail({
           to: sendTo.join(','),
           subject: row.subject || 'Scheduled email',
-          html: row.html || row.content || row.text || '',
-          text: row.text || '',
+          html: rawHtml || undefined,
+          text: rawText || undefined,
           userEmail: ownerEmail,
           from: row.from || ownerEmail,
           fromName: row.metadata?.fromName || undefined,
