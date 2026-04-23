@@ -146,16 +146,19 @@ const tools = [
       },
       {
         name: 'search_transcripts',
-        description: 'Search call transcripts and summaries. Use this to find past conversations about specific topics, keywords, or mentions of people/companies.',
+        description: 'Search call transcripts and summaries. INTELLIGENT PHONE SEARCH: When given a contact_id or account_id, automatically searches ALL associated phone numbers (contact mobile, work, other, company phone, AND account company phone). Use this to find past conversations about specific topics, keywords, or mentions of people/companies. Can also search by date or phone number.',
         parameters: {
           type: 'object',
           properties: {
-            query: { type: 'string', description: 'Search term for transcript content, summary, or topic' },
-            account_id: { type: 'string', description: 'Filter by account ID' },
-            contact_id: { type: 'string', description: 'Filter by contact ID' },
+            query: { type: 'string', description: 'Search term for transcript content, summary, or topic (optional if using date/phone/contact/account filters)' },
+            account_id: { type: 'string', description: 'Filter by account ID - will automatically search the account company phone number' },
+            contact_id: { type: 'string', description: 'Filter by contact ID - will automatically search ALL contact phone numbers (mobile, work, other, company) AND the associated account company phone' },
+            phone_number: { type: 'string', description: 'Explicitly filter by a specific phone number (from or to field). Usually not needed if you have contact_id or account_id.' },
+            date: { type: 'string', description: 'Filter by specific date (YYYY-MM-DD format, e.g. "2026-04-21")' },
+            date_from: { type: 'string', description: 'Filter calls from this date onwards (YYYY-MM-DD)' },
+            date_to: { type: 'string', description: 'Filter calls up to this date (YYYY-MM-DD)' },
             limit: { type: 'number', description: 'Max results (default 10)' }
-          },
-          required: ['query']
+          }
         }
       },
       {
@@ -1271,11 +1274,132 @@ const toolHandlers = {
     console.log(`[search_emails] Found ${data?.length || 0} results (Hybrid: ${usedHybrid})`);
     return data;
   },
-  search_transcripts: async ({ query, account_id, contact_id, limit = 10 }) => {
-    // Search call transcripts with Hybrid Search
+  search_transcripts: async ({ query, account_id, contact_id, phone_number, date, date_from, date_to, limit = 10 }) => {
+    // Search call transcripts with Hybrid Search or filters
     let data = [];
     let usedHybrid = false;
 
+    // If we have date or phone filters, use direct query first
+    const hasDateFilter = date || date_from || date_to;
+    const hasPhoneFilter = phone_number;
+
+    if (hasDateFilter || hasPhoneFilter) {
+      console.log(`[search_transcripts] Using filtered search - date: ${date || date_from || date_to}, phone: ${phone_number}, account: ${account_id}, contact: ${contact_id}`);
+      
+      // Strategy: Build a list of phone numbers to search for
+      const phoneNumbersToSearch = [];
+      
+      if (phone_number) {
+        phoneNumbersToSearch.push(phone_number);
+      }
+      
+      // If we have a contact_id, get all their phone numbers
+      if (contact_id) {
+        const { data: contact } = await supabaseAdmin
+          .from('contacts')
+          .select('phone, mobile, workPhone, otherPhone, companyPhone, accountId')
+          .eq('id', contact_id)
+          .single();
+        
+        if (contact) {
+          if (contact.mobile) phoneNumbersToSearch.push(contact.mobile);
+          if (contact.workPhone) phoneNumbersToSearch.push(contact.workPhone);
+          if (contact.phone) phoneNumbersToSearch.push(contact.phone);
+          if (contact.otherPhone) phoneNumbersToSearch.push(contact.otherPhone);
+          if (contact.companyPhone) phoneNumbersToSearch.push(contact.companyPhone);
+          
+          // Also get the account's company phone as fallback
+          if (contact.accountId && !account_id) {
+            account_id = contact.accountId;
+          }
+        }
+      }
+      
+      // If we have an account_id, get the company phone
+      if (account_id) {
+        const { data: account } = await supabaseAdmin
+          .from('accounts')
+          .select('phone')
+          .eq('id', account_id)
+          .single();
+        
+        if (account?.phone) {
+          phoneNumbersToSearch.push(account.phone);
+        }
+      }
+      
+      // Normalize all phone numbers to last 10 digits
+      const normalizedPhones = [...new Set(
+        phoneNumbersToSearch
+          .filter(p => p)
+          .map(p => normalizePhoneDigits(p).slice(-10))
+          .filter(p => p.length === 10)
+      )];
+      
+      console.log(`[search_transcripts] Searching for ${normalizedPhones.length} phone numbers:`, normalizedPhones);
+      
+      let query_builder = supabaseAdmin
+        .from('calls')
+        .select('*, accounts(name, phone), contacts(firstName, lastName, email, mobile, workPhone, phone, otherPhone, companyPhone)')
+        .order('timestamp', { ascending: false })
+        .limit(limit * 3); // Get more results to filter
+
+      // Apply date filters
+      if (date) {
+        // Specific date - match the date part only
+        query_builder = query_builder.gte('timestamp', `${date}T00:00:00Z`).lt('timestamp', `${date}T23:59:59Z`);
+      } else {
+        if (date_from) query_builder = query_builder.gte('timestamp', `${date_from}T00:00:00Z`);
+        if (date_to) query_builder = query_builder.lte('timestamp', `${date_to}T23:59:59Z`);
+      }
+
+      // Apply phone filter if we have normalized phones
+      if (normalizedPhones.length > 0) {
+        // Build OR condition for all phone numbers
+        const phoneConditions = normalizedPhones.flatMap(phone => [
+          `from.ilike.%${phone}%`,
+          `to.ilike.%${phone}%`
+        ]).join(',');
+        query_builder = query_builder.or(phoneConditions);
+      }
+
+      // Apply other filters
+      if (account_id && normalizedPhones.length === 0) {
+        // Only filter by account if we don't have phone numbers (phone search is more specific)
+        query_builder = query_builder.eq('accountId', account_id);
+      }
+      if (contact_id && normalizedPhones.length === 0) {
+        query_builder = query_builder.eq('contactId', contact_id);
+      }
+
+      const { data: filteredData, error } = await query_builder;
+
+      if (error) {
+        console.error('[search_transcripts] Filtered search error:', error);
+        throw error;
+      }
+
+      data = filteredData || [];
+      console.log(`[search_transcripts] Found ${data.length} calls with filters`);
+
+      // If we also have a query, filter the results by transcript content
+      if (query && data.length > 0) {
+        const queryLower = query.toLowerCase();
+        data = data.filter(call => {
+          const transcript = (call.transcript || '').toLowerCase();
+          const summary = (call.summary || '').toLowerCase();
+          return transcript.includes(queryLower) || summary.includes(queryLower);
+        });
+        console.log(`[search_transcripts] After text filter: ${data.length} calls`);
+      }
+      
+      // Limit to requested amount
+      data = data.slice(0, limit);
+
+      return data;
+    }
+
+    // Original hybrid search logic for text-only queries
     if (query) {
       try {
         const embedding = await generateEmbedding(query);
@@ -1315,11 +1439,14 @@ const toolHandlers = {
     if (!usedHybrid) {
       let query_builder = supabaseAdmin
         .from('calls')
-        .select('*')
+        .select('*, accounts(name, phone), contacts(firstName, lastName, email)')
         .not('transcript', 'is', null)
-        .or(`transcript.ilike.%${query}%,summary.ilike.%${query}%`)
         .order('timestamp', { ascending: false })
         .limit(limit);
+
+      if (query) {
+        query_builder = query_builder.or(`transcript.ilike.%${query}%,summary.ilike.%${query}%`);
+      }
 
       if (account_id) query_builder = query_builder.eq('accountId', account_id);
       if (contact_id) query_builder = query_builder.eq('contactId', contact_id);
@@ -1327,7 +1454,7 @@ const toolHandlers = {
       const { data: keywordData, error } = await query_builder;
 
       if (error) throw error;
-      data = keywordData;
+      data = keywordData || [];
     }
 
     console.log(`[search_transcripts] Found ${data?.length || 0} results (Hybrid: ${usedHybrid})`);
