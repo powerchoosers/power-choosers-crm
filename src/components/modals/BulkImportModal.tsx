@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/lib/supabase';
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session';
 import { useUpsertContact } from '@/hooks/useContacts';
 import { useUpsertAccount } from '@/hooks/useAccounts';
 import { useTargets, useCreateTarget } from '@/hooks/useTargets';
@@ -721,6 +722,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           
           // Add to list if selected
           if (selectedListId && result.id) {
+            await ensureFreshSupabaseSession()
             // Check if already in list
             const { data: existing } = await supabase
               .from('list_members')

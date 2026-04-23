@@ -6,6 +6,7 @@ import { mapLocationToZone, type ErcotZone } from '@/lib/market-mapping'
 import { getTexasEnergyContext } from '@/lib/texas-territory'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { buildAccountStatusClauses } from '@/lib/status-filters'
 
 export interface Account {
@@ -60,6 +61,7 @@ export function useDeleteAccounts() {
 
   return useMutation({
     mutationFn: async (ids: string[]) => {
+      await ensureFreshSupabaseSession()
       // Remove list memberships first so targets list counts stay correct
       await supabase
         .from('list_members')
@@ -550,6 +552,7 @@ export function useCreateAccount() {
   const { user } = useAuth()
   return useMutation({
     mutationFn: async (newAccount: Omit<Account, 'id'> & { id?: string }) => {
+      await ensureFreshSupabaseSession()
       // Map frontend fields to DB columns
       const dbAccount = {
         id: newAccount.id || crypto.randomUUID(),
@@ -605,6 +608,7 @@ export function useUpsertAccount() {
   const { user } = useAuth()
   return useMutation({
     mutationFn: async (account: Omit<Account, 'id'> & { id?: string }) => {
+      await ensureFreshSupabaseSession()
       // 1. Try to find existing account by domain or name if ID is missing
       let existingId = account.id;
 
@@ -730,6 +734,7 @@ export function useUpdateAccount() {
       }
     },
     mutationFn: async ({ id, ...updates }: Partial<Account> & { id: string }) => {
+      await ensureFreshSupabaseSession()
       // 1. Try to get metadata from cache to save a roundtrip
       const cachedAccount = queryClient.getQueriesData({ predicate: queryPredicateById('account', id) })[0]?.[1] as Account | undefined
       let currentMetadata = cachedAccount?.metadata || {}
@@ -875,6 +880,7 @@ export function useDeleteAccount() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
+      await ensureFreshSupabaseSession()
       const { error } = await supabase.from('accounts').delete().eq('id', id)
       if (error) throw error
       return id
