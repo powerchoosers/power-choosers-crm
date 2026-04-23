@@ -15,6 +15,7 @@ import { Loader2, X, Paperclip, Sparkles, Minus, Maximize2, Cpu, Check, RotateCc
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { buildAdaptiveEmailDocument, buildReadablePreviewDocument, ensureAdaptiveEmailDocument } from '@/lib/email-html'
 import { ScanlineLoader } from '@/components/chat/ScanlineLoader'
 import { INDUSTRY_VECTORS } from '@/lib/industry-mapping'
 import { generateStaticHtml, substituteVariables, contactToVariableMap } from '@/lib/foundry'
@@ -58,7 +59,7 @@ function EmailIframePreview({ content }: { content: string }) {
       const doc = iframeRef.current.contentDocument
       if (doc) {
         doc.open()
-        doc.write(content)
+        doc.write(buildReadablePreviewDocument(content))
         doc.close()
       }
     }
@@ -556,171 +557,11 @@ function normalizeEditorHtmlForEmail(html: string): string {
 }
 
 function buildComposeEmailDocument(bodyHtml: string, signatureHtml: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
-    <meta name="supported-color-schemes" content="light dark" />
-    <style>
-      :root {
-        color-scheme: light dark;
-      }
-
-      html,
-      body {
-        margin: 0;
-        padding: 0;
-        background-color: #fafafa;
-        color: #18181b;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-        line-height: 1.45;
-      }
-
-      .compose-email-shell {
-        margin: 0;
-        padding: 0;
-        background-color: #fafafa;
-        color: #18181b;
-      }
-
-      .compose-email-body {
-        margin: 0 0 24px 0;
-        color: #18181b;
-      }
-
-      .compose-email-paragraph-spacer {
-        line-height: 12px;
-        font-size: 12px;
-      }
-
-      .compose-email-body p,
-      .compose-email-body div,
-      .compose-email-body span,
-      .compose-email-body li,
-      .compose-email-body td,
-      .compose-email-body th {
-        color: inherit;
-      }
-
-      .compose-email-body a {
-        color: #002FA7;
-        text-decoration: underline;
-      }
-
-      .compose-email-body img {
-        max-width: 100%;
-        height: auto;
-      }
-
-      .compose-email-signature {
-        margin-top: 0;
-      }
-
-      [data-ogsc] .compose-email-shell,
-      [data-ogsc] .compose-email-body,
-      [data-ogsc] .compose-email-signature {
-        background-color: #0a0a0a !important;
-        color: #e4e4e7 !important;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        html,
-        body,
-        .compose-email-shell {
-          background-color: #0a0a0a !important;
-          color: #e4e4e7 !important;
-        }
-
-        .compose-email-body {
-          color: #e4e4e7 !important;
-        }
-
-        .compose-email-body p,
-        .compose-email-body div,
-        .compose-email-body span,
-        .compose-email-body li,
-        .compose-email-body td,
-        .compose-email-body th,
-        .compose-email-signature,
-        .compose-email-signature p,
-        .compose-email-signature div,
-        .compose-email-signature span,
-        .compose-email-signature td,
-        .compose-email-signature th {
-          color: inherit !important;
-        }
-
-        .compose-email-body a,
-        .compose-email-signature a {
-          color: #6b8eff !important;
-        }
-
-        .compose-email-signature [style*="border-top"],
-        .compose-email-signature [style*="border-left"],
-        .compose-email-signature [style*="border-right"],
-        .compose-email-signature [style*="border-bottom"] {
-          border-color: rgba(255, 255, 255, 0.1) !important;
-        }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="compose-email-shell">
-      <div class="compose-email-body">${bodyHtml}</div>
-      ${signatureHtml ? `<div class="compose-email-signature">${signatureHtml}</div>` : ''}
-    </div>
-  </body>
-</html>`
+  return buildAdaptiveEmailDocument(bodyHtml, signatureHtml)
 }
 
 function ensureDarkModeEmailSupport(html: string): string {
-  if (!html) return html
-  if (/color-scheme/i.test(html) || /compose-email-shell/i.test(html) || /foundry-email-shell/i.test(html)) {
-    return html
-  }
-
-  const darkModeSupport = `
-    <meta name="color-scheme" content="light dark" />
-    <meta name="supported-color-schemes" content="light dark" />
-    <style>
-      :root {
-        color-scheme: light dark;
-      }
-
-      @media (prefers-color-scheme: dark) {
-        body,
-        table,
-        td,
-        div,
-        p,
-        span,
-        li,
-        th {
-          color: #e4e4e7 !important;
-        }
-
-        body {
-          background-color: #0a0a0a !important;
-        }
-
-        a {
-          color: #6b8eff !important;
-        }
-      }
-    </style>
-  `
-
-  if (/<head[^>]*>/i.test(html)) {
-    return html.replace(/<head[^>]*>/i, (match) => `${match}${darkModeSupport}`)
-  }
-
-  if (/<html[^>]*>/i.test(html)) {
-    return html.replace(/<html[^>]*>/i, (match) => `${match}<head>${darkModeSupport}</head>`)
-  }
-
-  return `${darkModeSupport}${html}`
+  return ensureAdaptiveEmailDocument(html)
 }
 
 interface EmailTypeConfig {
@@ -2037,7 +1878,7 @@ Return exactly one subject line.`,
     const fullHtml = isColdPlaintext
       ? undefined
       : selectedFoundryId
-        ? content // Foundry template is already complete HTML
+        ? ensureAdaptiveEmailDocument(content)
         : buildComposeEmailDocument(normalizedEmailBodyHtml, outgoingSignatureHtml || '')
 
     const titleLine = profile?.jobTitle

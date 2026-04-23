@@ -1,5 +1,6 @@
 // Zoho Mail service for sending and syncing emails via Zoho Mail API
 import { getValidAccessTokenForUser, clearTokenCache } from './zoho-token-manager.js';
+import { ensureAdaptiveEmailDocument } from '@/lib/email-html';
 import logger from '../_logger.js';
 
 export class ZohoMailService {
@@ -107,13 +108,17 @@ export class ZohoMailService {
                     ? `"${fromName.replace(/"/g, '')}" <${senderEmail}>`
                     : senderEmail;
 
+                const htmlContent = String(html || '').trim();
+                const looksLikeHtml = /<\/?[a-z][\s\S]*>/i.test(htmlContent) || /<!doctype/i.test(htmlContent) || /<!--/i.test(htmlContent);
+                const normalizedHtml = looksLikeHtml ? ensureAdaptiveEmailDocument(htmlContent) : '';
+
                 // Construct payload with ONLY supported keys
                 const payload = {
                     fromAddress: fromAddress,
                     toAddress: Array.isArray(to) ? to.join(',') : to,
                     subject: subject,
-                    content: html || text || '',
-                    mailFormat: html ? 'html' : 'plaintext',
+                    content: normalizedHtml || text || '',
+                    mailFormat: normalizedHtml ? 'html' : 'plaintext',
                 };
 
                 // Add optional fields only if they have values

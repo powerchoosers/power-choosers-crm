@@ -10,6 +10,28 @@ import { enrichApolloOrganizationByDomain, normalizeOrganizationName } from '@/l
 import { cors } from '../_cors.js';
 import { getApiKey, APOLLO_BASE_URL, fetchWithRetry } from '../apollo/_utils.js';
 
+function normalizeLocationKey(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/’/g, "'")
+    .replace(/‘/g, "'")
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function matchesLocationKey(city, candidate) {
+  const normalizedCity = normalizeLocationKey(city);
+  const normalizedCandidate = normalizeLocationKey(candidate);
+  if (!normalizedCity || !normalizedCandidate) return false;
+  return normalizedCity === normalizedCandidate
+    || normalizedCity.startsWith(`${normalizedCandidate} `)
+    || normalizedCity.endsWith(` ${normalizedCandidate}`)
+    || normalizedCity.includes(` ${normalizedCandidate} `);
+}
+
 // SIC/NAICS → human-readable industry (Apollo accounts don't have an `industry` field)
 function resolveIndustry(org) {
   if (org.industry) return org.industry;
@@ -115,8 +137,26 @@ const DEREGULATED_LOCATIONS = [
   { city: 'Pearland', tdsp: 'CenterPoint' },
   { city: 'Sugar Land', tdsp: 'CenterPoint' },
   { city: 'Baytown', tdsp: 'CenterPoint' },
+  { city: 'Aldine', tdsp: 'CenterPoint' },
+  { city: 'Bammel', tdsp: 'CenterPoint' },
+  { city: 'Bunker Hill Village', tdsp: 'CenterPoint' },
   { city: 'Beaumont', tdsp: 'CenterPoint' },
   { city: 'Galveston', tdsp: 'CenterPoint' },
+  { city: 'Hedwig Village', tdsp: 'CenterPoint' },
+  { city: 'Hilshire Village', tdsp: 'CenterPoint' },
+  { city: 'Huffman', tdsp: 'CenterPoint' },
+  { city: 'Humble', tdsp: 'CenterPoint' },
+  { city: 'Hunters Creek Village', tdsp: 'CenterPoint' },
+  { city: 'Jersey Village', tdsp: 'CenterPoint' },
+  { city: 'Kingwood', tdsp: 'CenterPoint' },
+  { city: 'Oak Ridge North', tdsp: 'CenterPoint' },
+  { city: 'Piney Point Village', tdsp: 'CenterPoint' },
+  { city: 'Satsuma', tdsp: 'CenterPoint' },
+  { city: 'Spring', tdsp: 'CenterPoint' },
+  { city: 'Spring Branch', tdsp: 'CenterPoint' },
+  { city: 'Spring Valley', tdsp: 'CenterPoint' },
+  { city: 'Spring Valley Village', tdsp: 'CenterPoint' },
+  { city: 'Westfield', tdsp: 'CenterPoint' },
   // AEP Texas
   { city: 'Corpus Christi', tdsp: 'AEP Texas' },
   { city: 'Laredo', tdsp: 'AEP Texas' },
@@ -266,9 +306,9 @@ export default async function handler(req, res) {
       if (apolloId) seenIds.add(apolloId);
 
       // Determine TDSP zone from city match
-      const orgCity = (org.organization_city || org.city || '').toLowerCase();
+      const orgCity = org.organization_city || org.city || '';
       const matchedLocation = DEREGULATED_LOCATIONS.find(
-        (l) => l.city.toLowerCase() === orgCity
+        (l) => matchesLocationKey(orgCity, l.city)
       );
 
       toInsert.push({
@@ -307,9 +347,9 @@ export default async function handler(req, res) {
     // Recompute territory after enrichment. This keeps out-of-market records
     // from being mislabelled as ERCOT when Apollo gives us a better location.
     for (const prospect of toInsert) {
-      const city = (prospect.city || '').toString().trim().toLowerCase();
+      const city = prospect.city || '';
       const matchedLocation = city
-        ? DEREGULATED_LOCATIONS.find((l) => l.city.toLowerCase() === city)
+        ? DEREGULATED_LOCATIONS.find((l) => matchesLocationKey(city, l.city))
         : null;
       prospect.tdsp_zone = matchedLocation?.tdsp || 'Unknown';
     }

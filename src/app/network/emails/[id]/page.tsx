@@ -1444,7 +1444,7 @@ export default function EmailDetailPage() {
                                   html={threadEmail.html}
                                   text={threadEmail.text}
                                   subject={threadEmail.subject}
-                                  initialLightMode={threadIsOutbound}
+                                  initialLightMode={true}
                                   className="rounded-2xl border border-white/10"
                                 />
                                 {threadEmail.attachments && threadEmail.attachments.length > 0 && (
