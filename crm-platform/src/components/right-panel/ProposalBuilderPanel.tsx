@@ -33,6 +33,7 @@ import {
 } from '@/lib/proposal'
 import { generateNodalSignature } from '@/lib/signature'
 import { supabase } from '@/lib/supabase'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { useQueryClient } from '@tanstack/react-query'
 import DOMPurify from 'dompurify'
 import { toast } from 'sonner'
@@ -292,6 +293,7 @@ export function ProposalBuilderPanel() {
     setIsSaving(true)
     const toastId = toast.loading('Saving proposal to Vault...')
     try {
+      await ensureFreshSupabaseSession()
       const bytes = await generateProposalPdfBytes(draft, profile)
       const storagePath = buildProposalStoragePath(accountId, draft)
       const pdfName = buildProposalFileName(draft)

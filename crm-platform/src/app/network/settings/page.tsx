@@ -15,6 +15,7 @@ import { useSyncStore } from '@/store/syncStore'
 import { useZohoSync } from '@/hooks/useZohoSync'
 import { useAuth } from '@/context/AuthContext'
 import { supabase } from '@/lib/supabase'
+import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -1418,13 +1419,14 @@ export default function SettingsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-6 w-6 text-zinc-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={async () => {
-                              if (!confirm('Disconnect this account?')) return
-                              const toastId = toast.loading('Disconnecting...')
-                              try {
-                                const { error } = await supabase.from('zoho_connections').delete().eq('id', conn.id)
-                                if (error) throw error
-                                setConnections(prev => prev.filter(c => c.id !== conn.id))
+                              onClick={async () => {
+                                if (!confirm('Disconnect this account?')) return
+                                const toastId = toast.loading('Disconnecting...')
+                                try {
+                                  await ensureFreshSupabaseSession()
+                                  const { error } = await supabase.from('zoho_connections').delete().eq('id', conn.id)
+                                  if (error) throw error
+                                  setConnections(prev => prev.filter(c => c.id !== conn.id))
                                 toast.success('Account disconnected', { id: toastId })
                               } catch (e: any) {
                                 toast.error('Failed to disconnect', { id: toastId })
