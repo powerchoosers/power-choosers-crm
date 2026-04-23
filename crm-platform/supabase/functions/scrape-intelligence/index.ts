@@ -32,6 +32,27 @@ function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : ''
 }
 
+function normalizeCityKey(value: unknown): string {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/&/g, 'and')
+    .replace(/’/g, "'")
+    .replace(/‘/g, "'")
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function matchesCityTerm(city: string, term: string): boolean {
+  const normalizedCity = normalizeCityKey(city)
+  const normalizedTerm = normalizeCityKey(term)
+  if (!normalizedCity || !normalizedTerm) return false
+  return normalizedCity === normalizedTerm
+    || normalizedCity.startsWith(`${normalizedTerm} `)
+    || normalizedCity.endsWith(` ${normalizedTerm}`)
+    || normalizedCity.includes(` ${normalizedTerm} `)
+}
+
 function truncate(value: unknown, max: number): string | null {
   const text = cleanText(value)
   if (!text) return null
@@ -71,11 +92,10 @@ function determineTdspZone(city: string, foundTdsp?: string): string {
     if (foundTdsp.toLowerCase().includes('aep')) return 'AEP Texas'
     if (foundTdsp.toLowerCase().includes('tnmp')) return 'TNMP'
   }
-  const c = city.toLowerCase()
-  if (['houston', 'beaumont', 'port arthur', 'baytown', 'pasadena', 'pearland', 'sugar land', 'the woodlands', 'conroe', 'galveston', 'lufkin', 'nacogdoches'].some((x) => c.includes(x))) return 'CenterPoint'
-  if (['dallas', 'fort worth', 'arlington', 'plano', 'irving', 'garland', 'mesquite', 'mckinney', 'frisco', 'grand prairie', 'waco', 'lubbock', 'tyler', 'longview', 'wichita falls', 'abilene', 'midland', 'odessa'].some((x) => c.includes(x))) return 'Oncor'
-  if (['corpus christi', 'victoria', 'mcallen', 'laredo', 'harlingen', 'brownsville'].some((x) => c.includes(x))) return 'AEP Texas'
-  if (['pecos', 'fort stockton', 'alpine', 'marfa', 'presidio', 'big spring', 'sweetwater', 'clute', 'lake jackson', 'angleton', 'alvin', 'freeport'].some((x) => c.includes(x))) return 'TNMP'
+  if (['houston', 'beaumont', 'port arthur', 'baytown', 'pasadena', 'pearland', 'sugar land', 'the woodlands', 'conroe', 'galveston', 'lufkin', 'nacogdoches', 'aldine', 'bammel', 'bunker hill village', 'hedwig village', 'hilshire village', 'huffman', 'humble', 'hunters creek village', 'jersey village', 'kingwood', 'oak ridge north', 'piney point village', 'satsuma', 'spring', 'spring branch', 'spring valley', 'spring valley village', 'westfield'].some((x) => matchesCityTerm(city, x))) return 'CenterPoint'
+  if (['dallas', 'fort worth', 'arlington', 'plano', 'irving', 'garland', 'mesquite', 'mckinney', 'frisco', 'grand prairie', 'waco', 'lubbock', 'tyler', 'longview', 'wichita falls', 'abilene', 'midland', 'odessa'].some((x) => matchesCityTerm(city, x))) return 'Oncor'
+  if (['corpus christi', 'victoria', 'mcallen', 'laredo', 'harlingen', 'brownsville'].some((x) => matchesCityTerm(city, x))) return 'AEP Texas'
+  if (['pecos', 'fort stockton', 'alpine', 'marfa', 'presidio', 'big spring', 'sweetwater', 'clute', 'lake jackson', 'angleton', 'alvin', 'freeport'].some((x) => matchesCityTerm(city, x))) return 'TNMP'
   return 'ERCOT_Unknown'
 }
 
@@ -127,7 +147,7 @@ const INDUSTRY_BUCKETS = [
 
 // City cluster rotates by day-of-epoch (4 buckets → different ERCOT geography each day)
 const CITY_CLUSTERS = [
-  'Houston, Beaumont, Port Arthur, Baytown, Pasadena, Sugar Land, The Woodlands, Conroe, Galveston',
+  'Houston, Spring, Humble, Kingwood, Oak Ridge North, Jersey Village, Beaumont, Port Arthur, Baytown, Pasadena, Sugar Land, The Woodlands, Conroe, Galveston',
   'Dallas, Fort Worth, Arlington, Plano, Irving, McKinney, Frisco, Denton, Waco, Garland',
   'Corpus Christi, Victoria, McAllen, Laredo, Harlingen, Brownsville, Edinburg',
   'Midland, Odessa, Abilene, Lubbock, Wichita Falls, Tyler, Longview, Lufkin, Nacogdoches',

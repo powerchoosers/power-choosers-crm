@@ -18,6 +18,7 @@ import { ZohoMailService } from './zoho-service.js';
 import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
 import { generateForensicSignature } from '@/lib/signature';
+import { appendHtmlFragment } from '@/lib/email-html';
 import logger from '../_logger.js';
 
 function buildUnsubscribeFooter(unsubscribeUrl) {
@@ -155,8 +156,7 @@ export default async function handler(req, res) {
                     websiteDomain: senderDomain
                 });
 
-                // Simple append for sequence emails
-                htmlContent = `<div style="font-family: sans-serif; font-size: 14px; color: #09090b;">${htmlContent}</div>${forensicSig}`;
+                htmlContent = appendHtmlFragment(htmlContent, forensicSig);
                 if (userData && !userError) {
                     logger.info(`[Zoho Sequence] Injected Forensic Signature for ${fromEmail} (via ${lookupEmail})`, 'zoho-send-sequence');
                 } else {
@@ -181,7 +181,7 @@ export default async function handler(req, res) {
                 const baseUrl = (process.env.PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://www.nodalpoint.io').replace(/\/+$/, '');
                 const unsubscribeUrl = `${baseUrl}/unsubscribe?email=${encodeURIComponent(toEmail)}`;
                 const unsubscribeFooter = buildUnsubscribeFooter(unsubscribeUrl);
-                htmlContent = htmlContent + unsubscribeFooter;
+                htmlContent = appendHtmlFragment(htmlContent, unsubscribeFooter);
                 logger.info(
                     `[Zoho Sequence] ${hadExistingFooter ? 'Repositioned' : 'Injected'} unsubscribe footer for ${toEmail}`,
                     'zoho-send-sequence'
