@@ -755,6 +755,7 @@ export function EntityEmailFeed({
                                                                 html={email.html}
                                                                 text={email.text}
                                                                 subject={email.subject}
+                                                                initialLightMode={true}
                                                             />
                                                             <EmailActionBar
                                                                 email={email}

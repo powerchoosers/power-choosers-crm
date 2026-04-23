@@ -6,6 +6,7 @@ import { Maximize2, Minimize2, Sun, Moon, Printer, ExternalLink } from 'lucide-r
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { stripTrackedEmailPreviewHtml } from '@/lib/email-preview-html'
+import { escapeHtml } from '@/lib/email-html'
 
 interface EmailContentProps {
   html?: string
@@ -16,7 +17,7 @@ interface EmailContentProps {
   initialLightMode?: boolean
 }
 
-export const EmailContent: React.FC<EmailContentProps> = ({ html, text, className, subject, printTrigger, initialLightMode = false }) => {
+export const EmailContent: React.FC<EmailContentProps> = ({ html, text, className, subject, printTrigger, initialLightMode = true }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [iframeHeight, setIframeHeight] = useState('500px')
   const [isLightMode, setIsLightMode] = useState(initialLightMode)
@@ -60,7 +61,13 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
 
   // Construct the full HTML document for the iframe
   const getIframeContent = () => {
-    if (!html) return `<pre style="font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; white-space: pre-wrap; color: ${isLightMode ? '#18181b' : '#d4d4d8'}; font-size: 13px; line-height: 1.6; padding: 20px;">${text || ''}</pre>`
+    const shellBackground = isLightMode ? '#ffffff' : '#0a0a0a'
+    const panelBackground = isLightMode ? '#ffffff' : '#0f0f0f'
+    const bodyColor = isLightMode ? '#18181b' : '#e4e4e7'
+    const mutedColor = isLightMode ? '#71717a' : '#a1a1aa'
+    const borderColor = isLightMode ? 'rgba(228, 228, 231, 0.9)' : 'rgba(255, 255, 255, 0.1)'
+    const linkColor = '#002FA7'
+    const textFallback = text ? escapeHtml(text) : ''
 
     const baseStyles = `
       :root {
@@ -70,37 +77,32 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
       body {
         margin: 0;
         padding: 0;
+        min-height: 100%;
+        overflow: hidden;
+        word-wrap: break-word;
+        background-color: ${shellBackground};
+        color: ${bodyColor};
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
         line-height: 1.6;
-        color: ${isLightMode ? '#18181b' : '#d4d4d8'};
-        background-color: ${isLightMode ? '#ffffff' : '#09090b'};
-        overflow: hidden; /* Let parent handle scrolling */
-        word-wrap: break-word;
-        min-height: 0 !important;
-        height: auto !important;
+        -webkit-text-size-adjust: 100%;
+        -ms-text-size-adjust: 100%;
       }
       .email-wrapper {
         max-width: 100%;
         margin: 0 auto;
         padding: 24px;
         box-sizing: border-box;
-        overflow-x: auto; /* Allow horizontal scroll for wide content */
-        min-height: 0 !important;
-        height: auto !important;
-        max-height: none !important;
+        overflow-x: auto;
+        background-color: ${panelBackground};
+        color: inherit;
       }
-      .email-wrapper * {
-        min-height: 0 !important;
+      a { color: ${linkColor}; text-decoration: underline; }
+      img {
+        max-width: 100% !important;
+        max-height: 70vh !important;
         height: auto !important;
-        max-height: none !important;
-      }
-      a { color: #002FA7; text-decoration: underline; }
-      img { 
-        max-width: 100% !important; 
-        max-height: 70vh !important; /* Prevent massive icons from taking over */
-        height: auto !important; 
-        display: block; 
-        margin: 10px auto; /* Center images */
+        display: block;
+        margin: 10px auto;
         border-radius: 4px;
         object-fit: contain;
       }
@@ -109,26 +111,24 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
         display: inline-block;
         margin: 8px 0;
         font-size: 12px;
-        color: #71717a;
-        border: 1px dashed #3f3f46;
+        color: ${mutedColor};
+        border: 1px dashed ${borderColor};
         border-radius: 8px;
         padding: 6px 10px;
       }
-      table { 
-        border-collapse: collapse; 
-        width: auto !important; 
+      table {
+        border-collapse: collapse;
+        width: auto !important;
         min-width: 100% !important;
-        table-layout: auto !important; /* Allow table to expand naturally */
+        table-layout: auto !important;
         margin: 15px 0;
       }
       blockquote {
-        border-left: 2px solid #3f3f46;
+        border-left: 2px solid ${borderColor};
         margin-left: 0;
         padding-left: 16px;
-        color: #71717a;
+        color: ${mutedColor};
       }
-      
-      /* Custom Scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
         height: 8px;
@@ -143,54 +143,6 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(255, 255, 255, 0.2);
       }
-      
-      /* Handle dark mode readability for light-designed emails */
-      ${!isLightMode ? `
-        /* Nodal Point Hybrid Rendering Protocol v4 */
-        
-        /* 1. Base Dark Mode State */
-        .email-wrapper {
-          background-color: #09090b;
-          color: #e4e4e7; /* Default light text */
-        }
-
-        /* 2. Surgical Inversion Class (Applied by JS) */
-        .smart-invert {
-          filter: invert(1) hue-rotate(180deg);
-          background-color: #ffffff !important; /* Ensure base for inversion */
-        }
-        
-        /* Re-invert images inside inverted blocks ONLY if they are marked as photos */
-        .smart-invert img.re-invert {
-          filter: invert(1) hue-rotate(180deg) !important;
-        }
-
-        /* 3. Force White Text Class (Applied by JS) */
-        .force-white-text {
-          color: #e4e4e7 !important;
-        }
-
-        /* 4. Global Fallbacks (CSS-only for immediate render before JS runs) */
-        /* Force explicit black text to white if it's NOT in a known white-bg container */
-        /* This is a "best guess" before JS kicks in */
-        p, span, div, td, li {
-           color: inherit;
-        }
-        
-        /* Ensure images are visible */
-        img {
-          display: inline-block;
-          max-width: 100%;
-          height: auto;
-        }
-      ` : `
-        .email-wrapper {
-          background-color: #ffffff;
-          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-          border-radius: 8px;
-          margin: 10px;
-        }
-      `}
     `
 
     return `
@@ -204,7 +156,7 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
         </head>
         <body>
           <div class="email-wrapper">
-            ${sanitizedHtml}
+            ${sanitizedHtml || `<pre style="margin:0; white-space:pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; color: ${bodyColor}; font-size: 13px; line-height: 1.6;">${textFallback}</pre>`}
           </div>
           <script>
             function updateHeight() {
@@ -235,68 +187,6 @@ export const EmailContent: React.FC<EmailContentProps> = ({ html, text, classNam
             window.addEventListener('load', () => {
               // Initial update
               updateHeight();
-              
-              ${!isLightMode ? `
-                // Nodal Point Smart-Render Logic
-                try {
-                  const allElements = document.querySelectorAll('*');
-                  
-                  // 1. Detect White Backgrounds
-                  allElements.forEach(el => {
-                    const style = window.getComputedStyle(el);
-                    const bgColor = style.backgroundColor;
-                    
-                    // Check for white or near-white
-                    // rgb(255, 255, 255) is standard white
-                    if (bgColor.includes('rgb(255, 255, 255)') || bgColor === '#ffffff' || bgColor === 'white') {
-                        el.classList.add('smart-invert');
-                        
-                        // Check images inside this inverted container
-                        const images = el.querySelectorAll('img');
-                        images.forEach(img => {
-                          const src = (img.src || '').toLowerCase();
-                          const alt = (img.alt || '').toLowerCase();
-                          
-                          // Heuristic: Only re-invert (flip back to normal) if it looks like a PHOTO.
-                          // If it looks like a LOGO or TEXT-IMAGE (often PNG/GIF without "photo" in name), 
-                          // we leave it inverted so Black Text -> White Text (Visible).
-                          
-                          // 1. Check for common photo extensions
-                          const isPhotoExt = src.includes('.jpg') || src.includes('.jpeg') || src.includes('.webp') || src.includes('.heic');
-                          
-                          // 2. Check for keywords that suggest it's NOT a logo
-                          // (This helps with URLs that don't have extensions)
-                          const isLikelyPhoto = isPhotoExt && !src.includes('logo') && !alt.includes('logo') && !src.includes('icon');
-
-                          if (isLikelyPhoto) {
-                             img.classList.add('re-invert');
-                          }
-                        });
-                     }
-                   });
-
-                  // 2. Detect Dark Text on Dark Backgrounds
-                  // This runs AFTER inversion classes are added, so we can check if it's inverted.
-                  allElements.forEach(el => {
-                    // Skip if element is inside a smart-invert container
-                    if (el.closest('.smart-invert')) return;
-                    
-                    const style = window.getComputedStyle(el);
-                    const color = style.color;
-                    
-                    // Simple check for black/dark text
-                    // "rgb(0, 0, 0)" is standard black
-                    // Also check for very dark greys (brightness < 50)
-                    if (color.includes('rgb(0, 0, 0)') || color === '#000000' || color === 'black' || color === 'rgb(34, 34, 34)') {
-                      el.classList.add('force-white-text');
-                    }
-                  });
-                  
-                } catch (e) {
-                  console.error('Smart-Render Error:', e);
-                }
-              ` : ''}
-
               // Wait for images to load
               const images = document.getElementsByTagName('img');
               for (let img of images) {
