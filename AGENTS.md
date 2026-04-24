@@ -107,6 +107,42 @@ Supabase is doing more than storage in this repo.
 - Supabase edge functions include `embed`, `process-sequence-step`, `scrape-intelligence`, and `discover-apollo-prospects`.
 - `process-sequence-step` exists in two places: `src/edge-functions/process-sequence-step.ts` and `supabase/functions/process-sequence-step/index.ts`. Keep them in sync.
 
+## Email Sender Domain Rules
+
+**CRITICAL: Sequence emails MUST use the burner domain `getnodalpoint.com`, NOT `nodalpoint.io`**
+
+This has been a recurring issue. The system uses two domains:
+- `nodalpoint.io` - Real domain for manual/personal outreach and internal operations
+- `getnodalpoint.com` - Burner domain for automated sequence/cold emails
+
+### Why This Matters
+- Deliverability: The burner domain protects the primary domain's reputation
+- Tracking: Separates automated vs. manual outreach in analytics
+- Compliance: Keeps cold outreach isolated from warm relationships
+
+### Implementation Rules
+1. **Edge Functions**: Always use `getBurnerFromEmail()` utility when sending sequence emails
+2. **Email Records**: The `emails.from` field must show `@getnodalpoint.com` for sequence sends
+3. **Owner Tracking**: The `emails.ownerId` field should use the real `@nodalpoint.io` email for ownership
+4. **API Handlers**: Map burner domain back to real domain for profile/token lookups
+
+### Key Files
+- `src/lib/burner-email.ts` - Utility functions for domain conversion
+- `supabase/functions/process-sequence-step/index.ts` - Edge function that sends sequence emails
+- `src/pages/api/email/zoho-send-sequence.js` - API handler for sequence sends
+
+### Common Mistake
+Directly using `owner.email` from the database without converting to burner domain. Always call `getBurnerFromEmail(owner.email)` for sequence sends.
+
+### Verification Query
+```sql
+-- Check for incorrectly stored sequence emails
+SELECT COUNT(*) FROM emails 
+WHERE "from" LIKE '%@nodalpoint.io' 
+AND (id LIKE 'seq_exec_%' OR id LIKE 'zoho_seq_%');
+-- Should return 0
+```
+
 ## UI Rules
 
 The product uses a dark forensic interface, not a generic SaaS style.
