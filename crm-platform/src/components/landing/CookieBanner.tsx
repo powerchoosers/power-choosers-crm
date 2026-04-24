@@ -2,11 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 
 const CONSENT_KEY = 'np_cookie_consent'
 
 export function CookieBanner() {
   const [visible, setVisible] = useState(false)
+  const pathname = usePathname()
 
   useEffect(() => {
     try {
@@ -17,6 +19,7 @@ export function CookieBanner() {
     }
   }, [])
 
+  if (pathname?.startsWith('/briefings/')) return null
   if (!visible) return null
 
   const dismiss = () => {

@@ -270,7 +270,7 @@ async function createTask(execution: any, member: any, nodeType: string) {
   const taskId = crypto.randomUUID();
   await sql`
     INSERT INTO tasks (
-      id, title, description, status, priority,
+      id, title, description, status, priority, "dueDate",
       "contactId", "accountId", "ownerId", "createdAt", "updatedAt", metadata
     ) VALUES (
       ${taskId},
@@ -278,6 +278,7 @@ async function createTask(execution: any, member: any, nodeType: string) {
       ${taskDescription},
       'Pending',
       'Protocol',
+      NOW(),
       NULLIF(${s(member.contact_id || "")}, '')::text,
       NULLIF(${s(member.account_id || "")}, '')::text,
       NULLIF(${taskOwnerId}, '')::text,

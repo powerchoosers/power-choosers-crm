@@ -66,6 +66,14 @@ export interface Task {
 
 const PAGE_SIZE = 50
 
+function normalizeTaskDueDate<T extends Task>(task: T): T {
+  if (task.dueDate) return task
+  return {
+    ...task,
+    dueDate: task.createdAt,
+  }
+}
+
 export function refreshTaskCaches(queryClient: QueryClient) {
   return Promise.all([
     queryClient.invalidateQueries({ queryKey: ['tasks'] }),
@@ -140,7 +148,7 @@ export function useTasks(searchQuery?: string) {
         }
 
         return {
-          tasks: (data || []) as Task[],
+          tasks: (data || []).map((task) => normalizeTaskDueDate(task as Task)),
           nextCursor: count && (pageParam + 1) * PAGE_SIZE < count ? pageParam + 1 : null
         }
       } catch (error: any) {
@@ -432,7 +440,7 @@ export function useSearchTasks(queryTerm: string) {
           return []
         }
 
-        return data as Task[]
+        return (data || []).map((task) => normalizeTaskDueDate(task as Task))
       } catch (err: any) {
         if (err?.name === 'AbortError' || err?.message?.includes('Abort') || err?.message === 'FetchUserError: Request was aborted') {
           return []
@@ -490,7 +498,7 @@ export function useAllPendingTasks() {
           throw error
         }
 
-        const tasks = (data || []) as Task[]
+        const tasks = (data || []).map((task) => normalizeTaskDueDate(task as Task))
         return { allPendingTasks: tasks, totalCount: tasks.length }
       } catch (err: unknown) {
         if (err && typeof err === 'object' && 'name' in err && (err as { name?: string }).name === 'AbortError') {
