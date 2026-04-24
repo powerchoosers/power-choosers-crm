@@ -7,6 +7,7 @@ import {
   ArrowLeft,
   ArrowRight,
   BadgeDollarSign,
+  BarChart3,
   Building2,
   CheckCircle2,
   ChevronRight,
@@ -33,8 +34,9 @@ const slides: SlideTab[] = [
   { label: 'Locations', shortLabel: '02' },
   { label: 'Texas grid', shortLabel: '03' },
   { label: 'Cost drivers', shortLabel: '04' },
-  { label: 'Controls', shortLabel: '05' },
-  { label: 'Next steps', shortLabel: '06' },
+  { label: 'Bill range', shortLabel: '05' },
+  { label: 'Controls', shortLabel: '06' },
+  { label: 'Next steps', shortLabel: '07' },
 ]
 
 const slideCount = slides.length
@@ -44,6 +46,51 @@ const nodalLogoUrl = '/images/nodalpoint-webicon.png'
 const heroImage = '/briefings/east-coast-warehouse-ercot/ercot-hero.png'
 const controlsImage = '/briefings/east-coast-warehouse-ercot/warehouse-controls.png'
 const baytownImage = '/briefings/east-coast-warehouse-ercot/baytown-aerial.jpg'
+const baytownBuildingSf = 321440
+const planningEnergyRate = 0.085
+const planningDemandRatePerKwMonth = 11
+
+function calcAnnualKwh(perSf: number) {
+  return perSf * baytownBuildingSf
+}
+
+function calcEnergyCost(annualKwh: number) {
+  return annualKwh * planningEnergyRate
+}
+
+function calcDemandCost(peakKw: number) {
+  return peakKw * planningDemandRatePerKwMonth * 12
+}
+
+function formatCompactCurrency(value: number) {
+  if (value >= 1_000_000) {
+    return `$${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  }
+
+  if (value >= 10_000) {
+    return `$${Math.round(value / 1000)}k`
+  }
+
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(Math.round(value))
+}
+
+const wholeCurrencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  maximumFractionDigits: 0,
+})
+
+function formatCurrencyWhole(value: number) {
+  return wholeCurrencyFormatter.format(Math.round(value))
+}
+
+function formatMillionKwh(value: number) {
+  return `${(value / 1_000_000).toFixed(1)}M kWh/yr`
+}
 
 const heroMetrics = [
   {
@@ -157,6 +204,63 @@ const controlMoves = [
     text: 'Schedules and alarms should help you stay ahead of the peak, not react after it happens.',
   },
 ]
+
+const usageScenarios = [
+  {
+    label: 'Low / efficient',
+    summary: 'good LED, minimal HVAC in the warehouse, average operating hours',
+    annualKwh: calcAnnualKwh(8),
+    annualKwhLabel: '8 kWh/SF-year',
+    annualKwhRangeDisplay: '8 kWh/SF-year',
+    annualKwhDisplay: formatMillionKwh(calcAnnualKwh(8)),
+    energyCost: calcEnergyCost(calcAnnualKwh(8)),
+    energyCostDisplay: '~$219k energy',
+    energyRangeDisplay: '~$219k energy',
+    demandKw: 250,
+    demandCost: calcDemandCost(250),
+    demandCostDisplay: '~$33k demand',
+    demandRangeDisplay: '~$33k demand',
+    totalCost: calcEnergyCost(calcAnnualKwh(8)) + calcDemandCost(250),
+    totalCostDisplay: '~$252k total',
+    totalRangeDisplay: '~$252k total',
+  },
+  {
+    label: 'Typical busy DC',
+    summary: 'extended hours, conditioned office, some ventilation and dock equipment',
+    annualKwh: calcAnnualKwh(13.5),
+    annualKwhLabel: '12-15 kWh/SF-year',
+    annualKwhRangeDisplay: '3.9M-4.8M kWh/year',
+    annualKwhDisplay: formatMillionKwh(calcAnnualKwh(13.5)),
+    energyCost: calcEnergyCost(calcAnnualKwh(13.5)),
+    energyCostDisplay: '~$369k energy',
+    energyRangeDisplay: '~$329k-$410k energy',
+    demandKw: 575,
+    demandCost: calcDemandCost(575),
+    demandCostDisplay: '~$76k demand',
+    demandRangeDisplay: '~$66k-$86k demand',
+    totalCost: calcEnergyCost(calcAnnualKwh(13.5)) + calcDemandCost(575),
+    totalCostDisplay: '~$445k total',
+    totalRangeDisplay: '~$395k-$496k total',
+  },
+  {
+    label: 'High intensity',
+    summary: 'more HVAC in warehouse zones, heavier equipment, some temp-controlled space',
+    annualKwh: calcAnnualKwh(22.5),
+    annualKwhLabel: '20-25 kWh/SF-year',
+    annualKwhRangeDisplay: '6.4M-8.0M kWh/year',
+    annualKwhDisplay: formatMillionKwh(calcAnnualKwh(22.5)),
+    energyCost: calcEnergyCost(calcAnnualKwh(22.5)),
+    energyCostDisplay: '~$615k energy',
+    energyRangeDisplay: '~$546k-$683k energy',
+    demandKw: 950,
+    demandCost: calcDemandCost(950),
+    demandCostDisplay: '~$125k demand',
+    demandRangeDisplay: '~$106k-$158k demand',
+    totalCost: calcEnergyCost(calcAnnualKwh(22.5)) + calcDemandCost(950),
+    totalCostDisplay: '~$740k total',
+    totalRangeDisplay: '~$652k-$841k total',
+  },
+] as const
 
 const askList = [
   'Hours and days of operation',
@@ -559,9 +663,10 @@ function ErcotSlide() {
             <SectionLabel>ERCOT in plain English</SectionLabel>
             <SectionTitle>ERCOT runs most of Texas.</SectionTitle>
             <p className={cn(deckTextClass(), 'mt-4')}>
-              It is the grid operator. In choice areas, the supply can change,
-              but the delivery utility still owns the wires and the charges tied
-              to peaks.
+              It is the grid operator. In Texas, you can shop the supply, but
+              there is no PJM-style capacity market. The delivery utility still
+              owns the wires, and the main bill risks are demand, delivery,
+              4CP, and congestion.
             </p>
 
             <div className="mt-5 grid gap-3">
@@ -598,12 +703,12 @@ function ErcotSlide() {
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-                  How Texas differs
+                  PJM vs. ERCOT
                 </p>
                 <ul className="mt-3 space-y-3 text-sm leading-6 text-zinc-300">
-                  <li>Grid operator is ERCOT, not the East Coast market.</li>
-                  <li>CenterPoint delivery charges still hit the bill.</li>
-                  <li>One strong peak day can affect more than one billing cycle.</li>
+                  <li>PJM has a separate capacity market that secures resources years ahead.</li>
+                  <li>ERCOT is energy-only, with scarcity pricing and ancillary services instead.</li>
+                  <li>PSE&amp;G bills can carry capacity and transmission obligations; Texas leans harder on demand and delivery.</li>
                 </ul>
               </div>
               <div className="rounded-[24px] border border-[#002FA7]/35 bg-[#002FA7]/12 p-4">
@@ -611,8 +716,8 @@ function ErcotSlide() {
                   Conversation line
                 </p>
                 <p className="mt-3 text-base leading-7 text-white">
-                  A low supply rate still won&apos;t solve a site that peaks
-                  sharply.
+                  That is why Texas can look cheaper on the headline rate but
+                  still punish a spiky warehouse.
                 </p>
               </div>
             </div>
@@ -702,6 +807,272 @@ function BillDriversSlide() {
               </div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function BillRangeChart() {
+  const chartMaxValue = 900000
+  const chartTop = 38
+  const chartBottom = 328
+  const chartHeight = chartBottom - chartTop
+  const barWidth = 164
+  const barXs = [108, 368, 628]
+  const tickValues = [0, 250000, 500000, 750000]
+
+  return (
+    <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(0,0,0,0.22))] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
+            Annual planning bill
+          </p>
+          <p className="mt-2 text-sm leading-6 text-zinc-300">
+            Blue is energy. Amber is demand / TDSP.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-300">
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+            Energy
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+            Demand / TDSP
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+            Total
+          </span>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 900 460" className="mt-4 h-[31rem] w-full" aria-hidden="true">
+        <defs>
+          <linearGradient id="bill-chart-energy" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#5da4ff" />
+            <stop offset="100%" stopColor="#002FA7" />
+          </linearGradient>
+          <linearGradient id="bill-chart-demand" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="#ffd28a" />
+            <stop offset="100%" stopColor="#d97706" />
+          </linearGradient>
+          <linearGradient id="bill-chart-glow" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(0,47,167,0.24)" />
+            <stop offset="100%" stopColor="rgba(0,47,167,0)" />
+          </linearGradient>
+        </defs>
+
+        <rect x="0" y="0" width="900" height="460" fill="rgba(0,0,0,0.05)" rx="24" />
+
+        {tickValues.map((tick) => {
+          const y = chartBottom - (tick / chartMaxValue) * chartHeight
+          return (
+            <g key={tick}>
+              <line x1="68" x2="860" y1={y} y2={y} stroke="rgba(255,255,255,0.10)" />
+              <text
+                x="34"
+                y={y + 4}
+                className="fill-zinc-500"
+                fontSize="12"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              >
+                {tick === 0 ? '$0' : `$${Math.round(tick / 1000)}k`}
+              </text>
+            </g>
+          )
+        })}
+
+        {usageScenarios.map((scenario, index) => {
+          const x = barXs[index]
+          const totalHeight = (scenario.totalCost / chartMaxValue) * chartHeight
+          const energyHeight = (scenario.energyCost / chartMaxValue) * chartHeight
+          const demandHeight = (scenario.demandCost / chartMaxValue) * chartHeight
+          const totalTopY = chartBottom - totalHeight
+          const energyTopY = chartBottom - energyHeight
+
+          return (
+            <g key={scenario.label}>
+              <rect
+                x={x - 16}
+                y={chartBottom - totalHeight - 18}
+                width={barWidth + 32}
+                height={totalHeight + 42}
+                rx="24"
+                fill="url(#bill-chart-glow)"
+                opacity="0.75"
+              />
+
+              <rect
+                x={x}
+                y={energyTopY}
+                width={barWidth}
+                height={energyHeight}
+                rx="20"
+                fill="url(#bill-chart-energy)"
+              />
+              <rect
+                x={x}
+                y={totalTopY}
+                width={barWidth}
+                height={demandHeight}
+                rx="20"
+                fill="url(#bill-chart-demand)"
+              />
+
+              <text
+                x={x + barWidth / 2}
+                y={totalTopY - 18}
+                textAnchor="middle"
+                className="fill-white"
+                fontSize="30"
+                fontWeight="700"
+                fontFamily="Inter, ui-sans-serif, system-ui"
+              >
+                {formatCompactCurrency(scenario.totalCost)}
+              </text>
+              <text
+                x={x + barWidth / 2}
+                y={totalTopY + 6}
+                textAnchor="middle"
+                className="fill-zinc-500"
+                fontSize="12"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              >
+                {scenario.totalRangeDisplay}
+              </text>
+
+              <text
+                x={x + barWidth / 2}
+                y={chartBottom + 28}
+                textAnchor="middle"
+                className="fill-white"
+                fontSize="16"
+                fontWeight="700"
+                fontFamily="Inter, ui-sans-serif, system-ui"
+              >
+                {scenario.label}
+              </text>
+              <text
+                x={x + barWidth / 2}
+                y={chartBottom + 48}
+                textAnchor="middle"
+                className="fill-zinc-400"
+                fontSize="12"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              >
+                {scenario.annualKwhDisplay}
+              </text>
+              <text
+                x={x + barWidth / 2}
+                y={chartBottom + 67}
+                textAnchor="middle"
+                className="fill-zinc-500"
+                fontSize="11"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              >
+                {scenario.energyCostDisplay} + {scenario.demandCostDisplay}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
+  )
+}
+
+function UsageSlide() {
+  return (
+    <div className={slideShellClass('bg-[radial-gradient(circle_at_15%_18%,rgba(0,47,167,0.18),transparent_24%),radial-gradient(circle_at_88%_12%,rgba(255,255,255,0.06),transparent_20%)]')}>
+      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[0.94fr_1.06fr]">
+        <div className="flex min-h-0 flex-col gap-5">
+          <div className="max-w-2xl">
+            <SectionLabel>Estimated usage</SectionLabel>
+            <SectionTitle>The size of the building can turn into a very big annual bill.</SectionTitle>
+            <p className={cn(deckTextClass(), 'mt-4')}>
+              Using the 321,440 SF Baytown building and your planning assumptions,
+              the annual bill can land in a wide range depending on how much the
+              site runs, how much it is conditioned, and how hard it peaks.
+            </p>
+          </div>
+
+          <div className="grid gap-3">
+            {usageScenarios.map((scenario) => (
+              <div key={scenario.label} className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
+                      {scenario.annualKwhLabel}
+                    </p>
+                    <h3 className="mt-2 text-lg font-semibold tracking-tight text-white">
+                      {scenario.label}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-zinc-400">
+                      {scenario.summary}
+                    </p>
+                  </div>
+                  <div className="rounded-full border border-[#002FA7]/30 bg-[#002FA7]/12 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.3em] text-blue-100">
+                    {scenario.totalRangeDisplay}
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-2 text-sm text-zinc-300 md:grid-cols-3">
+                  <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+                      Usage
+                    </p>
+                    <p className="mt-1 text-white">{scenario.annualKwhRangeDisplay}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+                      Energy
+                    </p>
+                    <p className="mt-1 text-white">{scenario.energyRangeDisplay}</p>
+                  </div>
+                  <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
+                    <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">
+                      Demand
+                    </p>
+                    <p className="mt-1 text-white">{scenario.demandRangeDisplay}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-4">
+            <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
+              Simple rule
+            </p>
+            <p className="mt-2 text-sm leading-7 text-zinc-300 md:text-base">
+              Every 100 kW of monthly peak demand at roughly $11 per kW is about{' '}
+              {formatCurrencyWhole(calcDemandCost(100))}
+              {' '}per month, or about{' '}
+              {formatCurrencyWhole(calcDemandCost(100) * 12)}
+              {' '}per year.
+            </p>
+            <p className="mt-2 text-[11px] leading-5 text-zinc-500">
+              This is planning math. Final bills also depend on the exact delivery
+              tariff, taxes, and any pass-through items in the contract.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
+                Bill graph
+              </p>
+              <p className="mt-2 text-xl font-semibold tracking-tight text-white">
+                Energy and demand stack up fast.
+              </p>
+            </div>
+            <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#7fb0ff]">
+              <BarChart3 className="h-4 w-4" />
+            </div>
+          </div>
+
+          <BillRangeChart />
         </div>
       </div>
     </div>
@@ -896,6 +1267,7 @@ const slideComponents = [
   LocationSlide,
   ErcotSlide,
   BillDriversSlide,
+  UsageSlide,
   ControlSlide,
   AskSlide,
 ]
