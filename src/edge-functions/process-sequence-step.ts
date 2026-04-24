@@ -1312,9 +1312,9 @@ async function handleLinkedInTask(execution, job) {
         'Pending',
         'Protocol',
         NOW(),
-        ${member.contact_id},
-        ${member.account_id},
-        ${ownerEmail},
+        NULLIF(${String(member.contact_id || '')}, '')::text,
+        NULLIF(${String(member.account_id || '')}, '')::text,
+        NULLIF(${String(ownerEmail || '')}, '')::text,
         NOW(),
         NOW(),
         jsonb_build_object(
@@ -1350,8 +1350,8 @@ async function handleLinkedInTask(execution, job) {
 function resolveTaskOwnerId(member) {
     const rawOwnerId = String(member?.owner_id || '').trim();
     const ownerEmail = String(member?.owner_email || '').trim();
-    if (ownerEmail) return ownerEmail;
     if (rawOwnerId) return rawOwnerId;
+    if (ownerEmail) return ownerEmail;
     return null;
 }
 
@@ -1482,9 +1482,9 @@ async function handleCallTask(execution, job) {
         'Pending',
         'Protocol',
         NOW(),
-        ${member.contact_id},
-        ${member.account_id},
-        ${taskOwnerId},
+        NULLIF(${String(member.contact_id || '')}, '')::text,
+        NULLIF(${String(member.account_id || '')}, '')::text,
+        NULLIF(${String(taskOwnerId || '')}, '')::text,
         NOW(),
         NOW(),
         jsonb_build_object(
