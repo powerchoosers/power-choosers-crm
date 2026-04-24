@@ -34,10 +34,11 @@ const slides: SlideTab[] = [
   { label: 'Locations', shortLabel: '02' },
   { label: 'Texas grid', shortLabel: '03' },
   { label: 'Cost drivers', shortLabel: '04' },
-  { label: 'Market context', shortLabel: '05' },
-  { label: 'Bill range', shortLabel: '06' },
-  { label: 'Controls', shortLabel: '07' },
-  { label: 'Next steps', shortLabel: '08' },
+  { label: 'The penalty', shortLabel: '05' },
+  { label: 'Market context', shortLabel: '06' },
+  { label: 'Bill range', shortLabel: '07' },
+  { label: 'Controls', shortLabel: '08' },
+  { label: 'Next steps', shortLabel: '09' },
 ]
 
 const slideCount = slides.length
@@ -799,18 +800,86 @@ function MarketCurveChart() {
   )
 }
 
+function FinancialPenaltySlide() {
+  return (
+    <div className={slideShellClass('bg-[#07080d]')}>
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[1fr_1fr]')}>
+        <div className="flex min-h-0 flex-col gap-6">
+          <div>
+            <SectionLabel>The "One Hour" Penalty</SectionLabel>
+            <SectionTitle>A single bad hour can cost $80,000+ per year.</SectionTitle>
+            <p className={cn(deckTextClass(), 'mt-4')}>
+              In Texas, you don&apos;t just pay for the energy you use. You pay a massive premium for your "peak" moments. If you hit a high usage spike during a grid emergency, you are penalized on every bill for the next 12 months.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xl font-semibold text-white">1. The 4CP Penalty</h3>
+                <span className="rounded-full bg-red-500/10 px-3 py-1 font-mono text-[10px] text-red-400">STATE-WIDE</span>
+              </div>
+              <p className="mt-3 text-sm leading-7 text-zinc-300">
+                ERCOT looks at the 4 hottest hours of the summer. If your warehouse is running at full power during those 4 moments, you pay an extra <span className="font-mono text-white">$54,000/year</span> in transmission fees.
+              </p>
+            </div>
+
+            <div className="rounded-[26px] border border-white/10 bg-white/[0.04] p-5">
+              <div className="flex items-center justify-between gap-3">
+                <h3 className="text-xl font-semibold text-white">2. The Demand Ratchet</h3>
+                <span className="rounded-full bg-amber-500/10 px-3 py-1 font-mono text-[10px] text-amber-400">LOCAL UTILITY</span>
+              </div>
+              <p className="mt-3 text-sm leading-7 text-zinc-300">
+                CenterPoint uses an 80% ratchet. If you hit a 1,000 kW spike in August, they will bill you for at least 800 kW every month for the next year—even in months when the building is nearly empty. This "phantom" charge adds <span className="font-mono text-white">$26,000+/year</span>.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <div className="rounded-[32px] border border-[#002FA7]/40 bg-[#002FA7]/10 p-6 backdrop-blur-md">
+            <SectionLabel>The Bottom Line</SectionLabel>
+            <div className="mt-6 flex items-baseline gap-2">
+              <span className="text-5xl font-bold tracking-tighter text-white md:text-7xl">$80,620</span>
+              <span className="text-xl text-blue-100/60">/ year</span>
+            </div>
+            <p className="mt-4 text-lg leading-7 text-blue-50">
+              Total liability for a single bad hour in the summer. 
+            </p>
+            <div className="mt-8 space-y-4">
+              <div className="flex items-center gap-3 text-blue-100/80">
+                <ShieldAlert className="h-5 w-5 text-red-400" />
+                <span>Locked in for 12 months</span>
+              </div>
+              <div className="flex items-center gap-3 text-blue-100/80">
+                <BadgeDollarSign className="h-5 w-5 text-green-400" />
+                <span>Avoidable with smart operations</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-5">
+            <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">The "Nodal" Advantage</p>
+            <p className="mt-3 text-sm leading-6 text-zinc-400 italic">
+              "Sean, we aren&apos;t just shopping for a rate. We are building a defense against an $80k penalty you don&apos;t even know is coming."
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function MarketContextSlide() {
   return (
     <div className={slideShellClass('bg-[radial-gradient(circle_at_18%_16%,rgba(0,47,167,0.18),transparent_25%),radial-gradient(circle_at_86%_12%,rgba(255,255,255,0.05),transparent_20%)]')}>
       <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[1.05fr_0.95fr]')}>
         <div className="flex min-h-0 flex-col gap-5">
           <div className="max-w-2xl">
-            <SectionLabel>Market context</SectionLabel>
-            <SectionTitle>Why the Bloomberg curve jumps in summer.</SectionTitle>
+            <SectionLabel>Market Prices</SectionLabel>
+            <SectionTitle>Why power prices jump when it gets hot.</SectionTitle>
             <p className={cn(deckTextClass(), 'mt-4')}>
-              This is wholesale Houston load-zone pricing from Bloomberg. The
-              summer spike is the market pricing heat, tighter reserves, and
-              faster load growth, not just a random swing in the chart.
+              This chart shows the "wholesale" cost of power in Houston. When Texas gets hot, the grid gets tight, and prices spike. Retailers add their markup on top of these lines.
             </p>
           </div>
 
@@ -818,11 +887,10 @@ function MarketContextSlide() {
 
           <div className="rounded-[26px] border border-[#002FA7]/35 bg-[#002FA7]/14 p-4">
             <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-blue-100/70">
-              What Sean should hear
+              The Insight
             </p>
             <p className="mt-2 text-[13px] leading-5 text-white md:text-sm md:leading-6">
-              The curve is pricing the months when heat, big load, and the
-              late-day solar drop all hit at the same time.
+              The market is expensive when the sun goes down and everyone turns on their AC. We help you stay away from those peak price windows.
             </p>
           </div>
         </div>
@@ -1723,6 +1791,7 @@ const slideComponents = [
   LocationSlide,
   ErcotSlide,
   BillDriversSlide,
+  FinancialPenaltySlide,
   MarketContextSlide,
   UsageSlide,
   ControlSlide,
