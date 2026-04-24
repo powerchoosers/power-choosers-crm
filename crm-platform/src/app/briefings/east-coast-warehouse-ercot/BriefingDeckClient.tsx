@@ -48,19 +48,41 @@ const heroImage = '/briefings/east-coast-warehouse-ercot/ercot-hero.png'
 const controlsImage = '/briefings/east-coast-warehouse-ercot/warehouse-controls.png'
 const baytownImage = '/briefings/east-coast-warehouse-ercot/baytown-aerial.jpg'
 const baytownBuildingSf = 321440
-const planningEnergyRate = 0.085
-const planningDemandRatePerKwMonth = 11
+const houstonIndustrialEnergyRate = 0.078
+const centerpointPrimaryTariff = {
+  customerChargeMonthly: 6.37,
+  meterChargeMonthly: 285.64,
+  distributionPerBillingKvaMonth: 2.709502,
+  tcrfPerNcpKvaMonth: 4.868999,
+  teeefPerBillingKvaMonth: 0.449845,
+  rcePerBillingKvaMonth: 0.006406,
+  eecrfPerKwh: 0.001059,
+}
+
+const centerpointDeliveryPerKvaMonth =
+  centerpointPrimaryTariff.distributionPerBillingKvaMonth +
+  centerpointPrimaryTariff.tcrfPerNcpKvaMonth +
+  centerpointPrimaryTariff.teeefPerBillingKvaMonth +
+  centerpointPrimaryTariff.rcePerBillingKvaMonth
+
+const centerpointFixedDeliveryMonthly =
+  centerpointPrimaryTariff.customerChargeMonthly +
+  centerpointPrimaryTariff.meterChargeMonthly
 
 function calcAnnualKwh(perSf: number) {
   return perSf * baytownBuildingSf
 }
 
 function calcEnergyCost(annualKwh: number) {
-  return annualKwh * planningEnergyRate
+  return annualKwh * houstonIndustrialEnergyRate
 }
 
-function calcDemandCost(peakKw: number) {
-  return peakKw * planningDemandRatePerKwMonth * 12
+function calcDeliveryCost(peakKw: number, annualKwh: number) {
+  return (
+    centerpointFixedDeliveryMonthly * 12 +
+    peakKw * centerpointDeliveryPerKvaMonth * 12 +
+    annualKwh * centerpointPrimaryTariff.eecrfPerKwh
+  )
 }
 
 function formatCompactCurrency(value: number) {
@@ -95,6 +117,78 @@ function formatMillionKwh(value: number) {
 
 function formatForwardPrice(value: number) {
   return `$${value.toFixed(2)}`
+}
+
+function formatPeakDemand(value: number) {
+  if (value >= 1000) {
+    return `${(value / 1000).toFixed(1).replace(/\.0$/, '')} MW`
+  }
+
+  return `${Math.round(value)} kW`
+}
+
+function formatCurrencyRange(min: number, max: number) {
+  if (min === max) {
+    return formatCompactCurrency(min)
+  }
+
+  return `${formatCompactCurrency(min)}-${formatCompactCurrency(max)}`
+}
+
+function formatKwhRange(min: number, max: number) {
+  if (min === max) {
+    return `${(min / 1_000_000).toFixed(1)}M kWh/yr`
+  }
+
+  return `${(min / 1_000_000).toFixed(1)}M-${(max / 1_000_000).toFixed(1)}M kWh/yr`
+}
+
+type UsageScenarioInput = {
+  label: string
+  summary: string
+  annualKwhPerSfRange: [number, number]
+  annualKwhLabel: string
+  peakKwRange: [number, number]
+}
+
+function buildUsageScenario(input: UsageScenarioInput) {
+  const [minPerSf, maxPerSf] = input.annualKwhPerSfRange
+  const [minPeakKw, maxPeakKw] = input.peakKwRange
+  const midPerSf = (minPerSf + maxPerSf) / 2
+  const midPeakKw = (minPeakKw + maxPeakKw) / 2
+
+  const minAnnualKwh = calcAnnualKwh(minPerSf)
+  const maxAnnualKwh = calcAnnualKwh(maxPerSf)
+  const midAnnualKwh = calcAnnualKwh(midPerSf)
+
+  const minEnergyCost = calcEnergyCost(minAnnualKwh)
+  const maxEnergyCost = calcEnergyCost(maxAnnualKwh)
+  const midEnergyCost = calcEnergyCost(midAnnualKwh)
+
+  const minDeliveryCost = calcDeliveryCost(minPeakKw, minAnnualKwh)
+  const maxDeliveryCost = calcDeliveryCost(maxPeakKw, maxAnnualKwh)
+  const midDeliveryCost = calcDeliveryCost(midPeakKw, midAnnualKwh)
+  const midTotalCost = midEnergyCost + midDeliveryCost
+
+  return {
+    label: input.label,
+    summary: input.summary,
+    annualKwhLabel: input.annualKwhLabel,
+    annualKwhRangeDisplay: formatKwhRange(minAnnualKwh, maxAnnualKwh),
+    annualKwhDisplay: formatMillionKwh(midAnnualKwh),
+    peakDisplay: `${formatPeakDemand(midPeakKw)} peak`,
+    peakRangeDisplay: `${formatPeakDemand(minPeakKw)}-${formatPeakDemand(maxPeakKw)} peak`,
+    energyCost: midEnergyCost,
+    energyCostDisplay: `~${formatCompactCurrency(midEnergyCost)} energy`,
+    energyRangeDisplay: `${formatCurrencyRange(minEnergyCost, maxEnergyCost)} energy`,
+    deliveryCost: midDeliveryCost,
+    deliveryCostDisplay: `~${formatCompactCurrency(midDeliveryCost)} delivery / TDSP`,
+    deliveryRangeDisplay: `${formatCurrencyRange(minDeliveryCost, maxDeliveryCost)} delivery / TDSP`,
+    totalCost: midTotalCost,
+    totalCostDisplay: `~${formatCompactCurrency(midTotalCost)} total`,
+    totalRangeDisplay: `${formatCurrencyRange(minEnergyCost + minDeliveryCost, maxEnergyCost + maxDeliveryCost)} total`,
+    deliveryShareDisplay: `${Math.round((midDeliveryCost / midTotalCost) * 100)}% delivery`,
+  }
 }
 
 const heroMetrics = [
@@ -211,60 +305,27 @@ const controlMoves = [
 ]
 
 const usageScenarios = [
-  {
+  buildUsageScenario({
     label: 'Low / efficient',
     summary: 'good LED, minimal HVAC in the warehouse, average operating hours',
-    annualKwh: calcAnnualKwh(8),
     annualKwhLabel: '8 kWh/SF-year',
-    annualKwhRangeDisplay: '8 kWh/SF-year',
-    annualKwhDisplay: formatMillionKwh(calcAnnualKwh(8)),
-    energyCost: calcEnergyCost(calcAnnualKwh(8)),
-    energyCostDisplay: '~$219k energy',
-    energyRangeDisplay: '~$219k energy',
-    demandKw: 250,
-    demandCost: calcDemandCost(250),
-    demandCostDisplay: '~$33k demand',
-    demandRangeDisplay: '~$33k demand',
-    totalCost: calcEnergyCost(calcAnnualKwh(8)) + calcDemandCost(250),
-    totalCostDisplay: '~$252k total',
-    totalRangeDisplay: '~$252k total',
-  },
-  {
+    annualKwhPerSfRange: [8, 8],
+    peakKwRange: [1100, 1400],
+  }),
+  buildUsageScenario({
     label: 'Typical busy DC',
     summary: 'extended hours, conditioned office, some ventilation and dock equipment',
-    annualKwh: calcAnnualKwh(13.5),
     annualKwhLabel: '12-15 kWh/SF-year',
-    annualKwhRangeDisplay: '3.9M-4.8M kWh/year',
-    annualKwhDisplay: formatMillionKwh(calcAnnualKwh(13.5)),
-    energyCost: calcEnergyCost(calcAnnualKwh(13.5)),
-    energyCostDisplay: '~$369k energy',
-    energyRangeDisplay: '~$329k-$410k energy',
-    demandKw: 575,
-    demandCost: calcDemandCost(575),
-    demandCostDisplay: '~$76k demand',
-    demandRangeDisplay: '~$66k-$86k demand',
-    totalCost: calcEnergyCost(calcAnnualKwh(13.5)) + calcDemandCost(575),
-    totalCostDisplay: '~$445k total',
-    totalRangeDisplay: '~$395k-$496k total',
-  },
-  {
+    annualKwhPerSfRange: [12, 15],
+    peakKwRange: [1600, 2100],
+  }),
+  buildUsageScenario({
     label: 'High intensity',
     summary: 'more HVAC in warehouse zones, heavier equipment, some temp-controlled space',
-    annualKwh: calcAnnualKwh(22.5),
     annualKwhLabel: '20-25 kWh/SF-year',
-    annualKwhRangeDisplay: '6.4M-8.0M kWh/year',
-    annualKwhDisplay: formatMillionKwh(calcAnnualKwh(22.5)),
-    energyCost: calcEnergyCost(calcAnnualKwh(22.5)),
-    energyCostDisplay: '~$615k energy',
-    energyRangeDisplay: '~$546k-$683k energy',
-    demandKw: 950,
-    demandCost: calcDemandCost(950),
-    demandCostDisplay: '~$125k demand',
-    demandRangeDisplay: '~$106k-$158k demand',
-    totalCost: calcEnergyCost(calcAnnualKwh(22.5)) + calcDemandCost(950),
-    totalCostDisplay: '~$740k total',
-    totalRangeDisplay: '~$652k-$841k total',
-  },
+    annualKwhPerSfRange: [20, 25],
+    peakKwRange: [2200, 2900],
+  }),
 ] as const
 
 const bloombergForwardCurve = [
@@ -344,6 +405,32 @@ function slideShellClass(extra?: string) {
   return cn(
     'relative h-full w-full overflow-hidden rounded-[32px] border border-white/10 bg-[#07080d] shadow-[0_40px_120px_-50px_rgba(0,0,0,0.95)]',
     extra,
+  )
+}
+
+function slideScrollClass(extra?: string) {
+  return cn('relative z-10 h-full min-h-0 overflow-y-auto overscroll-contain', extra)
+}
+
+function EastCoastBadge({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-1.5 rounded-[20px] border border-white/10 bg-white/[0.04] px-2 py-2',
+        className,
+      )}
+    >
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-[14px] border border-white/10 bg-black/25 p-1.5">
+        <img
+          src={eastCoastLogoUrl}
+          alt="East Coast Warehouse & Distribution logo"
+          className="h-full w-full object-contain"
+        />
+      </div>
+      <span className="min-w-0 truncate font-mono text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+        East Coast Warehouse &amp; Distribution
+      </span>
+    </div>
   )
 }
 
@@ -715,7 +802,7 @@ function MarketCurveChart() {
 function MarketContextSlide() {
   return (
     <div className={slideShellClass('bg-[radial-gradient(circle_at_18%_16%,rgba(0,47,167,0.18),transparent_25%),radial-gradient(circle_at_86%_12%,rgba(255,255,255,0.05),transparent_20%)]')}>
-      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[1.05fr_0.95fr]">
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[1.05fr_0.95fr]')}>
         <div className="flex min-h-0 flex-col gap-5">
           <div className="max-w-2xl">
             <SectionLabel>Market context</SectionLabel>
@@ -783,7 +870,7 @@ function CoverSlide() {
   return (
     <div className={slideShellClass('bg-[radial-gradient(circle_at_75%_10%,rgba(0,47,167,0.28),transparent_28%),radial-gradient(circle_at_0%_100%,rgba(255,255,255,0.06),transparent_28%)]')}>
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(255,255,255,0.03),transparent_22%,rgba(0,0,0,0.35))] pointer-events-none" />
-      <div className="relative z-10 flex h-full flex-col p-5 md:p-8">
+      <div className={slideScrollClass('flex flex-col p-5 md:p-8')}>
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -796,16 +883,7 @@ function CoverSlide() {
                 Nodal Point
               </span>
             </div>
-            <div className="hidden items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 md:flex">
-              <img
-                src={eastCoastLogoUrl}
-                alt="East Coast Warehouse & Distribution logo"
-                className="h-6 w-24 object-contain"
-              />
-              <span className="font-mono text-[10px] uppercase tracking-[0.26em] text-zinc-500">
-                East Coast Warehouse & Distribution
-              </span>
-            </div>
+            <EastCoastBadge className="hidden md:flex" />
           </div>
 
           <div className="hidden items-center gap-2 text-[10px] font-mono uppercase tracking-[0.32em] text-zinc-500 sm:flex">
@@ -904,7 +982,7 @@ function CoverSlide() {
 function LocationSlide() {
   return (
     <div className={slideShellClass('bg-[radial-gradient(circle_at_15%_18%,rgba(0,47,167,0.14),transparent_28%),radial-gradient(circle_at_86%_0%,rgba(255,255,255,0.05),transparent_20%)]')}>
-      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[0.92fr_1.08fr]">
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[0.92fr_1.08fr]')}>
         <div className="flex min-h-0 flex-col gap-5">
           <div>
             <SectionLabel>Current footprint</SectionLabel>
@@ -1012,7 +1090,7 @@ function ErcotSlide() {
       />
       <div className="absolute inset-0 bg-gradient-to-r from-black via-black/72 to-black/18" />
 
-      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[0.9fr_1.1fr]">
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[0.9fr_1.1fr]')}>
         <div className="flex min-h-0 flex-col justify-between gap-5">
           <div className="max-w-xl">
             <SectionLabel>ERCOT in plain English</SectionLabel>
@@ -1094,7 +1172,7 @@ function BillDriversSlide() {
       />
       <div className="absolute inset-0 bg-gradient-to-r from-black via-black/78 to-black/18" />
 
-      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[1.08fr_0.92fr]">
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[1.08fr_0.92fr]')}>
         <div className="flex min-h-0 flex-col gap-5">
           <div className="max-w-2xl">
             <SectionLabel>What moves the bill</SectionLabel>
@@ -1169,13 +1247,13 @@ function BillDriversSlide() {
 }
 
 function BillRangeChart() {
-  const chartMaxValue = 900000
+  const chartMaxValue = 1_000_000
   const chartTop = 38
   const chartBottom = 328
   const chartHeight = chartBottom - chartTop
   const barWidth = 164
   const barXs = [108, 368, 628]
-  const tickValues = [0, 250000, 500000, 750000]
+  const tickValues = [0, 250000, 500000, 750000, 1_000_000]
 
   return (
     <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(0,0,0,0.22))] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
@@ -1184,21 +1262,21 @@ function BillRangeChart() {
           <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
             Annual planning bill
           </p>
-          <p className="mt-2 text-sm leading-6 text-zinc-300">
-            Blue is energy. Amber is demand / TDSP.
-          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-4 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-300">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-3 w-3 rounded-[4px] bg-[#002FA7]" />
+              Energy
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-3 w-3 rounded-[4px] bg-[#d97706]" />
+              Delivery / TDSP
+            </span>
+          </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-300">
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
-            Energy
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
-            Demand / TDSP
-          </span>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
-            Total
-          </span>
-        </div>
+        <p className="max-w-[15rem] text-right text-[10px] leading-4 text-zinc-500">
+          Houston industrial energy reference and current CenterPoint primary
+          service delivery tariff.
+        </p>
       </div>
 
       <svg viewBox="0 0 900 460" className="mt-4 h-[31rem] w-full" aria-hidden="true">
@@ -1207,7 +1285,7 @@ function BillRangeChart() {
             <stop offset="0%" stopColor="#5da4ff" />
             <stop offset="100%" stopColor="#002FA7" />
           </linearGradient>
-          <linearGradient id="bill-chart-demand" x1="0" x2="0" y1="0" y2="1">
+          <linearGradient id="bill-chart-delivery" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#ffd28a" />
             <stop offset="100%" stopColor="#d97706" />
           </linearGradient>
@@ -1241,9 +1319,11 @@ function BillRangeChart() {
           const x = barXs[index]
           const totalHeight = (scenario.totalCost / chartMaxValue) * chartHeight
           const energyHeight = (scenario.energyCost / chartMaxValue) * chartHeight
-          const demandHeight = (scenario.demandCost / chartMaxValue) * chartHeight
+          const deliveryHeight = (scenario.deliveryCost / chartMaxValue) * chartHeight
           const totalTopY = chartBottom - totalHeight
           const energyTopY = chartBottom - energyHeight
+          const labelY = Math.max(chartTop + 22, totalTopY - 24)
+          const shareY = labelY + 16
 
           return (
             <g key={scenario.label}>
@@ -1269,31 +1349,34 @@ function BillRangeChart() {
                 x={x}
                 y={totalTopY}
                 width={barWidth}
-                height={demandHeight}
+                height={deliveryHeight}
                 rx="20"
-                fill="url(#bill-chart-demand)"
+                fill="url(#bill-chart-delivery)"
               />
 
               <text
                 x={x + barWidth / 2}
-                y={totalTopY - 18}
+                y={labelY}
                 textAnchor="middle"
                 className="fill-white"
-                fontSize="30"
+                fontSize="28"
                 fontWeight="700"
                 fontFamily="Inter, ui-sans-serif, system-ui"
+                stroke="rgba(0,0,0,0.72)"
+                strokeWidth="4"
+                paintOrder="stroke fill"
               >
                 {formatCompactCurrency(scenario.totalCost)}
               </text>
               <text
                 x={x + barWidth / 2}
-                y={totalTopY + 6}
+                y={shareY}
                 textAnchor="middle"
-                className="fill-zinc-500"
+                className="fill-zinc-400"
                 fontSize="12"
                 fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
               >
-                {scenario.totalRangeDisplay}
+                {scenario.deliveryShareDisplay}
               </text>
 
               <text
@@ -1325,12 +1408,18 @@ function BillRangeChart() {
                 fontSize="11"
                 fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
               >
-                {scenario.energyCostDisplay} + {scenario.demandCostDisplay}
+                {scenario.energyCostDisplay} + {scenario.deliveryCostDisplay}
               </text>
             </g>
           )
         })}
       </svg>
+
+      <div className="mt-3 border-t border-white/8 pt-3 text-[9px] leading-4 text-zinc-500">
+        Source: CenterPoint Houston Primary Service tariff effective 4/28/25;
+        Houston industrial energy reference at 7.8¢/kWh. Excludes taxes and
+        site-specific credits.
+      </div>
     </div>
   )
 }
@@ -1338,15 +1427,15 @@ function BillRangeChart() {
 function UsageSlide() {
   return (
     <div className={slideShellClass('bg-[radial-gradient(circle_at_15%_18%,rgba(0,47,167,0.18),transparent_24%),radial-gradient(circle_at_88%_12%,rgba(255,255,255,0.06),transparent_20%)]')}>
-      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[0.94fr_1.06fr]">
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[0.94fr_1.06fr]')}>
         <div className="flex min-h-0 flex-col gap-5">
           <div className="max-w-2xl">
             <SectionLabel>Estimated usage</SectionLabel>
             <SectionTitle>The size of the building can turn into a very big annual bill.</SectionTitle>
             <p className={cn(deckTextClass(), 'mt-4')}>
               Using the 321,440 SF Baytown building and your planning assumptions,
-              the annual bill can land in a wide range depending on how much the
-              site runs, how much it is conditioned, and how hard it peaks.
+              the annual bill can swing a lot once Houston delivery charges and
+              peak demand get layered on top of the energy rate.
             </p>
           </div>
 
@@ -1354,7 +1443,7 @@ function UsageSlide() {
             {usageScenarios.map((scenario) => (
               <div key={scenario.label} className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
                       {scenario.annualKwhLabel}
                     </p>
@@ -1364,9 +1453,17 @@ function UsageSlide() {
                     <p className="mt-2 text-sm leading-6 text-zinc-400">
                       {scenario.summary}
                     </p>
+                    <p className="mt-2 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-500">
+                      Modeled peak {scenario.peakDisplay}
+                    </p>
                   </div>
-                  <div className="rounded-full border border-[#002FA7]/30 bg-[#002FA7]/12 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.3em] text-blue-100">
-                    {scenario.totalRangeDisplay}
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="rounded-full border border-[#002FA7]/30 bg-[#002FA7]/12 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.3em] text-blue-100">
+                      {scenario.totalRangeDisplay}
+                    </div>
+                    <div className="rounded-full border border-[#d97706]/30 bg-[#d97706]/12 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.3em] text-amber-100">
+                      {scenario.deliveryShareDisplay}
+                    </div>
                   </div>
                 </div>
 
@@ -1385,9 +1482,9 @@ function UsageSlide() {
                   </div>
                   <div className="rounded-2xl border border-white/10 bg-black/20 px-3 py-3">
                     <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">
-                      Demand
+                      Delivery / TDSP
                     </p>
-                    <p className="mt-1 text-white">{scenario.demandRangeDisplay}</p>
+                    <p className="mt-1 text-white">{scenario.deliveryRangeDisplay}</p>
                   </div>
                 </div>
               </div>
@@ -1399,15 +1496,19 @@ function UsageSlide() {
               Simple rule
             </p>
             <p className="mt-2 text-sm leading-7 text-zinc-300 md:text-base">
-              Every 100 kW of monthly peak demand at roughly $11 per kW is about{' '}
-              {formatCurrencyWhole(calcDemandCost(100))}
-              {' '}per month, or about{' '}
-              {formatCurrencyWhole(calcDemandCost(100) * 12)}
-              {' '}per year.
+              Every 1,000 kW of peak demand is roughly{' '}
+              {formatCurrencyWhole(centerpointDeliveryPerKvaMonth * 1000)}
+              {' '}per month in CenterPoint delivery charges before energy,
+              taxes, and any ratchet effect.
+            </p>
+            <p className="mt-2 text-sm leading-7 text-zinc-300 md:text-base">
+              That is why a bad summer peak can stay expensive after the month
+              closes. The 80% ratchet can keep a lot of that demand charge alive
+              in later months.
             </p>
             <p className="mt-2 text-[11px] leading-5 text-zinc-500">
-              This is planning math. Final bills also depend on the exact delivery
-              tariff, taxes, and any pass-through items in the contract.
+              This is planning math based on Houston industrial energy at 7.8¢/kWh
+              and current CenterPoint primary service delivery rates.
             </p>
           </div>
         </div>
@@ -1419,7 +1520,7 @@ function UsageSlide() {
                 Bill graph
               </p>
               <p className="mt-2 text-xl font-semibold tracking-tight text-white">
-                Energy and demand stack up fast.
+                Energy and delivery stack up fast.
               </p>
             </div>
             <div className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-[#7fb0ff]">
@@ -1437,7 +1538,7 @@ function UsageSlide() {
 function ControlSlide() {
   return (
     <div className={slideShellClass('bg-[radial-gradient(circle_at_15%_25%,rgba(0,47,167,0.16),transparent_25%),radial-gradient(circle_at_86%_15%,rgba(255,255,255,0.05),transparent_18%)]')}>
-      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[1fr_1fr]">
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[1fr_1fr]')}>
         <div className="flex min-h-0 flex-col gap-5">
           <div>
             <SectionLabel>Operational levers</SectionLabel>
@@ -1550,7 +1651,7 @@ function ControlSlide() {
 function AskSlide() {
   return (
     <div className={slideShellClass('bg-[radial-gradient(circle_at_0%_0%,rgba(0,47,167,0.18),transparent_24%),radial-gradient(circle_at_100%_100%,rgba(255,255,255,0.05),transparent_20%)]')}>
-      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[1fr_0.98fr]">
+      <div className={slideScrollClass('grid gap-6 p-5 md:p-8 lg:grid-cols-[1fr_0.98fr]')}>
         <div className="flex min-h-0 flex-col gap-5">
           <div className="max-w-2xl">
             <SectionLabel>What I need next</SectionLabel>
@@ -1683,9 +1784,9 @@ export function BriefingDeckClient() {
   const ActiveSlide = slideComponents[currentSlide]
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[#050507] text-zinc-100">
-      <div className="mx-auto flex min-h-screen w-full max-w-[1820px] flex-col gap-3 px-3 py-3 md:px-6 md:py-5">
-        <header className="sticky top-3 z-50 flex flex-col gap-3 rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-xl md:px-5">
+    <div className="h-[100svh] overflow-hidden bg-[#050507] text-zinc-100">
+      <div className="mx-auto flex h-full w-full max-w-[1820px] flex-col gap-3 px-3 py-3 md:px-6 md:py-5">
+        <header className="z-50 flex shrink-0 flex-col gap-3 rounded-[24px] border border-white/10 bg-black/35 px-4 py-3 backdrop-blur-xl md:px-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 flex-wrap items-center gap-3">
               <div className="flex items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
@@ -1698,16 +1799,7 @@ export function BriefingDeckClient() {
                   Nodal Point
                 </span>
               </div>
-              <div className="flex min-w-0 items-center gap-3 rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
-                <img
-                  src={eastCoastLogoUrl}
-                  alt="East Coast Warehouse & Distribution logo"
-                  className="h-6 w-24 object-contain"
-                />
-                <span className="hidden truncate font-mono text-[10px] uppercase tracking-[0.28em] text-zinc-500 sm:block">
-                  East Coast Warehouse & Distribution
-                </span>
-              </div>
+              <EastCoastBadge className="hidden min-w-0 md:flex" />
               <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.34em] text-zinc-300">
                 Texas energy briefing
               </div>
@@ -1755,12 +1847,12 @@ export function BriefingDeckClient() {
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 pb-2 md:pb-0">
-          <div className="relative h-full min-h-[calc(100svh-9.75rem)]">
+        <main className="min-h-0 flex-1 overflow-hidden pb-2 md:pb-0">
+          <div className="relative h-full min-h-0 overflow-hidden">
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={currentSlide}
-                className="absolute inset-0"
+                className="absolute inset-0 h-full w-full overflow-hidden"
                 initial={
                   prefersReducedMotion
                     ? { opacity: 0 }
