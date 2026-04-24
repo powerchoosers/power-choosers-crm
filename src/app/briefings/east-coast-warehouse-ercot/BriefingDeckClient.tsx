@@ -29,10 +29,10 @@ type SlideTab = {
 }
 
 const slides: SlideTab[] = [
-  { label: 'Cover', shortLabel: '01' },
+  { label: 'Overview', shortLabel: '01' },
   { label: 'Locations', shortLabel: '02' },
-  { label: 'ERCOT', shortLabel: '03' },
-  { label: 'Bill drivers', shortLabel: '04' },
+  { label: 'Texas grid', shortLabel: '03' },
+  { label: 'Cost drivers', shortLabel: '04' },
   { label: 'Controls', shortLabel: '05' },
   { label: 'Next steps', shortLabel: '06' },
 ]
@@ -48,17 +48,17 @@ const baytownImage = '/briefings/east-coast-warehouse-ercot/baytown-aerial.jpg'
 const heroMetrics = [
   {
     value: '8.5¢/kWh',
-    label: 'Texas commercial benchmark',
+    label: 'Commercial planning reference',
     icon: DollarSign,
   },
   {
     value: '7.8¢/kWh',
-    label: 'Houston industrial target',
+    label: 'Houston industrial reference',
     icon: Gauge,
   },
   {
     value: '80% ratchet',
-    label: 'CenterPoint demand exposure',
+    label: 'CenterPoint demand ratchet',
     icon: TriangleAlert,
   },
 ]
@@ -71,7 +71,7 @@ const locationCards = [
     title: 'Elizabeth, New Jersey',
     utility: 'PSE&G',
     market: 'PJM choice market',
-    note: 'Current East Coast anchor for the company.',
+    note: 'Current East Coast location for the company.',
     icon: Building2,
   },
   {
@@ -88,22 +88,22 @@ const ercotPoints = [
   {
     icon: Zap,
     title: 'ERCOT runs most of Texas',
-    text: 'The grid operator is local to Texas, so the market rules are not the same as the East Coast site.',
+    text: 'Texas is on ERCOT, so the market rules are different from the East Coast site.',
   },
   {
     icon: BadgeDollarSign,
     title: 'Supply can be competitive',
-    text: 'Customers can choose a retail supplier, but the delivery utility still owns the wires and delivery charge.',
+    text: 'You can choose a retail supplier, but the delivery utility still owns the wires and delivery charges.',
   },
   {
     icon: Warehouse,
     title: 'CenterPoint still matters',
-    text: 'In Houston, CenterPoint is the utility name that shows up on the delivery side of the bill.',
+    text: 'In Houston, CenterPoint is the utility name that appears on the delivery side of the bill.',
   },
   {
     icon: ShieldAlert,
     title: 'The bill is more than cents per kWh',
-    text: 'Demand peaks, delivery rules, and ratchets can change the real cost a lot.',
+    text: 'Demand peaks, delivery rules, and ratchets can have a large impact on the total bill.',
   },
 ]
 
@@ -116,17 +116,22 @@ const billDrivers = [
   {
     icon: Gauge,
     title: 'Peak demand',
-    text: 'The highest 15-minute load can matter more than a whole week of normal use.',
+    text: 'The highest 15-minute load can matter more than a normal week of use.',
   },
   {
     icon: TriangleAlert,
     title: 'Demand ratchet',
-    text: 'A bad peak can keep influencing later Houston delivery bills.',
+    text: 'A high peak can affect later Houston delivery bills.',
+  },
+  {
+    icon: CloudLightning,
+    title: 'Nodal congestion',
+    text: 'Grid congestion can show up as a separate cost line. Custom pricing can help address how that risk is handled in the quote.',
   },
   {
     icon: CloudLightning,
     title: '4CP exposure',
-    text: 'ERCOT transmission costs are tied to the four worst summer peaks.',
+    text: 'ERCOT transmission costs are tied to the four highest summer peaks.',
   },
 ]
 
@@ -134,22 +139,22 @@ const controlMoves = [
   {
     icon: Clock3,
     title: 'Stagger starts',
-    text: 'Do not turn every load on at the same minute.',
+    text: 'Stagger major starts so the load does not jump all at once.',
   },
   {
     icon: Fan,
     title: 'Tune HVAC schedules',
-    text: 'Use pre-cooling and setpoints to flatten the curve before expensive hours.',
+    text: 'Use pre-cooling and setpoints to lower the load before the expensive hours.',
   },
   {
     icon: Warehouse,
     title: 'Control dock loads',
-    text: 'Keep doors, lights, compressors, and other equipment from fighting each other.',
+    text: 'Keep doors, lights, compressors, and other equipment from creating avoidable overlap.',
   },
   {
     icon: Settings2,
     title: 'Use the BAS on purpose',
-    text: 'Alarms and schedules should help you avoid the peak, not react after it happens.',
+    text: 'Schedules and alarms should help you stay ahead of the peak, not react after it happens.',
   },
 ]
 
@@ -359,12 +364,12 @@ function CoverSlide() {
             <div className="max-w-2xl">
               <SectionLabel>Texas briefing</SectionLabel>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl md:text-6xl md:leading-[0.95]">
-                Texas energy is not the same bill Sean sees on the East Coast.
+                Texas energy will feel different from Sean&apos;s East Coast sites.
               </h1>
               <p className={cn(deckTextClass(), 'mt-5 max-w-xl')}>
                 Baytown sits in ERCOT and CenterPoint territory. That changes
-                who delivers power, how peaks are billed, and why one bad
-                operating day can cost more than the headline rate suggests.
+                how power is delivered, how demand is priced, and why the
+                operating pattern matters as much as the supply rate.
               </p>
             </div>
 
@@ -381,16 +386,16 @@ function CoverSlide() {
 
             <div className="rounded-[26px] border border-white/10 bg-white/[0.03] p-4">
               <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-                Read this first
+                What to keep in mind
               </p>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-300 md:text-base md:leading-7">
-                Both New Jersey and Texas let customers choose supply. The
-                difference is the grid, the delivery utility, and the way peak
-                demand can keep showing up on the bill.
+                Both New Jersey and Texas allow supply choice. The difference
+                is the grid, the delivery utility, and the way peak demand can
+                show up on the bill.
               </p>
               <p className="mt-2 text-[11px] leading-5 text-zinc-500">
-                Benchmarks are working targets, not guarantees. Final pricing
-                depends on load shape, term, and how the building actually runs.
+                These are planning references, not final pricing. The actual
+                bill depends on load shape, term, and how the building runs.
               </p>
             </div>
           </div>
@@ -421,11 +426,11 @@ function CoverSlide() {
                     Market signal
                   </p>
                   <p className="mt-2 text-lg font-semibold text-white">
-                    ERCOT + CenterPoint changes the cost story.
+                    ERCOT + CenterPoint changes the bill structure.
                   </p>
                   <p className="mt-2 text-sm leading-6 text-blue-50/80">
-                    The lowest energy rate does not mean the lowest total bill if
-                    the building is spiky.
+                    A low energy rate does not always mean the lowest total bill
+                    if the site peaks sharply.
                   </p>
                 </div>
               </div>
@@ -448,8 +453,8 @@ function LocationSlide() {
             <p className={cn(deckTextClass(), 'mt-4 max-w-xl')}>
               East Coast Warehouse&apos;s official site shows locations across
               NY/NJ, PA, MD, SC, GA, and TX. For this conversation, the useful
-              comparison is the East Coast base in New Jersey versus the new
-              Baytown site in Texas.
+              comparison is the East Coast base in New Jersey versus the Baytown
+              site in Texas.
             </p>
           </div>
 
@@ -474,8 +479,8 @@ function LocationSlide() {
               ))}
             </div>
             <p className="mt-3 text-sm leading-6 text-zinc-500">
-              Same company. Same product line. Different grid, different utility,
-              different cost triggers.
+              Same company. Different grid, different utility rules, different
+              cost drivers.
             </p>
           </div>
         </div>
@@ -526,7 +531,7 @@ function LocationSlide() {
                   <p className="text-[10px] font-mono uppercase tracking-[0.3em] text-zinc-500">
                     Status
                   </p>
-                  <p className="mt-1 text-sm text-white">New Texas site</p>
+                  <p className="mt-1 text-sm text-white">Texas location</p>
                 </div>
               </div>
             </div>
@@ -554,9 +559,9 @@ function ErcotSlide() {
             <SectionLabel>ERCOT in plain English</SectionLabel>
             <SectionTitle>ERCOT runs most of Texas.</SectionTitle>
             <p className={cn(deckTextClass(), 'mt-4')}>
-              It is the grid operator. In choice areas, the supplier can change,
-              but the delivery utility still owns the wires and the way the bill
-              reacts to peaks.
+              It is the grid operator. In choice areas, the supply can change,
+              but the delivery utility still owns the wires and the charges tied
+              to peaks.
             </p>
 
             <div className="mt-5 grid gap-3">
@@ -571,9 +576,9 @@ function ErcotSlide() {
               Bottom line
             </p>
             <p className="mt-2 text-sm leading-7 text-zinc-300 md:text-base">
-              If the building peaks wrong, the bill can stay ugly after the month
-              is over. That is the part Sean needs to understand before the first
-              Texas quote lands.
+              If the building peaks at the wrong time, the delivery charges can
+              stay elevated after the month closes. That is the piece Sean needs
+              to understand before talking pricing.
             </p>
           </div>
         </div>
@@ -593,12 +598,12 @@ function ErcotSlide() {
             <div className="mt-5 grid gap-3 md:grid-cols-2">
               <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
                 <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-                  What changed in Texas
+                  How Texas differs
                 </p>
                 <ul className="mt-3 space-y-3 text-sm leading-6 text-zinc-300">
                   <li>Grid operator is ERCOT, not the East Coast market.</li>
                   <li>CenterPoint delivery charges still hit the bill.</li>
-                  <li>One peak day can influence more than one month.</li>
+                  <li>One strong peak day can affect more than one billing cycle.</li>
                 </ul>
               </div>
               <div className="rounded-[24px] border border-[#002FA7]/35 bg-[#002FA7]/12 p-4">
@@ -606,8 +611,8 @@ function ErcotSlide() {
                   Conversation line
                 </p>
                 <p className="mt-3 text-base leading-7 text-white">
-                  The cheapest rate in town does not help if the building is
-                  peak-happy.
+                  A low supply rate still won&apos;t solve a site that peaks
+                  sharply.
                 </p>
               </div>
             </div>
@@ -633,11 +638,11 @@ function BillDriversSlide() {
         <div className="flex min-h-0 flex-col gap-5">
           <div className="max-w-2xl">
             <SectionLabel>What moves the bill</SectionLabel>
-            <SectionTitle>A cheap rate does not fix a bad load shape.</SectionTitle>
+            <SectionTitle>The bill depends on more than the supply rate.</SectionTitle>
             <p className={cn(deckTextClass(), 'mt-4')}>
-              In Houston, the bill is pushed by more than one thing. Supply is
-              one piece. Demand, delivery, and ratchet exposure are the parts
-              that surprise people who only look at the headline rate.
+              In Houston, the bill is shaped by more than one factor. Supply is
+              one piece. Demand, delivery, nodal congestion, and ratchet
+              charges can matter just as much as the headline rate.
             </p>
           </div>
 
@@ -649,12 +654,14 @@ function BillDriversSlide() {
 
           <div className="rounded-[26px] border border-white/10 bg-black/50 p-4 backdrop-blur-md">
             <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-              Bill anatomy
+              How the bill breaks down
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-3 text-sm text-zinc-300">
               <FlowPill>Supply</FlowPill>
               <ChevronRight className="h-4 w-4 text-zinc-600" />
               <FlowPill>Delivery</FlowPill>
+              <ChevronRight className="h-4 w-4 text-zinc-600" />
+              <FlowPill>Nodal congestion</FlowPill>
               <ChevronRight className="h-4 w-4 text-zinc-600" />
               <FlowPill>Demand / ratchet</FlowPill>
               <ChevronRight className="h-4 w-4 text-zinc-600" />
@@ -669,26 +676,28 @@ function BillDriversSlide() {
         <div className="flex min-h-0 items-end">
           <div className="w-full rounded-[30px] border border-white/10 bg-black/55 p-4 backdrop-blur-md">
             <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-              Why controls matter
+              Where custom pricing helps
             </p>
             <div className="mt-4 grid gap-3">
               <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-sm font-semibold text-white">Start times</p>
+                <p className="text-sm font-semibold text-white">Custom pricing</p>
                 <p className="mt-1 text-sm leading-6 text-zinc-400">
-                  If everything starts together, demand jumps together.
+                  Ask how nodal congestion and other site-specific charges are
+                  handled in the quote.
                 </p>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-sm font-semibold text-white">HVAC</p>
+                <p className="text-sm font-semibold text-white">Pass-through items</p>
                 <p className="mt-1 text-sm leading-6 text-zinc-400">
-                  Pre-cooling and schedule control can flatten the expensive
-                  hours without changing operations.
+                  Confirm which charges are fixed, variable, capped, or passed
+                  through before comparing offers.
                 </p>
               </div>
               <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-sm font-semibold text-white">Dock doors and lights</p>
+                <p className="text-sm font-semibold text-white">Better question</p>
                 <p className="mt-1 text-sm leading-6 text-zinc-400">
-                  Small waste adds up fast in a big warehouse.
+                  Can we quote this around the site&apos;s real load pattern
+                  instead of a generic warehouse average?
                 </p>
               </div>
             </div>
@@ -705,12 +714,12 @@ function ControlSlide() {
       <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[1fr_1fr]">
         <div className="flex min-h-0 flex-col gap-5">
           <div>
-            <SectionLabel>How to lower cost</SectionLabel>
-            <SectionTitle>Reduce the spike before you chase the rate.</SectionTitle>
+            <SectionLabel>Operational levers</SectionLabel>
+            <SectionTitle>Start with the load profile, then look at the rate.</SectionTitle>
             <p className={cn(deckTextClass(), 'mt-4 max-w-xl')}>
               The fastest wins usually come from operations, not the spreadsheet.
-              If the load curve gets flatter, the supplier quote becomes easier
-              to turn into a real bill.
+              When the load curve is flatter, the pricing conversation becomes
+              much cleaner.
             </p>
           </div>
 
@@ -728,11 +737,11 @@ function ControlSlide() {
                 Peak shape
               </p>
               <p className="mt-2 text-xl font-semibold tracking-tight text-white">
-                Make the load curve less pointy.
+                Flatten the load curve.
               </p>
             </div>
             <div className="rounded-full border border-[#002FA7]/35 bg-[#002FA7]/15 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.3em] text-blue-100">
-              Controls first
+              Lower peak exposure
             </div>
           </div>
 
@@ -778,16 +787,16 @@ function ControlSlide() {
               Peak held down
             </div>
             <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-3 font-mono text-[10px] uppercase tracking-[0.34em] text-zinc-500">
-              <span>Lower load early</span>
+              <span>Lower load before peak</span>
               <span>Higher load during peak</span>
-              <span>Flatter bill later</span>
+              <span>Lower bill later</span>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
               <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-                Do
+                Helpful habits
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
                 <li>Pre-cool before expensive hours</li>
@@ -797,7 +806,7 @@ function ControlSlide() {
             </div>
             <div className="rounded-[22px] border border-white/10 bg-white/[0.04] p-4">
               <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-                Avoid
+                Common pitfalls
               </p>
               <ul className="mt-3 space-y-2 text-sm leading-6 text-zinc-300">
                 <li>Turning everything on at once</li>
@@ -819,11 +828,12 @@ function AskSlide() {
         <div className="flex min-h-0 flex-col gap-5">
           <div className="max-w-2xl">
             <SectionLabel>What I need next</SectionLabel>
-            <SectionTitle>Give me the operating facts and I can make the quote real.</SectionTitle>
+            <SectionTitle>The more we know about how the site runs, the better the pricing discussion will be.</SectionTitle>
             <p className={cn(deckTextClass(), 'mt-4')}>
               The Baytown space is currently not occupied, so the current utility
-              bill does not tell the full story. A similar-sized bill plus the
-              real operating schedule will give us a much cleaner comparison.
+              bill does not tell the full story. A bill from a similar site,
+              along with the actual operating schedule, will give us a better
+              starting point.
             </p>
           </div>
 
@@ -843,19 +853,18 @@ function AskSlide() {
         <div className="flex min-h-0 flex-col justify-between gap-4 rounded-[30px] border border-white/10 bg-black/45 p-5 backdrop-blur-md">
           <div>
             <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
-              Email ask
+              What to send
             </p>
             <div className="mt-4 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
               <p className="text-sm leading-7 text-zinc-300">
-                To take a look at what we can do, I just need to know the hours
-                and days of operation, the service address and ESID, the square
-                footage of occupied space, the nature of the business, and a
-                bill from a similar sized facility.
+                To take a look at what we can do, I just need the hours and days
+                of operation, the service address and ESID, the square footage
+                of occupied space, the nature of the business, and a bill from a
+                similar sized facility.
               </p>
               <p className="mt-3 text-sm leading-7 text-zinc-300">
-                If we can get that, we can discuss how CenterPoint demand
-                penalties work so East Coast Warehouse does not get hit with a
-                bill that looks normal on the surface but is expensive underneath.
+                With that in hand, I can show where CenterPoint demand charges
+                show up and which operating choices have the biggest impact.
               </p>
             </div>
           </div>
@@ -864,15 +873,15 @@ function AskSlide() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-blue-100/70">
-                  Closing line
+                  Takeaway
                 </p>
                 <p className="mt-2 text-lg font-semibold tracking-tight text-white">
-                  Same business. Different bill. Smaller surprises if we get the
-                  controls right.
+                  Same business. Different utility rules. Fewer surprises once we
+                  understand the operating profile.
                 </p>
               </div>
               <div className="rounded-full border border-white/10 bg-black/20 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-200">
-                Ready for Sean
+                Ready for discovery
               </div>
             </div>
           </div>
@@ -972,7 +981,7 @@ export function BriefingDeckClient() {
                 </span>
               </div>
               <div className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-[10px] uppercase tracking-[0.34em] text-zinc-300">
-                Texas ERCOT briefing
+                Texas energy briefing
               </div>
             </div>
 
