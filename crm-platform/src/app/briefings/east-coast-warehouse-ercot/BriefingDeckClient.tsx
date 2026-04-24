@@ -34,9 +34,10 @@ const slides: SlideTab[] = [
   { label: 'Locations', shortLabel: '02' },
   { label: 'Texas grid', shortLabel: '03' },
   { label: 'Cost drivers', shortLabel: '04' },
-  { label: 'Bill range', shortLabel: '05' },
-  { label: 'Controls', shortLabel: '06' },
-  { label: 'Next steps', shortLabel: '07' },
+  { label: 'Market context', shortLabel: '05' },
+  { label: 'Bill range', shortLabel: '06' },
+  { label: 'Controls', shortLabel: '07' },
+  { label: 'Next steps', shortLabel: '08' },
 ]
 
 const slideCount = slides.length
@@ -90,6 +91,10 @@ function formatCurrencyWhole(value: number) {
 
 function formatMillionKwh(value: number) {
   return `${(value / 1_000_000).toFixed(1)}M kWh/yr`
+}
+
+function formatForwardPrice(value: number) {
+  return `$${value.toFixed(2)}`
 }
 
 const heroMetrics = [
@@ -262,6 +267,56 @@ const usageScenarios = [
   },
 ] as const
 
+const bloombergForwardCurve = [
+  { month: 'May 26', price: 35.2 },
+  { month: 'Jun 26', price: 38.04 },
+  { month: 'Jul 26', price: 53.6 },
+  { month: 'Aug 26', price: 78.77 },
+  { month: 'Sep 26', price: 46.93 },
+  { month: 'Oct 26', price: 34.62 },
+  { month: 'Nov 26', price: 34.54 },
+  { month: 'Dec 26', price: 39.8 },
+  { month: 'Jan 27', price: 53.84 },
+  { month: 'Feb 27', price: 52.14 },
+  { month: 'Mar 27', price: 36.03 },
+  { month: 'Apr 27', price: 35.12 },
+] as const
+
+const marketContextCards = [
+  {
+    icon: CloudLightning,
+    eyebrow: 'Summer timing',
+    value: '85,508 MW',
+    label: 'ERCOT all-time peak demand record',
+    text: 'ERCOT says June through September is the stress window. Demand usually peaks mid-to-late afternoon, and operating reserves are tightest in the evening as solar ramps down.',
+    source: 'ERCOT summer page; peak demand records',
+  },
+  {
+    icon: Zap,
+    eyebrow: 'Load growth',
+    value: '367,790 MW',
+    label: 'ERCOT forecast by 2032',
+    text: 'ERCOT’s latest preliminary long-term forecast projects 367,790 MW of demand in the ERCOT region by 2032. That is why the market is still pricing growth risk, not just today’s usage.',
+    source: 'ERCOT Apr. 15, 2026 forecast',
+  },
+  {
+    icon: Building2,
+    eyebrow: 'Texas growth',
+    value: '31.71M',
+    label: 'Texas population in July 2025',
+    text: 'Texas population reached 31.709 million in July 2025, up 8.8% since 2020. The governor’s office also lists 314 headquarters relocations announced from 2015 to 2024.',
+    source: 'U.S. Census QuickFacts; Texas Governor',
+  },
+  {
+    icon: Warehouse,
+    eyebrow: 'Supply buildout',
+    value: '18.8 GW',
+    label: 'Texas utility-scale solar in Aug. 2024',
+    text: 'EIA reported 18.8 GW of utility-scale solar in Texas in August 2024, and developers planned another 24 GW of solar additions in 2024 and 2025. Corporate PPAs help finance some of that buildout, but they do not remove the late-day summer peak.',
+    source: 'EIA Today in Energy',
+  },
+] as const
+
 const askList = [
   'Hours and days of operation',
   'Confirm service address and ESID',
@@ -421,6 +476,306 @@ function FlowPill({ children }: { children: string }) {
     <span className="inline-flex items-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 font-mono text-[11px] uppercase tracking-[0.3em] text-zinc-200">
       {children}
     </span>
+  )
+}
+
+function StatCard({
+  icon: Icon,
+  eyebrow,
+  value,
+  label,
+  text,
+  source,
+}: {
+  icon: ComponentType<{ className?: string }>
+  eyebrow: string
+  value: string
+  label: string
+  text: string
+  source: string
+}) {
+  return (
+    <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
+            {eyebrow}
+          </p>
+          <div className="mt-3 text-2xl font-semibold tracking-tight text-white md:text-[2rem]">
+            {value}
+          </div>
+          <p className="mt-1 text-sm leading-6 text-zinc-300">{label}</p>
+        </div>
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/10 bg-black/20 text-zinc-300">
+          <Icon className="h-4 w-4" />
+        </div>
+      </div>
+      <p className="mt-3 text-[13px] leading-5 text-zinc-400">{text}</p>
+      <p className="mt-2 font-mono text-[8px] uppercase tracking-[0.28em] text-zinc-500">
+        {source}
+      </p>
+    </div>
+  )
+}
+
+function MarketCurveChart() {
+  const chartWidth = 980
+  const chartHeight = 420
+  const chartLeft = 62
+  const chartRight = 26
+  const chartTop = 36
+  const chartBottom = 76
+  const plotWidth = chartWidth - chartLeft - chartRight
+  const plotHeight = chartHeight - chartTop - chartBottom
+  const minPrice = 30
+  const maxPrice = 85
+  const tickValues = [30, 40, 50, 60, 70, 80]
+
+  const points = bloombergForwardCurve.map((point, index) => {
+    const x =
+      chartLeft + (index / (bloombergForwardCurve.length - 1)) * plotWidth
+    const y =
+      chartTop +
+      (1 - (point.price - minPrice) / (maxPrice - minPrice)) * plotHeight
+
+    return { ...point, x, y }
+  })
+
+  const linePath = points
+    .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+    .join(' ')
+  const areaPath = `${linePath} L ${points.at(-1)?.x ?? 0} ${chartTop + plotHeight} L ${points[0]?.x ?? 0} ${chartTop + plotHeight} Z`
+
+  const summerBandLeft = points[2].x - 16
+  const summerBandRight = points[4].x + 16
+  const winterBandLeft = points[8].x - 16
+  const winterBandRight = points[9].x + 16
+
+  return (
+    <div className="rounded-[30px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.05),rgba(0,0,0,0.18))] p-4 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
+            Bloomberg Houston load zone
+          </p>
+          <p className="mt-2 text-sm leading-6 text-zinc-300">
+            Wholesale forward curve in $/MWh. Retail offers sit on top of this
+            once CenterPoint delivery, demand, and taxes are added.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-300">
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+            Summer spike
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+            Winter bump
+          </span>
+          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">
+            Bloomberg
+          </span>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 980 420" className="mt-4 h-[21rem] w-full" aria-hidden="true">
+        <defs>
+          <linearGradient id="market-curve-fill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor="rgba(0,47,167,0.25)" />
+            <stop offset="100%" stopColor="rgba(0,47,167,0)" />
+          </linearGradient>
+          <linearGradient id="market-curve-line" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%" stopColor="#5da4ff" />
+            <stop offset="100%" stopColor="#002FA7" />
+          </linearGradient>
+        </defs>
+
+        <rect x="0" y="0" width="980" height="420" rx="24" fill="rgba(0,0,0,0.04)" />
+
+        <rect
+          x={summerBandLeft}
+          y={chartTop}
+          width={summerBandRight - summerBandLeft}
+          height={plotHeight}
+          rx="18"
+          fill="rgba(0,47,167,0.07)"
+        />
+        <rect
+          x={winterBandLeft}
+          y={chartTop}
+          width={winterBandRight - winterBandLeft}
+          height={plotHeight}
+          rx="18"
+          fill="rgba(217,119,6,0.05)"
+        />
+
+        {tickValues.map((tick) => {
+          const y =
+            chartTop + (1 - (tick - minPrice) / (maxPrice - minPrice)) * plotHeight
+          return (
+            <g key={tick}>
+              <line x1={chartLeft} x2={chartWidth - chartRight} y1={y} y2={y} stroke="rgba(255,255,255,0.08)" />
+              <text
+                x={24}
+                y={y + 4}
+                className="fill-zinc-500"
+                fontSize="12"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              >
+                ${tick}
+              </text>
+            </g>
+          )
+        })}
+
+        <path d={areaPath} fill="url(#market-curve-fill)" opacity="0.85" />
+        <path
+          d={linePath}
+          fill="none"
+          stroke="url(#market-curve-line)"
+          strokeWidth="3.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+
+        {points.map((point, index) => {
+          const isPeak = index === 3
+          const isSummerBump = index === 2 || index === 3 || index === 4
+          const isWinterBump = index === 8 || index === 9
+          const labelY = point.price > 68 ? point.y + 20 : point.y - 12
+          const labelFill = isPeak ? '#ffffff' : isSummerBump ? '#cfe1ff' : isWinterBump ? '#ffd8a5' : '#d4d4d8'
+
+          return (
+            <g key={point.month}>
+              <circle
+                cx={point.x}
+                cy={point.y}
+                r={isPeak ? 6.5 : 4.5}
+                fill={isPeak ? '#ffffff' : '#7fb0ff'}
+                stroke={isPeak ? '#002FA7' : 'none'}
+                strokeWidth={isPeak ? 2 : 0}
+              />
+              <text
+                x={point.x}
+                y={labelY}
+                textAnchor="middle"
+                className={isPeak ? 'fill-white' : ''}
+                fill={labelFill}
+                fontSize="11"
+                fontWeight="700"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              >
+                {formatForwardPrice(point.price)}
+              </text>
+              <text
+                x={point.x}
+                y={chartTop + plotHeight + 24}
+                textAnchor="middle"
+                className="fill-zinc-500"
+                fontSize="11"
+                fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+              >
+                {point.month}
+              </text>
+            </g>
+          )
+        })}
+
+        <text
+          x={points[3].x}
+          y={points[3].y - 34}
+          textAnchor="middle"
+          className="fill-white"
+          fontSize="12"
+          fontWeight="700"
+          fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+        >
+          Summer spike
+        </text>
+        <text
+          x={points[8].x + 12}
+          y={points[8].y - 22}
+          textAnchor="start"
+          className="fill-zinc-200"
+          fontSize="12"
+          fontWeight="700"
+          fontFamily="ui-monospace, SFMono-Regular, Menlo, monospace"
+        >
+          Winter bump
+        </text>
+      </svg>
+
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[10px] font-mono uppercase tracking-[0.28em] text-zinc-500">
+        <span>Source: Bloomberg user screenshot</span>
+        <span>Wholesale only</span>
+        <span>Retail bills add CenterPoint delivery, demand, and taxes</span>
+      </div>
+    </div>
+  )
+}
+
+function MarketContextSlide() {
+  return (
+    <div className={slideShellClass('bg-[radial-gradient(circle_at_18%_16%,rgba(0,47,167,0.18),transparent_25%),radial-gradient(circle_at_86%_12%,rgba(255,255,255,0.05),transparent_20%)]')}>
+      <div className="relative z-10 grid h-full gap-6 p-5 md:p-8 lg:grid-cols-[1.05fr_0.95fr]">
+        <div className="flex min-h-0 flex-col gap-5">
+          <div className="max-w-2xl">
+            <SectionLabel>Market context</SectionLabel>
+            <SectionTitle>Why the Bloomberg curve jumps in summer.</SectionTitle>
+            <p className={cn(deckTextClass(), 'mt-4')}>
+              This is wholesale Houston load-zone pricing from Bloomberg. The
+              summer spike is the market pricing heat, tighter reserves, and
+              faster load growth, not just a random swing in the chart.
+            </p>
+          </div>
+
+          <MarketCurveChart />
+
+          <div className="rounded-[26px] border border-[#002FA7]/35 bg-[#002FA7]/14 p-4">
+            <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-blue-100/70">
+              What Sean should hear
+            </p>
+            <p className="mt-2 text-[13px] leading-5 text-white md:text-sm md:leading-6">
+              The curve is pricing the months when heat, big load, and the
+              late-day solar drop all hit at the same time.
+            </p>
+          </div>
+        </div>
+
+        <div className="flex min-h-0 flex-col gap-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            {marketContextCards.map((card) => (
+              <StatCard key={card.eyebrow} {...card} />
+            ))}
+          </div>
+
+          <div className="rounded-[30px] border border-white/10 bg-black/55 p-4 backdrop-blur-md">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-mono uppercase tracking-[0.34em] text-zinc-500">
+                  Winter Storm Uri
+                </p>
+                <p className="mt-2 text-2xl font-semibold tracking-tight text-white">
+                  20,000 MW of load shed at the peak.
+                </p>
+              </div>
+              <div className="rounded-full border border-[#002FA7]/35 bg-[#002FA7]/15 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.3em] text-blue-100">
+                Feb. 2021
+              </div>
+            </div>
+            <p className="mt-3 text-sm leading-6 text-zinc-300">
+              ERCOT also reported 52,277 MW of generation out at the worst
+              point. That is the reason Texas still carries a reliability
+              premium, even when the weather is normal.
+            </p>
+          </div>
+
+          <div className="mt-auto rounded-[24px] border border-white/10 bg-white/[0.03] p-3">
+            <p className="text-[9px] leading-4 text-zinc-400">
+              Sources: Bloomberg user screenshot; ERCOT summer page and Apr. 15, 2026 forecast; DOE data center demand; U.S. Census QuickFacts; Texas Governor relocation data; EIA Texas solar buildout; ERCOT Feb. 2021 hearing.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -1267,6 +1622,7 @@ const slideComponents = [
   LocationSlide,
   ErcotSlide,
   BillDriversSlide,
+  MarketContextSlide,
   UsageSlide,
   ControlSlide,
   AskSlide,
