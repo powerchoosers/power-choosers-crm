@@ -10,6 +10,16 @@ import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { z } from 'npm:zod'
 import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js'
 
+// Burner domain utilities
+const BURNER_DOMAIN = 'getnodalpoint.com'
+
+function getBurnerFromEmail(userEmail: string | null | undefined): string {
+  if (!userEmail || typeof userEmail !== 'string') return `hello@${BURNER_DOMAIN}`
+  const at = userEmail.indexOf('@')
+  const localPart = at > 0 ? userEmail.slice(0, at).trim() : 'hello'
+  return `${localPart}@${BURNER_DOMAIN}`
+}
+
 // Initialize Postgres client
 const sql = postgres(
   Deno.env.get('SUPABASE_DB_URL')!
@@ -138,6 +148,9 @@ async function processJob(job: Job) {
     throw new Error(`Sequence member/contact not found: ${execution.member_id}`)
   }
 
+  // CRITICAL: Use burner domain (getnodalpoint.com) for sequence emails
+  const burnerEmail = getBurnerFromEmail(memberRow.owner_email)
+  
   const context = {
     execution,
     member: memberRow,
@@ -149,7 +162,8 @@ async function processJob(job: Job) {
       companyName: memberRow.company_name
     },
     owner: {
-      email: memberRow.owner_email,
+      email: burnerEmail, // Use burner domain for sequences
+      realEmail: memberRow.owner_email, // Keep real email for ownerId
       name: `${memberRow.owner_first_name || 'Nodal Point'} | Nodal Point`
     }
   }
@@ -229,13 +243,13 @@ async function handleGeneration(ctx: any) {
       ${emailId},
       ${contact.id},
       ${ctx.member.accountId || null},
-      ${owner.email},
+      ${owner.email}, // Burner domain (getnodalpoint.com)
       ${JSON.stringify({ email: contact.email, name: `${contact.firstName} ${contact.lastName}` })},
       ${subject},
       ${generatedBody},
       'pending',
       'scheduled',
-      ${owner.email},
+      ${owner.realEmail}, // Real email for ownerId (nodalpoint.io)
       ${JSON.stringify({
     execution_id: execution.id,
     member_id: ctx.member.id,
@@ -288,11 +302,11 @@ async function handleExecution(ctx: any) {
 
 async function sendEmail(ctx: any) {
   const { execution, contact, owner } = ctx
-  console.log('[SendEmail] Delivering via Zoho to:', contact.email)
+  console.log('[SendEmail] Delivering via Zoho to:', contact.email, 'from:', owner.email)
 
   const payload = {
     to: { email: contact.email, name: `${contact.firstName} ${contact.lastName}` },
-    from: { email: owner.email, name: owner.name },
+    from: { email: owner.email, name: owner.name }, // Already converted to burner domain
     subject: execution.metadata?.subject || 'Message from Nodal Point',
     html: execution.metadata?.body || '',
     trackClicks: true,
@@ -354,7 +368,7 @@ async function createTask(ctx: any) {
       'high',
       ${contact.id},
       ${ctx.member.accountId || null},
-      ${owner.email},
+      ${owner.realEmail}, // Use real email for task ownership
       ${JSON.stringify({ execution_id: execution.id, member_id: ctx.member.id, sequence_id: execution.sequence_id })}
     )
   `

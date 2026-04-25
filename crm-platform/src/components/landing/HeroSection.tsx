@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Activity, PhoneCall } from 'lucide-react'
 
 const SIGNAL_POINTS = [
   { label: 'BILL REVIEW', sub: 'START' },
@@ -42,17 +43,16 @@ export function HeroSection() {
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <Link
             href="/bill-debugger"
-          className="animate-subtle-pulse inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group whitespace-nowrap"
-        >
-          <span>Review My Bill</span>
-          <svg className="w-5 h-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-          </svg>
+            className="animate-subtle-pulse inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group whitespace-nowrap"
+          >
+            <Activity className="w-5 h-5" />
+            <span>Review My Bill</span>
           </Link>
           <Link
             href="/book"
             className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-400 bg-white/60 text-zinc-700 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 whitespace-nowrap shadow-sm"
           >
+            <PhoneCall className="w-5 h-5" />
             <span>Book a Strategy Call</span>
           </Link>
         </div>
