@@ -12,8 +12,8 @@ export function TrustGate({ onNext }: TrustGateProps) {
 
             {/* Header Section */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                 className="mb-16"
             >
@@ -29,8 +29,8 @@ export function TrustGate({ onNext }: TrustGateProps) {
 
             {/* Trust Items Grid */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ duration: 0.8, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
                 className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16 w-full max-w-3xl"
             >
@@ -67,8 +67,8 @@ export function TrustGate({ onNext }: TrustGateProps) {
 
             {/* CTA Section */}
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ duration: 0.8, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 className="flex flex-col items-center space-y-6"
             >

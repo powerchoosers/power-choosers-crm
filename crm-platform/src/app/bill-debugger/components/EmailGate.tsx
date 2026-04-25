@@ -29,9 +29,9 @@ export function EmailGate({ onUnlock }: EmailGateProps) {
     return (
         <div className="w-full max-w-lg mx-auto text-center px-6">
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95 }}
+                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
                 className="glass-card p-10 md:p-14 relative overflow-hidden"
             >
                 {/* Success Overlay */}

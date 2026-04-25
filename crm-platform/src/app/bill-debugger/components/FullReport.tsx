@@ -139,8 +139,8 @@ export function FullReport({ data, email }: FullReportProps) {
     return (
         <div className="w-full max-w-6xl mx-auto px-4 pb-20">
             <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 className="mb-12"
             >
                 <div className="flex flex-col lg:flex-row gap-8 items-start">
@@ -232,8 +232,8 @@ export function FullReport({ data, email }: FullReportProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 text-left">
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     transition={{ delay: 0.08 }}
                     className="glass-card p-8 flex flex-col justify-between"
                 >
@@ -264,8 +264,8 @@ export function FullReport({ data, email }: FullReportProps) {
                 </motion.div>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     transition={{ delay: 0.16 }}
                     className="glass-card p-8 flex flex-col justify-between"
                 >
@@ -296,8 +296,8 @@ export function FullReport({ data, email }: FullReportProps) {
                 </motion.div>
 
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                     transition={{ delay: 0.24 }}
                     className="glass-card p-8 shadow-xl shadow-[#002FA7]/5 flex flex-col justify-between relative overflow-hidden"
                 >
@@ -336,8 +336,8 @@ export function FullReport({ data, email }: FullReportProps) {
             </div>
 
             <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ delay: 0.3 }}
                 className="glass-card p-8 md:p-10 mb-20 text-left"
             >
@@ -388,8 +388,8 @@ export function FullReport({ data, email }: FullReportProps) {
             </motion.div>
 
             <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
+                initial={{ opacity: 0, filter: 'blur(10px)' }}
+                whileInView={{ opacity: 1, filter: 'blur(0px)' }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
                 className="mb-20 glass-card p-10 shadow-xl"
@@ -417,8 +417,8 @@ export function FullReport({ data, email }: FullReportProps) {
             </motion.div>
 
             <motion.div
-                initial={{ opacity: 0 }}
-                whileInView={{ opacity: 1 }}
+                initial={{ opacity: 0, filter: 'blur(10px)' }}
+                whileInView={{ opacity: 1, filter: 'blur(0px)' }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.1 }}
                 className="mb-20 glass-card p-10 shadow-xl"

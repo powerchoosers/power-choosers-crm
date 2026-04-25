@@ -10,8 +10,8 @@ interface NextStepsCardProps {
 export function NextStepsCard({ email }: NextStepsCardProps) {
     return (
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
+            initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+            whileInView={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             viewport={{ once: true }}
             transition={{ delay: 0.2 }}
             className="glass-card p-8 md:p-14 text-center max-w-4xl mx-auto shadow-2xl relative overflow-hidden"

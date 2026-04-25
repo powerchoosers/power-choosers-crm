@@ -127,8 +127,8 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
     return (
         <div className="w-full max-w-5xl mx-auto text-center px-4">
             <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
                 transition={{ duration: 0.6 }}
                 className="mb-12 flex flex-col items-center"
             >
@@ -157,8 +157,8 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                 {snapshotFields.map((field, i) => (
                     <motion.div
                         key={field.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
+                        animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                         transition={{ duration: 0.5, delay: i * 0.08 }}
                         className="glass-card p-8 relative overflow-hidden group"
                     >
@@ -183,8 +183,8 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
             </div>
 
             <motion.div
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
+                initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 transition={{ delay: 0.3 }}
                 className="glass-card p-8 md:p-10 mb-12 text-left"
             >
@@ -231,8 +231,8 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
             </motion.div>
 
             <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
+                initial={{ opacity: 0, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, filter: 'blur(0px)' }}
                 transition={{ delay: 0.45 }}
                 className="flex flex-col items-center gap-4 py-10 glass-card bg-white/50 border-zinc-200"
             >
