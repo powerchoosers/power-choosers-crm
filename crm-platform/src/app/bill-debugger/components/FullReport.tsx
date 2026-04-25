@@ -1,8 +1,9 @@
 import React, { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Zap, Truck, Activity, Info, Calendar, AlertCircle, PieChart, Warehouse } from 'lucide-react'
+import { Zap, Truck, Activity, Info, Calendar, AlertCircle, Warehouse } from 'lucide-react'
 import { generateFeedback } from '../utils/feedbackLogic'
 import { FeedbackBadge } from './FeedbackBadge'
+import { BillReviewLens } from './BillReviewLens'
 import { NextStepsCard } from './NextStepsCard'
 
 interface ExtractedData {
@@ -60,6 +61,7 @@ interface ExtractedData {
 interface FullReportProps {
     data: ExtractedData
     email?: string
+    redactedMode?: boolean
 }
 
 function parseCurrency(value: string | number | undefined) {
@@ -84,7 +86,11 @@ function formatMoney(value: number) {
     return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
-export function FullReport({ data, email }: FullReportProps) {
+function formatCents(value: number) {
+    return `${(value * 100).toFixed(2)}¢/kWh`
+}
+
+export function FullReport({ data, email, redactedMode = false }: FullReportProps) {
     const usage = parseNumber(data.total_usage_kwh)
     const actualDemand = Math.max(
         parseNumber(data.actual_demand_kw),
@@ -98,8 +104,10 @@ export function FullReport({ data, email }: FullReportProps) {
         actualDemand
     )
     const powerFactor = parsePercent(data.power_factor_pct ?? data.analysis?.powerFactorPct)
+    const printedSupplyRate = parseNumber(data.energy_rate_per_kwh)
 
     const totalBill = parseCurrency(data.total_amount_due)
+    const allInRate = totalBill > 0 && usage > 0 ? totalBill / usage : 0
     const energyCharges = parseCurrency(data.energy_charges ?? data.analysis?.billSplit?.supply)
     const deliveryCharges = parseCurrency(data.delivery_charges ?? data.analysis?.billSplit?.delivery)
     const taxesCharges = parseCurrency(data.taxes_and_fees ?? data.analysis?.billSplit?.taxes)
@@ -133,8 +141,18 @@ export function FullReport({ data, email }: FullReportProps) {
         }, "Oncor")
     }, [actualDemand, billedDemand, data.analysis?.feedback, data.billing_period, data.contract_end_date, data.provider_name, data.retail_plan_name, deliveryCharges, deliveryShare, energyCharges, powerFactor, supplyShare, totalBill, usage])
 
-    const summaryText = feedback.description || 'The bill is being driven by delivery and demand, not just the supply rate.'
-    const siteLabel = 'Logistics warehouse'
+    const invoiceRateText = allInRate > 0 ? formatCents(allInRate) : 'N/A'
+    const summaryText = printedSupplyRate > 0
+        ? `The bill prints ${formatCents(printedSupplyRate)} on the supply line, but the invoice lands at ${invoiceRateText} once delivery and taxes are included.`
+        : (redactedMode
+            ? 'The bill is being driven by delivery and demand, not just the supply rate.'
+            : (feedback.description || 'The bill is being driven by delivery and demand, not just the supply rate.'))
+    const siteLabel = redactedMode ? 'Redacted facility' : 'Logistics warehouse'
+    const providerLabel = redactedMode ? 'Redacted provider' : data.provider_name
+    const utilityName = redactedMode ? 'the utility' : 'Oncor'
+    const powerFactorLine = redactedMode
+        ? 'Below the utility adjustment line.'
+        : 'Below Oncor’s 95% adjustment line.'
 
     return (
         <div className="w-full max-w-6xl mx-auto px-4 pb-20">
@@ -166,7 +184,7 @@ export function FullReport({ data, email }: FullReportProps) {
 
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="inline-flex items-center gap-2 bg-zinc-100 rounded-full px-4 py-1.5 text-sm text-zinc-600 border border-zinc-200">
-                                <span className="font-medium text-zinc-900">{data.provider_name}</span>
+                            <span className="font-medium text-zinc-900">{providerLabel}</span>
                                 <span>•</span>
                                 <span>{data.billing_period}</span>
                             </div>
@@ -210,7 +228,7 @@ export function FullReport({ data, email }: FullReportProps) {
                                     {powerFactor > 0 ? `${powerFactor.toFixed(1)}%` : 'Not shown'}
                                 </div>
                                 <div className="text-xs text-zinc-500 mt-2">
-                                    {powerFactor > 0 ? 'Below Oncor’s 95% adjustment line.' : 'No PF figure was visible on the bill.'}
+                                    {powerFactor > 0 ? powerFactorLine : 'No PF figure was visible on the bill.'}
                                 </div>
                             </div>
 
@@ -230,6 +248,17 @@ export function FullReport({ data, email }: FullReportProps) {
                 </div>
             </motion.div>
 
+            <div className="mb-10">
+                <BillReviewLens
+                    usageKwh={usage}
+                    totalBill={totalBill}
+                    printedSupplyRate={printedSupplyRate}
+                    supplyAmount={energyCharges}
+                    deliveryAmount={deliveryCharges}
+                    taxesAmount={taxesCharges}
+                />
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10 text-left">
                 <motion.div
                     initial={{ opacity: 0, y: 20, filter: 'blur(10px)' }}
@@ -246,19 +275,19 @@ export function FullReport({ data, email }: FullReportProps) {
                             {formatMoney(energyCharges)}
                         </div>
                         <div className="text-sm text-zinc-500">
-                            Fixed-price energy for the month.
+                            Supply-side subtotal for the month.
                         </div>
                     </div>
 
                     <div className="border-t border-zinc-100 pt-4 mt-8">
                         <div className="flex justify-between items-center text-sm mb-2">
-                            <span className="text-zinc-500">Effective rate</span>
+                            <span className="text-zinc-500">Printed rate</span>
                             <span className="text-zinc-900 font-mono font-medium">
-                                {usage > 0 ? `${((energyCharges / usage) * 100).toFixed(2)}¢/kWh` : 'N/A'}
+                                {printedSupplyRate > 0 ? formatCents(printedSupplyRate) : 'Not shown'}
                             </span>
                         </div>
                         <div className="text-xs text-zinc-400 mt-2">
-                            Supply is predictable. It is not the part of this bill that needs the most attention.
+                            This is the bill line rate, not the full invoice rate.
                         </div>
                     </div>
                 </motion.div>
@@ -328,64 +357,14 @@ export function FullReport({ data, email }: FullReportProps) {
                         <div className="text-xs text-zinc-400 mt-2 flex gap-2 items-start">
                             <Info className="w-3 h-3 mt-0.5 shrink-0 text-zinc-300" />
                             <span>
-                                Oncor can adjust billing demand when power factor falls below 95%, and the utility can still hold the bill up after a higher historical peak.
+                                {redactedMode
+                                    ? 'The utility can adjust billing demand when power factor falls below 95%, and it can still hold the bill up after a higher historical peak.'
+                                    : 'Oncor can adjust billing demand when power factor falls below 95%, and the utility can still hold the bill up after a higher historical peak.'}
                             </span>
                         </div>
                     </div>
                 </motion.div>
             </div>
-
-            <motion.div
-                initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ delay: 0.3 }}
-                className="glass-card p-8 md:p-10 mb-20 text-left"
-            >
-                <div className="flex items-center justify-between gap-4 mb-5">
-                    <div>
-                        <div className="text-xs font-mono uppercase tracking-widest text-zinc-400 mb-1">Bill sections</div>
-                        <div className="text-lg font-semibold text-zinc-900">Supply vs delivery vs taxes</div>
-                    </div>
-                    <PieChart className="w-5 h-5 text-[#002FA7]" />
-                </div>
-
-                <div className="h-3 rounded-full overflow-hidden bg-zinc-100 flex">
-                    <div
-                        className="bg-[#002FA7]"
-                        style={{ width: `${Math.max(0, Math.min(100, supplyShare))}%` }}
-                    />
-                    <div
-                        className="bg-zinc-300"
-                        style={{ width: `${Math.max(0, Math.min(100, deliveryShare))}%` }}
-                    />
-                    <div
-                        className="bg-zinc-200"
-                        style={{ width: `${Math.max(0, Math.min(100, taxesShare))}%` }}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Supply</div>
-                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(energyCharges)}</div>
-                        <div className="text-xs text-zinc-500 mt-2">{supplyShare.toFixed(1)}% of extracted sections</div>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Delivery</div>
-                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(deliveryCharges)}</div>
-                        <div className="text-xs text-zinc-500 mt-2">{deliveryShare.toFixed(1)}% of extracted sections</div>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Taxes & fees</div>
-                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(taxesCharges)}</div>
-                        <div className="text-xs text-zinc-500 mt-2">{taxesShare.toFixed(1)}% of extracted sections</div>
-                    </div>
-                </div>
-
-                <div className="mt-6 p-4 rounded-2xl border border-blue-100 bg-blue-50/70 text-sm text-zinc-700 leading-relaxed">
-                    The main story here is not the fixed supply price. The bill is being shaped by delivery charges, demand rules, and a power factor that sits below Oncor’s 95% adjustment line.
-                </div>
-            </motion.div>
 
             <motion.div
                 initial={{ opacity: 0, filter: 'blur(10px)' }}
@@ -405,7 +384,7 @@ export function FullReport({ data, email }: FullReportProps) {
                             ? `Billing demand is still above the current peak by ${totalDemandGap.toLocaleString()} kW.`
                             : 'The extracted bill did not show a clear billing gap, so the demand floor needs a second look.',
                         powerFactor > 0
-                            ? `Power factor is ${powerFactor.toFixed(1)}%, which is below Oncor’s 95% adjustment line.`
+                            ? `Power factor is ${powerFactor.toFixed(1)}%, which is below ${utilityName}’s 95% adjustment line.`
                             : 'The bill did not show a power factor figure, so that lever still needs verification.'
                     ].map((item, i) => (
                         <div key={i} className="flex items-start gap-4 p-5 bg-white/50 backdrop-blur-sm rounded-2xl border border-zinc-200">

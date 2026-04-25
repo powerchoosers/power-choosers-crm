@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { Calendar, Zap, Activity, ReceiptText, PieChart, ArrowRight, ShieldCheck } from 'lucide-react'
+import { Calendar, Zap, Activity, ReceiptText, ArrowRight, ShieldCheck } from 'lucide-react'
+import { BillReviewLens } from './BillReviewLens'
 import { FeedbackBadge } from './FeedbackBadge'
 
 interface ExtractedData {
@@ -10,6 +11,7 @@ interface ExtractedData {
     billed_demand_kw: string
     actual_demand_kw?: string
     power_factor_pct?: string | number
+    energy_rate_per_kwh?: string | number
     energy_charges?: string | number
     delivery_charges?: string | number
     taxes_and_fees?: string | number
@@ -35,6 +37,7 @@ interface ExtractedData {
 
 interface ResultsPreviewProps {
     data: ExtractedData
+    redactedMode?: boolean
     onUnlock: () => void
 }
 
@@ -60,13 +63,20 @@ function formatMoney(value: number) {
     return value.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 }
 
-export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
+function formatCents(value: number) {
+    return `${(value * 100).toFixed(2)}¢/kWh`
+}
+
+export function ResultsPreview({ data, redactedMode = false, onUnlock }: ResultsPreviewProps) {
     const feedback = data.analysis?.feedback
     const billTotal = parseCurrency(data.total_amount_due)
+    const usageKwh = parseNumber(data.total_usage_kwh)
+    const allInRate = billTotal > 0 && usageKwh > 0 ? billTotal / usageKwh : 0
+    const printedSupplyRate = parseNumber(data.energy_rate_per_kwh)
+    const invoiceRateText = allInRate > 0 ? formatCents(allInRate) : 'N/A'
     const supplyCost = parseCurrency(data.energy_charges ?? data.analysis?.billSplit?.supply)
     const deliveryCost = parseCurrency(data.delivery_charges ?? data.analysis?.billSplit?.delivery)
     const taxesCost = parseCurrency(data.taxes_and_fees ?? data.analysis?.billSplit?.taxes)
-    const structureTotal = supplyCost + deliveryCost + taxesCost
     const actualDemand = Math.max(
         parseNumber(data.actual_demand_kw),
         parseNumber(data.analysis?.actualDemandKW),
@@ -79,9 +89,6 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
         actualDemand
     )
     const powerFactor = parsePercent(data.power_factor_pct ?? data.analysis?.powerFactorPct)
-    const supplyShare = structureTotal > 0 ? (supplyCost / structureTotal) * 100 : parsePercent(data.analysis?.supplySharePct)
-    const deliveryShare = structureTotal > 0 ? (deliveryCost / structureTotal) * 100 : parsePercent(data.analysis?.deliverySharePct)
-    const taxesShare = structureTotal > 0 ? (taxesCost / structureTotal) * 100 : parsePercent(data.analysis?.taxesSharePct)
 
     const snapshotFields = [
         {
@@ -120,9 +127,13 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
         }
     ]
 
-    const summaryCopy = feedback?.description || 'We split the bill into supply, delivery, and demand so the main cost driver is easy to see.'
+    const summaryCopy = printedSupplyRate > 0
+        ? `The bill prints ${formatCents(printedSupplyRate)} on the supply line, but the invoice lands at ${invoiceRateText} once delivery and taxes are included.`
+        : (redactedMode
+            ? 'The bill is split into supply, delivery, and demand so the main cost driver is easy to see.'
+            : (feedback?.description || 'We split the bill into supply, delivery, and demand so the main cost driver is easy to see.'))
     const badgeTitle = feedback?.title || 'Review complete'
-    const siteLabel = 'Logistics warehouse review'
+    const siteLabel = redactedMode ? 'Redacted facility review' : 'Logistics warehouse review'
 
     return (
         <div className="w-full max-w-5xl mx-auto text-center px-4">
@@ -182,53 +193,16 @@ export function ResultsPreview({ data, onUnlock }: ResultsPreviewProps) {
                 ))}
             </div>
 
-            <motion.div
-                initial={{ opacity: 0, y: 16, filter: 'blur(10px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                transition={{ delay: 0.3 }}
-                className="glass-card p-8 md:p-10 mb-12 text-left"
-            >
-                <div className="flex items-center justify-between gap-4 mb-5">
-                    <div>
-                        <div className="text-xs font-mono uppercase tracking-widest text-zinc-400 mb-1">Bill sections</div>
-                        <div className="text-lg font-semibold text-zinc-900">Supply vs delivery vs taxes</div>
-                    </div>
-                    <PieChart className="w-5 h-5 text-[#002FA7]" />
-                </div>
-
-                <div className="h-3 rounded-full overflow-hidden bg-zinc-100 flex">
-                    <div
-                        className="bg-[#002FA7]"
-                        style={{ width: `${Math.max(0, Math.min(100, supplyShare))}%` }}
-                    />
-                    <div
-                        className="bg-zinc-300"
-                        style={{ width: `${Math.max(0, Math.min(100, deliveryShare))}%` }}
-                    />
-                    <div
-                        className="bg-zinc-200"
-                        style={{ width: `${Math.max(0, Math.min(100, taxesShare))}%` }}
-                    />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Supply</div>
-                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(supplyCost)}</div>
-                        <div className="text-xs text-zinc-500 mt-2">{supplyShare.toFixed(1)}% of extracted sections</div>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Delivery</div>
-                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(deliveryCost)}</div>
-                        <div className="text-xs text-zinc-500 mt-2">{deliveryShare.toFixed(1)}% of extracted sections</div>
-                    </div>
-                    <div className="rounded-2xl border border-zinc-200 bg-white/60 p-4">
-                        <div className="text-[10px] uppercase tracking-widest text-zinc-400 font-mono mb-1">Taxes & fees</div>
-                        <div className="text-2xl font-mono font-semibold text-zinc-900">{formatMoney(taxesCost)}</div>
-                        <div className="text-xs text-zinc-500 mt-2">{taxesShare.toFixed(1)}% of extracted sections</div>
-                    </div>
-                </div>
-            </motion.div>
+            <div className="mb-12 text-left">
+                <BillReviewLens
+                    usageKwh={usageKwh}
+                    totalBill={billTotal}
+                    printedSupplyRate={printedSupplyRate}
+                    supplyAmount={supplyCost}
+                    deliveryAmount={deliveryCost}
+                    taxesAmount={taxesCost}
+                />
+            </div>
 
             <motion.div
                 initial={{ opacity: 0, filter: 'blur(10px)' }}
