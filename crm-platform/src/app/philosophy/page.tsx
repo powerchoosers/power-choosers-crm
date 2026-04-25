@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { Activity, CalendarDays } from 'lucide-react'
 import { LandingHeader } from '@/components/landing/LandingHeader'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 
@@ -87,13 +87,14 @@ export default function Philosophy() {
               href="/bill-debugger"
               className="group inline-flex items-center gap-2 bg-[#002FA7] text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-lg shadow-blue-900/20"
             >
+              <Activity className="w-5 h-5" />
               <span>Review My Bill</span>
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link
               href="/book"
               className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-white/20 text-white rounded-full text-base md:text-lg font-medium hover:border-white/40 transition-all duration-300 whitespace-nowrap"
             >
+              <CalendarDays className="w-5 h-5" />
               <span>Book a Strategy Call</span>
             </Link>
           </div>

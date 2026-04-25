@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
     LogOut, FileText, AlertTriangle, Activity,
-    Calendar, ArrowRight, Download, TrendingDown, TrendingUp,
+    CalendarDays, ArrowRight, Download, TrendingDown, TrendingUp,
     Shield, Wifi, Lock, CheckCircle2, Flame, Zap,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
@@ -1021,7 +1021,7 @@ export function ClientDashboard() {
                             >
                                 <div className="flex items-center gap-4">
                                     <div className="w-10 h-10 rounded-xl bg-[#002FA7]/15 border border-[#002FA7]/20 flex items-center justify-center shrink-0">
-                                        <Calendar className="w-5 h-5 text-[#002FA7]" />
+                                        <CalendarDays className="w-5 h-5 text-[#002FA7]" />
                                     </div>
                                     <div>
                                         <p className="text-sm font-semibold text-white">Book a Strategy Session</p>
