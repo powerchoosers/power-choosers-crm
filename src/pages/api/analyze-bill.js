@@ -51,12 +51,14 @@ export default async function analyzeBillHandler(req, res) {
       - providerName (The Retail Electric Provider / REP - e.g., Reliant, TXU, Gexa, Direct Energy)
       
       - totalUsage (kWh) - Look for "Total Usage", "Base Usage", or the sum of meter reads.
+      - baseUsageCharge ($) - the charge on the bill's base usage line, before riders or utility adders.
+      - energyRatePerKWh ($/kWh) - the printed rate on the base usage line (for example the rate in "20250 kWh @ $0.0808412 = $1,637.03"). This is the supply price shown on the bill. Do NOT use the supply subtotal or total commercial charges for this field.
       - actualDemand (kW) - the highest measured 15-minute demand on the bill, usually shown as "Actual kW/kVA", "Metered kW", or "NCP Demand".
       - billedDemand (kW) - the kW used for billing on the delivery side, usually shown as "Billed kW/kVA", "Billing kW", ratchet floor, or the kW used in delivery line items. If the bill shows both actual and billed demand, capture both.
       - peakDemand (kW) - if you only find one demand number, put it here as a fallback.
       - powerFactor (percentage) - the power factor shown on the bill, if present.
       
-      - energyChargeTotal ($) - Look for "Total Commercial Charges" or the sum of energy-specific line items.
+      - energyChargeTotal ($) - the supply-side subtotal if the bill shows one, often labeled "Total Commercial Charges". This is NOT the printed supply rate.
       - deliveryChargeTotal ($) - IMPORTANT: Look for "Total Distribution Charges" or the sum of all delivery/TDU/Distribution line items.
       - taxesAndFees ($)
       - demandRatchetCharge ($) - Sum of items like "Distribution System Charge", "Transmission Cost Recov Factor".
@@ -105,6 +107,21 @@ export default async function analyzeBillHandler(req, res) {
         parsed.current_charges_amount ??
         parsed.totalCharges
       );
+      const baseUsageCharge = parseNum(
+        parsed.baseUsageCharge ??
+        parsed.base_usage_charge ??
+        parsed.baseUsageAmount ??
+        parsed.base_usage_amount
+      );
+      const parsedEnergyRate = parseNum(
+        parsed.energyRatePerKWh ??
+        parsed.energy_rate_per_kwh ??
+        parsed.baseUsageRatePerKWh ??
+        parsed.base_usage_rate_per_kwh
+      );
+      const energyRatePerKWh = parsedEnergyRate > 0
+        ? parsedEnergyRate
+        : (baseUsageCharge > 0 && usage > 0 ? baseUsageCharge / usage : 0);
       const actualDemand = parseNum(
         parsed.actualDemand ??
         parsed.actualDemandKw ??
@@ -135,6 +152,8 @@ export default async function analyzeBillHandler(req, res) {
         actualDemand,
         billedDemand,
         totalAmount,
+        baseUsageCharge,
+        energyRatePerKWh,
         deliveryCharges,
         powerFactor
       });
@@ -167,6 +186,8 @@ export default async function analyzeBillHandler(req, res) {
         // Ensure providerName is normalized
         providerName: parsed.providerName || parsed.supplier || 'Unknown Provider',
         customerName: parsed.customerName || 'Unknown Client',
+        baseUsageCharge: baseUsageCharge || parsed.baseUsageCharge || parsed.base_usage_charge || 0,
+        energyRatePerKWh: energyRatePerKWh || parsed.energyRatePerKWh || parsed.energy_rate_per_kwh || 0,
         analysis: {
           zone,
           territory,

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
@@ -13,6 +13,7 @@ import { AnalysisStream } from './components/AnalysisStream'
 import { ResultsPreview } from './components/ResultsPreview'
 import { EmailGate } from './components/EmailGate'
 import { FullReport } from './components/FullReport'
+import { isExampleBillFileName, redactBillIdentity } from './utils/redaction'
 
 type ExtractedData = {
     customer_name: string
@@ -22,11 +23,13 @@ type ExtractedData = {
     actual_demand_kw?: string
     billed_demand_kw: string
     power_factor_pct?: string
+    account_number?: string
     delivery_charges?: string | number
     energy_charges?: string | number
     taxes_and_fees?: string | number
     total_amount_due?: string | number
     service_address?: string
+    esid?: string
 
     // New Fields
     contract_end_date?: string
@@ -76,6 +79,7 @@ export default function BillDebuggerPage() {
     const [footerText, setFooterText] = useState('Waiting for upload')
     const [isProcessing, setIsProcessing] = useState(false)
     const [errorMsg, setErrorMsg] = useState('')
+    const [isDemoBill, setIsDemoBill] = useState(false)
 
     // Data State
     const [extractedData, setExtractedData] = useState<ExtractedData | null>(null)
@@ -95,6 +99,8 @@ export default function BillDebuggerPage() {
 
         try {
             const file = files[0]
+            const demoBill = isExampleBillFileName(file.name)
+            setIsDemoBill(demoBill)
 
             // 2. Convert to Base64
             const base64Data = await new Promise<string>((resolve, reject) => {
@@ -140,6 +146,8 @@ export default function BillDebuggerPage() {
                 customer_name: data.customerName || data.customer_name || 'Unknown Client',
                 provider_name: data.providerName || data.provider_name || data.supplier || 'Unknown Provider',
                 service_address: data.serviceAddress || data.service_address,
+                account_number: data.accountNumber || data.account_number,
+                esid: data.esid || data.esiId || data.esi_id,
                 billing_period: (data.billingPeriod && typeof data.billingPeriod === 'object' ?
                     (data.billingPeriod.start ? `${data.billingPeriod.start} - ${data.billingPeriod.end}` :
                         data.billingPeriod.startDate ? `${data.billingPeriod.startDate} - ${data.billingPeriod.endDate}` : 'Unknown Period')
@@ -180,6 +188,10 @@ export default function BillDebuggerPage() {
         setUserEmail(email)
         setView('report')
 
+        if (isDemoBill) {
+            return
+        }
+
         // Fire-and-forget notification
         try {
             fetch('/api/email/analysis-notification', {
@@ -200,6 +212,11 @@ export default function BillDebuggerPage() {
             console.error('[Notification] Error sending notification:', e);
         }
     }
+
+    const displayData = useMemo(
+        () => (extractedData ? redactBillIdentity(extractedData, isDemoBill) : null),
+        [extractedData, isDemoBill]
+    )
 
     // Dynamic Footer Logic
     useEffect(() => {
@@ -274,10 +291,11 @@ export default function BillDebuggerPage() {
                             }} />
                         )}
 
-                        {view === 'preview' && extractedData && (
+                        {view === 'preview' && displayData && (
                             <ResultsPreview
                                 key="preview"
-                                data={extractedData}
+                                data={displayData}
+                                redactedMode={isDemoBill}
                                 onUnlock={() => setView('email')}
                             />
                         )}
@@ -286,8 +304,8 @@ export default function BillDebuggerPage() {
                             <EmailGate key="email" onUnlock={handleEmailUnlock} />
                         )}
 
-                        {view === 'report' && extractedData && (
-                            <FullReport key="report" data={extractedData} email={userEmail} />
+                        {view === 'report' && displayData && (
+                            <FullReport key="report" data={displayData} email={userEmail} redactedMode={isDemoBill} />
                         )}
 
                         {view === 'error' && (
