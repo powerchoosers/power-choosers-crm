@@ -5,7 +5,6 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Activity, ArrowRight, CalendarDays, Clock, Menu, TrendingUp, X } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
-import { LandingHeader } from '@/components/landing/LandingHeader'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
@@ -44,6 +43,13 @@ const ZONES: { key: LoadZone; label: string }[] = [
   { key: 'south', label: 'South' },
   { key: 'west', label: 'West' },
 ]
+
+const MENU_ITEMS = [
+  { label: 'Forensic Review', href: '/forensic-review' },
+  { label: 'Who We Serve', href: '/who-we-serve' },
+  { label: 'Market Intelligence', href: '/market-data' },
+  { label: 'Contact', href: '/contact' },
+] as const
 
 // ── ERCOT Benchmark Thresholds ──
 // Based on real ERCOT operating data:
@@ -90,6 +96,15 @@ export default function MarketData() {
   const [briefing, setBriefing] = useState<MarketBriefing | null>(null)
   const [briefingLoading, setBriefingLoading] = useState(true)
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isScrolled, setIsScrolled] = useState(false)
+
+  useEffect(() => {
+    const handleScroll = () => setIsScrolled(window.scrollY > 50)
+    window.addEventListener('scroll', handleScroll, { passive: true })
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
+
   // Fetch latest briefing from Supabase
   useEffect(() => {
     async function fetchBriefing() {
@@ -135,7 +150,92 @@ export default function MarketData() {
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-white font-sans selection:bg-[#002FA7] selection:text-white">
-      <LandingHeader />
+      <header
+        id="main-header"
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+          isScrolled ? 'bg-[#0a0a0a]/80 backdrop-blur-xl h-16 shadow-sm border-b border-white/5' : 'bg-transparent h-24'
+        }`}
+      >
+        <div className="w-full px-8 h-full flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2 cursor-pointer">
+            <div className="bg-white p-1.5 rounded-xl">
+              <img src="/images/nodalpoint.png" alt="Nodal Point Logo" className="h-8 w-auto" />
+            </div>
+            <span className="font-bold text-xl tracking-tighter text-white">
+              Nodal <span className="text-[#002FA7]">Point</span>
+            </span>
+          </Link>
+
+          <div className="flex items-center gap-3 md:gap-6">
+            <Link href="/portal" className="hidden md:block text-sm font-medium text-zinc-400 hover:text-white transition-colors">
+              Sign In
+            </Link>
+            <Link
+              href="/book"
+              className="hidden md:flex items-center gap-2 border border-white/15 text-zinc-200 px-5 py-2.5 rounded-full text-sm font-medium hover:border-white/30 hover:bg-white/5 transition-all"
+            >
+              <CalendarDays className="w-4 h-4" />
+              <span>Book a Strategy Call</span>
+            </Link>
+            <a
+              href="/bill-debugger"
+              className="hidden md:flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-sm font-medium hover:scale-105 transition-all"
+            >
+              <Activity className="w-4 h-4" />
+              <span>Review My Bill</span>
+            </a>
+            <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+              <Menu className="w-6 h-6 text-white" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div
+        className={`fixed inset-0 z-50 bg-zinc-950/70 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${
+          isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setIsMenuOpen(false)
+        }}
+      >
+        <button onClick={() => setIsMenuOpen(false)} className="absolute top-8 right-8 p-2 hover:bg-white/10 rounded-full">
+          <X className="w-8 h-8 text-white" />
+        </button>
+        <div className="flex flex-col gap-8 text-center pointer-events-auto">
+          {MENU_ITEMS.map((item, i) => (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={() => setIsMenuOpen(false)}
+              className={`text-4xl md:text-5xl font-light tracking-tight text-white hover:text-[#002FA7] transition-all duration-500 ${
+                isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+              }`}
+              style={{ transitionDelay: `${(i + 1) * 100}ms` }}
+            >
+              {item.label}
+            </Link>
+          ))}
+          <div className={`mt-8 flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`} style={{ transitionDelay: '500ms' }}>
+            <Link
+              href="/book"
+              onClick={() => setIsMenuOpen(false)}
+              className="inline-flex items-center justify-center gap-2 border border-white/15 text-zinc-200 px-6 py-3 rounded-full text-base font-medium hover:border-white/30 hover:bg-white/5 transition-all"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Book a Strategy Call
+            </Link>
+            <a
+              href="/bill-debugger"
+              onClick={() => setIsMenuOpen(false)}
+              className="inline-flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 transition-all"
+            >
+              <Activity className="w-4 h-4" />
+              Review My Bill
+            </a>
+          </div>
+        </div>
+      </div>
 
       <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:40px_40px] opacity-[0.03] pointer-events-none z-0" />
 

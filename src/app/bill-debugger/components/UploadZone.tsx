@@ -34,9 +34,9 @@ export function UploadZone({ onUpload, isAnalyzing, onShowTrust }: UploadZonePro
             {/* Header */}
             {!isAnalyzing && (
                 <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0 }}
+                    initial={{ opacity: 0, y: 10, filter: 'blur(10px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, filter: 'blur(10px)' }}
                     className="mb-10"
                 >
                     <h2 className="text-3xl md:text-5xl font-light text-zinc-900 mb-4">
@@ -52,8 +52,8 @@ export function UploadZone({ onUpload, isAnalyzing, onShowTrust }: UploadZonePro
             {/* Drop Zone Area */}
             <motion.div
                 layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
+                animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
                 transition={{ duration: 0.4 }}
                 className={`relative w-full aspect-[2/1] md:aspect-[3/1] rounded-3xl border-2 transition-all duration-300 flex flex-col items-center justify-center cursor-pointer overflow-hidden backdrop-blur-xl bg-white/80
           ${isDragging
