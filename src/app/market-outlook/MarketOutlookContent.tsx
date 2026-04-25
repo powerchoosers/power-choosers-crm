@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowRight } from 'lucide-react'
+import { Activity, CalendarDays } from 'lucide-react'
 import {
   LineChart,
   Line,
@@ -198,21 +198,22 @@ export default function MarketOutlookContent() {
             <p className="text-zinc-400 text-lg mb-10 max-w-xl mx-auto font-light leading-relaxed">
               Use the curve to decide whether to review the bill now or talk through the next move with us.
             </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-6 max-w-2xl mx-auto">
-              <a
-                href="/bill-debugger"
-                className="w-full md:w-auto inline-flex items-center justify-center gap-3 bg-white text-zinc-900 px-8 py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl"
-              >
-                Review My Bill
-                <ArrowRight className="w-5 h-5" />
-              </a>
-              <Link
-                href="/book"
-                className="w-full md:w-auto inline-flex items-center justify-center gap-3 border border-white/20 text-white px-8 py-4 rounded-full font-bold text-lg hover:border-white/40 transition-all"
-              >
-                Book a Strategy Call
-              </Link>
-            </div>
+              <div className="flex flex-col md:flex-row items-center justify-center gap-6 max-w-2xl mx-auto">
+                <a
+                  href="/bill-debugger"
+                  className="w-full md:w-auto inline-flex items-center justify-center gap-3 bg-white text-zinc-900 px-8 py-4 rounded-full font-bold text-lg hover:scale-105 transition-transform shadow-xl"
+                >
+                  <Activity className="w-5 h-5" />
+                  Review My Bill
+                </a>
+                <Link
+                  href="/book"
+                  className="w-full md:w-auto inline-flex items-center justify-center gap-3 border border-white/20 text-white px-8 py-4 rounded-full font-bold text-lg hover:border-white/40 transition-all"
+                >
+                  <CalendarDays className="w-5 h-5" />
+                  Book a Strategy Call
+                </Link>
+              </div>
           </div>
         </div>
       </section>

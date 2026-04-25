@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, Calendar, ShieldCheck } from 'lucide-react'
+import { ArrowRight, CalendarDays, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 
 interface NextStepsCardProps {
@@ -42,7 +42,7 @@ export function NextStepsCard({ email }: NextStepsCardProps) {
                         href={`/book?${email ? `email=${encodeURIComponent(email)}&` : ''}from=%2Fbill-debugger`}
                         className="group px-12 py-6 bg-black text-white rounded-full font-bold text-xl hover:scale-105 transition-all flex items-center gap-4 shadow-[#000]/20 shadow-2xl hover:shadow-black/30 active:scale-95"
                     >
-                        <Calendar className="w-6 h-6" />
+                        <CalendarDays className="w-6 h-6" />
                         Book a Strategy Call
                         <ArrowRight className="w-6 h-6 group-hover:translate-x-1 transition-transform" />
                     </Link>

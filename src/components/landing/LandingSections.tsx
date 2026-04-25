@@ -4,7 +4,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Activity, UploadCloud, PhoneCall } from 'lucide-react'
+import { Activity, UploadCloud, CalendarDays } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 import { SupplierTicker, SUPPLIER_LOGOS } from '@/components/landing/SupplierTicker'
 import { WhoWeServeSection } from '@/components/landing/WhoWeServeSection'
@@ -311,7 +311,7 @@ export function LandingSections() {
               href="/book"
               className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-400 bg-white/70 text-zinc-700 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 whitespace-nowrap shadow-sm"
             >
-              <PhoneCall className="w-5 h-5" />
+              <CalendarDays className="w-5 h-5" />
               <span>Book a Strategy Call</span>
             </Link>
           </div>

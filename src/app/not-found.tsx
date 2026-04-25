@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import { Activity } from 'lucide-react'
 
 export const metadata: Metadata = {
   title: 'Nodal Point | Page Not Found',
@@ -50,6 +51,7 @@ export default function NotFound() {
             href="/bill-debugger"
             className="inline-flex items-center gap-2 border border-white/10 text-zinc-400 px-6 py-3 rounded-full text-sm font-medium hover:border-white/20 hover:text-white transition-all"
           >
+            <Activity className="w-4 h-4" />
             Review My Bill
           </Link>
         </div>
