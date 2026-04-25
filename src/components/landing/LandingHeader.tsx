@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { Activity, Menu, X, Lock } from 'lucide-react'
+import { Activity, Menu, X, Lock, CalendarDays } from 'lucide-react'
 import { useScrollEffect } from '@/hooks/useScrollEffect'
 
 const MENU_ITEMS = [
@@ -21,7 +21,7 @@ export function LandingHeader() {
     <>
       <header
         id="main-header"
-        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl h-16' : 'bg-transparent h-24'}`}
+        className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${isScrolled ? 'bg-white/80 backdrop-blur-xl h-16 shadow-sm' : 'bg-transparent h-24'}`}
       >
         <div className="w-full px-8 h-full flex items-center justify-between">
           <Link href="/" className="z-50 flex items-center gap-2">
@@ -37,13 +37,19 @@ export function LandingHeader() {
               Nodal <span className="text-[#002FA7]">Point</span>
             </span>
           </Link>
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-3 md:gap-6">
             <a
               href="/portal"
-              className="hidden md:flex items-center gap-2 border border-black/15 text-black/80 hover:text-black hover:border-black/30 px-5 py-2.5 rounded-full text-sm font-medium transition-all duration-200 hover:bg-black/[0.03]"
+              className="hidden md:flex items-center gap-2 border border-transparent text-black/80 hover:text-black hover:bg-black/5 px-4 py-2 rounded-full text-sm font-medium transition-all duration-200"
             >
-              <Lock className="w-4 h-4" />
               <span>Sign In</span>
+            </a>
+            <a
+              href="/book"
+              className="hidden md:flex items-center gap-2 border border-black/15 text-black px-5 py-2.5 rounded-full text-sm font-medium hover:bg-black/5 hover:border-black/30 transition-all"
+            >
+              <CalendarDays className="w-4 h-4" />
+              <span>Book a Strategy Call</span>
             </a>
             <a
               href="/bill-debugger"
@@ -65,8 +71,11 @@ export function LandingHeader() {
       </header>
 
       <div
-        className={`fixed inset-0 z-50 bg-white/10 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+        className={`fixed inset-0 z-50 bg-white/30 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
         aria-hidden={!isMenuOpen}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setIsMenuOpen(false)
+        }}
       >
         <button
           type="button"
@@ -76,32 +85,31 @@ export function LandingHeader() {
         >
           <X className="w-8 h-8 text-black stroke-[1.5]" />
         </button>
-        <div className="flex flex-col gap-8 text-center">
+        <div className="flex flex-col gap-8 text-center pointer-events-auto">
           {MENU_ITEMS.map((item, i) => (
             <a
               key={item.label}
               href={item.href}
-              className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'} delay-${(i + 1) * 100}`}
+              className={`menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
+              style={{ transitionDelay: `${(i + 1) * 100}ms` }}
             >
               {item.label}
             </a>
           ))}
-          <div className={`mt-8 md:hidden transition-all duration-500 delay-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+          <div className={`mt-8 flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`} style={{ transitionDelay: '500ms' }}>
             <a
-              href="/portal"
-              className="flex items-center gap-2 border border-black/15 text-black/80 hover:text-black hover:border-black/30 px-5 py-2.5 rounded-full text-lg font-medium transition-all duration-200 hover:bg-black/[0.03] inline-flex"
+              href="/book"
+              className="flex items-center justify-center gap-2 border border-black/15 text-black px-6 py-3 rounded-full text-base font-medium hover:bg-black/5 hover:border-black/30 transition-all inline-flex"
             >
-              <Lock className="w-5 h-5" />
-              <span>Sign In</span>
+              <CalendarDays className="w-4 h-4" />
+              Book a Strategy Call
             </a>
-          </div>
-          <div className={`transition-all duration-500 delay-500 menu-item ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
             <a
               href="/bill-debugger"
-              className="flex items-center gap-2 bg-[#002FA7] text-white px-5 py-2.5 rounded-full text-lg font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex"
+              className="flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex"
             >
-              <Activity className="w-5 h-5" />
-              <span>Review My Bill</span>
+              <Activity className="w-4 h-4" />
+              Review My Bill
             </a>
           </div>
         </div>

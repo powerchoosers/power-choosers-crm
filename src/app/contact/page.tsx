@@ -7,10 +7,9 @@ import { Activity, ArrowRight, Mail, Menu, Phone, Send, X, MapPin, CalendarDays 
 import { LandingFooter } from '@/components/landing/LandingFooter'
 
 const MENU_ITEMS = [
-  { label: 'Philosophy', href: '/philosophy' },
-  { label: 'How it works', href: '/technical-docs' },
-  { label: 'Market Data', href: '/market-data' },
-  { label: 'Market Outlook', href: '/market-outlook' },
+  { label: 'Forensic Review', href: '/forensic-review' },
+  { label: 'Who We Serve', href: '/who-we-serve' },
+  { label: 'Market Intelligence', href: '/market-data' },
   { label: 'Contact', href: '/contact' },
 ] as const
 
@@ -91,11 +90,14 @@ export default function Contact() {
         className={`fixed inset-0 z-50 bg-zinc-950/70 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${
           isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) setIsMenuOpen(false)
+        }}
       >
         <button onClick={() => setIsMenuOpen(false)} className="absolute top-8 right-8 p-2 hover:bg-white/10 rounded-full">
           <X className="w-8 h-8 text-white" />
         </button>
-        <div className="flex flex-col gap-8 text-center">
+        <div className="flex flex-col gap-8 text-center pointer-events-auto">
           {MENU_ITEMS.map((item, i) => (
             <Link
               key={item.label}
