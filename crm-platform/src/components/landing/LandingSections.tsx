@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Activity, UploadCloud, PhoneCall } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
+import { SupplierTicker, SUPPLIER_LOGOS } from '@/components/landing/SupplierTicker'
 import { WhoWeServeSection } from '@/components/landing/WhoWeServeSection'
 
 export function LandingSections() {
@@ -123,51 +124,10 @@ export function LandingSections() {
 
   return (
     <>
-      {/* ── SUPPLIER LOGO TICKER ── */}
-      <div className="bg-white border-y border-zinc-100 overflow-hidden relative py-7">
-        {/* Fade edges */}
-        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
-
-        <p className="mb-5 text-center font-mono text-[9px] uppercase tracking-[0.3em] text-zinc-400">
-          Supplier partnerships — we benchmark across all of them
-        </p>
-
-        <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
-          {[
-            { src: '/images/suppiers/constellation.png', alt: 'Constellation', tall: true, darker: true },
-            { src: '/images/suppiers/txu.png', alt: 'TXU Energy', tall: false, darker: false },
-            { src: '/images/suppiers/nrg.png', alt: 'NRG', tall: false, darker: false },
-            { src: '/images/suppiers/engie.png', alt: 'ENGIE', tall: false, darker: true },
-            { src: '/images/suppiers/chariot.png', alt: 'Chariot Energy', tall: true, darker: false },
-            { src: '/images/suppiers/shell.png', alt: 'Shell Energy', tall: false, darker: false },
-            { src: '/images/suppiers/freepoint (1).png', alt: 'Freepoint Energy', tall: true, darker: false },
-            { src: '/images/suppiers/gridmatic.png', alt: 'Gridmatic', tall: true, darker: false },
-            { src: '/images/suppiers/ammper.png', alt: 'Ammper Power', tall: false, darker: true },
-            { src: '/images/suppiers/apg&e.png', alt: 'APG&E', tall: false, darker: false },
-            // Duplicate for seamless loop
-            { src: '/images/suppiers/constellation.png', alt: 'Constellation-2', tall: true, darker: true },
-            { src: '/images/suppiers/txu.png', alt: 'TXU Energy-2', tall: false, darker: false },
-            { src: '/images/suppiers/nrg.png', alt: 'NRG-2', tall: false, darker: false },
-            { src: '/images/suppiers/engie.png', alt: 'ENGIE-2', tall: false, darker: true },
-            { src: '/images/suppiers/chariot.png', alt: 'Chariot Energy-2', tall: true, darker: false },
-            { src: '/images/suppiers/shell.png', alt: 'Shell Energy-2', tall: false, darker: false },
-            { src: '/images/suppiers/freepoint (1).png', alt: 'Freepoint Energy-2', tall: true, darker: false },
-            { src: '/images/suppiers/gridmatic.png', alt: 'Gridmatic-2', tall: true, darker: false },
-            { src: '/images/suppiers/ammper.png', alt: 'Ammper Power-2', tall: false, darker: true },
-            { src: '/images/suppiers/apg&e.png', alt: 'APG&E-2', tall: false, darker: false },
-          ].map((logo) => (
-            <div key={logo.alt} className="flex items-center shrink-0 px-10">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={logo.src}
-                alt={logo.alt}
-                className={`${logo.tall ? 'h-20' : 'h-14'} w-auto object-contain grayscale ${logo.darker ? 'brightness-50' : 'brightness-75'} opacity-90 transition-all duration-300 hover:grayscale-0 hover:brightness-100 hover:opacity-100`}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
+      <SupplierTicker
+        label="Supplier partnerships — we benchmark across all of them"
+        logos={SUPPLIER_LOGOS}
+      />
 
       {/* ACT 2: THE REALITY (The Problem) */}
       <section className="bg-[#F5F5F7] flex items-center justify-center px-6 py-20">
