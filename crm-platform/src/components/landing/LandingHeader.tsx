@@ -7,11 +7,9 @@ import { Activity, Menu, X, Lock } from 'lucide-react'
 import { useScrollEffect } from '@/hooks/useScrollEffect'
 
 const MENU_ITEMS = [
-  { label: 'Philosophy', href: '/philosophy' },
-  { label: 'Who we serve', href: '/who-we-serve' },
-  { label: 'How it works', href: '/technical-docs' },
-  { label: 'Market Data', href: '/market-data' },
-  { label: 'Market Outlook', href: '/market-outlook' },
+  { label: 'Forensic Review', href: '/forensic-review' },
+  { label: 'Who We Serve', href: '/who-we-serve' },
+  { label: 'Market Intelligence', href: '/market-data' },
   { label: 'Contact', href: '/contact' },
 ] as const
 

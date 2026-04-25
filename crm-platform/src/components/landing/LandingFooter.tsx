@@ -5,6 +5,7 @@ const NAV_GROUPS = [
   {
     label: 'Start Here',
     links: [
+      { label: 'Forensic Review', href: '/forensic-review' },
       { label: 'Review My Bill', href: '/bill-debugger' },
       { label: 'Book a Strategy Call', href: '/book' },
       { label: 'Sign In', href: '/portal' },
