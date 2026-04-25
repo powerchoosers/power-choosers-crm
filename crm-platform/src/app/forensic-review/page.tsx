@@ -151,7 +151,7 @@ export default function BillReviewLandingPage() {
               </Link>
               <Link
                 href="/book?from=/forensic-review"
-                className="inline-flex items-center justify-center gap-2 px-6 md:px-8 py-4 border border-zinc-400 bg-white/60 text-zinc-700 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 shadow-sm"
+                className="inline-flex items-center justify-center gap-2 px-6 md:px-8 py-4 bg-white border border-zinc-300 text-zinc-900 rounded-full text-base md:text-lg font-medium shadow-sm hover:border-zinc-400 hover:bg-zinc-50 transition-all duration-300"
               >
                 <CalendarDays className="h-5 w-5" />
                 Book a Strategy Call
@@ -358,7 +358,7 @@ export default function BillReviewLandingPage() {
             </Link>
             <Link
               href="/book?from=/forensic-review-bottom"
-              className="inline-flex items-center gap-2 px-8 py-4 border border-zinc-400 bg-white/60 text-zinc-700 rounded-full text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 shadow-sm"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-white border border-zinc-300 text-zinc-900 rounded-full text-lg font-medium shadow-sm hover:border-zinc-400 hover:bg-zinc-50 transition-all duration-300"
             >
               <CalendarDays className="h-5 w-5" />
               Book a Strategy Call
