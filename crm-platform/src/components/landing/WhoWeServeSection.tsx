@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import {
   Activity,
   ArrowRight,
+  CalendarDays,
   Building,
   Building2,
   Factory,
@@ -222,6 +223,7 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
                   href="/book"
                   className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-300 bg-white/80 text-zinc-700 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 whitespace-nowrap shadow-sm"
                 >
+                  <CalendarDays className="w-5 h-5" />
                   <span>Book a Strategy Call</span>
                 </Link>
               </div>

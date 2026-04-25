@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Activity, Menu, X, Lock, CalendarDays } from 'lucide-react'
 import { useScrollEffect } from '@/hooks/useScrollEffect'
 
@@ -12,6 +13,69 @@ const MENU_ITEMS = [
   { label: 'Market Intelligence', href: '/market-data' },
   { label: 'Contact', href: '/contact' },
 ] as const
+
+const MENU_BACKDROP_VARIANTS = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      duration: 0.24,
+      ease: [0.23, 1, 0.32, 1],
+      when: 'beforeChildren',
+      staggerChildren: 0.05,
+      delayChildren: 0.04,
+    },
+  },
+  exit: {
+    opacity: 0,
+    transition: {
+      duration: 0.16,
+      ease: [0.23, 1, 0.32, 1],
+    },
+  },
+} as const
+
+const MENU_PANEL_VARIANTS = {
+  hidden: { opacity: 0, y: 14, scale: 0.985 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: {
+      duration: 0.28,
+      ease: [0.23, 1, 0.32, 1],
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 8,
+    scale: 0.985,
+    transition: {
+      duration: 0.15,
+      ease: [0.23, 1, 0.32, 1],
+    },
+  },
+} as const
+
+const MENU_ITEM_VARIANTS = {
+  hidden: { opacity: 0, y: 10 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.22,
+      ease: [0.23, 1, 0.32, 1],
+    },
+  },
+  exit: {
+    opacity: 0,
+    y: 6,
+    transition: {
+      duration: 0.12,
+      ease: [0.23, 1, 0.32, 1],
+    },
+  },
+} as const
 
 export function LandingHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -70,52 +134,66 @@ export function LandingHeader() {
         </div>
       </header>
 
-      {isMenuOpen ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-[20px] opacity-100 pointer-events-auto transition-opacity duration-300"
-          aria-hidden={!isMenuOpen}
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setIsMenuOpen(false)
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setIsMenuOpen(false)}
-            className="absolute top-8 right-8 p-2 hover:bg-black/5 rounded-full"
-            aria-label="Close menu"
+      <AnimatePresence>
+        {isMenuOpen ? (
+          <motion.div
+            key="landing-menu"
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            variants={MENU_BACKDROP_VARIANTS}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-white/30 backdrop-blur-[20px]"
+            aria-hidden={!isMenuOpen}
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setIsMenuOpen(false)
+            }}
           >
-            <X className="w-8 h-8 text-black stroke-[1.5]" />
-          </button>
-          <div className="flex flex-col gap-8 text-center pointer-events-auto">
-            {MENU_ITEMS.map((item, i) => (
-              <a
-                key={item.label}
-                href={item.href}
-                className="menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-all duration-500 opacity-100 translate-y-0"
-                style={{ transitionDelay: `${(i + 1) * 100}ms` }}
-              >
-                {item.label}
-              </a>
-            ))}
-            <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500 menu-item opacity-100 translate-y-0" style={{ transitionDelay: '500ms' }}>
-              <a
-                href="/book"
-                className="flex items-center justify-center gap-2 border border-black/15 text-black px-6 py-3 rounded-full text-base font-medium hover:bg-black/5 hover:border-black/30 transition-all inline-flex"
-              >
-                <CalendarDays className="w-4 h-4" />
-                Book a Strategy Call
-              </a>
-              <a
-                href="/bill-debugger"
-                className="flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex"
-              >
-                <Activity className="w-4 h-4" />
-                Review My Bill
-              </a>
-            </div>
-          </div>
-        </div>
-      ) : null}
+            <motion.button
+              type="button"
+              onClick={() => setIsMenuOpen(false)}
+              className="absolute top-8 right-8 p-2 hover:bg-black/5 rounded-full"
+              aria-label="Close menu"
+              variants={MENU_ITEM_VARIANTS}
+            >
+              <X className="w-8 h-8 text-black stroke-[1.5]" />
+            </motion.button>
+            <motion.div
+              className="flex flex-col gap-8 text-center pointer-events-auto"
+              variants={MENU_PANEL_VARIANTS}
+            >
+              {MENU_ITEMS.map((item) => (
+                <motion.div key={item.label} variants={MENU_ITEM_VARIANTS}>
+                  <Link
+                    href={item.href}
+                    onClick={() => setIsMenuOpen(false)}
+                    className="menu-item text-4xl md:text-5xl font-light tracking-tight text-black hover:text-[#002FA7] transition-colors duration-300"
+                  >
+                    {item.label}
+                  </Link>
+                </motion.div>
+              ))}
+              <motion.div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center" variants={MENU_ITEM_VARIANTS}>
+                <a
+                  href="/book"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 border border-black/15 text-black px-6 py-3 rounded-full text-base font-medium hover:bg-black/5 hover:border-black/30 transition-all inline-flex"
+                >
+                  <CalendarDays className="w-4 h-4" />
+                  Book a Strategy Call
+                </a>
+                <a
+                  href="/bill-debugger"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-900/20 hover:shadow-blue-900/40 inline-flex"
+                >
+                  <Activity className="w-4 h-4" />
+                  Review My Bill
+                </a>
+              </motion.div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </>
   )
 }
