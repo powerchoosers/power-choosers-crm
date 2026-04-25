@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 import { LandingHeader } from '@/components/landing/LandingHeader'
+import { ScrollRevealScope } from '@/components/motion/ScrollRevealScope'
 
 export const metadata: Metadata = {
   title: 'No More Energy Surprises | Nodal Point Bill Review',
@@ -87,9 +88,9 @@ export default function BillReviewLandingPage() {
   return (
     <main className="min-h-screen bg-zinc-50 text-zinc-900 font-sans antialiased">
       <LandingHeader />
-
-      {/* ── HERO ── */}
-      <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6 pt-20 pb-16 md:pt-32">
+      <ScrollRevealScope>
+        {/* ── HERO ── */}
+        <section className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden px-6 pt-20 pb-16 md:pt-32">
         {/* Dot matrix — absolute so it stays inside the hero only */}
         <div
           className="absolute inset-0 pointer-events-none z-0"
@@ -101,12 +102,12 @@ export default function BillReviewLandingPage() {
           }}
         />
 
-        <div className="relative z-10 mx-auto max-w-7xl w-full grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-12 lg:gap-16 items-center">
+          <div className="relative z-10 mx-auto max-w-7xl w-full grid grid-cols-1 lg:grid-cols-[1fr_1.1fr] gap-12 lg:gap-16 items-center">
 
           {/* Left — copy */}
-          <div className="max-w-xl">
+            <div className="max-w-xl">
             {/* Season urgency badge */}
-            <div className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-2">
+              <div className="mb-6 inline-flex items-center gap-2.5 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-2 reveal-on-scroll">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-400" />
@@ -116,26 +117,31 @@ export default function BillReviewLandingPage() {
               </span>
             </div>
 
-            <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.3em] text-[#002FA7]">
+              <p className="mb-4 font-mono text-[10px] uppercase tracking-[0.3em] text-[#002FA7] reveal-on-scroll delay-100">
               Commercial energy bill review
             </p>
 
-            <h1 className="text-5xl sm:text-6xl lg:text-[4.25rem] font-bold tracking-[-0.07em] leading-[1.02] text-zinc-900">
-              No More Energy{' '}
-              <span className="text-[#002FA7]">Surprises.</span>
-            </h1>
+              <h1 className="text-5xl sm:text-6xl lg:text-[4.25rem] font-bold tracking-[-0.07em] leading-[1.02] text-zinc-900">
+                <span className="word-reveal" style={{ animationDelay: '0ms' }}>No</span>{' '}
+                <span className="word-reveal" style={{ animationDelay: '40ms' }}>More</span>{' '}
+                <span className="word-reveal" style={{ animationDelay: '80ms' }}>Energy</span>
+                <br />
+                <span className="text-[#002FA7]">
+                  <span className="word-reveal" style={{ animationDelay: '120ms' }}>Surprises.</span>
+                </span>
+              </h1>
 
-            <p className="mt-6 text-lg leading-8 text-zinc-600 max-w-lg">
+              <p className="mt-6 text-lg leading-8 text-zinc-600 max-w-lg reveal-on-scroll delay-100">
               Upload your bill before you sign another supplier offer. We separate the real cost
               drivers from the noise — so you can see whether the deal actually fits.
             </p>
 
-            <div className="mt-5 flex items-center gap-2 text-sm font-medium text-[#002FA7]">
+              <div className="mt-5 flex items-center gap-2 text-sm font-medium text-[#002FA7] reveal-on-scroll delay-200">
               <ShieldCheck className="h-4 w-4" />
               <span>No supplier switch required.</span>
             </div>
 
-            <div className="mt-8 flex flex-col sm:flex-row gap-4">
+              <div className="mt-8 flex flex-col sm:flex-row gap-4 reveal-on-scroll delay-300">
               <Link
                 href="/bill-debugger?source=ad-landing"
                 className="inline-flex items-center justify-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20"
@@ -152,27 +158,27 @@ export default function BillReviewLandingPage() {
               </Link>
             </div>
 
-            {/* Trust micro-chips — match home page pill style */}
-            <div className="mt-7 flex flex-wrap items-center gap-2.5">
-              {[
-                { icon: LockKeyhole, label: 'Secure upload' },
-                { icon: Check, label: 'No obligation' },
-                { icon: Check, label: 'Texas commercial only' },
-              ].map((item) => (
-                <span
-                  key={item.label}
-                  className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-3.5 py-2 font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-600 shadow-sm"
-                >
-                  <item.icon className="h-3 w-3 text-[#002FA7]" />
-                  {item.label}
-                </span>
-              ))}
+              {/* Trust micro-chips — match home page pill style */}
+              <div className="mt-7 flex flex-wrap items-center gap-2.5 reveal-on-scroll delay-500">
+                {[
+                  { icon: LockKeyhole, label: 'Secure upload' },
+                  { icon: Check, label: 'No obligation' },
+                  { icon: Check, label: 'Texas commercial only' },
+                ].map((item) => (
+                  <span
+                    key={item.label}
+                    className="inline-flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-3.5 py-2 font-mono text-[10px] uppercase tracking-[0.24em] text-zinc-600 shadow-sm"
+                  >
+                    <item.icon className="h-3 w-3 text-[#002FA7]" />
+                    {item.label}
+                  </span>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Right — forensic card */}
-          <div className="w-full">
-            <div className="rounded-3xl border border-zinc-200/50 bg-white shadow-xl overflow-hidden">
+            {/* Right — forensic card */}
+            <div className="w-full reveal-on-scroll delay-300">
+              <div className="rounded-3xl border border-zinc-200/50 bg-white shadow-xl overflow-hidden">
 
               {/* Card header */}
               <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-4">
@@ -273,22 +279,22 @@ export default function BillReviewLandingPage() {
                   Reviewed before renewal
                 </span>
               </div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
       {/* ── SUPPLIER LOGO TICKER ── */}
-      <section className="border-y border-zinc-100 bg-white py-7 overflow-hidden relative">
+        <section className="border-y border-zinc-100 bg-white py-7 overflow-hidden relative">
         {/* Fade edges */}
         <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
         <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
 
-        <p className="mb-5 text-center font-mono text-[9px] uppercase tracking-[0.3em] text-zinc-400">
+          <p className="mb-5 text-center font-mono text-[9px] uppercase tracking-[0.3em] text-zinc-400 reveal-on-scroll">
           Supplier partnerships — we benchmark across all of them
         </p>
 
-        <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
+          <div className="flex gap-0 w-max reveal-on-scroll delay-100" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
           {[
             { src: '/images/suppiers/constellation.png', alt: 'Constellation', tall: true, darker: true },
             { src: '/images/suppiers/txu.png', alt: 'TXU Energy', tall: false, darker: false },
@@ -321,39 +327,39 @@ export default function BillReviewLandingPage() {
               />
             </div>
           ))}
-        </div>
-      </section>
+          </div>
+        </section>
 
 
 
       {/* ── SOCIAL PROOF STRIP ── */}
-      <section className="border-y border-zinc-100 bg-white py-10 px-6">
-        <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 sm:grid-cols-4">
-          {statItems.map((s) => (
-            <div key={s.label} className="text-center">
+        <section className="border-y border-zinc-100 bg-white py-10 px-6">
+          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-8 sm:grid-cols-4">
+            {statItems.map((s, index) => (
+              <div key={s.label} className={`text-center reveal-on-scroll ${index === 0 ? '' : index === 1 ? 'delay-100' : index === 2 ? 'delay-200' : 'delay-300'}`}>
               <p className="font-mono text-2xl font-bold text-[#002FA7] sm:text-3xl">{s.value}</p>
               <p className="mt-1 text-xs text-zinc-500 uppercase tracking-widest font-mono">{s.label}</p>
             </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
       {/* ── WHAT HAPPENS AFTER UPLOAD ── */}
-      <section className="bg-[#F5F5F7] border-t border-zinc-100 px-6 py-20">
-        <div className="mx-auto max-w-7xl">
-          <div className="mb-12">
-            <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#002FA7] mb-3">
+        <section className="bg-[#F5F5F7] border-t border-zinc-100 px-6 py-20">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-12 reveal-on-scroll">
+              <p className="font-mono text-[10px] uppercase tracking-[0.3em] text-[#002FA7] mb-3">
               What happens after upload
             </p>
             <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900 max-w-2xl">
               A cleaner read before the wrong contract becomes your problem.
             </h2>
-          </div>
-          <div className="grid gap-6 md:grid-cols-3">
-            {trustPoints.map((point) => (
+            </div>
+            <div className="grid gap-6 md:grid-cols-3">
+              {trustPoints.map((point, index) => (
               <div
                 key={point.label}
-                className="rounded-3xl border border-zinc-200/50 bg-white p-8 shadow-sm hover:shadow-md transition-shadow duration-300"
+                className={`rounded-3xl border border-zinc-200/50 bg-white p-8 shadow-sm hover:shadow-md transition-shadow duration-300 reveal-on-scroll ${index === 0 ? '' : index === 1 ? 'delay-100' : 'delay-200'}`}
               >
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-200 bg-zinc-50">
                   <point.icon className="h-5 w-5 text-[#002FA7]" />
@@ -363,27 +369,27 @@ export default function BillReviewLandingPage() {
                 </h3>
                 <p className="mt-2 text-sm leading-6 text-zinc-600">{point.copy}</p>
               </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
 
       {/* ── BOTTOM CTA ── */}
-      <section className="py-32 bg-[#F5F5F7] border-t border-zinc-100 relative overflow-hidden">
+        <section className="py-32 bg-[#F5F5F7] border-t border-zinc-100 relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 max-w-2xl mx-auto px-6 text-center">
-          <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">
+          <div className="relative z-10 max-w-2xl mx-auto px-6 text-center">
+            <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3 reveal-on-scroll">
             4CP Season Opens June 2026
           </p>
           <h2 className="text-5xl md:text-6xl font-bold tracking-tighter text-zinc-900 mb-6 leading-[1.05]">
             Find out what your bill is actually costing you.
           </h2>
-          <p className="text-lg text-zinc-600 leading-7 mb-10 max-w-xl mx-auto">
+            <p className="text-lg text-zinc-600 leading-7 mb-10 max-w-xl mx-auto reveal-on-scroll delay-100">
             Accounts entering ERCOT&apos;s four coincident peak months without a clear picture of
             their demand ratchet exposure carry liability they don&apos;t have to. A 15-minute
             review changes that.
           </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 reveal-on-scroll delay-200">
             <Link
               href="/bill-debugger?source=ad-landing-bottom"
               className="inline-flex items-center gap-2 px-8 py-4 bg-[#002FA7] text-white rounded-full text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20"
@@ -398,12 +404,13 @@ export default function BillReviewLandingPage() {
               <PhoneCall className="h-5 w-5" />
               Book a Strategy Call
             </Link>
-          </div>
-          <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-400">
+            </div>
+            <p className="mt-7 font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-400 reveal-on-scroll delay-300">
             +1 (817) 809-3367 · signal@nodalpoint.io · ERCOT Region, North Texas
           </p>
-        </div>
-      </section>
+          </div>
+        </section>
+      </ScrollRevealScope>
 
       <LandingFooter />
     </main>
