@@ -1,30 +1,12 @@
 'use client'
 
+// Cache-busting comment to force recompile after ticker upgrade
+
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Activity } from 'lucide-react'
+import { Activity, UploadCloud, PhoneCall } from 'lucide-react'
 import { LandingFooter } from '@/components/landing/LandingFooter'
 import { WhoWeServeSection } from '@/components/landing/WhoWeServeSection'
-
-const TICKER_ITEMS = [
-  { label: 'ONCOR', sub: 'TDSP' },
-  { label: 'CENTERPOINT', sub: 'TDSP' },
-  { label: 'AEP TEXAS', sub: 'TDSP' },
-  { label: 'TNMP', sub: 'TDSP' },
-  { label: 'LUBBOCK LIGHT & POWER', sub: 'TDSP' },
-  { label: 'TXU ENERGY', sub: 'REP' },
-  { label: 'RELIANT', sub: 'REP' },
-  { label: 'CONSTELLATION', sub: 'REP' },
-  { label: 'DIRECT ENERGY', sub: 'REP' },
-  { label: 'NRG', sub: 'REP' },
-  { label: 'CHAMPION ENERGY', sub: 'REP' },
-  { label: 'CIRRO ENERGY', sub: 'REP' },
-  { label: 'GREEN MOUNTAIN', sub: 'REP' },
-  { label: '100+ TARIFF STRUCTURES', sub: 'MAPPED' },
-  { label: 'DEMAND RATCHET', sub: 'DECODED' },
-  { label: 'SCARCITY ADDER', sub: 'TRACKED' },
-  { label: 'PEAK DEMAND RISK', sub: 'TRACKED' },
-]
 
 export function LandingSections() {
   const observerRef = useRef<IntersectionObserver | null>(null)
@@ -139,38 +121,51 @@ export function LandingSections() {
     return () => { cancelled = true; obs.disconnect() }
   }, [livePrice])
 
-  const tickerParallax = Math.max(-36, Math.min(36, scrollY * 0.04))
-  const tickerItemsLoop = [...TICKER_ITEMS, ...TICKER_ITEMS]
-
   return (
     <>
-      {/* INTELLIGENCE COVERAGE TICKER */}
-      <div className="bg-white border-y border-zinc-100 overflow-hidden relative">
-        <div className="relative border-t border-zinc-100 py-5 overflow-hidden">
-          {/* Fade edges */}
-          <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+      {/* ── SUPPLIER LOGO TICKER ── */}
+      <div className="bg-white border-y border-zinc-100 overflow-hidden relative py-7">
+        {/* Fade edges */}
+        <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
 
-          <div
-            className="will-change-transform"
-            style={{ transform: `translate3d(${tickerParallax}px, 0, 0)` }}
-          >
-            <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 72s linear infinite' }}>
-              {tickerItemsLoop.map((item, i) => (
-                <div key={`primary-${i}`} className="flex items-center shrink-0">
-                  <div className="flex items-baseline gap-1.5 px-6 py-1 rounded-lg ticker-chip">
-                    <span className="font-mono text-[11px] font-semibold text-zinc-800 tracking-widest uppercase whitespace-nowrap">
-                      {item.label}
-                    </span>
-                    <span className="font-mono text-[9px] text-[#002FA7] tracking-widest uppercase whitespace-nowrap">
-                      {item.sub}
-                    </span>
-                  </div>
-                  <span className="text-zinc-200 text-xs select-none">·</span>
-                </div>
-              ))}
+        <p className="mb-5 text-center font-mono text-[9px] uppercase tracking-[0.3em] text-zinc-400">
+          Supplier partnerships — we benchmark across all of them
+        </p>
+
+        <div className="flex gap-0 w-max" style={{ animation: 'ticker-scroll 40s linear infinite' }}>
+          {[
+            { src: '/images/suppiers/constellation.png', alt: 'Constellation', tall: true, darker: true },
+            { src: '/images/suppiers/txu.png', alt: 'TXU Energy', tall: false, darker: false },
+            { src: '/images/suppiers/nrg.png', alt: 'NRG', tall: false, darker: false },
+            { src: '/images/suppiers/engie.png', alt: 'ENGIE', tall: false, darker: true },
+            { src: '/images/suppiers/chariot.png', alt: 'Chariot Energy', tall: true, darker: false },
+            { src: '/images/suppiers/shell.png', alt: 'Shell Energy', tall: false, darker: false },
+            { src: '/images/suppiers/freepoint (1).png', alt: 'Freepoint Energy', tall: true, darker: false },
+            { src: '/images/suppiers/gridmatic.png', alt: 'Gridmatic', tall: true, darker: false },
+            { src: '/images/suppiers/ammper.png', alt: 'Ammper Power', tall: false, darker: true },
+            { src: '/images/suppiers/apg&e.png', alt: 'APG&E', tall: false, darker: false },
+            // Duplicate for seamless loop
+            { src: '/images/suppiers/constellation.png', alt: 'Constellation-2', tall: true, darker: true },
+            { src: '/images/suppiers/txu.png', alt: 'TXU Energy-2', tall: false, darker: false },
+            { src: '/images/suppiers/nrg.png', alt: 'NRG-2', tall: false, darker: false },
+            { src: '/images/suppiers/engie.png', alt: 'ENGIE-2', tall: false, darker: true },
+            { src: '/images/suppiers/chariot.png', alt: 'Chariot Energy-2', tall: true, darker: false },
+            { src: '/images/suppiers/shell.png', alt: 'Shell Energy-2', tall: false, darker: false },
+            { src: '/images/suppiers/freepoint (1).png', alt: 'Freepoint Energy-2', tall: true, darker: false },
+            { src: '/images/suppiers/gridmatic.png', alt: 'Gridmatic-2', tall: true, darker: false },
+            { src: '/images/suppiers/ammper.png', alt: 'Ammper Power-2', tall: false, darker: true },
+            { src: '/images/suppiers/apg&e.png', alt: 'APG&E-2', tall: false, darker: false },
+          ].map((logo) => (
+            <div key={logo.alt} className="flex items-center shrink-0 px-10">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={logo.src}
+                alt={logo.alt}
+                className={`${logo.tall ? 'h-20' : 'h-14'} w-auto object-contain grayscale ${logo.darker ? 'brightness-50' : 'brightness-75'} opacity-90 transition-all duration-300 hover:grayscale-0 hover:brightness-100 hover:opacity-100`}
+              />
             </div>
-          </div>
+          ))}
         </div>
       </div>
 
@@ -345,17 +340,18 @@ export function LandingSections() {
             Upload a bill or supplier offer. We&apos;ll show the issue, the fit, and the next move.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <a
+            <Link
               href="/bill-debugger"
               className="inline-flex items-center gap-3 bg-black text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl hover:shadow-2xl"
             >
               <Activity className="w-5 h-5" />
               <span>Review My Bill</span>
-            </a>
+            </Link>
             <Link
               href="/book"
               className="inline-flex items-center gap-2 px-6 md:px-8 py-4 border border-zinc-400 bg-white/70 text-zinc-700 rounded-full text-base md:text-lg font-medium hover:border-zinc-900 hover:text-zinc-900 hover:bg-white transition-all duration-300 whitespace-nowrap shadow-sm"
             >
+              <PhoneCall className="w-5 h-5" />
               <span>Book a Strategy Call</span>
             </Link>
           </div>
