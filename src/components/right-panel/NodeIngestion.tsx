@@ -17,6 +17,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { CompanyIcon } from '@/components/ui/CompanyIcon';
 import { ForensicClose } from '@/components/ui/ForensicClose';
 import { panelTheme, useEscClose } from '@/components/right-panel/panelTheme';
+import { headcountMetadata, parseHeadcount } from '@/lib/headcount';
 
 // REAL API ENRICHMENT
 const getApolloAuthHeaders = async (includeContentType: boolean = false): Promise<Record<string, string>> => {
@@ -491,13 +492,13 @@ export function NodeIngestion() {
         const domainKey = identifier.includes('.') ? identifier : scanResult?.domain;
 
         // --- DUPLICATE CHECK: domain first, then name ---
-        let existingAccount: { id: string; ownerId?: string | null } | null = null;
+        let existingAccount: { id: string; ownerId?: string | null; metadata?: Record<string, any> | null } | null = null;
         if (domainKey) {
-          const { data } = await supabase.from('accounts').select('id, ownerId').eq('domain', domainKey).maybeSingle();
+          const { data } = await supabase.from('accounts').select('id, ownerId, metadata').eq('domain', domainKey).maybeSingle();
           if (data) existingAccount = data;
         }
         if (!existingAccount && entityName) {
-          const { data } = await supabase.from('accounts').select('id, ownerId').ilike('name', entityName).maybeSingle();
+          const { data } = await supabase.from('accounts').select('id, ownerId, metadata').ilike('name', entityName).maybeSingle();
           if (data) existingAccount = data;
         }
 
@@ -525,6 +526,7 @@ export function NodeIngestion() {
           rate: '',
           endDate: ''
         }] : [];
+        const parsedHeadcount = parseHeadcount(employees);
 
         const payload = {
           name: entityName,
@@ -532,7 +534,7 @@ export function NodeIngestion() {
           industry: scanResult?.industry,
           description: description || scanResult?.description,
           revenue: revenue,
-          employees: parseInt(employees) || null,
+          employees: parsedHeadcount.value,
           address: address,
           city: city,
           state: state,
@@ -543,7 +545,10 @@ export function NodeIngestion() {
           linkedin_url: scanResult?.linkedin,
           ownerId: currentOwnerId,
           status: 'active',
-          metadata: { meters: meters },
+          metadata: {
+            meters: meters,
+            ...headcountMetadata(parsedHeadcount, 'node_ingestion')
+          },
           updatedAt: now,
         };
 
@@ -557,8 +562,7 @@ export function NodeIngestion() {
           const desc = description || scanResult?.description;
           if (desc) enrichUpdate.description = desc;
           if (revenue) enrichUpdate.revenue = revenue;
-          const emp = parseInt(employees);
-          if (!isNaN(emp) && emp > 0) enrichUpdate.employees = emp;
+          if (parsedHeadcount.value !== null) enrichUpdate.employees = parsedHeadcount.value;
           if (address) enrichUpdate.address = address;
           if (city) enrichUpdate.city = city;
           if (state) enrichUpdate.state = state;
@@ -569,7 +573,16 @@ export function NodeIngestion() {
           const ph = formatPhoneNumber(phone || scanResult?.phone);
           if (ph) enrichUpdate.phone = ph;
           if (scanResult?.linkedin) enrichUpdate.linkedin_url = scanResult.linkedin;
-          if (meters.length > 0) enrichUpdate.metadata = { meters };
+          if (meters.length > 0 || parsedHeadcount.value !== null) {
+            const existingMetadata = existingAccount?.metadata && typeof existingAccount.metadata === 'object'
+              ? existingAccount.metadata
+              : {};
+            enrichUpdate.metadata = {
+              ...existingMetadata,
+              ...(meters.length > 0 ? { meters } : {}),
+              ...headcountMetadata(parsedHeadcount, 'node_ingestion')
+            };
+          }
           if (!existingOwnerId && currentOwnerId) enrichUpdate.ownerId = currentOwnerId;
           const { error } = await supabase.from('accounts').update(enrichUpdate).eq('id', existingId);
           if (error) throw error;
