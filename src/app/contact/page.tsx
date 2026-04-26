@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { Activity, ArrowRight, Mail, Menu, Phone, Send, X, MapPin, CalendarDays } from 'lucide-react'
@@ -15,15 +15,37 @@ const MENU_ITEMS = [
 
 export default function Contact() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isMenuRendered, setIsMenuRendered] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const [formState, setFormState] = useState({ name: '', company: '', email: '', message: '' })
   const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle')
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 50)
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    }
+  }, [])
+
+  const openMenu = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    setIsMenuRendered(true)
+    requestAnimationFrame(() => setIsMenuOpen(true))
+  }
+
+  const closeMenu = () => {
+    setIsMenuOpen(false)
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current)
+    closeTimerRef.current = setTimeout(() => {
+      setIsMenuRendered(false)
+    }, 650)
+  }
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -79,58 +101,72 @@ export default function Contact() {
               <Activity className="w-4 h-4" />
               <span>Review My Bill</span>
             </a>
-            <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+            <button onClick={openMenu} className="p-2 hover:bg-white/10 rounded-full transition-colors" aria-label="Open menu">
               <Menu className="w-6 h-6 text-white" />
             </button>
           </div>
         </div>
       </header>
 
-      <div
-        className={`fixed inset-0 z-50 bg-zinc-950/70 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${
-          isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-        onClick={(e) => {
-          if (e.target === e.currentTarget) setIsMenuOpen(false)
-        }}
-      >
-        <button onClick={() => setIsMenuOpen(false)} className="absolute top-8 right-8 p-2 hover:bg-white/10 rounded-full">
-          <X className="w-8 h-8 text-white" />
-        </button>
-        <div className="flex flex-col gap-8 text-center pointer-events-auto">
-          {MENU_ITEMS.map((item, i) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={() => setIsMenuOpen(false)}
-              className={`text-4xl md:text-5xl font-light tracking-tight text-white hover:text-[#002FA7] transition-all duration-500 ${
-                isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-              }`}
-              style={{ transitionDelay: `${(i + 1) * 100}ms` }}
-            >
-              {item.label}
-            </Link>
-          ))}
-          <div className={`mt-8 flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
-            <Link
-              href="/book"
-              onClick={() => setIsMenuOpen(false)}
-              className="inline-flex items-center justify-center gap-2 border border-white/15 text-zinc-200 px-6 py-3 rounded-full text-base font-medium hover:border-white/30 hover:bg-white/5 transition-all"
-            >
-              <CalendarDays className="w-4 h-4" />
-              Book a Strategy Call
-            </Link>
-            <a
-              href="/bill-debugger"
-              onClick={() => setIsMenuOpen(false)}
-              className="inline-flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 transition-all"
-            >
-              <Activity className="w-4 h-4" />
-              Review My Bill
-            </a>
+      {isMenuRendered ? (
+        <div
+          className={`fixed inset-0 z-50 bg-zinc-950/70 backdrop-blur-[20px] flex items-center justify-center transition-opacity duration-300 ${
+            isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          aria-hidden={!isMenuOpen}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) closeMenu()
+          }}
+        >
+          <button
+            type="button"
+            onClick={closeMenu}
+            className={`absolute top-8 right-8 p-2 hover:bg-white/10 rounded-full ${
+              isMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'
+            }`}
+            aria-label="Close menu"
+            tabIndex={isMenuOpen ? 0 : -1}
+          >
+            <X className="w-8 h-8 text-white" />
+          </button>
+          <div className={`flex flex-col gap-8 text-center ${isMenuOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
+            {MENU_ITEMS.map((item, i) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                onClick={closeMenu}
+                tabIndex={isMenuOpen ? 0 : -1}
+                className={`text-4xl md:text-5xl font-light tracking-tight text-white hover:text-[#002FA7] transition-all duration-500 ${
+                  isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+                }`}
+                style={{ transitionDelay: `${(i + 1) * 100}ms` }}
+              >
+                {item.label}
+              </Link>
+            ))}
+            <div className={`mt-8 flex flex-col sm:flex-row gap-3 justify-center transition-all duration-500 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}>
+              <Link
+                href="/book"
+                onClick={closeMenu}
+                tabIndex={isMenuOpen ? 0 : -1}
+                className="inline-flex items-center justify-center gap-2 border border-white/15 text-zinc-200 px-6 py-3 rounded-full text-base font-medium hover:border-white/30 hover:bg-white/5 transition-all"
+              >
+                <CalendarDays className="w-4 h-4" />
+                Book a Strategy Call
+              </Link>
+              <a
+                href="/bill-debugger"
+                onClick={closeMenu}
+                tabIndex={isMenuOpen ? 0 : -1}
+                className="inline-flex items-center justify-center gap-2 bg-[#002FA7] text-white px-6 py-3 rounded-full text-base font-medium hover:scale-105 transition-all"
+              >
+                <Activity className="w-4 h-4" />
+                Review My Bill
+              </a>
+            </div>
           </div>
         </div>
-      </div>
+      ) : null}
 
       <div className="fixed inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.1] pointer-events-none z-0" />
 
