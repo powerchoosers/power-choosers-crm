@@ -482,7 +482,7 @@ export default function AccountsPage() {
       },
       {
         accessorKey: 'employees',
-        header: 'Employees',
+        header: 'Headcount',
         cell: ({ row }) => <div className="text-zinc-500 text-sm font-mono tabular-nums">{row.getValue('employees')}</div>,
       },
       {
@@ -854,7 +854,7 @@ export default function AccountsPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Employees</label>
+                  <label className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Headcount</label>
                   <Input
                     value={newAccount.employees}
                     onChange={e => setNewAccount(p => ({ ...p, employees: e.target.value }))}
