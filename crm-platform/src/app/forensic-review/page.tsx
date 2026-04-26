@@ -159,7 +159,7 @@ export default function BillReviewLandingPage() {
             </div>
 
               {/* Trust micro-chips — match home page pill style */}
-              <div className="mt-7 flex flex-wrap items-center gap-2.5 reveal-on-scroll delay-500">
+              <div className="mt-7 hidden flex-wrap items-center gap-2.5 reveal-on-scroll delay-500 sm:flex">
                 {[
                   { icon: LockKeyhole, label: 'Secure upload' },
                   { icon: Check, label: 'No obligation' },
@@ -285,7 +285,12 @@ export default function BillReviewLandingPage() {
         </section>
 
       <SupplierTicker
-        label="Supplier partnerships — we benchmark across all of them"
+        label={
+          <>
+            <span className="sm:hidden">Supplier Partnerships</span>
+            <span className="hidden sm:inline">Supplier partnerships — we benchmark across all of them</span>
+          </>
+        }
         logos={SUPPLIER_LOGOS}
       />
 
