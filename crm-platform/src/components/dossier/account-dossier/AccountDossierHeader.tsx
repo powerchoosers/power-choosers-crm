@@ -15,6 +15,7 @@ import DestructModal from '@/components/network/DestructModal'
 import { cn } from '@/lib/utils'
 import { domainToClickableUrl } from '@/lib/url'
 import { isActiveLoadAccount, isContractExpired, isCustomerStatus } from '@/lib/status-filters'
+import { formatHeadcountLabel } from '@/lib/headcount'
 
 interface AccountDossierHeaderProps {
     account: any
@@ -93,6 +94,7 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
     const router = useRouter()
     const [isPending, startTransition] = useTransition()
     const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+    const headcountLabel = formatHeadcountLabel(account.employees, account.metadata)
 
     return (
         <header className="flex-none px-6 py-6 md:px-8 border-b border-white/5 nodal-recessed relative z-10">
@@ -417,12 +419,12 @@ export const AccountDossierHeader = memo(function AccountDossierHeader({
                                             <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
                                             <ForensicDataPoint value={account.location || 'Unknown Location'} valueClassName="text-zinc-400" inline compact />
                                         </div>
-                                        {account.employees && (
+                                        {headcountLabel && (
                                             <>
                                                 <span className="flex-none w-1 h-1 rounded-full bg-zinc-800" />
                                                 <div className="flex-none flex items-center gap-1.5 text-zinc-400">
                                                     <Users className="w-3.5 h-3.5 text-white shrink-0" />
-                                                    <ForensicDataPoint value={`${Number(account.employees).toLocaleString()} emp`} valueClassName="text-zinc-400" inline compact />
+                                                    <ForensicDataPoint value={`${headcountLabel} emp`} valueClassName="text-zinc-400" inline compact />
                                                 </div>
                                             </>
                                         )}

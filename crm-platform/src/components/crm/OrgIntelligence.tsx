@@ -26,6 +26,7 @@ import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { getFreshSupabaseAccessToken } from '@/lib/auth/supabase-session';
+import { formatHeadcountLabel, headcountMetadata, parseHeadcount } from '@/lib/headcount';
 
 interface OrgIntelligenceProps {
   domain?: string;
@@ -886,12 +887,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
 
     setScanStatus('scanning'); // This will trigger the blur overlay
     try {
-      // Parse employees to integer (database schema uses int, not text)
-      const employeesValue = companySummary.employees
-        ? (typeof companySummary.employees === 'number'
-          ? companySummary.employees
-          : parseInt(String(companySummary.employees).replace(/[^0-9]/g, ''), 10) || null)
-        : null;
+      const parsedHeadcount = parseHeadcount(companySummary.employees);
+      const employeesValue = parsedHeadcount.value;
 
       // Pull existing account shape so Apollo enrichment can merge instead of replace.
       const { data: existingAccount, error: existingAccountError } = await supabase
@@ -938,6 +935,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             ...currentMetadata,
             meters: meters, // Save meter with service address
             apollo_enriched_at: new Date().toISOString(),
+            ...headcountMetadata(parsedHeadcount, 'apollo_enrichment'),
             apollo_raw_data: companySummary
           }
         })
@@ -2228,7 +2226,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                       )}
                     </div>
                     <p className="text-[9px] font-mono text-zinc-400 truncate uppercase tracking-tighter">
-                      {companySummary.industry || 'Enterprise'} • {companySummary.employees || '0-50'} Emp
+                      {companySummary.industry || 'Enterprise'} • {formatHeadcountLabel(companySummary.employees) || '0-50'} Emp
                       {companySummary.revenue && ` • ${companySummary.revenue}`}
                     </p>
                     <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1">

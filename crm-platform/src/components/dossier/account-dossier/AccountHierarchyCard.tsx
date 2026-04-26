@@ -12,6 +12,7 @@ import { supabase } from '@/lib/supabase'
 import { formatPhoneNumber } from '@/lib/formatPhone'
 import { cn } from '@/lib/utils'
 import { parseAddressParts } from '@/lib/address'
+import { headcountMetadata, parseHeadcount } from '@/lib/headcount'
 
 type RelationshipMode = 'PARENT' | 'SUBSIDIARY'
 
@@ -355,8 +356,8 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
         endDate: ''
       }]
       : []
-    const employeesRaw = parseInt(String(merged.employees ?? ''), 10)
-    const employees = Number.isNaN(employeesRaw) ? null : employeesRaw
+    const parsedHeadcount = parseHeadcount(merged.employees)
+    const employees = parsedHeadcount.value
     const phone = formatPhoneNumber(merged.phone || '') || null
     const now = new Date().toISOString()
     const { data: { session } } = await supabase.auth.getSession()
@@ -413,8 +414,15 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
       const existingMetadata = (currentRow?.metadata && typeof currentRow.metadata === 'object')
         ? currentRow.metadata as Record<string, unknown>
         : {}
+      const nextMetadata = {
+        ...existingMetadata,
+        ...(meters.length > 0 ? { meters } : {}),
+        ...headcountMetadata(parsedHeadcount, 'account_hierarchy'),
+      }
       if (meters.length > 0) {
-        updates.metadata = { ...existingMetadata, meters }
+        updates.metadata = nextMetadata
+      } else if (parsedHeadcount.value !== null) {
+        updates.metadata = nextMetadata
       }
       if (!existingOwnerId && currentOwnerId) {
         updates.ownerId = currentOwnerId
@@ -447,7 +455,10 @@ export function AccountHierarchyCard({ accountId, account, className }: AccountH
           website: merged.website || null,
           ownerId: currentOwnerId,
           status: 'active',
-          metadata: { meters },
+          metadata: {
+            meters,
+            ...headcountMetadata(parsedHeadcount, 'account_hierarchy')
+          },
           createdAt: now,
           updatedAt: now
         })

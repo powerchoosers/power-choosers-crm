@@ -8,12 +8,14 @@ import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
 import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { buildAccountStatusClauses } from '@/lib/status-filters'
+import { formatHeadcountLabel, headcountMetadata, parseHeadcount } from '@/lib/headcount'
 
 export interface Account {
   id: string
   name: string
   industry: string
   domain: string
+  website?: string
   description: string
   logoUrl?: string
   companyPhone: string
@@ -132,12 +134,13 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
     id: data.id,
     name: data.name || 'Unknown Account',
     industry: data.industry || '',
-    domain: data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
+    domain: data.domain || data.website || data.metadata?.domain || data.metadata?.general?.domain || '',
+    website: data.website || data.domain || data.metadata?.domain || data.metadata?.general?.domain || '',
     description: data.description || '',
     logoUrl: data.logo_url || data.metadata?.logo_url || data.metadata?.logoUrl || '',
     companyPhone: data.phone || '',
     contractEnd: data.contract_end_date || '',
-    employees: data.employees?.toString() || '',
+    employees: formatHeadcountLabel(data.employees, data.metadata) || data.employees?.toString() || '',
     revenue: data.revenue || '',
     location,
     city,
@@ -553,18 +556,20 @@ export function useCreateAccount() {
   return useMutation({
     mutationFn: async (newAccount: Omit<Account, 'id'> & { id?: string }) => {
       await ensureFreshSupabaseSession()
+      const parsedHeadcount = parseHeadcount(newAccount.employees)
       // Map frontend fields to DB columns
       const dbAccount = {
         id: newAccount.id || crypto.randomUUID(),
         name: newAccount.name,
         industry: newAccount.industry,
         domain: newAccount.domain,
+        website: newAccount.website || newAccount.domain || null,
         logo_url: newAccount.logoUrl,
         phone: newAccount.companyPhone,
         linkedin_url: newAccount.linkedinUrl,
         service_addresses: newAccount.serviceAddresses,
         contract_end_date: newAccount.contractEnd || null,
-        employees: parseInt(newAccount.employees) || null,
+        employees: parsedHeadcount.value,
         revenue: newAccount.revenue || null,
         city: newAccount.city || newAccount.location?.split(',')[0]?.trim(),
         state: newAccount.state || newAccount.location?.split(',')[1]?.trim(),
@@ -580,6 +585,7 @@ export function useCreateAccount() {
         metadata: {
           sqft: newAccount.sqft,
           occupancy: newAccount.occupancy,
+          ...headcountMetadata(parsedHeadcount, 'account_create'),
           ...newAccount.metadata
         }
       }
@@ -618,6 +624,7 @@ export function useUpsertAccount() {
             .from('accounts')
             .select('id, metadata')
             .eq('domain', account.domain)
+            .limit(1)
             .maybeSingle();
 
           if (existing) {
@@ -631,6 +638,7 @@ export function useUpsertAccount() {
             .from('accounts')
             .select('id, metadata')
             .ilike('name', account.name)
+            .limit(1)
             .maybeSingle();
 
           if (existing) {
@@ -639,25 +647,56 @@ export function useUpsertAccount() {
         }
       }
 
-      const dbAccount: any = {
-        name: account.name,
-        industry: account.industry,
-        domain: account.domain,
-        logo_url: account.logoUrl,
-        phone: account.companyPhone,
-        linkedin_url: account.linkedinUrl,
-        service_addresses: account.serviceAddresses,
-        contract_end_date: account.contractEnd || null,
-        employees: parseInt(account.employees) || null,
-        description: account.description || '',
-        updatedAt: new Date().toISOString()
-      };
+      const hasText = (value: unknown) => typeof value === 'string' ? value.trim().length > 0 : value != null
+      const parsedHeadcount = parseHeadcount(account.employees)
+      const employeesValue = hasText(account.employees) ? parsedHeadcount.value : null
 
-      if (account.address !== undefined) dbAccount.address = account.address || null;
-      if (account.city !== undefined) dbAccount.city = account.city || null;
-      if (account.state !== undefined) dbAccount.state = account.state || null;
-      if (account.country !== undefined) dbAccount.country = account.country || null;
-      if (account.zip !== undefined) dbAccount.zip = account.zip || null;
+      const dbAccount: any = existingId
+        ? {
+          updatedAt: new Date().toISOString()
+        }
+        : {
+          name: account.name,
+          industry: account.industry,
+          domain: account.domain,
+          website: account.website || account.domain || null,
+          logo_url: account.logoUrl,
+          phone: account.companyPhone,
+          linkedin_url: account.linkedinUrl,
+          service_addresses: account.serviceAddresses,
+          contract_end_date: account.contractEnd || null,
+          employees: employeesValue,
+          description: account.description || '',
+          updatedAt: new Date().toISOString()
+        };
+
+      if (existingId) {
+        if (hasText(account.name)) dbAccount.name = account.name;
+        if (hasText(account.industry)) dbAccount.industry = account.industry;
+        if (hasText(account.domain)) dbAccount.domain = account.domain;
+        if (hasText(account.website || account.domain)) dbAccount.website = account.website || account.domain;
+        if (hasText(account.logoUrl)) dbAccount.logo_url = account.logoUrl;
+        if (hasText(account.companyPhone)) dbAccount.phone = account.companyPhone;
+        if (hasText(account.linkedinUrl)) dbAccount.linkedin_url = account.linkedinUrl;
+        if (Array.isArray(account.serviceAddresses) && account.serviceAddresses.length > 0) dbAccount.service_addresses = account.serviceAddresses;
+        if (hasText(account.contractEnd)) dbAccount.contract_end_date = account.contractEnd;
+        if (employeesValue !== null) dbAccount.employees = employeesValue;
+        if (hasText(account.description)) dbAccount.description = account.description;
+      }
+
+      if (!existingId) {
+        if (account.address !== undefined) dbAccount.address = account.address || null;
+        if (account.city !== undefined) dbAccount.city = account.city || null;
+        if (account.state !== undefined) dbAccount.state = account.state || null;
+        if (account.country !== undefined) dbAccount.country = account.country || null;
+        if (account.zip !== undefined) dbAccount.zip = account.zip || null;
+      } else {
+        if (hasText(account.address)) dbAccount.address = account.address;
+        if (hasText(account.city)) dbAccount.city = account.city;
+        if (hasText(account.state)) dbAccount.state = account.state;
+        if (hasText(account.country)) dbAccount.country = account.country;
+        if (hasText(account.zip)) dbAccount.zip = account.zip;
+      }
       if (account.revenue) dbAccount.revenue = account.revenue;
       if (account.annualUsage) dbAccount.annual_usage = account.annualUsage;
       if (account.electricitySupplier) dbAccount.electricity_supplier = account.electricitySupplier;
@@ -670,6 +709,7 @@ export function useUpsertAccount() {
         dbAccount.metadata = {
           sqft: account.sqft,
           occupancy: account.occupancy,
+          ...headcountMetadata(parsedHeadcount, 'account_upsert'),
           ...account.metadata
         };
 
@@ -693,6 +733,7 @@ export function useUpsertAccount() {
           ...(current?.metadata || {}),
           sqft: account.sqft || current?.metadata?.sqft,
           occupancy: account.occupancy || current?.metadata?.occupancy,
+          ...headcountMetadata(parsedHeadcount, 'account_upsert'),
           ...account.metadata
         };
 
@@ -756,14 +797,22 @@ export function useUpdateAccount() {
 
       // 2. Map updates to DB columns
       const dbUpdates: Record<string, string | number | null | object> = {}
+      let parsedHeadcountForMetadata: ReturnType<typeof parseHeadcount> | null = null
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.industry !== undefined) dbUpdates.industry = updates.industry
-      if (updates.domain !== undefined) dbUpdates.domain = updates.domain
+      if (updates.domain !== undefined) {
+        dbUpdates.domain = updates.domain
+        dbUpdates.website = updates.domain || null
+      }
+      if (updates.website !== undefined) dbUpdates.website = updates.website || null
       if (updates.description !== undefined) dbUpdates.description = updates.description
       if (updates.logoUrl !== undefined) dbUpdates.logo_url = updates.logoUrl
       if (updates.companyPhone !== undefined) dbUpdates.phone = updates.companyPhone
       if (updates.contractEnd !== undefined) dbUpdates.contract_end_date = updates.contractEnd || null
-      if (updates.employees !== undefined) dbUpdates.employees = updates.employees ? (parseInt(updates.employees) || null) : null
+      if (updates.employees !== undefined) {
+        parsedHeadcountForMetadata = parseHeadcount(updates.employees)
+        dbUpdates.employees = updates.employees ? parsedHeadcountForMetadata.value : null
+      }
       if (updates.location !== undefined) {
         const parts = updates.location?.split(',') || []
         dbUpdates.city = parts[0]?.trim() || null
@@ -788,6 +837,10 @@ export function useUpdateAccount() {
       if (updates.loadFactor !== undefined) { newMetadata.loadFactor = updates.loadFactor; hasMetadataUpdate = true; }
       if (updates.loadZone !== undefined) { newMetadata.loadZone = updates.loadZone; hasMetadataUpdate = true; }
       if (updates.mills !== undefined) { newMetadata.mills = updates.mills; hasMetadataUpdate = true; }
+      if (parsedHeadcountForMetadata && parsedHeadcountForMetadata.value !== null) {
+        Object.assign(newMetadata, headcountMetadata(parsedHeadcountForMetadata, 'account_update'))
+        hasMetadataUpdate = true
+      }
       if (updates.primaryContactId !== undefined) dbUpdates['primaryContactId'] = updates.primaryContactId ?? null
       if (updates.meters !== undefined) {
         newMetadata.meters = updates.meters;

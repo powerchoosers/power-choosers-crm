@@ -20,6 +20,7 @@ import { normalizeWebsiteForImport } from '@/lib/url';
 import { ForensicClose } from '@/components/ui/ForensicClose';
 import { isCsvFile } from '@/lib/file-ingestion';
 import { buildImportCommunicationSignals, pickBestSignal } from '@/lib/contact-signals';
+import { headcountMetadata, parseHeadcount } from '@/lib/headcount';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -40,6 +41,7 @@ type ImportFieldAliases = Record<string, string[]>
 
 // Nodal Point Field Schemas
 const CONTACT_FIELDS: ImportFieldDefinition[] = [
+  { id: 'full_name', label: 'Full Name', required: false },
   { id: 'first_name', label: 'First Name', required: true },
   { id: 'last_name', label: 'Last Name', required: true },
   { id: 'email', label: 'Email Address', required: true },
@@ -89,9 +91,10 @@ const ACCOUNT_FIELDS: ImportFieldDefinition[] = [
 ];
 
 const CONTACT_FIELD_ALIASES: ImportFieldAliases = {
+  full_name: ['contact full name', 'full name', 'contact name', 'name'],
   first_name: ['first name', 'firstname'],
   last_name: ['last name', 'lastname'],
-  email: ['email 1', 'email address', 'work email', 'business email', 'personal email'],
+  email: ['email 1', 'contact email', 'email address', 'work email', 'business email', 'personal email'],
   phone: ['contact phone 1', 'primary phone', 'direct phone'],
   mobile_phone: ['contact mobile phone', 'mobile phone', 'cell phone'],
   work_direct: ['contact phone 2', 'work direct', 'work direct phone'],
@@ -111,7 +114,7 @@ const CONTACT_FIELD_ALIASES: ImportFieldAliases = {
   company_address: ['company address', 'company location', 'service address', 'site address', 'address'],
   company_country: ['company country'],
   company_postal_code: ['company post code', 'company postal code', 'company zip', 'company zip code', 'postal code', 'zip', 'zip code'],
-  company_employee_count: ['company staff count', 'company employee count', 'staff count', 'headcount', 'head count'],
+  company_employee_count: ['company staff count', 'company employee count', 'staff count', 'headcount', 'head count', 'company staff count range', 'company employee count range', 'employee count range', 'headcount range', 'employee range', 'staff count range'],
   company_annual_revenue: ['company annual revenue', 'annual revenue', 'revenue'],
 }
 
@@ -129,7 +132,7 @@ const ACCOUNT_FIELD_ALIASES: ImportFieldAliases = {
   country: ['company country', 'country'],
   postal_code: ['company post code', 'company postal code', 'postal code', 'zip', 'zip code', 'post code'],
   annual_revenue: ['company annual revenue', 'annual revenue', 'revenue'],
-  employee_count: ['company staff count', 'company employee count', 'headcount', 'head count', 'employees'],
+  employee_count: ['company staff count', 'company employee count', 'headcount', 'head count', 'employees', 'company staff count range', 'company employee count range', 'employee count range', 'headcount range', 'employee range', 'staff count range'],
   energy_supplier: ['current supplier', 'energy supplier', 'supplier'],
   annual_usage: ['annual usage', 'annual usage kwh', 'usage'],
   contract_end: ['contract end date', 'contract end'],
@@ -143,27 +146,81 @@ function normalizeImportHeader(value: string) {
     .replace(/\s+/g, ' ')
 }
 
-function findFieldMatch(
-  header: string,
-  fields: ImportFieldDefinition[],
-  aliases: ImportFieldAliases,
-) {
+function getAliasRank(header: string, aliases: string[]) {
   const normalizedHeader = normalizeImportHeader(header)
+  const index = aliases.findIndex((alias) => normalizeImportHeader(alias) === normalizedHeader)
+  return index === -1 ? Number.POSITIVE_INFINITY : index
+}
 
-  for (const field of fields) {
-    const fieldAliases = aliases[field.id] ?? []
-    if (fieldAliases.some((alias) => normalizeImportHeader(alias) === normalizedHeader)) {
-      return field.id
-    }
+function countFilledRows(rows: any[], header: string) {
+  return rows.reduce((count, row) => {
+    const value = row?.[header]
+    return String(value ?? '').trim() ? count + 1 : count
+  }, 0)
+}
+
+function splitFullName(value: unknown) {
+  const cleaned = String(value ?? '').replace(/\s+/g, ' ').trim()
+  if (!cleaned) return { firstName: '', lastName: '' }
+
+  const parts = cleaned.split(' ')
+  return {
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' '),
   }
+}
 
-  return null
+function toMetadataKey(header: string) {
+  return normalizeImportHeader(header).replace(/\s+/g, '_')
+}
+
+function extractCompanySourceFields(row: Record<string, unknown>) {
+  const sourceFields: Record<string, string> = {}
+
+  Object.entries(row).forEach(([header, value]) => {
+    const cleanedValue = String(value ?? '').trim()
+    if (!cleanedValue) return
+
+    const normalizedHeader = normalizeImportHeader(header)
+    const isCompanyField = normalizedHeader.startsWith('company ')
+    const isCompanyCodeField = normalizedHeader === 'sic code' || normalizedHeader === 'naics code'
+    const isExtraCompanyPhone = /^company phone [2-9]/.test(normalizedHeader)
+
+    if ((isCompanyField || isCompanyCodeField) && !isExtraCompanyPhone) {
+      sourceFields[toMetadataKey(header)] = cleanedValue
+    }
+  })
+
+  return sourceFields
+}
+
+function resolveImportHeadcount(
+  primaryValue: unknown,
+  sourceCompanyFields: Record<string, string>,
+  source: string,
+) {
+  const fallbackValue =
+    String(primaryValue ?? '').trim() ||
+    sourceCompanyFields.company_staff_count ||
+    sourceCompanyFields.company_employee_count ||
+    sourceCompanyFields.company_staff_count_range ||
+    sourceCompanyFields.company_employee_count_range ||
+    sourceCompanyFields.headcount_range ||
+    sourceCompanyFields.employee_range ||
+    ''
+  const parsed = parseHeadcount(fallbackValue)
+
+  return {
+    value: parsed.value !== null ? String(parsed.value) : '',
+    metadata: headcountMetadata(parsed, source),
+  }
 }
 
 function buildInitialFieldMapping(
   headers: CsvHeader[],
   vector: ImportVector,
   cachedMapping: Record<string, string>,
+  rows: any[] = [],
 ) {
   const fields = vector === 'CONTACTS' ? CONTACT_FIELDS : ACCOUNT_FIELDS
   const aliases = vector === 'CONTACTS' ? CONTACT_FIELD_ALIASES : ACCOUNT_FIELD_ALIASES
@@ -182,13 +239,32 @@ function buildInitialFieldMapping(
     if (cachedValue && validFieldIds.has(cachedValue) && !usedFieldIds.has(cachedValue)) {
       nextMapping[header.raw] = cachedValue
       usedFieldIds.add(cachedValue)
-      return
     }
+  })
 
-    const detectedFieldId = findFieldMatch(header.raw, fields, aliases)
-    if (detectedFieldId && !usedFieldIds.has(detectedFieldId)) {
-      nextMapping[header.raw] = detectedFieldId
-      usedFieldIds.add(detectedFieldId)
+  fields.forEach((field) => {
+    if (usedFieldIds.has(field.id)) return
+
+    const fieldAliases = aliases[field.id] ?? []
+    const candidates = headers
+      .map((header, index) => ({
+        header,
+        index,
+        aliasRank: getAliasRank(header.raw, fieldAliases),
+        filledCount: countFilledRows(rows, header.raw),
+      }))
+      .filter((candidate) => candidate.aliasRank !== Number.POSITIVE_INFINITY)
+      .filter((candidate) => !nextMapping[candidate.header.raw])
+      .sort((a, b) => {
+        if (b.filledCount !== a.filledCount) return b.filledCount - a.filledCount
+        if (a.aliasRank !== b.aliasRank) return a.aliasRank - b.aliasRank
+        return a.index - b.index
+      })
+
+    const bestCandidate = candidates[0]
+    if (bestCandidate) {
+      nextMapping[bestCandidate.header.raw] = field.id
+      usedFieldIds.add(field.id)
     }
   })
 
@@ -273,6 +349,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                 .from('accounts')
                 .select('id')
                 .eq('domain', domain)
+                .limit(1)
                 .maybeSingle();
               if (data) return true;
             }
@@ -283,13 +360,15 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                 .from('accounts')
                 .select('id')
                 .ilike('name', name)
+                .limit(1)
                 .maybeSingle();
               if (data) return true;
             }
           } else {
             const email = mappedData.email;
-            const fName = mappedData.first_name;
-            const lName = mappedData.last_name;
+            const fullNameParts = splitFullName(mappedData.full_name);
+            const fName = mappedData.first_name || fullNameParts.firstName;
+            const lName = mappedData.last_name || fullNameParts.lastName;
             const company = mappedData.company_name;
 
             // Try email match
@@ -346,7 +425,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
   }, [step, fieldMapping]);
 
   // --- LOGIC: CACHED MAPPINGS ---
-  const getCacheKey = (vector: ImportVector | null) => `nodal_import_mapping_v2_${vector}`;
+  const getCacheKey = (vector: ImportVector | null) => `nodal_import_mapping_v3_${vector}`;
 
   const saveMappingToCache = (vector: ImportVector | null, mapping: Record<string, string>) => {
     if (!vector) return;
@@ -408,11 +487,11 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
     
     data.forEach(row => {
       if (vector === 'CONTACTS') {
-        const email = row.Email || row.email || row['Email Address'];
+        const email = row.Email || row.email || row['Email Address'] || row['Email 1'] || row['Contact Email'] || row['Email 2'];
         const isValidEmail = email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
         if (isValidEmail) valid++; else invalid++;
       } else {
-        const website = row.Website || row.website || row.Domain || row.domain;
+        const website = row.Website || row.website || row.Domain || row.domain || row['Company Website Domain'];
         const isValidDomain = website && website.includes('.');
         if (isValidDomain) valid++; else invalid++;
       }
@@ -448,7 +527,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                 
                 // --- PRE-CALIBRATE MAPPING BEFORE TRANSITION ---
                 const cachedMapping = loadMappingFromCache(vectorOverride);
-                const newMapping = buildInitialFieldMapping(headers, vectorOverride, cachedMapping);
+                const newMapping = buildInitialFieldMapping(headers, vectorOverride, cachedMapping, results.data);
                 setFieldMapping(newMapping);
                 saveMappingToCache(vectorOverride, newMapping);
               }
@@ -542,6 +621,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
     
     for (let i = 0; i < csvData.length; i++) {
       const row = csvData[i];
+      const sourceCompanyFields = extractCompanySourceFields(row);
       const mappedData: any = {};
       
       // Map fields
@@ -550,12 +630,21 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           mappedData[nodalId] = row[csvHeader];
         }
       });
+      const importHeadcount = resolveImportHeadcount(
+        importVector === 'CONTACTS' ? mappedData.company_employee_count : mappedData.employee_count,
+        sourceCompanyFields,
+        importVector === 'CONTACTS' ? 'bulk_import_contact' : 'bulk_import_account',
+      );
 
       try {
         if (importVector === 'CONTACTS') {
           // --- ROBUST ACCOUNT MERGE LOGIC ---
           // Look up existing account by company name; if none, create a new account
           let linkedAccountId: string | undefined = undefined;
+          const fullNameParts = splitFullName(mappedData.full_name);
+          const resolvedFirstName = mappedData.first_name || fullNameParts.firstName;
+          const resolvedLastName = mappedData.last_name || fullNameParts.lastName;
+          const resolvedContactName = mappedData.full_name || `${resolvedFirstName || ''} ${resolvedLastName || ''}`.trim();
           const companyName = mappedData.company_name?.trim();
           // Build communication signals for metadata only - don't use as fallback
           const communicationSignals = buildImportCommunicationSignals(row);
@@ -573,6 +662,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                 .from('accounts')
                 .select('id')
                 .eq('domain', companyDomain)
+                .limit(1)
                 .maybeSingle();
               existingAccount = data;
             }
@@ -581,12 +671,47 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                 .from('accounts')
                 .select('id')
                 .ilike('name', companyName)
+                .limit(1)
                 .maybeSingle();
               existingAccount = data;
             }
 
             if (existingAccount) {
               linkedAccountId = existingAccount.id;
+              await upsertAccount.mutateAsync({
+                id: existingAccount.id,
+                name: companyName,
+                domain: companyDomain || '',
+                website: companyDomain || '',
+                industry: mappedData.company_industry || '',
+                description: mappedData.company_description || '',
+                companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
+                linkedinUrl: mappedData.company_linkedin || '',
+                address: mappedData.company_address || '',
+                city: mappedData.company_city || '',
+                state: mappedData.company_state || '',
+                country: mappedData.company_country || '',
+                zip: mappedData.company_postal_code || '',
+                employees: importHeadcount.value,
+                revenue: mappedData.company_annual_revenue || '',
+                serviceAddresses: mappedData.company_address ? [{
+                  address: mappedData.company_address || '',
+                  city: mappedData.company_city || '',
+                  state: mappedData.company_state || '',
+                  country: mappedData.company_country || '',
+                  type: 'headquarters',
+                  isPrimary: true
+                }] : [],
+                metadata: {
+                  import_source: 'bulk_import_contact',
+                  import_batch: new Date().toISOString(),
+                  country: mappedData.company_country || '',
+                  postal_code: mappedData.company_postal_code || '',
+                  annual_revenue: mappedData.company_annual_revenue || '',
+                  ...importHeadcount.metadata,
+                  source_company_fields: sourceCompanyFields,
+                }
+              } as any);
             } else {
               // No match: create account with optional full Apollo enrichment
               try {
@@ -634,9 +759,16 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                   }
                 }
 
+                const accountHeadcount = resolveImportHeadcount(
+                  apolloData?.employees ?? mappedData.company_employee_count,
+                  sourceCompanyFields,
+                  apolloData?.employees ? 'apollo_enrichment' : 'bulk_import_contact',
+                );
+
                 const newAccount = await upsertAccount.mutateAsync({
                   name: apolloData?.name || companyName,
                   domain: apolloData?.domain || resolvedDomain || '',
+                  website: apolloData?.domain || resolvedDomain || '',
                   industry: apolloData?.industry || mappedData.company_industry || '',
                   description: apolloData?.description || mappedData.company_description || '',
                   companyPhone: apolloData?.companyPhone || formatPhoneNumber(mappedData.company_phone) || '',
@@ -647,7 +779,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                   state: apolloData?.state || mappedData.company_state || '',
                   country: apolloData?.country || mappedData.company_country || '',
                   zip: mappedData.company_postal_code || '',
-                  employees: apolloData?.employees ? String(apolloData.employees) : (mappedData.company_employee_count || ''),
+                  employees: accountHeadcount.value,
                   revenue: apolloData?.revenue || mappedData.company_annual_revenue || '',
                   contractEnd: '',
                   sqft: '',
@@ -667,6 +799,8 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                     country: apolloData?.country || mappedData.company_country || '',
                     postal_code: mappedData.company_postal_code || '',
                     annual_revenue: mappedData.company_annual_revenue || '',
+                    ...accountHeadcount.metadata,
+                    source_company_fields: sourceCompanyFields,
                     meters: (apolloData?.address || mappedData.company_address) ? [{
                       id: crypto.randomUUID(),
                       esiId: '',
@@ -687,9 +821,9 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           
           // Process Contact
           const contactData = {
-            name: `${mappedData.first_name || ''} ${mappedData.last_name || ''}`.trim(),
-            firstName: mappedData.first_name || '',
-            lastName: mappedData.last_name || '',
+            name: resolvedContactName || mappedData.email || 'Unknown',
+            firstName: resolvedFirstName || '',
+            lastName: resolvedLastName || '',
             title: mappedData.job_title || '',
             email: mappedData.email || '',
             phone: formatPhoneNumber(mappedData.phone) || '',
@@ -757,6 +891,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             name: mappedData.name || '',
             industry: mappedData.industry || '',
             domain: normalizeWebsiteForImport(mappedData.website) || '',
+            website: normalizeWebsiteForImport(mappedData.website) || '',
             logoUrl: mappedData.logo_url || '',
             description: mappedData.description || '',
             companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
@@ -775,7 +910,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             country: mappedData.country || '',
             zip: mappedData.postal_code || '',
             contractEnd: mappedData.contract_end || null,
-            employees: mappedData.employee_count || '',
+            employees: importHeadcount.value,
             revenue: mappedData.annual_revenue || '',
             annualUsage: mappedData.annual_usage || '',
             electricitySupplier: mappedData.energy_supplier || '',
@@ -789,6 +924,8 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
               country: mappedData.country,
               postal_code: mappedData.postal_code,
               annual_revenue: mappedData.annual_revenue,
+              ...importHeadcount.metadata,
+              source_company_fields: sourceCompanyFields,
               energy_supplier: mappedData.energy_supplier,
               import_batch: new Date().toISOString(),
               enriched: isEnriching,

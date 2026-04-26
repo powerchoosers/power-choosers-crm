@@ -48,7 +48,7 @@ export const ACCOUNT_VARIABLES: { key: string; label: string }[] = [
   { key: 'account.electricitySupplier', label: 'Current supplier' },
   { key: 'account.currentRate', label: 'Current rate' },
   { key: 'account.revenue', label: 'Revenue' },
-  { key: 'account.employees', label: 'Employees' },
+  { key: 'account.employees', label: 'Headcount' },
 ]
 
 /** All placeholder keys for regex extraction (e.g. {{contact.firstName}}) */
