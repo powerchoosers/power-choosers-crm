@@ -176,33 +176,49 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.06] pointer-events-none" />
         <div aria-hidden className="absolute right-[-8rem] top-0 h-[28rem] w-[28rem] rounded-full bg-[#002FA7]/[0.08] blur-3xl pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10">
-          <div className="max-w-3xl">
-            <p className="reveal-on-scroll font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">WHO WE SERVE</p>
-            <h1 className="reveal-on-scroll delay-100 text-4xl md:text-7xl font-bold tracking-tighter text-black leading-[0.95] break-words">
-              Texas businesses with real energy exposure.
-            </h1>
-            <p className="reveal-on-scroll delay-200 text-lg md:text-xl text-zinc-600 max-w-3xl leading-relaxed mt-6">
-              We work with manufacturing, logistics, commercial real estate, hospitality, office, and restaurants. Each one has a different load pattern, so the contract and plan have to fit the business.
-            </p>
-            <div className="reveal-on-scroll delay-300 flex flex-col sm:flex-row items-start gap-4 mt-8">
-              <Link
-                href="/bill-debugger"
-                className="inline-flex items-center gap-3 bg-[#002FA7] text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl shadow-blue-900/20"
-              >
-                <Activity className="w-5 h-5" />
-                <span>Review My Bill</span>
-              </Link>
-              <Link
-                href="/book"
-                className="inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-white border border-zinc-300 text-zinc-900 rounded-full text-base md:text-lg font-medium shadow-sm hover:border-zinc-400 hover:bg-zinc-50 transition-all duration-300 whitespace-nowrap"
-              >
-                <CalendarDays className="w-5 h-5" />
-                <span>Book a Strategy Call</span>
-              </Link>
+          <div className="grid lg:grid-cols-[1.2fr_0.8fr] gap-12 lg:gap-8 items-center">
+            <div className="max-w-3xl">
+              <p className="reveal-on-scroll font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">WHO WE SERVE</p>
+              <h1 className="reveal-on-scroll delay-100 text-4xl md:text-7xl font-bold tracking-tighter text-black leading-[0.95] break-words">
+                Texas businesses with real energy exposure.
+              </h1>
+              <p className="reveal-on-scroll delay-200 text-lg md:text-xl text-zinc-600 max-w-3xl leading-relaxed mt-6">
+                We work with manufacturing, logistics, commercial real estate, hospitality, office, and restaurants. Each one has a different load pattern, so the contract and plan have to fit the business.
+              </p>
+              <div className="reveal-on-scroll delay-300 flex flex-col sm:flex-row items-start gap-4 mt-8">
+                <Link
+                  href="/bill-debugger"
+                  className="inline-flex items-center gap-3 bg-[#002FA7] text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl shadow-blue-900/20"
+                >
+                  <Activity className="w-5 h-5" />
+                  <span>Review My Bill</span>
+                </Link>
+                <Link
+                  href="/book"
+                  className="inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-white border border-zinc-300 text-zinc-900 rounded-full text-base md:text-lg font-medium shadow-sm hover:border-zinc-400 hover:bg-zinc-50 transition-all duration-300 whitespace-nowrap"
+                >
+                  <CalendarDays className="w-5 h-5" />
+                  <span>Book a Strategy Call</span>
+                </Link>
+              </div>
+              <p className="reveal-on-scroll delay-500 mt-6 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-400">
+                Built for ERCOT accounts with variable load and active supplier choice
+              </p>
             </div>
-            <p className="reveal-on-scroll delay-500 mt-6 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-400">
-              Built for ERCOT accounts with variable load and active supplier choice
-            </p>
+
+            <div className="reveal-on-scroll delay-300 relative w-full aspect-[4/3] rounded-[2rem] overflow-hidden border border-zinc-200/80 shadow-2xl shadow-black/5 bg-zinc-950">
+              <div className="absolute inset-0 bg-gradient-to-tr from-[#002FA7]/10 to-transparent mix-blend-screen z-10 pointer-events-none" />
+              <img 
+                src="/images/texas-tdsp-map.png" 
+                alt="Texas TDSP Deregulated Electricity Areas Map" 
+                className="absolute inset-0 w-full h-full object-cover object-center opacity-90" 
+              />
+              <div className="absolute bottom-4 left-4 z-20">
+                <div className="bg-white/10 backdrop-blur-md border border-white/10 text-white/80 font-mono text-[9px] uppercase tracking-widest px-3 py-1.5 rounded-full">
+                  ERCOT Deregulated Zones
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="mt-16 border-t border-zinc-200/80 pt-14">
