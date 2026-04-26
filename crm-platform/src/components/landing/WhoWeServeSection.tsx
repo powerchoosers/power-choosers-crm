@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { motion } from 'framer-motion'
 import {
   Activity,
   ArrowRight,
@@ -14,6 +13,7 @@ import {
   UtensilsCrossed,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { ScrollRevealScope } from '@/components/motion/ScrollRevealScope'
 
 type Vertical = {
   title: string
@@ -118,27 +118,6 @@ const COMMON_PATTERNS = [
   },
 ] as const
 
-const revealContainer = {
-  hidden: {},
-  show: {
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.06,
-    },
-  },
-}
-
-const revealItem = {
-  hidden: { opacity: 0, y: 18 },
-  show: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.5,
-    },
-  },
-}
-
 export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
@@ -192,49 +171,42 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
   }
 
   return (
-    <>
+    <ScrollRevealScope>
       <section className="relative isolate overflow-hidden bg-[#FCFCFD] px-6 pt-20 pb-20 md:pt-24 md:pb-28 border-t border-zinc-100">
         <div aria-hidden className="absolute inset-0 bg-[radial-gradient(#002FA7_1px,transparent_1px)] [background-size:20px_20px] opacity-[0.06] pointer-events-none" />
         <div aria-hidden className="absolute right-[-8rem] top-0 h-[28rem] w-[28rem] rounded-full bg-[#002FA7]/[0.08] blur-3xl pointer-events-none" />
         <div className="max-w-7xl mx-auto relative z-10">
-          <motion.div
-            variants={revealContainer}
-            initial="hidden"
-            animate="show"
-            className="max-w-3xl"
-          >
-            <motion.div variants={revealItem}>
-              <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">WHO WE SERVE</p>
-              <h1 className="text-4xl md:text-7xl font-bold tracking-tighter text-black leading-[0.95] break-words">
-                Texas businesses with real energy exposure.
-              </h1>
-              <p className="text-lg md:text-xl text-zinc-600 max-w-3xl leading-relaxed mt-6">
-                We work with manufacturing, logistics, commercial real estate, hospitality, office, and restaurants. Each one has a different load pattern, so the contract and plan have to fit the business.
-              </p>
-              <div className="flex flex-col sm:flex-row items-start gap-4 mt-8">
-                <Link
-                  href="/bill-debugger"
-                  className="inline-flex items-center gap-3 bg-[#002FA7] text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl shadow-blue-900/20"
-                >
-                  <Activity className="w-5 h-5" />
-                  <span>Review My Bill</span>
-                </Link>
-                <Link
-                  href="/book"
-                  className="inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-white border border-zinc-300 text-zinc-900 rounded-full text-base md:text-lg font-medium shadow-sm hover:border-zinc-400 hover:bg-zinc-50 transition-all duration-300 whitespace-nowrap"
-                >
-                  <CalendarDays className="w-5 h-5" />
-                  <span>Book a Strategy Call</span>
-                </Link>
-              </div>
-              <p className="mt-6 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-400">
-                Built for ERCOT accounts with variable load and active supplier choice
-              </p>
-            </motion.div>
-          </motion.div>
+          <div className="max-w-3xl">
+            <p className="reveal-on-scroll font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">WHO WE SERVE</p>
+            <h1 className="reveal-on-scroll delay-100 text-4xl md:text-7xl font-bold tracking-tighter text-black leading-[0.95] break-words">
+              Texas businesses with real energy exposure.
+            </h1>
+            <p className="reveal-on-scroll delay-200 text-lg md:text-xl text-zinc-600 max-w-3xl leading-relaxed mt-6">
+              We work with manufacturing, logistics, commercial real estate, hospitality, office, and restaurants. Each one has a different load pattern, so the contract and plan have to fit the business.
+            </p>
+            <div className="reveal-on-scroll delay-300 flex flex-col sm:flex-row items-start gap-4 mt-8">
+              <Link
+                href="/bill-debugger"
+                className="inline-flex items-center gap-3 bg-[#002FA7] text-white px-8 py-4 rounded-full text-lg font-medium hover:scale-105 transition-transform shadow-xl shadow-blue-900/20"
+              >
+                <Activity className="w-5 h-5" />
+                <span>Review My Bill</span>
+              </Link>
+              <Link
+                href="/book"
+                className="inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-white border border-zinc-300 text-zinc-900 rounded-full text-base md:text-lg font-medium shadow-sm hover:border-zinc-400 hover:bg-zinc-50 transition-all duration-300 whitespace-nowrap"
+              >
+                <CalendarDays className="w-5 h-5" />
+                <span>Book a Strategy Call</span>
+              </Link>
+            </div>
+            <p className="reveal-on-scroll delay-500 mt-6 font-mono text-[10px] uppercase tracking-[0.3em] text-zinc-400">
+              Built for ERCOT accounts with variable load and active supplier choice
+            </p>
+          </div>
 
           <div className="mt-16 border-t border-zinc-200/80 pt-14">
-            <motion.div variants={revealItem} initial="hidden" whileInView="show" viewport={{ once: true, margin: '-80px' }} className="max-w-3xl">
+            <div className="reveal-on-scroll max-w-3xl">
               <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">INDUSTRIES WE COVER</p>
               <h2 className="text-3xl md:text-4xl font-semibold tracking-tighter text-zinc-900">
                 Coverage map
@@ -242,23 +214,18 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
               <p className="text-base md:text-lg text-zinc-600 leading-relaxed mt-4">
                 These are the accounts where load shape, contract language, and supplier choice actually change the answer.
               </p>
-            </motion.div>
+            </div>
 
-            <motion.div
-              variants={revealContainer}
-              initial="hidden"
-              whileInView="show"
-              viewport={{ once: true, margin: '-80px' }}
-              className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3"
-            >
+            <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
               {VERTICALS.map((item, index) => {
                 const Icon = item.icon
 
                 return (
-                  <motion.div
+                  <div
                     key={item.title}
-                    variants={revealItem}
-                    className="rounded-[1.75rem] border border-zinc-200/70 bg-white/85 p-5 shadow-[0_18px_40px_-35px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-colors duration-200 hover:border-[#002FA7]/20"
+                    className={`reveal-on-scroll ${
+                      index === 0 ? '' : index === 1 ? 'delay-100' : index === 2 ? 'delay-200' : 'delay-300'
+                    } rounded-[1.75rem] border border-zinc-200/70 bg-white/85 p-5 shadow-[0_18px_40px_-35px_rgba(0,0,0,0.35)] backdrop-blur-sm transition-colors duration-200 hover:border-[#002FA7]/20`}
                   >
                     <div className="flex items-start gap-4 min-w-0">
                       <div className="shrink-0 w-11 h-11 rounded-2xl bg-[#002FA7]/10 text-[#002FA7] flex items-center justify-center">
@@ -277,23 +244,17 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
                         </p>
                       </div>
                     </div>
-                  </motion.div>
+                  </div>
                 )
               })}
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="relative isolate overflow-hidden bg-white px-6 py-20 md:py-28 border-t border-zinc-100">
         <div className="max-w-7xl mx-auto grid gap-12 lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)] items-start">
-          <motion.div
-            variants={revealItem}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-80px' }}
-            className="max-w-md"
-          >
+          <div className="reveal-on-scroll max-w-md">
             <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">WHAT CHANGES THE ANSWER</p>
             <h2 className="text-3xl md:text-4xl font-semibold tracking-tighter text-zinc-900">
               Different loads leak in different places.
@@ -301,17 +262,15 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
             <p className="text-base md:text-lg text-zinc-600 leading-relaxed mt-4">
               We usually start with three things: how the account peaks, what the contract is really passing through, and whether the plan matches how the business actually operates.
             </p>
-          </motion.div>
+          </div>
 
           <div>
             {COMMON_PATTERNS.map((pattern, index) => (
-              <motion.article
+              <article
                 key={pattern.title}
-                variants={revealItem}
-                initial="hidden"
-                whileInView="show"
-                viewport={{ once: true, margin: '-80px' }}
-                className="grid gap-6 py-8 border-t border-zinc-200 first:border-t-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_180px] lg:gap-10"
+                className={`reveal-on-scroll ${
+                  index === 0 ? '' : index === 1 ? 'delay-100' : 'delay-200'
+                } grid gap-6 py-8 border-t border-zinc-200 first:border-t-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_180px] lg:gap-10`}
               >
                 <div className="flex items-start gap-4">
                   <div className="shrink-0 flex h-10 w-10 items-center justify-center rounded-2xl bg-[#002FA7]/10 text-[#002FA7] font-mono text-xs font-semibold">
@@ -327,7 +286,7 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
                   <p className="font-mono text-[9px] uppercase tracking-[0.28em] text-zinc-400">Signal</p>
                   <p className="mt-2 text-sm leading-6 text-zinc-700">{pattern.signal}</p>
                 </div>
-              </motion.article>
+              </article>
             ))}
           </div>
         </div>
@@ -335,13 +294,7 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
 
       <section className="relative isolate overflow-hidden bg-[#FCFCFD] px-6 py-20 md:py-28 border-t border-zinc-100">
         <div className="max-w-7xl mx-auto">
-          <motion.div
-            variants={revealItem}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-80px' }}
-            className="max-w-3xl mb-10"
-          >
+          <div className="reveal-on-scroll max-w-3xl mb-10">
             <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">SELECTED REVIEWS</p>
             <h2 className="text-3xl md:text-4xl font-semibold tracking-tighter text-zinc-900">
               Three anonymized bills from real Texas accounts.
@@ -349,17 +302,15 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
             <p className="text-base md:text-lg text-zinc-600 leading-relaxed mt-3">
               Company names are hidden. The numbers, charge patterns, and recommended actions are real.
             </p>
-          </motion.div>
+          </div>
 
           <div className="rounded-[2.5rem] border border-zinc-200 bg-white shadow-[0_30px_80px_-55px_rgba(0,0,0,0.35)] overflow-hidden">
             {PROOF_CARDS.map((card, index) => (
-              <motion.div
+              <div
                 key={card.title}
-                variants={revealItem}
-                initial="hidden"
-                whileInView="show"
-                viewport={{ once: true, margin: '-80px' }}
-                className={`grid gap-6 px-6 py-6 md:px-8 md:py-7 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)_minmax(0,200px)] items-start border-t border-zinc-100 first:border-t-0 ${
+                className={`reveal-on-scroll ${
+                  index === 0 ? '' : index === 1 ? 'delay-100' : 'delay-200'
+                } grid gap-6 px-6 py-6 md:px-8 md:py-7 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)_minmax(0,200px)] items-start border-t border-zinc-100 first:border-t-0 ${
                   index === 0 ? 'bg-[#002FA7]/[0.03]' : 'bg-white'
                 }`}
               >
@@ -381,11 +332,11 @@ export function WhoWeServeSection({ compact = false }: { compact?: boolean }) {
                   <p className="mt-2 text-3xl font-semibold tracking-tight text-zinc-900">{card.bill}</p>
                   <p className="mt-2 text-sm text-zinc-500">{card.usage}</p>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
       </section>
-    </>
+    </ScrollRevealScope>
   )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { useState } from 'react'
 
 export type SupplierLogo = {
@@ -23,7 +24,7 @@ export const SUPPLIER_LOGOS: SupplierLogo[] = [
 ]
 
 interface SupplierTickerProps {
-  label: string
+  label: ReactNode
   logos: SupplierLogo[]
   className?: string
 }

@@ -56,7 +56,7 @@ export function HeroSection() {
             <span>Book a Strategy Call</span>
           </Link>
         </div>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
+        <div className="mt-8 hidden flex-wrap items-center justify-center gap-2.5 sm:flex">
           {SIGNAL_POINTS.map((item) => (
             <span
               key={item.label}

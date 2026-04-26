@@ -125,7 +125,12 @@ export function LandingSections() {
   return (
     <>
       <SupplierTicker
-        label="Supplier partnerships — we benchmark across all of them"
+        label={
+          <>
+            <span className="sm:hidden">Supplier Partnerships</span>
+            <span className="hidden sm:inline">Supplier partnerships — we benchmark across all of them</span>
+          </>
+        }
         logos={SUPPLIER_LOGOS}
       />
 
