@@ -863,11 +863,44 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           }
           
           // --- AUTO-DERIVE PRIMARY PHONE FROM SIGNAL CONFIDENCE ---
-          // Rank phone buckets by their communication signal scores to determine hero phone
+          let autoMobile = formatPhoneNumber(mappedData.mobile_phone) || '';
+          let autoWork = formatPhoneNumber(mappedData.work_direct) || '';
+          let autoOther = formatPhoneNumber(mappedData.other_phone) || '';
+          let autoCompany = formatPhoneNumber(mappedData.company_phone) || '';
+
+          // If communicationSignals found extra phones, auto-fill empty buckets with the best ones
+          if (communicationSignals?.phones?.length) {
+            const mappedNumbers = new Set([autoMobile, autoWork, autoOther, autoCompany].filter(Boolean));
+            
+            // Extract unmapped phones from signals (already sorted by score descending)
+            const unmappedPhones = communicationSignals.phones
+              .map((p: any) => formatPhoneNumber(p.value))
+              .filter(Boolean)
+              .filter((p: string) => !mappedNumbers.has(p));
+
+            // Deduplicate
+            const uniqueUnmapped = Array.from(new Set(unmappedPhones));
+
+            // Fill empty buckets with highest scored unmapped phones
+            const emptyBuckets = [];
+            if (!autoMobile) emptyBuckets.push('mobile');
+            if (!autoWork) emptyBuckets.push('workDirectPhone');
+            if (!autoOther) emptyBuckets.push('otherPhone');
+
+            for (const num of uniqueUnmapped) {
+              if (emptyBuckets.length === 0) break;
+              const bucketToFill = emptyBuckets.shift();
+              if (bucketToFill === 'mobile') autoMobile = num;
+              else if (bucketToFill === 'workDirectPhone') autoWork = num;
+              else if (bucketToFill === 'otherPhone') autoOther = num;
+            }
+          }
+
+          // Rank the filled buckets to determine the hero phone
           const phoneBuckets: Array<{ field: 'mobile' | 'workDirectPhone' | 'otherPhone', value: string }> = []
-          if (formatPhoneNumber(mappedData.mobile_phone)) phoneBuckets.push({ field: 'mobile', value: formatPhoneNumber(mappedData.mobile_phone) })
-          if (formatPhoneNumber(mappedData.work_direct)) phoneBuckets.push({ field: 'workDirectPhone', value: formatPhoneNumber(mappedData.work_direct) })
-          if (formatPhoneNumber(mappedData.other_phone)) phoneBuckets.push({ field: 'otherPhone', value: formatPhoneNumber(mappedData.other_phone) })
+          if (autoMobile) phoneBuckets.push({ field: 'mobile', value: autoMobile })
+          if (autoWork) phoneBuckets.push({ field: 'workDirectPhone', value: autoWork })
+          if (autoOther) phoneBuckets.push({ field: 'otherPhone', value: autoOther })
 
           let derivedPrimaryField: 'mobile' | 'workDirectPhone' | 'otherPhone' = 'mobile'
           let derivedPrimaryPhone = ''
@@ -878,8 +911,11 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             let bestBucket = phoneBuckets[0]
 
             for (const bucket of phoneBuckets) {
+              let digits = bucket.value.replace(/\D/g, '')
+              if (digits.length === 11 && digits.startsWith('1')) digits = digits.substring(1)
+              
               const signal = communicationSignals?.phones?.find(
-                (s: any) => s.value && bucket.value && s.key === bucket.value.replace(/\D/g, '')
+                (s: any) => s.value && bucket.value && s.key === digits
               )
               const score = signal?.score ?? 50 // Default score for unscored numbers
               if (score > bestScore) {
@@ -900,10 +936,10 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             title: mappedData.job_title || '',
             email: mappedData.email || '',
             phone: derivedPrimaryPhone,
-            mobile: formatPhoneNumber(mappedData.mobile_phone) || '',
-            workPhone: formatPhoneNumber(mappedData.work_direct) || '',
-            otherPhone: formatPhoneNumber(mappedData.other_phone) || '',
-            companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
+            mobile: autoMobile,
+            workPhone: autoWork,
+            otherPhone: autoOther,
+            companyPhone: autoCompany,
             primaryPhoneField: derivedPrimaryField,
             status: 'Lead',
             company: companyName || '',
