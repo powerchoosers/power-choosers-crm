@@ -12,6 +12,7 @@ interface PowerDialerState {
     selectedCount: number
     sourceLabel?: string | null
   }) => void
+  removeContact: (contactId: string) => void
   clearPowerDialer: () => void
 }
 
@@ -32,6 +33,15 @@ export const usePowerDialerStore = create<PowerDialerState>((set) => ({
       sourceLabel,
       sessionId: state.sessionId + 1,
     }))
+  },
+  removeContact: (contactId: string) => {
+    set((state) => {
+      const filtered = state.contacts.filter((c) => c.id !== contactId)
+      return {
+        contacts: filtered,
+        selectedCount: Math.max(0, state.selectedCount - 1),
+      }
+    })
   },
   clearPowerDialer: () => set({ ...initialState }),
 }))

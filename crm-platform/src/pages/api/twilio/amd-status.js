@@ -88,7 +88,8 @@ export default async function handler(req, res) {
 
   } catch (error) {
     logger.error('[AMD] Error processing AMD status:', error);
-    res.writeHead(500, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: error.message }));
+    // Always 200 for Twilio webhooks — 500 causes retries which can duplicate voicemail drops
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: error.message, ok: false }));
   }
 }

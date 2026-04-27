@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { PhoneCall, Play, Pause, Square, X, Info, Users, Phone, Voicemail, CheckCircle2, Building2, Briefcase, TriangleAlert } from 'lucide-react'
+import { PhoneCall, Play, Pause, Square, X, Info, Users, Phone, Voicemail, CheckCircle2, Building2, Briefcase, TriangleAlert, Timer, BarChart3, UserX, PhoneOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/context/AuthContext'
 import { useCallStore } from '@/store/callStore'
@@ -15,9 +15,25 @@ import { PowerDialPostCallWorkspace, type PowerDialPostCallSnapshot } from '@/co
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 
+interface SessionStats {
+  connects: number
+  voicemails: number
+  noAnswers: number
+  totalTalkSeconds: number
+}
+
+const EMPTY_STATS: SessionStats = { connects: 0, voicemails: 0, noAnswers: 0, totalTalkSeconds: 0 }
+
+function formatTimer(seconds: number): string {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
 type SessionMode = 'idle' | 'running' | 'paused' | 'complete'
 type TargetCallState = 'queued' | 'ringing' | 'connected' | 'voicemail' | 'completed' | 'no-answer' | 'unknown'
 const EMPTY_BATCH: PowerDialTarget[] = []
+const POWER_DIAL_BROADCAST_CHANNEL = 'nodal-power-dial-session'
 
 function makeSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -27,13 +43,22 @@ function makeSessionId() {
   return `power-dial-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+/**
+ * Check if voice is currently busy by reading live from callStore.
+ * Avoids stale closure issues when used inside useCallback.
+ */
+function isVoiceBusyNow(): boolean {
+  const { isActive, status } = useCallStore.getState()
+  return isActive || status === 'dialing' || status === 'connected'
+}
+
 function formatSessionIndex(current: number, total: number) {
   if (total <= 0) return '00/00'
   return `${String(current + 1).padStart(2, '0')}/${String(total).padStart(2, '0')}`
 }
 
 export function PowerDialerDock() {
-  const { connect, disconnect, metadata: voiceMetadata } = useVoice()
+  const { connect, disconnect, currentCall, metadata: voiceMetadata } = useVoice()
   const { profile } = useAuth()
   const callStatus = useCallStore((state) => state.status)
   const isCallActive = useCallStore((state) => state.isActive)
@@ -45,6 +70,7 @@ export function PowerDialerDock() {
   const batchSize = usePowerDialerStore((state) => state.batchSize)
   const sessionId = usePowerDialerStore((state) => state.sessionId)
   const clearPowerDialer = usePowerDialerStore((state) => state.clearPowerDialer)
+  const removeContact = usePowerDialerStore((state) => state.removeContact)
 
   const [mode, setMode] = useState<SessionMode>('idle')
   const [currentBatchIndex, setCurrentBatchIndex] = useState(0)
@@ -52,12 +78,17 @@ export function PowerDialerDock() {
   const [sessionNote, setSessionNote] = useState<string | null>(null)
   const [targetStates, setTargetStates] = useState<Map<string, TargetCallState>>(new Map())
   const [postCallSnapshot, setPostCallSnapshot] = useState<PowerDialPostCallSnapshot | null>(null)
+  const [sessionStats, setSessionStats] = useState<SessionStats>({ ...EMPTY_STATS })
+  const [callTimer, setCallTimer] = useState(0)
+  const [isVmDropping, setIsVmDropping] = useState(false)
 
   const runIdRef = useRef<string | null>(null)
   const nextBatchIndexRef = useRef(0)
   const previousCallStatusRef = useRef(callStatus)
   const lastResolvedPhoneRef = useRef('')
   const lastPostCallSnapshotRef = useRef<PowerDialPostCallSnapshot | null>(null)
+  const callConnectedAtRef = useRef<number | null>(null)
+  const callTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const dialTargets = useMemo(() => buildPowerDialTargets(contacts), [contacts])
   const batches = useMemo(() => chunkPowerDialTargets(dialTargets, batchSize), [dialTargets, batchSize])
@@ -77,7 +108,33 @@ export function PowerDialerDock() {
   const skippedCount = Math.max(0, selectedCount - dialableCount)
   const currentBatch = useMemo(() => batches[currentBatchIndex] ?? EMPTY_BATCH, [batches, currentBatchIndex])
   const totalBatches = batches.length
+  // Derived for UI rendering (re-renders on change). For logic inside callbacks, use isVoiceBusyNow().
   const isVoiceBusy = isCallActive || callStatus === 'dialing' || callStatus === 'connected'
+  const broadcastChannelRef = useRef<BroadcastChannel | null>(null)
+  const isBlockedByOtherTabRef = useRef(false)
+
+  // Multi-tab concurrency guard using BroadcastChannel
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return
+
+    const bc = new BroadcastChannel(POWER_DIAL_BROADCAST_CHANNEL)
+    broadcastChannelRef.current = bc
+
+    bc.onmessage = (event) => {
+      const msg = event.data
+      if (msg?.type === 'session-started' && msg?.tabId !== sessionId) {
+        isBlockedByOtherTabRef.current = true
+      }
+      if (msg?.type === 'session-ended') {
+        isBlockedByOtherTabRef.current = false
+      }
+    }
+
+    return () => {
+      bc.close()
+      broadcastChannelRef.current = null
+    }
+  }, [sessionId])
 
   useEffect(() => {
     setMode('idle')
@@ -86,10 +143,46 @@ export function PowerDialerDock() {
     setSessionNote(null)
     setTargetStates(new Map())
     setPostCallSnapshot(null)
+    setSessionStats({ ...EMPTY_STATS })
+    setCallTimer(0)
+    setIsVmDropping(false)
     runIdRef.current = null
     nextBatchIndexRef.current = 0
     lastPostCallSnapshotRef.current = null
+    callConnectedAtRef.current = null
+    if (callTimerIntervalRef.current) clearInterval(callTimerIntervalRef.current)
+    callTimerIntervalRef.current = null
   }, [sessionId])
+
+  // Live call timer — starts when callStatus becomes 'connected', stops otherwise
+  useEffect(() => {
+    if (callStatus === 'connected' && mode === 'running') {
+      callConnectedAtRef.current = Date.now()
+      setCallTimer(0)
+      callTimerIntervalRef.current = setInterval(() => {
+        const start = callConnectedAtRef.current
+        if (start) setCallTimer(Math.floor((Date.now() - start) / 1000))
+      }, 1000)
+    } else {
+      // Accumulate talk time into session stats when a call ends
+      if (callConnectedAtRef.current && (callStatus === 'ended' || callStatus === 'idle')) {
+        const duration = Math.floor((Date.now() - callConnectedAtRef.current) / 1000)
+        setSessionStats((prev) => ({ ...prev, totalTalkSeconds: prev.totalTalkSeconds + duration }))
+      }
+      callConnectedAtRef.current = null
+      if (callTimerIntervalRef.current) {
+        clearInterval(callTimerIntervalRef.current)
+        callTimerIntervalRef.current = null
+      }
+      if (callStatus !== 'connected') setCallTimer(0)
+    }
+    return () => {
+      if (callTimerIntervalRef.current) {
+        clearInterval(callTimerIntervalRef.current)
+        callTimerIntervalRef.current = null
+      }
+    }
+  }, [callStatus, mode])
 
   useEffect(() => {
     if (currentDialedPhone) {
@@ -130,9 +223,18 @@ export function PowerDialerDock() {
       return false
     }
 
-    if (isVoiceBusy && mode !== 'running') {
+    // Read fresh from store to avoid stale closure blocking "Resume"
+    if (isVoiceBusyNow() && mode !== 'running') {
       toast.error('A call is already active', {
         description: 'Finish the current call before starting a new power dial.',
+      })
+      return false
+    }
+
+    // Multi-tab guard
+    if (isBlockedByOtherTabRef.current) {
+      toast.error('Power dial active in another tab', {
+        description: 'Only one power dial session can run at a time.',
       })
       return false
     }
@@ -141,7 +243,10 @@ export function PowerDialerDock() {
     setPostCallSnapshot(null)
     lastPostCallSnapshotRef.current = null
 
-    // Mark all targets in batch as ringing
+    // Broadcast to other tabs that we are starting
+    broadcastChannelRef.current?.postMessage({ type: 'session-started', tabId: sessionId })
+
+    // Reset targets in this batch to 'ringing', clearing any stale state from prior batches
     setTargetStates((prev) => {
       const next = new Map(prev)
       batch.forEach((target) => {
@@ -215,7 +320,7 @@ export function PowerDialerDock() {
     setMode('running')
     setSessionNote(`Batch ${formatSessionIndex(batchIndex, totalBatches)} started.`)
     return true
-  }, [batchSize, batches, connect, dialableCount, isVoiceBusy, mode, profile?.machineDetectionTimeout, selectedCallerNumber, selectedCount, sourceLabel, totalBatches])
+  }, [batchSize, batches, connect, dialableCount, mode, profile?.machineDetectionTimeout, selectedCallerNumber, selectedCount, sessionId, sourceLabel, totalBatches])
 
   const handleStartOrResume = useCallback(async () => {
     if (isStarting) return
@@ -255,10 +360,13 @@ export function PowerDialerDock() {
     setPostCallSnapshot(null)
     lastPostCallSnapshotRef.current = null
 
-    if (isVoiceBusy) {
+    // Notify other tabs this session ended
+    broadcastChannelRef.current?.postMessage({ type: 'session-ended' })
+
+    if (isVoiceBusyNow()) {
       disconnect()
     }
-  }, [disconnect, isVoiceBusy])
+  }, [disconnect])
 
   const handleClear = useCallback(() => {
     setMode('idle')
@@ -272,10 +380,13 @@ export function PowerDialerDock() {
     lastPostCallSnapshotRef.current = null
     clearPowerDialer()
 
-    if (isVoiceBusy) {
+    // Notify other tabs this session ended
+    broadcastChannelRef.current?.postMessage({ type: 'session-ended' })
+
+    if (isVoiceBusyNow()) {
       disconnect()
     }
-  }, [clearPowerDialer, disconnect, isVoiceBusy])
+  }, [clearPowerDialer, disconnect])
 
   const handleContinueAfterDisposition = useCallback(() => {
     if (mode !== 'paused') return
@@ -283,15 +394,91 @@ export function PowerDialerDock() {
     void handleStartOrResume()
   }, [handleStartOrResume, mode, totalBatches])
 
-  // Track call status changes to update target states
+  // Skip/remove a contact from the queue (only when not actively being called)
+  const handleSkipContact = useCallback((contactId: string, phoneNumber: string) => {
+    if (mode === 'running' && (callStatus === 'connected' || callStatus === 'dialing')) {
+      const currentPhone = currentDialedPhone || lastResolvedPhoneRef.current
+      if (phoneNumber === currentPhone) {
+        toast.error('Cannot skip active call')
+        return
+      }
+    }
+    removeContact(contactId)
+    setTargetStates((prev) => {
+      const next = new Map(prev)
+      next.delete(phoneNumber)
+      return next
+    })
+    toast.success('Contact removed from queue')
+  }, [callStatus, currentDialedPhone, mode, removeContact])
+
+  // Manual voicemail drop — ends the client-side call audio then triggers
+  // server-side TwiML override to play the voicemail recording at the beep.
+  const handleManualVmDrop = useCallback(async () => {
+    if (isVmDropping) return
+
+    // We need the Twilio Call SID from the active call
+    const callSid = voiceMetadata?.callSid || (currentCall as any)?.parameters?.CallSid || ''
+    if (!callSid) {
+      toast.error('No active call SID', { description: 'Cannot drop voicemail without an active call.' })
+      return
+    }
+
+    setIsVmDropping(true)
+    try {
+      const res = await fetch('/api/twilio/manual-voicemail-drop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          callSid,
+          businessNumber: selectedCallerNumber || '',
+        }),
+      })
+      const data = await res.json()
+
+      if (data.status === 'dropped') {
+        toast.success('Voicemail dropped', { description: 'Recording will play after the beep.' })
+        // Update the snapshot so the post-call workspace shows VM status
+        if (lastPostCallSnapshotRef.current) {
+          lastPostCallSnapshotRef.current = {
+            ...lastPostCallSnapshotRef.current,
+            voicemailDropStatus: 'dropped',
+            answeredBy: 'machine_start',
+          }
+        }
+        // Disconnect client-side audio — Twilio server will continue playing the recording
+        disconnect()
+      } else if (data.status === 'missing-config') {
+        toast.error('No voicemail configured', {
+          description: 'Set up an outbound voicemail drop in Settings → Voicemail.',
+        })
+      } else {
+        toast.error('Voicemail drop failed', { description: data.reason || 'Unknown error' })
+      }
+    } catch (err) {
+      console.error('[PowerDialer] Manual VM drop error:', err)
+      toast.error('Network error', { description: 'Could not reach the voicemail drop endpoint.' })
+    } finally {
+      setIsVmDropping(false)
+    }
+  }, [currentCall, disconnect, isVmDropping, selectedCallerNumber, voiceMetadata?.callSid])
+
+  // Combined effect for call status transitions — handles BOTH target state updates
+  // AND post-call workspace / mode transitions in a single effect to eliminate the race
+  // condition that occurred when two separate useEffects both fired on callStatus==='ended'.
   useEffect(() => {
+    const previous = previousCallStatusRef.current
+    previousCallStatusRef.current = callStatus
+
     if (mode !== 'running') return
+
     const lastSnapshot = lastPostCallSnapshotRef.current
     const currentPhone = currentDialedPhone || lastResolvedPhoneRef.current || lastSnapshot?.phoneNumber || ''
     const machineAnswered = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
     const unknownAnswered = isUnknownAnsweredBy(lastSnapshot?.answeredBy)
     const hasResolvedWinner = Boolean(lastSnapshot?.callSid || lastSnapshot?.answeredBy || lastSnapshot?.voicemailDropStatus)
 
+    // --- Phase 1: Update target card states ---
     if (callStatus === 'connected') {
       if (!currentPhone) return
       setTargetStates((prev) => {
@@ -301,7 +488,11 @@ export function PowerDialerDock() {
         })
         return next
       })
-    } else if (callStatus === 'ended') {
+      return
+    }
+
+    if (callStatus === 'ended') {
+      // Update target card states
       setTargetStates((prev) => {
         const next = new Map(prev)
         currentBatch.forEach((target) => {
@@ -316,58 +507,63 @@ export function PowerDialerDock() {
         })
         return next
       })
+
+      // --- Phase 2: Track session statistics ---
+      if (previous !== callStatus) {
+        if (machineAnswered) {
+          setSessionStats((prev) => ({ ...prev, voicemails: prev.voicemails + 1 }))
+        } else if (hasResolvedWinner || previous === 'connected') {
+          setSessionStats((prev) => ({ ...prev, connects: prev.connects + 1 }))
+        } else {
+          setSessionStats((prev) => ({ ...prev, noAnswers: prev.noAnswers + 1 }))
+        }
+      }
+
+      // --- Phase 3: Post-call workspace + mode transition ---
+      // Only fire on actual status transitions (not re-renders with same value)
+      if (previous === callStatus) return
+
+      const endedOnVoicemail = machineAnswered
+      const endedOnUnknown = unknownAnswered
+      const shouldOpenPostCallWorkspace = previous === 'connected' || endedOnVoicemail || endedOnUnknown || Boolean(lastSnapshot?.callSid)
+
+      if (shouldOpenPostCallWorkspace) {
+        const resolvedPhone = currentDialedPhone || lastResolvedPhoneRef.current
+        const matchingTarget = currentBatch.find((target) => target.phoneNumber === resolvedPhone) || currentBatch[0]
+        const fallbackSnapshot = matchingTarget ? {
+          contactId: matchingTarget.contactId || '',
+          accountId: matchingTarget.accountId || '',
+          name: matchingTarget.name || 'Unknown Contact',
+          accountName: matchingTarget.accountName || sourceLabel || '',
+          title: matchingTarget.title || '',
+          phoneNumber: resolvedPhone || matchingTarget.phoneNumber || '',
+          callSid: '',
+          answeredBy: '',
+          voicemailDropStatus: '',
+        } : null
+
+        setPostCallSnapshot(lastSnapshot || fallbackSnapshot)
+      }
+
+      const nextIndex = nextBatchIndexRef.current
+      if (nextIndex < totalBatches) {
+        setMode('paused')
+        setSessionNote(
+          endedOnVoicemail
+            ? `Voicemail handled. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+            : endedOnUnknown
+              ? `Twilio could not classify the answer. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+            : `Call finished. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
+        )
+        return
+      }
+
+      setMode('complete')
+      setSessionNote(`Finished ${dialableCount} dialable contact${dialableCount === 1 ? '' : 's'}.`)
+      toast.success('Power dial complete', {
+        description: sourceLabel ? `Queue finished for ${sourceLabel}.` : 'Queue finished.',
+      })
     }
-  }, [callStatus, currentBatch, currentDialedPhone, mode])
-
-  useEffect(() => {
-    const previous = previousCallStatusRef.current
-    previousCallStatusRef.current = callStatus
-
-    if (mode !== 'running') return
-    if (previous === callStatus) return
-    if (callStatus !== 'ended') return
-
-    const lastSnapshot = lastPostCallSnapshotRef.current
-    const endedOnVoicemail = isVoicemailAnsweredBy(lastSnapshot?.answeredBy)
-    const endedOnUnknown = isUnknownAnsweredBy(lastSnapshot?.answeredBy)
-    const shouldOpenPostCallWorkspace = previous === 'connected' || endedOnVoicemail || endedOnUnknown || Boolean(lastSnapshot?.callSid)
-
-    if (shouldOpenPostCallWorkspace) {
-      const resolvedPhone = currentDialedPhone || lastResolvedPhoneRef.current
-      const matchingTarget = currentBatch.find((target) => target.phoneNumber === resolvedPhone) || currentBatch[0]
-      const fallbackSnapshot = matchingTarget ? {
-        contactId: matchingTarget.contactId || '',
-        accountId: matchingTarget.accountId || '',
-        name: matchingTarget.name || 'Unknown Contact',
-        accountName: matchingTarget.accountName || sourceLabel || '',
-        title: matchingTarget.title || '',
-        phoneNumber: resolvedPhone || matchingTarget.phoneNumber || '',
-        callSid: '',
-        answeredBy: '',
-        voicemailDropStatus: '',
-      } : null
-
-      setPostCallSnapshot(lastSnapshot || fallbackSnapshot)
-    }
-
-    const nextIndex = nextBatchIndexRef.current
-    if (nextIndex < totalBatches) {
-      setMode('paused')
-      setSessionNote(
-        endedOnVoicemail
-          ? `Voicemail handled. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
-          : endedOnUnknown
-            ? `Twilio could not classify the answer. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
-          : `Call finished. Apply a disposition to continue for batch ${formatSessionIndex(nextIndex, totalBatches)}.`
-      )
-      return
-    }
-
-    setMode('complete')
-    setSessionNote(`Finished ${dialableCount} dialable contact${dialableCount === 1 ? '' : 's'}.`)
-    toast.success('Power dial complete', {
-      description: sourceLabel ? `Queue finished for ${sourceLabel}.` : 'Queue finished.',
-    })
   }, [callStatus, currentBatch, currentDialedPhone, dialableCount, mode, sourceLabel, totalBatches])
 
   const statusLabel = useMemo(() => {
@@ -415,6 +611,12 @@ export function PowerDialerDock() {
                     <span className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
                       {statusLabel}
                     </span>
+                    {callTimer > 0 && callStatus === 'connected' && mode === 'running' && (
+                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-mono tabular-nums text-emerald-400">
+                        <Timer className="h-3 w-3" />
+                        {formatTimer(callTimer)}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs text-zinc-500">
                     Call up to {batchSize} contacts at once. The first person to answer gets connected.
@@ -475,6 +677,25 @@ export function PowerDialerDock() {
                   >
                     <X className="h-4 w-4" />
                   </button>
+
+                  {/* Manual VM Drop button — visible when call is connected */}
+                  {isVoiceBusy && mode === 'running' && (
+                    <button
+                      type="button"
+                      onClick={handleManualVmDrop}
+                      disabled={isVmDropping}
+                      className={cn(
+                        'inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-mono uppercase tracking-widest transition-all',
+                        isVmDropping
+                          ? 'cursor-not-allowed border-amber-500/20 bg-amber-500/10 text-amber-400/60'
+                          : 'border-amber-500/20 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 hover:text-amber-300'
+                      )}
+                      title="Drop voicemail and end call"
+                    >
+                      <Voicemail className="h-3.5 w-3.5" />
+                      {isVmDropping ? 'Dropping' : 'VM Drop'}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -486,6 +707,33 @@ export function PowerDialerDock() {
                 <SummaryTile label="Skipped" value={String(skippedCount).padStart(2, '0')} accent={skippedCount > 0 ? 'text-amber-400' : 'text-zinc-400'} />
                 <SummaryTile label="Batch" value={totalBatches > 0 ? formatSessionIndex(currentBatchIndex, totalBatches) : '00/00'} accent="text-white" />
               </div>
+
+              {/* Session statistics — visible once at least one call has been processed */}
+              {(sessionStats.connects > 0 || sessionStats.voicemails > 0 || sessionStats.noAnswers > 0) && (
+                <div className="flex items-center gap-1.5 rounded-xl border border-white/5 bg-white/[0.02] px-3 py-2">
+                  <BarChart3 className="h-3.5 w-3.5 text-zinc-500 shrink-0" />
+                  <div className="flex flex-wrap items-center gap-3 text-[10px] font-mono uppercase tracking-widest">
+                    <span className="text-emerald-400">
+                      <CheckCircle2 className="inline h-3 w-3 mr-0.5" />
+                      {sessionStats.connects} connect{sessionStats.connects !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-amber-400">
+                      <Voicemail className="inline h-3 w-3 mr-0.5" />
+                      {sessionStats.voicemails} vm{sessionStats.voicemails !== 1 ? 's' : ''}
+                    </span>
+                    <span className="text-zinc-500">
+                      <PhoneOff className="inline h-3 w-3 mr-0.5" />
+                      {sessionStats.noAnswers} no answer
+                    </span>
+                    {sessionStats.totalTalkSeconds > 0 && (
+                      <span className="text-zinc-400">
+                        <Timer className="inline h-3 w-3 mr-0.5" />
+                        {formatTimer(sessionStats.totalTalkSeconds)} talk
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {sessionNote && (
                 <div className="flex items-center gap-2 rounded-xl border border-white/5 bg-white/[0.03] px-3 py-2 text-[11px] text-zinc-400">
@@ -520,6 +768,8 @@ export function PowerDialerDock() {
                       index={index}
                       state={state}
                       isActive={callStatus === 'connected' && currentDialedPhone === target.phoneNumber}
+                      callTimer={callStatus === 'connected' && currentDialedPhone === target.phoneNumber ? callTimer : 0}
+                      onSkip={mode !== 'running' || state === 'queued' ? () => handleSkipContact(target.contactId, target.phoneNumber) : undefined}
                     />
                   )
                 }) : (
@@ -562,11 +812,15 @@ function TargetCard({
   index,
   state,
   isActive,
+  callTimer = 0,
+  onSkip,
 }: {
   target: PowerDialTarget
   index: number
   state: TargetCallState
   isActive: boolean
+  callTimer?: number
+  onSkip?: () => void
 }) {
   const stateConfig = {
     queued: {
@@ -674,16 +928,30 @@ function TargetCard({
             </div>
           </div>
           
-          {/* Status badge */}
-          <div className={cn(
-            'flex items-center gap-1.5 px-2 py-1 rounded-lg border shrink-0',
-            config.bgColor,
-            config.borderColor
-          )}>
-            <StateIcon className={cn('w-3 h-3', config.color)} />
-            <span className={cn('text-[9px] font-mono uppercase tracking-widest', config.color)}>
-              {config.label}
-            </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Skip button \u2014 only shows on queued contacts or when not running */}
+            {onSkip && (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="flex items-center justify-center w-6 h-6 rounded-lg border border-white/5 bg-white/[0.02] text-zinc-600 hover:bg-red-500/10 hover:border-red-500/20 hover:text-red-400 transition-all"
+                title="Remove from queue"
+              >
+                <UserX className="w-3 h-3" />
+              </button>
+            )}
+
+            {/* Status badge */}
+            <div className={cn(
+              'flex items-center gap-1.5 px-2 py-1 rounded-lg border',
+              config.bgColor,
+              config.borderColor
+            )}>
+              <StateIcon className={cn('w-3 h-3', config.color)} />
+              <span className={cn('text-[9px] font-mono uppercase tracking-widest', config.color)}>
+                {config.label}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -706,14 +974,22 @@ function TargetCard({
           </div>
         )}
 
-        {/* Phone number */}
+        {/* Phone number + live timer */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5">
           <div className="flex items-center gap-1.5 text-[10px] font-mono text-zinc-500">
             <Phone className="w-3 h-3" />
             <span className="tabular-nums">{target.phoneNumber}</span>
           </div>
-          <div className="text-[10px] font-mono text-zinc-600">
-            #{String(index + 1).padStart(2, '0')}
+          <div className="flex items-center gap-2">
+            {isActive && callTimer > 0 && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono tabular-nums text-emerald-400">
+                <Timer className="w-3 h-3" />
+                {formatTimer(callTimer)}
+              </span>
+            )}
+            <div className="text-[10px] font-mono text-zinc-600">
+              #{String(index + 1).padStart(2, '0')}
+            </div>
           </div>
         </div>
       </div>

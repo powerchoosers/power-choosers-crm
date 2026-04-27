@@ -571,7 +571,7 @@ export default async function handler(req, res) {
         twiml.say('Sorry, there was an error processing your call.');
         twiml.hangup();
         res.setHeader('Content-Type', 'text/xml');
-        res.writeHead(500);
+        res.writeHead(200); // Always 200 for TwiML — Twilio plays "Application Error" on non-200
         res.end(twiml.toString());
         return;
     }
