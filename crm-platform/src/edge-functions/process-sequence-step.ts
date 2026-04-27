@@ -847,14 +847,18 @@ async function handleGeneration(execution, job) {
             notes: member.account_description || null,
         },
     ]);
+
+    // Initialize early to avoid ReferenceError in catch block
+    let senderEmail = String(member.sequence_sender_email || '').trim() || null;
+    let senderDomain = senderEmail && senderEmail.includes('@')
+        ? senderEmail.split('@')[1]
+        : null;
+
     const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
     const contractEndYear = member.account_contract_end_date
         ? new Date(member.account_contract_end_date).getUTCFullYear()
         : null;
-    const senderEmail = String(member.sequence_sender_email || '').trim() || null;
-    const senderDomain = senderEmail && senderEmail.includes('@')
-        ? senderEmail.split('@')[1]
-        : null;
+
     const targetEmailId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
     const defaultSubject = String(metadata?.subject || metadata?.aiSubject || metadata?.label || 'Message from Nodal Point').trim();
     const wantsLiveSignals = Array.isArray(metadata?.vectors)
@@ -1043,7 +1047,7 @@ async function handleSend(execution, job) {
     }
 
     const [member] = await sql`
-    SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
+    SELECT m.id, m.metadata as member_metadata, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
            a.name as company_name, a.city as account_city, a.state as account_state, a.industry as account_industry,
            s."ownerId" as owner_uuid, u.email as primary_owner_email,
            u.first_name as owner_first_name,
@@ -1068,6 +1072,9 @@ async function handleSend(execution, job) {
         await skipNode(execution, job);
         return;
     }
+
+    const texasEnergy = getTexasEnergyContext(member?.account_city || '', member?.account_state || '', member?.account_city || '');
+    const utilityTerritory = member?.member_metadata?.utility_territory || texasEnergy.utilityTerritory || null;
 
     // Suppression pre-check: skip send if contact has unsubscribed or paused.
     // spike_only contacts are NOT in suppressions (handled via contact metadata only),
@@ -1140,6 +1147,7 @@ async function handleSend(execution, job) {
       WHERE id = ${String(emailRecordId)}
       LIMIT 1
     `;
+
     const alreadySentForExecution = existingEmailRecord
         && (
             String(existingEmailRecord.status || '').toLowerCase() === 'sent'
