@@ -11,11 +11,17 @@ interface SyncStore {
   
   // Ingestion State
   isIngesting: boolean
+  isIngestAborted: boolean
   ingestProgress: number
   ingestTotal: number
   ingestVector: 'CONTACTS' | 'ACCOUNTS' | null
+  ingestLogs: string[]
+  ingestErrors: any[]
   startIngestion: (total: number, vector: 'CONTACTS' | 'ACCOUNTS') => void
   updateIngestProgress: (progress: number) => void
+  addIngestLog: (log: string) => void
+  addIngestError: (error: any) => void
+  cancelIngestion: () => void
   finishIngestion: () => void
 }
 
@@ -30,10 +36,16 @@ export const useSyncStore = create<SyncStore>((set) => ({
 
   // Ingestion State
   isIngesting: false,
+  isIngestAborted: false,
   ingestProgress: 0,
   ingestTotal: 0,
   ingestVector: null,
-  startIngestion: (total, vector) => set({ isIngesting: true, ingestProgress: 0, ingestTotal: total, ingestVector: vector }),
+  ingestLogs: [],
+  ingestErrors: [],
+  startIngestion: (total, vector) => set({ isIngesting: true, isIngestAborted: false, ingestProgress: 0, ingestTotal: total, ingestVector: vector, ingestLogs: [], ingestErrors: [] }),
   updateIngestProgress: (progress) => set({ ingestProgress: progress }),
-  finishIngestion: () => set({ isIngesting: false, ingestProgress: 0, ingestTotal: 0, ingestVector: null })
+  addIngestLog: (log) => set(state => ({ ingestLogs: [...state.ingestLogs, log].slice(-100) })),
+  addIngestError: (error) => set(state => ({ ingestErrors: [...state.ingestErrors, error] })),
+  cancelIngestion: () => set({ isIngestAborted: true, isIngesting: false }),
+  finishIngestion: () => set({ isIngesting: false, isIngestAborted: false, ingestProgress: 0, ingestTotal: 0, ingestVector: null, ingestLogs: [], ingestErrors: [] })
 }))

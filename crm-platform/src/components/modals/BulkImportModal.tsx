@@ -598,15 +598,38 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
     }
   };
 
+  const isGlobalIngesting = useSyncStore(s => s.isIngesting);
+  const globalProgress = useSyncStore(s => s.ingestProgress);
+  const globalTotal = useSyncStore(s => s.ingestTotal);
+
   useEffect(() => {
     if (!isOpen) {
-      return
+      if (!isGlobalIngesting) {
+        setStep('VECTOR_SELECT');
+        setImportVector(null);
+        setFile(null);
+        setCsvHeaders([]);
+        setCsvData([]);
+        setFieldMapping({});
+        setSelectedListId('');
+        setIsProcessing(false);
+        setProcessingStage(0);
+        setProgress(0);
+        setHygieneStats({ valid: 0, invalid: 0, total: 0 });
+      }
+      return;
+    }
+
+    if (isGlobalIngesting) {
+      setStep('PROCESSING');
+      setIsProcessing(true);
+      return;
     }
 
     if (initialFile && !file && !isProcessing) {
       setFile(initialFile)
     }
-  }, [isOpen, initialFile, file, isProcessing])
+  }, [isOpen, initialFile, file, isProcessing, isGlobalIngesting])
 
   // --- LOGIC: EXECUTE IMPORT ---
   const handleInitiateIngestion = async () => {
@@ -630,9 +653,19 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
     const selectedListName = targets?.find(t => t.id === selectedListId)?.name;
     const BATCH_SIZE = 5; // Batch size to prevent UI freezing
     
+    useSyncStore.getState().addIngestLog(`[SYSTEM] Initializing stream. Target vector: ${importVector}`);
+    useSyncStore.getState().addIngestLog(`[SYSTEM] Total payload size: ${total} records`);
+
     for (let i = 0; i < csvData.length; i += BATCH_SIZE) {
+      if (useSyncStore.getState().isIngestAborted) {
+        useSyncStore.getState().addIngestLog(`[SYSTEM] Ingestion ABORTED by operator.`);
+        break;
+      }
+
+      useSyncStore.getState().addIngestLog(`[PROCESS] Ingesting batch ${i} to ${Math.min(i + BATCH_SIZE, total)}...`);
+
       const batch = csvData.slice(i, i + BATCH_SIZE);
-      const promises = batch.map(async (row) => {
+      const promises = batch.map(async (row, batchIdx) => {
       const sourceCompanyFields = extractCompanySourceFields(row);
       const mappedData: any = {};
       
@@ -985,9 +1018,12 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           }
         }
         successCount++;
-      } catch (err) {
+        useSyncStore.getState().addIngestLog(`[SUCCESS] Ingested record: ${mappedData.company_name || mappedData.name || mappedData.email || 'Unknown'}`);
+      } catch (err: any) {
         console.error('Import error for row:', err);
         errorCount++;
+        useSyncStore.getState().addIngestLog(`[ERROR] Failed to ingest record at index ${i + batchIdx}`);
+        useSyncStore.getState().addIngestError({ index: i + batchIdx, row, error: err?.message || 'Unknown error' });
       }
       });
       
@@ -1008,10 +1044,33 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
     queryClient.invalidateQueries({ queryKey: ['list-memberships'] });
 
     // Show success toasts
-    toast.success(`Import complete: ${successCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} processed${errorCount > 0 ? `, ${errorCount} failed` : ''}.`);
+    const aborted = useSyncStore.getState().isIngestAborted;
     
-    if (selectedListId && listAddCount > 0) {
-      toast.success(`${listAddCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} added to list: "${selectedListName}"${listAddErrors > 0 ? ` (${listAddErrors} duplicates skipped)` : ''}`);
+    if (aborted) {
+      toast.error(`Ingestion aborted. ${successCount} processed before termination.`);
+    } else {
+      toast.success(`Import complete: ${successCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} processed${errorCount > 0 ? `, ${errorCount} failed` : ''}.`);
+      if (selectedListId && listAddCount > 0) {
+        toast.success(`${listAddCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} added to list: "${selectedListName}"${listAddErrors > 0 ? ` (${listAddErrors} duplicates skipped)` : ''}`);
+      }
+    }
+    
+    // Determine if we need to let the user see errors or just close
+    const finalErrors = useSyncStore.getState().ingestErrors;
+    if (finalErrors.length > 0 && !aborted) {
+      // Create a blob and download it automatically for quarantine logs
+      try {
+        const errorCsv = Papa.unparse(finalErrors.map(e => ({ Error: e.error, ...e.row })));
+        const blob = new Blob([errorCsv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('url');
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `quarantine_log_${new Date().toISOString()}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.info(`Downloaded quarantine log for ${errorCount} failed records.`);
+      } catch (e) {}
     }
     
     useSyncStore.getState().finishIngestion();
@@ -1484,13 +1543,21 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                 <div className="w-full max-w-md bg-black/40 rounded-full h-2 mb-4 overflow-hidden">
                   <motion.div 
                     initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
+                    animate={{ width: `${globalProgress}%` }}
                     className="h-full bg-[#002FA7]"
                   />
                 </div>
-                <div className="text-xs font-mono text-zinc-500 uppercase tracking-widest">
-                  SYNC_PROGRESS: {progress}% // NODES: {csvData.length}
+                <div className="text-xs font-mono text-zinc-500 uppercase tracking-widest mb-6">
+                  SYNC_PROGRESS: {globalProgress}% // NODES: {globalTotal || csvData.length}
                 </div>
+
+                <Button 
+                  variant="outline" 
+                  className="border-red-500/20 text-red-500 hover:bg-red-500/10 hover:text-red-400 font-mono text-[10px] uppercase tracking-widest"
+                  onClick={() => useSyncStore.getState().cancelIngestion()}
+                >
+                   <X className="w-4 h-4 mr-2" /> ABORT INGESTION
+                </Button>
               </motion.div>
             )}
 
