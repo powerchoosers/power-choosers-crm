@@ -15,6 +15,7 @@ import {
   formatPhoneBucketLabel,
   getSignalForValue,
   inferPhoneBucketFromText,
+  normalizePhoneKey,
 } from '@/lib/contact-signals'
 
 interface UplinkCardProps {
@@ -53,9 +54,7 @@ interface AdditionalPhoneEntry {
   signalDerived?: boolean
 }
 
-function normalizePhoneDigits(value: string) {
-  return value.replace(/\D/g, '')
-}
+// Using normalizePhoneKey from lib/contact-signals for consistency
 
 export const UplinkCard: React.FC<UplinkCardProps> = ({
   contact,
@@ -187,11 +186,11 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
     const firstNonCompany = phoneEntries.find((p) => p.id !== 'companyPhone')
     const nextPrimary = (contact.primaryPhoneField || (firstNonCompany?.id ?? 'mobile')) as PrimaryPhoneType
     const nextEmail = contact.email || ''
-    const canonicalValues = new Set(phoneEntries.map((p) => normalizePhoneDigits(p.value)))
+    const canonicalValues = new Set(phoneEntries.map((p) => normalizePhoneKey(p.value)))
     const extras = (Array.isArray(contact.additionalPhones) ? contact.additionalPhones : [])
       .filter((p) => p && typeof p.number === 'string' && p.number.trim())
       .filter((p) => {
-        const digits = normalizePhoneDigits(p.number)
+        const digits = normalizePhoneKey(p.number)
         return digits ? !canonicalValues.has(digits) : true
       })
       .map((p, idx) => {
@@ -282,7 +281,7 @@ export const UplinkCard: React.FC<UplinkCardProps> = ({
   const persistAdditionalPhones = (entries: AdditionalPhoneEntry[]): ContactAdditionalPhone[] => {
     return entries
       .map((entry) => {
-        const digits = normalizePhoneDigits(entry.value)
+        const digits = normalizePhoneKey(entry.value)
         if (!digits) return null
         const number = formatPhoneNumber(entry.value)
         if (!number) return null

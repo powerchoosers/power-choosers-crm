@@ -84,7 +84,7 @@ function normalizeEmailKey(value: string) {
   return value.trim().toLowerCase()
 }
 
-function normalizePhoneKey(value: string) {
+export function normalizePhoneKey(value: string) {
   let digits = value.replace(/\D/g, '')
   if (digits.length === 11 && digits.startsWith('1')) {
     digits = digits.substring(1)

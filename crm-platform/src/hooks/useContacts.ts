@@ -16,6 +16,7 @@ import {
   getSignalForValue,
   inferPhoneBucketFromText,
   normalizeSignalScore,
+  normalizePhoneKey,
 } from '@/lib/contact-signals'
 
 export type { ContactAdditionalPhone } from '@/lib/contact-signals'
@@ -337,7 +338,7 @@ function normalizeSignalCollection(raw: unknown): ContactSignalCollection | null
     return {
       kind,
       value,
-      key: kind === 'phone' ? value.replace(/\D/g, '') : value.toLowerCase(),
+      key: kind === 'phone' ? normalizePhoneKey(value) : value.toLowerCase(),
       score: score ?? 0,
       label: cleanText(typed.label) || undefined,
       source: cleanText(typed.source) || undefined,
@@ -365,9 +366,7 @@ function getContactSignals(metadata: ContactMetadata | null | undefined): Contac
   return normalizeSignalCollection(metadata.communicationSignals || metadata.importCommunicationSignals)
 }
 
-function normalizePhoneDigits(value: unknown) {
-  return String(value ?? '').replace(/\D/g, '')
-}
+
 
 function extractAdditionalPhones(
   metadata: ContactMetadata | null,
@@ -378,7 +377,7 @@ function extractAdditionalPhones(
   const seen = new Set<string>()
   const excludedDigits = new Set(
     excludedNumbers
-      .map((value) => normalizePhoneDigits(value))
+      .map((value) => normalizePhoneKey(String(value ?? '')))
       .filter(Boolean)
   )
   const bucketCounts: Record<ContactPhoneBucket, number> = {
@@ -396,7 +395,7 @@ function extractAdditionalPhones(
     bucketHint?: ContactPhoneBucket | null,
   ) => {
     const cleanedNumber = cleanText(number)
-    const digits = normalizePhoneDigits(cleanedNumber)
+    const digits = normalizePhoneKey(cleanedNumber)
     if (!digits) return
     const formattedNumber = formatPhoneNumber(cleanedNumber) || cleanedNumber
     const key = digits
@@ -645,31 +644,17 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
         if (!user && !loading) {
 
           return { contacts: [], nextCursor: null };
-        }
-
-        let query = supabase
-          .from('contacts')
-          .select(CONTACT_LIST_SELECT);
+        }        let query;
 
         if (listId) {
-          // Fetch targetIds from list_members first due to lack of FK for inner join
-          const { data: memberData, error: memberError } = await supabase
-            .from('list_members')
-            .select('targetId')
-            .eq('listId', listId)
-            .in('targetType', ['people', 'contact', 'contacts']);
-
-          if (memberError) {
-            console.error("Error fetching list members:", memberError);
-            return { contacts: [], nextCursor: null };
-          }
-
-          const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
-          if (targetIds.length === 0) {
-            return { contacts: [], nextCursor: null };
-          }
-
-          query = query.in('id', targetIds);
+          // Use RPC for large lists to avoid URL length limits in GET requests
+          query = supabase
+            .rpc('get_contacts_by_list', { p_list_id: listId })
+            .select(CONTACT_LIST_SELECT);
+        } else {
+          query = supabase
+            .from('contacts')
+            .select(CONTACT_LIST_SELECT);
         }
 
         // Admin and dev see all contacts; others filtered by ownerId
