@@ -486,12 +486,29 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       let query = supabase.from('accounts').select('id', { count: 'exact', head: true })
 
       if (listId) {
+        // Use RPC to get count for large lists to avoid URL length limits
+        const { data: countData, error: countError } = await supabase
+          .rpc('get_accounts_count_by_list', { p_list_id: listId });
+
+        if (countError) {
+          console.error("Error fetching list members count via RPC:", countError);
+          return 0;
+        }
+        
+        // If there are NO other filters, we can return this count directly.
+        const hasOtherFilters = !!searchQuery || (filters?.status && filters.status.length > 0) || (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
+        
+        if (!hasOtherFilters) {
+          return Number(countData || 0);
+        }
+
         // Fetch targetIds from list_members first
         const { data: memberData, error: memberError } = await supabase
           .from('list_members')
           .select('targetId')
           .eq('listId', listId)
-          .in('targetType', ['accounts', 'account', 'companies', 'company']);
+          .in('targetType', ['accounts', 'account', 'companies', 'company'])
+          .limit(1000); // Temporary cap for filtered large lists to prevent crash
 
         if (memberError) {
           console.error("Error fetching list members for count:", memberError);
