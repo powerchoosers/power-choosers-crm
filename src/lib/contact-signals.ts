@@ -85,7 +85,11 @@ function normalizeEmailKey(value: string) {
 }
 
 function normalizePhoneKey(value: string) {
-  return value.replace(/\D/g, '')
+  let digits = value.replace(/\D/g, '')
+  if (digits.length === 11 && digits.startsWith('1')) {
+    digits = digits.substring(1)
+  }
+  return digits
 }
 
 function countOccurrences(values: string[], key: string) {
