@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { type DealStage } from '@/types/deals'
 import type { SignatureRequestKind } from '@/lib/signature-request'
 
-export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'CREATE_PROPOSAL' | 'SEND_PORTAL_ACCESS' | 'TARGET_SEARCH';
+export type RightPanelMode = 'DEFAULT' | 'INGEST_ACCOUNT' | 'INGEST_CONTACT' | 'CREATE_TASK' | 'CREATE_DEAL' | 'CREATE_SIGNATURE_REQUEST' | 'CREATE_PROPOSAL' | 'SEND_PORTAL_ACCESS' | 'TARGET_SEARCH' | 'BULK_INGESTION_TERMINAL';
 
 export interface SignatureRequestContext {
   documentId?: string
