@@ -21,6 +21,7 @@ import { ForensicClose } from '@/components/ui/ForensicClose';
 import { isCsvFile } from '@/lib/file-ingestion';
 import { buildImportCommunicationSignals, pickBestSignal } from '@/lib/contact-signals';
 import { headcountMetadata, parseHeadcount } from '@/lib/headcount';
+import { useSyncStore } from '@/store/syncStore';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -611,6 +612,15 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
   const handleInitiateIngestion = async () => {
     setIsProcessing(true);
     setStep('PROCESSING');
+    
+    // Set Zustand state to show TopBar progress
+    useSyncStore.getState().startIngestion(csvData.length, importVector || 'CONTACTS');
+
+    // Fire and forget the background process
+    runBackgroundIngestion();
+  };
+
+  const runBackgroundIngestion = async () => {
     let successCount = 0;
     let errorCount = 0;
     let listAddCount = 0;
@@ -618,9 +628,11 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
 
     const total = csvData.length;
     const selectedListName = targets?.find(t => t.id === selectedListId)?.name;
+    const BATCH_SIZE = 5; // Batch size to prevent UI freezing
     
-    for (let i = 0; i < csvData.length; i++) {
-      const row = csvData[i];
+    for (let i = 0; i < csvData.length; i += BATCH_SIZE) {
+      const batch = csvData.slice(i, i + BATCH_SIZE);
+      const promises = batch.map(async (row) => {
       const sourceCompanyFields = extractCompanySourceFields(row);
       const mappedData: any = {};
       
@@ -974,11 +986,19 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
         }
         successCount++;
       } catch (err) {
-        console.error('Import error for row:', i, err);
+        console.error('Import error for row:', err);
         errorCount++;
       }
+      });
       
-      setProgress(Math.round(((i + 1) / total) * 100));
+      await Promise.allSettled(promises);
+      
+      const newProgress = Math.round((Math.min(i + BATCH_SIZE, total) / total) * 100);
+      setProgress(newProgress);
+      useSyncStore.getState().updateIngestProgress(newProgress);
+      
+      // Yield to main thread
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
 
     // Invalidate queries to refresh counts
@@ -994,8 +1014,14 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
       toast.success(`${listAddCount} ${importVector === 'CONTACTS' ? 'contacts' : 'accounts'} added to list: "${selectedListName}"${listAddErrors > 0 ? ` (${listAddErrors} duplicates skipped)` : ''}`);
     }
     
+    useSyncStore.getState().finishIngestion();
     setIsProcessing(false);
-    onClose();
+    
+    // Try to safely update state if mounted, but if not it's okay.
+    try {
+      setStep('VECTOR_SELECT');
+      onClose();
+    } catch(e) {}
   };
 
   return (
@@ -1014,7 +1040,14 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
               DATA_INGESTION_PROTOCOL // {step}
             </span>
           </div>
-          <ForensicClose size={18} onClick={onClose} />
+          <div className="flex items-center gap-4">
+            {step === 'PROCESSING' && (
+              <span className="text-[10px] font-mono text-emerald-500/80 animate-pulse uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">
+                Safe to close (Background Mode)
+              </span>
+            )}
+            <ForensicClose size={18} onClick={onClose} />
+          </div>
         </div>
 
         <motion.div 
