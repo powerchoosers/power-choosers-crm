@@ -496,6 +496,10 @@ export default async function handler(req, res) {
       .maybeSingle();
 
     const sequenceSender = sequence?.bgvector?.settings?.senderEmail || sequence?.metadata?.sender_email || null;
+    const preferredFrom = String(sequenceSender || '').trim();
+    const fromEmail = preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io';
+    const senderDomain = senderDomainFromEmail(fromEmail);
+
     let senderFirstName = null;
     if (sequence?.ownerId) {
       const { data: ownerUser } = await supabase
@@ -547,10 +551,6 @@ export default async function handler(req, res) {
       contact.notes ? `Contact notes: ${contact.notes.slice(0, 250)}` : null
     ].filter(Boolean).join('\n');
 
-    // Resolve sender email and domain before the AI call so they can be passed as contact context
-    const preferredFrom = String(sequenceSender || '').trim();
-    const fromEmail = preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io';
-    const senderDomain = senderDomainFromEmail(fromEmail);
     const targetEmailId = String(emailId || executionMeta.emailRecordId || `seq_exec_${execution.id}`);
     const defaultSubject = String(
       executionMeta.subject || executionMeta.aiSubject || executionMeta.label || 'Message from Nodal Point'

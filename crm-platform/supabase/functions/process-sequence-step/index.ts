@@ -513,8 +513,11 @@ function buildMemberContext(memberRow: any) {
 }
 
 async function processJob(job: any) {
-  const [execution] = await sql`SELECT * FROM sequence_executions WHERE id = ${job.execution_id} LIMIT 1`;
-  if (!execution) throw new Error(`Execution not found: ${job.execution_id}`);
+  const member_id = job.member_id;
+  const execution_id = job.execution_id;
+
+  const [execution] = await sql`SELECT * FROM sequence_executions WHERE id = ${execution_id} LIMIT 1`;
+  if (!execution) throw new Error(`Execution not found: ${execution_id}`);
 
   const metadata = asObject(execution.metadata);
   const nodeType = lower(job?.metadata?.type || metadata.type || execution.step_type || job?.step_type || "delay");
@@ -553,11 +556,16 @@ async function processJob(job: any) {
     LEFT JOIN accounts a ON c."accountId" = a.id
     JOIN sequences s ON s.id = m."sequenceId"
     LEFT JOIN users u ON (u.id = s."ownerId" OR u.email = s."ownerId")
-    WHERE m.id = ${job.member_id}
+    WHERE m.id = ${member_id}
     LIMIT 1
   `;
 
-  if (!memberRow) throw new Error(`Sequence member not found: ${job.member_id}`);
+  if (!memberRow) throw new Error(`Sequence member not found: ${member_id}`);
+
+  // Hoist sender info early to prevent ReferenceError in error handler
+  const senderEmail = s(memberRow.owner_email || "l.patterson@getnodalpoint.com");
+  const senderDomain = senderEmail.includes("@") ? senderEmail.split("@")[1] : null;
+
   const context = buildMemberContext(memberRow);
   const contactName = [memberRow.firstName, memberRow.lastName].filter(Boolean).join(" ").trim() || memberRow.contact_email || "Contact";
   const queueJobId = job.jobId;
@@ -613,6 +621,9 @@ async function processJob(job: any) {
       let body = existingBody;
       let subject = s(metadata.subject || metadata.aiSubject || metadata.label || "Message from Nodal Point");
 
+      const emailRecordId = s(metadata.emailRecordId || `seq_exec_${execution.id}`);
+      // Use hoisted sender info
+
       if (!body) {
         const aiResponse = await fetch(`${API_BASE_URL}/api/ai/optimize`, {
           method: "POST",
@@ -659,10 +670,6 @@ async function processJob(job: any) {
         body = extractGeneratedBody(aiResult) || buildFallbackBody(memberRow, replyStage, context.siteCity, context.utilityTerritory);
         subject = extractGeneratedSubject(aiResult, subject);
       }
-
-      const emailRecordId = s(metadata.emailRecordId || `seq_exec_${execution.id}`);
-      const senderEmail = s(memberRow.owner_email || "l.patterson@getnodalpoint.com");
-      const senderDomain = senderEmail.includes("@") ? senderEmail.split("@")[1] : null;
 
       const draftMetadata = {
         ...(asObject(metadata)),
@@ -810,6 +817,14 @@ async function processJob(job: any) {
 
 Deno.serve(async (req: Request) => {
   try {
+    const cronSecret = req.headers.get("x-cron-secret");
+    const authHeader = req.headers.get("Authorization");
+    
+    // Allow if valid cron secret OR valid auth header (though verify_jwt=false will make authHeader less useful unless we verify it manually)
+    if (cronSecret !== "nodal-cron-2026" && !authHeader) {
+      return new Response("unauthorized", { status: 401 });
+    }
+
     if (req.method !== "POST") {
       return new Response("expected POST request", { status: 405 });
     }
