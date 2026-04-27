@@ -1100,8 +1100,12 @@ export function useUpsertContact() {
           if (nameMatches && nameMatches.length > 0) {
             // Filter by company name in metadata
             const companyMatch = nameMatches.find(m => {
-              const existingCompany = m.metadata?.company || m.metadata?.companyName;
-              return existingCompany && existingCompany.toLowerCase() === contact.company.toLowerCase();
+              const existingCompany = (m.metadata?.company || m.metadata?.companyName)?.trim();
+              // Loosened match: if the existing record has no company name, we allow it to match
+              // the incoming record with the same name. This enables enriching records that 
+              // were previously imported without company data.
+              if (!existingCompany) return true;
+              return existingCompany.toLowerCase() === contact.company.toLowerCase();
             });
 
             if (companyMatch) {
