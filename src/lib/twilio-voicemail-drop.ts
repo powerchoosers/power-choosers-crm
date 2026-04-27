@@ -107,6 +107,31 @@ export async function triggerOutboundVoicemailDrop({
     twiml: twiml.toString(),
   })
 
+  // Update call record in database with voicemail drop metadata
+  try {
+    const { error: updateError } = await supabaseAdmin
+      .from('calls')
+      .update({
+        metadata: supabaseAdmin.raw(`
+          COALESCE(metadata, '{}'::jsonb) || 
+          jsonb_build_object(
+            'answeredBy', 'machine_start',
+            'voicemailDropStatus', 'dropped',
+            'voicemailDropAt', '${new Date().toISOString()}',
+            'voicemailDropUrl', '${playUrl}',
+            'voicemailDropType', 'manual'
+          )
+        `),
+      })
+      .eq('callSid', normalizedCallSid)
+
+    if (updateError) {
+      console.error('[Voicemail Drop] Failed to update call metadata:', updateError)
+    }
+  } catch (metadataError) {
+    console.error('[Voicemail Drop] Error updating metadata:', metadataError)
+  }
+
   return {
     status: 'dropped',
     playUrl,

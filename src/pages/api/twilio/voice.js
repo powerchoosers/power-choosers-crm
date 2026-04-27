@@ -514,8 +514,13 @@ export default async function handler(req, res) {
                 dial.number({
                     statusCallback: `${base}/api/twilio/dial-status?${targetParams.toString()}`,
                     statusCallbackEvent: 'initiated ringing answered completed',
+                    // Use async AMD for power dialer to avoid voicemail race condition
+                    // This connects immediately while AMD runs in background
                     machineDetection: 'DetectMessageEnd',
                     machineDetectionTimeout,
+                    asyncAmd: 'true',
+                    asyncAmdStatusCallback: `${base}/api/twilio/amd-status?${targetParams.toString()}`,
+                    asyncAmdStatusCallbackMethod: 'POST'
                 }, target.phoneNumber);
             });
 
