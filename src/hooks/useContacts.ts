@@ -817,15 +817,35 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
         : supabase.from('contacts').select('id', { count: 'exact', head: true });
 
       if (listId) {
-        // Fetch targetIds from list_members first
+        // Use RPC to get count for large lists to avoid URL length limits
+        const { data: countData, error: countError } = await supabase
+          .rpc('get_contacts_count_by_list', { p_list_id: listId });
+
+        if (countError) {
+          console.error("Error fetching list members count via RPC:", countError);
+          return 0;
+        }
+        
+        // If there are NO other filters, we can return this count directly.
+        // If there ARE other filters, we still have the URL length problem for now,
+        // but this handles the most common case of viewing a large list.
+        const hasOtherFilters = !!searchQuery || (filters?.status && filters.status.length > 0) || (filters?.title && filters.title.length > 0) || (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
+        
+        if (!hasOtherFilters) {
+          return Number(countData || 0);
+        }
+
+        // For filtered lists, we still need to fetch IDs for now, but we'll try to optimize by limiting.
+        // Ideally we should move the filtering into the RPC as well.
         const { data: memberData, error: memberError } = await supabase
           .from('list_members')
           .select('targetId')
           .eq('listId', listId)
-          .in('targetType', ['people', 'contact', 'contacts']);
+          .in('targetType', ['people', 'contact', 'contacts'])
+          .limit(1000); // Temporary cap for filtered large lists to prevent crash
 
         if (memberError) {
-          console.error("Error fetching list members for count:", memberError);
+          console.error("Error fetching list members for filtered count:", memberError);
           return 0;
         }
 
