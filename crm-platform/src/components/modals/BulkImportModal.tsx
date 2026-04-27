@@ -403,39 +403,39 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             };
           }).filter(p => p.f && p.l);
 
-          // We'll process a subset for name matches to keep preview snappy, or process all if payload is reasonable
-          // For 4k+ records, we process in batches of 25
+          // We'll process all records to ensure accuracy, using progress state for feedback
           const subBatchSize = 25;
-          const maxNameChecks = 1000; // Cap name checks in preview to keep it responsive
-          const checkLimit = Math.min(namesToCheck.length, maxNameChecks);
           
-          for (let i = 0; i < checkLimit; i += subBatchSize) {
+          for (let i = 0; i < namesToCheck.length; i += subBatchSize) {
+             // Update progress
+             const currentProgress = Math.round(((i + (mappedPayload.length - remaining.length)) / mappedPayload.length) * 100);
+             setProgress(currentProgress);
+
              const batch = namesToCheck.slice(i, i + subBatchSize);
              const batchResults = await Promise.all(batch.map(async (p) => {
-               const { data: nameMatches } = await supabase
-                .from('contacts')
-                .select('id, metadata')
-                .ilike('firstName', p.f)
-                .ilike('lastName', p.l);
-               
-               if (nameMatches && nameMatches.length > 0) {
-                 if (!p.c) return true; // No company in import -> match by name only
-                 const companyMatch = nameMatches.find(m => {
-                   const existingCompany = (m.metadata?.company || m.metadata?.companyName)?.trim();
-                   // Loosened logic: if existing has no company, it matches the new company
-                   if (!existingCompany) return true;
-                   return existingCompany.toLowerCase() === p.c.toLowerCase();
-                 });
-                 return !!companyMatch;
+               try {
+                 const { data: nameMatches } = await supabase
+                  .from('contacts')
+                  .select('id, metadata')
+                  .ilike('firstName', p.f)
+                  .ilike('lastName', p.l);
+                 
+                 if (nameMatches && nameMatches.length > 0) {
+                   if (!p.c) return true; // No company in import -> match by name only
+                   const companyMatch = nameMatches.find(m => {
+                     const existingCompany = (m.metadata?.company || m.metadata?.companyName)?.trim();
+                     // Loosened logic: if existing has no company, it matches the new company
+                     if (!existingCompany) return true;
+                     return existingCompany.toLowerCase() === p.c.toLowerCase();
+                   });
+                   return !!companyMatch;
+                 }
+               } catch (e) {
+                 return false;
                }
                return false;
              }));
              existingCount += batchResults.filter(Boolean).length;
-          }
-          
-          // If we capped it, warn in logs
-          if (namesToCheck.length > maxNameChecks) {
-            console.warn(`Analysis capped at ${maxNameChecks} name checks for performance.`);
           }
         }
       }
@@ -1456,19 +1456,13 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                   </div>
                 </div>
 
-                {/* FOOTER ACTIONS */}
                 <div className="mt-4 flex justify-end pt-4 border-t border-white/5">
                   <Button 
-                    onClick={async () => {
-                      // Ensure analysis is complete or at least started before moving forward
-                      if (!analysis && !isAnalyzing) {
-                        await runPreImportAnalysis();
-                      }
-                      setStep('ROUTING');
-                    }}
-                    className="bg-[#002FA7] hover:bg-[#002FA7]/90 text-white font-mono text-xs shadow-[0_0_15px_-3px_#002FA7] px-8"
+                    onClick={() => setStep('ROUTING')}
+                    disabled={!analysis || isAnalyzing}
+                    className="bg-white text-black hover:bg-zinc-200 font-mono text-xs px-8"
                   >
-                    {isAnalyzing ? '[ ANALYZING... ]' : <>CONFIRM_CALIBRATION <ArrowRight className="w-4 h-4 ml-2" /></>}
+                    PROCEED <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </motion.div>
