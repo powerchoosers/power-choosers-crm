@@ -778,7 +778,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
           }
         }) as Contact[];
 
-        const hasNextPage = data.length === PAGE_SIZE;
+        const hasNextPage = contacts.length === PAGE_SIZE;
 
 
         return {
