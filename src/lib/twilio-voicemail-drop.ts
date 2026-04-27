@@ -109,20 +109,26 @@ export async function triggerOutboundVoicemailDrop({
 
   // Update call record in database with voicemail drop metadata
   try {
+    // First, fetch the existing call to get current metadata
+    const { data: existingCall } = await supabaseAdmin
+      .from('calls')
+      .select('metadata')
+      .eq('callSid', normalizedCallSid)
+      .single()
+
+    const currentMetadata = existingCall?.metadata || {}
+    const updatedMetadata = {
+      ...currentMetadata,
+      answeredBy: 'machine_start',
+      voicemailDropStatus: 'dropped',
+      voicemailDropAt: new Date().toISOString(),
+      voicemailDropUrl: playUrl,
+      voicemailDropType: 'manual',
+    }
+
     const { error: updateError } = await supabaseAdmin
       .from('calls')
-      .update({
-        metadata: supabaseAdmin.raw(`
-          COALESCE(metadata, '{}'::jsonb) || 
-          jsonb_build_object(
-            'answeredBy', 'machine_start',
-            'voicemailDropStatus', 'dropped',
-            'voicemailDropAt', '${new Date().toISOString()}',
-            'voicemailDropUrl', '${playUrl}',
-            'voicemailDropType', 'manual'
-          )
-        `),
-      })
+      .update({ metadata: updatedMetadata })
       .eq('callSid', normalizedCallSid)
 
     if (updateError) {
