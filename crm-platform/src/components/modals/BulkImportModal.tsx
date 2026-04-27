@@ -692,6 +692,12 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           // Build communication signals for metadata only - don't use as fallback
           const communicationSignals = buildImportCommunicationSignals(row);
           
+          let derivedCompanyPhone = formatPhoneNumber(mappedData.company_phone) || '';
+          if (!derivedCompanyPhone && communicationSignals?.phones?.length) {
+            const companyPhoneSignal = communicationSignals.phones.find((p: any) => p.source?.toLowerCase().includes('company'));
+            if (companyPhoneSignal) derivedCompanyPhone = formatPhoneNumber(companyPhoneSignal.value);
+          }
+          
           if (companyName) {
             // Resolve domain from mapped field if available
             const companyDomain = mappedData.company_domain
@@ -728,7 +734,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                 website: companyDomain || '',
                 industry: mappedData.company_industry || '',
                 description: mappedData.company_description || '',
-                companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
+                companyPhone: derivedCompanyPhone,
                 linkedinUrl: mappedData.company_linkedin || '',
                 address: mappedData.company_address || '',
                 city: mappedData.company_city || '',
@@ -814,7 +820,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                   website: apolloData?.domain || resolvedDomain || '',
                   industry: apolloData?.industry || mappedData.company_industry || '',
                   description: apolloData?.description || mappedData.company_description || '',
-                  companyPhone: apolloData?.companyPhone || formatPhoneNumber(mappedData.company_phone) || '',
+                  companyPhone: apolloData?.companyPhone || derivedCompanyPhone || '',
                   logoUrl: apolloData?.logoUrl || mappedData.company_logo_url || '',
                   linkedinUrl: apolloData?.linkedin || mappedData.company_linkedin || '',
                   address: apolloData?.address || mappedData.company_address || '',
@@ -866,7 +872,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           let autoMobile = formatPhoneNumber(mappedData.mobile_phone) || '';
           let autoWork = formatPhoneNumber(mappedData.work_direct) || '';
           let autoOther = formatPhoneNumber(mappedData.other_phone) || '';
-          let autoCompany = formatPhoneNumber(mappedData.company_phone) || '';
+          let autoCompany = derivedCompanyPhone || '';
 
           // If communicationSignals found extra phones, auto-fill empty buckets with the best ones
           if (communicationSignals?.phones?.length) {
