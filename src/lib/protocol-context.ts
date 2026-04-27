@@ -83,7 +83,7 @@ export interface ProtocolContextData extends Record<string, unknown> {
   subsidiaryCompanyNames?: string[]
   organizationRole?: string
   hierarchySummary?: string
-  selectedNode?: { id?: string; label?: string; type?: string } | null
+  selectedNode?: { id?: string; label?: string; type?: string; content?: string; subject?: string } | null
   senderEmail?: string | null
   siteAddress?: string | null
   siteCity?: string | null
@@ -229,11 +229,13 @@ export function buildProtocolContextFromTask(
 
   const selectedNode = isRecord(extras.selectedNode)
     ? extras.selectedNode
-    : selectedNodeMeta
+      : selectedNodeMeta
       ? {
           id: firstText(selectedNodeMeta.id),
           label: firstText(selectedNodeMeta.label),
           type: firstText(selectedNodeMeta.type),
+          content: firstText(selectedNodeMeta.content),
+          subject: firstText(selectedNodeMeta.subject),
         }
       : null
 
@@ -372,6 +374,8 @@ export function buildProtocolContextFromTask(
       id: firstText(selectedNode.id),
       label: firstText(selectedNode.label),
       type: firstText(selectedNode.type),
+      content: firstText(selectedNode.content),
+      subject: firstText(selectedNode.subject),
     } : null,
     senderEmail,
     siteAddress,
@@ -470,7 +474,13 @@ export function buildProtocolContext(
       subsidiaryCompanyNames: extras.subsidiaryCompanyNames ?? [],
       organizationRole: extras.organizationRole,
       hierarchySummary: extras.hierarchySummary,
-      selectedNode: extras.selectedNode ?? null,
+      selectedNode: extras.selectedNode ? {
+        id: firstText(extras.selectedNode.id),
+        label: firstText(extras.selectedNode.label),
+        type: firstText(extras.selectedNode.type),
+        content: firstText(extras.selectedNode.content),
+        subject: firstText(extras.selectedNode.subject),
+      } : null,
       senderEmail: extras.senderEmail ?? protocol?.bgvector?.settings?.senderEmail ?? null,
       siteAddress: extras.siteAddress ?? null,
       siteCity: extras.siteCity ?? null,
