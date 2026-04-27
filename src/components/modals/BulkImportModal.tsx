@@ -46,7 +46,6 @@ const CONTACT_FIELDS: ImportFieldDefinition[] = [
   { id: 'first_name', label: 'First Name', required: true },
   { id: 'last_name', label: 'Last Name', required: true },
   { id: 'email', label: 'Email Address', required: true },
-  { id: 'phone', label: 'Primary Phone', required: false },
   { id: 'mobile_phone', label: 'Mobile Phone', required: false },
   { id: 'work_direct', label: 'Work Direct', required: false },
   { id: 'other_phone', label: 'Other Phone', required: false },
@@ -96,8 +95,7 @@ const CONTACT_FIELD_ALIASES: ImportFieldAliases = {
   first_name: ['first name', 'firstname'],
   last_name: ['last name', 'lastname'],
   email: ['email 1', 'contact email', 'email address', 'work email', 'business email', 'personal email'],
-  phone: ['contact phone 1', 'primary phone', 'direct phone'],
-  mobile_phone: ['contact mobile phone', 'mobile phone', 'cell phone'],
+  mobile_phone: ['contact mobile phone', 'mobile phone', 'cell phone', 'contact phone 1', 'primary phone', 'direct phone'],
   work_direct: ['contact phone 2', 'work direct', 'work direct phone'],
   other_phone: ['contact phone 3', 'other phone'],
   company_phone: ['company phone 1', 'company phone', 'main company phone'],
@@ -864,6 +862,36 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             }
           }
           
+          // --- AUTO-DERIVE PRIMARY PHONE FROM SIGNAL CONFIDENCE ---
+          // Rank phone buckets by their communication signal scores to determine hero phone
+          const phoneBuckets: Array<{ field: 'mobile' | 'workDirectPhone' | 'otherPhone', value: string }> = []
+          if (formatPhoneNumber(mappedData.mobile_phone)) phoneBuckets.push({ field: 'mobile', value: formatPhoneNumber(mappedData.mobile_phone) })
+          if (formatPhoneNumber(mappedData.work_direct)) phoneBuckets.push({ field: 'workDirectPhone', value: formatPhoneNumber(mappedData.work_direct) })
+          if (formatPhoneNumber(mappedData.other_phone)) phoneBuckets.push({ field: 'otherPhone', value: formatPhoneNumber(mappedData.other_phone) })
+
+          let derivedPrimaryField: 'mobile' | 'workDirectPhone' | 'otherPhone' = 'mobile'
+          let derivedPrimaryPhone = ''
+
+          if (phoneBuckets.length > 0) {
+            // Score each bucket via communicationSignals if available
+            let bestScore = -1
+            let bestBucket = phoneBuckets[0]
+
+            for (const bucket of phoneBuckets) {
+              const signal = communicationSignals?.phones?.find(
+                (s: any) => s.value && bucket.value && s.key === bucket.value.replace(/\D/g, '')
+              )
+              const score = signal?.score ?? 50 // Default score for unscored numbers
+              if (score > bestScore) {
+                bestScore = score
+                bestBucket = bucket
+              }
+            }
+
+            derivedPrimaryField = bestBucket.field
+            derivedPrimaryPhone = bestBucket.value
+          }
+
           // Process Contact
           const contactData = {
             name: resolvedContactName || mappedData.email || 'Unknown',
@@ -871,11 +899,12 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             lastName: resolvedLastName || '',
             title: mappedData.job_title || '',
             email: mappedData.email || '',
-            phone: formatPhoneNumber(mappedData.phone) || '',
+            phone: derivedPrimaryPhone,
             mobile: formatPhoneNumber(mappedData.mobile_phone) || '',
             workPhone: formatPhoneNumber(mappedData.work_direct) || '',
             otherPhone: formatPhoneNumber(mappedData.other_phone) || '',
             companyPhone: formatPhoneNumber(mappedData.company_phone) || '',
+            primaryPhoneField: derivedPrimaryField,
             status: 'Lead',
             company: companyName || '',
             accountId: linkedAccountId, // Link to existing account if found
@@ -894,6 +923,8 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
               work_direct: mappedData.work_direct,
               other_phone: mappedData.other_phone,
               company_phone: mappedData.company_phone,
+              primary_phone_auto_derived: true,
+              primary_phone_source_field: derivedPrimaryField,
             }
           };
 

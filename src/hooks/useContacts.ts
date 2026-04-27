@@ -1187,6 +1187,11 @@ export function useUpsertContact() {
         updatedAt: new Date().toISOString()
       };
 
+      // Persist primaryPhoneField if provided (e.g. auto-derived from signal confidence during bulk import)
+      if ((contact as any).primaryPhoneField) {
+        dbContact.primaryPhoneField = (contact as any).primaryPhoneField
+      }
+
       if ((contact as any).city) dbContact.city = (contact as any).city;
       if ((contact as any).state) dbContact.state = (contact as any).state;
 
