@@ -22,6 +22,7 @@ import { isCsvFile } from '@/lib/file-ingestion';
 import { buildImportCommunicationSignals, pickBestSignal } from '@/lib/contact-signals';
 import { headcountMetadata, parseHeadcount } from '@/lib/headcount';
 import { useSyncStore } from '@/store/syncStore';
+import { cn } from '@/lib/utils';
 
 // --- FORENSIC TYPES ---
 type ImportVector = 'CONTACTS' | 'ACCOUNTS';
@@ -1456,13 +1457,33 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                   </div>
                 </div>
 
-                <div className="mt-4 flex justify-end pt-4 border-t border-white/5">
+                <div className="mt-4 flex items-center justify-between pt-4 border-t border-white/5">
+                  <div className="flex items-center gap-3">
+                    {isAnalyzing && (
+                      <div className="flex items-center gap-2 text-[10px] font-mono text-[#002FA7] uppercase tracking-widest animate-pulse">
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <span>Analyzing Calibration... {progress > 0 ? `(${progress}%)` : ''}</span>
+                      </div>
+                    )}
+                    {!isAnalyzing && analysis && (
+                      <div className="text-[10px] font-mono text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                        <CheckCircle className="w-3 h-3" />
+                        <span>Calibration Ready // {analysis.existing} Enrichments Found</span>
+                      </div>
+                    )}
+                  </div>
+
                   <Button 
                     onClick={() => setStep('ROUTING')}
                     disabled={!analysis || isAnalyzing}
-                    className="bg-white text-black hover:bg-zinc-200 font-mono text-xs px-8"
+                    className={cn(
+                      "font-mono text-xs px-8 transition-all duration-300",
+                      (!analysis || isAnalyzing) 
+                        ? "bg-zinc-800 text-zinc-500 border-white/5" 
+                        : "bg-white text-black hover:bg-[#002FA7] hover:text-white"
+                    )}
                   >
-                    PROCEED <ArrowRight className="w-4 h-4 ml-2" />
+                    {isAnalyzing ? `PROCESSING_DATA...` : `PROCEED →`}
                   </Button>
                 </div>
               </motion.div>
