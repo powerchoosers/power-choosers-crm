@@ -729,6 +729,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           const resolvedLastName = mappedData.last_name || fullNameParts.lastName;
           const resolvedContactName = mappedData.full_name || `${resolvedFirstName || ''} ${resolvedLastName || ''}`.trim();
           const companyName = mappedData.company_name?.trim();
+          const sourceCompanyFields = extractCompanySourceFields(row);
           // Build communication signals for metadata only - don't use as fallback
           const communicationSignals = buildImportCommunicationSignals(row);
           
@@ -990,6 +991,19 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             status: 'Lead',
             company: companyName || '',
             accountId: linkedAccountId, // Link to existing account if found
+            companyDomain: mappedData.company_domain || '',
+            companyDescription: mappedData.company_description || '',
+            companyIndustry: mappedData.company_industry || '',
+            companyLogoUrl: mappedData.company_logo_url || '',
+            companyLinkedin: mappedData.company_linkedin || '',
+            companyPhone: autoCompany,
+            companyAddress: mappedData.company_address || '',
+            companyCity: mappedData.company_city || '',
+            companyState: mappedData.company_state || '',
+            companyCountry: mappedData.company_country || '',
+            companyPostalCode: mappedData.company_postal_code || '',
+            companyEmployeeCount: importHeadcount.value,
+            companyAnnualRevenue: mappedData.company_annual_revenue || '',
             city: mappedData.city || '',
             state: mappedData.state || '',
             // Add metadata fields
@@ -1000,6 +1014,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
               import_batch: new Date().toISOString(),
               enriched: isEnriching,
               communicationSignals,
+              source_company_fields: sourceCompanyFields,
               // Keep original field names in metadata for backup
               mobile_phone: mappedData.mobile_phone,
               work_direct: mappedData.work_direct,
@@ -1215,7 +1230,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           <div className="flex items-center gap-4">
             {step === 'PROCESSING' && (
               <span className="text-[10px] font-mono text-emerald-500/80 animate-pulse uppercase tracking-widest bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">
-                Safe to close (Background Mode)
+                Safe to close
               </span>
             )}
             <ForensicClose size={18} onClick={onClose} />
