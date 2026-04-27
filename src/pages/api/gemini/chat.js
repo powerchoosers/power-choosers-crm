@@ -2070,6 +2070,8 @@ Output rules:
           const selectedLabel = firstText(selectedNode.label, selectedNode.id, 'Selected node');
           const selectedType = firstText(selectedNode.type, '');
           lines.push(`Selected node: ${selectedLabel}${selectedType ? ` [${selectedType}]` : ''}`);
+          if (selectedNode.subject) lines.push(`Selected node subject: ${selectedNode.subject}`);
+          if (selectedNode.content) lines.push(`Selected node content: ${selectedNode.content}`);
         }
         if (senderEmail) lines.push(`Sender email: ${senderEmail}`);
         if (targetContact) {
@@ -3227,6 +3229,7 @@ Output rules:
         The user is currently viewing: ${JSON.stringify(req.body.context || { type: 'general' })}
         - If the user's query applies to this context (e.g., "who is the decision maker?", "draft an email to him", "find a Louis at this company", "phone number for the Allen location"), PRIORITY ONE is to use this context. When context has \`type: 'account'\` and \`id\`, use that \`id\` as \`accountId\` for \`list_contacts\` and as \`account_id\` for \`get_account_details\`.
         - When context has \`type: 'protocol'\`, use the protocol context first. Treat \`stepSummary\`, \`selectedNode\`, \`targetContactId\`, \`targetAccountId\`, \`decisionMakerId\`, \`hierarchySummary\`, and \`senderEmail\` as first-class context, not optional hints.
+        - If a \`selectedNode\` is present, it is the user's CURRENT focus. If they ask to "draft a message", "what should I say", or "follow up", use the \`selectedNode.content\` and \`selectedNode.subject\` as the base template or context for the suggestion. Look at the \`Interaction Trace\` to see what was sent previously if available.
         - If the user's query is unrelated (e.g., "general market trends", "new search"), IGNORE the current screen context and answer broadly.
         - Use this to offer proactive, zero-click insights ONLY when relevant.
         ${historyContextBlock ? `
@@ -3760,9 +3763,14 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
       const promptText = String(prompt || '').trim();
 
       const wantsNote = /\b(?:note|memo|add a note|make a note|log a note|save a note)\b/i.test(promptText);
-      const wantsTask = /\b(?:task|remind|reminder|follow up|follow-up)\b/i.test(promptText);
+      const wantsTask = /\b(?:create|add|schedule|set up|set)\s+(?:a|an|the)?\s*(?:task|reminder|follow up|follow-up)\b/i.test(promptText)
+        || /\b(?:remind me|follow up on|task to)\b/i.test(promptText);
       const wantsCompany = /\b(?:company|account)\b/i.test(promptText) && /\b(?:add|create|make|save|open)\b/i.test(promptText);
 
+      const looksLikeQuestion = /^(?:what|how|why|who|can|should|could|where)\b/i.test(promptText) || promptText.endsWith('?');
+      const looksLikeDrafting = /\b(?:message|email|draft|write|say|template|script)\b/i.test(promptText);
+
+      if ((looksLikeQuestion || looksLikeDrafting) && !/^(?:create|add|make|schedule|set up|set)\b/i.test(promptText)) return false;
       if (!isControlledActionIntent && !wantsCompany && !wantsNote && !wantsTask) return false;
 
       let targetQuery = stripActionPreamble(promptText);
