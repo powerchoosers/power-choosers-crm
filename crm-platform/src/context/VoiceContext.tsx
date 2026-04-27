@@ -355,13 +355,20 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'calls',
         },
         (payload) => {
           if (powerDialWinnerResolvedRef.current) return
-          const winner = extractPowerDialWinner((payload as any)?.new, batchId)
+
+          // Early exit: only completed/answered/in-progress rows can be winners.
+          // This avoids the heavier extractPowerDialWinner work for unrelated updates.
+          const row = (payload as any)?.new
+          const rowStatus = String(row?.status || '').toLowerCase()
+          if (!rowStatus || rowStatus === 'initiated' || rowStatus === 'ringing' || rowStatus === 'queued') return
+
+          const winner = extractPowerDialWinner(row, batchId)
           if (!winner) return
           applyPowerDialWinner({ winner, fallbackMetadata, fallbackPhone })
         }
@@ -1153,9 +1160,15 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setCurrentCall(null)
         setStatus('ended')
         setActive(false)
-        setMetadata(null)
-        setPhoneNumber('')
         setCallHealth('good')
+        // Defer metadata + phone clearing so downstream consumers (PowerDialerDock
+        // post-call snapshot) can capture these values during the 'ended' render pass
+        // before they are wiped. Without this delay, dispositions silently fail to
+        // stamp the call because the snapshot captures null values.
+        setTimeout(() => {
+          setMetadata(null)
+          setPhoneNumber('')
+        }, 200)
       })
 
       call.on('error', (error) => {
@@ -1175,7 +1188,10 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         setStatus('error')
         setActive(false)
         setCallHealth('poor')
-        setPhoneNumber('')
+        // Defer phone clearing for same reason as disconnect handler above
+        setTimeout(() => {
+          setPhoneNumber('')
+        }, 200)
       })
 
       call.on('warning', () => {
