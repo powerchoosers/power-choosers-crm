@@ -1096,6 +1096,54 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
         params: connectParams
       })
 
+      // For power dial with async AMD: suppress early media (carrier ringback tones)
+      // from all simultaneous outbound legs. We only want to hear our custom two-tone beep.
+      if (isPowerDial) {
+        // Mute remote audio tracks to suppress early media ringback
+        const muteRemoteAudio = () => {
+          try {
+            const remoteStream = (call as any).getRemoteStream?.()
+            if (remoteStream && remoteStream.getAudioTracks) {
+              remoteStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+                track.enabled = false
+              })
+              console.log('[Voice] Muted remote audio tracks to suppress early media ringback')
+            }
+          } catch (err) {
+            console.warn('[Voice] Failed to mute remote audio tracks:', err)
+          }
+        }
+
+        // Unmute remote audio tracks when call is accepted
+        const unmuteRemoteAudio = () => {
+          try {
+            const remoteStream = (call as any).getRemoteStream?.()
+            if (remoteStream && remoteStream.getAudioTracks) {
+              remoteStream.getAudioTracks().forEach((track: MediaStreamTrack) => {
+                track.enabled = true
+              })
+              console.log('[Voice] Unmuted remote audio tracks on call accept')
+            }
+          } catch (err) {
+            console.warn('[Voice] Failed to unmute remote audio tracks:', err)
+          }
+        }
+
+        // Listen for ringing event to mute early media
+        call.on('ringing', (hasEarlyMedia: boolean) => {
+          if (hasEarlyMedia) {
+            console.log('[Voice] Early media detected, muting remote audio')
+            muteRemoteAudio()
+          }
+        })
+
+        // Also try to mute immediately in case remote stream is already available
+        setTimeout(muteRemoteAudio, 100)
+
+        // Store unmute function for use in accept handler
+        ;(call as any)._unmuteRemoteAudio = unmuteRemoteAudio
+      }
+
       // Set dialing status immediately
       isCallSessionActiveRef.current = true
       setStatus('dialing')
@@ -1112,6 +1160,12 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
 
       call.on('accept', () => {
         stopPowerDialRingback()
+        
+        // Unmute remote audio for power dial calls
+        if (isPowerDial && (call as any)._unmuteRemoteAudio) {
+          ;(call as any)._unmuteRemoteAudio()
+        }
+        
         setCurrentCall(call)
         setStatus('connected')
         setActive(true)
