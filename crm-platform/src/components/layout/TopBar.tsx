@@ -24,6 +24,7 @@ import { playNavigation } from '@/lib/audio'
 import { forensicNotify } from '@/lib/notifications'
 import { NotificationsPanel } from '@/components/notifications/NotificationsPanel'
 import { useNotificationCenter } from '@/hooks/useNotificationCenter'
+import { useSyncStore } from '@/store/syncStore'
 
 function getDaysUntilJune() {
   const now = new Date();
@@ -128,6 +129,7 @@ export function TopBar() {
   const [mounted, setMounted] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const { unreadCount: notificationsUnreadCount } = useNotificationCenter()
+  const { isIngesting, ingestProgress, ingestVector } = useSyncStore()
 
   useEffect(() => {
     setMounted(true)
@@ -588,11 +590,40 @@ export function TopBar() {
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20, transition: { duration: 0.2 } }}
-                className="w-full flex items-center gap-4"
+                className="w-full flex items-center gap-4 overflow-hidden"
               >
-                <div className="flex-1">
+                <div className="flex-1 min-w-0 transition-all duration-300">
                   <GlobalSearch />
                 </div>
+                
+                <AnimatePresence mode="popLayout">
+                  {isIngesting && (
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, x: 20, width: 0 }}
+                      animate={{ opacity: 1, x: 0, width: "auto" }}
+                      exit={{ opacity: 0, x: 20, width: 0 }}
+                      className="shrink-0 flex items-center gap-3 px-4 h-[50px] nodal-glass border-white/10 rounded-2xl overflow-hidden"
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] animate-pulse shrink-0" />
+                      <div className="flex flex-col justify-center w-[140px]">
+                        <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-1">
+                          <span className="truncate mr-2">SYNC: {ingestVector}</span>
+                          <span className="text-white shrink-0">{ingestProgress}%</span>
+                        </div>
+                        <div className="w-full h-1 bg-black/40 rounded-full overflow-hidden">
+                          <motion.div 
+                            className="h-full bg-[#002FA7]"
+                            initial={{ width: 0 }}
+                            animate={{ width: `${ingestProgress}%` }}
+                            transition={{ ease: "linear", duration: 0.3 }}
+                          />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+                
                 {isActive && (
                   <button
                     onClick={() => {
