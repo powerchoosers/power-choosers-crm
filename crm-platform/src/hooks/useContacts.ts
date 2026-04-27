@@ -1152,25 +1152,57 @@ export function useUpsertContact() {
           // No matching account: create a new one with the company name
           const newAccountId = crypto.randomUUID();
           const now = new Date().toISOString();
+          
+          // Extract company-specific fields from the contact object if they exist
+          const companyInfo = {
+            domain: (contact as any).companyDomain || (contact as any).website || '',
+            industry: (contact as any).companyIndustry || (contact as any).industry || '',
+            description: (contact as any).companyDescription || (contact as any).accountDescription || '',
+            logo_url: (contact as any).companyLogoUrl || (contact as any).logoUrl || null,
+            phone: (contact as any).companyPhone || null,
+            linkedin_url: (contact as any).companyLinkedin || (contact as any).linkedinUrl || null,
+            address: (contact as any).companyAddress || (contact as any).address || null,
+            city: (contact as any).companyCity || (contact as any).city || null,
+            state: (contact as any).companyState || (contact as any).state || null,
+            country: (contact as any).companyCountry || (contact as any).country || null,
+            postal_code: (contact as any).companyPostalCode || (contact as any).zip || (contact as any).postal_code || null,
+            employees: (contact as any).companyEmployeeCount || (contact as any).employees || null,
+            revenue: (contact as any).companyAnnualRevenue || (contact as any).revenue || null,
+          };
+
+          // Parse employees to integer if it's a string
+          let parsedEmployees: number | null = null;
+          if (companyInfo.employees) {
+            const num = parseInt(String(companyInfo.employees).replace(/[^0-9]/g, ''));
+            if (!isNaN(num)) parsedEmployees = num;
+          }
+
           const { error: insertAccountError } = await supabase
             .from('accounts')
             .insert({
               id: newAccountId,
               name: contact.company,
-              domain: '',
-              industry: '',
-              description: '',
-              logo_url: null,
-              phone: null,
-              linkedin_url: null,
+              domain: companyInfo.domain,
+              industry: companyInfo.industry,
+              description: companyInfo.description,
+              logo_url: companyInfo.logo_url,
+              phone: companyInfo.phone,
+              linkedin_url: companyInfo.linkedin_url,
               service_addresses: [],
               contract_end_date: null,
-              employees: null,
-              city: null,
-              state: null,
-              address: null,
+              employees: parsedEmployees,
+              revenue: String(companyInfo.revenue || ''),
+              city: companyInfo.city,
+              state: companyInfo.state,
+              address: companyInfo.address,
+              country: companyInfo.country,
+              zip: companyInfo.postal_code, // Note: zip column in DB, postal_code in mapping
               ownerId: user?.email || null,
-              metadata: { import_source: 'contact_upsert', import_batch: now },
+              metadata: { 
+                import_source: 'contact_upsert', 
+                import_batch: now,
+                ...((contact as any).metadata?.source_company_fields || {})
+              },
               createdAt: now,
               updatedAt: now,
             });
