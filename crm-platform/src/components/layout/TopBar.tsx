@@ -16,6 +16,7 @@ import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { GeminiChatTrigger, GeminiChatPanel } from '@/components/chat/GeminiChat'
 import { useGeminiStore } from '@/store/geminiStore'
+import { useUIStore } from '@/store/uiStore'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { ActiveCallInterface } from '@/components/calls/ActiveCallInterface'
 import { useAccount } from '@/hooks/useAccounts'
@@ -598,13 +599,14 @@ export function TopBar() {
                 
                 <AnimatePresence mode="popLayout">
                   {isIngesting && (
-                    <motion.div
-                      layout
-                      initial={{ opacity: 0, x: 20, width: 0 }}
-                      animate={{ opacity: 1, x: 0, width: "auto" }}
-                      exit={{ opacity: 0, x: 20, width: 0 }}
-                      className="shrink-0 flex items-center gap-3 px-4 h-[50px] nodal-glass border-white/10 rounded-2xl overflow-hidden"
-                    >
+                      <motion.div
+                        layout
+                        onClick={() => useUIStore.getState().setRightPanelMode('BULK_INGESTION_TERMINAL')}
+                        initial={{ opacity: 0, x: 20, width: 0 }}
+                        animate={{ opacity: 1, x: 0, width: "auto" }}
+                        exit={{ opacity: 0, x: 20, width: 0 }}
+                        className="shrink-0 flex items-center gap-3 px-4 h-[50px] nodal-glass border-white/10 rounded-2xl overflow-hidden cursor-pointer hover:border-white/20 transition-all hover:bg-white/5"
+                      >
                       <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7] animate-pulse shrink-0" />
                       <div className="flex flex-col justify-center w-[140px]">
                         <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-widest text-zinc-400 mb-1">
