@@ -996,7 +996,6 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
             companyIndustry: mappedData.company_industry || '',
             companyLogoUrl: mappedData.company_logo_url || '',
             companyLinkedin: mappedData.company_linkedin || '',
-            companyPhone: autoCompany,
             companyAddress: mappedData.company_address || '',
             companyCity: mappedData.company_city || '',
             companyState: mappedData.company_state || '',
