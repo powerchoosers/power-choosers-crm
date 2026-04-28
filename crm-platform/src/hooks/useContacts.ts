@@ -281,7 +281,7 @@ type ContactRow = {
 
 const PAGE_SIZE = 50
 
-const CONTACTS_QUERY_BUSTER = 'v5'
+const CONTACTS_QUERY_BUSTER = 'v6'
 const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata'
 const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, accountId, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url)'
 const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
@@ -307,6 +307,11 @@ function normalizePrimaryPhoneField(value: unknown): ContactDetail['primaryPhone
 function cleanText(value: unknown): string {
   if (value == null) return ''
   return String(value).replace(/\s+/g, ' ').trim()
+}
+
+function toRpcTextArray(values: string[] | undefined): string[] | null {
+  const cleaned = (values || []).map((value) => cleanText(value)).filter(Boolean)
+  return cleaned.length > 0 ? cleaned : null
 }
 
 function normalizeMetadata(value: ContactMetadata | string | null | undefined): ContactMetadata | null {
@@ -642,66 +647,85 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
           return { contacts: [], nextCursor: null };
         }
         if (!user && !loading) {
-
           return { contacts: [], nextCursor: null };
-        }        let query;
-
-        if (listId) {
-          // Use RPC for large lists to avoid URL length limits in GET requests
-          query = supabase
-            .rpc('get_contacts_by_list', { p_list_id: listId })
-            .select(CONTACT_LIST_SELECT);
-        } else {
-          query = supabase
-            .from('contacts')
-            .select(CONTACT_LIST_SELECT);
-        }
-
-        // Admin and dev see all contacts; others filtered by ownerId
-        if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
-          query = query.in('ownerId', ownerScopeValues);
-        }
-
-        if (searchQuery) {
-          query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,mobile.ilike.%${searchQuery}%,workPhone.ilike.%${searchQuery}%,otherPhone.ilike.%${searchQuery}%`);
-        }
-
-        // Apply column filters
-        if (filters?.status && filters.status.length > 0) {
-          const statusConditions = buildStatusIlikeClauses(filters.status)
-          if (statusConditions.length > 0) {
-            query = query.or(statusConditions.join(','))
-          }
-        }
-
-        if (filters?.title && filters.title.length > 0) {
-          query = query.in('title', filters.title);
-        }
-
-        // Industry and Location filters are tricky for contacts because they often live on the account
-        // but some contacts might have them directly. We'll check both if possible, or focus on account join
-        if (filters?.industry && filters.industry.length > 0) {
-          // Filter by account industry
-          query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
-        }
-
-        if (filters?.location && filters.location.length > 0) {
-          // Filter by account location (city or state)
-          const conditions = filters.location.flatMap((loc: string) => [
-            `city.ilike.%${loc}%`,
-            `state.ilike.%${loc}%`
-          ]).join(',');
-          query = query.or(conditions, { foreignTable: 'accounts' });
         }
 
         const from = pageParam * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
+        let data: ContactRow[] | null = null
+        let error: any = null
 
-        const { data, error } = await query
-          .range(from, to)
-          .order('lastName', { ascending: true })
-          .order('firstName', { ascending: true })
-          .order('createdAt', { ascending: false });
+        if (listId) {
+          const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
+          const response = await supabase
+            .rpc('get_contacts_by_list_filtered', {
+              p_list_id: listId,
+              p_search: cleanText(searchQuery) || null,
+              p_industries: toRpcTextArray(filters?.industry),
+              p_statuses: toRpcTextArray(filters?.status),
+              p_locations: toRpcTextArray(filters?.location),
+              p_titles: toRpcTextArray(filters?.title),
+              p_owner_ids: ownerIds,
+              p_limit: PAGE_SIZE,
+              p_offset: from,
+            })
+            .select(CONTACT_LIST_SELECT)
+
+          data = response.data as ContactRow[] | null
+          error = response.error
+        } else {
+          let query = supabase
+            .from('contacts')
+            .select(CONTACT_LIST_SELECT);
+
+          // Admin and dev see all contacts; others filtered by ownerId
+          if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+            query = query.in('ownerId', ownerScopeValues);
+          }
+
+          if (searchQuery) {
+            query = query.or(`name.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%,firstName.ilike.%${searchQuery}%,lastName.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,mobile.ilike.%${searchQuery}%,workPhone.ilike.%${searchQuery}%,otherPhone.ilike.%${searchQuery}%`);
+          }
+
+          // Apply column filters
+          if (filters?.status && filters.status.length > 0) {
+            const statusConditions = buildStatusIlikeClauses(filters.status)
+            if (statusConditions.length > 0) {
+              query = query.or(statusConditions.join(','))
+            }
+          }
+
+          if (filters?.title && filters.title.length > 0) {
+            query = query.in('title', filters.title);
+          }
+
+          // Contact industry is resolved from the linked account in the list shape.
+          if (filters?.industry && filters.industry.length > 0) {
+            query = query.filter('accounts.industry', 'in', `(${filters.industry.map((i: string) => `"${i}"`).join(',')})`);
+          }
+
+          if (filters?.location && filters.location.length > 0) {
+            // Filter by account location (city or state)
+            const conditions = filters.location.flatMap((loc: string) => [
+              `city.ilike.%${loc}%`,
+              `state.ilike.%${loc}%`
+            ]).join(',');
+            query = query.or(conditions, { foreignTable: 'accounts' });
+          }
+
+          const response = await query
+            .range(from, to)
+            .order('lastName', { ascending: true })
+            .order('firstName', { ascending: true })
+            .order('createdAt', { ascending: false });
+
+          data = Array.isArray(response.data)
+            ? response.data
+            : response.data
+              ? [response.data]
+              : null
+          error = response.error
+        }
 
         if (error) {
 
@@ -817,42 +841,24 @@ export function useContactsCount(searchQuery?: string, filters?: ContactFilters,
         : supabase.from('contacts').select('id', { count: 'exact', head: true });
 
       if (listId) {
-        // Use RPC to get count for large lists to avoid URL length limits
-        const { data: countData, error: countError } = await supabase
-          .rpc('get_contacts_count_by_list', { p_list_id: listId });
+        const ownerIds = role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null
+        const { data: filteredCount, error: filteredCountError } = await supabase
+          .rpc('get_contacts_count_by_list_filtered', {
+            p_list_id: listId,
+            p_search: cleanText(searchQuery) || null,
+            p_industries: toRpcTextArray(filters?.industry),
+            p_statuses: toRpcTextArray(filters?.status),
+            p_locations: toRpcTextArray(filters?.location),
+            p_titles: toRpcTextArray(filters?.title),
+            p_owner_ids: ownerIds,
+          })
 
-        if (countError) {
-          console.error("Error fetching list members count via RPC:", countError);
-          return 0;
-        }
-        
-        // If there are NO other filters, we can return this count directly.
-        // If there ARE other filters, we still have the URL length problem for now,
-        // but this handles the most common case of viewing a large list.
-        const hasOtherFilters = !!searchQuery || (filters?.status && filters.status.length > 0) || (filters?.title && filters.title.length > 0) || (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
-        
-        if (!hasOtherFilters) {
-          return Number(countData || 0);
-        }
-
-        // For filtered lists, we still need to fetch IDs for now, but we'll try to optimize by limiting.
-        // Ideally we should move the filtering into the RPC as well.
-        const { data: memberData, error: memberError } = await supabase
-          .from('list_members')
-          .select('targetId')
-          .eq('listId', listId)
-          .in('targetType', ['people', 'contact', 'contacts'])
-          .limit(1000); // Temporary cap for filtered large lists to prevent crash
-
-        if (memberError) {
-          console.error("Error fetching list members for filtered count:", memberError);
+        if (filteredCountError) {
+          console.error("Error fetching filtered list members count via RPC:", filteredCountError);
           return 0;
         }
 
-        const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
-        if (targetIds.length === 0) return 0;
-
-        query = query.in('id', targetIds);
+        return Number(filteredCount || 0);
       }
 
       // Admin and dev see all contacts; others filtered by ownerId

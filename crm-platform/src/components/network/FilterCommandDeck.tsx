@@ -1,9 +1,9 @@
 'use client'
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { ForensicClose } from '@/components/ui/ForensicClose';
 import { cn } from '@/lib/utils';
-import { INDUSTRY_VECTORS } from '@/lib/industry-mapping';
+import { INDUSTRY_VECTOR_GROUPS, INDUSTRY_VECTORS } from '@/lib/industry-mapping';
 import { TITLE_VECTORS } from '@/lib/title-mapping';
 
 interface FilterDeckProps {
@@ -92,7 +92,14 @@ export default function FilterCommandDeck({
       : ['IDENTIFIED', 'AUDITING', 'BRIEFED', 'ENGAGED', 'SECURED', 'TERMINATED'];
 
 
-  const industryOptions = Object.keys(INDUSTRY_VECTORS);
+  const industryGroups = INDUSTRY_VECTOR_GROUPS
+    .map(group => ({
+      ...group,
+      vectors: group.vectors.filter(vector => INDUSTRY_VECTORS[vector])
+    }))
+    .filter(group => group.vectors.length > 0);
+  const groupedIndustryOptions = new Set(industryGroups.flatMap(group => group.vectors));
+  const ungroupedIndustryOptions = Object.keys(INDUSTRY_VECTORS).filter(industry => !groupedIndustryOptions.has(industry));
   const titleOptions = Object.keys(TITLE_VECTORS);
 
   const locationOptions = [
@@ -116,9 +123,9 @@ export default function FilterCommandDeck({
         >
           <div className={cn(
             "p-6 grid gap-8",
-            type === 'people' ? "grid-cols-1 md:grid-cols-4" :
-              type === 'account' ? "grid-cols-1 md:grid-cols-3" :
-                "grid-cols-1 md:grid-cols-3"
+            type === 'people' ? "grid-cols-1 md:grid-cols-5" :
+              type === 'account' ? "grid-cols-1 md:grid-cols-4" :
+                "grid-cols-1 md:grid-cols-4"
 
           )}>
 
@@ -143,19 +150,45 @@ export default function FilterCommandDeck({
             </div>
 
             {/* COLUMN 2: INDUSTRY VECTOR */}
-            <div className="space-y-3">
+            <div className="space-y-4 md:col-span-2">
               <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                INDUSTRY_VECTOR
+                {type === 'people' ? 'LINKED_ACCOUNT_INDUSTRY' : 'ACCOUNT_INDUSTRY'}
               </h4>
-              <div className="flex flex-wrap gap-2">
-                {industryOptions.map(industry => (
-                  <FilterChip
-                    key={industry}
-                    label={industry}
-                    active={isActive('industry', industry)}
-                    onClick={() => toggleFilter('industry', industry)}
-                  />
+              <div className="space-y-4">
+                {industryGroups.map(group => (
+                  <div key={group.label} className="space-y-2">
+                    <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                      {group.label}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {group.vectors.map(industry => (
+                        <FilterChip
+                          key={industry}
+                          label={industry}
+                          active={isActive('industry', industry)}
+                          onClick={() => toggleFilter('industry', industry)}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
+                {ungroupedIndustryOptions.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[9px] font-mono text-zinc-600 uppercase tracking-widest">
+                      OTHER_VERTICALS
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {ungroupedIndustryOptions.map(industry => (
+                        <FilterChip
+                          key={industry}
+                          label={industry}
+                          active={isActive('industry', industry)}
+                          onClick={() => toggleFilter('industry', industry)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
