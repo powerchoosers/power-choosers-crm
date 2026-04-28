@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 import { Inter } from 'next/font/google'
 import type { Metadata, Viewport } from 'next'
 import ApolloTracker from '@/components/apollo-tracker'
+import LinkedInInsightTag from '@/components/linkedin-insight-tag'
 import { CookieBanner } from '@/components/landing/CookieBanner'
 
 const inter = Inter({
@@ -109,6 +110,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ApolloTracker />
+        <LinkedInInsightTag />
         <CookieBanner />
         <Providers>
           <>
