@@ -851,7 +851,47 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
   }
 }
 
-async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHit[]) {
+async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit | null> {
+  const domain = cleanText(account.domain)
+  if (!domain) return null
+
+  try {
+    const url = domain.startsWith('http') ? domain : `https://${domain}`
+    const bucket = {
+      priority: 8,
+      label: 'Company Website',
+      query: `${account.name} company information`,
+    }
+    
+    const hit = await fetchPageHit(url, bucket, 'web', `${account.name} website`)
+    return hit
+  } catch (error) {
+    console.warn('[Intelligence Brief] Company website fetch failed:', error)
+    return null
+  }
+}
+
+async function fetchIndustryTrends(account: AccountRow): Promise<ResearchHit[]> {
+  const industry = cleanText(account.industry)
+  if (!industry) return []
+
+  const trendBuckets = [
+    {
+      priority: 9,
+      label: 'Industry Trends',
+      query: `${industry} industry trends 2026 technology adoption digital transformation`,
+    },
+  ]
+
+  try {
+    return await fetchBingNewsHits(trendBuckets, 'news', 3)
+  } catch (error) {
+    console.warn('[Intelligence Brief] Industry trends fetch failed:', error)
+    return []
+  }
+}
+
+async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHit[], isFallbackMode = false) {
   const openRouterKey = process.env.OPEN_ROUTER_API_KEY
   if (!openRouterKey) {
     throw new Error('OPEN_ROUTER_API_KEY is not configured')
@@ -888,9 +928,11 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
     })),
   }
 
-  const prompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
+  const basePrompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
 
-Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.
+Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.`
+
+  const newsSignalPrompt = `${basePrompt}
 
 Decision rules:
 - Pick ONE signal only.
@@ -902,7 +944,25 @@ Decision rules:
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
-- Write plain English that a rep can use immediately.
+- Write plain English that a rep can use immediately.`
+
+  const fallbackPrompt = `${basePrompt}
+
+FALLBACK MODE: No recent news signals were found. Generate an intelligence brief based on company website information and industry context.
+
+Decision rules:
+- ALWAYS set "usable_signal" to true in fallback mode.
+- Create a headline that positions the company within their industry context and growth opportunities.
+- Signal Detail should describe: company overview (services, team size, location), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
+- Talk Track must be first-person, consultative, and focus on how industry trends create opportunities for the company (e.g., technology adoption, efficiency improvements, competitive positioning).
+- Confidence Level should be "Medium" for fallback briefs.
+- Source URL should be the company website or the most relevant industry trend article.
+- Signal Date should be today's date in YYYY-MM-DD format.
+- Write plain English that positions you as a knowledgeable partner who understands their industry.`
+
+  const prompt = isFallbackMode ? fallbackPrompt : newsSignalPrompt
+
+  const fullPrompt = `${prompt}
 
 Return JSON only with this shape:
 {
@@ -933,10 +993,10 @@ ${JSON.stringify(researchPayload, null, 2)}`
       model: 'google/gemini-3-flash-preview',
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: prompt },
+        { role: 'system', content: fullPrompt },
         { role: 'user', content: 'Generate the account intelligence brief now.' },
       ],
-      temperature: 0.2,
+      temperature: isFallbackMode ? 0.3 : 0.2,
       max_tokens: 900,
     }),
   }, 25000)
@@ -1049,10 +1109,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let outcomeStatus: BriefStatus = 'empty'
     let validated: ReturnType<typeof validateBriefResult> = null
     let generatedBrief: ReturnType<typeof validateBriefResult> = null
+    let usedFallback = false
 
     if (candidateResults.length > 0) {
       try {
-        generatedBrief = await runOpenRouterResearch(account, candidateResults)
+        generatedBrief = await runOpenRouterResearch(account, candidateResults, false)
         if (generatedBrief) {
           outcomeStatus = 'ready'
           validated = generatedBrief
@@ -1063,7 +1124,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         console.error('[Intelligence Brief] OpenRouter research failed:', error)
         outcomeStatus = 'error'
       }
-    } else {
+    }
+
+    // Fallback mode: If no news signals found or OpenRouter returned empty, try generating from company website + industry trends
+    if (!validated && (candidateResults.length === 0 || outcomeStatus === 'empty')) {
+      console.info('[Intelligence Brief] Entering fallback mode - fetching company website and industry trends')
+      
+      try {
+        const fallbackCandidates: ResearchHit[] = []
+        
+        // Fetch company website
+        const websiteInfo = await fetchCompanyWebsiteInfo(account)
+        if (websiteInfo) {
+          fallbackCandidates.push(websiteInfo)
+        }
+        
+        // Fetch industry trends
+        const industryTrends = await fetchIndustryTrends(account)
+        fallbackCandidates.push(...industryTrends)
+        
+        if (fallbackCandidates.length > 0) {
+          console.info('[Intelligence Brief] Fallback candidates collected:', {
+            accountId,
+            accountName: account.name,
+            fallbackTotal: fallbackCandidates.length,
+          })
+          
+          generatedBrief = await runOpenRouterResearch(account, fallbackCandidates, true)
+          if (generatedBrief) {
+            outcomeStatus = 'ready'
+            validated = generatedBrief
+            usedFallback = true
+          }
+        }
+      } catch (error) {
+        console.error('[Intelligence Brief] Fallback mode failed:', error)
+        outcomeStatus = 'error'
+      }
+    }
+
+    if (!validated) {
       outcomeStatus = 'empty'
     }
 
@@ -1098,10 +1198,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (validated) {
       return res.status(200).json({
         ok: true,
-        message: 'Intelligence brief refreshed.',
+        message: usedFallback 
+          ? 'Intelligence brief generated from company profile and industry context.' 
+          : 'Intelligence brief refreshed.',
         brief: validated,
         account: serialized,
         diagnostics,
+        usedFallback,
       })
     }
 
