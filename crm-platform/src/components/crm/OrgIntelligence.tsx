@@ -1279,21 +1279,36 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (error) throw error;
       } else {
         const contactData = { ...contactBaseData, ...contactIdentityPatch };
+        const contactEmail = sanitizeContactText(contactData.email);
 
-        // Try to find existing contact by Apollo person id (from a previous reveal) or by email
-        const { data: byApolloId } = await supabase
-          .from('contacts')
-          .select('id')
-          .eq('metadata->>apollo_person_id', person.id)
-          .maybeSingle();
-        if (byApolloId?.id) {
+        // PRIORITY 1: Try to find existing contact by email (most reliable unique identifier)
+        if (!crmId && contactEmail && contactEmail !== 'N/A') {
+          const { data: byEmail } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('accountId', accountId)
+            .ilike('email', contactEmail)
+            .maybeSingle();
+          if (byEmail?.id) {
+            crmId = byEmail.id;
+          }
+        }
+
+        // PRIORITY 2: Try Apollo person ID (from a previous reveal)
+        if (!crmId) {
+          const { data: byApolloId } = await supabase
+            .from('contacts')
+            .select('id')
+            .eq('accountId', accountId)
+            .eq('metadata->>apollo_person_id', person.id)
+            .maybeSingle();
+          if (byApolloId?.id) {
             crmId = byApolloId.id;
-            const { error } = await supabase
-              .from('contacts')
-              .update(contactData)
-            .eq('id', crmId);
-          if (error) throw error;
-        } else if (linkedinLookup) {
+          }
+        }
+
+        // PRIORITY 3: Try LinkedIn URL
+        if (!crmId && linkedinLookup) {
           const linkedinPattern = `%${linkedinLookup.split('linkedin.com/').pop() || linkedinLookup}%`;
           const { data: byLinkedin } = await supabase
             .from('contacts')
@@ -1303,14 +1318,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             .maybeSingle();
           if (byLinkedin?.id) {
             crmId = byLinkedin.id;
-            const { error } = await supabase
-              .from('contacts')
-              .update(contactData)
-              .eq('id', crmId);
-            if (error) throw error;
           }
         }
 
+        // PRIORITY 4: Try First + Last Name (least reliable, only if we have both)
         if (!crmId && resolvedIdentity.firstName && resolvedIdentity.lastName) {
           const { data: byName } = await supabase
             .from('contacts')
@@ -1321,39 +1332,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
             .maybeSingle();
           if (byName?.id) {
             crmId = byName.id;
-            const { error } = await supabase
-              .from('contacts')
-              .update(contactData)
-              .eq('id', crmId);
-            if (error) throw error;
           }
         }
 
-        const contactEmail = sanitizeContactText(contactData.email);
-        if (!crmId && contactEmail && contactEmail !== 'N/A') {
-          const { data: existing } = await supabase
+        // If we found a match, UPDATE the existing contact
+        if (crmId) {
+          const { error } = await supabase
             .from('contacts')
-            .select('id')
-            .ilike('email', contactEmail)
-            .maybeSingle();
-          if (existing?.id) {
-            crmId = existing.id;
-            const { error } = await supabase
-              .from('contacts')
-              .update(contactData)
-              .eq('id', crmId);
-            if (error) throw error;
-          } else {
-            contactData.id = crypto.randomUUID();
-            const { data: newContact, error } = await supabase
-              .from('contacts')
-              .insert(contactData)
-              .select()
-              .single();
-            if (error) throw error;
-            crmId = newContact.id;
-          }
+            .update(contactData)
+            .eq('id', crmId);
+          if (error) throw error;
         } else {
+          // No match found - CREATE new contact
           contactData.id = crypto.randomUUID();
           const { data: newContact, error } = await supabase
             .from('contacts')
