@@ -91,10 +91,15 @@ export function NetworkLayoutClient({
       <MobileBottomNav />
       <PowerDialerDock />
       <DesktopDropBridge />
-      <main className={cn(
-        "absolute top-0 bottom-0 left-0 lg:left-[70px] overflow-y-auto pt-16 lg:pt-24 pb-20 lg:pb-8 transition-all duration-300 scroll-smooth np-scroll",
-        rightPanelMinimized ? "right-0" : "right-0 lg:right-80"
-      )}>
+      <main 
+        className={cn(
+          "absolute top-0 bottom-0 left-0 lg:left-[70px] overflow-y-auto pt-16 lg:pt-24 pb-20 lg:pb-8 scroll-smooth np-scroll",
+          rightPanelMinimized ? "right-0" : "right-0 lg:right-80"
+        )}
+        style={{
+          transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1), right 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+        }}
+      >
         <div className="max-w-[1600px] 2xl:max-w-[1800px] mx-auto px-4 sm:px-6 lg:px-10">
           {children}
         </div>
