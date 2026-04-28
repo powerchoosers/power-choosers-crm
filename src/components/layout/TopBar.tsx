@@ -589,6 +589,7 @@ export function TopBar() {
 
         {/* Center Side: Search or Active Call */}
         <motion.div
+          layout
           className="flex-1 min-w-0 overflow-visible"
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
         >
@@ -919,16 +920,16 @@ export function TopBar() {
 
         {/* Right Actions / Dialer Widget */}
         <motion.div
+          layout
           initial={false}
           animate={{
             width: (isGeminiOpen || isCallHUDOpen || isNotificationsOpen) ? 480 : (isDialerOpen ? 350 : 172),
             borderRadius: 24,
           }}
           transition={{
-            type: "spring",
-            stiffness: 320,
-            damping: 35,
-            mass: 0.8
+            layout: { type: "spring", stiffness: 300, damping: 30 },
+            width: { type: "spring", stiffness: 320, damping: 35, mass: 0.8 },
+            borderRadius: { type: "spring", stiffness: 320, damping: 35, mass: 0.8 }
           }}
           className={cn(
             "overflow-visible flex flex-col relative h-12 transition-all max-w-[calc(100vw-5rem)] lg:max-w-none",
@@ -1176,24 +1177,26 @@ export function TopBar() {
         </motion.div>
 
         {/* Restore Right Panel Button - Positioned outside the quick actions container */}
-        <motion.button
-          initial={false}
-          animate={{
-            opacity: rightPanelMinimized ? 1 : 0,
-            scale: rightPanelMinimized ? 1 : 0.5,
-            x: rightPanelMinimized ? 0 : 20,
-          }}
-          transition={{ type: "spring", stiffness: 300, damping: 25 }}
-          onClick={toggleRightPanel}
-          className="icon-button-forensic pointer-events-auto"
-          style={{
-            pointerEvents: rightPanelMinimized ? 'auto' : 'none',
-          }}
-          aria-label="Restore Intelligence Feed"
-          disabled={!rightPanelMinimized}
-        >
-          <ChevronLeft size={20} />
-        </motion.button>
+        <AnimatePresence mode="popLayout">
+          {rightPanelMinimized && (
+            <motion.button
+              layout
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              transition={{ 
+                layout: { type: "spring", stiffness: 300, damping: 30 },
+                opacity: { duration: 0.2 },
+                scale: { duration: 0.2 }
+              }}
+              onClick={toggleRightPanel}
+              className="icon-button-forensic pointer-events-auto"
+              aria-label="Restore Intelligence Feed"
+            >
+              <ChevronLeft size={20} />
+            </motion.button>
+          )}
+        </AnimatePresence>
       </div >
     </motion.header >
   )
