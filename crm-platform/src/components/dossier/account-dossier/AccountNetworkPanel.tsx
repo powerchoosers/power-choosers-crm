@@ -4,7 +4,6 @@ import dynamic from 'next/dynamic'
 import { memo, useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import type { ComposeContext } from '@/components/emails/ComposeModal'
-import { IntelligenceBrief } from '@/components/dossier/IntelligenceBrief'
 import { EngagementLog } from '@/components/dossier/contact-dossier/EngagementLog'
 import { DossierSectionSkeleton } from '@/components/dossier/DossierSectionSkeleton'
 import { AccountHolderCard } from './AccountHolderCard'
@@ -177,10 +176,6 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                         variant="skinny"
                         showRelativeDate={true}
                     />
-                </motion.div>
-
-                <motion.div layout="position" transition={stackShiftTransition}>
-                    <IntelligenceBrief account={account} />
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>

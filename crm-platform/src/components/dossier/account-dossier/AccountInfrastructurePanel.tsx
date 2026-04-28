@@ -7,6 +7,7 @@ import { Sparkles, Clock, Check, Copy, Activity } from 'lucide-react'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { MeterArray } from '@/components/accounts/MeterArray'
+import { IntelligenceBrief } from '@/components/dossier/IntelligenceBrief'
 import { DossierSectionSkeleton } from '@/components/dossier/DossierSectionSkeleton'
 import { buildForensicNoteEntries, formatForensicNoteClipboard, type ForensicNoteSource } from '@/lib/forensic-notes'
 
@@ -243,6 +244,8 @@ export const AccountInfrastructurePanel = memo(function AccountInfrastructurePan
                         )}
                     </div>
                 </div>
+
+                <IntelligenceBrief account={account} />
 
                 <MeterArray meters={editMeters} isEditing={isEditing} onEnter={toggleEditing} onUpdate={setEditMeters} />
                 {isSecondaryReady ? (
