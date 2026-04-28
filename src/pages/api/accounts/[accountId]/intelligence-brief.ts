@@ -1,5 +1,4 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
-import { JSDOM } from 'jsdom'
 import { supabaseAdmin, requireUser } from '@/lib/supabase'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
@@ -49,6 +48,19 @@ type BriefResult = {
   source_title?: string
   source_domain?: string
   reason?: string
+}
+
+type ResearchDiagnostics = {
+  total: number
+  bySourceKind: Record<ResearchSourceKind, number>
+  topResults: Array<{
+    priority: number
+    label: string
+    title: string
+    url: string
+    sourceKind: ResearchSourceKind
+    source: string
+  }>
 }
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
@@ -128,7 +140,13 @@ function stripXml(value: string): string {
   ).replace(/\s+/g, ' ').trim()
 }
 
-function parseRssItems(xml: string, bucket: { priority: number; label: string; query: string }, maxItems = 3, defaultSource = 'Google News'): ResearchHit[] {
+function parseRssItems(
+  xml: string,
+  bucket: { priority: number; label: string; query: string },
+  maxItems = 3,
+  defaultSource = 'Google News',
+  sourceKind: ResearchSourceKind = 'news'
+): ResearchHit[] {
   const items: ResearchHit[] = []
   const itemRegex = /<item>([\s\S]*?)<\/item>/g
   let match
@@ -159,7 +177,7 @@ function parseRssItems(xml: string, bucket: { priority: number; label: string; q
       snippet: description,
       publishedAt: publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt.toISOString() : null,
       source,
-      sourceKind: 'news',
+      sourceKind,
     })
   }
 
@@ -349,8 +367,54 @@ function getHostname(value: string) {
   }
 }
 
-function createDocument(html: string) {
-  return new JSDOM(html).window.document
+function normalizeUrlForMatch(value: string) {
+  const raw = cleanText(value)
+  if (!raw) return ''
+
+  try {
+    const url = new URL(raw)
+    url.hash = ''
+    url.search = ''
+    return url.toString().replace(/\/$/, '').toLowerCase()
+  } catch {
+    return raw.replace(/[?#].*$/, '').replace(/\/$/, '').toLowerCase()
+  }
+}
+
+function findCandidateForResult(result: BriefResult, candidates: ResearchHit[]) {
+  const sourceUrl = normalizeUrlForMatch(result?.source_url || '')
+  if (sourceUrl) {
+    const byUrl = candidates.find((item) => normalizeUrlForMatch(item.url) === sourceUrl)
+    if (byUrl) return byUrl
+  }
+
+  const selectedPriority = Number(result?.selected_priority)
+  if (Number.isFinite(selectedPriority)) {
+    const byPriority = candidates.find((item) => item.priority === selectedPriority)
+    if (byPriority) return byPriority
+  }
+
+  return candidates[0] || null
+}
+
+function buildResearchDiagnostics(candidates: ResearchHit[]): ResearchDiagnostics {
+  const bySourceKind = candidates.reduce((acc, item) => {
+    acc[item.sourceKind] = (acc[item.sourceKind] || 0) + 1
+    return acc
+  }, { news: 0, web: 0, sec: 0, linkedin: 0 } as Record<ResearchSourceKind, number>)
+
+  return {
+    total: candidates.length,
+    bySourceKind,
+    topResults: candidates.slice(0, 8).map((item) => ({
+      priority: item.priority,
+      label: item.label,
+      title: item.title,
+      url: item.url,
+      sourceKind: item.sourceKind,
+      source: item.source,
+    })),
+  }
 }
 
 function extractKeywordSnippet(text: string, keywords = SIGNAL_KEYWORDS) {
@@ -391,32 +455,58 @@ function inferSignalPriority(text: string, fallbackPriority: number) {
   return fallbackPriority
 }
 
+function extractHtmlAttribute(tag: string, attribute: string) {
+  const match = new RegExp(`${attribute}\\s*=\\s*["']([^"']+)["']`, 'i').exec(tag)
+  return match ? decodeHtmlEntities(match[1]) : ''
+}
+
+function extractMetaContent(html: string, names: string[]) {
+  for (const name of names) {
+    const metaRegex = new RegExp(`<meta\\b[^>]*(?:property|name)\\s*=\\s*["']${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}["'][^>]*>`, 'i')
+    const match = metaRegex.exec(html)
+    if (!match) continue
+    const content = extractHtmlAttribute(match[0], 'content')
+    if (content) return cleanText(content)
+  }
+  return ''
+}
+
+function extractTitle(html: string) {
+  const match = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html)
+  return match ? stripXml(match[1]) : ''
+}
+
+function extractTimeDatetime(html: string) {
+  const match = /<time\b[^>]*datetime\s*=\s*["']([^"']+)["'][^>]*>/i.exec(html)
+  return match ? cleanText(decodeHtmlEntities(match[1])) : ''
+}
+
+function extractBodyText(html: string) {
+  return cleanText(
+    String(html || '')
+      .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+  )
+}
+
 function extractPagePreview(html: string, fallbackTitle: string, url: string, sourceKind: ResearchSourceKind) {
-  const doc = createDocument(html)
-  const meta = (selector: string) => cleanText(doc.querySelector(selector)?.getAttribute('content') || '')
   const title = cleanText(
-    meta('meta[property="og:title"]') ||
-    meta('meta[name="twitter:title"]') ||
-    doc.querySelector('title')?.textContent ||
+    extractMetaContent(html, ['og:title', 'twitter:title']) ||
+    extractTitle(html) ||
     fallbackTitle ||
     url
   )
   const description = cleanText(
-    meta('meta[property="og:description"]') ||
-    meta('meta[name="description"]') ||
-    meta('meta[name="twitter:description"]')
+    extractMetaContent(html, ['og:description', 'description', 'twitter:description'])
   )
   const publishedAtRaw = cleanText(
-    meta('meta[property="article:published_time"]') ||
-    meta('meta[property="article:modified_time"]') ||
-    meta('meta[property="og:updated_time"]') ||
-    meta('meta[name="pubdate"]') ||
-    meta('meta[name="date"]') ||
-    doc.querySelector('time[datetime]')?.getAttribute('datetime') ||
-    ''
+    extractMetaContent(html, ['article:published_time', 'article:modified_time', 'og:updated_time', 'pubdate', 'date']) ||
+    extractTimeDatetime(html)
   )
 
-  const bodyText = cleanText(doc.body?.textContent || '')
+  const bodyText = extractBodyText(html)
   if (sourceKind === 'linkedin' && /(sign in|join linkedin|authwall|create account)/i.test(bodyText)) {
     return null
   }
@@ -447,7 +537,7 @@ async function fetchBingRssHits(buckets: Array<{ priority: number; label: string
     try {
       const { response, text } = await fetchTextWithTimeout(searchUrl, { headers }, 10000)
       if (!response.ok || !text) return [] as ResearchHit[]
-      return parseRssItems(text, bucket, maxItemsPerBucket, 'Bing')
+      return parseRssItems(text, bucket, maxItemsPerBucket, 'Bing', sourceKind)
     } catch (error) {
       console.warn('[Intelligence Brief] Bing RSS search failed for bucket:', bucket.label, error)
       return [] as ResearchHit[]
@@ -465,7 +555,7 @@ async function fetchBingNewsHits(buckets: Array<{ priority: number; label: strin
     try {
       const { response, text } = await fetchTextWithTimeout(searchUrl, { headers }, 10000)
       if (!response.ok || !text) return [] as ResearchHit[]
-      return parseRssItems(text, bucket, maxItemsPerBucket, 'Bing News')
+      return parseRssItems(text, bucket, maxItemsPerBucket, 'Bing News', sourceKind)
     } catch (error) {
       console.warn('[Intelligence Brief] Bing News RSS search failed for bucket:', bucket.label, error)
       return [] as ResearchHit[]
@@ -699,11 +789,11 @@ async function collectResearchCandidates(account: AccountRow) {
         try {
           const { response, text } = await fetchTextWithTimeout(url, { headers: { 'User-Agent': WEB_USER_AGENT } }, 12000)
           if (!response.ok || !text) return [] as ResearchHit[]
-          return parseRssItems(text, bucket, 3)
-      } catch (error) {
-        console.warn('[Intelligence Brief] RSS fetch failed for bucket:', bucket.label, error)
-        return [] as ResearchHit[]
-      }
+          return parseRssItems(text, bucket, 3, 'Google News', 'news')
+        } catch (error) {
+          console.warn('[Intelligence Brief] RSS fetch failed for bucket:', bucket.label, error)
+          return [] as ResearchHit[]
+        }
       }))
       return dedupeAndSort(rssResults.flat())
     })(),
@@ -740,7 +830,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
   const headline = cleanText(result?.signal_headline)
   const detail = cleanText(result?.signal_detail)
   const talkTrack = cleanText(result?.talk_track)
-  const sourceUrl = cleanText(result?.source_url) || candidate?.url || ''
+  const sourceUrl = candidate?.url || cleanText(result?.source_url) || ''
   const signalDate = formatDateForDb(result?.signal_date, candidate?.publishedAt || null)
   const confidence = toTitleCase(cleanText(result?.confidence_level))
 
@@ -886,7 +976,7 @@ ${JSON.stringify(researchPayload, null, 2)}`
     throw new Error('Could not parse OpenRouter model response as JSON')
   }
 
-  const bestCandidate = selectedCandidates.find((item) => item.priority === Number(parsed?.selected_priority)) || selectedCandidates[0] || null
+  const bestCandidate = findCandidateForResult(parsed, selectedCandidates)
   const validated = validateBriefResult(parsed, bestCandidate)
   return validated
 }
@@ -948,6 +1038,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const candidateResults = await collectResearchCandidates(account)
+    const diagnostics = buildResearchDiagnostics(candidateResults)
+    console.info('[Intelligence Brief] Research candidates collected:', {
+      accountId,
+      accountName: account.name,
+      total: diagnostics.total,
+      bySourceKind: diagnostics.bySourceKind,
+    })
 
     let outcomeStatus: BriefStatus = 'empty'
     let validated: ReturnType<typeof validateBriefResult> = null
@@ -1004,6 +1101,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         message: 'Intelligence brief refreshed.',
         brief: validated,
         account: serialized,
+        diagnostics,
       })
     }
 
@@ -1011,6 +1109,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       ok: false,
       message: FALLBACK_MESSAGE,
       account: serialized,
+      diagnostics,
     })
   } catch (error) {
     console.error('[Intelligence Brief] Unexpected handler failure:', error)
