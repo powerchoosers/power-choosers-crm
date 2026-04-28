@@ -1,5 +1,11 @@
 {
     "framework": "nextjs",
+    "functions": {
+        "src/pages/api/accounts/**/intelligence-brief.ts": {
+            "maxDuration": 120,
+            "memory": 1024
+        }
+    },
     "rewrites": [
         {
             "source": "/posts/:slug",
