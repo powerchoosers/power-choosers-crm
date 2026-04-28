@@ -548,13 +548,15 @@ export function TopBar() {
 
   return (
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
-    <header className={cn(
-      "fixed top-0 left-0 lg:left-[70px] z-40 flex items-center justify-center h-16 lg:h-24 pointer-events-none border-b border-transparent",
-      rightPanelMinimized ? "right-0" : "right-0 lg:right-80"
-    )}
-    style={{
-      transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1), right 300ms cubic-bezier(0.4, 0, 0.2, 1)'
-    }}
+    <motion.header 
+      className={cn(
+        "fixed top-0 left-0 lg:left-[70px] z-40 flex items-center justify-center h-16 lg:h-24 pointer-events-none border-b border-transparent"
+      )}
+      initial={false}
+      animate={{
+        right: rightPanelMinimized ? 0 : (typeof window !== 'undefined' && window.innerWidth >= 1024 ? 320 : 0)
+      }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
     >
       {/* Visual background and blur layer - Moved here to prevent nested backdrop-filter issues */}
       <AnimatePresence>
@@ -1185,11 +1187,11 @@ export function TopBar() {
               className="icon-button-forensic pointer-events-auto"
               aria-label="Restore Intelligence Feed"
             >
-              <ChevronLeft size={16} />
+              <ChevronLeft size={20} />
             </motion.button>
           )}
         </AnimatePresence>
       </div >
-    </header >
+    </motion.header >
   )
 }
