@@ -1,9 +1,9 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format, isValid } from 'date-fns'
-import { Copy, ExternalLink, Loader2, RefreshCcw, Sparkles } from 'lucide-react'
+import { Copy, ExternalLink, Loader2, RefreshCcw, Sparkles, TrendingUp, MessageSquare, Lightbulb } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -85,8 +85,65 @@ function confidenceTone(level: string | null | undefined) {
   return 'border-white/10 bg-white/5 text-zinc-400'
 }
 
+// Animated text component with smooth character-by-character reveal
+function AnimatedText({ text, delay = 0, speed = 15 }: { text: string; delay?: number; speed?: number }) {
+  const [displayedText, setDisplayedText] = useState('')
+  const [isComplete, setIsComplete] = useState(false)
+
+  useEffect(() => {
+    setDisplayedText('')
+    setIsComplete(false)
+    
+    const timeout = setTimeout(() => {
+      let currentIndex = 0
+      const interval = setInterval(() => {
+        if (currentIndex <= text.length) {
+          setDisplayedText(text.slice(0, currentIndex))
+          currentIndex++
+        } else {
+          setIsComplete(true)
+          clearInterval(interval)
+        }
+      }, speed)
+
+      return () => clearInterval(interval)
+    }, delay)
+
+    return () => clearTimeout(timeout)
+  }, [text, delay, speed])
+
+  return (
+    <span className={cn('inline', !isComplete && 'animate-pulse-subtle')}>
+      {displayedText}
+      {!isComplete && <span className="inline-block w-0.5 h-4 bg-[#002FA7] ml-0.5 animate-blink" />}
+    </span>
+  )
+}
+
+// Format text with bullet points and better structure
+function formatDetailText(text: string) {
+  // Split by sentences and add structure
+  const sentences = text.split(/\.\s+/).filter(Boolean)
+  
+  if (sentences.length <= 2) {
+    return <p className="text-sm leading-7 text-zinc-200">{text}</p>
+  }
+
+  return (
+    <div className="space-y-3">
+      {sentences.map((sentence, idx) => (
+        <div key={idx} className="flex items-start gap-3">
+          <div className="w-1.5 h-1.5 rounded-full bg-[#002FA7]/60 mt-2.5 shrink-0" />
+          <p className="text-sm leading-7 text-zinc-200">{sentence.trim()}.</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export function IntelligenceBrief({ account, className }: IntelligenceBriefProps) {
   const queryClient = useQueryClient()
+  const [showContent, setShowContent] = useState(false)
 
   const refreshMutation = useMutation<RefreshPayload>({
     mutationFn: async () => {
@@ -128,6 +185,9 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       void queryClient.invalidateQueries({
         predicate: (query) => query.queryKey.some((part) => part === account.id),
       })
+      // Trigger animation after successful refresh
+      setShowContent(false)
+      setTimeout(() => setShowContent(true), 100)
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : 'Research failed.'
@@ -158,6 +218,13 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
   const canRefresh = !!displayAccount?.id && !isCooldownActive
   const isFallbackState = brief.status === 'empty' || brief.status === 'error'
 
+  // Trigger initial animation on mount if there's content
+  useEffect(() => {
+    if (hasBrief && !isFallbackState) {
+      setShowContent(true)
+    }
+  }, [hasBrief, isFallbackState])
+
   const handleCopy = async () => {
     if (!hasBrief || !displayAccount || isFallbackState) return
     try {
@@ -173,6 +240,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
       'nodal-void-card transition-all duration-500 p-6 relative overflow-hidden shadow-lg space-y-4',
       className
     )}>
+      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <h3 className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.3em] flex items-center gap-2">
@@ -219,8 +287,9 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
         </div>
       </div>
 
+      {/* Loading State */}
       {refreshMutation.isPending && (
-        <div className="rounded-2xl border border-[#002FA7]/15 bg-[#002FA7]/10 px-4 py-3 flex items-center gap-3">
+        <div className="rounded-2xl border border-[#002FA7]/15 bg-[#002FA7]/10 px-4 py-3 flex items-center gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
           <Loader2 className="w-4 h-4 animate-spin text-[#002FA7]" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-zinc-100">
@@ -233,64 +302,104 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
         </div>
       )}
 
+      {/* Fallback State */}
       {!refreshMutation.isPending && isFallbackState && (
-        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3">
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-300">
           <p className="text-sm text-amber-100">{FALLBACK_MESSAGE}</p>
         </div>
       )}
 
+      {/* Empty State */}
       {!refreshMutation.isPending && !hasBrief && !isFallbackState && (
-        <div className="rounded-2xl border border-dashed border-white/10 bg-zinc-950/20 p-5">
+        <div className="rounded-2xl border border-dashed border-white/10 bg-zinc-950/20 p-5 animate-in fade-in slide-in-from-top-2 duration-300">
           <p className="text-sm text-zinc-300">{EMPTY_MESSAGE}</p>
         </div>
       )}
 
-      {!refreshMutation.isPending && hasBrief && (
+      {/* Content */}
+      {!refreshMutation.isPending && hasBrief && showContent && (
         <div className="space-y-4">
-          <section className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-            <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">Signal Headline</div>
-            <p className="text-base leading-6 text-white font-medium">
-              {brief.headline}
-            </p>
+          {/* Signal Headline */}
+          <section className={cn(
+            'rounded-2xl border border-white/8 bg-gradient-to-br from-white/[0.03] to-white/[0.01] p-5',
+            'animate-in fade-in slide-in-from-top-2 duration-500'
+          )}>
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-4 h-4 text-[#002FA7]" />
+              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500">
+                Signal Headline
+              </div>
+            </div>
+            <h4 className="text-lg leading-7 text-white font-semibold">
+              <AnimatedText text={brief.headline} delay={0} speed={12} />
+            </h4>
           </section>
 
-          <section className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-            <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">Signal Detail</div>
-            <p className="text-sm leading-6 text-zinc-200 whitespace-pre-line">
-              {brief.detail}
-            </p>
+          {/* Signal Detail */}
+          <section className={cn(
+            'rounded-2xl border border-white/8 bg-gradient-to-br from-white/[0.03] to-white/[0.01] p-5',
+            'animate-in fade-in slide-in-from-top-2 duration-500 delay-100'
+          )}>
+            <div className="flex items-center gap-2 mb-3">
+              <Lightbulb className="w-4 h-4 text-[#002FA7]" />
+              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500">
+                Signal Detail
+              </div>
+            </div>
+            <div className="prose prose-invert prose-sm max-w-none">
+              {formatDetailText(brief.detail)}
+            </div>
           </section>
 
-          <section className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-            <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">Talk Track</div>
-            <p className="text-sm leading-6 text-zinc-100 whitespace-pre-line">
-              {brief.talkTrack}
-            </p>
+          {/* Talk Track */}
+          <section className={cn(
+            'rounded-2xl border border-[#002FA7]/20 bg-gradient-to-br from-[#002FA7]/10 to-[#002FA7]/5 p-5',
+            'animate-in fade-in slide-in-from-top-2 duration-500 delay-200'
+          )}>
+            <div className="flex items-center gap-2 mb-3">
+              <MessageSquare className="w-4 h-4 text-[#002FA7]" />
+              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-[#002FA7]">
+                Talk Track
+              </div>
+            </div>
+            <blockquote className="text-sm leading-7 text-zinc-100 italic border-l-2 border-[#002FA7]/40 pl-4">
+              "{brief.talkTrack}"
+            </blockquote>
           </section>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          {/* Metadata Grid */}
+          <div className={cn(
+            'grid gap-3 md:grid-cols-3',
+            'animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300'
+          )}>
             <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">Signal Date</div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">
+                Signal Date
+              </div>
               <p className="text-sm font-medium text-zinc-100">
                 {getHumanDate(brief.signalDate) || 'Not set'}
               </p>
             </div>
 
             <div className={cn('rounded-2xl border p-4', confidenceTone(brief.confidenceLevel))}>
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] mb-2">Confidence</div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.22em] mb-2">
+                Confidence
+              </div>
               <p className="text-sm font-medium">
                 {brief.confidenceLevel ? brief.confidenceLevel.charAt(0).toUpperCase() + brief.confidenceLevel.slice(1).toLowerCase() : 'Not set'}
               </p>
             </div>
 
             <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
-              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">Source</div>
+              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">
+                Source
+              </div>
               {brief.sourceUrl ? (
                 <a
                   href={brief.sourceUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-sm font-medium text-[#002FA7] hover:text-[#6d93ff] break-all"
+                  className="inline-flex items-center gap-1 text-sm font-medium text-[#002FA7] hover:text-[#6d93ff] break-all transition-colors"
                 >
                   View source
                   <ExternalLink className="w-3.5 h-3.5 shrink-0" />
