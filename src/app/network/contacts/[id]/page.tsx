@@ -15,6 +15,7 @@ import { format } from 'date-fns'
 import { useComposeStore } from '@/store/composeStore'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
 import { buildUsableCallContextBlock } from '@/lib/call-context'
+import { IntelligenceBrief } from '@/components/dossier/IntelligenceBrief'
 
 // Modular Components
 import { useContactDossierState } from '@/hooks/useContactDossierState'
@@ -262,6 +263,8 @@ export default function ContactDossierPage() {
                   recentlyUpdatedFields={s.recentlyUpdatedFields}
                   isSaving={s.isSaving}
                 />
+
+                <IntelligenceBrief account={s.account} />
 
                 <EngagementLog
                   id={id}
