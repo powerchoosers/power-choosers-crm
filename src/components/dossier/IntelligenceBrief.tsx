@@ -212,7 +212,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
               Researching {account?.name || 'this account'}…
             </p>
             <p className="text-[11px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
-              Pulling public signals from news, press releases, journals, and filings
+              Pulling public signals from news, web search, LinkedIn, SEC filings, and company pages
             </p>
           </div>
         </div>
