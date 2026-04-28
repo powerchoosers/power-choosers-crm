@@ -45,7 +45,7 @@ import { useWeather } from '@/hooks/useWeather'
 import { isTodayOrOverdue } from '@/lib/task-date'
 
 export function RightPanel() {
-  const { rightPanelMode, setRightPanelMode, setTaskContext, ingestionContext } = useUIStore()
+  const { rightPanelMode, setRightPanelMode, setTaskContext, ingestionContext, rightPanelMinimized, toggleRightPanel } = useUIStore()
   const pathname = usePathname()
   const params = useParams()
 
@@ -226,10 +226,17 @@ export function RightPanel() {
   if (!isReady) return <aside className="fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 hidden lg:flex" />
 
   return (
-    <aside className={cn(
-      "fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 flex flex-col overflow-hidden hidden lg:flex",
-      rightPanelMode === 'DEFAULT' && "np-scroll"
-    )}>
+    <motion.aside
+      initial={false}
+      animate={{
+        x: rightPanelMinimized ? 320 : 0,
+      }}
+      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+      className={cn(
+        "fixed right-0 top-0 bottom-0 z-30 w-80 bg-zinc-950 border-l border-white/5 flex flex-col overflow-hidden hidden lg:flex",
+        rightPanelMode === 'DEFAULT' && "np-scroll"
+      )}
+    >
       <AnimatePresence mode="wait">
         {rightPanelMode === 'CREATE_TASK' ? (
           <TaskCreationPanel key="task" />
@@ -340,6 +347,7 @@ export function RightPanel() {
               <button
                 className="icon-button-forensic"
                 title="Minimize Intelligence Feed"
+                onClick={toggleRightPanel}
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -549,7 +557,7 @@ export function RightPanel() {
           </motion.div>
         )}
       </AnimatePresence>
-    </aside>
+    </motion.aside>
   )
 }
 

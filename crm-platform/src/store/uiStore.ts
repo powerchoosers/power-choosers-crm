@@ -84,6 +84,9 @@ interface UIState {
   toggleEditing: () => void
   rightPanelMode: RightPanelMode
   setRightPanelMode: (mode: RightPanelMode) => void
+  rightPanelMinimized: boolean
+  setRightPanelMinimized: (minimized: boolean) => void
+  toggleRightPanel: () => void
   /** Pre-filled context when opening INGEST_CONTACT from Account Dossier (Rapid Contact Injection) */
   ingestionContext: IngestionContext | null
   setIngestionContext: (ctx: IngestionContext | null) => void
@@ -148,6 +151,9 @@ export const useUIStore = create<UIState>()(
       toggleEditing: () => set((state) => ({ isEditing: !state.isEditing })),
       rightPanelMode: 'DEFAULT',
       setRightPanelMode: (mode) => set({ rightPanelMode: mode }),
+      rightPanelMinimized: false,
+      setRightPanelMinimized: (minimized) => set({ rightPanelMinimized: minimized }),
+      toggleRightPanel: () => set((state) => ({ rightPanelMinimized: !state.rightPanelMinimized })),
       ingestionContext: null,
       setIngestionContext: (ctx) => set({ ingestionContext: ctx }),
       taskContext: null,

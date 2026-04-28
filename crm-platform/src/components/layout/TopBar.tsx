@@ -2,7 +2,7 @@
 
 import { useCallStore } from '@/store/callStore'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Phone, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap, Handshake, FileSignature, Headphones } from 'lucide-react'
+import { Phone, Grid3X3, RefreshCw, Bell, X, Shield, Search, Zap, Handshake, FileSignature, Headphones, ChevronLeft } from 'lucide-react'
 import { Building2 } from 'lucide-react'
 import { cn, formatToE164 } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -118,6 +118,8 @@ export function TopBar() {
   } = useCallStore()
   const isGeminiOpen = useGeminiStore((state) => state.isOpen)
   const setIsGeminiOpen = useGeminiStore((state) => state.setIsOpen)
+  const rightPanelMinimized = useUIStore((state) => state.rightPanelMinimized)
+  const toggleRightPanel = useUIStore((state) => state.toggleRightPanel)
   const { profile } = useAuth()
   const { connect, disconnect, sendDigits, metadata: voiceMetadata } = useVoice()
   const pathname = usePathname()
@@ -1028,6 +1030,24 @@ export function TopBar() {
                 <span className="absolute top-2 right-2.5 w-2 h-2 bg-signal rounded-full border border-zinc-900" />
               )}
             </button>
+
+            {/* Restore Right Panel Button - Only shows when minimized */}
+            <AnimatePresence>
+              {rightPanelMinimized && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.5, x: 20 }}
+                  animate={{ opacity: 1, scale: 1, x: 0 }}
+                  exit={{ opacity: 0, scale: 0.5, x: 20 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                  onClick={toggleRightPanel}
+                  className="icon-button-forensic w-9 h-9 relative text-[#002FA7] hover:text-[#002FA7]/80"
+                  aria-label="Restore Intelligence Feed"
+                >
+                  <ChevronLeft size={22} />
+                  <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full bg-[#002FA7] animate-pulse" />
+                </motion.button>
+              )}
+            </AnimatePresence>
 
             {/* Manual Dialer Trigger OR Active Call HUD Trigger */}
             {isActive ? (
