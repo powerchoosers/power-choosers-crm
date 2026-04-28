@@ -549,10 +549,13 @@ export function TopBar() {
   return (
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
     <header className={cn(
-      "fixed top-0 left-0 lg:left-[70px] z-40 flex items-center justify-center h-16 lg:h-24 pointer-events-none transition-all duration-300 ease-in-out",
-      "border-b border-transparent",
+      "fixed top-0 left-0 lg:left-[70px] z-40 flex items-center justify-center h-16 lg:h-24 pointer-events-none border-b border-transparent",
       rightPanelMinimized ? "right-0" : "right-0 lg:right-80"
-    )}>
+    )}
+    style={{
+      transition: 'left 300ms cubic-bezier(0.4, 0, 0.2, 1), right 300ms cubic-bezier(0.4, 0, 0.2, 1)'
+    }}
+    >
       {/* Visual background and blur layer - Moved here to prevent nested backdrop-filter issues */}
       <AnimatePresence>
         {isScrolled && (
@@ -1182,11 +1185,10 @@ export function TopBar() {
             >
               <button
                 onClick={toggleRightPanel}
-                className="w-12 h-12 rounded-[24px] bg-zinc-950/80 backdrop-blur-xl border border-white/5 hover:border-white/10 flex items-center justify-center text-[#002FA7] hover:text-[#002FA7]/80 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(0,47,167,0.3)] relative group"
+                className="w-10 h-10 rounded-full bg-zinc-950/80 backdrop-blur-xl border border-white/5 hover:border-white/10 flex items-center justify-center text-white hover:text-white/80 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] relative group"
                 aria-label="Restore Intelligence Feed"
               >
-                <ChevronLeft size={22} className="transition-transform group-hover:scale-110" />
-                <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#002FA7] animate-pulse" />
+                <ChevronLeft size={18} className="transition-transform group-hover:scale-110" />
               </button>
             </motion.div>
           )}
