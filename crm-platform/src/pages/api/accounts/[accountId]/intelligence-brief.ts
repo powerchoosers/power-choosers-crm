@@ -1,14 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
+import { JSDOM } from 'jsdom'
 import { supabaseAdmin, requireUser } from '@/lib/supabase'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 type BriefStatus = 'idle' | 'ready' | 'empty' | 'error'
+type ResearchSourceKind = 'news' | 'web' | 'sec' | 'linkedin'
 
 type AccountRow = {
   id: string
   name: string | null
   industry: string | null
   domain: string | null
+  linkedin_url: string | null
   city: string | null
   state: string | null
   ownerId: string | null
@@ -31,6 +34,7 @@ type ResearchHit = {
   snippet: string
   publishedAt: string | null
   source: string
+  sourceKind: ResearchSourceKind
 }
 
 type BriefResult = {
@@ -49,7 +53,59 @@ type BriefResult = {
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
-const ACCOUNT_SELECT = 'id, name, industry, domain, city, state, ownerId, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const SIGNAL_KEYWORDS = [
+  'acquisition',
+  'acquired',
+  'acquirer',
+  'merger',
+  'takeover',
+  'buyout',
+  'cfo',
+  'chief financial officer',
+  'coo',
+  'chief operating officer',
+  'vp of finance',
+  'vice president of finance',
+  'facilities director',
+  'energy manager',
+  'new location',
+  'future location',
+  'opening',
+  'opening soon',
+  'lease',
+  'construction',
+  'groundbreaking',
+  'expansion',
+  'headcount',
+  'capital expenditure',
+  'capex',
+  'restructuring',
+  'closure',
+  'plant closure',
+  'consolidation',
+  'contract award',
+  'government contract',
+  'customer win',
+  'funding round',
+  'ipo',
+]
+const WEB_USER_AGENT = process.env.SEC_USER_AGENT || 'NodalPointCRM/1.0 (public-web-research)'
+const SEC_LOOKBACK_DAYS = 730
+const SEC_FILING_FORMS = new Set([
+  '8-K',
+  '8-K/A',
+  '10-K',
+  '10-K/A',
+  '10-Q',
+  '10-Q/A',
+  'S-1',
+  'S-1/A',
+  '424B4',
+  '424B5',
+  'DEF 14A',
+  'PRE 14A',
+])
 
 function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
@@ -103,6 +159,7 @@ function parseRssItems(xml: string, bucket: { priority: number; label: string; q
       snippet: description,
       publishedAt: publishedAt && !Number.isNaN(publishedAt.getTime()) ? publishedAt.toISOString() : null,
       source,
+      sourceKind: 'news',
     })
   }
 
@@ -166,14 +223,14 @@ async function fetchTextWithTimeout(url: string, init: RequestInit, timeoutMs = 
   }
 }
 
-function buildSearchBuckets(account: AccountRow) {
+function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
   const name = cleanText(account.name) || 'Unknown Company'
   const domain = cleanText(account.domain)
   const city = cleanText(account.city)
   const state = cleanText(account.state)
   const location = [city, state].filter(Boolean).join(', ')
   const industry = cleanText(account.industry)
-  const domainClause = domain ? ` site:${domain.replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : ''
+  const domainClause = includeDomainClause && domain ? ` site:${domain.replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : ''
 
   const locationClause = location ? ` ${location}` : ''
   const texasClause = ' Texas'
@@ -187,17 +244,17 @@ function buildSearchBuckets(account: AccountRow) {
     {
       priority: 2,
       label: 'Texas Openings / Construction',
-      query: `"${name}" new Texas location opening lease construction facility warehouse plant${domainClause}${texasClause}${locationClause}`,
+      query: `"${name}" new Texas location future location opening soon lease construction facility warehouse plant${domainClause}${texasClause}${locationClause}`,
     },
     {
       priority: 3,
       label: 'Executive Leadership Changes',
-      query: `"${name}" CFO COO "VP of Finance" "Facilities Director" "Energy Manager" promoted hired LinkedIn${domainClause}${locationClause}`,
+      query: `"${name}" CFO COO "VP of Finance" "Facilities Director" "Energy Manager" promoted hired${domainClause}${locationClause}`,
     },
     {
       priority: 4,
       label: 'Expansion / Capex / Headcount',
-      query: `"${name}" expansion capital expenditure capex hiring headcount growth${industry ? ` ${industry}` : ''}${domainClause}${locationClause}`,
+      query: `"${name}" expansion planned expansion capital expenditure capex hiring headcount growth future site${industry ? ` ${industry}` : ''}${domainClause}${locationClause}`,
     },
     {
       priority: 5,
@@ -215,6 +272,478 @@ function buildSearchBuckets(account: AccountRow) {
       query: `"${name}" funding round IPO Series A Series B going public${domainClause}${locationClause}`,
     },
   ]
+}
+
+function buildLinkedInBuckets(account: AccountRow) {
+  const name = cleanText(account.name) || 'Unknown Company'
+  const city = cleanText(account.city)
+  const state = cleanText(account.state)
+  const locationClause = [city, state].filter(Boolean).join(', ')
+  const locationBits = locationClause ? ` "${locationClause}"` : ''
+
+  return [
+    {
+      priority: 3,
+      label: 'LinkedIn Company Page',
+      query: `site:linkedin.com/company "${name}"${locationBits}`,
+    },
+    {
+      priority: 3,
+      label: 'LinkedIn Posts / Updates',
+      query: `site:linkedin.com/posts "${name}" acquisition merger CFO COO expansion opening construction hiring${locationBits}`,
+    },
+  ]
+}
+
+function buildSecBuckets(account: AccountRow) {
+  const name = cleanText(account.name) || 'Unknown Company'
+  const city = cleanText(account.city)
+  const state = cleanText(account.state)
+  const locationClause = [city, state].filter(Boolean).join(', ')
+  const locationBits = locationClause ? ` "${locationClause}"` : ''
+
+  return [
+    {
+      priority: 1,
+      label: 'SEC Acquisitions / M&A',
+      query: `site:sec.gov "${name}" acquisition merger buyout takeover${locationBits}`,
+    },
+    {
+      priority: 2,
+      label: 'SEC Texas Openings / Construction',
+      query: `site:sec.gov "${name}" Texas location opening lease construction facility warehouse plant${locationBits}`,
+    },
+    {
+      priority: 3,
+      label: 'SEC Executive Leadership Changes',
+      query: `site:sec.gov "${name}" CFO COO "VP of Finance" "Facilities Director" "Energy Manager" promoted hired${locationBits}`,
+    },
+    {
+      priority: 4,
+      label: 'SEC Expansion / Capex / Headcount',
+      query: `site:sec.gov "${name}" expansion capital expenditure capex hiring headcount growth future location${locationBits}`,
+    },
+    {
+      priority: 5,
+      label: 'SEC Restructuring / Closures',
+      query: `site:sec.gov "${name}" restructuring plant closure consolidation downsizing${locationBits}`,
+    },
+    {
+      priority: 6,
+      label: 'SEC Contract Awards / Customer Wins',
+      query: `site:sec.gov "${name}" contract award government contract major customer win${locationBits}`,
+    },
+    {
+      priority: 7,
+      label: 'SEC Funding / IPO',
+      query: `site:sec.gov "${name}" funding round IPO Series A Series B going public${locationBits}`,
+    },
+  ]
+}
+
+function getHostname(value: string) {
+  try {
+    return new URL(value).hostname.replace(/^www\./i, '').toLowerCase()
+  } catch {
+    return ''
+  }
+}
+
+function normalizeDuckDuckGoUrl(rawUrl: string) {
+  if (!rawUrl) return ''
+
+  try {
+    const url = new URL(rawUrl, 'https://duckduckgo.com')
+    const uddg = url.searchParams.get('uddg')
+    if (uddg) return decodeURIComponent(uddg)
+    return url.toString()
+  } catch {
+    return rawUrl
+  }
+}
+
+function createDocument(html: string) {
+  return new JSDOM(html).window.document
+}
+
+function extractKeywordSnippet(text: string, keywords = SIGNAL_KEYWORDS) {
+  const normalized = cleanText(text)
+  if (!normalized) return ''
+
+  const lower = normalized.toLowerCase()
+  let bestIndex = -1
+  let bestKeyword = ''
+
+  for (const keyword of keywords) {
+    const searchTerm = keyword.toLowerCase()
+    const index = lower.indexOf(searchTerm)
+    if (index >= 0 && (bestIndex < 0 || index < bestIndex)) {
+      bestIndex = index
+      bestKeyword = searchTerm
+    }
+  }
+
+  if (bestIndex < 0) {
+    return normalized.slice(0, 360)
+  }
+
+  const start = Math.max(0, bestIndex - 180)
+  const end = Math.min(normalized.length, bestIndex + bestKeyword.length + 240)
+  return normalized.slice(start, end).replace(/\s+/g, ' ').trim()
+}
+
+function inferSignalPriority(text: string, fallbackPriority: number) {
+  const lower = cleanText(text).toLowerCase()
+  if (/(acquir|merger|takeover|buyout)/.test(lower)) return 1
+  if (/(new location|future location|opening soon|opening|lease|construction|facility|warehouse|plant|groundbreaking)/.test(lower)) return 2
+  if (/(cfo|chief financial officer|coo|chief operating officer|vp of finance|vice president of finance|facilities director|energy manager|promoted|hired)/.test(lower)) return 3
+  if (/(expansion|capital expenditure|capex|headcount|growth|future site|buildout|build-out)/.test(lower)) return 4
+  if (/(restructuring|closure|consolidation|downsizing|layoff|shutdown)/.test(lower)) return 5
+  if (/(contract award|government contract|customer win|major customer|new customer)/.test(lower)) return 6
+  if (/(funding round|series [abcde]|ipo|initial public offering|going public)/.test(lower)) return 7
+  return fallbackPriority
+}
+
+function parseDuckDuckGoResults(html: string, bucket: { priority: number; label: string; query: string }, sourceKind: ResearchSourceKind, maxItems = 4): ResearchHit[] {
+  const doc = createDocument(html)
+  const results = Array.from(doc.querySelectorAll('.result__body') as NodeListOf<Element>)
+  const hits: ResearchHit[] = []
+
+  for (const result of results.slice(0, maxItems)) {
+    const link = result.querySelector('a.result__a')
+    const snippetEl = result.querySelector('.result__snippet')
+    const rawHref = link?.getAttribute('href') || ''
+    const url = normalizeDuckDuckGoUrl(rawHref)
+    const title = cleanText(link?.textContent || '')
+    const snippet = cleanText(snippetEl?.textContent || '')
+
+    if (!title || !url) continue
+
+    hits.push({
+      priority: bucket.priority,
+      label: bucket.label,
+      query: bucket.query,
+      title,
+      url,
+      snippet,
+      publishedAt: null,
+      source: getHostname(url) || 'DuckDuckGo',
+      sourceKind,
+    })
+  }
+
+  return hits
+}
+
+function extractPagePreview(html: string, fallbackTitle: string, url: string, sourceKind: ResearchSourceKind) {
+  const doc = createDocument(html)
+  const meta = (selector: string) => cleanText(doc.querySelector(selector)?.getAttribute('content') || '')
+  const title = cleanText(
+    meta('meta[property="og:title"]') ||
+    meta('meta[name="twitter:title"]') ||
+    doc.querySelector('title')?.textContent ||
+    fallbackTitle ||
+    url
+  )
+  const description = cleanText(
+    meta('meta[property="og:description"]') ||
+    meta('meta[name="description"]') ||
+    meta('meta[name="twitter:description"]')
+  )
+  const publishedAtRaw = cleanText(
+    meta('meta[property="article:published_time"]') ||
+    meta('meta[property="article:modified_time"]') ||
+    meta('meta[property="og:updated_time"]') ||
+    meta('meta[name="pubdate"]') ||
+    meta('meta[name="date"]') ||
+    doc.querySelector('time[datetime]')?.getAttribute('datetime') ||
+    ''
+  )
+
+  const bodyText = cleanText(doc.body?.textContent || '')
+  if (sourceKind === 'linkedin' && /(sign in|join linkedin|authwall|create account)/i.test(bodyText)) {
+    return null
+  }
+
+  const snippet = extractKeywordSnippet(bodyText) || description || bodyText.slice(0, 420) || title
+
+  let publishedAt: string | null = null
+  if (publishedAtRaw) {
+    const parsed = new Date(publishedAtRaw)
+    if (!Number.isNaN(parsed.getTime())) {
+      publishedAt = parsed.toISOString()
+    }
+  }
+
+  return {
+    title,
+    snippet,
+    publishedAt,
+    source: getHostname(url) || 'web',
+  }
+}
+
+async function fetchDuckDuckGoHits(buckets: Array<{ priority: number; label: string; query: string }>, sourceKind: ResearchSourceKind, maxItemsPerBucket = 4) {
+  const headers = { 'User-Agent': WEB_USER_AGENT }
+
+  const results = await Promise.all(buckets.map(async (bucket) => {
+    const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(bucket.query)}`
+    try {
+      const { response, text } = await fetchTextWithTimeout(searchUrl, { headers }, 10000)
+      if (!response.ok || !text) return [] as ResearchHit[]
+      return parseDuckDuckGoResults(text, bucket, sourceKind, maxItemsPerBucket)
+    } catch (error) {
+      console.warn('[Intelligence Brief] DuckDuckGo search failed for bucket:', bucket.label, error)
+      return [] as ResearchHit[]
+    }
+  }))
+
+  return dedupeAndSort(results.flat())
+}
+
+async function fetchPageHit(url: string, bucket: { priority: number; label: string; query: string }, sourceKind: ResearchSourceKind, titleFallback: string) {
+  const headers = {
+    'User-Agent': sourceKind === 'sec' ? WEB_USER_AGENT : WEB_USER_AGENT,
+    'Accept-Language': 'en-US,en;q=0.9',
+  }
+
+  const { response, text } = await fetchTextWithTimeout(url, { headers }, 12000)
+  if (!response.ok || !text) return null
+
+  const preview = extractPagePreview(text, titleFallback, response.url || url, sourceKind)
+  if (!preview) return null
+
+  return {
+    priority: bucket.priority,
+    label: bucket.label,
+    query: bucket.query,
+    title: preview.title,
+    url: response.url || url,
+    snippet: preview.snippet,
+    publishedAt: preview.publishedAt,
+    source: preview.source,
+    sourceKind,
+  } satisfies ResearchHit
+}
+
+type SecTickerEntry = {
+  cik: string
+  ticker: string
+  title: string
+}
+
+let secTickerCache: Promise<SecTickerEntry[]> | null = null
+
+function normalizeEntityName(value: string) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/\b(the|incorporated|inc|corporation|corp|company|co|limited|ltd|llc|lp|holdings?|group)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function scoreEntityMatch(left: string, right: string) {
+  if (!left || !right) return 0
+  if (left === right) return 100
+  if (left.includes(right) || right.includes(left)) return 85
+
+  const leftTokens = new Set(left.split(' ').filter(Boolean))
+  const rightTokens = right.split(' ').filter(Boolean)
+  const overlap = rightTokens.filter((token) => leftTokens.has(token)).length
+  if (overlap >= 3) return 70 + overlap * 4
+  if (overlap === 2) return 60
+  if (overlap === 1) return 35
+  return 0
+}
+
+async function loadSecCompanyTickers() {
+  if (!secTickerCache) {
+    secTickerCache = (async () => {
+      const { response, text } = await fetchTextWithTimeout('https://www.sec.gov/files/company_tickers.json', {
+        headers: { 'User-Agent': WEB_USER_AGENT },
+      }, 15000)
+
+      if (!response.ok || !text) {
+        return []
+      }
+
+      const parsed = JSON.parse(text)
+      const entries = Array.isArray(parsed) ? parsed : Object.values(parsed)
+      return entries
+        .map((entry: any) => ({
+          cik: String(entry?.cik_str ?? entry?.cik ?? '').trim().padStart(10, '0'),
+          ticker: cleanText(entry?.ticker),
+          title: cleanText(entry?.title || entry?.name),
+        }))
+        .filter((entry: SecTickerEntry) => entry.cik && entry.title)
+    })().catch((error) => {
+      console.warn('[Intelligence Brief] SEC ticker lookup failed:', error)
+      return []
+    })
+  }
+
+  return secTickerCache
+}
+
+function findBestSecMatch(account: AccountRow, entries: SecTickerEntry[]) {
+  const accountName = normalizeEntityName(account.name || '')
+  if (!accountName) return null
+
+  const ranked = entries
+    .map((entry) => ({
+      entry,
+      score: scoreEntityMatch(accountName, normalizeEntityName(entry.title)),
+    }))
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+
+  const best = ranked[0]
+  if (!best || best.score < 60) return null
+  return best.entry
+}
+
+function buildSecFilingUrl(cik: string, accessionNumber: string, primaryDocument?: string | null) {
+  const normalizedCik = String(Number(cik)).trim()
+  const accessionPath = String(accessionNumber || '').replace(/-/g, '')
+  if (!normalizedCik || !accessionPath) return ''
+  if (!primaryDocument) {
+    return `https://www.sec.gov/Archives/edgar/data/${normalizedCik}/${accessionPath}/${accessionPath}-index.html`
+  }
+  return `https://www.sec.gov/Archives/edgar/data/${normalizedCik}/${accessionPath}/${primaryDocument}`
+}
+
+async function fetchSecFilingHits(account: AccountRow) {
+  const tickers = await loadSecCompanyTickers()
+  const match = findBestSecMatch(account, tickers)
+  if (!match) return [] as ResearchHit[]
+
+  const { response, text } = await fetchTextWithTimeout(`https://data.sec.gov/submissions/CIK${match.cik}.json`, {
+    headers: { 'User-Agent': WEB_USER_AGENT },
+  }, 15000)
+
+  if (!response.ok || !text) return [] as ResearchHit[]
+
+  let payload: any
+  try {
+    payload = JSON.parse(text)
+  } catch (error) {
+    console.warn('[Intelligence Brief] SEC submissions JSON parse failed:', error)
+    return [] as ResearchHit[]
+  }
+  const recent = payload?.filings?.recent
+  if (!recent?.form?.length) return [] as ResearchHit[]
+
+  const cutoffMs = Date.now() - (SEC_LOOKBACK_DAYS * 24 * 60 * 60 * 1000)
+  const filings = recent.form
+    .map((form: string, index: number) => ({
+      form: String(form || '').toUpperCase(),
+      filingDate: recent.filingDate?.[index] || '',
+      accessionNumber: recent.accessionNumber?.[index] || '',
+      primaryDocument: recent.primaryDocument?.[index] || '',
+      primaryDocDescription: recent.primaryDocDescription?.[index] || '',
+      reportDate: recent.reportDate?.[index] || '',
+    }))
+    .filter((filing: any) => SEC_FILING_FORMS.has(filing.form) && filing.filingDate)
+    .filter((filing: any) => {
+      const parsed = new Date(filing.filingDate)
+      return !Number.isNaN(parsed.getTime()) && parsed.getTime() >= cutoffMs
+    })
+    .sort((a: any, b: any) => String(b.filingDate).localeCompare(String(a.filingDate)))
+    .slice(0, 5)
+
+  const candidates = await Promise.all(filings.map(async (filing: any) => {
+    try {
+      const filingUrl = buildSecFilingUrl(match.cik, filing.accessionNumber, filing.primaryDocument)
+      if (!filingUrl) return null
+
+      const bucket = {
+        priority: inferSignalPriority(`${filing.form} ${filing.primaryDocDescription || ''} ${filing.primaryDocument || ''}`, 1),
+        label: `SEC ${filing.form}`,
+        query: `SEC filing ${match.title}`,
+      }
+
+      const hit = await fetchPageHit(filingUrl, bucket, 'sec', `${filing.form} filing`)
+      if (!hit) return null
+
+      const combinedText = `${hit.title} ${hit.snippet} ${filing.primaryDocDescription || ''}`
+      return {
+        ...hit,
+        priority: inferSignalPriority(combinedText, hit.priority),
+        title: `${filing.form} filing - ${match.title}`,
+        snippet: hit.snippet || filing.primaryDocDescription || '',
+        source: 'SEC EDGAR',
+      } satisfies ResearchHit
+    } catch (error) {
+      console.warn('[Intelligence Brief] SEC filing fetch failed:', error)
+      return null
+    }
+  }))
+
+  return dedupeAndSort(candidates.filter(Boolean) as ResearchHit[])
+}
+
+async function fetchSecSearchHits(account: AccountRow) {
+  return fetchDuckDuckGoHits(buildSecBuckets(account).slice(0, 4), 'sec', 3)
+}
+
+async function fetchLinkedInHits(account: AccountRow) {
+  const hits: ResearchHit[] = []
+  const directLinkedInUrl = cleanText(account.linkedin_url)
+
+  if (directLinkedInUrl) {
+    try {
+      const directBucket = {
+        priority: 3,
+        label: 'LinkedIn Company Page',
+        query: directLinkedInUrl,
+      }
+      const directHit = await fetchPageHit(directLinkedInUrl, directBucket, 'linkedin', `${account.name || 'LinkedIn'} page`)
+      if (directHit) {
+        hits.push(directHit)
+      }
+    } catch (error) {
+      console.warn('[Intelligence Brief] LinkedIn direct page fetch failed:', error)
+    }
+  }
+
+  const searchHits = await fetchDuckDuckGoHits(buildLinkedInBuckets(account), 'linkedin', 3)
+  hits.push(...searchHits)
+  return dedupeAndSort(hits)
+}
+
+async function fetchGeneralWebHits(account: AccountRow) {
+  return fetchDuckDuckGoHits(buildSearchBuckets(account), 'web', 4)
+}
+
+async function collectResearchCandidates(account: AccountRow) {
+  const buckets = buildSearchBuckets(account)
+  const settled = (await Promise.allSettled([
+    (async () => {
+      const rssResults = await Promise.all(buckets.map(async (bucket) => {
+        const url = `https://news.google.com/rss/search?q=${encodeURIComponent(bucket.query)}&hl=en-US&gl=US&ceid=US:en`
+        try {
+          const { response, text } = await fetchTextWithTimeout(url, { headers: { 'User-Agent': WEB_USER_AGENT } }, 12000)
+          if (!response.ok || !text) return [] as ResearchHit[]
+          return parseRssItems(text, bucket, 3)
+        } catch (error) {
+          console.warn('[Intelligence Brief] RSS fetch failed for bucket:', bucket.label, error)
+          return [] as ResearchHit[]
+        }
+      }))
+      return dedupeAndSort(rssResults.flat())
+    })(),
+    fetchGeneralWebHits(account),
+    fetchLinkedInHits(account),
+    fetchSecSearchHits(account),
+    fetchSecFilingHits(account),
+  ])) as PromiseSettledResult<ResearchHit[]>[]
+
+  const [newsHits, webHits, linkedInHits, secSearchHits, secFilingHits] = settled.map((result: PromiseSettledResult<ResearchHit[]>) => (
+    result.status === 'fulfilled' ? result.value : []
+  )) as [ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[]]
+
+  return dedupeAndSort([...newsHits, ...webHits, ...linkedInHits, ...secSearchHits, ...secFilingHits])
 }
 
 function serializeAccount(account: AccountRow) {
@@ -263,12 +792,13 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
     throw new Error('OPEN_ROUTER_API_KEY is not configured')
   }
 
-  const selectedCandidates = candidates.slice(0, 12)
+  const selectedCandidates = candidates.slice(0, 16)
   const researchPayload = {
     account: {
       name: account.name || '',
       industry: account.industry || '',
       domain: account.domain || '',
+      linkedin_url: account.linkedin_url || '',
       city: account.city || '',
       state: account.state || '',
     },
@@ -289,16 +819,18 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
       snippet: item.snippet,
       published_at: item.publishedAt,
       source: item.source,
+      source_kind: item.sourceKind,
     })),
   }
 
   const prompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
 
-Use ONLY the research payload below. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, or any source platform in the final output.
+Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.
 
 Decision rules:
 - Pick ONE signal only.
 - Use the highest-priority signal supported by the research results.
+- If a SEC filing or LinkedIn result confirms the same event, prefer it over a generic web snippet.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be first-person and sound like an energy broker who did the homework.
@@ -439,22 +971,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   }
 
-  const buckets = buildSearchBuckets(account)
-  const headers = { 'User-Agent': 'NodalPointCRM/1.0' }
-  const fetchPromises = buckets.map(async (bucket) => {
-    const url = `https://news.google.com/rss/search?q=${encodeURIComponent(bucket.query)}&hl=en-US&gl=US&ceid=US:en`
-    try {
-      const { response, text } = await fetchTextWithTimeout(url, { headers }, 12000)
-      if (!response.ok || !text) return [] as ResearchHit[]
-      return parseRssItems(text, bucket, 3)
-    } catch (error) {
-      console.warn('[Intelligence Brief] RSS fetch failed for bucket:', bucket.label, error)
-      return [] as ResearchHit[]
-    }
-  })
-
-  const bucketResults = await Promise.all(fetchPromises)
-  const candidateResults = dedupeAndSort(bucketResults.flat())
+  const candidateResults = await collectResearchCandidates(account)
 
   let outcomeStatus: BriefStatus = 'empty'
   let validated: ReturnType<typeof validateBriefResult> = null
