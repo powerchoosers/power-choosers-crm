@@ -917,123 +917,131 @@ ${JSON.stringify(researchPayload, null, 2)}`
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, message: 'Method not allowed' })
-  }
+  try {
+    if (req.method !== 'POST') {
+      return res.status(405).json({ ok: false, message: 'Method not allowed' })
+    }
 
-  const auth = await requireUser(req)
-  if (!auth.user) {
-    return res.status(401).json({ ok: false, message: 'Unauthorized' })
-  }
+    const auth = await requireUser(req)
+    if (!auth.user) {
+      return res.status(401).json({ ok: false, message: 'Unauthorized' })
+    }
 
-  const accountIdRaw = Array.isArray(req.query.accountId) ? req.query.accountId[0] : req.query.accountId
-  const accountId = cleanText(accountIdRaw)
+    const accountIdRaw = Array.isArray(req.query.accountId) ? req.query.accountId[0] : req.query.accountId
+    const accountId = cleanText(accountIdRaw)
 
-  if (!accountId) {
-    return res.status(400).json({ ok: false, message: 'Missing account ID' })
-  }
+    if (!accountId) {
+      return res.status(400).json({ ok: false, message: 'Missing account ID' })
+    }
 
-  const { data: account, error: accountError } = await supabaseAdmin
-    .from('accounts')
-    .select(ACCOUNT_SELECT)
-    .eq('id', accountId)
-    .maybeSingle()
+    const { data: account, error: accountError } = await supabaseAdmin
+      .from('accounts')
+      .select(ACCOUNT_SELECT)
+      .eq('id', accountId)
+      .maybeSingle()
 
-  if (accountError) {
-    console.error('[Intelligence Brief] Account fetch failed:', accountError)
-    return res.status(500).json({ ok: false, message: 'Failed to load account', detail: accountError.message })
-  }
+    if (accountError) {
+      console.error('[Intelligence Brief] Account fetch failed:', accountError)
+      return res.status(200).json({ ok: false, message: FALLBACK_MESSAGE, detail: accountError.message })
+    }
 
-  if (!account) {
-    return res.status(404).json({ ok: false, message: 'Account not found' })
-  }
+    if (!account) {
+      return res.status(404).json({ ok: false, message: 'Account not found' })
+    }
 
-  const privileged = auth.isAdmin || auth.role === 'dev'
-  const ownerScopeValues = buildOwnerScopeValues(auth.user)
-  const accountOwner = cleanText(account.ownerId).toLowerCase()
-  const allowed = privileged || !accountOwner || ownerScopeValues.map((value) => value.toLowerCase()).includes(accountOwner)
+    const privileged = auth.isAdmin || auth.role === 'dev'
+    const ownerScopeValues = buildOwnerScopeValues(auth.user)
+    const accountOwner = cleanText(account.ownerId).toLowerCase()
+    const allowed = privileged || !accountOwner || ownerScopeValues.map((value) => value.toLowerCase()).includes(accountOwner)
 
-  if (!allowed) {
-    return res.status(403).json({ ok: false, message: 'You do not have access to refresh this account' })
-  }
+    if (!allowed) {
+      return res.status(403).json({ ok: false, message: 'You do not have access to refresh this account' })
+    }
 
-  const lastRefreshAt = account.intelligence_brief_last_refreshed_at
-  if (lastRefreshAt) {
-    const age = Date.now() - new Date(lastRefreshAt).getTime()
-    if (Number.isFinite(age) && age < COOLDOWN_MS) {
-      const retryAfterMinutes = Math.max(1, Math.ceil((COOLDOWN_MS - age) / (60 * 1000)))
-      return res.status(429).json({
-        ok: false,
-        message: `This account was refreshed recently. Try again in about ${retryAfterMinutes} minute${retryAfterMinutes === 1 ? '' : 's'}.`,
-        retryAfterMinutes,
-        account: serializeAccount(account),
+    const lastRefreshAt = account.intelligence_brief_last_refreshed_at
+    if (lastRefreshAt) {
+      const age = Date.now() - new Date(lastRefreshAt).getTime()
+      if (Number.isFinite(age) && age < COOLDOWN_MS) {
+        const retryAfterMinutes = Math.max(1, Math.ceil((COOLDOWN_MS - age) / (60 * 1000)))
+        return res.status(429).json({
+          ok: false,
+          message: `This account was refreshed recently. Try again in about ${retryAfterMinutes} minute${retryAfterMinutes === 1 ? '' : 's'}.`,
+          retryAfterMinutes,
+          account: serializeAccount(account),
+        })
+      }
+    }
+
+    const candidateResults = await collectResearchCandidates(account)
+
+    let outcomeStatus: BriefStatus = 'empty'
+    let validated: ReturnType<typeof validateBriefResult> = null
+    let generatedBrief: ReturnType<typeof validateBriefResult> = null
+
+    if (candidateResults.length > 0) {
+      try {
+        generatedBrief = await runOpenRouterResearch(account, candidateResults)
+        if (generatedBrief) {
+          outcomeStatus = 'ready'
+          validated = generatedBrief
+        } else {
+          outcomeStatus = 'empty'
+        }
+      } catch (error) {
+        console.error('[Intelligence Brief] OpenRouter research failed:', error)
+        outcomeStatus = 'error'
+      }
+    } else {
+      outcomeStatus = 'empty'
+    }
+
+    const updatePayload: Record<string, unknown> = {
+      intelligence_brief_status: outcomeStatus,
+      intelligence_brief_last_refreshed_at: new Date().toISOString(),
+    }
+
+    if (validated) {
+      updatePayload.intelligence_brief_headline = validated.signal_headline
+      updatePayload.intelligence_brief_detail = validated.signal_detail
+      updatePayload.intelligence_brief_talk_track = validated.talk_track
+      updatePayload.intelligence_brief_signal_date = validated.signal_date
+      updatePayload.intelligence_brief_source_url = validated.source_url
+      updatePayload.intelligence_brief_confidence_level = validated.confidence_level
+    }
+
+    const { data: updatedAccount, error: updateError } = await supabaseAdmin
+      .from('accounts')
+      .update(updatePayload)
+      .eq('id', accountId)
+      .select(ACCOUNT_SELECT)
+      .single()
+
+    if (updateError) {
+      console.error('[Intelligence Brief] Account update failed:', updateError)
+      return res.status(200).json({ ok: false, message: FALLBACK_MESSAGE, detail: updateError.message, account: serializeAccount(account) })
+    }
+
+    const serialized = serializeAccount(updatedAccount as AccountRow)
+
+    if (validated) {
+      return res.status(200).json({
+        ok: true,
+        message: 'Intelligence brief refreshed.',
+        brief: validated,
+        account: serialized,
       })
     }
-  }
 
-  const candidateResults = await collectResearchCandidates(account)
-
-  let outcomeStatus: BriefStatus = 'empty'
-  let validated: ReturnType<typeof validateBriefResult> = null
-  let generatedBrief: ReturnType<typeof validateBriefResult> = null
-
-  if (candidateResults.length > 0) {
-    try {
-      generatedBrief = await runOpenRouterResearch(account, candidateResults)
-      if (generatedBrief) {
-        outcomeStatus = 'ready'
-        validated = generatedBrief
-      } else {
-        outcomeStatus = 'empty'
-      }
-    } catch (error) {
-      console.error('[Intelligence Brief] OpenRouter research failed:', error)
-      outcomeStatus = 'error'
-    }
-  } else {
-    outcomeStatus = 'empty'
-  }
-
-  const updatePayload: Record<string, unknown> = {
-    intelligence_brief_status: outcomeStatus,
-    intelligence_brief_last_refreshed_at: new Date().toISOString(),
-  }
-
-  if (validated) {
-    updatePayload.intelligence_brief_headline = validated.signal_headline
-    updatePayload.intelligence_brief_detail = validated.signal_detail
-    updatePayload.intelligence_brief_talk_track = validated.talk_track
-    updatePayload.intelligence_brief_signal_date = validated.signal_date
-    updatePayload.intelligence_brief_source_url = validated.source_url
-    updatePayload.intelligence_brief_confidence_level = validated.confidence_level
-  }
-
-  const { data: updatedAccount, error: updateError } = await supabaseAdmin
-    .from('accounts')
-    .update(updatePayload)
-    .eq('id', accountId)
-    .select(ACCOUNT_SELECT)
-    .single()
-
-  if (updateError) {
-    console.error('[Intelligence Brief] Account update failed:', updateError)
-    return res.status(500).json({ ok: false, message: 'Failed to store intelligence brief', detail: updateError.message })
-  }
-
-  const serialized = serializeAccount(updatedAccount as AccountRow)
-
-  if (validated) {
     return res.status(200).json({
-      ok: true,
-      message: 'Intelligence brief refreshed.',
-      brief: validated,
+      ok: false,
+      message: FALLBACK_MESSAGE,
       account: serialized,
     })
+  } catch (error) {
+    console.error('[Intelligence Brief] Unexpected handler failure:', error)
+    return res.status(200).json({
+      ok: false,
+      message: FALLBACK_MESSAGE,
+    })
   }
-
-  return res.status(200).json({
-    ok: false,
-    message: FALLBACK_MESSAGE,
-    account: serialized,
-  })
 }
