@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High Confidence Signals Vol. 3 - News & Structural Signals</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0b;
+            color: #fafafa;
+            line-height: 1.6;
+            padding: 0;
+        }
+        
+        .page {
+            width: 8.5in;
+            min-height: 11in;
+            margin: 0 auto;
+            background: #0a0a0b;
+            padding: 0.75in;
+            page-break-after: always;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .logo {
+            height: 48px;
+        }
+        
+        .header-meta {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #a1a1aa;
+        }
+        
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #fafafa;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+        
+        .intro {
+            background: rgba(9, 9, 11, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+        }
+        
+        .intro p {
+            color: #a1a1aa;
+            font-size: 0.95rem;
+        }
+        
+        .company-card {
+            background: rgba(9, 9, 11, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+            page-break-inside: avoid;
+        }
+        
+        .company-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .company-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #002FA7;
+        }
+        
+        .company-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fafafa;
+        }
+        
+        .company-location {
+            color: #a1a1aa;
+            font-size: 0.9rem;
+        }
+        
+        .section {
+            margin-bottom: 1rem;
+        }
+        
+        .section-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #71717a;
+            margin-bottom: 0.5rem;
+        }
+        
+        .section-content {
+            color: #d4d4d8;
+            font-size: 0.9rem;
+        }
+        
+        .metric {
+            font-family: 'JetBrains Mono', monospace;
+            color: #fafafa;
+            font-weight: 500;
+        }
+        
+        .signal-tag {
+            display: inline-block;
+            background: rgba(0, 47, 167, 0.15);
+            color: #002FA7;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+        
+        .talk-track {
+            background: rgba(0, 47, 167, 0.08);
+            border-left: 3px solid #002FA7;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 4px;
+        }
+        
+        .talk-track-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #002FA7;
+            margin-bottom: 0.5rem;
+        }
+        
+        .talk-track-content {
+            color: #e4e4e7;
+            font-size: 0.9rem;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        
+        .strategic-pattern {
+            background: rgba(9, 9, 11, 0.9);
+            border: 2px solid #002FA7;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 8px;
+            page-break-inside: avoid;
+        }
+        
+        .pattern-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #002FA7;
+            margin-bottom: 1rem;
+        }
+        
+        ul {
+            margin-left: 1.25rem;
+            color: #d4d4d8;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+        }
+        
+        strong {
+            color: #fafafa;
+            font-weight: 600;
+        }
+        
+        @media print {
+            body {
+                background: #0a0a0b;
+            }
+            .page {
+                margin: 0;
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <img src="../images/nodalpoint.png" alt="Nodal Point" class="logo">
+            <div class="header-meta">
+                <div>VOL. 3</div>
+                <div>NEWS & STRUCTURAL SIGNALS</div>
+            </div>
+        </div>
+        
+        <h1>High Confidence – News & Structural Signals</h1>
+        
+        <div class="intro">
+            <p>This volume focuses only on <strong>hard signals</strong> you can reference in calls and emails: recent acquisitions, equipment investments, and growth moves that show you're paying attention to each company's world.</p>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">1)</span>
+                <div>
+                    <span class="company-name">AirBorn Inc.</span>
+                    <span class="company-location">– Georgetown, TX (airborn.com)</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    Controller + CFO in your High Confidence list; <span class="metric">750 employees</span>, <span class="metric">$300M revenue</span> in your data.
+                </div>
+            </div>
+            
+            <span class="signal-tag">ACQUISITION CLOSED Q1 2025</span>
+            
+            <div class="section">
+                <div class="section-label">Big Change</div>
+                <div class="section-content">
+                    In late 2024, connector giant <strong>Molex</strong> (a Koch subsidiary) announced an agreement to acquire AirBorn, an employee-owned company headquartered in Georgetown, TX, specializing in rugged connectors for aerospace, defense, space, medical, and industrial OEMs. The acquisition closed in early 2025 and now forms the core of Molex's new <strong>Aerospace & Defense Division</strong>, with combined headcount over 50,000 across 85 plants.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why This Matters</div>
+                <div class="section-content">
+                    Moving from employee-owned to being part of Molex/Koch is a huge cultural and structural shift; they'll be under new reporting structures, integration timelines, and margin expectations.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Talk Track Snippet</div>
+                <div class="talk-track-content">
+                    "I saw Molex completed the acquisition of AirBorn and that your Georgetown operation is now at the center of their new Aerospace & Defense division. When any aerospace plant integrates into a larger portfolio, energy is one of the easiest operating costs to bring under tighter control – have you had anyone benchmark the Georgetown facility's ERCOT contracts post-deal?"
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">2)</span>
+                <div>
+                    <span class="company-name">AGE Industries Ltd.</span>
+                    <span class="company-location">– Cleburne, TX (ageindustries.com)</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    Owner + CFO in your High Confidence list; <span class="metric">125 employees</span>, <span class="metric">$300M revenue</span> in your data.
+                </div>
+            </div>
+            
+            <span class="signal-tag">EQUIPMENT EXPANSION 2024</span>
+            
+            <div class="section">
+                <div class="section-label">Hard Signal – New Equipment & Capacity Expansion</div>
+                <div class="section-content">
+                    AGE announced the addition of <strong>two flexo folder-gluers, two unitizers, an automated stitcher, and a new scrap-handling system</strong> at its Texas plants. These upgrades increase efficiency, throughput per shift, and reduce forklift movements – effectively increasing production capacity within the same footprint.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Scale Context</div>
+                <div class="section-content">
+                    LinkedIn company profile notes <strong>over 800,000 sq ft of manufacturing and warehousing</strong> across Texas, serving five states and two countries in packaging and containers.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why This Matters</div>
+                <div class="section-content">
+                    More machines and higher throughput mean more connected load and likely higher peak demand; the new scrap system also changes how and when motors and conveyors run.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Talk Track Snippet</div>
+                <div class="talk-track-content">
+                    "I noticed you recently invested in new flexo folder-gluers and scrap-handling systems across your Texas plants, and you're running over 800,000 sq ft of manufacturing space. When you increase throughput like that, your load shape changes – have you revisited your ERCOT contracts to match the new demand profile?"
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="page">
+        <div class="header">
+            <img src="../images/nodalpoint.png" alt="Nodal Point" class="logo">
+            <div class="header-meta">
+                <div>VOL. 3</div>
+                <div>PAGE 2</div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">3)</span>
+                <div>
+                    <span class="company-name">Albers Aerospace</span>
+                    <span class="company-location">– McKinney, TX (albers.aero)</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    Multiple CFO contacts in your High Confidence list; <span class="metric">350 employees</span>, <span class="metric">$75M revenue</span> in your data.
+                </div>
+            </div>
+            
+            <span class="signal-tag">ACQUISITION SPREE 2024-2025</span>
+            
+            <div class="section">
+                <div class="section-label">Hard Signal – Acquisition Spree & Expanded Capabilities</div>
+                <div class="section-content">
+                    <ul>
+                        <li><strong>Nov 2024:</strong> Albers announced acquisitions of <strong>Advanced Packaging Inc.</strong> and <strong>Impact Case & Container</strong>, adding specialized protective case and storage manufacturing to its portfolio and increasing manufacturing capacity.</li>
+                        <li><strong>Feb 2025:</strong> Announced acquisition of <strong>Parallel Ventures</strong>, further strengthening aerospace manufacturing capabilities and machining depth.</li>
+                        <li><strong>Feb 2024:</strong> Acquisition of <strong>Onepath Systems LLC</strong>, an 18-year DoD contractor for turnkey installation and technical integration, which becomes a wholly owned subsidiary under the Defense Division.</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why This Matters</div>
+                <div class="section-content">
+                    Multiple acquisitions in 12–18 months = integration work, consolidation of facilities, possible new Texas production or integration sites, and intense focus from CFO on cost control and synergy realization.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Talk Track Snippet</div>
+                <div class="talk-track-content">
+                    "You've been busy – between the Advanced Packaging, Impact Case & Container, Parallel Ventures and Onepath deals, Albers' manufacturing and integration footprint has changed a lot in the last year. In every integration I've seen, energy spend at the core plants becomes a lever for hitting synergy targets – where are you today on locking in ERCOT pricing for your McKinney operations?"
+                </div>
+            </div>
+        </div>
+        
+        <div class="strategic-pattern">
+            <div class="pattern-title">4) Strategic Pattern You Can Point To</div>
+            
+            <div class="section">
+                <div class="section-label">Common Theme</div>
+                <div class="section-content">
+                    <strong>All three are mid-market industrials in Texas that have gone through meaningful structural change</strong> in the last 24 months – either being acquired (AirBorn), investing heavily in equipment (AGE), or acquiring others (Albers).
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">How to Phrase It</div>
+                <div class="talk-track-content">
+                    "A lot of Texas industrial manufacturers like AirBorn, AGE Industries, and Albers Aerospace have been through major structural changes lately – acquisitions, new divisions, and large equipment upgrades. We've found that's exactly when it makes sense to take a fresh look at ERCOT contracts because your usage pattern and risk profile are no longer what they were when you originally signed your deals."
+                </div>
+            </div>
+        </div>
+        
+        <div class="intro">
+            <div class="section-label">Suggested Usage</div>
+            <p>Use this brief when emailing or calling <strong>AirBorn, AGE Industries, or Albers Aerospace</strong> – open by referencing the specific move (Molex acquisition, new flexo equipment, or recent M&A) so it's obvious you've done your homework.</p>
+        </div>
+    </div>
+</body>
+</html>
