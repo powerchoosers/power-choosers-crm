@@ -76,16 +76,49 @@ function normalizeRevealedPhones(entries: PhoneEntry[]): RevealedPhone[] {
   return out;
 }
 
-function assignRevealedPhonesToContactFields(phones: RevealedPhone[]) {
+function assignRevealedPhonesToContactFields(phones: RevealedPhone[], existingPhones?: {
+  mobile?: string;
+  workPhone?: string;
+  otherPhone?: string;
+  companyPhone?: string;
+}) {
   const patch: Record<string, string> = {};
   const extras: RevealedPhone[] = [];
+  
+  // Normalize existing phone numbers for comparison
+  const normalizeForComparison = (num: string | undefined) => {
+    if (!num) return '';
+    return num.replace(/\D/g, '');
+  };
+  
+  const existingNormalized = {
+    mobile: normalizeForComparison(existingPhones?.mobile),
+    workPhone: normalizeForComparison(existingPhones?.workPhone),
+    otherPhone: normalizeForComparison(existingPhones?.otherPhone),
+    companyPhone: normalizeForComparison(existingPhones?.companyPhone)
+  };
+  
   const slotsUsed = {
-    mobile: false,
-    work_direct: false,
-    other: false
+    mobile: !!existingPhones?.mobile,
+    work_direct: !!existingPhones?.workPhone,
+    other: !!existingPhones?.otherPhone
   };
 
   for (const phone of phones) {
+    const normalizedPhone = normalizeForComparison(phone.number);
+    
+    // Check if this phone already exists in any slot
+    const alreadyExists = 
+      normalizedPhone === existingNormalized.mobile ||
+      normalizedPhone === existingNormalized.workPhone ||
+      normalizedPhone === existingNormalized.otherPhone ||
+      normalizedPhone === existingNormalized.companyPhone;
+    
+    if (alreadyExists) {
+      // Phone already exists, skip it to preserve existing data
+      continue;
+    }
+    
     const t = (phone.type || '').toLowerCase();
     if (t.includes('mobile')) {
       if (!slotsUsed.mobile) {
@@ -116,11 +149,20 @@ function assignRevealedPhonesToContactFields(phones: RevealedPhone[]) {
     }
   }
 
-  if (!patch.mobile && phones[0]?.number) {
-    patch.mobile = phones[0].number;
+  // Only set fallback phone if no existing phone and no mobile was set
+  if (!existingPhones?.mobile && !patch.mobile && phones[0]?.number) {
+    const normalizedFirst = normalizeForComparison(phones[0].number);
+    const firstAlreadyExists = 
+      normalizedFirst === existingNormalized.workPhone ||
+      normalizedFirst === existingNormalized.otherPhone ||
+      normalizedFirst === existingNormalized.companyPhone;
+    
+    if (!firstAlreadyExists) {
+      patch.mobile = phones[0].number;
+    }
   }
 
-  if (!patch.phone) {
+  if (!existingPhones?.mobile && !patch.phone) {
     patch.phone = patch.mobile || phones[0]?.number || patch.workPhone || patch.otherPhone || '';
   }
 
@@ -1309,6 +1351,25 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       // 2. Insert or Update Supabase
       // Use contact's own city/state (person location), not company location. LinkedIn from enriched or person.
       let crmId = person.crmId;
+      
+      // Fetch existing contact phones if we have a crmId to preserve them
+      let existingPhones: { mobile?: string; workPhone?: string; otherPhone?: string; companyPhone?: string } | undefined;
+      if (crmId) {
+        const { data: existingContact } = await supabase
+          .from('contacts')
+          .select('mobile, workPhone, otherPhone, companyPhone')
+          .eq('id', crmId)
+          .maybeSingle();
+        if (existingContact) {
+          existingPhones = {
+            mobile: existingContact.mobile || undefined,
+            workPhone: existingContact.workPhone || undefined,
+            otherPhone: existingContact.otherPhone || undefined,
+            companyPhone: existingContact.companyPhone || undefined
+          };
+        }
+      }
+      
       const contactCity = (enriched as { city?: string }).city ?? person.location?.split(',')[0]?.trim() ?? null;
       const contactState = (enriched as { state?: string }).state ?? (person.location?.includes(',') ? person.location.split(',')[1]?.trim() : null) ?? null;
       const linkedinUrl = (enriched as { linkedin?: string }).linkedin || person.linkedin || null;
@@ -1320,7 +1381,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         })
         .filter(Boolean) as PhoneEntry[];
       const immediatePhones = normalizeRevealedPhones(rawImmediatePhones);
-      const assignedImmediatePhones = assignRevealedPhonesToContactFields(immediatePhones);
+      const assignedImmediatePhones = assignRevealedPhonesToContactFields(immediatePhones, existingPhones);
       const enrichedIdentity = buildIdentityName({
         name: enriched.fullName,
         firstName: enriched.firstName,
@@ -1404,18 +1465,29 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (!crmId && contactEmail && contactEmail !== 'N/A') {
           const { data: byEmail } = await supabase
             .from('contacts')
-            .select('id, metadata')
+            .select('id, metadata, mobile, workPhone, otherPhone, companyPhone')
             .eq('accountId', accountId)
             .ilike('email', contactEmail)
             .maybeSingle();
           if (byEmail?.id) {
             crmId = byEmail.id;
+            existingPhones = {
+              mobile: byEmail.mobile || undefined,
+              workPhone: byEmail.workPhone || undefined,
+              otherPhone: byEmail.otherPhone || undefined,
+              companyPhone: byEmail.companyPhone || undefined
+            };
+            // Re-assign phones with existing phone context
+            const reassignedPhones = assignRevealedPhonesToContactFields(immediatePhones, existingPhones);
+            Object.assign(contactData, reassignedPhones.patch);
             // Preserve existing metadata when updating
             const existingMetadata = isRecord(byEmail.metadata) ? byEmail.metadata : {};
             contactData.metadata = {
               ...existingMetadata,
               ...(contactData.metadata as Record<string, unknown>),
-              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {}),
+              apollo_revealed_phones: immediatePhones,
+              apollo_overflow_phones: reassignedPhones.extras
             };
           }
         }
@@ -1424,17 +1496,27 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (!crmId) {
           const { data: byApolloId } = await supabase
             .from('contacts')
-            .select('id, metadata')
+            .select('id, metadata, mobile, workPhone, otherPhone, companyPhone')
             .eq('accountId', accountId)
             .eq('metadata->>apollo_person_id', person.id)
             .maybeSingle();
           if (byApolloId?.id) {
             crmId = byApolloId.id;
+            existingPhones = {
+              mobile: byApolloId.mobile || undefined,
+              workPhone: byApolloId.workPhone || undefined,
+              otherPhone: byApolloId.otherPhone || undefined,
+              companyPhone: byApolloId.companyPhone || undefined
+            };
+            const reassignedPhones = assignRevealedPhonesToContactFields(immediatePhones, existingPhones);
+            Object.assign(contactData, reassignedPhones.patch);
             const existingMetadata = isRecord(byApolloId.metadata) ? byApolloId.metadata : {};
             contactData.metadata = {
               ...existingMetadata,
               ...(contactData.metadata as Record<string, unknown>),
-              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {}),
+              apollo_revealed_phones: immediatePhones,
+              apollo_overflow_phones: reassignedPhones.extras
             };
           }
         }
@@ -1444,17 +1526,27 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           const linkedinPattern = `%${linkedinLookup.split('linkedin.com/').pop() || linkedinLookup}%`;
           const { data: byLinkedin } = await supabase
             .from('contacts')
-            .select('id, metadata')
+            .select('id, metadata, mobile, workPhone, otherPhone, companyPhone')
             .eq('accountId', accountId)
             .ilike('linkedinUrl', linkedinPattern)
             .maybeSingle();
           if (byLinkedin?.id) {
             crmId = byLinkedin.id;
+            existingPhones = {
+              mobile: byLinkedin.mobile || undefined,
+              workPhone: byLinkedin.workPhone || undefined,
+              otherPhone: byLinkedin.otherPhone || undefined,
+              companyPhone: byLinkedin.companyPhone || undefined
+            };
+            const reassignedPhones = assignRevealedPhonesToContactFields(immediatePhones, existingPhones);
+            Object.assign(contactData, reassignedPhones.patch);
             const existingMetadata = isRecord(byLinkedin.metadata) ? byLinkedin.metadata : {};
             contactData.metadata = {
               ...existingMetadata,
               ...(contactData.metadata as Record<string, unknown>),
-              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {}),
+              apollo_revealed_phones: immediatePhones,
+              apollo_overflow_phones: reassignedPhones.extras
             };
           }
         }
@@ -1463,18 +1555,28 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (!crmId && resolvedIdentity.firstName && resolvedIdentity.lastName) {
           const { data: byName } = await supabase
             .from('contacts')
-            .select('id, metadata')
+            .select('id, metadata, mobile, workPhone, otherPhone, companyPhone')
             .eq('accountId', accountId)
             .ilike('firstName', resolvedIdentity.firstName)
             .ilike('lastName', resolvedIdentity.lastName)
             .maybeSingle();
           if (byName?.id) {
             crmId = byName.id;
+            existingPhones = {
+              mobile: byName.mobile || undefined,
+              workPhone: byName.workPhone || undefined,
+              otherPhone: byName.otherPhone || undefined,
+              companyPhone: byName.companyPhone || undefined
+            };
+            const reassignedPhones = assignRevealedPhonesToContactFields(immediatePhones, existingPhones);
+            Object.assign(contactData, reassignedPhones.patch);
             const existingMetadata = isRecord(byName.metadata) ? byName.metadata : {};
             contactData.metadata = {
               ...existingMetadata,
               ...(contactData.metadata as Record<string, unknown>),
-              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {}),
+              apollo_revealed_phones: immediatePhones,
+              apollo_overflow_phones: reassignedPhones.extras
             };
           }
         }
@@ -1621,13 +1723,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               const incoming = normalizeRevealedPhones(incomingRaw);
               if (incoming.length === 0) return;
 
-              const assignedIncomingPhones = assignRevealedPhonesToContactFields(incoming);
-
               const { data: existingContact } = await supabase
                 .from('contacts')
-                .select('metadata')
+                .select('metadata, mobile, workPhone, otherPhone, companyPhone')
                 .eq('id', crmId)
                 .maybeSingle();
+
+              const existingPhones = existingContact ? {
+                mobile: existingContact.mobile || undefined,
+                workPhone: existingContact.workPhone || undefined,
+                otherPhone: existingContact.otherPhone || undefined,
+                companyPhone: existingContact.companyPhone || undefined
+              } : undefined;
+
+              const assignedIncomingPhones = assignRevealedPhonesToContactFields(incoming, existingPhones);
 
               const existingMetadata = isRecord(existingContact?.metadata) ? existingContact.metadata : {};
               const metadataPatch = {
