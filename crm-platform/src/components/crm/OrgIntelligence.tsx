@@ -1259,7 +1259,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       if (crmId) {
         const { data: currentContact } = await supabase
           .from('contacts')
-          .select('name, firstName, lastName')
+          .select('name, firstName, lastName, metadata')
           .eq('id', crmId)
           .maybeSingle();
 
@@ -1268,9 +1268,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           sanitizeContactText(currentContact?.firstName) ||
           sanitizeContactText(currentContact?.lastName);
 
+        // Preserve existing metadata (especially communicationSignals from bulk import)
+        const existingMetadata = isRecord(currentContact?.metadata) ? currentContact.metadata : {};
+        const mergedMetadata = {
+          ...existingMetadata,
+          ...(contactBaseData.metadata as Record<string, unknown>),
+          // Preserve communicationSignals if they exist (from Seamless AI import)
+          ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+        };
+
         const updateData = hasExistingName
-          ? contactBaseData
-          : { ...contactBaseData, ...contactIdentityPatch };
+          ? { ...contactBaseData, metadata: mergedMetadata }
+          : { ...contactBaseData, ...contactIdentityPatch, metadata: mergedMetadata };
 
         const { error } = await supabase
           .from('contacts')
@@ -1285,12 +1294,19 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (!crmId && contactEmail && contactEmail !== 'N/A') {
           const { data: byEmail } = await supabase
             .from('contacts')
-            .select('id')
+            .select('id, metadata')
             .eq('accountId', accountId)
             .ilike('email', contactEmail)
             .maybeSingle();
           if (byEmail?.id) {
             crmId = byEmail.id;
+            // Preserve existing metadata when updating
+            const existingMetadata = isRecord(byEmail.metadata) ? byEmail.metadata : {};
+            contactData.metadata = {
+              ...existingMetadata,
+              ...(contactData.metadata as Record<string, unknown>),
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+            };
           }
         }
 
@@ -1298,12 +1314,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (!crmId) {
           const { data: byApolloId } = await supabase
             .from('contacts')
-            .select('id')
+            .select('id, metadata')
             .eq('accountId', accountId)
             .eq('metadata->>apollo_person_id', person.id)
             .maybeSingle();
           if (byApolloId?.id) {
             crmId = byApolloId.id;
+            const existingMetadata = isRecord(byApolloId.metadata) ? byApolloId.metadata : {};
+            contactData.metadata = {
+              ...existingMetadata,
+              ...(contactData.metadata as Record<string, unknown>),
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+            };
           }
         }
 
@@ -1312,12 +1334,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           const linkedinPattern = `%${linkedinLookup.split('linkedin.com/').pop() || linkedinLookup}%`;
           const { data: byLinkedin } = await supabase
             .from('contacts')
-            .select('id')
+            .select('id, metadata')
             .eq('accountId', accountId)
             .ilike('linkedinUrl', linkedinPattern)
             .maybeSingle();
           if (byLinkedin?.id) {
             crmId = byLinkedin.id;
+            const existingMetadata = isRecord(byLinkedin.metadata) ? byLinkedin.metadata : {};
+            contactData.metadata = {
+              ...existingMetadata,
+              ...(contactData.metadata as Record<string, unknown>),
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+            };
           }
         }
 
@@ -1325,13 +1353,19 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         if (!crmId && resolvedIdentity.firstName && resolvedIdentity.lastName) {
           const { data: byName } = await supabase
             .from('contacts')
-            .select('id')
+            .select('id, metadata')
             .eq('accountId', accountId)
             .ilike('firstName', resolvedIdentity.firstName)
             .ilike('lastName', resolvedIdentity.lastName)
             .maybeSingle();
           if (byName?.id) {
             crmId = byName.id;
+            const existingMetadata = isRecord(byName.metadata) ? byName.metadata : {};
+            contactData.metadata = {
+              ...existingMetadata,
+              ...(contactData.metadata as Record<string, unknown>),
+              ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
+            };
           }
         }
 

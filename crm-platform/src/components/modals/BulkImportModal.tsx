@@ -734,9 +734,15 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
           const communicationSignals = buildImportCommunicationSignals(row);
           
           let derivedCompanyPhone = formatPhoneNumber(mappedData.company_phone) || '';
+          let companyPhoneSignal = null;
           if (!derivedCompanyPhone && communicationSignals?.phones?.length) {
-            const companyPhoneSignal = communicationSignals.phones.find((p: any) => p.source?.toLowerCase().includes('company'));
+            companyPhoneSignal = communicationSignals.phones.find((p: any) => p.source?.toLowerCase().includes('company'));
             if (companyPhoneSignal) derivedCompanyPhone = formatPhoneNumber(companyPhoneSignal.value);
+          } else if (derivedCompanyPhone && communicationSignals?.phones?.length) {
+            // Find the signal for the mapped company phone to preserve its score
+            companyPhoneSignal = communicationSignals.phones.find((p: any) => 
+              formatPhoneNumber(p.value) === derivedCompanyPhone
+            );
           }
           
           if (companyName) {
@@ -800,6 +806,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                   annual_revenue: mappedData.company_annual_revenue || '',
                   ...importHeadcount.metadata,
                   source_company_fields: sourceCompanyFields,
+                  ...(companyPhoneSignal ? { companyPhoneSignal } : {})
                 }
               } as any);
             } else {
@@ -891,6 +898,7 @@ export function BulkImportModal({ isOpen, onClose, initialFile = null }: { isOpe
                     annual_revenue: mappedData.company_annual_revenue || '',
                     ...accountHeadcount.metadata,
                     source_company_fields: sourceCompanyFields,
+                    ...(companyPhoneSignal ? { companyPhoneSignal } : {}),
                     meters: (apolloData?.address || mappedData.company_address) ? [{
                       id: crypto.randomUUID(),
                       esiId: '',
