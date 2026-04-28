@@ -300,8 +300,67 @@ function coerceString(value: unknown): string {
 function normalizeAddressKey(value: unknown): string {
   return coerceString(value)
     .toLowerCase()
-    .replace(/[,\s]+/g, ' ')
+    // Normalize country variations FIRST (before other replacements)
+    .replace(/\bunited states of america\b/g, 'united states')
+    .replace(/\busa\b/g, 'united states')
+    .replace(/\bus\b(?=\s*$)/g, 'united states') // Only replace "us" at the end or standalone
+    .replace(/\bunited kingdom\b/g, 'uk')
+    // Normalize common abbreviations
+    .replace(/\bstreet\b/g, 'st')
+    .replace(/\bavenue\b/g, 'ave')
+    .replace(/\bboulevard\b/g, 'blvd')
+    .replace(/\bdrive\b/g, 'dr')
+    .replace(/\broad\b/g, 'rd')
+    .replace(/\blane\b/g, 'ln')
+    .replace(/\bcourt\b/g, 'ct')
+    .replace(/\bsuite\b/g, 'ste')
+    .replace(/\bapartment\b/g, 'apt')
+    .replace(/\bfloor\b/g, 'fl')
+    .replace(/\bnorth\b/g, 'n')
+    .replace(/\bsouth\b/g, 's')
+    .replace(/\beast\b/g, 'e')
+    .replace(/\bwest\b/g, 'w')
+    // Remove punctuation and normalize whitespace
+    .replace(/[,.\-#]/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
+}
+
+function addressSimilarity(addr1: string, addr2: string): number {
+  const key1 = normalizeAddressKey(addr1);
+  const key2 = normalizeAddressKey(addr2);
+  
+  if (!key1 || !key2) return 0;
+  if (key1 === key2) return 1;
+  
+  // Split into tokens
+  const tokens1 = new Set(key1.split(' ').filter(Boolean));
+  const tokens2 = new Set(key2.split(' ').filter(Boolean));
+  
+  // Calculate Jaccard similarity (intersection / union)
+  const intersection = new Set([...tokens1].filter(x => tokens2.has(x)));
+  const union = new Set([...tokens1, ...tokens2]);
+  
+  return intersection.size / union.size;
+}
+
+function findSimilarAddressIndex(
+  existingAddresses: ServiceAddressRecord[],
+  targetAddress: string,
+  threshold: number = 0.7
+): number {
+  let bestIndex = -1;
+  let bestScore = 0;
+  
+  existingAddresses.forEach((entry, index) => {
+    const score = addressSimilarity(entry.address, targetAddress);
+    if (score > bestScore && score >= threshold) {
+      bestScore = score;
+      bestIndex = index;
+    }
+  });
+  
+  return bestIndex;
 }
 
 function buildApolloFullAddress(company: ApolloCompany): string {
@@ -347,9 +406,33 @@ function mergeApolloAddressIntoMeters(existingMeters: MeterRecord[], fullAddress
   const addressKey = normalizeAddressKey(fullAddress);
   if (!addressKey) return existingMeters;
 
-  const alreadyPresent = existingMeters.some((meter) => normalizeAddressKey(meter.address) === addressKey);
-  if (alreadyPresent) return existingMeters;
+  // Check for exact match or high similarity (>= 0.8)
+  const SIMILARITY_THRESHOLD = 0.8;
+  let bestMatchIndex = -1;
+  let bestSimilarity = 0;
 
+  existingMeters.forEach((meter, index) => {
+    const existingKey = normalizeAddressKey(meter.address);
+    
+    // Exact match
+    if (existingKey === addressKey) {
+      bestMatchIndex = index;
+      bestSimilarity = 1;
+      return;
+    }
+    
+    // Similarity match
+    const similarity = addressSimilarity(meter.address, fullAddress);
+    if (similarity >= SIMILARITY_THRESHOLD && similarity > bestSimilarity) {
+      bestMatchIndex = index;
+      bestSimilarity = similarity;
+    }
+  });
+
+  // If we found a similar address, don't add duplicate
+  if (bestMatchIndex >= 0) return existingMeters;
+
+  // Check for blank address to fill
   const blankAddressIndex = existingMeters.findIndex((meter) => !normalizeAddressKey(meter.address));
   if (blankAddressIndex >= 0) {
     return existingMeters.map((meter, index) =>
@@ -359,6 +442,7 @@ function mergeApolloAddressIntoMeters(existingMeters: MeterRecord[], fullAddress
     );
   }
 
+  // No match and no blank - add as new meter
   return [
     ...existingMeters,
     {
@@ -433,13 +517,33 @@ function mergeApolloAddressIntoServiceAddresses(
     isPrimary: existingServiceAddresses.length === 0
   };
 
-  const existingIndex = existingServiceAddresses.findIndex(
-    (entry) => normalizeAddressKey(entry.address) === addressKey
-  );
+  // Find exact match or highly similar address (>= 0.8 similarity)
+  const SIMILARITY_THRESHOLD = 0.8;
+  let bestMatchIndex = -1;
+  let bestSimilarity = 0;
 
-  if (existingIndex >= 0) {
+  existingServiceAddresses.forEach((entry, index) => {
+    const existingKey = normalizeAddressKey(entry.address);
+    
+    // Exact match
+    if (existingKey === addressKey) {
+      bestMatchIndex = index;
+      bestSimilarity = 1;
+      return;
+    }
+    
+    // Similarity match
+    const similarity = addressSimilarity(entry.address, fullAddress);
+    if (similarity >= SIMILARITY_THRESHOLD && similarity > bestSimilarity) {
+      bestMatchIndex = index;
+      bestSimilarity = similarity;
+    }
+  });
+
+  // If we found a match, enrich that existing record instead of creating duplicate
+  if (bestMatchIndex >= 0) {
     return existingServiceAddresses.map((entry, index) =>
-      index === existingIndex
+      index === bestMatchIndex
         ? {
           ...entry,
           address: entry.address || apolloEntry.address,
@@ -453,6 +557,7 @@ function mergeApolloAddressIntoServiceAddresses(
     );
   }
 
+  // No match found - add as new address
   return [...existingServiceAddresses, apolloEntry];
 }
 
@@ -571,6 +676,11 @@ function mergeApolloContact(existing: ApolloContactRow, fresh: ApolloContactRow)
   (Array.isArray(existing.phones) ? existing.phones : []).forEach((entry) => addPhone(entry));
   (Array.isArray(fresh.phones) ? fresh.phones : []).forEach((entry) => addPhone(entry));
 
+  // Prioritize existing photoUrl if fresh one is empty (preserve revealed data)
+  const mergedPhotoUrl = sanitizeContactText(fresh.photoUrl || '') || 
+                         sanitizeContactText(existing.photoUrl || '') || 
+                         undefined;
+
   return {
     ...existing,
     ...fresh,
@@ -581,7 +691,7 @@ function mergeApolloContact(existing: ApolloContactRow, fresh: ApolloContactRow)
     lastName: sanitizeContactText(fresh.lastName || existing.lastName || '') || undefined,
     title: sanitizeContactText(fresh.title || existing.title || '') || undefined,
     email: sanitizeContactText(fresh.email || '') || sanitizeContactText(existing.email || '') || 'N/A',
-    photoUrl: sanitizeContactText(fresh.photoUrl || existing.photoUrl || '') || undefined,
+    photoUrl: mergedPhotoUrl,
     location: sanitizeContactText(fresh.location || existing.location || '') || undefined,
     linkedin: sanitizeContactText(fresh.linkedin || existing.linkedin || '') || undefined,
     status: fresh.status === 'verified' || existing.status === 'verified'
@@ -1672,7 +1782,19 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           per_page: 50,
           q_organization_domains: hasDomainScope ? domain : undefined,
           q_organization_name: !hasDomainScope ? companyName || undefined : undefined,
-          person_titles: ['owner', 'founder', 'c-level', 'vp', 'director', 'manager']
+          person_titles: [
+            'owner',
+            'founder',
+            'c-level',
+            'cfo',
+            'chief financial officer',
+            'controller',
+            'vp',
+            'director',
+            'facilities',
+            'real estate & facilities',
+            'manager'
+          ]
         }),
       });
 
@@ -1809,7 +1931,25 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     }
 
     setContactsLoading(true);
-    const previousData = data;
+    
+    // Load cache to get previously revealed data
+    const cacheKey = cacheKeyFromDomainOrName(domain, companyName);
+    let cachedContacts: ApolloContactRow[] = [];
+    if (cacheKey) {
+      const cached = localStorage.getItem(`apollo_cache_${cacheKey}`);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as Partial<ApolloSearchCache>;
+          if (Array.isArray(parsed.contacts)) {
+            cachedContacts = parsed.contacts;
+          }
+        } catch (err) {
+          console.error('Failed to parse cache for search hydration:', err);
+        }
+      }
+    }
+    
+    const previousData = data.length > 0 ? data : cachedContacts;
     try {
       const token = await getApolloBearerToken(true);
       const hasDomainScope = Boolean(domain && domain.trim());
@@ -2035,12 +2175,42 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const filteredData = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return data;
+    
+    // Split search term into words for multi-word matching (e.g., "John Smith")
+    const searchWords = term.split(/\s+/).filter(Boolean);
+    
     return data.filter((p) => {
       const name = (p.name ?? '').toLowerCase();
       const first = (p.firstName ?? '').toLowerCase();
       const last = (p.lastName ?? '').toLowerCase();
       const title = (p.title ?? '').toLowerCase();
-      return name.includes(term) || first.includes(term) || last.includes(term) || title.includes(term);
+      
+      // Simple single-term search
+      if (searchWords.length === 1) {
+        return name.includes(term) || first.includes(term) || last.includes(term) || title.includes(term);
+      }
+      
+      // Multi-word search: handle "John Smith" matching "John S." (redacted last name)
+      // Check if all search words match somewhere in the contact data
+      return searchWords.every((word) => {
+        // Direct match in any field
+        if (name.includes(word) || first.includes(word) || last.includes(word) || title.includes(word)) {
+          return true;
+        }
+        
+        // Fuzzy match: if word looks like a last name (2+ chars), check if it matches first char of last name
+        // This handles: searching "Smith" matches contact with lastName "S." or "S"
+        if (word.length >= 2 && last.length >= 1) {
+          const firstCharMatch = word.charAt(0) === last.charAt(0);
+          // Also check if the stored last name is redacted (single char or char + period)
+          const isRedacted = last.length <= 2 && (last.endsWith('.') || last.length === 1);
+          if (firstCharMatch && isRedacted) {
+            return true;
+          }
+        }
+        
+        return false;
+      });
     });
   }, [data, searchTerm]);
 

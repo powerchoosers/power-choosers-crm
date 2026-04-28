@@ -24,10 +24,12 @@ import { AccountHolderCard } from '@/components/dossier/account-dossier/AccountH
 import DataIngestionCard from '@/components/dossier/DataIngestionCard'
 import { useUIStore } from '@/store/uiStore'
 import { useAuth } from '@/context/AuthContext'
+import { useCallStore } from '@/store/callStore'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { CollapsiblePageHeader } from '@/components/layout/CollapsiblePageHeader'
 import { buildProposalAttentionLine } from '@/lib/proposal'
+import { formatPhoneNumber } from '@/lib/formatPhone'
 import { type Deal, type DealStage, DEAL_STAGES } from '@/types/deals'
 import { toast } from 'sonner'
 
@@ -314,19 +316,39 @@ function ForensicBriefModule({
 // ---------------------------------------------------------------------------
 
 function AccountIntelPanel({ deal }: { deal: Deal }) {
+  const initiateCall = useCallStore(s => s.initiateCall)
+  
+  const handleCall = () => {
+    if (!deal.account?.companyPhone) return
+    initiateCall(deal.account.companyPhone, {
+      name: deal.account.name || deal.accountId,
+      account: deal.account.name || deal.accountId,
+      logoUrl: deal.account.logoUrl ?? deal.account.logo_url,
+      domain: deal.account.domain,
+      isAccountOnly: true,
+      accountId: deal.accountId,
+    })
+  }
+
   return (
-    <div className="nodal-glass rounded-2xl p-5 space-y-4">
+    <div className="nodal-glass rounded-2xl p-5 space-y-3">
       <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
         Account Intel
       </span>
-      <div className="flex items-center gap-3">
+      
+      {/* Clickable account identity container */}
+      <Link
+        href={`/network/accounts/${deal.accountId}`}
+        className="group flex items-center gap-3 p-2 rounded-lg border border-transparent hover:border-white/5 transition-all cursor-pointer"
+      >
         <CompanyIcon
           domain={deal.account?.domain}
           logoUrl={deal.account?.logoUrl ?? deal.account?.logo_url}
           name={deal.account?.name || deal.accountId}
-          size={36}
+          size={40}
+          className="rounded-xl shrink-0"
         />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="font-sans text-sm text-zinc-200 truncate font-medium">
             {deal.account?.name || deal.accountId}
           </div>
@@ -336,15 +358,29 @@ function AccountIntelPanel({ deal }: { deal: Deal }) {
             </div>
           )}
         </div>
-      </div>
-      <Link
-        href={`/network/accounts/${deal.accountId}`}
-        className="flex items-center gap-2 font-mono text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors group w-full"
-      >
-        <Building2 className="w-3 h-3 flex-none" />
-        <span>View Account Dossier</span>
-        <ArrowUpRight className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity ml-auto flex-none" />
+        <ArrowUpRight className="w-3 h-3 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity flex-none" />
       </Link>
+
+      {/* Company phone in blue like uplinks */}
+      {deal.account?.companyPhone && (
+        <button
+          onClick={handleCall}
+          className="w-full group flex items-center justify-between p-3 bg-[#002FA7]/90 hover:bg-[#002FA7] rounded-xl transition-all duration-300 border border-white/10 hover:border-white/20 hover:shadow-[0_0_24px_-5px_rgba(0,47,167,0.6)] hover:-translate-y-0.5"
+        >
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Building2 className="w-4 h-4 text-white/70 group-hover:text-white transition-colors shrink-0" />
+            <div className="flex flex-col items-start min-w-0 flex-1">
+              <span className="text-[9px] font-mono text-white/50 uppercase tracking-widest leading-none">
+                Company Phone
+              </span>
+              <span className="font-mono tabular-nums text-[13px] tracking-tight text-white whitespace-nowrap leading-none mt-0.5">
+                {formatPhoneNumber(deal.account.companyPhone)}
+              </span>
+            </div>
+          </div>
+          <ArrowUpRight className="w-3 h-3 text-white/50 group-hover:text-white transition-colors shrink-0" />
+        </button>
+      )}
     </div>
   )
 }
