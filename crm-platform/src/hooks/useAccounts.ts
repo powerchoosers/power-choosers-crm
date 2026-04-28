@@ -47,6 +47,14 @@ export interface Account {
   currentRate?: string
   mills?: string // the commission/margin mills
   status?: 'ACTIVE' | 'ACTIVE_LOAD' | 'PROSPECT' | 'CHURNED' | 'CUSTOMER'
+  intelligenceBriefHeadline?: string | null
+  intelligenceBriefDetail?: string | null
+  intelligenceBriefTalkTrack?: string | null
+  intelligenceBriefSignalDate?: string | null
+  intelligenceBriefSourceUrl?: string | null
+  intelligenceBriefConfidenceLevel?: string | null
+  intelligenceBriefLastRefreshedAt?: string | null
+  intelligenceBriefStatus?: 'idle' | 'ready' | 'empty' | 'error' | string | null
   meters?: Array<{
     id: string
     esiId: string
@@ -123,7 +131,7 @@ export interface AccountFilters {
 const PAGE_SIZE = 50
 const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url'
 const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
-const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website'
+const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 
 function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
   const city = data.city || ''
@@ -165,6 +173,14 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
     electricitySupplier: data.electricity_supplier || data.metadata?.electricity_supplier || '',
     currentRate: data.current_rate || data.metadata?.current_rate || '',
     status: data.status || 'PROSPECT',
+    intelligenceBriefHeadline: data.intelligence_brief_headline || null,
+    intelligenceBriefDetail: data.intelligence_brief_detail || null,
+    intelligenceBriefTalkTrack: data.intelligence_brief_talk_track || null,
+    intelligenceBriefSignalDate: data.intelligence_brief_signal_date || null,
+    intelligenceBriefSourceUrl: data.intelligence_brief_source_url || null,
+    intelligenceBriefConfidenceLevel: data.intelligence_brief_confidence_level || null,
+    intelligenceBriefLastRefreshedAt: data.intelligence_brief_last_refreshed_at || null,
+    intelligenceBriefStatus: data.intelligence_brief_status || 'idle',
     meters: metersOverride ?? data.metadata?.meters ?? [],
     mills: data.metadata?.mills || '',
     metadata: data.metadata || {},
@@ -844,6 +860,14 @@ export function useUpdateAccount() {
       if (updates.electricitySupplier !== undefined) dbUpdates.electricity_supplier = updates.electricitySupplier || null
       if (updates.currentRate !== undefined) dbUpdates.current_rate = updates.currentRate || null
       if (updates.status !== undefined) dbUpdates.status = updates.status || 'PROSPECT' 
+      if (updates.intelligenceBriefHeadline !== undefined) dbUpdates.intelligence_brief_headline = updates.intelligenceBriefHeadline || null
+      if (updates.intelligenceBriefDetail !== undefined) dbUpdates.intelligence_brief_detail = updates.intelligenceBriefDetail || null
+      if (updates.intelligenceBriefTalkTrack !== undefined) dbUpdates.intelligence_brief_talk_track = updates.intelligenceBriefTalkTrack || null
+      if (updates.intelligenceBriefSignalDate !== undefined) dbUpdates.intelligence_brief_signal_date = updates.intelligenceBriefSignalDate || null
+      if (updates.intelligenceBriefSourceUrl !== undefined) dbUpdates.intelligence_brief_source_url = updates.intelligenceBriefSourceUrl || null
+      if (updates.intelligenceBriefConfidenceLevel !== undefined) dbUpdates.intelligence_brief_confidence_level = updates.intelligenceBriefConfidenceLevel || null
+      if (updates.intelligenceBriefLastRefreshedAt !== undefined) dbUpdates.intelligence_brief_last_refreshed_at = updates.intelligenceBriefLastRefreshedAt || null
+      if (updates.intelligenceBriefStatus !== undefined) dbUpdates.intelligence_brief_status = updates.intelligenceBriefStatus || 'idle'
 
       // Metadata updates
       const newMetadata = { ...currentMetadata }
