@@ -165,10 +165,6 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>
-                    <IntelligenceBrief account={account} />
-                </motion.div>
-
-                <motion.div layout="position" transition={stackShiftTransition}>
                     <EngagementLog
                         recentCalls={calls || []}
                         isLoadingCalls={isLoadingCalls}
@@ -181,6 +177,10 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
                         variant="skinny"
                         showRelativeDate={true}
                     />
+                </motion.div>
+
+                <motion.div layout="position" transition={stackShiftTransition}>
+                    <IntelligenceBrief account={account} />
                 </motion.div>
 
                 <motion.div layout="position" transition={stackShiftTransition}>
