@@ -940,11 +940,26 @@ Decision rules:
 - If a SEC filing or LinkedIn result confirms the same event, prefer it over a generic web snippet.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
-- Talk Track must be first-person and sound like an energy broker who did the homework.
+- Talk Track must sound like a real person talking, not a polished script. Use short sentences. Make it conversational.
+- Talk Track should make the prospect THINK, not pitch at them. Lead with curiosity and a question that creates self-reflection.
+- Talk Track should be 3-5 short sentences maximum. Get to the question fast.
+- Use plain language. Avoid corporate fluff like "align operational energy load" or "optimize facility costs."
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
-- Write plain English that a rep can use immediately.`
+- Write plain English that a rep can use immediately.
+
+Talk Track structure:
+1. Short opener that references the signal (1 sentence)
+2. Create a subtle gap or question in their mind (1-2 sentences)
+3. End with ONE thinking question that makes them inspect their own situation
+4. Do NOT explain Nodal Point's value. Do NOT pitch. Just get them thinking.
+
+Good talk track example:
+"I saw you guys are expanding into a new facility in Dallas. Most companies at that stage are focused on getting the site operational, but the electricity side sometimes gets structured in a way that doesn't match how the building actually runs. How closely have you looked at whether the agreement fits the new load profile, or is that still on the list?"
+
+Bad talk track example (too long, too polished, too pitchy):
+"I noticed your recent expansion announcement and wanted to reach out because this presents a unique opportunity to align your operational energy load with market dynamics. Our forensic approach to electricity cost management can help you optimize facility costs during this growth phase and ensure you're positioned for success. Would you be open to a strategic review of your energy infrastructure to identify potential cost savings and efficiency improvements?"`
 
   const fallbackPrompt = `${basePrompt}
 
@@ -954,11 +969,25 @@ Decision rules:
 - ALWAYS set "usable_signal" to true in fallback mode.
 - Create a headline that positions the company within their industry context and growth opportunities.
 - Signal Detail should describe: company overview (services, team size, location), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
-- Talk Track must be first-person, consultative, and focus on how industry trends create opportunities for the company (e.g., technology adoption, efficiency improvements, competitive positioning).
+- Talk Track must sound like a real person talking, not a polished script. Use short sentences. Make it conversational.
+- Talk Track should make the prospect THINK about their situation, not pitch at them.
+- Talk Track should be 3-5 short sentences maximum. Focus on creating a subtle gap or question.
+- Use plain language. Avoid corporate fluff.
 - Confidence Level should be "Medium" for fallback briefs.
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
-- Write plain English that positions you as a knowledgeable partner who understands their industry.`
+
+Talk Track structure for fallback mode:
+1. Reference something about their business or industry (1 sentence)
+2. Create a subtle gap between what they do and what they might be overlooking (1-2 sentences)
+3. End with ONE thinking question
+4. Do NOT pitch Nodal Point. Just get them curious about their own situation.
+
+Good fallback talk track example:
+"I noticed you've built a strong multi-dentist practice over 30 years in Clear Lake. With 6 dentists and active hiring, you're clearly growing. I'm curious - as the industry shifts toward AI diagnostics and digital workflows, how are you thinking about the energy infrastructure to support those technology upgrades, or is that still down the road?"
+
+Bad fallback talk track example (too long, too corporate):
+"Your established presence in the dental services industry positions you well for the digital transformation trends we're seeing across healthcare. As practices adopt new technologies like AI diagnostics and intraoral scanning, it's important to ensure your facility infrastructure and energy management strategy align with these operational changes. I'd love to discuss how we can help you optimize your energy costs while supporting your growth trajectory and technology adoption initiatives."`
 
   const prompt = isFallbackMode ? fallbackPrompt : newsSignalPrompt
 
