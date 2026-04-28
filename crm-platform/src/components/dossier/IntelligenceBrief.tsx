@@ -33,6 +33,11 @@ interface IntelligenceBriefProps {
   className?: string
 }
 
+type RefreshPayload = {
+  account?: IntelligenceBriefAccount
+  message?: string
+}
+
 function getHumanDate(value: string | null | undefined) {
   if (!value) return null
 
@@ -83,26 +88,7 @@ function confidenceTone(level: string | null | undefined) {
 export function IntelligenceBrief({ account, className }: IntelligenceBriefProps) {
   const queryClient = useQueryClient()
 
-  const brief = useMemo(() => ({
-    headline: account?.intelligenceBriefHeadline?.trim() || '',
-    detail: account?.intelligenceBriefDetail?.trim() || '',
-    talkTrack: account?.intelligenceBriefTalkTrack?.trim() || '',
-    signalDate: account?.intelligenceBriefSignalDate || null,
-    sourceUrl: account?.intelligenceBriefSourceUrl?.trim() || '',
-    confidenceLevel: account?.intelligenceBriefConfidenceLevel?.trim() || '',
-    lastRefreshedAt: account?.intelligenceBriefLastRefreshedAt || null,
-    status: account?.intelligenceBriefStatus || 'idle',
-  }), [account])
-
-  const hasBrief = Boolean(brief.headline || brief.detail || brief.talkTrack)
-  const isCooldownActive = Boolean(
-    brief.lastRefreshedAt &&
-    (Date.now() - new Date(brief.lastRefreshedAt).getTime()) < RESEARCH_COOLDOWN_MS
-  )
-  const canRefresh = !!account?.id && !isCooldownActive
-  const isFallbackState = brief.status === 'empty' || brief.status === 'error'
-
-  const refreshMutation = useMutation({
+  const refreshMutation = useMutation<RefreshPayload>({
     mutationFn: async () => {
       if (!account?.id) throw new Error('Missing account ID')
 
@@ -137,16 +123,45 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
 
       return payload
     },
+    onSuccess: (payload) => {
+      if (!account?.id || !payload?.account) return
+      void queryClient.invalidateQueries({
+        predicate: (query) => query.queryKey.some((part) => part === account.id),
+      })
+    },
     onError: (error) => {
       const message = error instanceof Error ? error.message : 'Research failed.'
       toast.error(message)
     },
   })
 
+  const displayAccount = useMemo(() => (
+    refreshMutation.data?.account ? { ...account, ...refreshMutation.data.account } : account
+  ), [account, refreshMutation.data?.account])
+
+  const brief = useMemo(() => ({
+    headline: displayAccount?.intelligenceBriefHeadline?.trim() || '',
+    detail: displayAccount?.intelligenceBriefDetail?.trim() || '',
+    talkTrack: displayAccount?.intelligenceBriefTalkTrack?.trim() || '',
+    signalDate: displayAccount?.intelligenceBriefSignalDate || null,
+    sourceUrl: displayAccount?.intelligenceBriefSourceUrl?.trim() || '',
+    confidenceLevel: displayAccount?.intelligenceBriefConfidenceLevel?.trim() || '',
+    lastRefreshedAt: displayAccount?.intelligenceBriefLastRefreshedAt || null,
+    status: displayAccount?.intelligenceBriefStatus || 'idle',
+  }), [displayAccount])
+
+  const hasBrief = Boolean(brief.headline || brief.detail || brief.talkTrack)
+  const isCooldownActive = Boolean(
+    brief.lastRefreshedAt &&
+    (Date.now() - new Date(brief.lastRefreshedAt).getTime()) < RESEARCH_COOLDOWN_MS
+  )
+  const canRefresh = !!displayAccount?.id && !isCooldownActive
+  const isFallbackState = brief.status === 'empty' || brief.status === 'error'
+
   const handleCopy = async () => {
-    if (!hasBrief || !account || isFallbackState) return
+    if (!hasBrief || !displayAccount || isFallbackState) return
     try {
-      await navigator.clipboard.writeText(buildClipboardText(account))
+      await navigator.clipboard.writeText(buildClipboardText(displayAccount))
       toast.success('Copied to clipboard.')
     } catch {
       toast.error('Copy failed.')
@@ -209,7 +224,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
           <Loader2 className="w-4 h-4 animate-spin text-[#002FA7]" />
           <div className="min-w-0">
             <p className="text-sm font-medium text-zinc-100">
-              Researching {account?.name || 'this account'}…
+              Researching {displayAccount?.name || 'this account'}…
             </p>
             <p className="text-[11px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
               Pulling public signals from news, web search, LinkedIn, SEC filings, and company pages
