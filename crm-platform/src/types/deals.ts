@@ -43,6 +43,7 @@ export interface Deal {
     annualUsage?: string | number
     logoUrl?: string
     logo_url?: string
+    companyPhone?: string
   }
   signature_requests?: {
     id: string
