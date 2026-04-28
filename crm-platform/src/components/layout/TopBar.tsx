@@ -1176,21 +1176,17 @@ export function TopBar() {
         {/* Restore Right Panel Button - Positioned outside the quick actions container */}
         <AnimatePresence>
           {rightPanelMinimized && (
-            <motion.div
+            <motion.button
               initial={{ opacity: 0, scale: 0.5, x: 20 }}
               animate={{ opacity: 1, scale: 1, x: 0 }}
               exit={{ opacity: 0, scale: 0.5, x: 20 }}
               transition={{ type: "spring", stiffness: 300, damping: 25 }}
-              className="pointer-events-auto ml-3"
+              onClick={toggleRightPanel}
+              className="icon-button-forensic pointer-events-auto"
+              aria-label="Restore Intelligence Feed"
             >
-              <button
-                onClick={toggleRightPanel}
-                className="w-10 h-10 rounded-full bg-zinc-950/80 backdrop-blur-xl border border-white/5 hover:border-white/10 flex items-center justify-center text-white hover:text-white/80 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(255,255,255,0.1)] relative group"
-                aria-label="Restore Intelligence Feed"
-              >
-                <ChevronLeft size={18} className="transition-transform group-hover:scale-110" />
-              </button>
-            </motion.div>
+              <ChevronLeft size={16} />
+            </motion.button>
           )}
         </AnimatePresence>
       </div >
