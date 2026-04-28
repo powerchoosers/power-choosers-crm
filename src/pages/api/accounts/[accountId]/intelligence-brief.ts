@@ -940,26 +940,69 @@ Decision rules:
 - If a SEC filing or LinkedIn result confirms the same event, prefer it over a generic web snippet.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
-- Talk Track must sound like a real person talking, not a polished script. Use short sentences. Make it conversational.
-- Talk Track should make the prospect THINK, not pitch at them. Lead with curiosity and a question that creates self-reflection.
-- Talk Track should be 3-5 short sentences maximum. Get to the question fast.
-- Use plain language. Avoid corporate fluff like "align operational energy load" or "optimize facility costs."
+- Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
+- Talk Track should sound like a real person who actually researched this company, not a script.
+- Talk Track must be 3-5 short sentences maximum. Use conversational language.
+- Talk Track should make the prospect THINK about their specific situation, not pitch at them.
+- Use plain language. Avoid corporate fluff.
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
-- Write plain English that a rep can use immediately.
 
-Talk Track structure:
-1. Short opener that references the signal (1 sentence)
-2. Create a subtle gap or question in their mind (1-2 sentences)
-3. End with ONE thinking question that makes them inspect their own situation
-4. Do NOT explain Nodal Point's value. Do NOT pitch. Just get them thinking.
+Talk Track angle selection (choose ONE based on the actual signal):
 
-Good talk track example:
-"I saw you guys are expanding into a new facility in Dallas. Most companies at that stage are focused on getting the site operational, but the electricity side sometimes gets structured in a way that doesn't match how the building actually runs. How closely have you looked at whether the agreement fits the new load profile, or is that still on the list?"
+IF SIGNAL = New location/facility/expansion:
+- Focus on timing and planning ahead, not reactive decisions
+- Question: Are they thinking about the electricity setup NOW or waiting until they move in?
+- Example: "I saw you're opening a new location in [city]. Most companies wait until they're in the building to think about the electricity setup, and by then they're reacting instead of planning. How far ahead are you on that, or is it still on the back burner?"
 
-Bad talk track example (too long, too polished, too pitchy):
-"I noticed your recent expansion announcement and wanted to reach out because this presents a unique opportunity to align your operational energy load with market dynamics. Our forensic approach to electricity cost management can help you optimize facility costs during this growth phase and ensure you're positioned for success. Would you be open to a strategic review of your energy infrastructure to identify potential cost savings and efficiency improvements?"`
+IF SIGNAL = Acquisition/merger/being acquired:
+- Focus on inherited agreements and hidden exposure
+- Question: Do they know what they're inheriting on the electricity side?
+- Example: "I saw [company] was acquired by [acquirer]. Usually when that happens, the electricity agreements get inherited without much review, and sometimes there's exposure nobody caught. Have you guys looked at what you're actually taking on, or is that still being sorted out?"
+
+IF SIGNAL = Leadership change (CFO, COO, Facilities Director):
+- Focus on inherited problems and fresh-eyes review
+- Question: Is the new person aware of what they inherited?
+- Example: "I saw [name] just joined as CFO. Usually when someone new comes in, they inherit the electricity setup without realizing what's actually in there. Has [name] had a chance to review that side yet, or is it still on the list?"
+
+IF SIGNAL = Funding round/IPO/capital raise:
+- Focus on budget scrutiny and cost visibility before scaling
+- Question: Are they tightening up costs before the next growth phase?
+- Example: "I saw you guys just closed a Series B. Most companies at that stage start tightening up on costs that were flying under the radar before. Has electricity come up in those conversations yet, or not really?"
+
+IF SIGNAL = Contract win/new customer/major project:
+- Focus on load increase and whether current agreement can handle it
+- Question: Will the current setup handle the new load without surprises?
+- Example: "I saw you landed the [customer/project] contract. That's going to change your load profile pretty significantly. Have you looked at whether your current electricity setup can handle that without creating surprises, or is that still down the road?"
+
+IF SIGNAL = Restructuring/closure/consolidation:
+- Focus on stranded costs and agreement flexibility
+- Question: Are they stuck paying for capacity they no longer need?
+- Example: "I saw you're consolidating the [location] facility. Usually when that happens, companies get stuck paying for electricity capacity they don't need anymore. Have you looked at whether you can adjust that, or are you locked in?"
+
+IF SIGNAL = Hiring/headcount growth:
+- Focus on operational changes creating cost creep
+- Question: Is the electricity side keeping up with the operational changes?
+- Example: "I saw you're hiring pretty aggressively right now. Usually when headcount moves like that, the electricity side starts behaving differently than it used to, but nobody notices until the bills start creeping up. Has that been pretty stable for you guys, or are you seeing some movement?"
+
+IF SIGNAL = Technology adoption/digital transformation:
+- Focus on new equipment load and whether agreement accounts for it
+- Question: Did they factor in the electricity impact of new tech?
+- Example: "I saw you're rolling out [technology/system]. Most companies focus on the tech side but don't think about what that does to the electricity load until it's already running. Did you guys factor that in upfront, or is it still being figured out?"
+
+IF SIGNAL = Industry trend (no specific company news):
+- Focus on whether they're ahead of or behind the trend
+- Question: Are they thinking about this proactively or waiting?
+- Example: "I've been seeing a lot of [industry] companies dealing with [trend]. Some are getting ahead of it, some are waiting to see what happens. Where are you guys on that — already thinking about it, or is it not urgent yet?"
+
+CRITICAL RULES:
+- Do NOT reuse the same angle for different signals
+- Do NOT use generic phrases like "structured in a way that doesn't match"
+- Each talk track should feel like it was written specifically for THIS signal
+- The question should be directly tied to the signal found
+- Make it sound like you actually read the news and are curious about their specific situation
+- Do NOT pitch Nodal Point. Do NOT explain value. Just get them thinking.`
 
   const fallbackPrompt = `${basePrompt}
 
@@ -967,27 +1010,57 @@ FALLBACK MODE: No recent news signals were found. Generate an intelligence brief
 
 Decision rules:
 - ALWAYS set "usable_signal" to true in fallback mode.
-- Create a headline that positions the company within their industry context and growth opportunities.
+- Create a headline that positions the company within their industry context.
 - Signal Detail should describe: company overview (services, team size, location), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
-- Talk Track must sound like a real person talking, not a polished script. Use short sentences. Make it conversational.
-- Talk Track should make the prospect THINK about their situation, not pitch at them.
-- Talk Track should be 3-5 short sentences maximum. Focus on creating a subtle gap or question.
+- Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
+- Talk Track should sound like you actually researched this specific company.
+- Talk Track should be 3-5 short sentences maximum. Use conversational language.
 - Use plain language. Avoid corporate fluff.
 - Confidence Level should be "Medium" for fallback briefs.
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
 
-Talk Track structure for fallback mode:
-1. Reference something about their business or industry (1 sentence)
-2. Create a subtle gap between what they do and what they might be overlooking (1-2 sentences)
-3. End with ONE thinking question
-4. Do NOT pitch Nodal Point. Just get them curious about their own situation.
+Talk Track angle selection for fallback mode (choose based on what you found):
 
-Good fallback talk track example:
-"I noticed you've built a strong multi-dentist practice over 30 years in Clear Lake. With 6 dentists and active hiring, you're clearly growing. I'm curious - as the industry shifts toward AI diagnostics and digital workflows, how are you thinking about the energy infrastructure to support those technology upgrades, or is that still down the road?"
+IF COMPANY = Multi-location/multi-site:
+- Focus on whether they look at electricity site-by-site or portfolio-wide
+- Example: "I noticed you've got locations across [region]. Most multi-site companies end up looking at electricity one location at a time, which is fine, but sometimes that leaves leverage on the table. Do you guys tend to look at that site by site, or more at the company level?"
 
-Bad fallback talk track example (too long, too corporate):
-"Your established presence in the dental services industry positions you well for the digital transformation trends we're seeing across healthcare. As practices adopt new technologies like AI diagnostics and intraoral scanning, it's important to ensure your facility infrastructure and energy management strategy align with these operational changes. I'd love to discuss how we can help you optimize your energy costs while supporting your growth trajectory and technology adoption initiatives."`
+IF COMPANY = Actively hiring/growing team:
+- Focus on operational changes and whether electricity setup is keeping up
+- Example: "I saw you're actively hiring right now. Usually when headcount is moving like that, the electricity side starts behaving differently, but nobody notices until costs start creeping up. Has that been pretty stable for you guys, or are you seeing some movement?"
+
+IF COMPANY = Long-established (20+ years):
+- Focus on whether they've reviewed their setup recently or it's just been running
+- Example: "I noticed you've been around for [X] years in [city]. Most established companies have electricity agreements that have just been rolling over without much review. When's the last time you guys actually looked at whether the setup still makes sense, or has it just been running?"
+
+IF COMPANY = Industry facing digital transformation:
+- Focus on new technology load and whether they've thought about electricity impact
+- Example: "I've been seeing a lot of [industry] companies adopting [technology trend]. Most are focused on the tech side but don't think about what that does to the electricity load until it's already running. Have you guys factored that in, or is it still being figured out?"
+
+IF COMPANY = Manufacturing/industrial:
+- Focus on demand spikes and whether agreement matches how the plant actually runs
+- Example: "I work with a lot of [industry] companies in Texas. What's interesting is, even when the rate looks fine, the way the agreement handles demand spikes doesn't always match how the plant actually runs. Has that been pretty dialed in for you guys, or not really?"
+
+IF COMPANY = Service business (dental, medical, professional services):
+- Focus on whether they think about facility costs as much as they help clients
+- Example: "I noticed you help clients with [service]. I'm curious — do you feel like your own facility costs are just as dialed in as the work you do for clients, or is that side kind of a different story?"
+
+IF COMPANY = Retail/customer-facing:
+- Focus on seasonal swings and budget predictability
+- Example: "I work with a lot of retail companies in Texas. Usually the electricity bills swing pretty significantly with the seasons, and sometimes that creates budget surprises. Has that been pretty predictable for you guys, or does it move around more than you'd like?"
+
+IF COMPANY = Small business (under 20 employees):
+- Focus on whether anyone is actually reviewing the bills or it's just autopay
+- Example: "Most companies your size have electricity on autopay and nobody's really looking at whether the setup makes sense anymore. When's the last time someone actually reviewed that, or has it just been running?"
+
+CRITICAL RULES:
+- Do NOT use the same angle for every fallback brief
+- Each talk track should feel specific to THIS company and THIS industry
+- The question should be directly tied to what you learned about them
+- Make it sound like you actually looked at their website and thought about their situation
+- Do NOT pitch Nodal Point. Do NOT explain value. Just get them curious about their own situation.
+- Vary your language - don't repeat the same phrases across different briefs`
 
   const prompt = isFallbackMode ? fallbackPrompt : newsSignalPrompt
 
