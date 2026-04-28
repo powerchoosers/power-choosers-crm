@@ -2,6 +2,8 @@
 export const INDUSTRY_VECTORS: Record<string, string[]> = {
   'Manufacturing': [
     'Manufacturing',
+    'Automotive',
+    'Machinery',
     '3D Printing Materials',
     'Agricultural Plastics Manufacturing',
     'Battery Manufacturing',
@@ -63,11 +65,63 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
     'textiles',
     'glass, ceramics & concrete'
   ],
+  'Automotive': [
+    'Automotive',
+    'automotive',
+    'Motor Vehicle Manufacturing',
+    'Auto Parts',
+    'Automobile',
+    'Automotive Services'
+  ],
+  'Industrial Machinery': [
+    'Machinery',
+    'machinery',
+    'Industrial Machinery & Equipment',
+    'Industrial Machinery Manufacturing',
+    'Industrial Equipment',
+    'Industrial Products',
+    'Industrial Automation',
+    'industrial automation',
+    'mechanical or industrial engineering',
+    'Mechanical or Industrial Engineering',
+    'Equipment Manufacturing',
+    'Manufacturing Support'
+  ],
+  'Building Materials': [
+    'Building Materials',
+    'building materials',
+    'Building Materials Manufacturing',
+    'Building Products',
+    'Construction Materials',
+    'Glass, Ceramics & Concrete',
+    'glass, ceramics & concrete',
+    'Wholesale Building Materials'
+  ],
+  'Chemicals & Plastics': [
+    'Chemicals',
+    'chemicals',
+    'Chemical Manufacturing',
+    'Specialty Chemical Manufacturing',
+    'Plastics',
+    'plastics',
+    'Plastics Manufacturing',
+    'Pharmaceuticals',
+    'pharmaceuticals',
+    'Packaging & Containers',
+    'packaging & containers'
+  ],
   'Healthcare': [
     'Healthcare',
     'Health Care and Social Assistance',
     'Assisted Living And Memory Care',
     'Hospitals, Healthcare & Clinics',
+    'Hospital & Health Care',
+    'Medical Practice',
+    'Mental Health Care',
+    'Health, Wellness & Fitness',
+    'Veterinary',
+    'Biotechnology',
+    'Medical Devices',
     'Nursing Homes and Residential Care Facilities',
     'biotechnology',
     'health, wellness & fitness',
@@ -79,7 +133,9 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
   ],
   'Real Estate': [
     'Real Estate',
+    'real estate',
     'Construction',
+    'construction',
     'Construction Services',
     'Engineering & Construction',
     'architecture & planning',
@@ -91,6 +147,7 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
   ],
   'Retail': [
     'Retail',
+    'retail',
     'Retail Distribution',
     'Retailer',
     'Distribution',
@@ -109,9 +166,24 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
     'wholesale',
     'wine & spirits'
   ],
+  'Wholesale & Distribution': [
+    'Wholesale',
+    'wholesale',
+    'Distribution',
+    'Distribution Services',
+    'Retail Distribution',
+    'Wholesale Building Materials',
+    'Wholesaler',
+    'Sporting Goods Distribution',
+    'import & export',
+    'Import & Export'
+  ],
   'Education': [
     'Education',
     'School district office',
+    'Education Management',
+    'Primary/Secondary Education',
+    'Higher Education',
     'education management',
     'e-learning',
     'higher education',
@@ -124,6 +196,10 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
     'Information',
     'Technology Services',
     'Travel Technology',
+    'Computer Software',
+    'Information Technology & Services',
+    'Telecommunications',
+    'Computer Hardware',
     'computer & network security',
     'computer networking',
     'computer software',
@@ -138,6 +214,7 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
     'Oil & Gas',
     'Oil & Gas Production',
     'Oil, Gas & Mining',
+    'Oil & Energy',
     'oil & energy',
     'renewables & environment',
     'utilities'
@@ -146,6 +223,7 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
     'Food & Beverage',
     'Accommodation and Food Services',
     'Agriculture Processing',
+    'Restaurants',
     'Food & Beverage Manufacturing',
     'Food Distribution',
     'Food Processing',
@@ -160,17 +238,68 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
     'ranching',
     'restaurants'
   ],
+  'Restaurants & Hospitality': [
+    'Restaurants',
+    'restaurants',
+    'Hospitality',
+    'hospitality',
+    'Food & Beverages',
+    'food & beverages',
+    'Accommodation and Food Services',
+    'Leisure, Travel & Tourism',
+    'leisure, travel & tourism'
+  ],
   'Logistics & Warehouse': [
     'Cross-border Logistics',
+    'Logistics & Supply Chain',
     'logistics & supply chain',
     'package/freight delivery',
+    'Package/Freight Delivery',
+    'Transportation/Trucking/Railroad',
     'transportation/trucking/railroad',
+    'Warehousing',
     'warehousing',
     'distribution',
     'supply chain',
     'Transportation and Warehousing',
     'Warehousing & 3PL Services',
     'Transportation Services'
+  ],
+  'Religious & Nonprofit': [
+    'Religious Institutions',
+    'religious institutions',
+    'Nonprofit Organization Management',
+    'nonprofit organization management',
+    'Non-Profit Organization Management',
+    'Non-profit Organization Management',
+    'Museums & Institutions',
+    'museums & institutions',
+    'Philanthropy',
+    'philanthropy'
+  ],
+  'Aviation & Aerospace': [
+    'Airlines & Aviation',
+    'airlines/aviation',
+    'Aviation & Aerospace',
+    'aviation & aerospace',
+    'Defense & Space',
+    'defense & space'
+  ],
+  'Financial Services': [
+    'Financial Services',
+    'financial services',
+    'Finance and Insurance',
+    'Financial Services/Housing Finance',
+    'Banking',
+    'banking',
+    'Insurance',
+    'insurance',
+    'Capital Markets',
+    'capital markets',
+    'Investment Banking',
+    'investment banking',
+    'Investment Management',
+    'investment management'
   ],
   'Services': [
     'Services',
@@ -225,6 +354,43 @@ export const INDUSTRY_VECTORS: Record<string, string[]> = {
   ]
 };
 
+export const INDUSTRY_VECTOR_GROUPS: Array<{ label: string; vectors: string[] }> = [
+  {
+    label: 'LOAD_INTENSIVE',
+    vectors: [
+      'Manufacturing',
+      'Industrial Machinery',
+      'Building Materials',
+      'Chemicals & Plastics',
+      'Food & Beverage',
+      'Logistics & Warehouse'
+    ]
+  },
+  {
+    label: 'HIGH_CONFIDENCE',
+    vectors: [
+      'Healthcare',
+      'Restaurants & Hospitality',
+      'Automotive',
+      'Wholesale & Distribution',
+      'Retail',
+      'Education',
+      'Religious & Nonprofit'
+    ]
+  },
+  {
+    label: 'INFRASTRUCTURE_SERVICES',
+    vectors: [
+      'Real Estate',
+      'Technology',
+      'Energy',
+      'Aviation & Aerospace',
+      'Financial Services',
+      'Services'
+    ]
+  }
+];
+
 // Helper to get all industry strings for a given set of vectors
 export function getIndustryFilters(selectedVectors: string[]): string[] {
   return selectedVectors.flatMap(vector => INDUSTRY_VECTORS[vector] || [vector]);
@@ -244,8 +410,15 @@ export const NEPQ_DM_CHAMPION: Record<string, { decisionMaker: string[]; champio
   Education: { decisionMaker: ['CFO', 'Business Director'], champion: ['Facilities Director'] },
   Technology: { decisionMaker: ['CFO', 'VP Operations'], champion: ['Facilities Manager'] },
   'Logistics & Warehouse': { decisionMaker: ['COO', 'VP Operations'], champion: ['Operations Manager'] },
+  'Industrial Machinery': { decisionMaker: ['COO', 'Controller'], champion: ['Plant Manager', 'Maintenance Manager'] },
+  'Building Materials': { decisionMaker: ['COO', 'Controller'], champion: ['Plant Manager', 'Operations Manager'] },
+  'Chemicals & Plastics': { decisionMaker: ['COO', 'Controller'], champion: ['Plant Manager', 'Maintenance Manager'] },
   Services: { decisionMaker: ['CFO', 'VP Operations', 'Owner'], champion: ['Facilities Director', 'General Manager'] },
   'Food & Beverage': { decisionMaker: ['Owner', 'COO'], champion: ['General Manager'] },
+  'Restaurants & Hospitality': { decisionMaker: ['Owner', 'COO'], champion: ['General Manager'] },
+  Automotive: { decisionMaker: ['Owner', 'COO'], champion: ['General Manager', 'Service Director'] },
+  'Wholesale & Distribution': { decisionMaker: ['COO', 'VP Operations'], champion: ['Operations Manager'] },
+  'Religious & Nonprofit': { decisionMaker: ['Executive Director', 'CFO'], champion: ['Facilities Director'] },
   Energy: { decisionMaker: ['CFO', 'VP Operations'], champion: ['Facilities Manager'] },
 };
 

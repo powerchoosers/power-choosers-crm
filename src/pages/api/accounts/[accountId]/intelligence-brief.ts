@@ -128,7 +128,7 @@ function stripXml(value: string): string {
   ).replace(/\s+/g, ' ').trim()
 }
 
-function parseRssItems(xml: string, bucket: { priority: number; label: string; query: string }, maxItems = 3): ResearchHit[] {
+function parseRssItems(xml: string, bucket: { priority: number; label: string; query: string }, maxItems = 3, defaultSource = 'Google News'): ResearchHit[] {
   const items: ResearchHit[] = []
   const itemRegex = /<item>([\s\S]*?)<\/item>/g
   let match
@@ -145,7 +145,7 @@ function parseRssItems(xml: string, bucket: { priority: number; label: string; q
     const url = getTag('link')
     const description = getTag('description')
     const pubDate = getTag('pubDate')
-    const source = getTag('source') || 'Google News'
+    const source = getTag('source') || defaultSource
 
     if (!title || !url) continue
 
@@ -349,19 +349,6 @@ function getHostname(value: string) {
   }
 }
 
-function normalizeDuckDuckGoUrl(rawUrl: string) {
-  if (!rawUrl) return ''
-
-  try {
-    const url = new URL(rawUrl, 'https://duckduckgo.com')
-    const uddg = url.searchParams.get('uddg')
-    if (uddg) return decodeURIComponent(uddg)
-    return url.toString()
-  } catch {
-    return rawUrl
-  }
-}
-
 function createDocument(html: string) {
   return new JSDOM(html).window.document
 }
@@ -402,37 +389,6 @@ function inferSignalPriority(text: string, fallbackPriority: number) {
   if (/(contract award|government contract|customer win|major customer|new customer)/.test(lower)) return 6
   if (/(funding round|series [abcde]|ipo|initial public offering|going public)/.test(lower)) return 7
   return fallbackPriority
-}
-
-function parseDuckDuckGoResults(html: string, bucket: { priority: number; label: string; query: string }, sourceKind: ResearchSourceKind, maxItems = 4): ResearchHit[] {
-  const doc = createDocument(html)
-  const results = Array.from(doc.querySelectorAll('.result__body') as NodeListOf<Element>)
-  const hits: ResearchHit[] = []
-
-  for (const result of results.slice(0, maxItems)) {
-    const link = result.querySelector('a.result__a')
-    const snippetEl = result.querySelector('.result__snippet')
-    const rawHref = link?.getAttribute('href') || ''
-    const url = normalizeDuckDuckGoUrl(rawHref)
-    const title = cleanText(link?.textContent || '')
-    const snippet = cleanText(snippetEl?.textContent || '')
-
-    if (!title || !url) continue
-
-    hits.push({
-      priority: bucket.priority,
-      label: bucket.label,
-      query: bucket.query,
-      title,
-      url,
-      snippet,
-      publishedAt: null,
-      source: getHostname(url) || 'DuckDuckGo',
-      sourceKind,
-    })
-  }
-
-  return hits
 }
 
 function extractPagePreview(html: string, fallbackTitle: string, url: string, sourceKind: ResearchSourceKind) {
@@ -483,17 +439,35 @@ function extractPagePreview(html: string, fallbackTitle: string, url: string, so
   }
 }
 
-async function fetchDuckDuckGoHits(buckets: Array<{ priority: number; label: string; query: string }>, sourceKind: ResearchSourceKind, maxItemsPerBucket = 4) {
+async function fetchBingRssHits(buckets: Array<{ priority: number; label: string; query: string }>, sourceKind: ResearchSourceKind, maxItemsPerBucket = 4) {
   const headers = { 'User-Agent': WEB_USER_AGENT }
 
   const results = await Promise.all(buckets.map(async (bucket) => {
-    const searchUrl = `https://duckduckgo.com/html/?q=${encodeURIComponent(bucket.query)}`
+    const searchUrl = `https://www.bing.com/search?format=rss&q=${encodeURIComponent(bucket.query)}&mkt=en-US&setlang=en-US`
     try {
       const { response, text } = await fetchTextWithTimeout(searchUrl, { headers }, 10000)
       if (!response.ok || !text) return [] as ResearchHit[]
-      return parseDuckDuckGoResults(text, bucket, sourceKind, maxItemsPerBucket)
+      return parseRssItems(text, bucket, maxItemsPerBucket, 'Bing')
     } catch (error) {
-      console.warn('[Intelligence Brief] DuckDuckGo search failed for bucket:', bucket.label, error)
+      console.warn('[Intelligence Brief] Bing RSS search failed for bucket:', bucket.label, error)
+      return [] as ResearchHit[]
+    }
+  }))
+
+  return dedupeAndSort(results.flat())
+}
+
+async function fetchBingNewsHits(buckets: Array<{ priority: number; label: string; query: string }>, sourceKind: ResearchSourceKind, maxItemsPerBucket = 4) {
+  const headers = { 'User-Agent': WEB_USER_AGENT }
+
+  const results = await Promise.all(buckets.map(async (bucket) => {
+    const searchUrl = `https://www.bing.com/news/search?format=rss&q=${encodeURIComponent(bucket.query)}&mkt=en-US&setlang=en-US`
+    try {
+      const { response, text } = await fetchTextWithTimeout(searchUrl, { headers }, 10000)
+      if (!response.ok || !text) return [] as ResearchHit[]
+      return parseRssItems(text, bucket, maxItemsPerBucket, 'Bing News')
+    } catch (error) {
+      console.warn('[Intelligence Brief] Bing News RSS search failed for bucket:', bucket.label, error)
       return [] as ResearchHit[]
     }
   }))
@@ -684,7 +658,7 @@ async function fetchSecFilingHits(account: AccountRow) {
 }
 
 async function fetchSecSearchHits(account: AccountRow) {
-  return fetchDuckDuckGoHits(buildSecBuckets(account).slice(0, 4), 'sec', 3)
+  return fetchBingRssHits(buildSecBuckets(account).slice(0, 4), 'sec', 3)
 }
 
 async function fetchLinkedInHits(account: AccountRow) {
@@ -707,13 +681,13 @@ async function fetchLinkedInHits(account: AccountRow) {
     }
   }
 
-  const searchHits = await fetchDuckDuckGoHits(buildLinkedInBuckets(account), 'linkedin', 3)
+  const searchHits = await fetchBingRssHits(buildLinkedInBuckets(account), 'linkedin', 3)
   hits.push(...searchHits)
   return dedupeAndSort(hits)
 }
 
 async function fetchGeneralWebHits(account: AccountRow) {
-  return fetchDuckDuckGoHits(buildSearchBuckets(account), 'web', 4)
+  return fetchBingRssHits(buildSearchBuckets(account, true), 'web', 4)
 }
 
 async function collectResearchCandidates(account: AccountRow) {
@@ -726,24 +700,25 @@ async function collectResearchCandidates(account: AccountRow) {
           const { response, text } = await fetchTextWithTimeout(url, { headers: { 'User-Agent': WEB_USER_AGENT } }, 12000)
           if (!response.ok || !text) return [] as ResearchHit[]
           return parseRssItems(text, bucket, 3)
-        } catch (error) {
-          console.warn('[Intelligence Brief] RSS fetch failed for bucket:', bucket.label, error)
-          return [] as ResearchHit[]
-        }
+      } catch (error) {
+        console.warn('[Intelligence Brief] RSS fetch failed for bucket:', bucket.label, error)
+        return [] as ResearchHit[]
+      }
       }))
       return dedupeAndSort(rssResults.flat())
     })(),
+    fetchBingNewsHits(buckets, 'news', 4),
     fetchGeneralWebHits(account),
     fetchLinkedInHits(account),
     fetchSecSearchHits(account),
     fetchSecFilingHits(account),
   ])) as PromiseSettledResult<ResearchHit[]>[]
 
-  const [newsHits, webHits, linkedInHits, secSearchHits, secFilingHits] = settled.map((result: PromiseSettledResult<ResearchHit[]>) => (
+  const [newsHits, bingNewsHits, webHits, linkedInHits, secSearchHits, secFilingHits] = settled.map((result: PromiseSettledResult<ResearchHit[]>) => (
     result.status === 'fulfilled' ? result.value : []
-  )) as [ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[]]
+  )) as [ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[]]
 
-  return dedupeAndSort([...newsHits, ...webHits, ...linkedInHits, ...secSearchHits, ...secFilingHits])
+  return dedupeAndSort([...newsHits, ...bingNewsHits, ...webHits, ...linkedInHits, ...secSearchHits, ...secFilingHits])
 }
 
 function serializeAccount(account: AccountRow) {
