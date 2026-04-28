@@ -549,8 +549,9 @@ export function TopBar() {
   return (
     // Updated positioning: constrained to match main content area with "Frost Shield" scroll effect
     <header className={cn(
-      "fixed top-0 left-0 lg:left-[70px] right-0 lg:right-80 z-40 flex items-center justify-center h-16 lg:h-24 pointer-events-none transition-all duration-300 ease-in-out",
-      "border-b border-transparent"
+      "fixed top-0 left-0 lg:left-[70px] z-40 flex items-center justify-center h-16 lg:h-24 pointer-events-none transition-all duration-300 ease-in-out",
+      "border-b border-transparent",
+      rightPanelMinimized ? "right-0" : "right-0 lg:right-80"
     )}>
       {/* Visual background and blur layer - Moved here to prevent nested backdrop-filter issues */}
       <AnimatePresence>
@@ -1031,24 +1032,6 @@ export function TopBar() {
               )}
             </button>
 
-            {/* Restore Right Panel Button - Only shows when minimized */}
-            <AnimatePresence>
-              {rightPanelMinimized && (
-                <motion.button
-                  initial={{ opacity: 0, scale: 0.5, x: 20 }}
-                  animate={{ opacity: 1, scale: 1, x: 0 }}
-                  exit={{ opacity: 0, scale: 0.5, x: 20 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                  onClick={toggleRightPanel}
-                  className="icon-button-forensic w-9 h-9 relative text-[#002FA7] hover:text-[#002FA7]/80"
-                  aria-label="Restore Intelligence Feed"
-                >
-                  <ChevronLeft size={22} />
-                  <span className="absolute top-2 right-2.5 w-1.5 h-1.5 rounded-full bg-[#002FA7] animate-pulse" />
-                </motion.button>
-              )}
-            </AnimatePresence>
-
             {/* Manual Dialer Trigger OR Active Call HUD Trigger */}
             {isActive ? (
               <button
@@ -1186,6 +1169,28 @@ export function TopBar() {
             )}
           </AnimatePresence>
         </motion.div>
+
+        {/* Restore Right Panel Button - Positioned outside the quick actions container */}
+        <AnimatePresence>
+          {rightPanelMinimized && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.5, x: 20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.5, x: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="pointer-events-auto ml-3"
+            >
+              <button
+                onClick={toggleRightPanel}
+                className="w-12 h-12 rounded-[24px] bg-zinc-950/80 backdrop-blur-xl border border-white/5 hover:border-white/10 flex items-center justify-center text-[#002FA7] hover:text-[#002FA7]/80 transition-all shadow-[0_0_20px_rgba(0,0,0,0.5)] hover:shadow-[0_0_30px_rgba(0,47,167,0.3)] relative group"
+                aria-label="Restore Intelligence Feed"
+              >
+                <ChevronLeft size={22} className="transition-transform group-hover:scale-110" />
+                <span className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-[#002FA7] animate-pulse" />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div >
     </header >
   )
