@@ -1,0 +1,1463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High Confidence Signals - Complete Brief</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        @page {
+            size: letter;
+            margin: 0.75in;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #ffffff;
+            color: #18181b;
+            line-height: 1.6;
+            padding: 0;
+            max-width: 8.5in;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e4e4e7;
+        }
+        
+        .logo {
+            height: 42px;
+        }
+        
+        .header-meta {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            color: #71717a;
+        }
+        
+        h1 {
+            font-size: 1.65rem;
+            font-weight: 700;
+            color: #18181b;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.02em;
+            page-break-after: avoid;
+        }
+        
+        h2 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #18181b;
+            margin: 1.25rem 0 0.75rem 0;
+            letter-spacing: -0.01em;
+            page-break-after: avoid;
+        }
+        
+        .intro {
+            background: #f4f4f5;
+            border-left: 4px solid #002FA7;
+            padding: 0.9rem;
+            margin-bottom: 1rem;
+            border-radius: 4px;
+            page-break-inside: avoid;
+        }
+        
+        .intro p {
+            color: #3f3f46;
+            font-size: 0.85rem;
+            margin-bottom: 0.4rem;
+            line-height: 1.5;
+        }
+        
+        .intro p:last-child {
+            margin-bottom: 0;
+        }
+        
+        .company-card {
+            background: #fafafa;
+            border: 1px solid #e4e4e7;
+            padding: 1rem;
+            margin-bottom: 1rem;
+            border-radius: 6px;
+            page-break-inside: avoid;
+        }
+        
+        .company-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.6rem;
+            margin-bottom: 0.75rem;
+            flex-wrap: wrap;
+        }
+        
+        .company-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: #002FA7;
+        }
+        
+        .company-name {
+            font-size: 1.15rem;
+            font-weight: 600;
+            color: #18181b;
+        }
+        
+        .company-location {
+            color: #71717a;
+            font-size: 0.85rem;
+        }
+        
+        .section {
+            margin-bottom: 0.65rem;
+        }
+        
+        .section-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #71717a;
+            margin-bottom: 0.35rem;
+        }
+        
+        .section-content {
+            color: #3f3f46;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        
+        .metric {
+            font-family: 'JetBrains Mono', monospace;
+            color: #18181b;
+            font-weight: 500;
+        }
+        
+        .industry-tag {
+            display: inline-block;
+            background: #e4e4e7;
+            color: #52525b;
+            padding: 0.2rem 0.6rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            margin-bottom: 0.6rem;
+        }
+        
+        .signal-tag {
+            display: inline-block;
+            background: #dbeafe;
+            color: #002FA7;
+            padding: 0.2rem 0.6rem;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-bottom: 0.6rem;
+            margin-right: 0.4rem;
+        }
+        
+        .talk-track {
+            background: #eff6ff;
+            border-left: 3px solid #002FA7;
+            padding: 0.85rem;
+            margin-top: 0.75rem;
+            border-radius: 4px;
+        }
+        
+        .talk-track-label {
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #002FA7;
+            margin-bottom: 0.4rem;
+        }
+        
+        .talk-track-content {
+            color: #1e40af;
+            font-size: 0.85rem;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        
+        .strategic-pattern {
+            background: #fafafa;
+            border: 2px solid #002FA7;
+            padding: 1rem;
+            margin: 1.25rem 0;
+            border-radius: 6px;
+            page-break-inside: avoid;
+        }
+        
+        .pattern-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #002FA7;
+            margin-bottom: 0.75rem;
+        }
+        
+        ul {
+            margin-left: 1.1rem;
+            color: #3f3f46;
+        }
+        
+        li {
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        
+        strong {
+            color: #18181b;
+            font-weight: 600;
+        }
+        
+        .volume-divider {
+            border-top: 3px solid #002FA7;
+            margin: 1.75rem 0 1.25rem 0;
+            padding-top: 1.25rem;
+            page-break-before: always;
+        }
+        
+        @media print {
+            body {
+                background: #ffffff;
+                max-width: none;
+            }
+            
+            .header {
+                margin-bottom: 1.25rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <img src="../images/nodalpoint.png" alt="Nodal Point" class="logo">
+        <div class="header-meta">
+            <div>HIGH CONFIDENCE SIGNALS</div>
+            <div>COMPLETE BRIEF</div>
+        </div>
+    </div>
+    
+    <h1>High Confidence – Signal Brief</h1>
+    <h2>Volume 1: Core Accounts</h2>
+
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">1)</span>
+            <div>
+                <span class="company-name">Abracon</span>
+                <span class="company-location">– Bee Cave, TX (abracon.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Electrical & Electronic Manufacturing</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~125 employees</span> in TX CRM sample.
+            </div>
+        </div>
+        
+        <span class="signal-tag">PE-BACKED GROWTH</span>
+        <span class="signal-tag">ACQUISITIONS</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Genstar Capital acquired Abracon from Riverside in April 2026 to drive next-phase strategic growth and M&A. Abracon acquired NEL Frequency Controls (2024) and has restructured leadership for expansion.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Expanding manufacturing and integration of acquisitions typically increases continuous load (testing, labs, production, lab HVAC) and puts cost pressure on CFO.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "With Genstar now backing Abracon and multiple acquisitions in motion, it's the perfect moment to benchmark your ERCOT contracts against what other PE-backed component manufacturers are paying and lock in predictable costs before the next rate cycle."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">2)</span>
+            <div>
+                <span class="company-name">AbiMar Foods</span>
+                <span class="company-location">– Abilene, TX (abimarfoods.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Food Production (Cookies/Crackers)</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~350 employees</span>
+            </div>
+        </div>
+        
+        <span class="signal-tag">$4.6M EXPANSION 2024</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                $4.6M expansion of Texas operations announced 2024, adding automation and capacity at Abilene plants. Source: Development Corporation of Abilene / BakingBusiness coverage.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                New automated lines and ovens increase peak kW and total kWh; expansions often trigger new meters or upgrades.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "You're mid-way through an automation and capacity expansion – we can model the new usage profile and structure a fixed ERCOT contract so your new load doesn't show up at spot prices."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">3)</span>
+            <div>
+                <span class="company-name">Accent Wire Tie</span>
+                <span class="company-location">– Tomball, TX (accentwiretie.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Recycling & Baling Equipment</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~125 employees</span>
+            </div>
+        </div>
+        
+        <span class="signal-tag">PE OWNERSHIP</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Crossplane Capital took a controlling interest in the Accent family of companies to support growth and infrastructure investment.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                PE ownership means active review of all major operating expenses; fabrication and assembly operations are power-intensive.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Your new private-equity partner will be expecting clear cost controls; electricity at the Tomball facility is a large, negotiable line item where we can deliver quick wins."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">4)</span>
+            <div>
+                <span class="company-name">4Front Engineered Solutions</span>
+                <span class="company-location">– Carrollton, TX (4frontes.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Machinery (Dock Levelers, Doors, Loading Systems)</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~350 employees</span>, <span class="metric">$300M revenue</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Large established industrial footprint in Carrollton (3000 Kellway Dr.) and clear fit with Nodal Point ICP.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Manufacturing, testing bays, and warehouse operations translate to solid baseload and good load factor.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "You look like the kind of mid-market industrial operator that utilities love putting on auto-renew; let's see if your current contract actually reflects your usage profile across manufacturing vs. warehouse load."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">5)</span>
+            <div>
+                <span class="company-name">ABM International</span>
+                <span class="company-location">– Montgomery, TX (abminternational.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Machinery (Bedding/Textile Equipment)</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~30 employees</span> in local CRM record but much larger enterprise-wide via acquisitions.
+            </div>
+        </div>
+        
+        <span class="signal-tag">ROLL-UP STRATEGY</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Active roll-up strategy, acquiring Atlanta Attachment Company and other brands, consolidating major bedding-machine manufacturers.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Roll-ups often rationalize production footprints; Texas facilities could see more machines, longer shifts, or added lines.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "As ABM integrates the new brands, we can line up your ERCOT contracts with how production is actually shifting so you're not stuck with contracts sized for a smaller pre-acquisition footprint."
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">6)</span>
+            <div>
+                <span class="company-name">Abyss Solutions</span>
+                <span class="company-location">– Houston, TX (abysssolutions.co)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Industrial Automation / Inspection Robotics</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~150–200 employees</span> globally.
+            </div>
+        </div>
+        
+        <span class="signal-tag">VENTURE-BACKED GROWTH</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Fast-growing Houston HQ with significant venture funding and a strategy focused on large industrial clients; recent partnerships and deployments drive scale.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                HQ, labs, and compute/analytics workloads create a concentrated office/technical load profile; leadership is focused on efficiency and vendor cost.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "You are scaling high-value analytics and robotics work out of Houston; ERCOT power is a controllable cost where we can create multi-year budget certainty while you focus capital on R&D and talent."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">7)</span>
+            <div>
+                <span class="company-name">AC Horn Manufacturing</span>
+                <span class="company-location">– Dallas, TX (achornmfg.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Machinery (Food Processing/Roasting Equipment)</span>
+        
+        <span class="signal-tag">ACQUIRED BY PROBAT 2024</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Acquired by Probat (German coffee-equipment giant) in early 2024; Probat consolidating U.S. operations into Dallas, increasing the strategic importance and likely scale of Horn's Dallas facility.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Consolidation of operations into Dallas increases throughput and equipment run-time (roasters, conveyors, ovens), driving higher and more continuous demand.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "With Probat folding more U.S. operations into your Dallas plant, your load profile is changing – I can help you reset your ERCOT contract to match that new reality before summer peaks."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">8)</span>
+            <div>
+                <span class="company-name">ABC Auto Parts</span>
+                <span class="company-location">– Longview, TX (abcauto.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Automotive Parts Distribution</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~125 employees</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Solid mid-market distributor anchored in Longview; steady regional presence.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Distribution centers and parts warehouses are strong C&I loads, and secondary markets like Longview see less broker competition.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Most brokers chase Dallas and Houston – I specialize in getting better power deals for operators like you in markets the big players ignore."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">9)</span>
+            <div>
+                <span class="company-name">12 Oaks Senior Living</span>
+                <span class="company-location">– Dallas, TX (12oaks.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Senior Living Management</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Multi-facility operator with corporate offices at Merit/Park Central in Dallas and numerous managed communities.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Senior living portfolios run 24/7 HVAC, lighting, kitchens, and medical equipment across many ESIDs – ideal for portfolio aggregation.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Instead of letting each community renew on its own, we can synchronize and aggregate your meters across Texas to leverage your total kWh for better pricing."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">10)</span>
+            <div>
+                <span class="company-name">Access Dental & Orthodontics</span>
+                <span class="company-location">– Irving, TX (accessdentalclinics.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Healthcare / Dental DSO</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">~125 employees</span> HQ, <span class="metric">20+ clinics</span> across multiple states.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                Growing dental service organization headquartered at 8150 Springwood Dr, Irving; continued network expansion across Texas and other states.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Multi-site medical/dental operator with repeatable, similar load shapes per clinic; perfect for templated ERCOT contracts.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "You already manage 20+ clinics – we can standardize your Texas power contracts so every new location slots into a proven rate structure from day one."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">11)</span>
+            <div>
+                <span class="company-name">AccessDx Laboratory</span>
+                <span class="company-location">– Houston, TX (accessdxlab.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Biotechnology / Diagnostics Lab</span>
+        
+        <span class="signal-tag">EXPANSION FEB 2025</span>
+        
+        <div class="section">
+            <div class="section-label">Signal</div>
+            <div class="section-content">
+                February 2025 announcement of expanded integration with PointClickCare and growing hospital partnerships; high-compute, lab-heavy operation at 8920 Kirby Dr, Houston.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Labs have extremely high kWh per sq ft (refrigeration, analyzers, fume hoods, HVAC) and run long hours.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Your lab's energy intensity is high and growing with new integrations – locking in a competitive ERCOT rate now materially improves your per-test economics."
+            </div>
+        </div>
+    </div>
+    
+    <div class="strategic-pattern">
+        <div class="pattern-title">Volume 1 - Suggested Next Steps</div>
+        
+        <div class="section">
+            <div class="section-content">
+                <strong>Prioritize outreach in this order:</strong> AbiMar Foods (strongest signal), Abracon, Accent Wire Tie, AC Horn, ABM International, AccessDx Lab, 4Front, then multi-location healthcare/dental operators.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-content">
+                <strong>Tailor talk tracks around:</strong> (1) recent M&A or facility expansion, (2) private equity ownership and cost control, (3) multi-site portfolio consolidation across Texas metros.
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="volume-divider">
+        <h2>Volume 2: Additional High Confidence Accounts</h2>
+        
+        <div class="intro">
+            <p>This volume adds additional High Confidence accounts from your Supabase list that fit your industrial, logistics, construction, and food profile and had not been highlighted in the first brief.</p>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">1)</span>
+            <div>
+                <span class="company-name">ACT Pipe & Supply Inc.</span>
+                <span class="company-location">– Houston + Statewide TX (actpipe.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Wholesale / Waterworks Distribution</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">350 employees</span>, Houston HQ at 6950 W Sam Houston Pkwy N; multiple CFO/Controller contacts.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">External Signal</div>
+            <div class="section-content">
+                ACT appears as a primary waterworks distributor with extensive Texas footprint – Dallas, Fort Worth, Houston, Mission, Temple, Bryan, Beaumont, and more – on McWane Ductile and similar distributor lists. They are also listed as a BuyBoard vendor for water/wastewater pumps, motors, and water treatment chemicals through 2028–2029.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Multiple large warehouses and yards across Texas metro and secondary markets; heavy use of lighting, yard equipment, and fabrication/assembly spaces. Their locations are close to high-load infrastructure projects (TxDOT/municipal) where operations run extended hours.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "You've built a statewide waterworks distribution network with multiple Texas warehouses; let's benchmark each site's ERCOT contract and see where we can standardize pricing and terms, especially as you ramp work tied to infrastructure and municipal projects."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">2)</span>
+            <div>
+                <span class="company-name">Action Gypsum Supply LP</span>
+                <span class="company-location">– Houston + Dallas + Multi-state (actiongypsum.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Building Materials</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">350 employees</span>, Houston address 9635 W Little York Rd; CFO + Controller in High Confidence list.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">External Signal</div>
+            <div class="section-content">
+                Action Gypsum operates more than 30 locations across TX, AZ, CA, CO, NV, and OK, including major sites in South Houston (4452 Genoa Red Bluff) and Dallas (1706 N I-35E, Carrollton), with extended hours serving large construction contractors.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Large distribution centers with high-bay lighting, loading equipment, indoor/outdoor storage, and frequent truck traffic; regional building cycles can drive extended shifts and higher kWh.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "You're running a multi-state materials network with long operating hours; we can build a Texas-specific energy strategy that protects margins on every gypsum load you ship in ERCOT territory."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">3)</span>
+            <div>
+                <span class="company-name">Action Meat Distributors</span>
+                <span class="company-location">– Houston, TX (actionmeat.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Wholesale Meat Distribution / Cold Chain</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">30 employees</span> and <span class="metric">$300M+ revenue</span> in your data – strong revenue-to-headcount ratio.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">External Signal</div>
+            <div class="section-content">
+                Action Meat runs a large wholesale distribution operation from 1920 S Starpoint Dr, Houston, with a fleet of trucks delivering meat, poultry, cheese, and seafood across all major Texas markets.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Significant freezer/cooler capacity and 24/7 cold-chain operations; concentrated load at the Houston facility with refrigeration, processing, and truck loading bays.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Your cold storage and distribution hub at S Starpoint is exactly the kind of 24/7 load ERCOT punishes in summer; I can help you structure a contract that protects your margins as volumes grow across Texas."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">4)</span>
+            <div>
+                <span class="company-name">A3 Glass Fabricator</span>
+                <span class="company-location">– Houston, TX (a3glassfabricator.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Glass Fabrication</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">30 employees</span>, Houston address 13021 Windfern Rd; CFO contact in list.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">External Signal</div>
+            <div class="section-content">
+                A3 positions itself as a full-service glass fabrication company serving commercial and residential projects across Houston; online presence and reviews emphasize steady contractor volume.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Fabrication facilities rely on cutting, tempering, and finishing equipment plus warehouse lighting and dust collection systems; high kWh per sq ft, especially during peak construction season.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Your fabrication shop's energy profile tracks the Houston construction cycle; we can lock in a contract that smooths those peaks so you're not exposed to seasonal ERCOT volatility."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">5)</span>
+            <div>
+                <span class="company-name">ABF Packing</span>
+                <span class="company-location">– Dublin, TX (abfpacking.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Beef Processing & Packing</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">30 employees</span>, rural address south of Dublin; owner contact in list.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">External Signal</div>
+            <div class="section-content">
+                ABF is a vertically integrated beef processor (The Udder Packers) with on-site slaughter, packing, and further processing; available case studies emphasize consistent throughput for private-label and branded beef.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Slaughter and packing operations are extremely energy intensive – refrigeration, washdown, motors, pumps, and compressed air – often running long hours or multiple shifts.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Beef processing is one of the highest kWh-per-pound industries in ERCOT; we can align your contract with your kill/fabrication schedules so your true load shape is priced correctly."
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">6)</span>
+            <div>
+                <span class="company-name">1X Plastics</span>
+                <span class="company-location">– Fort Worth, TX (1xplastics.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Plastics / Industrial Equipment</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                <span class="metric">30 employees</span>, Fort Worth address 7333 Jack Newell Blvd N; owner contact in list.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">External Signal</div>
+            <div class="section-content">
+                1X Plastics manufactures or refurbishes equipment for plastics/converting applications; leadership bios highlight decades of experience and a growing service business for industrial clients.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why Energy Matters</div>
+            <div class="section-content">
+                Shop environment with CNC machines, extruders, or similar heavy equipment; good baseload and relatively stable usage month to month.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Call Angle</div>
+            <div class="talk-track-content">
+                "Your Fort Worth shop looks like a classic industrial ERCOT customer – we can likely improve your contract terms just by matching pricing to your actual run hours and load factor."
+            </div>
+        </div>
+    </div>
+    
+    <div class="strategic-pattern">
+        <div class="pattern-title">Portfolio Angle: Cold Chain + Fabrication</div>
+        
+        <div class="section">
+            <div class="section-content">
+                Combined, these three accounts (glass fabrication + beef packing + meat distribution) give you a powerful 'cold chain + fabrication' story in Texas.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Pitch Theme</div>
+            <div class="talk-track-content">
+                "We work with energy-intensive manufacturing and food companies across ERCOT that look just like your operations – from cold storage to fabrication shops – and we've helped them navigate both price spikes and contract pitfalls unique to Texas."
+            </div>
+        </div>
+    </div>
+    
+    <div class="strategic-pattern">
+        <div class="pattern-title">Construction Materials Cluster</div>
+        
+        <div class="section">
+            <div class="section-content">
+                ACT Pipe & Supply and Action Gypsum are anchor distributors in waterworks and building materials with multiple Texas locations.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Pitch Theme</div>
+            <div class="talk-track-content">
+                "For construction materials groups with yards and DCs in several Texas metros, we typically find hidden savings by standardizing term lengths, aligning renewal dates, and fixing known peak periods before the market moves."
+            </div>
+        </div>
+    </div>
+    
+    <div class="intro">
+        <div class="section-label">Volume 2 - Suggested Next Steps</div>
+        <p><strong>First calls from this volume:</strong> ACT Pipe & Supply, Action Gypsum Supply, Action Meat Distributors.</p>
+        <p><strong>Secondary calls:</strong> A3 Glass Fabricator, ABF Packing, 1X Plastics.</p>
+        <p><strong>Strategy:</strong> Use vertical-specific talk tracks: 'cold chain and protein', 'construction materials distributors', 'fabrication and industrial shops' rather than a generic broker pitch.</p>
+    </div>
+
+    
+    <div class="volume-divider">
+        <h2>Volume 3: News & Structural Signals</h2>
+        
+        <div class="intro">
+            <p>This volume focuses only on <strong>hard signals</strong> you can reference in calls and emails: recent acquisitions, equipment investments, and growth moves that show you're paying attention to each company's world.</p>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">1)</span>
+            <div>
+                <span class="company-name">AirBorn Inc.</span>
+                <span class="company-location">– Georgetown, TX (airborn.com)</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                Controller + CFO in your High Confidence list; <span class="metric">750 employees</span>, <span class="metric">$300M revenue</span> in your data.
+            </div>
+        </div>
+        
+        <span class="signal-tag">ACQUISITION CLOSED Q1 2025</span>
+        
+        <div class="section">
+            <div class="section-label">Big Change</div>
+            <div class="section-content">
+                In late 2024, connector giant <strong>Molex</strong> (a Koch subsidiary) announced an agreement to acquire AirBorn, an employee-owned company headquartered in Georgetown, TX, specializing in rugged connectors for aerospace, defense, space, medical, and industrial OEMs. The acquisition closed in early 2025 and now forms the core of Molex's new <strong>Aerospace & Defense Division</strong>, with combined headcount over 50,000 across 85 plants.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Matters</div>
+            <div class="section-content">
+                Moving from employee-owned to being part of Molex/Koch is a huge cultural and structural shift; they'll be under new reporting structures, integration timelines, and margin expectations.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track Snippet</div>
+            <div class="talk-track-content">
+                "I saw Molex completed the acquisition of AirBorn and that your Georgetown operation is now at the center of their new Aerospace & Defense division. When any aerospace plant integrates into a larger portfolio, energy is one of the easiest operating costs to bring under tighter control – have you had anyone benchmark the Georgetown facility's ERCOT contracts post-deal?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">2)</span>
+            <div>
+                <span class="company-name">AGE Industries Ltd.</span>
+                <span class="company-location">– Cleburne, TX (ageindustries.com)</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                Owner + CFO in your High Confidence list; <span class="metric">125 employees</span>, <span class="metric">$300M revenue</span> in your data.
+            </div>
+        </div>
+        
+        <span class="signal-tag">EQUIPMENT EXPANSION 2024</span>
+        
+        <div class="section">
+            <div class="section-label">Hard Signal – New Equipment & Capacity Expansion</div>
+            <div class="section-content">
+                AGE announced the addition of <strong>two flexo folder-gluers, two unitizers, an automated stitcher, and a new scrap-handling system</strong> at its Texas plants. These upgrades increase efficiency, throughput per shift, and reduce forklift movements – effectively increasing production capacity within the same footprint.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Scale Context</div>
+            <div class="section-content">
+                LinkedIn company profile notes <strong>over 800,000 sq ft of manufacturing and warehousing</strong> across Texas, serving five states and two countries in packaging and containers.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Matters</div>
+            <div class="section-content">
+                More machines and higher throughput mean more connected load and likely higher peak demand; the new scrap system also changes how and when motors and conveyors run.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track Snippet</div>
+            <div class="talk-track-content">
+                "I noticed you recently invested in new flexo folder-gluers and scrap-handling systems across your Texas plants, and you're running over 800,000 sq ft of manufacturing space. When you increase throughput like that, your load shape changes – have you revisited your ERCOT contracts to match the new demand profile?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">3)</span>
+            <div>
+                <span class="company-name">Albers Aerospace</span>
+                <span class="company-location">– McKinney, TX (albers.aero)</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">CRM Snapshot</div>
+            <div class="section-content">
+                Multiple CFO contacts in your High Confidence list; <span class="metric">350 employees</span>, <span class="metric">$75M revenue</span> in your data.
+            </div>
+        </div>
+        
+        <span class="signal-tag">ACQUISITION SPREE 2024-2025</span>
+        
+        <div class="section">
+            <div class="section-label">Hard Signal – Acquisition Spree & Expanded Capabilities</div>
+            <div class="section-content">
+                <ul>
+                    <li><strong>Nov 2024:</strong> Albers announced acquisitions of <strong>Advanced Packaging Inc.</strong> and <strong>Impact Case & Container</strong>, adding specialized protective case and storage manufacturing to its portfolio and increasing manufacturing capacity.</li>
+                    <li><strong>Feb 2025:</strong> Announced acquisition of <strong>Parallel Ventures</strong>, further strengthening aerospace manufacturing capabilities and machining depth.</li>
+                    <li><strong>Feb 2024:</strong> Acquisition of <strong>Onepath Systems LLC</strong>, an 18-year DoD contractor for turnkey installation and technical integration, which becomes a wholly owned subsidiary under the Defense Division.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Matters</div>
+            <div class="section-content">
+                Multiple acquisitions in 12–18 months = integration work, consolidation of facilities, possible new Texas production or integration sites, and intense focus from CFO on cost control and synergy realization.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track Snippet</div>
+            <div class="talk-track-content">
+                "You've been busy – between the Advanced Packaging, Impact Case & Container, Parallel Ventures and Onepath deals, Albers' manufacturing and integration footprint has changed a lot in the last year. In every integration I've seen, energy spend at the core plants becomes a lever for hitting synergy targets – where are you today on locking in ERCOT pricing for your McKinney operations?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="strategic-pattern">
+        <div class="pattern-title">Strategic Pattern You Can Point To</div>
+        
+        <div class="section">
+            <div class="section-label">Common Theme</div>
+            <div class="section-content">
+                <strong>All three are mid-market industrials in Texas that have gone through meaningful structural change</strong> in the last 24 months – either being acquired (AirBorn), investing heavily in equipment (AGE), or acquiring others (Albers).
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">How to Phrase It</div>
+            <div class="talk-track-content">
+                "A lot of Texas industrial manufacturers like AirBorn, AGE Industries, and Albers Aerospace have been through major structural changes lately – acquisitions, new divisions, and large equipment upgrades. We've found that's exactly when it makes sense to take a fresh look at ERCOT contracts because your usage pattern and risk profile are no longer what they were when you originally signed your deals."
+            </div>
+        </div>
+    </div>
+    
+    <div class="intro">
+        <div class="section-label">Volume 3 - Suggested Usage</div>
+        <p>Use this brief when emailing or calling <strong>AirBorn, AGE Industries, or Albers Aerospace</strong> – open by referencing the specific move (Molex acquisition, new flexo equipment, or recent M&A) so it's obvious you've done your homework.</p>
+    </div>
+    
+</body>
+</html>
+
+    
+    <div class="volume-divider">
+        <h2>Volume 4: Recent News & Structural Signals</h2>
+        
+        <div class="intro">
+            <p>This brief focuses exclusively on hard, recent news signals tied to accounts already in your High Confidence CRM list that have not been addressed in prior volumes. Each section is written as a cold-call / email reference: the signal, why it creates an energy conversation, and a word-for-word talk track you can adapt.</p>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">1)</span>
+            <div>
+                <span class="company-name">Ryder System Inc.</span>
+                <span class="company-location">– Miami, FL HQ (ryder.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Transportation / Logistics</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Contact</div>
+            <div class="section-content">
+                Josh Haber (VP Corporate Real Estate, Construction & Facility Services) | <span class="metric">10,000+ employees</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">The Signal</div>
+            <div class="section-content">
+                Ryder has been on a Texas facility opening spree tied to the U.S.-Mexico nearshoring boom:
+                <ul>
+                    <li><strong>January 2026:</strong> Opened a brand-new 109,000 sq ft logistics facility in <strong>Laredo, TX</strong> — 51 dock doors, 2 ramps, 114 trailer spaces, handling 11,250+ cross-border freight movements per month for 19 customers in auto, industrial, retail, and high-tech.</li>
+                    <li><strong>April 2024:</strong> Opened a 228,000 sq ft multiclient warehouse and cross-dock in <strong>El Paso, TX</strong> near the Ysleta Port of Entry to support northbound goods from Juárez, Mexico.</li>
+                    <li><strong>February 2024:</strong> A second 228,000 sq ft Laredo facility opened just three miles from the World Trade Bridge.</li>
+                </ul>
+                That's three major Texas facility openings in under 24 months — all brand-new meters, brand-new leases in ERCOT.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Creates an Energy Conversation</div>
+            <div class="section-content">
+                Each new Texas warehouse is a fresh energy account with no legacy contract in place. Ryder is growing fast enough that whoever signs first sets the baseline for their entire Texas cross-border portfolio. The Laredo and El Paso facilities run dock equipment, lighting, climate control, and security systems around the clock given their cross-border operational hours.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track</div>
+            <div class="talk-track-content">
+                "I saw Ryder just opened your third major Texas logistics facility in less than two years — the new Laredo site in January and the El Paso location before that. When you're standing up facilities that fast in ERCOT, you typically get defaulted into whatever rate the utility offers. We specialize in getting those new meters under a proper fixed-rate contract before you're exposed to summer peaks. Are those three Texas sites already under contract, or are they still on utility default?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">2)</span>
+            <div>
+                <span class="company-name">Ferguson Enterprises</span>
+                <span class="company-location">– Newport News, VA HQ (ferguson.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Wholesale / Distribution</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Contact</div>
+            <div class="section-content">
+                Paul Vlaming, Andrew Huddleston, Jack Willard (Real Estate & Facilities PMs) | <span class="metric">10,000+ employees</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">The Signal</div>
+            <div class="section-content">
+                Ferguson is the largest U.S. plumbing, HVAC, and waterworks distributor ($29.7B annual revenue) and has been aggressively growing its Texas footprint:
+                <ul>
+                    <li><strong>April 2025:</strong> Signed a new 35,000 sq ft lease in <strong>San Marcos, TX</strong> (between Austin and San Antonio), pushing its Austin-area real estate above 500,000 sq ft — on top of a 207,000 sq ft lease signed in 2023 near Austin-Bergstrom airport.</li>
+                    <li>Ferguson already operates Market Distribution Centers in <strong>both Dallas and Houston</strong> for branch replenishment, plus dozens of waterworks branches including locations in Fort Worth (13201 Harmon Rd) and multiple Houston sites.</li>
+                    <li><strong>February 2026:</strong> Ferguson reported strong 2025 results and issued forward guidance suggesting continued Texas expansion as construction markets remain active.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Creates an Energy Conversation</div>
+            <div class="section-content">
+                Multi-site wholesale distributors with dozens of Texas branches are exactly where aggregated ERCOT purchasing creates the most value. Ferguson's DFW and Houston distribution centers are large, high-load facilities. Their procurement team (your contacts are in Real Estate & Facilities) typically owns utility management as part of the broader vendor portfolio.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track</div>
+            <div class="talk-track-content">
+                "I noticed Ferguson just pushed past 500,000 square feet in the Austin market alone, and you've got major distribution centers running in both Dallas and Houston. With that kind of Texas footprint, you're likely paying retail ERCOT rates at half a dozen sites. We help large distributors aggregate their Texas locations under a single competitive contract — have your facilities managers had a chance to benchmark those sites against the current market?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">3)</span>
+            <div>
+                <span class="company-name">Smurfit Westrock</span>
+                <span class="company-location">– (smurfitwestrock.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Packaging & Containers</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Contacts</div>
+            <div class="section-content">
+                Richard Tyler (Director of Real Estate), Bert Collins (Director of Facilities and Real Estate) | <span class="metric">10,000+ employees</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">The Signal — Two Separate Stories</div>
+            <div class="section-content">
+                <strong>Story A – Major merger integration underway:</strong><br>
+                Smurfit Kappa acquired WestRock in July 2024, creating a combined global packaging giant with 560+ locations worldwide and 2025 as its first full year of combined operations. Integration at this scale means facility consolidation decisions, new energy procurement strategies, and cost-reduction mandates from the combined CFO.
+                <br><br>
+                <strong>Story B – Texas plant closure creates a rebid moment:</strong><br>
+                Smurfit Westrock announced the permanent closure of its Forney, TX containerboard facility (affecting approximately 200+ employees), part of a broader capacity rationalization. When a plant closes, neighboring facilities absorb volume — meaning nearby Texas sites are likely running harder and using more power than their current contracts anticipated.
+                <br><br>
+                Additionally, the company signed two solar VPPAs in Texas and is actively managing its Texas energy exposure at the executive level — meaning energy procurement is already a known priority.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Creates an Energy Conversation</div>
+            <div class="section-content">
+                Post-merger cost rationalization + a Texas plant closure + documented energy procurement activity = CFO-level mandate to optimize every remaining Texas facility's cost base. Richard Tyler (Director of Real Estate) and Bert Collins (Director of Facilities and Real Estate) are the exact right people to have this conversation.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track</div>
+            <div class="talk-track-content">
+                "Congratulations on completing the Smurfit Kappa / WestRock combination — 2025 being your first full year together must mean every cost line is getting scrutinized. I also saw the Forney, Texas facility is closing, which usually means your remaining Texas plants are absorbing more volume. We work with packaging manufacturers in ERCOT who are going through exactly that kind of consolidation — making sure the plants that stay open are under the right contracts for their new load profiles. Is that something your facilities team has revisited lately?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">4)</span>
+            <div>
+                <span class="company-name">Northrop Grumman</span>
+                <span class="company-location">– (northropgrumman.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Defense & Space</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Contacts</div>
+            <div class="section-content">
+                9 Facilities & Real Estate Managers listed (Daniel Hutton, Brad Musgrove, Michael Hughes, Tyler Bo, Oscar Renneker, Kelly Singleton, Ryan McFarland, Marco Torres, Jeff Drugg) | <span class="metric">10,000+ employees</span>, <span class="metric">$1B+ revenue</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">The Signal</div>
+            <div class="section-content">
+                Northrop Grumman is in the middle of its biggest production ramp in decades:
+                <ul>
+                    <li><strong>March 2026:</strong> USAF and Northrop agreed to deploy <strong>$4.5 billion</strong> in FY2025 reconciliation funding to massively accelerate B-21 Raider production capacity. B-21 deliveries are slated for Dyess Air Force Base in Abilene, TX, positioning Texas as a key deployment and support hub.</li>
+                    <li>Northrop has nine different Facilities & Real Estate Managers in your CRM, suggesting a large, fragmented Texas operational footprint. Each manager is likely independently managing utilities at their site.</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Creates an Energy Conversation</div>
+            <div class="section-content">
+                A defense production ramp of this magnitude requires extended shifts, new manufacturing infrastructure, and higher electrical consumption at Texas facilities. With nine separate facilities managers in your list, there is almost certainly no coordinated ERCOT energy strategy — each site is likely on its own default or expiring contract.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track</div>
+            <div class="talk-track-content">
+                "With the $4.5 billion B-21 production expansion just approved and Dyess AFB in Texas serving as a key delivery site, Northrop's Texas operational tempo is about to increase significantly. I noticed you have multiple facilities managers across different Texas sites, which usually means energy contracts aren't being managed in a coordinated way. We help defense contractors consolidate ERCOT purchasing across sites so you're not leaving savings on the table right when production ramps — who on your team owns the energy side for the Texas facilities?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="company-card">
+        <div class="company-header">
+            <span class="company-number">5)</span>
+            <div>
+                <span class="company-name">C.H. Robinson</span>
+                <span class="company-location">– Eden Prairie, MN HQ (chrobinson.com)</span>
+            </div>
+        </div>
+        
+        <span class="industry-tag">Logistics & Supply Chain</span>
+        
+        <div class="section">
+            <div class="section-label">CRM Contact</div>
+            <div class="section-content">
+                Maria Zaffke (Senior Manager, Real Estate & Facilities) | <span class="metric">10,000+ employees</span>
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">The Signal</div>
+            <div class="section-content">
+                C.H. Robinson — the world's largest third-party logistics broker — underwent a major CEO transition and structural overhaul in 2023–2024, cutting costs and restructuring its operating model under new CEO Dave Bozeman (the former Amazon supply chain executive). The restructuring targeted $1 billion in cost reductions and involved consolidating facilities and renegotiating vendor contracts.
+                <br><br>
+                C.H. Robinson operates a significant Texas presence including a major Dallas-area freight hub, consistent with its role as one of the top brokers on cross-border U.S.-Mexico trade lanes — a market growing rapidly with nearshoring.
+            </div>
+        </div>
+        
+        <div class="section">
+            <div class="section-label">Why This Creates an Energy Conversation</div>
+            <div class="section-content">
+                Post-restructuring, vendor contracts including energy are exactly what a CFO mandate scrutinizes. Maria Zaffke (Real Estate & Facilities Senior Manager) is your door in — she owns real estate and facilities, which typically includes utilities at the operating hub level.
+            </div>
+        </div>
+        
+        <div class="talk-track">
+            <div class="talk-track-label">Talk Track</div>
+            <div class="talk-track-content">
+                "C.H. Robinson went through a pretty significant restructuring over the last couple of years, and I know the focus has been on reducing costs across every vendor category. Your Texas freight hubs are some of the highest-volume facilities in the ERCOT market. Have your facilities and real estate teams had a chance to benchmark energy contracts since the restructuring — we've helped other large 3PLs find meaningful savings just by getting off default utility pricing?"
+            </div>
+        </div>
+    </div>
+    
+    <div class="strategic-pattern">
+        <div class="pattern-title">Volume 4 - Priority Ranking for Outreach</div>
+        
+        <div class="section">
+            <div class="section-content">
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                    <thead>
+                        <tr style="background: #e4e4e7;">
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid #d4d4d8;">#</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid #d4d4d8;">Company</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid #d4d4d8;">Signal Type</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid #d4d4d8;">Urgency</th>
+                            <th style="padding: 0.5rem; text-align: left; border: 1px solid #d4d4d8;">Texas Footprint Size</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">1</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Ryder System</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">3 new TX facilities opened 2024–2026</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;"><strong>Very High</strong></td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">3 new sites + existing fleet network</td>
+                        </tr>
+                        <tr style="background: #fafafa;">
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">2</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Smurfit Westrock</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Post-merger integration + TX plant closure</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;"><strong>Very High</strong></td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">560+ global, multiple TX plants</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">3</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Northrop Grumman</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">$4.5B production ramp, Dyess AFB TX delivery</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;"><strong>High</strong></td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">9 facilities managers in CRM</td>
+                        </tr>
+                        <tr style="background: #fafafa;">
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">4</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Ferguson Enterprises</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">500k+ sq ft Austin, Dallas MDC, Houston MDC</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;"><strong>High</strong></td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Dozens of TX branches + 2 DCs</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">5</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">C.H. Robinson</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Post-restructuring cost mandate</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Medium</td>
+                            <td style="padding: 0.5rem; border: 1px solid #d4d4d8;">Dallas/TX freight hubs</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="section" style="margin-top: 1rem;">
+            <div class="section-content" style="font-size: 0.8rem; font-style: italic; color: #71717a;">
+                All signals sourced from public news, company press releases, and regulatory filings as of April 2026.
+            </div>
+        </div>
+    </div>
+    
+</body>
+</html>
