@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>High Confidence Signals Vol. 1 - Signal Brief</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0a0a0b;
+            color: #fafafa;
+            line-height: 1.6;
+            padding: 0;
+        }
+        
+        .page {
+            width: 8.5in;
+            min-height: 11in;
+            margin: 0 auto;
+            background: #0a0a0b;
+            padding: 0.75in;
+            page-break-after: always;
+        }
+        
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .logo {
+            height: 48px;
+        }
+        
+        .header-meta {
+            text-align: right;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            color: #a1a1aa;
+        }
+        
+        h1 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #fafafa;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+        
+        .intro {
+            background: rgba(9, 9, 11, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+            padding: 1.25rem;
+            margin-bottom: 2rem;
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+        }
+        
+        .intro p {
+            color: #a1a1aa;
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
+        }
+        
+        .intro p:last-child {
+            margin-bottom: 0;
+        }
+        
+        .company-card {
+            background: rgba(9, 9, 11, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.5);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            backdrop-filter: blur(12px);
+            page-break-inside: avoid;
+        }
+        
+        .company-header {
+            display: flex;
+            align-items: baseline;
+            gap: 0.75rem;
+            margin-bottom: 1rem;
+        }
+        
+        .company-number {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #002FA7;
+        }
+        
+        .company-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #fafafa;
+        }
+        
+        .company-location {
+            color: #a1a1aa;
+            font-size: 0.9rem;
+        }
+        
+        .section {
+            margin-bottom: 1rem;
+        }
+        
+        .section-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #71717a;
+            margin-bottom: 0.5rem;
+        }
+        
+        .section-content {
+            color: #d4d4d8;
+            font-size: 0.9rem;
+        }
+        
+        .metric {
+            font-family: 'JetBrains Mono', monospace;
+            color: #fafafa;
+            font-weight: 500;
+        }
+        
+        .industry-tag {
+            display: inline-block;
+            background: rgba(113, 113, 122, 0.15);
+            color: #a1a1aa;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+        }
+        
+        .signal-tag {
+            display: inline-block;
+            background: rgba(0, 47, 167, 0.15);
+            color: #002FA7;
+            padding: 0.25rem 0.75rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            margin-right: 0.5rem;
+        }
+        
+        .talk-track {
+            background: rgba(0, 47, 167, 0.08);
+            border-left: 3px solid #002FA7;
+            padding: 1rem;
+            margin-top: 1rem;
+            border-radius: 4px;
+        }
+        
+        .talk-track-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #002FA7;
+            margin-bottom: 0.5rem;
+        }
+        
+        .talk-track-content {
+            color: #e4e4e7;
+            font-size: 0.9rem;
+            font-style: italic;
+            line-height: 1.5;
+        }
+        
+        .strategic-pattern {
+            background: rgba(9, 9, 11, 0.9);
+            border: 2px solid #002FA7;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 8px;
+            page-break-inside: avoid;
+        }
+        
+        .pattern-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #002FA7;
+            margin-bottom: 1rem;
+        }
+        
+        ul {
+            margin-left: 1.25rem;
+            color: #d4d4d8;
+        }
+        
+        li {
+            margin-bottom: 0.5rem;
+        }
+        
+        strong {
+            color: #fafafa;
+            font-weight: 600;
+        }
+        
+        @media print {
+            body {
+                background: #0a0a0b;
+            }
+            .page {
+                margin: 0;
+                page-break-after: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <img src="../images/nodalpoint.png" alt="Nodal Point" class="logo">
+            <div class="header-meta">
+                <div>VOL. 1</div>
+                <div>SIGNAL BRIEF</div>
+            </div>
+        </div>
+        
+        <h1>High Confidence – Signal Brief</h1>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">1)</span>
+                <div>
+                    <span class="company-name">Abracon</span>
+                    <span class="company-location">– Bee Cave, TX (abracon.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Electrical & Electronic Manufacturing</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~125 employees</span> in TX CRM sample.
+                </div>
+            </div>
+            
+            <span class="signal-tag">PE-BACKED GROWTH</span>
+            <span class="signal-tag">ACQUISITIONS</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Genstar Capital acquired Abracon from Riverside in April 2026 to drive next-phase strategic growth and M&A. Abracon acquired NEL Frequency Controls (2024) and has restructured leadership for expansion.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Expanding manufacturing and integration of acquisitions typically increases continuous load (testing, labs, production, lab HVAC) and puts cost pressure on CFO.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "With Genstar now backing Abracon and multiple acquisitions in motion, it's the perfect moment to benchmark your ERCOT contracts against what other PE-backed component manufacturers are paying and lock in predictable costs before the next rate cycle."
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">2)</span>
+                <div>
+                    <span class="company-name">AbiMar Foods</span>
+                    <span class="company-location">– Abilene, TX (abimarfoods.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Food Production (Cookies/Crackers)</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~350 employees</span>
+                </div>
+            </div>
+            
+            <span class="signal-tag">$4.6M EXPANSION 2024</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    $4.6M expansion of Texas operations announced 2024, adding automation and capacity at Abilene plants. Source: Development Corporation of Abilene / BakingBusiness coverage.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    New automated lines and ovens increase peak kW and total kWh; expansions often trigger new meters or upgrades.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "You're mid-way through an automation and capacity expansion – we can model the new usage profile and structure a fixed ERCOT contract so your new load doesn't show up at spot prices."
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">3)</span>
+                <div>
+                    <span class="company-name">Accent Wire Tie</span>
+                    <span class="company-location">– Tomball, TX (accentwiretie.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Recycling & Baling Equipment</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~125 employees</span>
+                </div>
+            </div>
+            
+            <span class="signal-tag">PE OWNERSHIP</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Crossplane Capital took a controlling interest in the Accent family of companies to support growth and infrastructure investment.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    PE ownership means active review of all major operating expenses; fabrication and assembly operations are power-intensive.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "Your new private-equity partner will be expecting clear cost controls; electricity at the Tomball facility is a large, negotiable line item where we can deliver quick wins."
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="page">
+        <div class="header">
+            <img src="../images/nodalpoint.png" alt="Nodal Point" class="logo">
+            <div class="header-meta">
+                <div>VOL. 1</div>
+                <div>PAGE 2</div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">4)</span>
+                <div>
+                    <span class="company-name">4Front Engineered Solutions</span>
+                    <span class="company-location">– Carrollton, TX (4frontes.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Machinery (Dock Levelers, Doors, Loading Systems)</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~350 employees</span>, <span class="metric">$300M revenue</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Large established industrial footprint in Carrollton (3000 Kellway Dr.) and clear fit with Nodal Point ICP.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Manufacturing, testing bays, and warehouse operations translate to solid baseload and good load factor.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "You look like the kind of mid-market industrial operator that utilities love putting on auto-renew; let's see if your current contract actually reflects your usage profile across manufacturing vs. warehouse load."
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">6)</span>
+                <div>
+                    <span class="company-name">ABM International</span>
+                    <span class="company-location">– Montgomery, TX (abminternational.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Machinery (Bedding/Textile Equipment)</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~30 employees</span> in local CRM record but much larger enterprise-wide via acquisitions.
+                </div>
+            </div>
+            
+            <span class="signal-tag">ROLL-UP STRATEGY</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Active roll-up strategy, acquiring Atlanta Attachment Company and other brands, consolidating major bedding-machine manufacturers.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Roll-ups often rationalize production footprints; Texas facilities could see more machines, longer shifts, or added lines.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "As ABM integrates the new brands, we can line up your ERCOT contracts with how production is actually shifting so you're not stuck with contracts sized for a smaller pre-acquisition footprint."
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">7)</span>
+                <div>
+                    <span class="company-name">Abyss Solutions</span>
+                    <span class="company-location">– Houston, TX (abysssolutions.co)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Industrial Automation / Inspection Robotics</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~150–200 employees</span> globally.
+                </div>
+            </div>
+            
+            <span class="signal-tag">VENTURE-BACKED GROWTH</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Fast-growing Houston HQ with significant venture funding and a strategy focused on large industrial clients; recent partnerships and deployments drive scale.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    HQ, labs, and compute/analytics workloads create a concentrated office/technical load profile; leadership is focused on efficiency and vendor cost.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "You are scaling high-value analytics and robotics work out of Houston; ERCOT power is a controllable cost where we can create multi-year budget certainty while you focus capital on R&D and talent."
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="page">
+        <div class="header">
+            <img src="../images/nodalpoint.png" alt="Nodal Point" class="logo">
+            <div class="header-meta">
+                <div>VOL. 1</div>
+                <div>PAGE 3</div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">8)</span>
+                <div>
+                    <span class="company-name">AC Horn Manufacturing</span>
+                    <span class="company-location">– Dallas, TX (achornmfg.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Machinery (Food Processing/Roasting Equipment)</span>
+            
+            <span class="signal-tag">ACQUIRED BY PROBAT 2024</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Acquired by Probat (German coffee-equipment giant) in early 2024; Probat consolidating U.S. operations into Dallas, increasing the strategic importance and likely scale of Horn's Dallas facility.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Consolidation of operations into Dallas increases throughput and equipment run-time (roasters, conveyors, ovens), driving higher and more continuous demand.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "With Probat folding more U.S. operations into your Dallas plant, your load profile is changing – I can help you reset your ERCOT contract to match that new reality before summer peaks."
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">9)</span>
+                <div>
+                    <span class="company-name">ABC Auto Parts</span>
+                    <span class="company-location">– Longview, TX (abcauto.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Automotive Parts Distribution</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~125 employees</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Solid mid-market distributor anchored in Longview; steady regional presence.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Distribution centers and parts warehouses are strong C&I loads, and secondary markets like Longview see less broker competition.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "Most brokers chase Dallas and Houston – I specialize in getting better power deals for operators like you in markets the big players ignore."
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">10)</span>
+                <div>
+                    <span class="company-name">12 Oaks Senior Living</span>
+                    <span class="company-location">– Dallas, TX (12oaks.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Senior Living Management</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Multi-facility operator with corporate offices at Merit/Park Central in Dallas and numerous managed communities.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Senior living portfolios run 24/7 HVAC, lighting, kitchens, and medical equipment across many ESIDs – ideal for portfolio aggregation.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "Instead of letting each community renew on its own, we can synchronize and aggregate your meters across Texas to leverage your total kWh for better pricing."
+                </div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">11)</span>
+                <div>
+                    <span class="company-name">Access Dental & Orthodontics</span>
+                    <span class="company-location">– Irving, TX (accessdentalclinics.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Healthcare / Dental DSO</span>
+            
+            <div class="section">
+                <div class="section-label">CRM Snapshot</div>
+                <div class="section-content">
+                    <span class="metric">~125 employees</span> HQ, <span class="metric">20+ clinics</span> across multiple states.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    Growing dental service organization headquartered at 8150 Springwood Dr, Irving; continued network expansion across Texas and other states.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Multi-site medical/dental operator with repeatable, similar load shapes per clinic; perfect for templated ERCOT contracts.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "You already manage 20+ clinics – we can standardize your Texas power contracts so every new location slots into a proven rate structure from day one."
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="page">
+        <div class="header">
+            <img src="../images/nodalpoint.png" alt="Nodal Point" class="logo">
+            <div class="header-meta">
+                <div>VOL. 1</div>
+                <div>PAGE 4</div>
+            </div>
+        </div>
+        
+        <div class="company-card">
+            <div class="company-header">
+                <span class="company-number">12)</span>
+                <div>
+                    <span class="company-name">AccessDx Laboratory</span>
+                    <span class="company-location">– Houston, TX (accessdxlab.com)</span>
+                </div>
+            </div>
+            
+            <span class="industry-tag">Biotechnology / Diagnostics Lab</span>
+            
+            <span class="signal-tag">EXPANSION FEB 2025</span>
+            
+            <div class="section">
+                <div class="section-label">Signal</div>
+                <div class="section-content">
+                    February 2025 announcement of expanded integration with PointClickCare and growing hospital partnerships; high-compute, lab-heavy operation at 8920 Kirby Dr, Houston.
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-label">Why Energy Matters</div>
+                <div class="section-content">
+                    Labs have extremely high kWh per sq ft (refrigeration, analyzers, fume hoods, HVAC) and run long hours.
+                </div>
+            </div>
+            
+            <div class="talk-track">
+                <div class="talk-track-label">Call Angle</div>
+                <div class="talk-track-content">
+                    "Your lab's energy intensity is high and growing with new integrations – locking in a competitive ERCOT rate now materially improves your per-test economics."
+                </div>
+            </div>
+        </div>
+        
+        <div class="strategic-pattern">
+            <div class="pattern-title">Suggested Next Steps</div>
+            
+            <div class="section">
+                <div class="section-content">
+                    <strong>Prioritize outreach in this order:</strong>
+                    <ul>
+                        <li>AbiMar Foods (strongest signal)</li>
+                        <li>Abracon</li>
+                        <li>Accent Wire Tie</li>
+                        <li>AC Horn</li>
+                        <li>ABM International</li>
+                        <li>AccessDx Lab</li>
+                        <li>4Front</li>
+                        <li>Multi-location healthcare/dental operators</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-content">
+                    <strong>Tailor talk tracks around:</strong>
+                    <ul>
+                        <li>Recent M&A or facility expansion</li>
+                        <li>Private equity ownership and cost control</li>
+                        <li>Multi-site portfolio consolidation across Texas metros</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
