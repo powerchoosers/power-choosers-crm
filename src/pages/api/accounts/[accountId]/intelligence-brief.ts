@@ -63,6 +63,48 @@ type ResearchDiagnostics = {
   }>
 }
 
+type SignalFamily =
+  | 'acquisition'
+  | 'new_location'
+  | 'leadership_change'
+  | 'growth'
+  | 'restructuring'
+  | 'contract_win'
+  | 'funding'
+  | 'industry_context'
+
+type IndustryCluster =
+  | 'manufacturing'
+  | 'logistics'
+  | 'food_storage'
+  | 'healthcare'
+  | 'banking'
+  | 'retail'
+  | 'restaurant'
+  | 'education_nonprofit'
+  | 'technology'
+  | 'energy_intensive'
+  | 'office_services'
+  | 'multi_site'
+  | 'unknown'
+
+type TalkTrackContext = {
+  signalFamily: SignalFamily
+  signalLabel: string
+  signalAngle: string
+  signalOpeners: string[]
+  industryCluster: IndustryCluster
+  industryLabel: string
+  industryAngle: string
+  industryOpeners: string[]
+  openingPattern: 'observation' | 'question' | 'contrast' | 'curiosity'
+  openingStyle: string
+  question: string
+  ercotFocus: string[]
+  avoidPhrases: string[]
+  seed: string
+}
+
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
 const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
@@ -453,6 +495,585 @@ function inferSignalPriority(text: string, fallbackPriority: number) {
   if (/(contract award|government contract|customer win|major customer|new customer)/.test(lower)) return 6
   if (/(funding round|series [abcde]|ipo|initial public offering|going public)/.test(lower)) return 7
   return fallbackPriority
+}
+
+const TALK_TRACK_GENERIC_PATTERNS = [
+  /autopilot/i,
+  /site\s*by\s*site/i,
+  /load profile/i,
+  /energy load/i,
+  /structured in a way/i,
+  /current setup/i,
+  /electricity side starts behaving differently/i,
+  /one location at a time/i,
+  /doesn't always match/i,
+  /most companies/i,
+  /rate looks fine/i,
+]
+
+const TALK_TRACK_SIGNAL_KEYWORDS: Record<SignalFamily, string[]> = {
+  acquisition: ['acquisition', 'acquired', 'merger', 'buyout', 'takeover', 'deal', 'inherited'],
+  new_location: ['new location', 'new site', 'facility', 'construction', 'lease', 'opening', 'meter', 'buildout', 'ramp-up'],
+  leadership_change: ['cfo', 'coo', 'finance', 'facilities', 'energy manager', 'leadership', 'new leader'],
+  growth: ['expansion', 'capex', 'headcount', 'growth', 'ramp', 'capacity', 'hiring'],
+  restructuring: ['restructuring', 'closure', 'consolidation', 'downsizing', 'shutdown', 'footprint'],
+  contract_win: ['contract', 'customer', 'project', 'new work', 'win', 'deal', 'load'],
+  funding: ['funding', 'series', 'ipo', 'capital', 'raise', 'investor'],
+  industry_context: ['budget', 'load', 'site', 'agreement', 'cost', 'Texas'],
+}
+
+const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
+  manufacturing: ['manufacturing', 'plant', 'production', 'shift', 'demand', '4cp', 'motor'],
+  logistics: ['warehouse', 'logistics', 'distribution', 'dock', 'automation', 'throughput', '24/7'],
+  food_storage: ['cold storage', 'refrigeration', 'freezer', 'cooler', 'temperature', 'food'],
+  healthcare: ['healthcare', 'hospital', 'clinic', 'occupancy', 'reliability', 'backup'],
+  banking: ['bank', 'branch', 'portfolio', 'delivery', 'budget', 'predictability'],
+  retail: ['retail', 'store', 'seasonal', 'traffic', 'occupancy', 'multi-site'],
+  restaurant: ['restaurant', 'kitchen', 'hvac', 'hospitality', 'hours', 'multi-unit'],
+  education_nonprofit: ['school', 'campus', 'nonprofit', 'occupancy', 'budget', 'seasonal'],
+  technology: ['technology', 'software', 'cooling', 'fit-out', 'growth', 'office'],
+  energy_intensive: ['4cp', 'peak', 'process', 'motor', 'load', 'industrial'],
+  office_services: ['office', 'lease', 'occupancy', 'headcount', 'budget', 'service'],
+  multi_site: ['portfolio', 'site', 'location', 'meter', 'branch', 'footprint'],
+  unknown: ['Texas', 'budget', 'load', 'site'],
+}
+
+function hashString(value: string) {
+  let hash = 0
+  const text = cleanText(value)
+  for (let index = 0; index < text.length; index += 1) {
+    hash = Math.imul(31, hash) + text.charCodeAt(index)
+    hash |= 0
+  }
+  return Math.abs(hash)
+}
+
+function pickVariant<T>(items: T[], seed: string) {
+  if (!items.length) return null
+  return items[hashString(seed) % items.length]
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function shortenText(value: string, maxLength = 90) {
+  const text = cleanText(value)
+  if (text.length <= maxLength) return text
+  return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`
+}
+
+function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) {
+  const title = cleanText(candidate?.title)
+  const companyName = cleanText(account.name)
+
+  if (!title) {
+    return companyName || 'this account'
+  }
+
+  if (companyName) {
+    const stripped = title.replace(new RegExp(`^${escapeRegExp(companyName)}[\\s\\-:–—|,]+`, 'i'), '')
+    const cleaned = cleanText(stripped)
+    if (cleaned && cleaned.length < title.length) {
+      return shortenText(cleaned, 110)
+    }
+  }
+
+  return shortenText(title, 110)
+}
+
+function inferIndustryCluster(account: AccountRow): IndustryCluster {
+  const text = cleanText(`${account.industry || ''} ${account.name || ''}`).toLowerCase()
+  if (!text) return 'unknown'
+  if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
+  if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
+  if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component)/.test(text)) return 'manufacturing'
+  if (/(logistics|warehouse|distribution|fulfillment|freight|trucking|supply chain|transport|shipping)/.test(text)) return 'logistics'
+  if (/(cold storage|refrigerat|freezer|food|beverage|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
+  if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
+  if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
+  if (/(restaurant|dining|cafe|hospitality|hotel|food service)/.test(text)) return 'restaurant'
+  if (/(retail|store|shopping|franchise|dealer|showroom|convenience)/.test(text)) return 'retail'
+  if (/(school|education|university|college|nonprofit|church|foundation|charity|municipal)/.test(text)) return 'education_nonprofit'
+  if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
+  if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency)/.test(text)) return 'office_services'
+  return 'unknown'
+}
+
+function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false): SignalFamily {
+  if (isFallbackMode || !candidate) return 'industry_context'
+
+  const text = `${candidate.title || ''} ${candidate.snippet || ''}`
+  switch (inferSignalPriority(text, candidate.priority)) {
+    case 1:
+      return 'acquisition'
+    case 2:
+      return 'new_location'
+    case 3:
+      return 'leadership_change'
+    case 4:
+      return 'growth'
+    case 5:
+      return 'restructuring'
+    case 6:
+      return 'contract_win'
+    case 7:
+      return 'funding'
+    default:
+      return 'industry_context'
+  }
+}
+
+function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, candidate: ResearchHit | null) {
+  const companyName = cleanText(account.name) || 'the company'
+  const signalAnchor = deriveSignalAnchor(account, candidate)
+  const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
+  const texasLocation = location || 'Texas'
+
+  switch (signalFamily) {
+    case 'acquisition':
+      return {
+        label: 'Acquisition / being acquired',
+        angle: 'Inherited agreements, duplicate meters, hidden load, and who owns the cleanup.',
+        question: 'Have you already looked at what got inherited on the electricity side, or is that still being sorted out?',
+        openers: [
+          `I saw the note about ${signalAnchor}.`,
+          `The acquisition news on ${companyName} is the kind of thing that usually makes me ask what got inherited on the utility side.`,
+          `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
+        ],
+        focus: ['inherited contracts', 'duplicate sites or meters', 'utility cleanup after the deal'],
+      }
+    case 'new_location':
+      return {
+        label: 'New location / facility / construction',
+        angle: 'New meter timing, lease timing, construction power, and ramp-up risk.',
+        question: `Are you planning the electricity piece for the ${texasLocation} site now, or is that still early?`,
+        openers: [
+          `I saw the new location / construction note on ${signalAnchor}.`,
+          `When a company is adding a Texas site, the electricity piece usually needs to get handled before move-in, not after.`,
+          `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
+        ],
+        focus: ['new meter timing', 'lease or buildout timing', 'ramp-up load'],
+      }
+    case 'leadership_change':
+      return {
+        label: 'Leadership change',
+        angle: 'Fresh eyes on a setup someone else inherited, especially from finance or facilities.',
+        question: 'Has the new leader had a chance to review the electricity side yet, or is it still on the list?',
+        openers: [
+          `I saw the leadership change on ${signalAnchor}.`,
+          `When a new CFO or facilities lead comes in, the utility setup is usually one of the first things that should get a clean look.`,
+          `Fresh eyes tend to surface questions the old team never had time to ask.`,
+        ],
+        focus: ['fresh-eyes review', 'budget authority', 'facility ownership'],
+      }
+    case 'growth':
+      return {
+        label: 'Growth / capex / headcount',
+        angle: 'Growing load, added equipment, and budget creep before the bills catch up.',
+        question: 'Has anyone checked whether the current setup still matches the way the site is growing?',
+        openers: [
+          `I saw the growth / expansion note on ${signalAnchor}.`,
+          `When headcount or capex starts moving, the electricity side usually changes before anyone notices it in the budget.`,
+          `The thing I’d want to understand is whether the current setup still fits the way the operation is scaling.`,
+        ],
+        focus: ['load growth', 'equipment additions', 'budget creep'],
+      }
+    case 'restructuring':
+      return {
+        label: 'Restructuring / closure / consolidation',
+        angle: 'Stranded capacity, unused sites, and cleanup after a footprint change.',
+        question: 'Have you looked at whether the power side can be cleaned up with the footprint change?',
+        openers: [
+          `I saw the restructuring / consolidation note on ${signalAnchor}.`,
+          `When a company closes or merges sites, the utility side can keep carrying costs that no longer make sense.`,
+          `That’s usually the point where I want to know whether the footprint change has already been worked through on the power side.`,
+        ],
+        focus: ['stranded capacity', 'unused sites', 'footprint cleanup'],
+      }
+    case 'contract_win':
+      return {
+        label: 'Contract win / customer growth',
+        angle: 'New work changing the load and the way the site runs.',
+        question: 'Has the utility side been checked against the new work yet?',
+        openers: [
+          `I saw the contract win / customer growth note on ${signalAnchor}.`,
+          `A new contract or major customer usually changes the load story faster than people expect.`,
+          `That is the kind of change that can make the existing electricity setup feel out of sync pretty quickly.`,
+        ],
+        focus: ['new load', 'operating changes', 'customer-driven growth'],
+      }
+    case 'funding':
+      return {
+        label: 'Funding / IPO',
+        angle: 'Fresh capital, tighter cost scrutiny, and the next growth phase.',
+        question: 'Has electricity been part of the cost review yet, or not really?',
+        openers: [
+          `I saw the funding / IPO note on ${signalAnchor}.`,
+          `Right after a raise, leadership usually gets more serious about cost visibility before the next growth phase.`,
+          `That usually makes the utility side worth a quick look before the next round of spending starts.`,
+        ],
+        focus: ['cost scrutiny', 'growth planning', 'budget visibility'],
+      }
+    case 'industry_context':
+    default:
+      return {
+        label: 'Industry context',
+        angle: 'The strongest ERCOT issue for this business type.',
+        question: 'When companies like this review electricity, what tends to get missed first?',
+        openers: [
+          `I was looking at ${companyName} from an industry angle.`,
+          `Even without a fresh news item, the electricity side still tends to show up in the same few places for companies like this.`,
+          `What usually matters most is whether the setup still matches how the business actually runs.`,
+        ],
+        focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
+      }
+  }
+}
+
+function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow) {
+  const companyName = cleanText(account.name) || 'the company'
+  const industryLabel = cleanText(account.industry) || companyName
+
+  switch (industryCluster) {
+    case 'manufacturing':
+      return {
+        label: 'Manufacturing / industrial',
+        angle: 'Demand spikes, 4CP exposure, production ramps, and shift changes.',
+        question: 'Has anyone checked whether the plan matches how the plant actually runs when demand spikes hit?',
+        openers: [
+          `In manufacturing, the thing that usually bites is not the rate, it is how the plant behaves at peak.`,
+          `If the operation runs in shifts, the electricity bill can punish the wrong kind of peak pretty fast.`,
+          `The part I’d sanity-check first is whether the agreement matches the way production really moves.`,
+        ],
+        focus: ['demand spikes', '4CP', 'production ramps', 'shift changes'],
+      }
+    case 'logistics':
+      return {
+        label: 'Logistics / warehouse / distribution',
+        angle: '24/7 load, HVAC, dock doors, automation, and seasonal throughput.',
+        question: 'Has the warehouse load been reviewed against how the site actually runs, or is it mostly just the rate?',
+        openers: [
+          `Warehouses can look simple on paper, but 24/7 load and automation usually tell a different story.`,
+          `Dock doors, HVAC, and throughput swings can make the bill behave very differently than people expect.`,
+          `A lot of logistics groups miss the utility side until the footprint gets busier or more automated.`,
+        ],
+        focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings'],
+      }
+    case 'food_storage':
+      return {
+        label: 'Food / cold storage',
+        angle: 'Refrigeration load, freezer power, and summer peaks that never really shut off.',
+        question: 'Has the refrigeration load been part of the review, or has it mostly just been the rate?',
+        openers: [
+          `Cold storage is different because refrigeration never really turns off.`,
+          `When the load is tied to freezers and coolers, a small miss can show up quickly in the bill.`,
+          `That is the kind of operation where the utility setup needs to match the real load, not the brochure version.`,
+        ],
+        focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load'],
+      }
+    case 'healthcare':
+      return {
+        label: 'Healthcare',
+        angle: '24/7 uptime, reliability, occupancy, and backup systems.',
+        question: 'Has anyone reviewed whether the current setup still fits the way the building runs around the clock?',
+        openers: [
+          `Healthcare is one of those sectors where the building never really gets to sleep.`,
+          `With 24/7 operations, the part I care about is reliability first and budget predictability second.`,
+          `The utility side matters because the load is tied to constant occupancy and backup readiness.`,
+        ],
+        focus: ['24/7 uptime', 'reliability', 'occupancy', 'backup systems'],
+      }
+    case 'banking':
+      return {
+        label: 'Banking / financial services',
+        angle: 'Branch portfolios, delivery charges, and budget predictability.',
+        question: 'Do you review it branch by branch or as a portfolio?',
+        openers: [
+          `A lot of banks and branch groups end up looking at one site at a time and missing the bigger picture.`,
+          `Branch footprints can hide more in the delivery side than people expect.`,
+          `The first question I usually have is whether the group is managing this as a portfolio or just reacting site by site.`,
+        ],
+        focus: ['branch portfolio', 'delivery charges', 'budget predictability'],
+      }
+    case 'retail':
+      return {
+        label: 'Retail',
+        angle: 'Seasonal swings, occupancy changes, and multi-site timing.',
+        question: 'Has that been pretty stable for you, or does it swing with the seasons and traffic?',
+        openers: [
+          `Retail usually swings more than people expect once the seasons and traffic patterns change.`,
+          `A lot of stores look steady until occupancy or weather shifts start moving the bill around.`,
+          `If there are multiple locations, the timing can get messy fast if nobody is looking at the whole picture.`,
+        ],
+        focus: ['seasonal swings', 'occupancy changes', 'multi-site timing'],
+      }
+    case 'restaurant':
+      return {
+        label: 'Restaurant / hospitality',
+        angle: 'Kitchen load, HVAC, hours of operation, and multi-unit consistency.',
+        question: 'Has anyone checked whether the electricity setup matches how the locations actually operate?',
+        openers: [
+          `Restaurants are tough because kitchen load and HVAC can make the bill move even when sales look flat.`,
+          `The utility side often gets overlooked until a location starts behaving differently in the summer.`,
+          `If there are multiple units, consistency matters because each site can drift in a different direction.`,
+        ],
+        focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency'],
+      }
+    case 'education_nonprofit':
+      return {
+        label: 'Education / nonprofit',
+        angle: 'Tight budgets, campus timing, and stewardship over a fixed footprint.',
+        question: 'Has the power side been reviewed recently, or does it just keep rolling over?',
+        openers: [
+          `For schools and nonprofits, the utility side usually comes down to budget discipline and timing.`,
+          `Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.`,
+          `That is the sort of setup that deserves a clean review instead of just letting it keep rolling.`,
+        ],
+        focus: ['tight budgets', 'campus timing', 'stewardship', 'seasonal occupancy'],
+      }
+    case 'technology':
+      return {
+        label: 'Technology / data-heavy office',
+        angle: 'Fit-outs, growth, cooling, and office load that changes faster than people expect.',
+        question: 'Has anyone checked whether the load from growth or new tech was accounted for?',
+        openers: [
+          `Tech companies can add load quietly through fit-outs, cooling, and space changes.`,
+          `A lot of the cost shows up after the growth is already live instead of before it starts.`,
+          `That is why I’d want to know whether the electricity side was planned alongside the growth plan.`,
+        ],
+        focus: ['fit-outs', 'growth', 'cooling', 'office load'],
+      }
+    case 'energy_intensive':
+      return {
+        label: 'Energy-intensive industrial',
+        angle: '4CP exposure, process load, large motors, and peak timing.',
+        question: 'Has the peak side been reviewed lately, or is it mostly set and forgotten?',
+        openers: [
+          `When a site carries heavy load, the peak side of the bill can matter as much as the rate.`,
+          `That is usually where demand timing and operational patterns start to matter a lot more.`,
+          `If the plant or site is energy intensive, I’d want to know whether the plan matches the way it really runs.`,
+        ],
+        focus: ['4CP', 'process load', 'peak exposure', 'large motors'],
+      }
+    case 'office_services':
+      return {
+        label: 'Office / professional services',
+        angle: 'Occupancy, new leases, conference load, and budget control.',
+        question: 'Has the load been reviewed since the last space or headcount change?',
+        openers: [
+          `Office businesses usually feel quiet until a lease, occupancy change, or growth step changes the load.`,
+          `The electricity side can stay untouched for years even when the business around it has changed a lot.`,
+          `That is the kind of thing I’d want to check before it gets swallowed by the rest of the budget.`,
+        ],
+        focus: ['occupancy', 'new leases', 'conference load', 'budget control'],
+      }
+    case 'multi_site':
+      return {
+        label: 'Multi-site / portfolio',
+        angle: 'Portfolio timing, site-by-site blind spots, and contract alignment.',
+        question: 'Do you guys look at that site by site, or more at the company level?',
+        openers: [
+          `Multi-site groups can leave leverage on the table when each location gets treated like a separate decision.`,
+          `The bigger issue is usually whether someone is looking at the whole footprint instead of just one meter at a time.`,
+          `Portfolio timing matters because the wrong site can hide the real opportunity.`,
+        ],
+        focus: ['portfolio timing', 'site-by-site blind spots', 'contract alignment'],
+      }
+    case 'unknown':
+    default:
+      return {
+        label: 'Company context',
+        angle: 'Budget visibility, operating fit, and whether the current setup still makes sense.',
+        question: 'Has anyone looked at whether the setup still fits how the business runs now?',
+        openers: [
+          `I was trying to get a clean read on ${industryLabel}.`,
+          `Even when the industry is broad, the utility side usually shows up in the same few places.`,
+          `What matters most is whether the current setup still matches the business as it runs today.`,
+        ],
+        focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
+      }
+  }
+}
+
+function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | null, isFallbackMode: boolean): TalkTrackContext {
+  const seed = [account.id, candidate?.url || candidate?.title || '', isFallbackMode ? 'fallback' : 'signal'].join('|')
+  const signalFamily = inferSignalFamily(candidate, isFallbackMode)
+  const industryCluster = inferIndustryCluster(account)
+  const signalGuidance = buildSignalGuidance(signalFamily, account, candidate)
+  const industryGuidance = buildIndustryGuidance(industryCluster, account)
+  const openingPattern = pickVariant(['observation', 'question', 'contrast', 'curiosity'] as const, seed) || 'observation'
+  const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
+    observation: 'Observation-led opening that names the event first.',
+    question: 'Question-led opening that moves quickly into curiosity.',
+    contrast: 'Contrast the event with the electricity side before asking.',
+    curiosity: 'Curiosity-led opening that explains what you want to understand.',
+  }
+
+  return {
+    signalFamily,
+    signalLabel: signalGuidance.label,
+    signalAngle: signalGuidance.angle,
+    signalOpeners: signalGuidance.openers,
+    industryCluster,
+    industryLabel: industryGuidance.label,
+    industryAngle: industryGuidance.angle,
+    industryOpeners: industryGuidance.openers,
+    openingPattern,
+    openingStyle: openingStyleMap[openingPattern],
+    question: signalGuidance.question || industryGuidance.question,
+    ercotFocus: Array.from(new Set([...signalGuidance.focus, ...industryGuidance.focus])),
+    avoidPhrases: [
+      'autopilot',
+      'site by site',
+      'load profile',
+      'energy load',
+      'current setup',
+      'electricity side starts behaving differently',
+      'structured in a way that does not match',
+      'one location at a time',
+      'most companies',
+      'rate looks fine',
+    ],
+    seed,
+  }
+}
+
+function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
+  const text = cleanText(talkTrack)
+  if (!text) return true
+
+  const lower = text.toLowerCase()
+  const genericHits = TALK_TRACK_GENERIC_PATTERNS.filter((pattern) => pattern.test(lower)).length
+  const sentenceCount = text.split(/[.!?]+/).map(cleanText).filter(Boolean).length
+  const mentionsSignal = TALK_TRACK_SIGNAL_KEYWORDS[context.signalFamily].some((keyword) => lower.includes(keyword.toLowerCase()))
+  const mentionsIndustry = TALK_TRACK_INDUSTRY_KEYWORDS[context.industryCluster].some((keyword) => lower.includes(keyword.toLowerCase()))
+  const mentionsAtLeastOneFocus = context.ercotFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
+
+  return genericHits > 0 || sentenceCount < 2 || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+}
+
+function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
+  const companyName = cleanText(account.name) || 'the company'
+  const signalAnchor = deriveSignalAnchor(account, candidate)
+  const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
+  const locationText = location || 'Texas'
+  const openerBySignal: Record<SignalFamily, string[]> = {
+    acquisition: [
+      `I saw the note about ${signalAnchor}.`,
+      `The deal news on ${companyName} is exactly the kind of thing that makes me ask what got inherited on the utility side.`,
+      `When ownership changes, the electricity setup is usually the first thing that deserves a clean look.`,
+    ],
+    new_location: [
+      `I saw the new site / construction note for ${signalAnchor}.`,
+      `When a company adds a ${locationText} location, the power setup usually needs to be thought through before move-in.`,
+      `That is the kind of change where the new meter and ramp-up deserve attention early.`,
+    ],
+    leadership_change: [
+      `I saw the leadership change on ${signalAnchor}.`,
+      `Fresh eyes usually mean somebody has to explain what the utility side looks like in plain English.`,
+      `That is the first thing I would want a new CFO or facilities lead to have in front of them.`,
+    ],
+    growth: [
+      `I saw the growth note on ${signalAnchor}.`,
+      `Headcount, capex, or a bigger footprint usually changes the bill before it shows up anywhere obvious.`,
+      `That is why I would want to know whether the current setup still matches how the site is growing.`,
+    ],
+    restructuring: [
+      `I saw the restructuring note on ${signalAnchor}.`,
+      `When a company consolidates or closes a site, the power side can keep carrying costs that no longer make sense.`,
+      `That is usually the point where I want to know whether the footprint change has already been cleaned up on the utility side.`,
+    ],
+    contract_win: [
+      `I saw the customer win or contract note on ${signalAnchor}.`,
+      `New work can change the load story faster than people expect.`,
+      `That is the kind of change that can leave the old utility setup out of step pretty quickly.`,
+    ],
+    funding: [
+      `I saw the funding or IPO note on ${signalAnchor}.`,
+      `Fresh capital usually comes with tighter cost scrutiny before the next growth phase.`,
+      `That makes the utility side worth a quick look before the spending picks up again.`,
+    ],
+    industry_context: [
+      `I was looking at ${companyName} from an industry angle.`,
+      `Even without a fresh news item, the electricity side usually shows up in the same few places for companies like this.`,
+      `What matters is whether the setup still matches how the business actually runs.`,
+    ],
+  }
+
+  const opener = pickVariant(openerBySignal[context.signalFamily], context.seed) || openerBySignal[context.signalFamily][0]
+  const industryLineByCluster: Record<IndustryCluster, string[]> = {
+    manufacturing: [
+      'In manufacturing, the thing that usually bites is not the rate, it is how the plant behaves at peak.',
+      'If the operation runs in shifts, the bill can punish the wrong kind of peak pretty fast.',
+      'I would want to know whether the plan matches how production actually moves.',
+    ],
+    logistics: [
+      'Warehouses can look simple on paper, but 24/7 load and automation usually tell a different story.',
+      'Dock doors, HVAC, and throughput swings can make the bill behave very differently than people expect.',
+      'A lot of logistics groups miss the utility side until the footprint gets busier or more automated.',
+    ],
+    food_storage: [
+      'Cold storage is different because refrigeration never really turns off.',
+      'When the load is tied to freezers and coolers, a small miss can show up quickly in the bill.',
+      'That is the kind of operation where the utility setup needs to match the real load, not the brochure version.',
+    ],
+    healthcare: [
+      'Healthcare is one of those sectors where the building never really gets to sleep.',
+      'With 24/7 operations, the part I care about is reliability first and budget predictability second.',
+      'The utility side matters because the load is tied to constant occupancy and backup readiness.',
+    ],
+    banking: [
+      'A lot of banks and branch groups end up looking at one site at a time and missing the bigger picture.',
+      'Branch footprints can hide more in the delivery side than people expect.',
+      'The first question I usually have is whether the group is managing this as a portfolio or just reacting site by site.',
+    ],
+    retail: [
+      'Retail usually swings more than people expect once the seasons and traffic patterns change.',
+      'A lot of stores look steady until occupancy or weather shifts start moving the bill around.',
+      'If there are multiple locations, the timing can get messy fast if nobody is looking at the whole picture.',
+    ],
+    restaurant: [
+      'Restaurants are tough because kitchen load and HVAC can make the bill move even when sales look flat.',
+      'The utility side often gets overlooked until a location starts behaving differently in the summer.',
+      'If there are multiple units, consistency matters because each site can drift in a different direction.',
+    ],
+    education_nonprofit: [
+      'For schools and nonprofits, the utility side usually comes down to budget discipline and timing.',
+      'Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.',
+      'That is the sort of setup that deserves a clean review instead of just letting it keep rolling.',
+    ],
+    technology: [
+      'Tech companies can add load quietly through fit-outs, cooling, and space changes.',
+      'A lot of the cost shows up after the growth is already live instead of before it starts.',
+      'That is why I would want to know whether the electricity side was planned alongside the growth plan.',
+    ],
+    energy_intensive: [
+      'When a site carries heavy load, the peak side of the bill can matter as much as the rate.',
+      'That is usually where demand timing and operational patterns start to matter a lot more.',
+      'If the plant or site is energy intensive, I would want to know whether the plan matches the way it really runs.',
+    ],
+    office_services: [
+      'Office businesses usually feel quiet until a lease, occupancy change, or growth step changes the load.',
+      'The electricity side can stay untouched for years even when the business around it has changed a lot.',
+      'That is the kind of thing I would want to check before it gets swallowed by the rest of the budget.',
+    ],
+    multi_site: [
+      'Multi-site groups can leave leverage on the table when each location gets treated like a separate decision.',
+      'The bigger issue is usually whether someone is looking at the whole footprint instead of just one meter at a time.',
+      'Portfolio timing matters because the wrong site can hide the real opportunity.',
+    ],
+    unknown: [
+      'Even when the industry is broad, the utility side usually shows up in the same few places.',
+      'What matters most is whether the current setup still matches the business as it runs today.',
+      'That is the part I would want to understand before anything else.',
+    ],
+  }
+
+  const industryLine = pickVariant(industryLineByCluster[context.industryCluster], context.seed) || industryLineByCluster[context.industryCluster][0]
+  const question = context.question
+
+  return [opener, industryLine, question].join(' ')
 }
 
 function extractHtmlAttribute(tag: string, attribute: string) {
@@ -879,7 +1500,7 @@ async function fetchIndustryTrends(account: AccountRow): Promise<ResearchHit[]> 
     {
       priority: 9,
       label: 'Industry Trends',
-      query: `${industry} industry trends 2026 technology adoption digital transformation`,
+      query: `${industry} Texas ERCOT commercial energy demand expansion facilities hiring 4CP`,
     },
   ]
 
@@ -898,6 +1519,9 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
   }
 
   const selectedCandidates = candidates.slice(0, 16)
+  const primaryCandidate = selectedCandidates[0] || null
+  const talkTrackContext = buildTalkTrackContext(account, primaryCandidate, isFallbackMode)
+  const talkTrackContextJson = JSON.stringify(talkTrackContext, null, 2)
   const researchPayload = {
     account: {
       name: account.name || '',
@@ -916,6 +1540,7 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
       '6. Public contract awards, government contracts, or major new customer wins',
       '7. Funding rounds or IPO activity for private companies',
     ],
+    talk_track_context: talkTrackContext,
     research_results: selectedCandidates.map((item) => ({
       priority: item.priority,
       bucket: item.label,
@@ -948,6 +1573,10 @@ Decision rules:
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
+- Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the industry angle, the opening style, and the question to ask.
+- Rotate the first sentence shape. Do not always open the same way.
+- Make the talk track specific to the signal and the industry, not just the company name.
+- Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 
 Talk Track angle selection (choose ONE based on the actual signal):
 
@@ -1019,6 +1648,10 @@ Decision rules:
 - Confidence Level should be "Medium" for fallback briefs.
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
+- Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on the industry angle and the company's operating footprint.
+- Rotate the first sentence shape. Do not always open with the same setup.
+- Make it sound like a Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
+- Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 
 Talk Track angle selection for fallback mode (choose based on what you found):
 
@@ -1079,6 +1712,9 @@ Return JSON only with this shape:
   "source_title": "",
   "source_domain": ""
 }
+
+TALK_TRACK_CONTEXT:
+${talkTrackContextJson}
 
 RESEARCH PAYLOAD:
 ${JSON.stringify(researchPayload, null, 2)}`
@@ -1267,6 +1903,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!validated) {
       outcomeStatus = 'empty'
+    }
+
+    const talkTrackCandidate = generatedBrief ? findCandidateForResult(generatedBrief as BriefResult, candidateResults) : candidateResults[0] || null
+    const talkTrackRewriteContext = buildTalkTrackContext(account, talkTrackCandidate, usedFallback)
+    if (validated && talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext)) {
+      const rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext)
+      validated = {
+        ...validated,
+        talk_track: rewrittenTalkTrack,
+      }
     }
 
     const updatePayload: Record<string, unknown> = {

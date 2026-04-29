@@ -7,6 +7,7 @@ import { buildOwnerScopeValues } from '@/lib/owner-scope'
 import { queryPredicateById } from '@/lib/queryKeys'
 import { ensureFreshSupabaseSession } from '@/lib/auth/supabase-session'
 import { buildStatusIlikeClauses } from '@/lib/status-filters'
+import { pruneContactCaches, restoreContactCaches } from '@/lib/contact-cache'
 import {
   type ContactAdditionalPhone,
   type ContactPhoneBucket,
@@ -97,7 +98,7 @@ export function useDeleteContacts() {
         .from('list_members')
         .delete()
         .in('targetId', ids)
-        .in('targetType', ['people', 'contact', 'contacts'])
+        .in('targetType', [...CONTACT_TARGET_TYPES])
 
       const { error } = await supabase
         .from('contacts')
@@ -107,30 +108,23 @@ export function useDeleteContacts() {
       if (error) throw error
     },
     onMutate: async (ids) => {
-      await queryClient.cancelQueries({ queryKey: ['contacts'] })
-      const previousContacts = queryClient.getQueryData(['contacts'])
-
-      queryClient.setQueryData(['contacts'], (old: any) => {
-        if (!old) return old
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
-            ...page,
-            contacts: page.contacts.filter((c: Contact) => !ids.includes(c.id))
-          }))
-        }
-      })
-
-      return { previousContacts }
+      const previousContactQueries = await pruneContactCaches(queryClient, { contactIds: ids })
+      return { previousContactQueries }
     },
     onError: (err, ids, context: any) => {
-      if (context?.previousContacts) {
-        queryClient.setQueryData(['contacts'], context.previousContacts)
+      if (context?.previousContactQueries) {
+        restoreContactCaches(queryClient, context.previousContactQueries)
       }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contact'] })
+      queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-membership'] })
+      queryClient.invalidateQueries({ queryKey: ['page-list-memberships'] })
       queryClient.invalidateQueries({ queryKey: ['targets'] })
     }
   })
@@ -282,6 +276,7 @@ type ContactRow = {
 const PAGE_SIZE = 50
 
 const CONTACTS_QUERY_BUSTER = 'v6'
+const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
 const ACCOUNT_CONTACTS_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, title, accountId, lastContactedAt, metadata'
 const CONTACT_SEARCH_SELECT = 'id, name, ownerId, email, firstName, lastName, accountId, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url)'
 const CONTACT_LIST_SELECT = 'id, name, ownerId, firstName, lastName, email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt, lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes, metadata, accounts!contacts_accountId_fkey(name, domain, logo_url, metadata, industry, city, state, address, service_addresses)'
@@ -1490,35 +1485,35 @@ export function useDeleteContact() {
   return useMutation({
     mutationFn: async (id: string) => {
       await ensureFreshSupabaseSession()
+      await supabase
+        .from('list_members')
+        .delete()
+        .eq('targetId', id)
+        .in('targetType', [...CONTACT_TARGET_TYPES])
+
       const { error } = await supabase.from('contacts').delete().eq('id', id)
       if (error) throw error
       return id
     },
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['contacts'] })
-      const previousContacts = queryClient.getQueryData(['contacts'])
-
-      queryClient.setQueryData(['contacts'], (old: any) => {
-        if (!old) return old
-        return {
-          ...old,
-          pages: old.pages.map((page: any) => ({
-            ...page,
-            contacts: page.contacts.filter((c: Contact) => c.id !== id)
-          }))
-        }
-      })
-
-      return { previousContacts }
+      const previousContactQueries = await pruneContactCaches(queryClient, { contactIds: [id] })
+      return { previousContactQueries }
     },
     onError: (err, id, context: any) => {
-      if (context?.previousContacts) {
-        queryClient.setQueryData(['contacts'], context.previousContacts)
+      if (context?.previousContactQueries) {
+        restoreContactCaches(queryClient, context.previousContactQueries)
       }
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contact'] })
+      queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['list-membership'] })
+      queryClient.invalidateQueries({ queryKey: ['page-list-memberships'] })
+      queryClient.invalidateQueries({ queryKey: ['targets'] })
     }
   })
 }
