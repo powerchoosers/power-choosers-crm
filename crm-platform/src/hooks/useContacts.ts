@@ -119,6 +119,7 @@ export function useDeleteContacts() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-search'] })
       queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contact'] })
       queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] })
@@ -489,13 +490,121 @@ function buildContactName(args: {
   return rawName || email || 'Unknown'
 }
 
-function patchContactDetailCache(cached: any, contactPatch: Partial<ContactDetail> & { id: string }) {
-  if (!cached || cached.id !== contactPatch.id) return cached
+type ContactCachePatch = Partial<ContactDetail> & { id: string }
+
+function buildOptimisticContactRecord(base: any, contactPatch: ContactCachePatch, forcedAccountId?: string | null) {
+  const nextAccountId = forcedAccountId ?? contactPatch.accountId ?? contactPatch.linkedAccountId ?? base?.accountId ?? base?.linkedAccountId ?? null
+  const firstName = contactPatch.firstName ?? base?.firstName
+  const lastName = contactPatch.lastName ?? base?.lastName
+  const rawName = contactPatch.name ?? base?.name
+  const email = contactPatch.email ?? base?.email
+  const companyCandidate = contactPatch.companyName ?? contactPatch.company ?? base?.companyName ?? base?.company
+
   return {
-    ...cached,
+    ...base,
     ...contactPatch,
-    linkedAccountId: contactPatch.accountId ?? contactPatch.linkedAccountId ?? cached.linkedAccountId,
+    name: buildContactName({
+      firstName,
+      lastName,
+      rawName,
+      email,
+      companyCandidate,
+    }),
+    firstName,
+    lastName,
+    company: contactPatch.company ?? base?.company ?? '',
+    companyName: contactPatch.companyName ?? base?.companyName ?? base?.company ?? '',
+    accountId: nextAccountId || undefined,
+    linkedAccountId: nextAccountId || undefined,
+    primaryPhoneField: normalizePrimaryPhoneField(contactPatch.primaryPhoneField ?? base?.primaryPhoneField),
   }
+}
+
+function patchContactDetailCache(cached: any, contactPatch: ContactCachePatch) {
+  if (!cached || cached.id !== contactPatch.id) return cached
+  return buildOptimisticContactRecord(cached, contactPatch)
+}
+
+function patchContactCollection(cached: any, contactPatch: ContactCachePatch) {
+  if (!cached) return cached
+
+  if (Array.isArray(cached)) {
+    let changed = false
+    const next = cached.map((item: any) => {
+      if (!item || item.id !== contactPatch.id) return item
+      changed = true
+      return buildOptimisticContactRecord(item, contactPatch)
+    })
+    return changed ? next : cached
+  }
+
+  if (typeof cached === 'object') {
+    if (Array.isArray((cached as any).pages)) {
+      let changed = false
+      const pages = (cached as any).pages.map((page: any) => {
+        if (!page || !Array.isArray(page.contacts)) return page
+
+        let pageChanged = false
+        const contacts = page.contacts.map((item: any) => {
+          if (!item || item.id !== contactPatch.id) return item
+          pageChanged = true
+          return buildOptimisticContactRecord(item, contactPatch)
+        })
+
+        if (!pageChanged) return page
+        changed = true
+        return {
+          ...page,
+          contacts,
+        }
+      })
+
+      return changed ? { ...cached, pages } : cached
+    }
+
+    if ((cached as any).id === contactPatch.id) {
+      return buildOptimisticContactRecord(cached, contactPatch)
+    }
+  }
+
+  return cached
+}
+
+function upsertContactInAccountContactsCache(cached: any, contactPatch: ContactCachePatch, accountId?: string | null) {
+  if (!Array.isArray(cached)) return cached
+
+  const nextAccountId = accountId ?? contactPatch.accountId ?? contactPatch.linkedAccountId ?? null
+  const existingIndex = cached.findIndex((item: any) => item?.id === contactPatch.id)
+
+  if (existingIndex === -1) {
+    return [
+      ...cached,
+      buildOptimisticContactRecord(
+        {
+          id: contactPatch.id,
+          accountId: nextAccountId || undefined,
+          linkedAccountId: nextAccountId || undefined,
+        },
+        contactPatch,
+        nextAccountId
+      ),
+    ]
+  }
+
+  let changed = false
+  const next = cached.map((item: any) => {
+    if (!item || item.id !== contactPatch.id) return item
+    changed = true
+    return buildOptimisticContactRecord(item, contactPatch, nextAccountId)
+  })
+
+  return changed ? next : cached
+}
+
+function removeContactFromAccountContactsCache(cached: any, contactId: string) {
+  if (!Array.isArray(cached)) return cached
+  const next = cached.filter((item: any) => item?.id !== contactId)
+  return next.length === cached.length ? cached : next
 }
 
 export function useAccountContacts(accountId: string) {
@@ -1345,16 +1454,97 @@ export function useUpsertContact() {
 export function useUpdateContact() {
   const queryClient = useQueryClient()
   return useMutation({
-    onMutate: async (updates) => {
+    onMutate: async (updates: ContactCachePatch) => {
       const contactPredicate = queryPredicateById('contact', updates.id)
-      await queryClient.cancelQueries({ predicate: contactPredicate })
+      await Promise.all([
+        queryClient.cancelQueries({ predicate: contactPredicate }),
+        queryClient.cancelQueries({ queryKey: ['account-contacts'] }),
+        queryClient.cancelQueries({ queryKey: ['contacts'] }),
+        queryClient.cancelQueries({ queryKey: ['contacts-search'] }),
+      ])
+
       const previousContactQueries = queryClient.getQueriesData({ predicate: contactPredicate })
+      const previousAccountContactQueries = queryClient.getQueriesData({ queryKey: ['account-contacts'] })
+      const previousContactsQueries = queryClient.getQueriesData({ queryKey: ['contacts'] })
+      const previousSearchQueries = queryClient.getQueriesData({ queryKey: ['contacts-search'] })
+
+      let previousAccountId: string | null = null
+      for (const [queryKey, cached] of previousAccountContactQueries) {
+        const queryAccountId = Array.isArray(queryKey) ? String(queryKey[1] ?? '') : ''
+        if (!Array.isArray(cached)) continue
+
+        const found = cached.find((item: any) => item?.id === updates.id)
+        if (!found) continue
+
+        previousAccountId = found.accountId ?? found.linkedAccountId ?? queryAccountId ?? null
+        if (previousAccountId) break
+      }
+
+      if (!previousAccountId) {
+        for (const [, cached] of previousContactQueries) {
+          if (!cached || typeof cached !== 'object') continue
+          const contact = cached as Partial<ContactDetail>
+          previousAccountId = contact.accountId ?? contact.linkedAccountId ?? null
+          if (previousAccountId) break
+        }
+      }
+
+      const targetAccountId = updates.accountId || updates.linkedAccountId || previousAccountId
+      const optimisticPatch: ContactCachePatch = {
+        ...updates,
+        id: updates.id,
+        previousAccountId,
+        accountId: targetAccountId ?? updates.accountId,
+        linkedAccountId: targetAccountId ?? updates.linkedAccountId ?? updates.accountId,
+      }
 
       queryClient.setQueriesData({ predicate: contactPredicate }, (cached: any) =>
-        patchContactDetailCache(cached, updates)
+        patchContactDetailCache(cached, optimisticPatch)
       )
 
-      return { previousContactQueries }
+      queryClient.setQueriesData({ queryKey: ['contacts'] }, (cached: any) =>
+        patchContactCollection(cached, optimisticPatch)
+      )
+
+      queryClient.setQueriesData({ queryKey: ['contacts-search'] }, (cached: any) =>
+        patchContactCollection(cached, optimisticPatch)
+      )
+
+      for (const [queryKey, cached] of previousAccountContactQueries) {
+        if (!Array.isArray(queryKey)) continue
+        const queryAccountId = String(queryKey[1] ?? '')
+        if (!queryAccountId || !Array.isArray(cached)) continue
+
+        const hasContact = cached.some((item: any) => item?.id === updates.id)
+        if (!hasContact && queryAccountId !== targetAccountId) continue
+
+        if (previousAccountId && targetAccountId && previousAccountId !== targetAccountId && queryAccountId === previousAccountId) {
+          queryClient.setQueryData(queryKey, removeContactFromAccountContactsCache(cached, updates.id))
+          continue
+        }
+
+        if (targetAccountId && queryAccountId === targetAccountId) {
+          queryClient.setQueryData(
+            queryKey,
+            upsertContactInAccountContactsCache(cached, optimisticPatch, targetAccountId)
+          )
+          continue
+        }
+
+        if (hasContact) {
+          queryClient.setQueryData(
+            queryKey,
+            upsertContactInAccountContactsCache(cached, optimisticPatch, queryAccountId)
+          )
+        }
+      }
+
+      return {
+        previousContactQueries,
+        previousAccountContactQueries,
+        previousContactsQueries,
+        previousSearchQueries,
+      }
     },
     onError: (err, updates, context) => {
       if (context?.previousContactQueries) {
@@ -1362,9 +1552,32 @@ export function useUpdateContact() {
           queryClient.setQueryData(queryKey, value)
         }
       }
+      if (context?.previousAccountContactQueries) {
+        for (const [queryKey, value] of context.previousAccountContactQueries) {
+          queryClient.setQueryData(queryKey, value)
+        }
+      }
+      if (context?.previousContactsQueries) {
+        for (const [queryKey, value] of context.previousContactsQueries) {
+          queryClient.setQueryData(queryKey, value)
+        }
+      }
+      if (context?.previousSearchQueries) {
+        for (const [queryKey, value] of context.previousSearchQueries) {
+          queryClient.setQueryData(queryKey, value)
+        }
+      }
     },
     mutationFn: async ({ id, ...updates }: Partial<ContactDetail> & { id: string }) => {
       await ensureFreshSupabaseSession()
+      const { data: currentContact } = await supabase
+        .from('contacts')
+        .select('accountId, metadata')
+        .eq('id', id)
+        .single()
+
+      const previousAccountId = currentContact?.accountId ?? null
+      const currentMetadata = normalizeMetadata(currentContact?.metadata) || {}
       const dbUpdates: Record<string, unknown> = {}
       if (updates.name !== undefined) dbUpdates.name = updates.name
       if (updates.email !== undefined) dbUpdates.email = updates.email
@@ -1382,13 +1595,7 @@ export function useUpdateContact() {
       if (updates.companyPhone !== undefined) dbUpdates.companyPhone = updates.companyPhone
       if (updates.primaryPhoneField !== undefined) dbUpdates.primaryPhoneField = updates.primaryPhoneField
       if (updates.additionalPhones !== undefined) {
-        const { data: currentContact } = await supabase
-          .from('contacts')
-          .select('metadata')
-          .eq('id', id)
-          .single()
-
-        const nextMetadata = normalizeMetadata(currentContact?.metadata) || {}
+        const nextMetadata = { ...currentMetadata }
         nextMetadata.apollo_revealed_phones = serializeAdditionalPhones(updates.additionalPhones) || []
         dbUpdates.metadata = nextMetadata
       }
@@ -1408,17 +1615,7 @@ export function useUpdateContact() {
       if (contactError) throw contactError
 
       // 2. Update Account Table if account-specific fields are present
-      // We first need to get the accountId if not provided in updates
-      let targetAccountId = updates.accountId || updates.linkedAccountId
-
-      if (!targetAccountId) {
-        const { data: contactData } = await supabase
-          .from('contacts')
-          .select('accountId')
-          .eq('id', id)
-          .single()
-        targetAccountId = contactData?.accountId
-      }
+      const targetAccountId = updates.accountId || updates.linkedAccountId || previousAccountId
 
       if (targetAccountId) {
         const accountUpdates: Record<string, unknown> = {}
@@ -1446,36 +1643,62 @@ export function useUpdateContact() {
       return {
         id,
         ...updates,
+        previousAccountId,
         accountId: targetAccountId ?? updates.accountId,
         linkedAccountId: targetAccountId ?? updates.linkedAccountId ?? updates.accountId,
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
+      const mergedPatch = {
+        ...variables,
+        ...data,
+        id: variables.id,
+      }
+
       const contactPredicate = queryPredicateById('contact', variables.id)
       queryClient.setQueriesData({ predicate: contactPredicate }, (cached: any) =>
-        patchContactDetailCache(cached, variables)
+        patchContactDetailCache(cached, mergedPatch)
       )
 
-      if (variables.accountId || variables.linkedAccountId) {
-        const linkedAccountId = variables.accountId || variables.linkedAccountId
+      const previousAccountId = (mergedPatch as any)?.previousAccountId ?? null
+      const linkedAccountId = (mergedPatch as any)?.linkedAccountId ?? (mergedPatch as any)?.accountId ?? null
+
+      if (linkedAccountId) {
         queryClient.setQueriesData({ queryKey: ['account', linkedAccountId] }, (cached: any) => {
           if (!cached || cached.id !== linkedAccountId) return cached
           return {
             ...cached,
-            name: variables.companyName ?? cached.name,
-            companyPhone: variables.companyPhone ?? cached.companyPhone,
-            electricitySupplier: variables.electricitySupplier ?? cached.electricitySupplier,
-            annualUsage: variables.annualUsage ?? cached.annualUsage,
-            currentRate: variables.currentRate ?? cached.currentRate,
-            contractEnd: variables.contractEnd ?? cached.contractEnd,
-            serviceAddresses: variables.serviceAddresses ?? cached.serviceAddresses,
+            name: mergedPatch.companyName ?? cached.name,
+            companyPhone: mergedPatch.companyPhone ?? cached.companyPhone,
+            electricitySupplier: mergedPatch.electricitySupplier ?? cached.electricitySupplier,
+            annualUsage: mergedPatch.annualUsage ?? cached.annualUsage,
+            currentRate: mergedPatch.currentRate ?? cached.currentRate,
+            contractEnd: mergedPatch.contractEnd ?? cached.contractEnd,
+            serviceAddresses: mergedPatch.serviceAddresses ?? cached.serviceAddresses,
           }
         })
-        queryClient.invalidateQueries({ queryKey: ['account-contacts', linkedAccountId] })
+      }
+
+      if (previousAccountId && previousAccountId !== linkedAccountId) {
+        queryClient.setQueriesData({ queryKey: ['account-contacts', previousAccountId] }, (cached: any) =>
+          removeContactFromAccountContactsCache(cached, variables.id)
+        )
+      }
+
+      if (linkedAccountId) {
+        queryClient.setQueriesData({ queryKey: ['account-contacts', linkedAccountId] }, (cached: any) =>
+          upsertContactInAccountContactsCache(cached, {
+            ...mergedPatch,
+            accountId: linkedAccountId,
+            linkedAccountId,
+          }, linkedAccountId)
+        )
       }
 
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-search'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
     }
   })
 }
@@ -1507,6 +1730,7 @@ export function useDeleteContact() {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contacts-count'] })
+      queryClient.invalidateQueries({ queryKey: ['contacts-search'] })
       queryClient.invalidateQueries({ queryKey: ['account-contacts'] })
       queryClient.invalidateQueries({ queryKey: ['contact'] })
       queryClient.invalidateQueries({ queryKey: ['contact-list-memberships'] })
