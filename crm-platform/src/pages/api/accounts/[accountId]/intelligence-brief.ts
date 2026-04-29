@@ -523,19 +523,19 @@ const TALK_TRACK_SIGNAL_KEYWORDS: Record<SignalFamily, string[]> = {
 }
 
 const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
-  manufacturing: ['manufacturing', 'plant', 'production', 'shift', 'demand', '4cp', 'motor'],
-  logistics: ['warehouse', 'logistics', 'distribution', 'dock', 'automation', 'throughput', '24/7'],
-  food_storage: ['cold storage', 'refrigeration', 'freezer', 'cooler', 'temperature', 'food'],
-  healthcare: ['healthcare', 'hospital', 'clinic', 'occupancy', 'reliability', 'backup'],
-  banking: ['bank', 'branch', 'portfolio', 'delivery', 'budget', 'predictability'],
-  retail: ['retail', 'store', 'seasonal', 'traffic', 'occupancy', 'multi-site'],
-  restaurant: ['restaurant', 'kitchen', 'hvac', 'hospitality', 'hours', 'multi-unit'],
-  education_nonprofit: ['school', 'campus', 'nonprofit', 'occupancy', 'budget', 'seasonal'],
-  technology: ['technology', 'software', 'cooling', 'fit-out', 'growth', 'office'],
-  energy_intensive: ['4cp', 'peak', 'process', 'motor', 'load', 'industrial'],
-  office_services: ['office', 'lease', 'occupancy', 'headcount', 'budget', 'service'],
-  multi_site: ['portfolio', 'site', 'location', 'meter', 'branch', 'footprint'],
-  unknown: ['Texas', 'budget', 'load', 'site'],
+  manufacturing: ['process', 'equipment', 'shift', 'peak', 'load', 'production', 'startup'],
+  logistics: ['dock', 'automation', 'hvac', 'throughput', 'occupancy', 'warehouse', '24/7'],
+  food_storage: ['refrigeration', 'freezer', 'defrost', 'cooler', 'temperature', 'compressor'],
+  healthcare: ['occupancy', 'hvac', 'backup', 'reliability', '24/7', 'clinical', 'lab'],
+  banking: ['branch', 'occupancy', 'hvac', 'it', 'atms', 'portfolio', 'hours'],
+  retail: ['store', 'seasonal', 'traffic', 'lighting', 'hvac', 'refrigeration', 'multi-site'],
+  restaurant: ['kitchen', 'hvac', 'refrigeration', 'prep', 'hours', 'multi-unit', 'equipment'],
+  education_nonprofit: ['campus', 'occupancy', 'events', 'hvac', 'controls', 'building', 'schedule'],
+  technology: ['cooling', 'server', 'fit-out', 'occupancy', 'equipment', 'space', 'data'],
+  energy_intensive: ['4cp', 'process', 'motor', 'equipment', 'peak', 'load', 'maintenance'],
+  office_services: ['occupancy', 'lease', 'hvac', 'conference', 'equipment', 'hours', 'space'],
+  multi_site: ['portfolio', 'site', 'occupancy', 'hours', 'equipment', 'load', 'meter'],
+  unknown: ['usage', 'occupancy', 'equipment', 'load'],
 }
 
 function hashString(value: string) {
@@ -776,159 +776,159 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'manufacturing':
       return {
         label: 'Manufacturing / industrial',
-        angle: 'Demand spikes driven by how the plant runs, plus 4CP exposure, production ramps, and shift changes.',
-        question: 'Has anyone looked at where the spikes are coming from in the way the plant is running, and whether operational or hardware changes could smooth them out?',
+        angle: 'Demand spikes driven by process timing, shift changes, and equipment start-up, plus 4CP exposure.',
+        question: 'Has anyone mapped which processes or equipment are creating the spikes, and whether anything on-site could smooth them out?',
         openers: [
           `In manufacturing, the thing that usually bites is not the rate, it is the usage pattern and where the peaks come from.`,
           `If the operation runs in shifts, the electricity bill can punish the wrong kind of peak pretty fast.`,
           `The part I’d sanity-check first is which processes, schedules, or equipment are driving the spikes.`,
         ],
-        focus: ['demand spikes', '4CP', 'production ramps', 'shift changes', 'equipment', 'operations'],
+        focus: ['demand spikes', '4CP', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
       }
     case 'logistics':
       return {
         label: 'Logistics / warehouse / distribution',
-        angle: '24/7 load, HVAC, dock doors, automation, and seasonal throughput.',
-        question: 'Has the warehouse load been reviewed against how the site actually runs, or is it mostly just the rate?',
+        angle: '24/7 warehouse usage, dock activity, automation, and HVAC drive the bill more than the headline rate.',
+        question: 'Has anyone looked at which parts of the warehouse operation are creating the peaks, and whether scheduling or controls could smooth them out?',
         openers: [
-          `Warehouses can look simple on paper, but 24/7 load and automation usually tell a different story.`,
-          `Dock doors, HVAC, and throughput swings can make the bill behave very differently than people expect.`,
-          `A lot of logistics groups miss the utility side until the footprint gets busier or more automated.`,
+          `Warehouses can look simple on paper, but dock activity, HVAC, and automation usually tell a different story.`,
+          `A lot of the cost pressure comes from how the site is used, not just how it is priced.`,
+          `I’d want to know which part of the operation is creating the peaks.`,
         ],
-        focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings'],
+        focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings', 'scheduling', 'controls'],
       }
     case 'food_storage':
       return {
         label: 'Food / cold storage',
-        angle: 'Refrigeration load, freezer power, and summer peaks that never really shut off.',
-        question: 'Has the refrigeration load been part of the review, or has it mostly just been the rate?',
+        angle: 'Refrigeration load, freezer power, defrost cycles, and door openings drive the cost more than the rate.',
+        question: 'Have you looked at which cooling systems or operating habits are causing the peaks, and whether controls or maintenance could help?',
         openers: [
           `Cold storage is different because refrigeration never really turns off.`,
-          `When the load is tied to freezers and coolers, a small miss can show up quickly in the bill.`,
-          `That is the kind of operation where the utility setup needs to match the real load, not the brochure version.`,
+          `When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly in the bill.`,
+          `That is the kind of operation where I’d want to know what is driving the peaks on-site.`,
         ],
-        focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load'],
+        focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load', 'defrost cycles', 'controls'],
       }
     case 'healthcare':
       return {
         label: 'Healthcare',
-        angle: '24/7 uptime, reliability, occupancy, and backup systems.',
-        question: 'Has anyone reviewed whether the current setup still fits the way the building runs around the clock?',
+        angle: '24/7 uptime, occupancy, HVAC, and backup systems keep the load steady all day.',
+        question: 'Have you looked at which parts of the building are driving the base load, and whether there is any safe way to trim waste without hurting reliability?',
         openers: [
           `Healthcare is one of those sectors where the building never really gets to sleep.`,
           `With 24/7 operations, the part I care about is reliability first and budget predictability second.`,
-          `The utility side matters because the load is tied to constant occupancy and backup readiness.`,
+          `The utility side matters because the load is tied to occupancy, HVAC, and backup readiness.`,
         ],
-        focus: ['24/7 uptime', 'reliability', 'occupancy', 'backup systems'],
+        focus: ['24/7 uptime', 'reliability', 'occupancy', 'backup systems', 'HVAC', 'base load'],
       }
     case 'banking':
       return {
         label: 'Banking / financial services',
-        angle: 'Branch portfolios, delivery charges, and budget predictability.',
-        question: 'Do you review it branch by branch or as a portfolio?',
+        angle: 'Branch hours, occupancy, HVAC, ATMs, and IT closets drive the load more than one big bill number.',
+        question: 'Do you know which branches or building systems are actually driving the most usage, or is it mostly handled as one bucket?',
         openers: [
           `A lot of banks and branch groups end up looking at one site at a time and missing the bigger picture.`,
-          `Branch footprints can hide more in the delivery side than people expect.`,
-          `The first question I usually have is whether the group is managing this as a portfolio or just reacting site by site.`,
+          `Branch footprints can hide more in the usage pattern than people expect.`,
+          `The first question I usually have is whether the group is tracking the real drivers or just the invoice total.`,
         ],
-        focus: ['branch portfolio', 'delivery charges', 'budget predictability'],
+        focus: ['branch portfolio', 'usage drivers', 'budget predictability', 'HVAC', 'IT closets'],
       }
     case 'retail':
       return {
         label: 'Retail',
-        angle: 'Seasonal swings, occupancy changes, and multi-site timing.',
-        question: 'Has that been pretty stable for you, or does it swing with the seasons and traffic?',
+        angle: 'Store hours, traffic swings, lighting, HVAC, and refrigeration create seasonal load changes.',
+        question: 'Have you looked at which store behaviors are creating the peaks, and whether controls or equipment changes could smooth them out?',
         openers: [
           `Retail usually swings more than people expect once the seasons and traffic patterns change.`,
-          `A lot of stores look steady until occupancy or weather shifts start moving the bill around.`,
+          `A lot of stores look steady until occupancy, weather, or operating hours start moving the bill around.`,
           `If there are multiple locations, the timing can get messy fast if nobody is looking at the whole picture.`,
         ],
-        focus: ['seasonal swings', 'occupancy changes', 'multi-site timing'],
+        focus: ['seasonal swings', 'occupancy changes', 'multi-site timing', 'lighting', 'HVAC', 'refrigeration'],
       }
     case 'restaurant':
       return {
         label: 'Restaurant / hospitality',
-        angle: 'Kitchen load, HVAC, hours of operation, and multi-unit consistency.',
-        question: 'Has anyone checked whether the electricity setup matches how the locations actually operate?',
+        angle: 'Kitchen load, HVAC, refrigeration, and prep schedules drive the bill more than the rate does.',
+        question: 'Have you looked at which kitchen or HVAC loads are creating the spikes, and whether equipment or operating changes could help?',
         openers: [
-          `Restaurants are tough because kitchen load and HVAC can make the bill move even when sales look flat.`,
+          `Restaurants are tough because kitchen load, HVAC, and refrigeration can move the bill even when sales look flat.`,
           `The utility side often gets overlooked until a location starts behaving differently in the summer.`,
           `If there are multiple units, consistency matters because each site can drift in a different direction.`,
         ],
-        focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency'],
+        focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency', 'refrigeration', 'equipment'],
       }
     case 'education_nonprofit':
       return {
         label: 'Education / nonprofit',
-        angle: 'Tight budgets, campus timing, and stewardship over a fixed footprint.',
-        question: 'Has the power side been reviewed recently, or does it just keep rolling over?',
+        angle: 'Campus occupancy, events, HVAC schedules, and building controls drive the load more than the invoice total.',
+        question: 'Do you know which buildings or schedules are driving the load, and whether smarter controls or occupancy planning could help?',
         openers: [
           `For schools and nonprofits, the utility side usually comes down to budget discipline and timing.`,
           `Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.`,
-          `That is the sort of setup that deserves a clean review instead of just letting it keep rolling.`,
+          `That is the sort of setup where usage patterns matter more than the contract headline.`,
         ],
-        focus: ['tight budgets', 'campus timing', 'stewardship', 'seasonal occupancy'],
+        focus: ['tight budgets', 'campus timing', 'stewardship', 'seasonal occupancy', 'controls', 'scheduling'],
       }
     case 'technology':
       return {
         label: 'Technology / data-heavy office',
-        angle: 'Fit-outs, growth, cooling, and office load that changes faster than people expect.',
-        question: 'Has anyone checked whether the load from growth or new tech was accounted for?',
+        angle: 'Cooling, server rooms, fit-outs, and occupancy changes drive the load faster than people expect.',
+        question: 'Have you looked at which rooms or systems are causing the peaks, and whether cooling or space planning could reduce waste?',
         openers: [
           `Tech companies can add load quietly through fit-outs, cooling, and space changes.`,
           `A lot of the cost shows up after the growth is already live instead of before it starts.`,
-          `That is why I’d want to know whether the electricity side was planned alongside the growth plan.`,
+          `That is why I’d want to know which systems are driving the peaks now.`,
         ],
-        focus: ['fit-outs', 'growth', 'cooling', 'office load'],
+        focus: ['fit-outs', 'growth', 'cooling', 'office load', 'server rooms', 'space planning'],
       }
     case 'energy_intensive':
       return {
         label: 'Energy-intensive industrial',
-        angle: '4CP exposure, process load, large motors, and which equipment is driving the peaks.',
-        question: 'Has the peak side been reviewed lately so you know which processes or motors are creating it?',
+        angle: '4CP exposure, process load, large motors, and the equipment driving the peaks.',
+        question: 'Have you mapped which processes or motors are creating the peaks, and whether controls or maintenance could smooth them out?',
         openers: [
           `When a site carries heavy load, the peak side of the bill can matter as much as the rate.`,
           `That is usually where process timing and equipment choices start to matter a lot more.`,
           `If the plant or site is energy intensive, I’d want to know which pieces are driving the peaks and whether anything can be smoothed on-site.`,
         ],
-        focus: ['4CP', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices'],
+        focus: ['4CP', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices', 'maintenance'],
       }
     case 'office_services':
       return {
         label: 'Office / professional services',
-        angle: 'Occupancy, new leases, conference load, and budget control.',
-        question: 'Has the load been reviewed since the last space or headcount change?',
+        angle: 'Occupancy, lease changes, conference rooms, HVAC, and equipment usually drive the waste.',
+        question: 'Has anyone looked at which parts of the building are actually driving the bill now, and whether occupancy or controls could trim waste?',
         openers: [
           `Office businesses usually feel quiet until a lease, occupancy change, or growth step changes the load.`,
           `The electricity side can stay untouched for years even when the business around it has changed a lot.`,
           `That is the kind of thing I’d want to check before it gets swallowed by the rest of the budget.`,
         ],
-        focus: ['occupancy', 'new leases', 'conference load', 'budget control'],
+        focus: ['occupancy', 'new leases', 'conference load', 'budget control', 'HVAC', 'equipment'],
       }
     case 'multi_site':
       return {
         label: 'Multi-site / portfolio',
-        angle: 'Portfolio timing, site-by-site blind spots, and contract alignment.',
-        question: 'Do you guys look at that site by site, or more at the company level?',
+        angle: 'Portfolio timing, site-by-site usage differences, and whether one location is masking the real load story.',
+        question: 'Do you look at usage patterns site by site, or is it mostly one bucket across the portfolio?',
         openers: [
           `Multi-site groups can leave leverage on the table when each location gets treated like a separate decision.`,
           `The bigger issue is usually whether someone is looking at the whole footprint instead of just one meter at a time.`,
-          `Portfolio timing matters because the wrong site can hide the real opportunity.`,
+          `Portfolio timing matters because one site can hide the real usage pattern.`,
         ],
-        focus: ['portfolio timing', 'site-by-site blind spots', 'contract alignment'],
+        focus: ['portfolio timing', 'site-by-site blind spots', 'usage patterns', 'operating differences'],
       }
     case 'unknown':
     default:
       return {
         label: 'Company context',
-        angle: 'Budget visibility, operating fit, and whether the current setup still makes sense.',
-        question: 'Has anyone looked at whether the setup still fits how the business runs now?',
+        angle: 'Budget visibility, usage patterns, and whether the current setup still fits how the business runs now.',
+        question: 'Has anyone looked at which parts of the business are actually driving the bill now?',
         openers: [
           `I was trying to get a clean read on ${industryLabel}.`,
           `Even when the industry is broad, the utility side usually shows up in the same few places.`,
           `What matters most is whether the current setup still matches the business as it runs today.`,
         ],
-        focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
+        focus: ['budget visibility', 'operating fit', 'ERCOT exposure', 'usage patterns'],
       }
   }
 }
@@ -1047,44 +1047,44 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'I would want to know which processes, schedules, or equipment are driving the spikes.',
     ],
     logistics: [
-      'Warehouses can look simple on paper, but 24/7 load and automation usually tell a different story.',
-      'Dock doors, HVAC, and throughput swings can make the bill behave very differently than people expect.',
-      'A lot of logistics groups miss the utility side until the footprint gets busier or more automated.',
+      'Warehouses can look simple on paper, but dock activity, HVAC, and automation usually tell a different story.',
+      'A lot of the cost pressure comes from how the site is used, not just how it is priced.',
+      'I would want to know which part of the operation is creating the peaks.',
     ],
     food_storage: [
       'Cold storage is different because refrigeration never really turns off.',
-      'When the load is tied to freezers and coolers, a small miss can show up quickly in the bill.',
-      'That is the kind of operation where the utility setup needs to match the real load, not the brochure version.',
+      'When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly in the bill.',
+      'That is the kind of operation where I would want to know what is driving the peaks on-site.',
     ],
     healthcare: [
       'Healthcare is one of those sectors where the building never really gets to sleep.',
       'With 24/7 operations, the part I care about is reliability first and budget predictability second.',
-      'The utility side matters because the load is tied to constant occupancy and backup readiness.',
+      'The utility side matters because the load is tied to occupancy, HVAC, and backup readiness.',
     ],
     banking: [
       'A lot of banks and branch groups end up looking at one site at a time and missing the bigger picture.',
-      'Branch footprints can hide more in the delivery side than people expect.',
-      'The first question I usually have is whether the group is managing this as a portfolio or just reacting site by site.',
+      'Branch footprints can hide more in the usage pattern than people expect.',
+      'The first question I usually have is whether the group is tracking the real drivers or just the invoice total.',
     ],
     retail: [
       'Retail usually swings more than people expect once the seasons and traffic patterns change.',
-      'A lot of stores look steady until occupancy or weather shifts start moving the bill around.',
+      'A lot of stores look steady until occupancy, weather, or operating hours start moving the bill around.',
       'If there are multiple locations, the timing can get messy fast if nobody is looking at the whole picture.',
     ],
     restaurant: [
-      'Restaurants are tough because kitchen load and HVAC can make the bill move even when sales look flat.',
+      'Restaurants are tough because kitchen load, HVAC, and refrigeration can move the bill even when sales look flat.',
       'The utility side often gets overlooked until a location starts behaving differently in the summer.',
       'If there are multiple units, consistency matters because each site can drift in a different direction.',
     ],
     education_nonprofit: [
       'For schools and nonprofits, the utility side usually comes down to budget discipline and timing.',
       'Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.',
-      'That is the sort of setup that deserves a clean review instead of just letting it keep rolling.',
+      'That is the sort of setup where usage patterns matter more than the contract headline.',
     ],
     technology: [
       'Tech companies can add load quietly through fit-outs, cooling, and space changes.',
       'A lot of the cost shows up after the growth is already live instead of before it starts.',
-      'That is why I would want to know whether the electricity side was planned alongside the growth plan.',
+      'That is why I would want to know which systems are driving the peaks now.',
     ],
     energy_intensive: [
       'When a site carries heavy load, the peak side of the bill can matter as much as the rate.',
@@ -1099,7 +1099,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     multi_site: [
       'Multi-site groups can leave leverage on the table when each location gets treated like a separate decision.',
       'The bigger issue is usually whether someone is looking at the whole footprint instead of just one meter at a time.',
-      'Portfolio timing matters because the wrong site can hide the real opportunity.',
+      'Portfolio timing matters because one site can hide the real usage pattern.',
     ],
     unknown: [
       'Even when the industry is broad, the utility side usually shows up in the same few places.',
