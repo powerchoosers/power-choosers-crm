@@ -5,6 +5,8 @@ import { generateForensicSignature } from '@/lib/signature';
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes';
 import { buildUsableCallContextEntries, buildUsableCallContextBlock } from '@/lib/call-context';
 import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
+import { buildSequenceTemplateVariables, renderSequenceTemplate } from '@/lib/sequence-template';
+import { getBurnerFromEmail } from '@/lib/burner-email';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -497,7 +499,7 @@ export default async function handler(req, res) {
 
     const sequenceSender = sequence?.bgvector?.settings?.senderEmail || sequence?.metadata?.sender_email || null;
     const preferredFrom = String(sequenceSender || '').trim();
-    const fromEmail = preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io';
+    const fromEmail = getBurnerFromEmail(preferredFrom || String(executionMeta.from || '').trim() || 'l.patterson@nodalpoint.io');
     const senderDomain = senderDomainFromEmail(fromEmail);
 
     let senderFirstName = null;
@@ -653,7 +655,72 @@ export default async function handler(req, res) {
       throw new Error('AI generation returned empty body');
     }
 
-    let finalBody = generatedBody;
+    const templateVariables = buildSequenceTemplateVariables({
+      contact: {
+        id: contact.id || null,
+        firstName: contact.firstName || null,
+        lastName: contact.lastName || null,
+        name: contact.name || null,
+        email: contact.email || null,
+        title: contact.title || null,
+        phone: contact.phone || null,
+        mobile: contact.mobile || null,
+        workDirectPhone: contact.workDirectPhone || null,
+        otherPhone: contact.otherPhone || null,
+        companyPhone: contact.companyPhone || null,
+        city: contactCity || null,
+        state: contactState || null,
+        location,
+        address: contact.address || null,
+        linkedinUrl: linkedInUrl || null,
+        website: website || null,
+        notes: contact.notes || null,
+        listName: contact.listName || null,
+        companyName: account?.name || null,
+        industry: account?.industry || null,
+        electricitySupplier: account?.electricity_supplier || null,
+        annualUsage: account?.annual_usage || null,
+        currentRate: account?.current_rate || null,
+        contractEnd: account?.contract_end_date || null,
+        accountDescription: account?.description || null,
+        metadata: contact.metadata || null
+      },
+      account: {
+        name: account?.name || null,
+        industry: account?.industry || null,
+        domain: accountDomain || null,
+        description: account?.description || null,
+        companyPhone: account?.phone || null,
+        contractEnd: account?.contract_end_date || null,
+        location,
+        city: accountCity || null,
+        state: accountState || null,
+        address: primarySiteAddress || account?.address || null,
+        linkedinUrl: linkedInUrl || null,
+        annualUsage: account?.annual_usage || null,
+        electricitySupplier: account?.electricity_supplier || null,
+        currentRate: account?.current_rate || null,
+        revenue: account?.revenue || null,
+        employees: account?.employees || null
+      },
+      site: {
+        city: siteCity || accountCity || null,
+        state: siteState || accountState || null,
+        address: primarySiteAddress || account?.address || null,
+        utilityTerritory: utilityTerritory || null,
+        tdu: texasEnergy.tduDisplay || null,
+        marketContext: marketContext || null
+      }
+    });
+
+    const renderedBody = renderSequenceTemplate(generatedBody, templateVariables);
+    const renderedSubject = renderSequenceTemplate(generatedSubject, templateVariables);
+
+    if (/\{\{\s*[^}]+\s*\}\}/.test(renderedBody) || /\{\{\s*[^}]+\s*\}\}/.test(renderedSubject)) {
+      throw new Error('Sequence template still contains unresolved variables after rendering');
+    }
+
+    let finalBody = renderedBody;
 
     if (!finalBody.includes('NODAL_FORENSIC_SIGNATURE') && !finalBody.includes('nodal-signature')) {
       const lookupEmail = fromEmail.endsWith('@getnodalpoint.com')
@@ -690,7 +757,7 @@ export default async function handler(req, res) {
     const nextExecutionMeta = {
       ...executionMeta,
       body: finalBody,
-      subject: generatedSubject,
+      subject: renderedSubject,
       from: fromEmail,
       senderEmail: fromEmail,
       senderDomain,
@@ -728,8 +795,8 @@ export default async function handler(req, res) {
       status: 'pending_send',
       sentAt: null,
       aiPrompt: String(executionMeta?.prompt || '').trim() || null,
-      generatedBody: generatedBody,
-      generatedSubject: generatedSubject
+      generatedBody: renderedBody,
+      generatedSubject: renderedSubject
     };
     // Always use the sequence-configured fromEmail (from bgvector.settings.senderEmail).
     // Keep the ownership metadata, but do not let an older placeholder `from` win here.
@@ -741,7 +808,7 @@ export default async function handler(req, res) {
       accountId: contact.accountId || null,
       from: fromEmail,
       to: contact.email ? [contact.email] : [],
-      subject: generatedSubject,
+      subject: renderedSubject,
       html: finalBody,
       text: finalBody.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(),
       aiPrompt: String(executionMeta?.prompt || '').trim() || null,
@@ -777,7 +844,7 @@ export default async function handler(req, res) {
     res.status(200).json({
       success: true,
       action: normalizedAction,
-      subject: generatedSubject,
+      subject: renderedSubject,
       generated: !!generatedBody
     });
   } catch (error) {
@@ -810,7 +877,7 @@ export default async function handler(req, res) {
           accountId: contact?.accountId || null,
           from: fromEmail,
           to: contact?.email ? [contact.email] : [],
-          subject: defaultSubject,
+      subject: defaultSubject,
           html: '',
           text: failureText,
           status: 'failed',
