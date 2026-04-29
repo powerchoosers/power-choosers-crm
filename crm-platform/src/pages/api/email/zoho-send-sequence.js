@@ -19,6 +19,8 @@ import { injectTracking, hasTrackingPixel } from './tracking-helper.js';
 import { supabaseAdmin as supabase } from '@/lib/supabase';
 import { generateForensicSignature } from '@/lib/signature';
 import { appendHtmlFragment } from '@/lib/email-html';
+import { buildSequenceTemplateVariables, renderSequenceTemplate } from '@/lib/sequence-template';
+import { getBurnerFromEmail } from '@/lib/burner-email';
 import logger from '../_logger.js';
 
 function buildUnsubscribeFooter(unsubscribeUrl) {
@@ -42,6 +44,106 @@ function stripExistingUnsubscribeFooter(html) {
         return { html: html.replace(textPattern, ''), hadFooter: true };
     }
     return { html, hadFooter: false };
+}
+
+function hasUnresolvedTemplateVariables(value) {
+  return /\{\{\s*[^}]+\s*\}\}/.test(String(value || ''));
+}
+
+function extractPrimarySiteDetails(account) {
+    const direct = typeof account?.address === 'string' ? account.address.trim() : '';
+    const city = typeof account?.city === 'string' ? account.city.trim() : '';
+    const state = typeof account?.state === 'string' ? account.state.trim() : '';
+    const serviceAddresses = Array.isArray(account?.service_addresses) ? account.service_addresses : [];
+
+    if (serviceAddresses.length > 0) {
+        const candidates = [];
+        for (const item of serviceAddresses) {
+            if (typeof item === 'string' && item.trim()) {
+                candidates.push({ address: item.trim(), city: '', state: '', isPrimary: false });
+                continue;
+            }
+            if (item && typeof item === 'object') {
+                const normalized = item && typeof item === 'object' && !Array.isArray(item) ? item : {};
+                const serviceAddress = typeof item.address === 'string' ? item.address.trim() : '';
+                const serviceCity = typeof item.city === 'string' ? item.city.trim() : '';
+                const serviceState = typeof item.state === 'string' ? item.state.trim() : '';
+                const flagText = [normalized.type, normalized.label, normalized.name, normalized.kind]
+                    .filter((part) => typeof part === 'string')
+                    .join(' ')
+                    .toLowerCase();
+                const isPrimary = [normalized.isPrimary, normalized.primary, normalized.is_primary, normalized.preferred, normalized.default]
+                    .some((flag) => flag === true || flag === 'true' || flag === 1 || flag === '1')
+                    || /\b(primary|headquarters|head office|hq|main|billing)\b/.test(flagText);
+                candidates.push({
+                    address: serviceAddress || [serviceCity, serviceState].filter(Boolean).join(', '),
+                    city: serviceCity,
+                    state: serviceState,
+                    isPrimary,
+                });
+            }
+        }
+
+        if (candidates.length > 0) {
+            return candidates.find((candidate) => candidate.isPrimary) || candidates[0];
+        }
+    }
+
+    return {
+        address: direct || [city, state].filter(Boolean).join(', '),
+        city,
+        state,
+    };
+}
+
+async function buildSequenceTemplateVariablesForEmail(contactId, metadata) {
+    const effectiveContactId = String(
+        contactId || metadata?.contactId || metadata?.contact_id || metadata?.targetId || metadata?.target_id || ''
+    ).trim();
+    if (!effectiveContactId) return null;
+
+    const { data: contact, error: contactError } = await supabase
+        .from('contacts')
+        .select('id, email, notes, "firstName", "lastName", title, city, state, phone, mobile, "workPhone", "otherPhone", "companyPhone", "primaryPhoneField", "linkedinUrl", "accountId", metadata')
+        .eq('id', effectiveContactId)
+        .maybeSingle();
+
+    if (contactError || !contact) return null;
+
+    let account = null;
+    if (contact.accountId) {
+        const { data: acc } = await supabase
+            .from('accounts')
+            .select('id, name, domain, website, linkedin_url, industry, description, phone, annual_usage, current_rate, contract_end_date, revenue, employees, city, state, address, service_addresses, electricity_supplier, metadata')
+            .eq('id', contact.accountId)
+            .maybeSingle();
+        account = acc || null;
+    }
+
+    const primarySite = extractPrimarySiteDetails(account || {});
+    const siteCity = typeof primarySite.city === 'string' && primarySite.city.trim()
+        ? primarySite.city.trim()
+        : typeof account?.city === 'string' && account.city.trim()
+            ? account.city.trim()
+            : typeof contact.city === 'string' ? contact.city.trim() : '';
+    const siteState = typeof primarySite.state === 'string' && primarySite.state.trim()
+        ? primarySite.state.trim()
+        : typeof account?.state === 'string' && account.state.trim()
+            ? account.state.trim()
+            : typeof contact.state === 'string' ? contact.state.trim() : '';
+
+    return buildSequenceTemplateVariables({
+        contact,
+        account: account || {},
+        site: {
+            city: siteCity || null,
+            state: siteState || null,
+            address: primarySite.address || account?.address || contact.address || null,
+            utilityTerritory: account?.metadata?.utility_territory || account?.metadata?.utilityTerritory || null,
+            tdu: account?.tdu || null,
+            marketContext: account?.metadata?.market_context || account?.metadata?.marketContext || null,
+        },
+    });
 }
 
 export default async function handler(req, res) {
@@ -96,7 +198,7 @@ export default async function handler(req, res) {
         // Extract email addresses and names
         const toEmail = typeof to === 'object' ? to.email : to;
         // const toName = typeof to === 'object' ? (to.name || '') : '';
-        const fromEmail = typeof from === 'object' ? from.email : from;
+        const fromEmail = getBurnerFromEmail(typeof from === 'object' ? from.email : from);
         let fromName = typeof from === 'object' ? (from.name || 'Nodal Point') : 'Nodal Point';
 
         logger.info(`[Zoho Sequence] Sending email: to=${toEmail}, from=${fromEmail}, subject=${subject}`, 'zoho-send-sequence');
@@ -106,6 +208,8 @@ export default async function handler(req, res) {
 
         // Prepare HTML content with tracking if enabled
         let htmlContent = html || '';
+        let normalizedSubject = String(subject || '').trim();
+        let textContent = text || '';
 
         // Forensic Signature Injection for Sequences
         // Rules: 
@@ -115,17 +219,34 @@ export default async function handler(req, res) {
         htmlContent = strippedFooter.html || '';
         const hadExistingFooter = strippedFooter.hadFooter;
 
+        const templateMarkersPresent = [normalizedSubject, htmlContent, textContent].some(hasUnresolvedTemplateVariables);
+        if (templateMarkersPresent) {
+            const templateVariables = await buildSequenceTemplateVariablesForEmail(contactId, body.metadata);
+            if (!templateVariables) {
+                throw new Error('Sequence template still contains unresolved variables and no contact context was available');
+            }
+
+            normalizedSubject = renderSequenceTemplate(normalizedSubject, templateVariables);
+            htmlContent = renderSequenceTemplate(htmlContent, templateVariables);
+            textContent = renderSequenceTemplate(textContent, templateVariables);
+        }
+
+        if (
+            hasUnresolvedTemplateVariables(normalizedSubject) ||
+            hasUnresolvedTemplateVariables(htmlContent) ||
+            hasUnresolvedTemplateVariables(textContent)
+        ) {
+            throw new Error('Sequence template still contains unresolved variables after rendering');
+        }
+
         const isFoundry = htmlContent.includes('<!-- FOUNDRY_TEMPLATE -->') || htmlContent.includes('data-foundry');
         const hasSignature = htmlContent.includes('NODAL_FORENSIC_SIGNATURE') || htmlContent.includes('nodal-signature');
 
         if (!isFoundry && !hasSignature && htmlContent) {
             try {
                 // Normalize fromEmail for lookups (handle cold-outreach burner domain)
-                let lookupEmail = fromEmail;
-                if (fromEmail.endsWith('@getnodalpoint.com')) {
-                    lookupEmail = fromEmail.replace('@getnodalpoint.com', '@nodalpoint.io');
-                    logger.info(`[Zoho Sequence] Burner domain detected. Mapping ${fromEmail} -> ${lookupEmail} for profile lookup.`, 'zoho-send-sequence');
-                }
+                const lookupEmail = fromEmail.replace('@getnodalpoint.com', '@nodalpoint.io');
+                logger.info(`[Zoho Sequence] Burner domain detected. Mapping ${fromEmail} -> ${lookupEmail} for profile lookup.`, 'zoho-send-sequence');
 
                 const { data: userData, error: userError } = await supabase
                     .from('users')
@@ -203,8 +324,6 @@ export default async function handler(req, res) {
             logger.info(`[Zoho Sequence] Internal/Self-send detected. Tracking: opens=${finalTrackOpens}, clicks=${finalTrackClicks}`, 'zoho-send-sequence');
         }
 
-        // Prepare text content (use provided text or convert HTML)
-        let textContent = text || '';
         if (!textContent && htmlContent) {
             textContent = htmlContent
                 .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -227,7 +346,7 @@ export default async function handler(req, res) {
         // Send email via Zoho API
         const result = await zohoService.sendEmail({
             to: toEmail,
-            subject,
+            subject: normalizedSubject,
             html: htmlContent || undefined,
             text: textContent || undefined,
             userEmail: fromEmail, // Critical for multi-tenant token selection
@@ -255,7 +374,7 @@ export default async function handler(req, res) {
                 .update({
                     status: 'sent',
                     type: 'sent',
-                    subject,
+                    subject: normalizedSubject,
                     html: htmlContent || '',
                     text: textContent || '',
                     aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
@@ -269,8 +388,8 @@ export default async function handler(req, res) {
                         zohoMessageId: result.messageId,
                         trackingId: trackingId,
                         aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
-                        generatedBody: String(generatedBody || htmlContent || '').trim() || null,
-                        generatedSubject: String(generatedSubject || subject || '').trim() || null
+                        generatedBody: String(htmlContent || textContent || '').trim() || null,
+                        generatedSubject: String(normalizedSubject || '').trim() || null
                     }
                 })
                 .eq('id', email_id);
@@ -290,7 +409,7 @@ export default async function handler(req, res) {
                 .insert({
                     id: trackingId,
                     to: [toEmail],
-                    subject,
+                    subject: normalizedSubject,
                     from: fromEmail,
                     aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
                     // Tracking-only record for pixel/click handlers. Keep out of outbound UI lists.
@@ -315,8 +434,8 @@ export default async function handler(req, res) {
                         isSequenceEmail: true,
                         provider: 'zoho',
                         aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
-                        generatedBody: String(generatedBody || htmlContent || '').trim() || null,
-                        generatedSubject: String(generatedSubject || subject || '').trim() || null
+                        generatedBody: String(htmlContent || textContent || '').trim() || null,
+                        generatedSubject: String(normalizedSubject || '').trim() || null
                     }
                 });
 
@@ -332,7 +451,7 @@ export default async function handler(req, res) {
                 .insert({
                     id: trackingId,
                     to: [toEmail],
-                    subject,
+                    subject: normalizedSubject,
                     html: htmlContent || '',
                     text: textContent || '',
                     from: fromEmail,
@@ -361,8 +480,8 @@ export default async function handler(req, res) {
                         sentAt,
                         trackingId,
                         aiPrompt: String(aiPrompt || body?.metadata?.aiPrompt || '').trim() || null,
-                        generatedBody: String(generatedBody || htmlContent || '').trim() || null,
-                        generatedSubject: String(generatedSubject || subject || '').trim() || null,
+                        generatedBody: String(htmlContent || textContent || '').trim() || null,
+                        generatedSubject: String(normalizedSubject || '').trim() || null,
                         ...((body.metadata && typeof body.metadata === 'object') ? body.metadata : {})
                     }
                 });
@@ -380,7 +499,7 @@ export default async function handler(req, res) {
             success: true,
             messageId: result.messageId,
             to: toEmail,
-            subject
+            subject: normalizedSubject
         }));
 
     } catch (error) {
