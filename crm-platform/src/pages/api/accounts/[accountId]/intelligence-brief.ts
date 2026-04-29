@@ -563,6 +563,43 @@ function shortenText(value: string, maxLength = 90) {
   return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`
 }
 
+function stripTrailingQuestionMark(value: string) {
+  return cleanText(value).replace(/\?+$/, '').trim()
+}
+
+function tokenizeTalkTrack(value: string) {
+  return Array.from(
+    new Set(
+      cleanText(value)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(' ')
+        .map((token) => token.trim())
+        .filter((token) => token.length > 2)
+    )
+  )
+}
+
+function talkTrackSimilarity(left: string, right: string) {
+  const leftTokens = tokenizeTalkTrack(left)
+  const rightTokens = tokenizeTalkTrack(right)
+  if (!leftTokens.length || !rightTokens.length) return 0
+
+  const rightSet = new Set(rightTokens)
+  const overlap = leftTokens.filter((token) => rightSet.has(token)).length
+  const union = new Set([...leftTokens, ...rightTokens]).size
+  if (!union) return 0
+  return overlap / union
+}
+
+function talkTrackIsTooSimilarToPrevious(current: string, previous: string) {
+  const currentText = cleanText(current)
+  const previousText = cleanText(previous)
+  if (!currentText || !previousText) return false
+  if (currentText.toLowerCase() === previousText.toLowerCase()) return true
+  return talkTrackSimilarity(currentText, previousText) >= 0.58
+}
+
 function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) {
   const title = cleanText(candidate?.title)
   const companyName = cleanText(account.name)
@@ -739,14 +776,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'manufacturing':
       return {
         label: 'Manufacturing / industrial',
-        angle: 'Demand spikes, 4CP exposure, production ramps, and shift changes.',
-        question: 'Has anyone checked whether the plan matches how the plant actually runs when demand spikes hit?',
+        angle: 'Demand spikes driven by how the plant runs, plus 4CP exposure, production ramps, and shift changes.',
+        question: 'Has anyone looked at where the spikes are coming from in the way the plant is running, and whether operational or hardware changes could smooth them out?',
         openers: [
-          `In manufacturing, the thing that usually bites is not the rate, it is how the plant behaves at peak.`,
+          `In manufacturing, the thing that usually bites is not the rate, it is the usage pattern and where the peaks come from.`,
           `If the operation runs in shifts, the electricity bill can punish the wrong kind of peak pretty fast.`,
-          `The part I’d sanity-check first is whether the agreement matches the way production really moves.`,
+          `The part I’d sanity-check first is which processes, schedules, or equipment are driving the spikes.`,
         ],
-        focus: ['demand spikes', '4CP', 'production ramps', 'shift changes'],
+        focus: ['demand spikes', '4CP', 'production ramps', 'shift changes', 'equipment', 'operations'],
       }
     case 'logistics':
       return {
@@ -847,14 +884,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'energy_intensive':
       return {
         label: 'Energy-intensive industrial',
-        angle: '4CP exposure, process load, large motors, and peak timing.',
-        question: 'Has the peak side been reviewed lately, or is it mostly set and forgotten?',
+        angle: '4CP exposure, process load, large motors, and which equipment is driving the peaks.',
+        question: 'Has the peak side been reviewed lately so you know which processes or motors are creating it?',
         openers: [
           `When a site carries heavy load, the peak side of the bill can matter as much as the rate.`,
-          `That is usually where demand timing and operational patterns start to matter a lot more.`,
-          `If the plant or site is energy intensive, I’d want to know whether the plan matches the way it really runs.`,
+          `That is usually where process timing and equipment choices start to matter a lot more.`,
+          `If the plant or site is energy intensive, I’d want to know which pieces are driving the peaks and whether anything can be smoothed on-site.`,
         ],
-        focus: ['4CP', 'process load', 'peak exposure', 'large motors'],
+        focus: ['4CP', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices'],
       }
     case 'office_services':
       return {
@@ -953,11 +990,12 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   return genericHits > 0 || sentenceCount < 2 || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
-function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
+function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const companyName = cleanText(account.name) || 'the company'
   const signalAnchor = deriveSignalAnchor(account, candidate)
   const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
   const locationText = location || 'Texas'
+  const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
       `I saw the note about ${signalAnchor}.`,
@@ -1001,12 +1039,12 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
   }
 
-  const opener = pickVariant(openerBySignal[context.signalFamily], context.seed) || openerBySignal[context.signalFamily][0]
+  const opener = pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
   const industryLineByCluster: Record<IndustryCluster, string[]> = {
     manufacturing: [
-      'In manufacturing, the thing that usually bites is not the rate, it is how the plant behaves at peak.',
+      'In manufacturing, the thing that usually bites is not the rate, it is the usage pattern and where the peaks come from.',
       'If the operation runs in shifts, the bill can punish the wrong kind of peak pretty fast.',
-      'I would want to know whether the plan matches how production actually moves.',
+      'I would want to know which processes, schedules, or equipment are driving the spikes.',
     ],
     logistics: [
       'Warehouses can look simple on paper, but 24/7 load and automation usually tell a different story.',
@@ -1050,8 +1088,8 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
     energy_intensive: [
       'When a site carries heavy load, the peak side of the bill can matter as much as the rate.',
-      'That is usually where demand timing and operational patterns start to matter a lot more.',
-      'If the plant or site is energy intensive, I would want to know whether the plan matches the way it really runs.',
+      'That is usually where process timing and equipment choices start to matter a lot more.',
+      'If the plant or site is energy intensive, I would want to know which pieces are driving the peaks and whether anything can be smoothed on-site.',
     ],
     office_services: [
       'Office businesses usually feel quiet until a lease, occupancy change, or growth step changes the load.',
@@ -1070,10 +1108,34 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
   }
 
-  const industryLine = pickVariant(industryLineByCluster[context.industryCluster], context.seed) || industryLineByCluster[context.industryCluster][0]
+  const industryLine = pickVariant(industryLineByCluster[context.industryCluster], variantSeed) || industryLineByCluster[context.industryCluster][0]
   const question = context.question
 
-  return [opener, industryLine, question].join(' ')
+  switch (context.openingPattern) {
+    case 'question':
+      return [
+        `${stripTrailingQuestionMark(question)}?`,
+        opener,
+        industryLine,
+      ].join(' ')
+    case 'contrast':
+      return [
+        `The news is one thing, but the electricity side is usually where the real questions show up.`,
+        opener,
+        industryLine,
+        question,
+      ].join(' ')
+    case 'curiosity':
+      return [
+        `What I’m trying to understand is whether the electricity side is already set up for ${signalAnchor}.`,
+        opener,
+        industryLine,
+        question,
+      ].join(' ')
+    case 'observation':
+    default:
+      return [opener, industryLine, question].join(' ')
+  }
 }
 
 function extractHtmlAttribute(tag: string, attribute: string) {
@@ -1576,6 +1638,7 @@ Decision rules:
 - Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the industry angle, the opening style, and the question to ask.
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
+- Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 
 Talk Track angle selection (choose ONE based on the actual signal):
@@ -1651,6 +1714,7 @@ Decision rules:
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on the industry angle and the company's operating footprint.
 - Rotate the first sentence shape. Do not always open with the same setup.
 - Make it sound like a Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
+- Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 
 Talk Track angle selection for fallback mode (choose based on what you found):
@@ -1672,8 +1736,8 @@ IF COMPANY = Industry facing digital transformation:
 - Example: "I've been seeing a lot of [industry] companies adopting [technology trend]. Most are focused on the tech side but don't think about what that does to the electricity load until it's already running. Have you guys factored that in, or is it still being figured out?"
 
 IF COMPANY = Manufacturing/industrial:
-- Focus on demand spikes and whether agreement matches how the plant actually runs
-- Example: "I work with a lot of [industry] companies in Texas. What's interesting is, even when the rate looks fine, the way the agreement handles demand spikes doesn't always match how the plant actually runs. Has that been pretty dialed in for you guys, or not really?"
+- Focus on where the demand spikes are coming from and whether site practices or hardware could smooth them out
+- Example: "I work with a lot of [industry] companies in Texas. What's interesting is, even when the rate looks fine, the real issue is usually which processes, schedules, or equipment are creating the demand spikes, and whether there are operational or hardware changes that could smooth them out. Have you guys looked at that side yet, or not really?"
 
 IF COMPANY = Service business (dental, medical, professional services):
 - Focus on whether they think about facility costs as much as they help clients
@@ -1907,11 +1971,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const talkTrackCandidate = generatedBrief ? findCandidateForResult(generatedBrief as BriefResult, candidateResults) : candidateResults[0] || null
     const talkTrackRewriteContext = buildTalkTrackContext(account, talkTrackCandidate, usedFallback)
-    if (validated && talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext)) {
-      const rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext)
-      validated = {
-        ...validated,
-        talk_track: rewrittenTalkTrack,
+    const previousTalkTrack = cleanText(account.intelligence_brief_talk_track || '')
+    if (validated) {
+      const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext) ||
+        (previousTalkTrack && talkTrackIsTooSimilarToPrevious(validated.talk_track || '', previousTalkTrack))
+
+      if (shouldRewrite) {
+        let rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 0)
+
+        if (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) {
+          rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 1)
+        }
+
+        if (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) {
+          rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 2)
+        }
+
+        validated = {
+          ...validated,
+          talk_track: rewrittenTalkTrack,
+        }
       }
     }
 
