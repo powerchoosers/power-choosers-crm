@@ -134,6 +134,8 @@ This has been a recurring issue. The system uses two domains:
 ### Common Mistake
 Directly using `owner.email` from the database without converting to burner domain. Always call `getBurnerFromEmail(owner.email)` for sequence sends.
 
+Another recurring failure mode is shipping sequence copy with raw template markers like `{{contact.firstName}}` or `{{account.name}}`. The send path must render those variables from the live contact/account record first, and if any placeholders are still present after rendering, the send should fail and retry instead of going out broken.
+
 ### Verification Query
 ```sql
 -- Check for incorrectly stored sequence emails

@@ -12,6 +12,8 @@ import postgres from 'https://deno.land/x/postgresjs@v3.4.5/mod.js'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '../lib/forensic-notes.ts'
 import { buildUsableCallContextEntries, buildUsableCallContextBlock } from '../lib/call-context.ts'
 import { getTexasEnergyContext } from '../lib/texas-territory.ts'
+import { getBurnerFromEmail } from '../lib/burner-email.ts'
+import { buildSequenceTemplateVariables, renderSequenceTemplate } from '../lib/sequence-template.ts'
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!)
 
@@ -861,7 +863,7 @@ async function handleGeneration(execution, job) {
     ]);
 
     // Initialize early to avoid ReferenceError in catch block
-    let senderEmail = String(member.sequence_sender_email || '').trim() || null;
+    let senderEmail = getBurnerFromEmail(String(member.sequence_sender_email || '').trim() || 'l.patterson@nodalpoint.io');
     let senderDomain = senderEmail && senderEmail.includes('@')
         ? senderEmail.split('@')[1]
         : null;
@@ -957,6 +959,65 @@ async function handleGeneration(execution, job) {
         body = buildContextualFallbackBody(member, replyStage, location, utilityTerritory);
     }
 
+    const templateVariables = buildSequenceTemplateVariables({
+        contact: {
+            id: member.contact_id || null,
+            firstName: member.firstName || null,
+            lastName: member.lastName || null,
+            name: [member.firstName, member.lastName].filter(Boolean).join(' ') || null,
+            email: member.contact_email || null,
+            title: member.contact_title || null,
+            city: member.contact_city || null,
+            state: member.contact_state || null,
+            location: location || null,
+            address: primarySiteAddress || member.account_address || null,
+            linkedinUrl: member.contact_linkedin_url || null,
+            website: member.account_website || website || null,
+            notes: member.contact_notes || null,
+            companyName: member.company_name || null,
+            industry: member.account_industry || null,
+            electricitySupplier: member.account_supplier || null,
+            annualUsage: member.account_annual_usage || null,
+            currentRate: member.account_current_rate || null,
+            contractEnd: member.account_contract_end_date || null,
+            accountDescription: member.account_description || null,
+            metadata: member.contact_metadata || null,
+        },
+        account: {
+            name: member.company_name || null,
+            industry: member.account_industry || null,
+            domain: member.account_domain || null,
+            description: member.account_description || null,
+            companyPhone: member.account_phone || null,
+            contractEnd: member.account_contract_end_date || null,
+            location: location || null,
+            city: accountCity || null,
+            state: accountState || null,
+            address: primarySiteAddress || member.account_address || null,
+            linkedinUrl: member.account_linkedin_url || null,
+            annualUsage: member.account_annual_usage || null,
+            electricitySupplier: member.account_supplier || null,
+            currentRate: member.account_current_rate || null,
+            revenue: member.account_revenue || null,
+            employees: member.account_employees || null,
+        },
+        site: {
+            city: siteCity || accountCity || null,
+            state: siteState || accountState || null,
+            address: primarySiteAddress || member.account_address || null,
+            utilityTerritory: utilityTerritory || null,
+            tdu: texasEnergy.tduDisplay || null,
+            marketContext,
+        },
+    });
+
+    body = renderSequenceTemplate(body, templateVariables);
+    const renderedSubject = renderSequenceTemplate(subject, templateVariables);
+
+    if (/\{\{\s*[^}]+\s*\}\}/.test(body) || /\{\{\s*[^}]+\s*\}\}/.test(renderedSubject)) {
+        throw new Error('Sequence template still contains unresolved variables after rendering');
+    }
+
     if (!body.includes('NODAL_FORENSIC_SIGNATURE') && !body.includes('nodal-signature')) {
         const lookupEmail = senderEmail && senderEmail.endsWith('@getnodalpoint.com')
             ? senderEmail.replace('@getnodalpoint.com', '@nodalpoint.io')
@@ -976,8 +1037,8 @@ async function handleGeneration(execution, job) {
 
     const bodyWithFooter = appendPreviewUnsubscribeFooter(body, member.contact_email);
     const metadataPatch = senderEmail
-        ? { body: bodyWithFooter, subject, from: senderEmail, senderEmail, senderDomain }
-        : { body: bodyWithFooter, subject };
+        ? { body: bodyWithFooter, subject: renderedSubject, from: senderEmail, senderEmail, senderDomain }
+        : { body: bodyWithFooter, subject: renderedSubject };
 
     return metadataPatch;
     } catch (error) {
@@ -1113,7 +1174,7 @@ async function handleSend(execution, job) {
     }
 
     const preferredSender = String(metadata?.senderEmail || metadata?.from || member.sequence_sender_email || '').trim();
-    let fromEmail = preferredSender || member.primary_owner_email;
+    let fromEmail = getBurnerFromEmail(preferredSender || member.primary_owner_email || 'l.patterson@nodalpoint.io');
     if (preferredSender) {
         const preferredConnection = await sql`
       SELECT email
