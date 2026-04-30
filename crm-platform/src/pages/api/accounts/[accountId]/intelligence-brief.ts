@@ -555,6 +555,36 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   }
 }
 
+function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null) {
+  const companyName = cleanText(account.name) || 'the company'
+  const signalAnchor = cleanText(deriveSignalAnchor(account, candidate))
+
+  if (!candidate) {
+    return `I saw a report about ${companyName}.`
+  }
+
+  if (candidate.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate)) {
+    if (isOfficialCompanyAnnouncement(account, candidate)) {
+      return `I saw your announcement about ${companyName}.`
+    }
+    return 'I came across your website.'
+  }
+
+  if (signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase()) {
+    const connector =
+      candidate.sourceKind === 'news'
+        ? 'report'
+        : candidate.sourceKind === 'sec'
+          ? 'filing'
+          : candidate.sourceKind === 'linkedin'
+            ? 'post'
+            : 'article'
+    return `I saw a ${connector} about ${companyName}, and it was ${lowercaseFirst(signalAnchor)}.`
+  }
+
+  return buildSourceLead(account, candidate)
+}
+
 function isLikelyBadSourceUrl(value: string) {
   const url = cleanText(value)
   if (!url) return true
@@ -743,6 +773,22 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   unknown: ['usage', 'occupancy', 'equipment', 'load'],
 }
 
+const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
+  manufacturing: ['manufacturing', 'industrial', 'factory', 'plant'],
+  logistics: ['logistics', 'warehouse', 'distribution', 'fulfillment'],
+  food_storage: ['cold storage', 'refrigeration', 'freezer', 'food storage'],
+  healthcare: ['healthcare', 'hospital', 'clinic', 'medical', 'senior living', 'assisted living', 'nursing'],
+  banking: ['bank', 'banking', 'credit union', 'financial services'],
+  retail: ['retail', 'store', 'shopping', 'showroom'],
+  restaurant: ['restaurant', 'restaurants', 'hospitality', 'dining', 'cafe', 'food service'],
+  education_nonprofit: ['school', 'education', 'campus', 'nonprofit', 'church', 'university', 'college'],
+  technology: ['technology', 'tech', 'software', 'saas', 'data center'],
+  energy_intensive: ['energy-intensive', 'heavy site', 'industrial gas', 'refinery', 'mining', 'quarry'],
+  office_services: ['office', 'professional services', 'consulting', 'legal', 'accounting'],
+  multi_site: ['multi-site', 'portfolio', 'branch', 'chain'],
+  unknown: [],
+}
+
 function hashString(value: string) {
   let hash = 0
   const text = cleanText(value)
@@ -766,6 +812,12 @@ function shortenText(value: string, maxLength = 90) {
   const text = cleanText(value)
   if (text.length <= maxLength) return text
   return `${text.slice(0, Math.max(0, maxLength - 1)).trim()}…`
+}
+
+function lowercaseFirst(value: string) {
+  const text = cleanText(value)
+  if (!text) return ''
+  return text.charAt(0).toLowerCase() + text.slice(1)
 }
 
 function stripTrailingQuestionMark(value: string) {
@@ -1326,44 +1378,27 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const genericOpening = /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i.test(firstSentence)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
+  const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
+    if (cluster === context.industryCluster) return false
+    return labels.some((label) => lower.includes(label.toLowerCase()))
+  })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || sentenceCount < 2 || overstuffed || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || sentenceCount < 2 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const signalAnchor = deriveSignalAnchor(account, candidate)
-  const sourceLead = buildSourceLead(account, candidate)
+  const sourceLead = buildSignalAwareLead(account, candidate)
   const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
-    acquisition: [
-      sourceLead,
-      `That kind of change usually means somebody has to sort out what got inherited on the power side.`,
-    ],
-    new_location: [
-      sourceLead,
-      `When a new location is coming online, the electricity setup needs to be handled before move-in, not after.`,
-    ],
-    leadership_change: [
-      sourceLead,
-      `A new leader usually means the power setup gets a fresh look, or should.`,
-    ],
-    growth: [
-      sourceLead,
-      `Growth like that usually changes the bill before anyone notices it in operations.`,
-    ],
-    restructuring: [
-      sourceLead,
-      `When a site gets consolidated or closed, the first question is whether the power costs were cleaned up too.`,
-    ],
-    contract_win: [
-      sourceLead,
-      `A new customer or project can change how the site runs pretty fast.`,
-    ],
-    funding: [
-      sourceLead,
-      `That usually means somebody needs to map the new money against the facility plan.`,
-    ],
+    acquisition: [sourceLead],
+    new_location: [sourceLead],
+    leadership_change: [sourceLead],
+    growth: [sourceLead],
+    restructuring: [sourceLead],
+    contract_win: [sourceLead],
+    funding: [sourceLead],
     industry_context: [
       sourceLead,
       `What usually matters next is whether the way they run the business still matches the bill.`,
@@ -1371,6 +1406,39 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   }
 
   const opener = pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
+  const signalLineBySignal: Record<SignalFamily, string[]> = {
+    acquisition: [
+      `That usually means somebody has to sort out what got inherited on the power side.`,
+      `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
+    ],
+    new_location: [
+      `That is the kind of change where the electricity setup needs to be handled before move-in, not after.`,
+      `The power piece should already be thought through before the new site is live.`,
+    ],
+    leadership_change: [
+      `A new leader usually means the power setup gets a fresh look, or should.`,
+      `Fresh eyes tend to surface questions the old team never had time to ask.`,
+    ],
+    growth: [
+      `Growth like that usually changes the bill before anyone notices it in operations.`,
+      `Once headcount or capex starts moving, the bill can move with it.`,
+    ],
+    restructuring: [
+      `That is usually when stranded power costs show up if nobody cleans it up.`,
+      `When a site gets consolidated or closed, the first question is whether the power costs were cleaned up too.`,
+    ],
+    contract_win: [
+      `That can change the load faster than people expect.`,
+      `A new customer or project can change how the site runs pretty fast.`,
+    ],
+    funding: [
+      `That usually means somebody needs to map the new money against the facility plan.`,
+      `Fresh capital can turn into new space, new equipment, or both.`,
+    ],
+    industry_context: [
+      `The main thing is whether the way they run the business still matches the bill.`,
+    ],
+  }
   const industryLineByCluster: Record<IndustryCluster, string[]> = {
     manufacturing: [
       'In manufacturing, the spikes usually come from processes, schedules, or equipment, not the rate.',
@@ -1414,11 +1482,13 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   }
 
   const industryLine = pickVariant(industryLineByCluster[context.industryCluster], variantSeed) || industryLineByCluster[context.industryCluster][0]
+  const signalLine = pickVariant(signalLineBySignal[context.signalFamily], variantSeed) || signalLineBySignal[context.signalFamily][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
-  const loadSensitiveCluster = ['manufacturing', 'logistics', 'food_storage', 'healthcare', 'energy_intensive'].includes(context.industryCluster)
   const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'unknown'].includes(context.industryCluster)
   const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
-  const primaryLine = loadSensitiveCluster ? industryLine : shouldUseMarketLine ? marketLine : industryLine
+  const primaryLine = context.signalFamily === 'industry_context'
+    ? (shouldUseMarketLine ? marketLine : industryLine)
+    : signalLine
   const question = context.question
 
   switch (context.openingPattern) {
@@ -1968,7 +2038,7 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   const snippet = isLikelyNonEnglishText(candidate?.snippet || '') ? '' : cleanText(candidate?.snippet || '')
   const headline = (isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')) || `${companyName} update`
   const detailParts = [
-    snippet || `I saw an update about ${signalAnchor}.`,
+    snippet || `I saw an update about ${companyName}${signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase() ? `, ${lowercaseFirst(signalAnchor)}` : ''}.`,
     `That is the kind of change that can matter on the power side because it usually shifts how the site is being used.`,
     context.question,
   ]
@@ -2104,6 +2174,7 @@ Decision rules:
 - Start with a direct observation about the event and why it matters for operations. Do not open like a support ticket or ask if the person is "responsible" for electricity.
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
+- Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
@@ -2193,6 +2264,7 @@ Decision rules:
 - Start with a direct observation about the business and why it matters for the power side. Do not open like a support ticket or ask if the person is "responsible" for electricity.
 - Rotate the first sentence shape. Do not always open with the same setup.
 - Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
+- Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
