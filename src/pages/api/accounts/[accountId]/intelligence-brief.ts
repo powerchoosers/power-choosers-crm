@@ -292,6 +292,7 @@ function getSourceTrustRank(account: AccountRow, item: ResearchHit) {
 function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
   const seen = new Set<string>()
   return items
+    .filter((item) => item.sourceKind === 'sec' || !looksLikeCommercialListingPage(item.title, item.snippet, item.snippet, item.url))
     .slice()
     .map((item, index) => ({
       ...item,
@@ -666,10 +667,17 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /the part i would want to understand/i,
   /before the spending picks up again/i,
   /cost review/i,
+  /responsible for electricity/i,
+  /support ticket/i,
   /i was looking at/i,
   /i took a look at/i,
   /utility side/i,
   /(?:i saw (?:a|the) note|the note about)/i,
+  /for sale/i,
+  /pre[-\s]?owned/i,
+  /\binventory\b/i,
+  /cars?,\s*trucks?,\s*&?\s*suvs?/i,
+  /dealership/i,
   /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i,
 ]
 
@@ -767,6 +775,14 @@ function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) 
   const companyName = cleanText(account.name)
 
   if (!title) {
+    return companyName || 'this account'
+  }
+
+  if (looksLikeCommercialListingPage(title, candidate?.snippet || '', candidate?.snippet || '', candidate?.url || '')) {
+    return companyName || 'this account'
+  }
+
+  if (countMatchingPatterns(title, LOW_QUALITY_LISTING_PATTERNS) >= 2) {
     return companyName || 'this account'
   }
 
@@ -1103,7 +1119,7 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
   const industryCluster = inferIndustryCluster(account)
   const signalGuidance = buildSignalGuidance(signalFamily, account, candidate)
   const industryGuidance = buildIndustryGuidance(industryCluster, account)
-  const openingPattern = pickVariant(['observation', 'question', 'contrast', 'curiosity'] as const, seed) || 'observation'
+  const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
     observation: 'Observation-led opening that names the event first.',
     question: 'Question-led opening that moves quickly into curiosity.',
@@ -1144,6 +1160,13 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
       'i was looking at',
       'i took a look at',
       'utility side',
+      'responsible for electricity',
+      'support ticket',
+      'for sale',
+      'pre-owned',
+      'inventory',
+      'cars, trucks, & suvs',
+      'dealership',
     ],
     seed,
   }
@@ -1291,20 +1314,20 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   switch (context.openingPattern) {
     case 'question':
       return [
-        `${stripTrailingQuestionMark(question)}?`,
         opener,
         industryLine,
+        `${stripTrailingQuestionMark(question)}?`,
       ].join(' ')
     case 'contrast':
       return [
-        `The news is one thing, but the electricity side is usually where the real questions show up.`,
+        `The business update is one thing, but the power side is usually where the practical questions show up.`,
         opener,
         industryLine,
         question,
       ].join(' ')
     case 'curiosity':
       return [
-        `What I’m trying to understand is whether the electricity side is already set up for ${signalAnchor}.`,
+        `I saw the update about ${signalAnchor}. What I wanted to understand is how that changes the power side.`,
         opener,
         industryLine,
         question,
@@ -1351,6 +1374,58 @@ function extractBodyText(html: string) {
   )
 }
 
+const LOW_QUALITY_LISTING_PATTERNS = [
+  /for sale/i,
+  /inventory/i,
+  /pre[-\s]?owned/i,
+  /\bused\b/i,
+  /cars?,\s*trucks?,\s*&?\s*suvs?/i,
+  /\bvehicles?\b/i,
+  /dealership/i,
+  /browse inventory/i,
+  /view inventory/i,
+  /search inventory/i,
+  /\bshop\b/i,
+  /catalog/i,
+  /online store/i,
+  /\bprice\b/i,
+  /\bmileage\b/i,
+  /new and used/i,
+  /showroom/i,
+  /product listing/i,
+  /\bproducts?\b/i,
+]
+
+const OFFICIAL_ANNOUNCEMENT_PATTERNS = [
+  /newsroom/i,
+  /press[-\s]?release/i,
+  /announcement/i,
+  /announcements/i,
+  /investor/i,
+  /media/i,
+  /news/i,
+  /blog/i,
+  /story/i,
+  /release/i,
+]
+
+function countMatchingPatterns(value: string, patterns: RegExp[]) {
+  const text = cleanText(value)
+  if (!text) return 0
+  return patterns.reduce((count, pattern) => count + (pattern.test(text) ? 1 : 0), 0)
+}
+
+function looksLikeCommercialListingPage(title: string, snippet: string, bodyText: string, url: string) {
+  const combined = [title, snippet, bodyText, url].join(' ')
+  const lower = combined.toLowerCase()
+  const listingHits = countMatchingPatterns(combined, LOW_QUALITY_LISTING_PATTERNS)
+  const officialHits = countMatchingPatterns(combined, OFFICIAL_ANNOUNCEMENT_PATTERNS)
+
+  if (officialHits > 0) return false
+  if (/\/(inventory|vehicle|vehicles|cars|trucks|suvs|used-cars|new-cars|pre-owned|shop|store|catalog)\b/i.test(lower)) return true
+  return listingHits >= 2
+}
+
 function extractPagePreview(html: string, fallbackTitle: string, url: string, sourceKind: ResearchSourceKind) {
   const title = cleanText(
     extractMetaContent(html, ['og:title', 'twitter:title']) ||
@@ -1368,6 +1443,10 @@ function extractPagePreview(html: string, fallbackTitle: string, url: string, so
 
   const bodyText = extractBodyText(html)
   if (sourceKind === 'linkedin' && /(sign in|join linkedin|authwall|create account)/i.test(bodyText)) {
+    return null
+  }
+
+  if (sourceKind !== 'sec' && looksLikeCommercialListingPage(title, description, bodyText, url)) {
     return null
   }
 
@@ -1815,7 +1894,8 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
 
   const basePrompt = `You are writing an Intelligence Brief for Nodal Point, a Texas commercial energy broker.
 
-Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.`
+Use ONLY the research payload below. It may include Google News, broad web search, LinkedIn company pages/posts, SEC filings, and official company pages. Do not invent facts. Do not mention that you searched or mention LinkedIn, Google, RSS, SEC, or any source platform in the final output.
+If a research result has "official_source": true, treat it as the source of record and prefer its date over a republished article when both are available for the same event.`
 
   const newsSignalPrompt = `${basePrompt}
 
@@ -1837,9 +1917,11 @@ Decision rules:
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
 - Source Date should be the publication date of the report, article, post, filing, or company announcement in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
 - Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, the opening style, and the question to ask.
+- Start with a direct observation about the event and why it matters for operations. Do not open like a support ticket or ask if the person is "responsible" for electricity.
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
+- Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 
 Talk Track angle selection (choose ONE based on the actual signal):
@@ -1918,9 +2000,11 @@ Decision rules:
 - Signal Date should be today's date in YYYY-MM-DD format.
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article, or the page's publish date if the source includes one.
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
+- Start with a direct observation about the business and why it matters for the power side. Do not open like a support ticket or ask if the person is "responsible" for electricity.
 - Rotate the first sentence shape. Do not always open with the same setup.
 - Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
+- Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 
 Talk Track angle selection for fallback mode (choose based on what you found):
