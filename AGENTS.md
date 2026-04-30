@@ -37,6 +37,7 @@ If the answer is no, simplify.
 - `src/app/` - App Router UI
 - `src/app/api/` - App Router route handlers for a few auth/webhook endpoints
 - `src/pages/api/` - legacy API routes
+- `public/images/nodalpoint-webicon.png` - official Nodal Point web icon used in headers, print sheets, and small brand marks
 - `src/components/` - reusable UI
 - `src/hooks/` - data hooks and normalization
 - `src/lib/` - utilities, Supabase, Firebase
