@@ -446,7 +446,7 @@ export default function TargetDetailPage() {
         return (
           <Link
             href={`/network/accounts/${contact.accountId}`}
-            className="flex items-center gap-2 group/acc whitespace-nowrap"
+            className="flex items-start gap-2 group/acc"
             onClick={(e) => { e.stopPropagation(); saveScroll(); }}
           >
             <CompanyIcon
@@ -456,9 +456,14 @@ export default function TargetDetailPage() {
               size={36}
               className="w-8 h-8"
             />
-            <span className="text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
-              {contact.company}
-            </span>
+            <div className="flex min-w-0 flex-col">
+              <div className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
+                {contact.company || 'Unknown Company'}
+              </div>
+              <div className="truncate text-xs font-mono tracking-tight text-zinc-500">
+                {contact.accountLocation || 'Unknown location'}
+              </div>
+            </div>
           </Link>
         )
       }

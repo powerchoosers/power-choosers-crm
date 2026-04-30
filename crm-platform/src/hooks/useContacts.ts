@@ -32,6 +32,7 @@ export interface Contact {
   email: string
   phone: string
   company: string
+  accountLocation?: string
   companyDomain?: string
   logoUrl?: string
   status: 'Lead' | 'Customer' | 'Churned'
@@ -303,6 +304,10 @@ function normalizePrimaryPhoneField(value: unknown): ContactDetail['primaryPhone
 function cleanText(value: unknown): string {
   if (value == null) return ''
   return String(value).replace(/\s+/g, ' ').trim()
+}
+
+function formatCityState(city?: string | null, state?: string | null): string {
+  return [cleanText(city), cleanText(state)].filter(Boolean).join(', ')
 }
 
 function toRpcTextArray(values: string[] | undefined): string[] | null {
@@ -893,6 +898,7 @@ export function useContacts(searchQuery?: string, filters?: ContactFilters, list
             communicationSignals: signals,
             address: getFirstServiceAddressAddress(account?.service_addresses) || metadata?.address || '',
             company: account?.name || metadata?.company || metadata?.companyName || metadata?.general?.company || metadata?.general?.companyName || '',
+            accountLocation: formatCityState(account?.city, account?.state),
             companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || metadata?.domain || metadata?.general?.domain || '',
             logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
             status: item.status || 'Lead',
@@ -1094,6 +1100,7 @@ export function useContact(id: string) {
         notes: typedData.notes || '',
         phone: typedData.phone || typedData.mobile || typedData.workPhone || typedData.otherPhone || '',
         company: account?.name || '',
+        accountLocation: formatCityState(account?.city, account?.state),
         companyDomain: account?.domain || account?.metadata?.domain || account?.metadata?.general?.domain || undefined,
         logoUrl: account?.logo_url || account?.metadata?.logo_url || account?.metadata?.logoUrl || '',
         status: typedData.status || 'Lead',

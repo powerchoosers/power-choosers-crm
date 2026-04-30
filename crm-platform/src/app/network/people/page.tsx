@@ -379,7 +379,7 @@ export default function PeoplePage() {
           return (
             <Link
               href={`/network/accounts/${contact.accountId}`}
-              className="flex items-center gap-2 group/acc"
+              className="flex items-start gap-2 group/acc"
               onClick={(e) => { e.stopPropagation(); saveScroll(); }}
             >
               <CompanyIcon
@@ -389,9 +389,14 @@ export default function PeoplePage() {
                 size={36}
                 className="w-9 h-9 transition-all"
               />
-              <span className="text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
-                {companyName}
-              </span>
+              <div className="flex min-w-0 flex-col">
+                <div className="truncate text-zinc-400 group-hover/acc:text-white group-hover/acc:scale-[1.02] transition-all origin-left">
+                  {companyName || 'Unknown Company'}
+                </div>
+                <div className="truncate text-xs font-mono tracking-tight text-zinc-500">
+                  {contact.accountLocation || 'Unknown location'}
+                </div>
+              </div>
             </Link>
           )
         },
