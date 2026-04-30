@@ -1,6 +1,11 @@
 import { supabaseAdmin } from '@/lib/supabase'
+import { getBurnerFromEmail } from '@/lib/burner-email'
 import logger from '../_logger.js'
 import { ZohoMailService } from './zoho-service.js'
+
+function hasUnresolvedTemplateVariables(value) {
+  return /\{\{\s*[^}]+\s*\}\}/.test(String(value || ''))
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -15,7 +20,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const limit = Math.max(1, Math.min(Number(req.body?.limit) || 25, 100))
+    const limit = Math.max(1, Math.min(Number(req.body?.limit) || 8, 25))
     const nowIso = new Date().toISOString()
 
     const { data: dueRows, error } = await supabaseAdmin
@@ -42,16 +47,35 @@ export default async function handler(req, res) {
       }
 
       try {
-        const ownerEmail = row.from || row.ownerId || row.metadata?.scheduledBy || ''
+        const isSequenceEmail = row.metadata?.source === 'sequence' || row.metadata?.isSequenceEmail === true || String(row.id || '').startsWith('seq_exec_')
         const rawHtml = row.html || row.content || ''
         const rawText = row.text || ''
+        const rawSubject = row.subject || 'Scheduled email'
+        if (hasUnresolvedTemplateVariables(rawHtml) || hasUnresolvedTemplateVariables(rawText) || hasUnresolvedTemplateVariables(rawSubject)) {
+          const failureAt = new Date().toISOString()
+          await supabaseAdmin.from('emails').update({
+            status: isSequenceEmail ? 'awaiting_generation' : 'failed',
+            updatedAt: failureAt,
+            metadata: {
+              ...(row.metadata && typeof row.metadata === 'object' ? row.metadata : {}),
+              needsGeneration: isSequenceEmail,
+              failedAt: failureAt,
+              failureReason: 'Blocked scheduled send with unresolved template variables',
+            },
+          }).eq('id', row.id)
+          results.push({ id: row.id, status: 'blocked', reason: 'unresolved_template_variables' })
+          continue
+        }
+
+        const ownerEmail = row.from || row.ownerId || row.metadata?.scheduledBy || ''
+        const sendFrom = isSequenceEmail ? getBurnerFromEmail(ownerEmail) : (row.from || ownerEmail)
         const sendResult = await zohoService.sendEmail({
           to: sendTo.join(','),
-          subject: row.subject || 'Scheduled email',
+          subject: rawSubject,
           html: rawHtml || undefined,
           text: rawText || undefined,
-          userEmail: ownerEmail,
-          from: row.from || ownerEmail,
+          userEmail: sendFrom,
+          from: sendFrom,
           fromName: row.metadata?.fromName || undefined,
         })
 
@@ -64,8 +88,9 @@ export default async function handler(req, res) {
           updatedAt: sentAt,
           metadata: {
             ...(row.metadata && typeof row.metadata === 'object' ? row.metadata : {}),
-            source: 'manual_schedule',
+            source: isSequenceEmail ? 'sequence' : 'manual_schedule',
             scheduler: 'supabase_cron',
+            isSequenceEmail,
             sentAt,
             provider: 'zoho',
             messageId: sendResult?.messageId || null,

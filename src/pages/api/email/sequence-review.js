@@ -352,15 +352,24 @@ export default async function handler(req, res) {
     }
 
     if (normalizedAction === 'accept') {
+      const nowIso = new Date().toISOString();
+      const scheduledAt = execution.scheduled_at && new Date(execution.scheduled_at).getTime() > Date.now()
+        ? execution.scheduled_at
+        : nowIso;
       const acceptedPatch = {
         reviewAccepted: true,
-        reviewAcceptedAt: new Date().toISOString(),
+        reviewAcceptedAt: nowIso,
       };
 
       const nextExecutionMeta = { ...executionMeta, ...acceptedPatch };
       const { error: updateExecutionError } = await supabase
         .from('sequence_executions')
-        .update({ metadata: nextExecutionMeta, updated_at: new Date().toISOString() })
+        .update({
+          metadata: nextExecutionMeta,
+          status: 'queued',
+          scheduled_at: scheduledAt,
+          updated_at: nowIso
+        })
         .eq('id', execution.id);
 
       if (updateExecutionError) throw updateExecutionError;
@@ -381,8 +390,11 @@ export default async function handler(req, res) {
       const { error: emailAcceptError } = await supabase
         .from('emails')
         .update({
+          status: 'queued',
+          scheduledSendTime: scheduledAt,
+          timestamp: scheduledAt,
           metadata: mergedEmailMeta,
-          updatedAt: new Date().toISOString()
+          updatedAt: nowIso
         })
         .eq('id', targetEmailId);
       if (emailAcceptError) {

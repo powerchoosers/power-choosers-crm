@@ -107,6 +107,7 @@ Supabase is doing more than storage in this repo.
 - Semantic search is automated. Tables with embedding or search plumbing include `accounts`, `contacts`, `calls`, `emails`, `apollo_news_articles`, `market_telemetry`, and `meters`. If you change the content that should be searchable, update the matching `*_embedding_input` function and make sure `util.process_embeddings()` still covers it.
 - Supabase edge functions include `embed`, `process-sequence-step`, `scrape-intelligence`, and `discover-apollo-prospects`.
 - `process-sequence-step` exists in two places: `src/edge-functions/process-sequence-step.ts` and `supabase/functions/process-sequence-step/index.ts`. Keep them in sync.
+- `process-sequence-step` is invoked by Supabase database cron/pg_net, not by a logged-in browser user. Deploy it with `--no-verify-jwt`; the function still protects itself with the cron secret header. If JWT verification is turned on, sequence jobs return 401 and protocols look frozen.
 
 ## Email Sender Domain Rules
 

@@ -859,6 +859,20 @@ function hasStrongNewLocationEvidence(text: string) {
   return openingVerb && siteNoun && !genericDirectory
 }
 
+function hasLeadershipChangeEvidence(text: string) {
+  const lower = cleanText(text).toLowerCase()
+  if (!lower) return false
+
+  const leadershipRole = /(\bcfo\b|chief financial officer|\bcoo\b|chief operating officer|vp of finance|vice president of finance|facilities director|facility director|energy manager|\bceo\b|chief executive officer|\bpresident\b|controller|director of operations|general manager)/i.test(lower)
+  const changeVerb = /(\bappointed\b|\bnamed\b|\bjoins\b|\bjoined\b|\bhired\b|\bpromoted\b|\bpromotion\b|\bnewly appointed\b|\btakes over\b|\bsucceeds\b|\bsteps down\b|\bretires\b|\bretired\b|\bleadership change\b|\bnew (?:cfo|coo|ceo|president|controller|director|manager|leader)\b)/i.test(lower)
+
+  if (/\bthird[-\s]?generation\b/i.test(lower) && !changeVerb) {
+    return false
+  }
+
+  return leadershipRole && changeVerb
+}
+
 function inferSignalPriority(text: string, fallbackPriority: number) {
   const lower = cleanText(text).toLowerCase()
   
@@ -869,7 +883,7 @@ function inferSignalPriority(text: string, fallbackPriority: number) {
   
   if (/(acquir|merger|takeover|buyout)/.test(lower)) return 1
   if (hasStrongNewLocationEvidence(lower)) return 2
-  if (/(cfo|chief financial officer|coo|chief operating officer|vp of finance|vice president of finance|facilities director|energy manager|promoted|hired)/.test(lower)) return 3
+  if (hasLeadershipChangeEvidence(lower)) return 3
   if (/(expansion|capital expenditure|capex|headcount|growth|future site|buildout|build-out)/.test(lower)) return 4
   if (/(restructuring|closure|consolidation|downsizing|layoff|shutdown)/.test(lower)) return 5
   if (/(contract award|government contract|customer win|major customer|new customer)/.test(lower)) return 6
@@ -898,6 +912,7 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /cost review/i,
   /business update is one thing/i,
   /practical question is what it changes on the power side/i,
+  /new leader usually/i,
   /responsible for electricity/i,
   /support ticket/i,
   /i was looking at/i,
@@ -1099,7 +1114,14 @@ function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false
   if (isFallbackMode || !candidate) return 'industry_context'
 
   const text = `${candidate.title || ''} ${candidate.snippet || ''}`
-  switch (inferSignalPriority(text, candidate.priority)) {
+  const inferredPriority = inferSignalPriority(text, 9)
+  const priority = inferredPriority === 9 ? candidate.priority : inferredPriority
+
+  if (priority === 3 && !hasLeadershipChangeEvidence(text)) {
+    return 'industry_context'
+  }
+
+  switch (priority) {
     case 1:
       return 'acquisition'
     case 2:
@@ -1577,6 +1599,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const mentionsMarket = context.marketFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
   const mentionsAtLeastOneFocus = context.ercotFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
   const genericOpening = /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i.test(firstSentence)
+  const unsupportedLeadershipAngle = context.signalFamily !== 'leadership_change' &&
+    /\b(new leader|new cfo|new coo|new ceo|new president|new facilities director|new energy manager)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
@@ -1585,7 +1609,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -2360,6 +2384,7 @@ Decision rules:
 - Use the highest-priority signal supported by the research results.
 - If a SEC filing, official company page, company newsroom page, or press-release wire result confirms the same event, prefer it over a republished news story or generic web snippet.
 - If both a republished article and an original company announcement are available, use the original announcement date when you can verify it from the source. Do not invent an earlier date.
+- Only use a leadership-change signal when the source names a real person or role change. If you cannot name who changed roles and roughly when it happened, do not use the leadership angle.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
@@ -2401,6 +2426,7 @@ IF SIGNAL = Acquisition/merger/being acquired:
 
 IF SIGNAL = Leadership change (CFO, COO, Facilities Director):
 - Focus on inherited problems and fresh-eyes review
+- The talk track MUST name the person and role from the source. If the source does not name them, this is not a leadership signal.
 - Question: Is the new person aware of what they inherited?
 - Example: "I saw [name] just joined as CFO. Usually when someone new comes in, they inherit the electricity setup without realizing what's actually in there. Has [name] had a chance to review that side yet, or is it still on the list?"
 
