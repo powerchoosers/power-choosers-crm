@@ -1,0 +1,774 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nodal Point Discovery Sheet</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    :root {
+      --ink: #0b0f19;
+      --ink-2: #1f2937;
+      --muted: #5b6475;
+      --soft: #eef3fb;
+      --paper: #ffffff;
+      --paper-alt: #f8fafc;
+      --line: #d7deea;
+      --line-strong: #bfd0f7;
+      --blue: #002fa7;
+      --blue-soft: #e8efff;
+      --blue-faint: #f5f8ff;
+      --success: #0f7a4d;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background:
+        radial-gradient(circle at top left, rgba(0, 47, 167, 0.12), transparent 32%),
+        linear-gradient(180deg, #edf2fb 0%, #f8fafc 28%, #ffffff 100%);
+      color: var(--ink);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    @page {
+      size: letter;
+      margin: 0.3in;
+    }
+
+    body {
+      min-height: 100vh;
+    }
+
+    .sheet {
+      width: 8.5in;
+      margin: 0 auto;
+      background: transparent;
+      padding: 0;
+    }
+
+    .page {
+      width: 100%;
+      padding: 0.05in 0;
+    }
+
+    .page:not(:last-child) {
+      break-after: page;
+      page-break-after: always;
+    }
+
+    .page-inner {
+      padding: 0.06in 0.02in 0.02in;
+      display: flex;
+      flex-direction: column;
+      gap: 0.12in;
+    }
+
+    .header-band {
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 0.2in;
+      padding: 0.15in 0.18in;
+      border-radius: 18px;
+      background:
+        linear-gradient(135deg, #0b0f19 0%, #111827 45%, #0b1220 100%);
+      color: white;
+      box-shadow: 0 16px 30px rgba(2, 6, 23, 0.12);
+    }
+
+    .header-band::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--blue), rgba(0, 47, 167, 0.1));
+    }
+
+    .brand {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.16in;
+    }
+
+    .monogram {
+      width: 0.54in;
+      height: 0.54in;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(153, 194, 255, 0.35);
+      background:
+        linear-gradient(135deg, rgba(0, 47, 167, 0.2), rgba(255, 255, 255, 0.04));
+      color: #e5edff;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      text-indent: 0.15em;
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .brand-copy {
+      display: flex;
+      flex-direction: column;
+      gap: 0.05in;
+    }
+
+    .eyebrow {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: #9cb7f0;
+    }
+
+    .title {
+      font-size: 21px;
+      font-weight: 800;
+      letter-spacing: -0.05em;
+      line-height: 1;
+      margin: 0;
+    }
+
+    .subtitle {
+      max-width: 6.4in;
+      margin: 0;
+      color: #cdd9f7;
+      font-size: 11px;
+      line-height: 1.45;
+    }
+
+    .header-meta {
+      text-align: right;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: #9cb7f0;
+      white-space: nowrap;
+    }
+
+    .header-meta strong {
+      display: block;
+      margin-top: 0.06in;
+      color: white;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    .top-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 0.82fr;
+      gap: 0.14in;
+    }
+
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 14px 32px rgba(15, 23, 42, 0.05);
+      overflow: hidden;
+    }
+
+    .card.pad {
+      padding: 0.15in;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.16in;
+      align-items: flex-start;
+      padding: 0.13in 0.16in 0;
+    }
+
+    .card-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 0.05in;
+    }
+
+    .card-title {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      margin: 0;
+      color: var(--ink);
+    }
+
+    .card-body {
+      padding: 0.1in 0.16in 0.14in;
+    }
+
+    .note {
+      border-left: 4px solid var(--blue);
+      background: linear-gradient(180deg, var(--blue-faint), #ffffff);
+      border-radius: 14px;
+      padding: 0.12in 0.14in;
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--ink-2);
+    }
+
+    .note strong {
+      color: var(--ink);
+    }
+
+    .metrics {
+      display: grid;
+      gap: 0.12in;
+    }
+
+    .metric-box {
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff 0%, var(--paper-alt) 100%);
+      padding: 0.14in 0.16in;
+    }
+
+    .metric-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.05in;
+    }
+
+    .metric-text {
+      font-size: 12px;
+      line-height: 1.5;
+      color: var(--ink-2);
+    }
+
+    .metric-text strong {
+      color: var(--ink);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1.35fr 0.85fr;
+      gap: 0.14in;
+      align-items: start;
+    }
+
+    .section-stack {
+      display: grid;
+      gap: 0.14in;
+    }
+
+    .section {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: #fff;
+      overflow: hidden;
+    }
+
+    .section-inner {
+      padding: 0.13in 0.16in;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.14in;
+      margin-bottom: 0.08in;
+    }
+
+    .section-title h2 {
+      font-size: 15px;
+      margin: 0;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+    }
+
+    .section-title .count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .question-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.06in;
+    }
+
+    .question {
+      display: grid;
+      grid-template-columns: 0.3in 1fr;
+      gap: 0.1in;
+      align-items: start;
+      padding: 0.075in 0.11in;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #ffffff, #fafcff);
+      border: 1px solid #edf1f7;
+    }
+
+    .question .n {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--blue);
+      line-height: 1.2;
+    }
+
+    .question .q {
+      font-size: 12px;
+      line-height: 1.45;
+      color: var(--ink-2);
+    }
+
+    .question .q strong {
+      color: var(--ink);
+    }
+
+    .rail {
+      display: grid;
+      gap: 0.1in;
+    }
+
+    .rail-card {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(180deg, rgba(232, 239, 255, 0.75), #ffffff 58%);
+      overflow: hidden;
+    }
+
+    .rail-card.dark {
+      background:
+        linear-gradient(180deg, rgba(11, 15, 25, 0.04), #ffffff 62%);
+    }
+
+    .rail-card-inner {
+      padding: 0.13in 0.14in 0.12in;
+    }
+
+    .rail-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: var(--blue);
+      margin-bottom: 0.06in;
+    }
+
+    .rail-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin: 0 0 0.09in 0;
+      color: var(--ink);
+    }
+
+    .rail-list {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      gap: 0.08in;
+    }
+
+    .rail-list li {
+      position: relative;
+      padding-left: 0.16in;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--ink-2);
+    }
+
+    .rail-list li::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      position: absolute;
+      left: 0.04in;
+      top: 0.32em;
+      border-radius: 999px;
+      background: var(--blue);
+      box-shadow: 0 0 0 4px rgba(0, 47, 167, 0.12);
+    }
+
+    .pill-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.07in;
+      margin-top: 0.04in;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.05in;
+      padding: 0.08in 0.11in;
+      border-radius: 999px;
+      border: 1px solid #dce5f6;
+      background: #f7faff;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--ink-2);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .pill.blue {
+      border-color: rgba(0, 47, 167, 0.18);
+      background: rgba(0, 47, 167, 0.08);
+      color: var(--blue);
+    }
+
+    .tip-box {
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: linear-gradient(180deg, #ffffff, #f9fbff);
+      padding: 0.12in 0.14in;
+    }
+
+    .tip-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.26em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.05in;
+    }
+
+    .tip-text {
+      font-size: 11px;
+      line-height: 1.55;
+      color: var(--ink-2);
+    }
+
+    .tip-text strong {
+      color: var(--ink);
+    }
+
+    .close-steps {
+      display: grid;
+      gap: 0.06in;
+      margin-top: 0.05in;
+    }
+
+    .close-step {
+      padding: 0.08in 0.11in;
+      border-radius: 14px;
+      background: linear-gradient(180deg, #fff, #fafcff);
+      border: 1px solid #edf1f7;
+      font-size: 11px;
+      line-height: 1.5;
+      color: var(--ink-2);
+    }
+
+    .close-step strong {
+      color: var(--ink);
+    }
+
+    .say-dont {
+      display: grid;
+      gap: 0.06in;
+    }
+
+    .say-dont-row {
+      display: grid;
+      grid-template-columns: 0.9fr 1fr;
+      gap: 0.06in;
+    }
+
+    .say-dont-cell {
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      padding: 0.09in 0.11in;
+      font-size: 10px;
+      line-height: 1.45;
+      background: #fff;
+    }
+
+    .say-dont-cell .tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      margin-bottom: 0.05in;
+    }
+
+    .say-dont-cell.say .tag {
+      color: var(--success);
+    }
+
+    .say-dont-cell.dont .tag {
+      color: #b42318;
+    }
+
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.12in;
+      margin-top: auto;
+      padding: 0.02in 0.03in 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 9px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .footer strong {
+      color: var(--blue);
+    }
+
+    .small-print {
+      margin-top: 0.06in;
+      font-size: 10px;
+      line-height: 1.45;
+      color: var(--muted);
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .sheet {
+        width: auto;
+      }
+
+      .page {
+        padding: 0;
+      }
+
+      .card,
+      .section,
+      .rail-card,
+      .metric-box,
+      .tip-box,
+      .question,
+      .close-step,
+      .say-dont-cell {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="sheet">
+    <section class="page">
+      <div class="page-inner">
+        <header class="header-band">
+          <div class="brand">
+            <div class="monogram">NP</div>
+            <div class="brand-copy">
+              <div class="eyebrow">Nodal Point // Texas Commercial Energy</div>
+              <h1 class="title">Discovery Questions</h1>
+              <p class="subtitle">
+                Use this when you want the call to feel bigger than a rate quote.
+                The job is to learn the current setup, whether they trust it, and
+                what could bite them next.
+              </p>
+            </div>
+          </div>
+          <div class="header-meta">
+            print ready
+            <strong id="generated-on">Generated April 30, 2026</strong>
+          </div>
+        </header>
+
+        <div class="top-grid">
+          <section class="card pad">
+            <div class="card-label">What you need to uncover</div>
+            <div class="note">
+              <strong>Do not lead with "are you responsible for electricity?"</strong><br />
+              Lead with the reason for the call, then pull them into the bigger picture.
+              You want the supplier, the expiration, the rate per kWh, the all-in bill,
+              and anything coming that could create pain.
+            </div>
+            <div class="pill-row" style="margin-top: 0.12in;">
+              <span class="pill blue">Supplier</span>
+              <span class="pill blue">Renewal</span>
+              <span class="pill blue">Spend</span>
+              <span class="pill blue">Confidence</span>
+              <span class="pill blue">Future risk</span>
+            </div>
+          </section>
+
+          <aside class="rail">
+            <div class="rail-card dark">
+              <div class="rail-card-inner">
+                <div class="rail-label">Listen for</div>
+                <div class="rail-title">The lines that matter</div>
+                <ul class="rail-list">
+                  <li>"I do not know when it expires."</li>
+                  <li>"We have just been rolling it over."</li>
+                  <li>"Nobody has looked at the bill in a while."</li>
+                  <li>"We had a few ugly summer months."</li>
+                  <li>"We are expanding / moving / adding equipment."</li>
+                </ul>
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div class="grid-2">
+          <section class="section">
+            <div class="section-inner">
+              <div class="section-title">
+                <h2>Discovery Ladder</h2>
+                <div class="count">Situation - Pain - Future risk</div>
+              </div>
+              <ol class="question-list">
+                <li class="question">
+                  <div class="n">01</div>
+                  <div class="q"><strong>Who are you using today?</strong> If they are not sure, ask who handles the renewal paperwork or the last bill review.</div>
+                </li>
+                <li class="question">
+                  <div class="n">02</div>
+                  <div class="q"><strong>When does the current agreement expire?</strong> If they do not know the exact day, ask for the month and whether it has been reviewed recently.</div>
+                </li>
+                <li class="question">
+                  <div class="n">03</div>
+                  <div class="q"><strong>Do you know what rate they are making you pay lately?</strong> I mean the cents per kWh piece, not just the all-in bill.</div>
+                </li>
+                <li class="question">
+                  <div class="n">04</div>
+                  <div class="q"><strong>Roughly what are you paying all-in right now?</strong> If the exact number is fuzzy, ask for the latest bill amount or a ballpark range.</div>
+                </li>
+                <li class="question">
+                  <div class="n">05</div>
+                  <div class="q"><strong>How confident are you in the current deal?</strong> That tells you whether they trust it or are just living with it.</div>
+                </li>
+                <li class="question">
+                  <div class="n">06</div>
+                  <div class="q"><strong>If nothing changed before renewal, what would worry you most?</strong> Say <strong>worry</strong> or <strong>concern</strong>.</div>
+                </li>
+              </ol>
+              <div class="tip-box" style="margin-top: 0.1in;">
+                <div class="tip-label">If the conversation opens up</div>
+                <div class="tip-text">
+                  Ask about growth, a move, new equipment, or summer spikes only if it is real. Do not stack every angle at once.
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="rail">
+            <div class="tip-box">
+              <div class="tip-label">Decision rule</div>
+              <div class="tip-text">
+                One clear lane is better than a stacked pitch.
+                Small accounts: budget, comfort, timing.
+                Heavy sites: peaks, schedules, equipment.
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div class="footer">
+          <div><strong>Nodal Point</strong> discovery sheet</div>
+          <div>page 1 of 2</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="page">
+      <div class="page-inner">
+        <header class="header-band">
+          <div class="brand">
+            <div class="monogram">NP</div>
+            <div class="brand-copy">
+              <div class="eyebrow">Nodal Point // Transition And Close</div>
+              <h1 class="title">Move from discovery to a real next step</h1>
+              <p class="subtitle">
+                The close should feel like a simple check, not a pitch. You are either
+                confirming the setup, or you are finding something worth fixing before the
+                renewal or the market forces the issue.
+              </p>
+            </div>
+          </div>
+          <div class="header-meta">
+            close sheet
+            <strong>bill or 10 minutes</strong>
+          </div>
+        </header>
+
+        <div class="grid-2">
+          <section class="section">
+            <div class="section-inner">
+              <div class="section-title">
+                <h2>Transition into the close</h2>
+                <div class="count">Keep it short</div>
+              </div>
+              <div class="close-steps">
+                <div class="close-step">
+                  <strong>1.</strong> "Based on what you said, the next step is to check the bill and the expiration timing."
+                </div>
+                <div class="close-step">
+                  <strong>2.</strong> "If the setup looks fine, we say that. If there is an issue, we catch it before renewal forces a rushed decision."
+                </div>
+                <div class="close-step">
+                  <strong>3.</strong> "Would you rather send the bill over, or would it be easier to walk through it together for 10 minutes?"
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside class="rail">
+            <div class="tip-box">
+              <div class="tip-label">What to say</div>
+              <div class="tip-text">
+                "If nothing is wrong, great. If there is something to fix, we will know."
+                "I am not trying to turn this into a big pitch."
+                "I just want to see whether the setup deserves a second look."
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        <div class="footer">
+          <div><strong>Nodal Point</strong> close sheet</div>
+          <div>page 2 of 2</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const target = document.getElementById('generated-on');
+      if (!target) return;
+      const date = new Date();
+      const formatted = new Intl.DateTimeFormat('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      }).format(date);
+      target.textContent = 'Generated ' + formatted;
+    })();
+  </script>
+</body>
+</html>
