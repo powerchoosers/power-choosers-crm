@@ -2,6 +2,99 @@ import type { NextApiRequest, NextApiResponse } from 'next'
 import { supabaseAdmin, requireUser } from '@/lib/supabase'
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
+// Simple LRU Cache for talk track deduplication
+class TalkTrackCache {
+  private cache: Map<string, { talkTrack: string; timestamp: number }>
+  private maxSize: number
+  private ttlMs: number
+
+  constructor(maxSize = 500, ttlMs = 7 * 24 * 60 * 60 * 1000) { // 7 days TTL
+    this.cache = new Map()
+    this.maxSize = maxSize
+    this.ttlMs = ttlMs
+  }
+
+  private cleanExpired() {
+    const now = Date.now()
+    for (const [key, value] of this.cache.entries()) {
+      if (now - value.timestamp > this.ttlMs) {
+        this.cache.delete(key)
+      }
+    }
+  }
+
+  add(talkTrack: string) {
+    this.cleanExpired()
+    
+    const hash = this.hashTalkTrack(talkTrack)
+    this.cache.set(hash, { talkTrack, timestamp: Date.now() })
+
+    // LRU eviction if cache is too large
+    if (this.cache.size > this.maxSize) {
+      const firstKey = this.cache.keys().next().value
+      if (firstKey) this.cache.delete(firstKey)
+    }
+  }
+
+  isTooSimilar(talkTrack: string, threshold = 0.65): boolean {
+    this.cleanExpired()
+    
+    const tokens = this.tokenize(talkTrack)
+    if (tokens.length === 0) return false
+
+    for (const cached of this.cache.values()) {
+      const similarity = this.calculateSimilarity(tokens, this.tokenize(cached.talkTrack))
+      if (similarity >= threshold) {
+        return true
+      }
+    }
+
+    return false
+  }
+
+  private hashTalkTrack(talkTrack: string): string {
+    let hash = 0
+    const text = talkTrack.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+    for (let i = 0; i < text.length; i++) {
+      hash = Math.imul(31, hash) + text.charCodeAt(i)
+      hash |= 0
+    }
+    return Math.abs(hash).toString(36)
+  }
+
+  private tokenize(text: string): Set<string> {
+    return new Set(
+      text
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .split(' ')
+        .map(token => token.trim())
+        .filter(token => token.length > 2)
+    )
+  }
+
+  private calculateSimilarity(tokensA: Set<string>, tokensB: Set<string>): number {
+    if (tokensA.size === 0 || tokensB.size === 0) return 0
+
+    const intersection = new Set([...tokensA].filter(token => tokensB.has(token)))
+    const union = new Set([...tokensA, ...tokensB])
+
+    return intersection.size / union.size
+  }
+
+  clear() {
+    this.cache.clear()
+  }
+
+  size(): number {
+    this.cleanExpired()
+    return this.cache.size
+  }
+}
+
+// Global cache instance
+const talkTrackCache = new TalkTrackCache()
+
 type BriefStatus = 'idle' | 'ready' | 'empty' | 'error'
 type ResearchSourceKind = 'news' | 'web' | 'sec' | 'linkedin'
 
@@ -2453,6 +2546,28 @@ ${JSON.stringify(researchPayload, null, 2)}`
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    // GET endpoint for cache stats (admin only)
+    if (req.method === 'GET') {
+      const auth = await requireUser(req)
+      if (!auth.user) {
+        return res.status(401).json({ ok: false, message: 'Unauthorized' })
+      }
+
+      // Only allow admins to view cache stats
+      if (auth.role !== 'admin' && auth.role !== 'super_admin') {
+        return res.status(403).json({ ok: false, message: 'Forbidden' })
+      }
+
+      return res.status(200).json({
+        ok: true,
+        cache: {
+          size: talkTrackCache.size(),
+          maxSize: 500,
+          ttlDays: 7,
+        },
+      })
+    }
+
     if (req.method !== 'POST') {
       return res.status(405).json({ ok: false, message: 'Method not allowed' })
     }
@@ -2602,16 +2717,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const previousTalkTrack = cleanText(account.intelligence_brief_talk_track || '')
     if (validated) {
       const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext) ||
-        (previousTalkTrack && talkTrackIsTooSimilarToPrevious(validated.talk_track || '', previousTalkTrack))
+        (previousTalkTrack && talkTrackIsTooSimilarToPrevious(validated.talk_track || '', previousTalkTrack)) ||
+        talkTrackCache.isTooSimilar(validated.talk_track || '')
 
       if (shouldRewrite) {
         let rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 0)
 
-        if (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) {
+        // Check against cache and previous talk track
+        if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
+            talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
           rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 1)
         }
 
-        if (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) {
+        if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
+            talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
           rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 2)
         }
 
@@ -2619,6 +2738,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...validated,
           talk_track: rewrittenTalkTrack,
         }
+      }
+
+      // Add to cache after successful generation
+      if (validated.talk_track) {
+        talkTrackCache.add(validated.talk_track)
       }
     }
 
