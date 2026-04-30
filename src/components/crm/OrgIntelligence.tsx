@@ -1381,10 +1381,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           email?: string;
           linkedin?: string;
           location?: string;
-          phones?: Array<{ number: string }>;
+          phones?: Array<{ number: string; type?: string }>;
         }>
       };
       const enriched = enrichData.contacts?.[0];
+
+      // Debug logging to diagnose phone reveal issues
+      console.log('[OrgIntelligence] Enrichment response for', person.name, ':', {
+        hasEnriched: !!enriched,
+        phonesCount: enriched?.phones?.length || 0,
+        phones: enriched?.phones,
+        fullResponse: enrichData
+      });
 
       if (!enriched) {
         throw new Error('No enrichment data available');
@@ -1423,7 +1431,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         })
         .filter(Boolean) as PhoneEntry[];
       const immediatePhones = normalizeRevealedPhones(rawImmediatePhones);
+      
+      // Debug logging for phone assignment
+      console.log('[OrgIntelligence] Phone processing for', person.name, ':', {
+        rawImmediatePhones,
+        immediatePhones,
+        existingPhones
+      });
+      
       const assignedImmediatePhones = assignRevealedPhonesToContactFields(immediatePhones, existingPhones);
+      
+      console.log('[OrgIntelligence] Phone assignment result:', {
+        patch: assignedImmediatePhones.patch,
+        extras: assignedImmediatePhones.extras
+      });
       const enrichedIdentity = buildIdentityName({
         name: enriched.fullName,
         firstName: enriched.firstName,
