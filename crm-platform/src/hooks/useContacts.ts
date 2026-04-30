@@ -86,6 +86,8 @@ export type ContactDetail = Contact & {
   primaryPhoneField?: 'mobile' | 'workDirectPhone' | 'otherPhone'
   additionalPhones?: ContactAdditionalPhone[]
   communicationSignals?: ContactSignalCollection | null
+  // Timestamp for cache invalidation
+  updatedAt?: string
 }
 
 export function useDeleteContacts() {
@@ -286,7 +288,7 @@ const CONTACT_DETAIL_SELECT = `
           id, name, ownerId, firstName, lastName,
           email, phone, mobile, workPhone, otherPhone, companyPhone, primaryPhoneField, status, createdAt,
           lastContactedAt, lastActivityAt, accountId, title, city, state, linkedinUrl, notes,
-          metadata,
+          metadata, updatedAt,
           accounts!contacts_accountId_fkey (
             id, name, domain, logo_url, metadata, city, state, industry, address,
             electricity_supplier, annual_usage, current_rate, contract_end_date,
@@ -1142,11 +1144,14 @@ export function useContact(id: string) {
         primaryPhoneField: normalizePrimaryPhoneField(typedData.primaryPhoneField),
         additionalPhones: extractAdditionalPhones(metadata, signals, [typedData.phone, typedData.mobile, typedData.workPhone, typedData.otherPhone, typedData.companyPhone]),
         communicationSignals: signals,
-        metadata
+        metadata,
+        updatedAt: (typedData as any).updatedAt || typedData.lastContactedAt || new Date().toISOString(),
       } as ContactDetail
     },
     enabled: !!id && !loading && !!user,
-    staleTime: 1000 * 60 * 5,
+    // Reduced staleTime to 10 seconds to pick up webhook updates faster
+    // This ensures phones revealed via webhook appear quickly after page refresh
+    staleTime: 1000 * 10,
     gcTime: 1000 * 60 * 60 * 24,
   })
 }
