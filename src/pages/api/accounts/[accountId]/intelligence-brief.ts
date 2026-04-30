@@ -630,7 +630,7 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
     if (isOfficialCompanyAnnouncement(account, candidate)) {
       return `I saw your announcement about ${companyName}.`
     }
-    return 'I came across your website.'
+    return `I came across ${companyName}'s website.`
   }
 
   // Add variation based on priority to prevent repetition
@@ -684,6 +684,63 @@ function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null
   // Simplified version - just use buildSourceLead
   // The signal anchor approach was creating nonsensical output
   return buildSourceLead(account, candidate)
+}
+
+function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | null) {
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  return /\b(multi[-\s]?unit|multi[-\s]?site|multiple locations|locations across|several locations|portfolio|stores?|branches|restaurant group)\b/.test(text)
+}
+
+function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
+  const multiLocation = hasMultiLocationEvidence(account, candidate)
+
+  if (context.industryCluster === 'restaurant' && multiLocation) {
+    return `For a multi-location restaurant group, the useful check is whether the stores are being looked at together, because kitchen equipment, HVAC, refrigeration, and hours can make one location look fine while another is quietly carrying the cost.`
+  }
+
+  if (context.industryCluster === 'restaurant') {
+    return `For a restaurant, the useful check is whether the bill lines up with how the kitchen, HVAC, refrigeration, and daily hours actually run, not just whether the rate looks reasonable.`
+  }
+
+  if (context.industryCluster === 'retail' && multiLocation) {
+    return `For a multi-location retail group, the useful check is whether the stores are being reviewed together, because hours, traffic, lighting, and HVAC can hide different cost patterns by location.`
+  }
+
+  if (context.industryCluster === 'office_services' || context.industryCluster === 'banking') {
+    return `For an office-style account, the useful check is usually budget predictability, HVAC, lease timing, and whether the bill still matches how the space is being used.`
+  }
+
+  if (context.industryCluster === 'logistics') {
+    return `For a logistics account, the useful check is where the operation is creating cost pressure: dock activity, HVAC, automation, longer hours, or a few peaks that make the bill look worse than expected.`
+  }
+
+  if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
+    return `For a heavier site, the useful check is which processes, schedules, or equipment are creating the peaks, because those spikes come from how the site runs, not from the agreement itself.`
+  }
+
+  if (context.industryCluster === 'food_storage') {
+    return `For a food or cold-storage operation, the useful check is refrigeration, defrost cycles, doors, compressors, and whether small operating habits are quietly moving the bill.`
+  }
+
+  return `The useful check is whether the bill still matches how the business actually runs today, especially if nobody has looked at the setup in a while.`
+}
+
+function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
+  const multiLocation = hasMultiLocationEvidence(account, candidate)
+
+  if (multiLocation) {
+    return 'Has anyone compared the locations side by side, or is electricity still being handled one location at a time?'
+  }
+
+  if (context.industryCluster === 'restaurant') {
+    return 'Has anyone looked at the bill against the way the kitchen and dining room actually run, or is it mostly just getting paid each month?'
+  }
+
+  if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
+    return 'Has anyone mapped where the peaks are coming from, or is that still hidden inside the monthly bill?'
+  }
+
+  return context.question
 }
 
 function isLikelyBadSourceUrl(value: string) {
@@ -1511,6 +1568,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   if (isLikelyNonEnglishText(text)) return true
 
   const lower = text.toLowerCase()
+  const wordCount = text.split(/\s+/).filter(Boolean).length
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
   const genericHits = TALK_TRACK_GENERIC_PATTERNS.filter((pattern) => pattern.test(lower)).length
   const sentenceCount = text.split(/[.!?]+/).map(cleanText).filter(Boolean).length
@@ -1527,12 +1585,14 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || sentenceCount < 2 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const companyName = cleanText(account.name) || 'the company'
   const sourceLead = buildSourceLead(account, candidate)
+  const fallbackIndustryLine = buildFallbackIndustryLine(account, candidate, context)
+  const fallbackQuestion = buildFallbackQuestion(account, candidate, context)
   const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [sourceLead],
@@ -1543,8 +1603,8 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     contract_win: [sourceLead],
     funding: [sourceLead],
     industry_context: [
-      sourceLead,
-      `The real question is whether the setup still matches how they run the business today.`,
+      `${sourceLead} What stood out is how the operation likely uses power day to day.`,
+      `I came across ${companyName}'s footprint and wanted to ask a practical power question.`,
     ],
   }
 
@@ -1579,7 +1639,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       `Fresh capital can turn into new space, new equipment, or both.`,
     ],
     industry_context: [
-      `The main thing is whether the way they run the business still matches the bill.`,
+      fallbackIndustryLine,
     ],
   }
   const industryLineByCluster: Record<IndustryCluster, string[]> = {
@@ -1635,7 +1695,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const primaryLine = context.signalFamily === 'industry_context'
     ? (shouldUseMarketLine ? marketLine : industryLine)
     : signalLine
-  const question = context.question
+  const question = context.signalFamily === 'industry_context' ? fallbackQuestion : context.question
 
   switch (context.openingPattern) {
     case 'question':
