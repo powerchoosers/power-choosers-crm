@@ -1364,6 +1364,30 @@ function extractTimeDatetime(html: string) {
   return match ? cleanText(decodeHtmlEntities(match[1])) : ''
 }
 
+function extractDateFromUrl(url: string) {
+  const raw = cleanText(url)
+  if (!raw) return ''
+
+  const patterns = [
+    /(?:^|[\/_-])(20\d{2})[\/_-](0[1-9]|1[0-2])[\/_-](0[1-9]|[12]\d|3[01])(?:[\/?#._-]|$)/,
+    /(?:^|[\/_-])(20\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?:[\/?#._-]|$)/,
+  ]
+
+  for (const pattern of patterns) {
+    const match = pattern.exec(raw)
+    if (!match) continue
+    const year = match[1]
+    const month = match[2]
+    const day = match[3]
+    const parsed = new Date(`${year}-${month}-${day}T12:00:00Z`)
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toISOString()
+    }
+  }
+
+  return ''
+}
+
 function extractBodyText(html: string) {
   return cleanText(
     String(html || '')
@@ -1438,7 +1462,8 @@ function extractPagePreview(html: string, fallbackTitle: string, url: string, so
   )
   const publishedAtRaw = cleanText(
     extractMetaContent(html, ['article:published_time', 'article:modified_time', 'og:updated_time', 'pubdate', 'date']) ||
-    extractTimeDatetime(html)
+    extractTimeDatetime(html) ||
+    extractDateFromUrl(url)
   )
 
   const bodyText = extractBodyText(html)
@@ -1806,6 +1831,42 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
     selected_priority: candidate?.priority ?? result?.selected_priority ?? 0,
     source_title: candidate?.title || result?.source_title || '',
     source_domain: candidate?.source || result?.source_domain || '',
+  }
+}
+
+function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext): NonNullable<ReturnType<typeof validateBriefResult>> | null {
+  const companyName = cleanText(account.name) || 'the company'
+  const signalAnchor = deriveSignalAnchor(account, candidate)
+  const sourceUrl = candidate?.url && !isLikelyBadSourceUrl(candidate.url)
+    ? candidate.url
+    : cleanText(account.domain)
+      ? `https://${cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}`
+      : ''
+
+  if (!sourceUrl) return null
+
+  const signalDate = formatDateForDb(candidate?.publishedAt || null, candidate?.publishedAt || null) || new Date().toISOString().slice(0, 10)
+  const sourceDate = formatDateForDb(candidate?.publishedAt || null, candidate?.publishedAt || null) || signalDate
+  const snippet = cleanText(candidate?.snippet || '')
+  const headline = cleanText(candidate?.title || '') || `${companyName} update`
+  const detailParts = [
+    snippet || `I saw an update about ${signalAnchor}.`,
+    `That is the kind of change that can matter on the power side because it usually shifts how the site is being used.`,
+    context.question,
+  ]
+  const talkTrack = buildManualTalkTrack(account, candidate, context, 0)
+
+  return {
+    signal_headline: shortenText(headline, 120),
+    signal_detail: detailParts.join(' '),
+    talk_track: talkTrack,
+    signal_date: signalDate,
+    source_date: sourceDate,
+    source_url: sourceUrl,
+    confidence_level: candidate?.sourceKind === 'sec' ? 'Medium' : 'Low',
+    selected_priority: candidate?.priority ?? 9,
+    source_title: candidate?.title || '',
+    source_domain: candidate?.source || '',
   }
 }
 
@@ -2203,6 +2264,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let validated: ReturnType<typeof validateBriefResult> = null
     let generatedBrief: ReturnType<typeof validateBriefResult> = null
     let usedFallback = false
+    let rescueCandidates = candidateResults
 
     if (candidateResults.length > 0) {
       try {
@@ -2242,6 +2304,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             accountName: account.name,
             fallbackTotal: fallbackCandidates.length,
           })
+
+          rescueCandidates = dedupeAndSort([...candidateResults, ...fallbackCandidates], account)
           
           generatedBrief = await runOpenRouterResearch(account, fallbackCandidates, true)
           if (generatedBrief) {
@@ -2256,12 +2320,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
+    if (!validated && rescueCandidates.length > 0) {
+      const rescueCandidate = rescueCandidates[0]
+      const rescueContext = buildTalkTrackContext(account, rescueCandidate, false)
+      const rescueBrief = buildRescueBrief(account, rescueCandidate, rescueContext)
+      if (rescueBrief) {
+        validated = rescueBrief
+        generatedBrief = rescueBrief
+        outcomeStatus = 'ready'
+        console.info('[Intelligence Brief] Using deterministic rescue brief:', {
+          accountId,
+          accountName: account.name,
+          candidateTitle: rescueCandidate.title,
+          sourceKind: rescueCandidate.sourceKind,
+        })
+      }
+    }
+
     if (!validated) {
       outcomeStatus = 'empty'
     }
 
-    const talkTrackCandidate = generatedBrief ? findCandidateForResult(generatedBrief as BriefResult, candidateResults) : candidateResults[0] || null
-    const talkTrackRewriteContext = buildTalkTrackContext(account, talkTrackCandidate, usedFallback)
+    const talkTrackCandidate = generatedBrief ? findCandidateForResult(generatedBrief as BriefResult, rescueCandidates) : rescueCandidates[0] || null
+    const talkTrackRewriteContext = buildTalkTrackContext(account, talkTrackCandidate, false)
     const previousTalkTrack = cleanText(account.intelligence_brief_talk_track || '')
     if (validated) {
       const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext) ||
