@@ -411,9 +411,25 @@ function getHostname(value: string) {
   }
 }
 
+function isCompanyWebsiteHit(account: AccountRow, candidate: ResearchHit | null) {
+  const candidateUrl = cleanText(candidate?.url)
+  const accountDomain = cleanText(account.domain)
+  if (!candidateUrl || !accountDomain) return false
+
+  const candidateHost = getHostname(candidateUrl)
+  const accountHost = getHostname(accountDomain.startsWith('http') ? accountDomain : `https://${accountDomain}`)
+  if (!candidateHost || !accountHost) return false
+
+  return candidateHost === accountHost || candidateHost.endsWith(`.${accountHost}`) || accountHost.endsWith(`.${candidateHost}`)
+}
+
 function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
-  if (!candidate) return `I saw an update about ${companyName}.`
+  if (!candidate) return `I came across an update about ${companyName}.`
+
+  if (candidate.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate)) {
+    return 'I came across your website.'
+  }
 
   switch (candidate.sourceKind) {
     case 'linkedin':
@@ -561,6 +577,9 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /site\s*by\s*site/i,
   /load profile/i,
   /energy load/i,
+  /operating footprint/i,
+  /industry angle/i,
+  /from an industry angle/i,
   /structured in a way/i,
   /current setup/i,
   /electricity side starts behaving differently/i,
@@ -572,6 +591,9 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /the part i would want to understand/i,
   /before the spending picks up again/i,
   /cost review/i,
+  /i was looking at/i,
+  /i took a look at/i,
+  /utility side/i,
   /(?:i saw (?:a|the) note|the note about)/i,
   /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i,
 ]
@@ -742,7 +764,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         question: 'Have you already looked at what got inherited on the electricity side, or is that still being sorted out?',
         openers: [
           sourceLead,
-          `The report on ${companyName} is the kind of thing that usually makes me ask what got inherited on the utility side.`,
+          `The report on ${companyName} is the kind of thing that usually makes me ask what got inherited on the power side.`,
           `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
         ],
         focus: ['inherited contracts', 'duplicate sites or meters', 'utility cleanup after the deal'],
@@ -790,7 +812,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         question: 'Have you looked at whether the power side can be cleaned up with the footprint change?',
         openers: [
           sourceLead,
-          `When a company closes or merges sites, the utility side can keep carrying costs that no longer make sense.`,
+          `When a company closes or merges sites, the power side can keep carrying costs that no longer make sense.`,
           `That’s usually the point where I want to know whether the footprint change has already been worked through on the power side.`,
         ],
         focus: ['stranded capacity', 'unused sites', 'footprint cleanup'],
@@ -799,7 +821,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
       return {
         label: 'Contract win / customer growth',
         angle: 'New work changing the load and the way the site runs.',
-        question: 'Has the utility side been checked against the new work yet?',
+        question: 'Has the power side been checked against the new work yet?',
         openers: [
           sourceLead,
           `A new contract or major customer usually changes the load story faster than people expect.`,
@@ -815,7 +837,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         openers: [
           sourceLead,
           `A Series C plus a new manufacturing buildout usually means the power plan needs to be thought through before the next round of spending starts.`,
-          `That is the kind of moment where I want to understand how the new facility and production ramp are being handled on the utility side.`,
+          `That is the kind of moment where I want to understand how the new facility and production ramp are being handled on the power side.`,
         ],
         focus: ['cost scrutiny', 'growth planning', 'budget visibility', 'facility buildout', 'production ramp'],
       }
@@ -826,9 +848,9 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'How this kind of business actually uses electricity.',
         question: 'When companies like this review electricity, what tends to get missed first?',
         openers: [
-          `I took a look at how ${companyName} actually runs its operation.`,
-          `Even without a fresh news item, the electricity side usually shows up in the same few places for companies like this.`,
-          `What usually matters most is whether the setup still matches the way the business works day to day.`,
+          `I looked at how ${companyName} runs day to day.`,
+          `Even without a fresh news item, the bill usually points back to a few real operating habits.`,
+          `What usually matters most is whether the setup still matches the way the business works now.`,
         ],
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
       }
@@ -884,7 +906,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         openers: [
           `Healthcare is one of those sectors where the building never really gets to sleep.`,
           `With 24/7 operations, the part I care about is reliability first and budget predictability second.`,
-          `The utility side matters because the load is tied to occupancy, HVAC, and backup readiness.`,
+          `The power side matters because the load is tied to occupancy, HVAC, and backup readiness.`,
         ],
         focus: ['24/7 uptime', 'reliability', 'occupancy', 'backup systems', 'HVAC', 'base load'],
       }
@@ -919,7 +941,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at which kitchen or HVAC loads are creating the spikes, and whether equipment or operating changes could help?',
         openers: [
           `Restaurants are tough because kitchen load, HVAC, and refrigeration can move the bill even when sales look flat.`,
-          `The utility side often gets overlooked until a location starts behaving differently in the summer.`,
+          `The power side often gets overlooked until a location starts behaving differently in the summer.`,
           `If there are multiple units, consistency matters because each site can drift in a different direction.`,
         ],
         focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency', 'refrigeration', 'equipment'],
@@ -930,7 +952,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         angle: 'Campus occupancy, events, HVAC schedules, and building controls drive the load more than the invoice total.',
         question: 'Do you know which buildings or schedules are driving the load, and whether smarter controls or occupancy planning could help?',
         openers: [
-          `For schools and nonprofits, the utility side usually comes down to budget discipline and timing.`,
+          `For schools and nonprofits, the power side usually comes down to budget discipline and timing.`,
           `Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.`,
           `That is the sort of setup where usage patterns matter more than the contract headline.`,
         ],
@@ -991,8 +1013,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         angle: 'Budget visibility, usage patterns, and whether the current setup still fits how the business runs now.',
         question: 'Has anyone looked at which parts of the business are actually driving the bill now?',
         openers: [
-          `I was trying to get a clean read on ${industryLabel}.`,
-          `Even when the industry is broad, the utility side usually shows up in the same few places.`,
+          `I was trying to get a feel for how ${industryLabel} runs day to day.`,
+          `Even when the industry is broad, the bill usually points back to a few real habits.`,
           `What matters most is whether the current setup still matches the business as it runs today.`,
         ],
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure', 'usage patterns'],
@@ -1032,6 +1054,9 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
       'site by site',
       'load profile',
       'energy load',
+      'operating footprint',
+      'industry angle',
+      'from an industry angle',
       'current setup',
       'electricity side starts behaving differently',
       'structured in a way that does not match',
@@ -1041,6 +1066,9 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
       'the note about',
       'i saw the note',
       'saw the note',
+      'i was looking at',
+      'i took a look at',
+      'utility side',
     ],
     seed,
   }
@@ -1072,7 +1100,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
       sourceLead,
-      `The deal news on ${companyName} is exactly the kind of thing that makes me ask what got inherited on the utility side.`,
+      `The deal news on ${companyName} is exactly the kind of thing that makes me ask what got inherited on the power side.`,
       `When ownership changes, the electricity setup is usually the first thing that deserves a clean look.`,
     ],
     new_location: [
@@ -1082,18 +1110,18 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
     leadership_change: [
       sourceLead,
-      `Fresh eyes usually mean somebody has to explain what the utility side looks like in plain English.`,
-      `That is the first thing I would want a new CFO or facilities lead to have in front of them.`,
+      `Fresh eyes usually mean somebody has to explain what the power side looks like in plain English.`,
+      `That is the first thing I'd want a new CFO or facilities lead to have in front of them.`,
     ],
     growth: [
       sourceLead,
       `Headcount, capex, or a bigger footprint usually changes the bill before it shows up anywhere obvious.`,
-      `That is why I would want to know whether the current setup still matches how the site is growing.`,
+      `That is why I'd want to know whether the current setup still matches how the site is growing.`,
     ],
     restructuring: [
       sourceLead,
       `When a company consolidates or closes a site, the power side can keep carrying costs that no longer make sense.`,
-      `That is usually the point where I want to know whether the footprint change has already been cleaned up on the utility side.`,
+      `That is usually the point where I'd want to know whether the footprint change has already been cleaned up on the power side.`,
     ],
     contract_win: [
       sourceLead,
@@ -1103,11 +1131,12 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     funding: [
       sourceLead,
       `A raise like that usually means someone is going to ask whether the new capital lines up with the facility and production plan.`,
-      `That is where I would want to understand the load growth, not just the headline funding number.`,
+      `That is where I'd want to understand the load growth, not just the headline funding number.`,
     ],
     industry_context: [
-      `I took a look at how ${companyName} actually runs its operation.`,
-      `Even without a fresh news item, the electricity side usually shows up in the same few places for companies like this.`,
+      sourceLead,
+      `I looked at how ${companyName} runs day to day.`,
+      `Even without a fresh news item, the bill usually points back to a few real operating habits.`,
       `What matters is whether the setup still matches the way the business works day to day.`,
     ],
   }
@@ -1117,22 +1146,22 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     manufacturing: [
       'In manufacturing, the thing that usually bites is not the rate, it is the usage pattern and where the peaks come from.',
       'If the operation runs in shifts, the bill can punish the wrong kind of peak pretty fast.',
-      'I would want to know which processes, schedules, or equipment are driving the spikes.',
+      'I’d want to know which processes, schedules, or equipment are driving the spikes.',
     ],
     logistics: [
       'Warehouses can look simple on paper, but dock activity, HVAC, and automation usually tell a different story.',
       'A lot of the cost pressure comes from how the site is used, not just how it is priced.',
-      'I would want to know which part of the operation is creating the peaks.',
+      'I’d want to know which part of the operation is creating the peaks.',
     ],
     food_storage: [
       'Cold storage is different because refrigeration never really turns off.',
       'When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly in the bill.',
-      'That is the kind of operation where I would want to know what is driving the peaks on-site.',
+      'That is the kind of operation where I’d want to know what is driving the peaks on-site.',
     ],
     healthcare: [
       'Healthcare is one of those sectors where the building never really gets to sleep.',
       'With 24/7 operations, the part I care about is reliability first and budget predictability second.',
-      'The utility side matters because the load is tied to occupancy, HVAC, and backup readiness.',
+      'The power side matters because the load is tied to occupancy, HVAC, and backup readiness.',
     ],
     banking: [
       'A lot of banks and branch groups end up looking at one site at a time and missing the bigger picture.',
@@ -1146,28 +1175,28 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
     restaurant: [
       'Restaurants are tough because kitchen load, HVAC, and refrigeration can move the bill even when sales look flat.',
-      'The utility side often gets overlooked until a location starts behaving differently in the summer.',
+      'The power side often gets overlooked until a location starts behaving differently in the summer.',
       'If there are multiple units, consistency matters because each site can drift in a different direction.',
     ],
     education_nonprofit: [
-      'For schools and nonprofits, the utility side usually comes down to budget discipline and timing.',
+      'For schools and nonprofits, the power side usually comes down to budget discipline and timing.',
       'Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.',
       'That is the sort of setup where usage patterns matter more than the contract headline.',
     ],
     technology: [
       'Tech companies can add load quietly through fit-outs, cooling, and space changes.',
       'A lot of the cost shows up after the growth is already live instead of before it starts.',
-      'That is why I would want to know which systems are driving the peaks now.',
+      'That is why I’d want to know which systems are driving the peaks now.',
     ],
     energy_intensive: [
       'When a site carries heavy load, the peak side of the bill can matter as much as the rate.',
       'That is usually where process timing and equipment choices start to matter a lot more.',
-      'If the plant or site is energy intensive, I would want to know which pieces are driving the peaks and whether anything can be smoothed on-site.',
+      'If the plant or site is energy intensive, I’d want to know which pieces are driving the peaks and whether anything can be smoothed on-site.',
     ],
     office_services: [
       'Office businesses usually feel quiet until a lease, occupancy change, or growth step changes the load.',
-      'The electricity side can stay untouched for years even when the business around it has changed a lot.',
-      'That is the kind of thing I would want to check before it gets swallowed by the rest of the budget.',
+      'The power side can stay untouched for years even when the business around it has changed a lot.',
+      'That is the kind of thing I’d want to check before it gets swallowed by the rest of the budget.',
     ],
     multi_site: [
       'Multi-site groups can leave leverage on the table when each location gets treated like a separate decision.',
@@ -1175,9 +1204,9 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Portfolio timing matters because one site can hide the real usage pattern.',
     ],
     unknown: [
-      'Even when the industry is broad, the utility side usually shows up in the same few places.',
+      'Even when the industry is broad, the bill usually shows up in the same few places.',
       'What matters most is whether the current setup still matches the business as it runs today.',
-      'That is the part I would want to understand before anything else.',
+      'That is the part I’d want to understand before anything else.',
     ],
   }
 
@@ -1714,7 +1743,7 @@ Decision rules:
 - Talk Track must be 3-5 short sentences maximum. Use conversational language.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
-- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I saw a filing about..." instead of "I saw the note...".
+- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
@@ -1745,7 +1774,7 @@ IF SIGNAL = Leadership change (CFO, COO, Facilities Director):
 IF SIGNAL = Funding round/IPO/capital raise:
 - Focus on budget scrutiny and cost visibility before scaling
 - Question: Are they tightening up costs before the next growth phase?
-- Example: "I saw you guys just closed a Series B. If that capital is going toward a new facility or a bigger production ramp, the thing I would want to understand is how the electricity side is being mapped against that buildout. Has that been reviewed yet, or is it still getting sorted out?"
+- Example: "I saw you guys just closed a Series B. If that capital is going toward a new facility or a bigger production ramp, the thing I'd want to understand is how the power side is being mapped against that buildout. Has that been reviewed yet, or is it still getting sorted out?"
 
 IF SIGNAL = Contract win/new customer/major project:
 - Focus on load increase and whether current agreement can handle it
@@ -1792,14 +1821,16 @@ Decision rules:
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track should be 3-5 short sentences maximum. Use conversational language.
 - Use plain language. Avoid corporate fluff.
-- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I saw a filing about..." instead of "I saw the note...".
+- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
+- Use short sentences and contractions. Sound plainspoken, not polished.
+- Prefer "bill" or "power side" over "utility side".
 - Confidence Level should be "Medium" for fallback briefs.
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article.
-- Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on the company's operating footprint and how the business actually uses power.
+- Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
 - Rotate the first sentence shape. Do not always open with the same setup.
-- Make it sound like a Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
+- Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
 
