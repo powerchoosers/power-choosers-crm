@@ -41,11 +41,15 @@ export default function ContactDossierPage() {
   const s = useContactDossierState(id, taskIdFromUrl)
   const openCompose = useComposeStore((state) => state.openCompose)
   const deleteContact = useDeleteContact()
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = () => {
+    if (isDeleting) return
+    setIsDeleting(true)
     s.lockWithoutSaving()
     deleteContact.mutate(id, {
       onSuccess: () => router.back(),
+      onError: () => setIsDeleting(false),
     })
   }
 
@@ -136,6 +140,14 @@ export default function ContactDossierPage() {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
         <LoadingOrb label="Initialising Terminal..." />
+      </div>
+    )
+  }
+
+  if (s.isLoading || isDeleting) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
+        <LoadingOrb label="LOADING DOSSIER DATA..." />
       </div>
     )
   }
