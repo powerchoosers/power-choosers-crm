@@ -635,7 +635,7 @@ async function processJob(job) {
 
     if (effectiveType === 'email') {
         const existingBody = String(execution.metadata?.body || execution.metadata?.aiBody || '').trim();
-        if (!existingBody) {
+        if (!existingBody || hasUnresolvedTemplateVariables(existingBody)) {
             const generatedPatch = await handleGeneration(execution, job);
             const patchedExecution = {
                 ...execution,
@@ -686,6 +686,60 @@ function extractGeneratedBody(result: any): string {
         if (text) return text;
     }
     return '';
+}
+
+function hasUnresolvedTemplateVariables(value: unknown): boolean {
+    return /\{\{\s*[^}]+\s*\}\}/.test(String(value || ''));
+}
+
+async function deferSequenceEmailSend(execution, fromEmail: string): Promise<boolean> {
+    const spacingMinutes = Math.max(1, Number(Deno.env.get('SEQUENCE_SEND_SPACING_MINUTES') || '3'));
+    const windowMinutes = Math.max(spacingMinutes, Number(Deno.env.get('SEQUENCE_SEND_WINDOW_MINUTES') || '15'));
+    const windowLimit = Math.max(1, Number(Deno.env.get('SEQUENCE_SEND_WINDOW_LIMIT') || '8'));
+
+    const [throttle] = await sql`
+      SELECT
+        COUNT(*) FILTER (
+          WHERE "sentAt" >= NOW() - (${windowMinutes} || ' minutes')::interval
+        )::int AS recent_count,
+        MAX("sentAt") AS last_sent_at
+      FROM emails
+      WHERE type = 'sent'
+        AND (
+          COALESCE(metadata->>'isSequenceEmail', 'false') = 'true'
+          OR COALESCE(metadata->>'source', '') = 'sequence'
+          OR id LIKE 'seq_exec_%'
+          OR id LIKE 'zoho_seq_%'
+        )
+        AND LOWER("from") = LOWER(${fromEmail})
+    `;
+
+    const recentCount = Number(throttle?.recent_count || 0);
+    const lastSentAt = throttle?.last_sent_at ? new Date(throttle.last_sent_at).getTime() : 0;
+    const millisSinceLast = lastSentAt ? Date.now() - lastSentAt : Number.POSITIVE_INFINITY;
+    const needsSpacing = millisSinceLast < spacingMinutes * 60 * 1000;
+    const needsWindowLimit = recentCount >= windowLimit;
+
+    if (!needsSpacing && !needsWindowLimit) return false;
+
+    const deferMinutes = needsWindowLimit ? windowMinutes : spacingMinutes;
+    await sql`
+      UPDATE sequence_executions
+      SET status = 'queued',
+          scheduled_at = NOW() + (${deferMinutes} || ' minutes')::interval,
+          updated_at = NOW(),
+          metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify({
+            throttledAt: new Date().toISOString(),
+            throttleReason: needsWindowLimit ? 'window_limit' : 'spacing',
+            throttleFrom: fromEmail,
+            throttleWindowMinutes: windowMinutes,
+            throttleWindowLimit: windowLimit,
+            throttleSpacingMinutes: spacingMinutes,
+          })}::jsonb
+      WHERE id = ${execution.id}
+    `;
+    console.log(`[DEBUG] Deferred sequence email ${execution.id} for ${deferMinutes} minutes due to Zoho throttle`);
+    return true;
 }
 
 async function handleGeneration(execution, job) {
@@ -1108,7 +1162,7 @@ async function handleSend(execution, job) {
     }
 
     const [member] = await sql`
-    SELECT m.id, m.metadata as member_metadata, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
+    SELECT m.id, c.id as contact_id, c."accountId" as account_id, c.email as target_email, c."firstName", c."lastName",
            a.name as company_name, a.city as account_city, a.state as account_state, a.industry as account_industry,
            s."ownerId" as owner_uuid, u.email as primary_owner_email,
            u.first_name as owner_first_name,
@@ -1135,7 +1189,7 @@ async function handleSend(execution, job) {
     }
 
     const texasEnergy = getTexasEnergyContext(member?.account_city || '', member?.account_state || '', member?.account_city || '');
-    const utilityTerritory = member?.member_metadata?.utility_territory || texasEnergy.utilityTerritory || null;
+    const utilityTerritory = texasEnergy.utilityTerritory || null;
 
     // Suppression pre-check: skip send if contact has unsubscribed or paused.
     // spike_only contacts are NOT in suppressions (handled via contact metadata only),
@@ -1185,7 +1239,7 @@ async function handleSend(execution, job) {
     `;
         fromEmail = fallbackConnection[0]?.email || member.primary_owner_email;
     }
-    fromEmail = String(fromEmail || '').trim();
+    fromEmail = getBurnerFromEmail(String(fromEmail || '').trim());
     if (!fromEmail) {
         await sql`
       UPDATE sequence_executions
@@ -1200,6 +1254,22 @@ async function handleSend(execution, job) {
     const senderDomain = fromEmail.includes('@')
         ? fromEmail.split('@')[1]
         : null;
+
+    if (metadata?.previewGeneratedAt && metadata?.reviewAccepted !== true && metadata?.reviewAccepted !== 'true') {
+        await sql`
+      UPDATE sequence_executions
+      SET status = 'pending_send',
+          scheduled_at = CASE WHEN scheduled_at > NOW() THEN scheduled_at ELSE NOW() + INTERVAL '30 minutes' END,
+          updated_at = NOW()
+      WHERE id = ${execution.id}
+    `;
+        console.log(`[DEBUG] handleSend: held reviewed draft ${execution.id} until review is accepted`);
+        return;
+    }
+
+    if (await deferSequenceEmailSend(execution, fromEmail)) {
+        return;
+    }
 
     const emailRecordId = metadata?.emailRecordId || `seq_exec_${execution.id}`;
     const [existingEmailRecord] = await sql`
