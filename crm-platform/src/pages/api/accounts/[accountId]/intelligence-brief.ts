@@ -18,6 +18,7 @@ type AccountRow = {
   intelligence_brief_detail: string | null
   intelligence_brief_talk_track: string | null
   intelligence_brief_signal_date: string | null
+  intelligence_brief_reported_at: string | null
   intelligence_brief_source_url: string | null
   intelligence_brief_confidence_level: string | null
   intelligence_brief_last_refreshed_at: string | null
@@ -42,6 +43,7 @@ type BriefResult = {
   signal_detail?: string
   talk_track?: string
   signal_date?: string
+  source_date?: string
   source_url?: string
   confidence_level?: string
   selected_priority?: number
@@ -107,7 +109,7 @@ type TalkTrackContext = {
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
-const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 const SIGNAL_KEYWORDS = [
   'acquisition',
   'acquired',
@@ -304,7 +306,7 @@ function buildSearchBuckets(account: AccountRow, includeDomainClause = false) {
     {
       priority: 2,
       label: 'Texas Openings / Construction',
-      query: `"${name}" new Texas location future location opening soon lease construction facility warehouse plant${domainClause}${texasClause}${locationClause}`,
+      query: `"${name}" (opened OR opening OR opens OR launch OR launches OR groundbreaking OR "lease signed" OR construction OR relocation OR relocating OR "new facility" OR "new site" OR "new office" OR "new branch")${domainClause}${texasClause}${locationClause}`,
     },
     {
       priority: 3,
@@ -371,7 +373,7 @@ function buildSecBuckets(account: AccountRow) {
     {
       priority: 2,
       label: 'SEC Texas Openings / Construction',
-      query: `site:sec.gov "${name}" Texas location opening lease construction facility warehouse plant${locationBits}`,
+      query: `site:sec.gov "${name}" (opened OR opening OR opens OR launch OR launches OR groundbreaking OR "lease signed" OR construction OR relocation OR relocating OR "new facility" OR "new site" OR "new office" OR "new branch")${locationBits}`,
     },
     {
       priority: 3,
@@ -409,12 +411,30 @@ function getHostname(value: string) {
   }
 }
 
+function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
+  const companyName = cleanText(account.name) || 'the company'
+  if (!candidate) return `I saw an update about ${companyName}.`
+
+  switch (candidate.sourceKind) {
+    case 'linkedin':
+      return `I saw a post online about ${companyName}.`
+    case 'sec':
+      return `I saw a filing about ${companyName}.`
+    case 'web':
+      return `I saw an article about ${companyName}.`
+    case 'news':
+    default:
+      return `I saw a report about ${companyName}.`
+  }
+}
+
 function isLikelyBadSourceUrl(value: string) {
   const url = cleanText(value)
   if (!url) return true
 
   const hostname = getHostname(url)
   if (!hostname) return true
+  const lowerUrl = url.toLowerCase()
 
   if (
     hostname === 'support.google.com' ||
@@ -427,6 +447,10 @@ function isLikelyBadSourceUrl(value: string) {
   }
 
   if (/\/translate\/answer\/\d+/i.test(url)) {
+    return true
+  }
+
+  if (/(\/logout\b|\/log-out\b|\/login\b|\/log-in\b|\/signin\b|\/sign-in\b|\/signup\b|\/sign-up\b|\/auth\b)/i.test(lowerUrl)) {
     return true
   }
 
@@ -509,10 +533,21 @@ function extractKeywordSnippet(text: string, keywords = SIGNAL_KEYWORDS) {
   return normalized.slice(start, end).replace(/\s+/g, ' ').trim()
 }
 
+function hasStrongNewLocationEvidence(text: string) {
+  const lower = cleanText(text).toLowerCase()
+  if (!lower) return false
+
+  const genericDirectory = /(\blocations?\b|\bour locations\b|\boffice locations\b|\bfind us\b|\bcontact us\b|\bheadquarters\b|\blocation page\b|\bbranch locator\b)/i.test(lower)
+  const openingVerb = /(\bopened\b|\bopening\b|\bopens\b|\blaunch\b|\blaunches\b|\bgroundbreaking\b|\blease signed\b|\bsigned a lease\b|\bconstruction\b|\brelocation\b|\brelocating\b|\bmove[- ]?in\b|\bbuildout\b|\bnew location\b|\bnew site\b|\bnew facility\b|\bnew office\b|\bnew branch\b)/i.test(lower)
+  const siteNoun = /(\blocation\b|\bsite\b|\bfacility\b|\bwarehouse\b|\bplant\b|\boffice\b|\bbranch\b|\bcampus\b|\bbuilding\b)/i.test(lower)
+
+  return openingVerb && siteNoun && !genericDirectory
+}
+
 function inferSignalPriority(text: string, fallbackPriority: number) {
   const lower = cleanText(text).toLowerCase()
   if (/(acquir|merger|takeover|buyout)/.test(lower)) return 1
-  if (/(new location|future location|opening soon|opening|lease|construction|facility|warehouse|plant|groundbreaking)/.test(lower)) return 2
+  if (hasStrongNewLocationEvidence(lower)) return 2
   if (/(cfo|chief financial officer|coo|chief operating officer|vp of finance|vice president of finance|facilities director|energy manager|promoted|hired)/.test(lower)) return 3
   if (/(expansion|capital expenditure|capex|headcount|growth|future site|buildout|build-out)/.test(lower)) return 4
   if (/(restructuring|closure|consolidation|downsizing|layoff|shutdown)/.test(lower)) return 5
@@ -537,6 +572,7 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /the part i would want to understand/i,
   /before the spending picks up again/i,
   /cost review/i,
+  /(?:i saw (?:a|the) note|the note about)/i,
   /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i,
 ]
 
@@ -696,6 +732,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   const signalAnchor = deriveSignalAnchor(account, candidate)
   const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
   const texasLocation = location || 'Texas'
+  const sourceLead = buildSourceLead(account, candidate)
 
   switch (signalFamily) {
     case 'acquisition':
@@ -704,8 +741,8 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'Inherited agreements, duplicate meters, hidden load, and who owns the cleanup.',
         question: 'Have you already looked at what got inherited on the electricity side, or is that still being sorted out?',
         openers: [
-          `I saw the note about ${signalAnchor}.`,
-          `The acquisition news on ${companyName} is the kind of thing that usually makes me ask what got inherited on the utility side.`,
+          sourceLead,
+          `The report on ${companyName} is the kind of thing that usually makes me ask what got inherited on the utility side.`,
           `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
         ],
         focus: ['inherited contracts', 'duplicate sites or meters', 'utility cleanup after the deal'],
@@ -716,7 +753,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'New meter timing, lease timing, construction power, and ramp-up risk.',
         question: `Are you planning the electricity piece for the ${texasLocation} site now, or is that still early?`,
         openers: [
-          `I saw the new location / construction note on ${signalAnchor}.`,
+          sourceLead,
           `When a company is adding a Texas site, the electricity piece usually needs to get handled before move-in, not after.`,
           `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
         ],
@@ -728,7 +765,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'Fresh eyes on a setup someone else inherited, especially from finance or facilities.',
         question: 'Has the new leader had a chance to review the electricity side yet, or is it still on the list?',
         openers: [
-          `I saw the leadership change on ${signalAnchor}.`,
+          sourceLead,
           `When a new CFO or facilities lead comes in, the utility setup is usually one of the first things that should get a clean look.`,
           `Fresh eyes tend to surface questions the old team never had time to ask.`,
         ],
@@ -740,7 +777,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'Growing load, added equipment, and budget creep before the bills catch up.',
         question: 'Has anyone checked whether the current setup still matches the way the site is growing?',
         openers: [
-          `I saw the growth / expansion note on ${signalAnchor}.`,
+          sourceLead,
           `When headcount or capex starts moving, the electricity side usually changes before anyone notices it in the budget.`,
           `The thing I’d want to understand is whether the current setup still fits the way the operation is scaling.`,
         ],
@@ -752,7 +789,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'Stranded capacity, unused sites, and cleanup after a footprint change.',
         question: 'Have you looked at whether the power side can be cleaned up with the footprint change?',
         openers: [
-          `I saw the restructuring / consolidation note on ${signalAnchor}.`,
+          sourceLead,
           `When a company closes or merges sites, the utility side can keep carrying costs that no longer make sense.`,
           `That’s usually the point where I want to know whether the footprint change has already been worked through on the power side.`,
         ],
@@ -764,7 +801,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'New work changing the load and the way the site runs.',
         question: 'Has the utility side been checked against the new work yet?',
         openers: [
-          `I saw the contract win / customer growth note on ${signalAnchor}.`,
+          sourceLead,
           `A new contract or major customer usually changes the load story faster than people expect.`,
           `That is the kind of change that can make the existing electricity setup feel out of sync pretty quickly.`,
         ],
@@ -776,7 +813,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'Fresh capital, tighter cost scrutiny, a new facility, and the next growth phase.',
         question: 'Has the electricity side been mapped against the new facility and production ramp, or is that still getting sorted out?',
         openers: [
-          `I saw the funding / IPO note on ${signalAnchor}.`,
+          sourceLead,
           `A Series C plus a new manufacturing buildout usually means the power plan needs to be thought through before the next round of spending starts.`,
           `That is the kind of moment where I want to understand how the new facility and production ramp are being handled on the utility side.`,
         ],
@@ -1001,6 +1038,9 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
       'one location at a time',
       'most companies',
       'rate looks fine',
+      'the note about',
+      'i saw the note',
+      'saw the note',
     ],
     seed,
   }
@@ -1025,42 +1065,43 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
   const companyName = cleanText(account.name) || 'the company'
   const signalAnchor = deriveSignalAnchor(account, candidate)
+  const sourceLead = buildSourceLead(account, candidate)
   const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
   const locationText = location || 'Texas'
   const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
-      `I saw the note about ${signalAnchor}.`,
+      sourceLead,
       `The deal news on ${companyName} is exactly the kind of thing that makes me ask what got inherited on the utility side.`,
       `When ownership changes, the electricity setup is usually the first thing that deserves a clean look.`,
     ],
     new_location: [
-      `I saw the new site / construction note for ${signalAnchor}.`,
+      sourceLead,
       `When a company adds a ${locationText} location, the power setup usually needs to be thought through before move-in.`,
       `That is the kind of change where the new meter and ramp-up deserve attention early.`,
     ],
     leadership_change: [
-      `I saw the leadership change on ${signalAnchor}.`,
+      sourceLead,
       `Fresh eyes usually mean somebody has to explain what the utility side looks like in plain English.`,
       `That is the first thing I would want a new CFO or facilities lead to have in front of them.`,
     ],
     growth: [
-      `I saw the growth note on ${signalAnchor}.`,
+      sourceLead,
       `Headcount, capex, or a bigger footprint usually changes the bill before it shows up anywhere obvious.`,
       `That is why I would want to know whether the current setup still matches how the site is growing.`,
     ],
     restructuring: [
-      `I saw the restructuring note on ${signalAnchor}.`,
+      sourceLead,
       `When a company consolidates or closes a site, the power side can keep carrying costs that no longer make sense.`,
       `That is usually the point where I want to know whether the footprint change has already been cleaned up on the utility side.`,
     ],
     contract_win: [
-      `I saw the customer win or contract note on ${signalAnchor}.`,
+      sourceLead,
       `New work can change the load story faster than people expect.`,
       `That is the kind of change that can leave the old utility setup out of step pretty quickly.`,
     ],
     funding: [
-      `I saw the funding or IPO note on ${signalAnchor}.`,
+      sourceLead,
       `A raise like that usually means someone is going to ask whether the new capital lines up with the facility and production plan.`,
       `That is where I would want to understand the load growth, not just the headline funding number.`,
     ],
@@ -1533,6 +1574,7 @@ function serializeAccount(account: AccountRow) {
     intelligenceBriefDetail: account.intelligence_brief_detail || null,
     intelligenceBriefTalkTrack: account.intelligence_brief_talk_track || null,
     intelligenceBriefSignalDate: account.intelligence_brief_signal_date || null,
+    intelligenceBriefReportedAt: account.intelligence_brief_reported_at || null,
     intelligenceBriefSourceUrl: account.intelligence_brief_source_url || null,
     intelligenceBriefConfidenceLevel: account.intelligence_brief_confidence_level || null,
     intelligenceBriefLastRefreshedAt: account.intelligence_brief_last_refreshed_at || null,
@@ -1553,6 +1595,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
       ? resultUrl
       : ''
   const signalDate = formatDateForDb(result?.signal_date, candidate?.publishedAt || null)
+  const sourceDate = formatDateForDb(result?.source_date, candidate?.publishedAt || null)
   const confidence = toTitleCase(cleanText(result?.confidence_level))
 
   if (!usable || !headline || !detail || !talkTrack || !sourceUrl || !signalDate) {
@@ -1564,6 +1607,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
     signal_detail: detail,
     talk_track: talkTrack,
     signal_date: signalDate,
+    source_date: sourceDate,
     source_url: sourceUrl,
     confidence_level: confidence || 'Medium',
     selected_priority: candidate?.priority ?? result?.selected_priority ?? 0,
@@ -1670,9 +1714,11 @@ Decision rules:
 - Talk Track must be 3-5 short sentences maximum. Use conversational language.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
+- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I saw a filing about..." instead of "I saw the note...".
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
+- Source Date should be the publication date of the report, article, post, or filing in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
 - Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the industry angle, the opening style, and the question to ask.
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
@@ -1746,9 +1792,11 @@ Decision rules:
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track should be 3-5 short sentences maximum. Use conversational language.
 - Use plain language. Avoid corporate fluff.
+- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I saw a filing about..." instead of "I saw the note...".
 - Confidence Level should be "Medium" for fallback briefs.
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
+- Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article.
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on the industry angle and the company's operating footprint.
 - Rotate the first sentence shape. Do not always open with the same setup.
 - Make it sound like a Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
@@ -1808,6 +1856,7 @@ Return JSON only with this shape:
   "signal_detail": "",
   "talk_track": "",
   "signal_date": "YYYY-MM-DD",
+  "source_date": "YYYY-MM-DD",
   "source_url": "",
   "confidence_level": "High|Medium|Low",
   "selected_priority": 1,
@@ -2042,6 +2091,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       updatePayload.intelligence_brief_detail = validated.signal_detail
       updatePayload.intelligence_brief_talk_track = validated.talk_track
       updatePayload.intelligence_brief_signal_date = validated.signal_date
+      updatePayload.intelligence_brief_reported_at = formatDateForDb(validated.source_date, talkTrackCandidate?.publishedAt || null)
       updatePayload.intelligence_brief_source_url = validated.source_url
       updatePayload.intelligence_brief_confidence_level = validated.confidence_level
     }

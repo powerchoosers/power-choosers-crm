@@ -22,6 +22,7 @@ export interface IntelligenceBriefAccount {
   intelligenceBriefDetail?: string | null
   intelligenceBriefTalkTrack?: string | null
   intelligenceBriefSignalDate?: string | null
+  intelligenceBriefReportedAt?: string | null
   intelligenceBriefSourceUrl?: string | null
   intelligenceBriefConfidenceLevel?: string | null
   intelligenceBriefLastRefreshedAt?: string | null
@@ -204,6 +205,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
     detail: displayAccount?.intelligenceBriefDetail?.trim() || '',
     talkTrack: displayAccount?.intelligenceBriefTalkTrack?.trim() || '',
     signalDate: displayAccount?.intelligenceBriefSignalDate || null,
+    reportedAt: displayAccount?.intelligenceBriefReportedAt || null,
     sourceUrl: displayAccount?.intelligenceBriefSourceUrl?.trim() || '',
     confidenceLevel: displayAccount?.intelligenceBriefConfidenceLevel?.trim() || '',
     lastRefreshedAt: displayAccount?.intelligenceBriefLastRefreshedAt || null,
@@ -369,9 +371,18 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
 
           {/* Metadata Grid */}
           <div className={cn(
-            'grid gap-3 md:grid-cols-3',
+            'grid gap-3 md:grid-cols-2 xl:grid-cols-4',
             'animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300'
           )}>
+            <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
+              <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">
+                Reported
+              </div>
+              <p className="text-sm font-medium text-zinc-100">
+                {getHumanDate(brief.reportedAt) || 'Not set'}
+              </p>
+            </div>
+
             <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
               <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">
                 Signal Date

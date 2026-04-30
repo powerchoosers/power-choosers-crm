@@ -53,6 +53,7 @@ export interface Account {
   intelligenceBriefDetail?: string | null
   intelligenceBriefTalkTrack?: string | null
   intelligenceBriefSignalDate?: string | null
+  intelligenceBriefReportedAt?: string | null
   intelligenceBriefSourceUrl?: string | null
   intelligenceBriefConfidenceLevel?: string | null
   intelligenceBriefLastRefreshedAt?: string | null
@@ -164,7 +165,7 @@ export interface AccountFilters {
 const PAGE_SIZE = 50
 const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url'
 const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
-const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 
 function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
   const city = data.city || ''
@@ -210,6 +211,7 @@ function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
     intelligenceBriefDetail: data.intelligence_brief_detail || null,
     intelligenceBriefTalkTrack: data.intelligence_brief_talk_track || null,
     intelligenceBriefSignalDate: data.intelligence_brief_signal_date || null,
+    intelligenceBriefReportedAt: data.intelligence_brief_reported_at || null,
     intelligenceBriefSourceUrl: data.intelligence_brief_source_url || null,
     intelligenceBriefConfidenceLevel: data.intelligence_brief_confidence_level || null,
     intelligenceBriefLastRefreshedAt: data.intelligence_brief_last_refreshed_at || null,
@@ -897,6 +899,7 @@ export function useUpdateAccount() {
       if (updates.intelligenceBriefDetail !== undefined) dbUpdates.intelligence_brief_detail = updates.intelligenceBriefDetail || null
       if (updates.intelligenceBriefTalkTrack !== undefined) dbUpdates.intelligence_brief_talk_track = updates.intelligenceBriefTalkTrack || null
       if (updates.intelligenceBriefSignalDate !== undefined) dbUpdates.intelligence_brief_signal_date = updates.intelligenceBriefSignalDate || null
+      if (updates.intelligenceBriefReportedAt !== undefined) dbUpdates.intelligence_brief_reported_at = updates.intelligenceBriefReportedAt || null
       if (updates.intelligenceBriefSourceUrl !== undefined) dbUpdates.intelligence_brief_source_url = updates.intelligenceBriefSourceUrl || null
       if (updates.intelligenceBriefConfidenceLevel !== undefined) dbUpdates.intelligence_brief_confidence_level = updates.intelligenceBriefConfidenceLevel || null
       if (updates.intelligenceBriefLastRefreshedAt !== undefined) dbUpdates.intelligence_brief_last_refreshed_at = updates.intelligenceBriefLastRefreshedAt || null
