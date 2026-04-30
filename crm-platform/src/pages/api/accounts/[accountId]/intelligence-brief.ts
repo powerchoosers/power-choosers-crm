@@ -95,6 +95,17 @@ type IndustryCluster =
   | 'multi_site'
   | 'unknown'
 
+type MarketSeason = 'spring_shoulder' | 'summer_peak' | 'fall_reset' | 'winter_reliability'
+
+type MarketGuidance = {
+  marketSeason: MarketSeason
+  marketLabel: string
+  marketAngle: string
+  marketQuestion: string
+  marketOpeners: string[]
+  marketFocus: string[]
+}
+
 type TalkTrackContext = {
   signalFamily: SignalFamily
   signalLabel: string
@@ -104,6 +115,12 @@ type TalkTrackContext = {
   industryLabel: string
   industryAngle: string
   industryOpeners: string[]
+  marketSeason: MarketSeason
+  marketLabel: string
+  marketAngle: string
+  marketQuestion: string
+  marketOpeners: string[]
+  marketFocus: string[]
   openingPattern: 'observation' | 'question' | 'contrast' | 'curiosity'
   openingStyle: string
   question: string
@@ -1109,7 +1126,99 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           `What matters most is whether the current setup still matches the business as it runs today.`,
         ],
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure', 'usage patterns'],
-      }
+    }
+  }
+}
+
+function getMarketSeason(date = new Date()): MarketSeason {
+  const month = date.getMonth() + 1
+  if (month >= 6 && month <= 9) return 'summer_peak'
+  if (month === 10 || month === 11) return 'fall_reset'
+  if (month === 12 || month <= 2) return 'winter_reliability'
+  return 'spring_shoulder'
+}
+
+function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
+  const season = getMarketSeason()
+  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'unknown'].includes(industryCluster)
+
+  if (season === 'summer_peak') {
+    return lowIntensityCluster
+      ? {
+          marketSeason: season,
+          marketLabel: 'ERCOT summer volatility',
+          marketAngle: 'Cooling-driven bills and budget predictability before the hottest months hit.',
+          marketQuestion: 'Have you looked at how the summer stretch usually changes the bill for a business like this?',
+          marketOpeners: [
+            'We are heading into the hottest part of the year, and that is when a lot of Texas accounts feel the bill move even if nothing else changed.',
+            'For smaller offices and service businesses, summer is usually more about budget predictability and cooling than about raw load.',
+            'This is the time of year when I want to know whether the company is ready for the hotter months or still treating it as business as usual.',
+          ],
+          marketFocus: ['summer volatility', 'cooling load', 'budget predictability', 'billing surprise', 'comfort'],
+        }
+      : {
+          marketSeason: season,
+          marketLabel: 'ERCOT summer peak season',
+          marketAngle: 'Summer volatility, 4CP, and whether the site is ready for hotter-weather peaks.',
+          marketQuestion: 'Have you looked at how the account behaves once the summer peak window shows up?',
+          marketOpeners: [
+            'We are moving into the ERCOT summer window, and that is when peak-hour behavior starts to matter a lot more.',
+            'This is usually the time of year when a Texas account finds out whether the setup is built for summer or just looked fine in spring.',
+            'If the site has real load behind it, I would want to know how it handles the hotter months before the bills start moving.',
+          ],
+          marketFocus: ['summer volatility', '4CP', 'peak-hour exposure', 'cooling load', 'budget risk'],
+        }
+  }
+
+  if (season === 'winter_reliability') {
+    return {
+      marketSeason: season,
+      marketLabel: 'ERCOT winter reliability',
+      marketAngle: 'Cold-weather exposure, morning and evening swings, and whether the setup is resilient enough for a snap.',
+      marketQuestion: 'Have you looked at how the account holds up when winter weather pushes usage around?',
+      marketOpeners: [
+        'Winter is when a lot of Texas accounts find out whether the setup is actually steady or just looked steady.',
+        'The question in the cold months is usually more about reliability and exposure than about one big load number.',
+        'If a cold snap hits, I would want to know what part of the bill or building gets stressed first.',
+      ],
+      marketFocus: ['winter reliability', 'cold-snap exposure', 'morning/evening volatility', 'heating load', 'budget risk'],
+    }
+  }
+
+  if (season === 'fall_reset') {
+    return {
+      marketSeason: season,
+      marketLabel: 'Fall planning window',
+      marketAngle: 'Budget reset, year-end planning, and whether the current setup still makes sense before winter.',
+      marketQuestion: 'Have you looked at whether this is the right time to reset the budget or leave it alone?',
+      marketOpeners: [
+        'Fall is usually when companies decide whether the current setup deserves another look before year-end.',
+        'That is often the quiet window to clean up the power side before winter or the next contract cycle shows up.',
+        'For a lot of accounts, the bigger question now is whether they want to lock in the budget story before the next season changes it.',
+      ],
+      marketFocus: ['budget reset', 'year-end planning', 'winter prep', 'renewal timing', 'cost visibility'],
+    }
+  }
+
+  return {
+    marketSeason: season,
+    marketLabel: 'Spring shoulder season',
+    marketAngle: 'Pre-summer positioning, budget cleanup, and whether the account is ready before ERCOT gets hotter.',
+    marketQuestion: 'Have you looked at whether the account is set up for summer, or is that still ahead?',
+    marketOpeners: lowIntensityCluster
+      ? [
+          'We are in the shoulder season, which is usually the best time to get ahead of summer instead of reacting to it.',
+          'For smaller offices and service businesses, this is less about a heavy-load conversation and more about budget predictability and cooling.',
+          'The question I would want answered now is whether the account is ready for the hotter months or still running on autopilot.',
+        ]
+      : [
+          'We are in the shoulder season, which is usually the best time to get ahead of ERCOT summer exposure instead of reacting to it.',
+          'This is when a lot of Texas companies decide whether they want to look at the power side before the hotter months create noise.',
+          'If the site has meaningful usage, this is the window to line up the budget before summer gets here.',
+        ],
+    marketFocus: lowIntensityCluster
+      ? ['summer volatility', 'budget predictability', 'cooling load', 'comfort', 'billing clarity']
+      : ['summer volatility', 'pre-summer planning', 'ERCOT exposure', 'budget visibility', 'cooling load'],
   }
 }
 
@@ -1119,6 +1228,7 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
   const industryCluster = inferIndustryCluster(account)
   const signalGuidance = buildSignalGuidance(signalFamily, account, candidate)
   const industryGuidance = buildIndustryGuidance(industryCluster, account)
+  const marketGuidance = buildMarketGuidance(industryCluster)
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
     observation: 'Observation-led opening that names the event first.',
@@ -1136,6 +1246,12 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
     industryLabel: industryGuidance.label,
     industryAngle: industryGuidance.angle,
     industryOpeners: industryGuidance.openers,
+    marketSeason: marketGuidance.marketSeason,
+    marketLabel: marketGuidance.marketLabel,
+    marketAngle: marketGuidance.marketAngle,
+    marketQuestion: marketGuidance.marketQuestion,
+    marketOpeners: marketGuidance.marketOpeners,
+    marketFocus: marketGuidance.marketFocus,
     openingPattern,
     openingStyle: openingStyleMap[openingPattern],
     question: signalGuidance.question || industryGuidance.question,
@@ -1309,32 +1425,35 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   }
 
   const industryLine = pickVariant(industryLineByCluster[context.industryCluster], variantSeed) || industryLineByCluster[context.industryCluster][0]
+  const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
+  const loadSensitiveCluster = ['manufacturing', 'logistics', 'food_storage', 'healthcare', 'energy_intensive'].includes(context.industryCluster)
+  const primaryLine = loadSensitiveCluster ? industryLine : marketLine
   const question = context.question
 
   switch (context.openingPattern) {
     case 'question':
       return [
         opener,
-        industryLine,
+        primaryLine,
         `${stripTrailingQuestionMark(question)}?`,
       ].join(' ')
     case 'contrast':
       return [
-        `The business update is one thing, but the power side is usually where the practical questions show up.`,
+        `The business update is one thing, but the market context is usually where the practical questions show up.`,
         opener,
-        industryLine,
+        primaryLine,
         question,
       ].join(' ')
     case 'curiosity':
       return [
         `I saw the update about ${signalAnchor}. What I wanted to understand is how that changes the power side.`,
         opener,
-        industryLine,
+        primaryLine,
         question,
       ].join(' ')
     case 'observation':
     default:
-      return [opener, industryLine, question].join(' ')
+      return [opener, primaryLine, question].join(' ')
   }
 }
 
@@ -1972,6 +2091,9 @@ Decision rules:
 - Talk Track must be 3-5 short sentences maximum. Use conversational language.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
+- Load is one angle, not the default angle. Use it only when the account is operationally heavy or the research result clearly points to load, production, refrigeration, or 24/7 usage.
+- For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
+- Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead.
 - Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", "I saw your announcement about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
@@ -2052,6 +2174,9 @@ Decision rules:
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track should be 3-5 short sentences maximum. Use conversational language.
 - Use plain language. Avoid corporate fluff.
+- Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
+- For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
+- Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead.
 - Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
 - If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
 - Use short sentences and contractions. Sound plainspoken, not polished.
