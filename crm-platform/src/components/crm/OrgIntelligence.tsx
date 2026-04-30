@@ -1209,6 +1209,7 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
     metadataPatch?: Record<string, unknown>,
     additionalPhones?: ContactAdditionalPhone[]
   ) => {
+    console.log('[OrgIntelligence] syncContactCachesImmediately', { crmId, phonePatch, metadataPatch, additionalPhones });
     const mergedPatch = {
       ...phonePatch,
       ...(phonePatch.workPhone !== undefined ? { workDirectPhone: phonePatch.workPhone } : {}),
@@ -1216,16 +1217,18 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       ...(additionalPhones?.length ? { additionalPhones } : {})
     } as Record<string, unknown>;
 
-    queryClient.setQueriesData(
+    const updatedContactCount = queryClient.setQueriesData(
       { predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId },
       (old: any) => {
         if (!old) return old;
+        console.log('[OrgIntelligence] Updating contact cache for', crmId, { old, mergedPatch });
         return {
           ...old,
           ...mergedPatch
         };
       }
     );
+    console.log('[OrgIntelligence] syncContactCachesImmediately: updatedContactCount', updatedContactCount);
 
     if (accountId) {
       queryClient.setQueriesData(
@@ -1841,6 +1844,20 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                   metadataPatch,
                   buildAdditionalPhonesForCache(assignedIncomingPhones.extras)
                 );
+                
+                // Force immediate invalidation and refetch to ensure Dossier UI is in sync
+                console.log('[OrgIntelligence] Polling success. Forcing query invalidation for', crmId);
+                await queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId });
+                await queryClient.refetchQueries({ predicate: (q) => q.queryKey[0] === 'contact' && q.queryKey[2] === crmId });
+                
+                if (accountId) {
+                  queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === 'account-contacts' && q.queryKey[1] === accountId });
+                }
+
+                // Trigger blur-in on contact dossier
+                setLastEnrichedContactId(crmId);
+                setTimeout(() => setLastEnrichedContactId(null), 3500);
+
                 setData(prev => {
                   const existing = prev.find(p => p.id === person.id)?.phones || [];
                   const existingNums = new Set(existing.map(phoneDisplayNumber));
