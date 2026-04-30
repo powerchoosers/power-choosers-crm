@@ -371,6 +371,26 @@ const PRESS_RELEASE_HOSTS = new Set([
   'einpresswire.com',
 ])
 
+const AMBIGUOUS_LOCAL_NAME_WORDS = new Set([
+  'data',
+  'center',
+  'centers',
+  'service',
+  'services',
+  'solution',
+  'solutions',
+  'system',
+  'systems',
+  'technology',
+  'technologies',
+  'logistics',
+  'warehouse',
+  'storage',
+  'group',
+  'company',
+  'co',
+])
+
 function isPressReleaseStyleUrl(value: string) {
   const url = cleanText(value)
   if (!url) return false
@@ -381,6 +401,60 @@ function isPressReleaseStyleUrl(value: string) {
 
   if (host && PRESS_RELEASE_HOSTS.has(host)) return true
   return pressReleasePath.test(lower)
+}
+
+function normalizeEntityToken(value: string) {
+  return cleanText(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function tokenizeEntity(value: string) {
+  return normalizeEntityToken(value).split(/\s+/).filter(Boolean)
+}
+
+function isAmbiguousLocalGenericName(account: AccountRow) {
+  const nameTokens = tokenizeEntity(account.name || '')
+  const city = normalizeEntityToken(account.city || '')
+
+  if (!city || nameTokens.length < 2 || nameTokens.length > 3) {
+    return false
+  }
+
+  return nameTokens[0] === city && nameTokens.slice(1).some((token) => AMBIGUOUS_LOCAL_NAME_WORDS.has(token))
+}
+
+function candidateMentionsAccountEntity(account: AccountRow, item: ResearchHit) {
+  const accountName = normalizeEntityToken(account.name || '')
+  if (!accountName) return false
+
+  const text = normalizeEntityToken(`${item.title || ''} ${item.snippet || ''}`)
+  if (!text.includes(accountName)) return false
+
+  const legalEntityPattern = new RegExp(`\\b${escapeRegExp(accountName)}\\s+(inc|llc|lp|ltd|corp|corporation|company|co)\\b`, 'i')
+  if (legalEntityPattern.test(text)) return true
+
+  const namePattern = new RegExp(`\\b${escapeRegExp(accountName)}\\b`, 'i')
+  return namePattern.test(text)
+}
+
+function isAccountRelevantCandidate(account: AccountRow, item: ResearchHit) {
+  if (item.sourceKind === 'sec') return true
+  if (isCompanyWebsiteHit(account, item)) return true
+
+  const host = getHostname(item.url)
+  const accountDomain = cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase()
+  const accountLinkedInUrl = cleanText(account.linkedin_url)
+  if (accountDomain && host === accountDomain) return true
+  if (item.sourceKind === 'linkedin' && accountLinkedInUrl && normalizeUrlForMatch(item.url).includes(normalizeUrlForMatch(accountLinkedInUrl))) return true
+
+  if (isAmbiguousLocalGenericName(account)) {
+    const text = normalizeEntityToken(`${item.title || ''} ${item.snippet || ''}`)
+    const accountName = normalizeEntityToken(account.name || '')
+    const falseGenericContinuation = new RegExp(`\\b${escapeRegExp(accountName)}\\s+(center|centers|market|project|facility|facilities|campus|development)\\b`, 'i')
+    if (falseGenericContinuation.test(text)) return false
+    return candidateMentionsAccountEntity(account, item) && /(\binc\b|\bllc\b|\blp\b|\bltd\b|\bcorp\b|\bcorporation\b|\bcompany\b|\bco\b|planodata\.com)/i.test(text)
+  }
+
+  return candidateMentionsAccountEntity(account, item)
 }
 
 function isOfficialCompanyAnnouncement(account: AccountRow, item: ResearchHit) {
@@ -422,6 +496,7 @@ function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
   const seen = new Set<string>()
   return items
     .filter((item) => item.sourceKind === 'sec' || !looksLikeCommercialListingPage(item.title, item.snippet, item.snippet, item.url))
+    .filter((item) => !account || isAccountRelevantCandidate(account, item))
     .slice()
     .map((item, index) => ({
       ...item,
@@ -625,10 +700,14 @@ function isCompanyWebsiteHit(account: AccountRow, candidate: ResearchHit | null)
 function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   if (!candidate) return `I came across an update about ${companyName}.`
+  const signalAnchor = deriveSignalAnchor(account, candidate)
+  const hasSpecificAnchor = signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase()
 
   if (candidate.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate)) {
     if (isOfficialCompanyAnnouncement(account, candidate)) {
-      return `I saw your announcement about ${companyName}.`
+      return hasSpecificAnchor
+        ? `I saw your announcement about ${signalAnchor}.`
+        : `I saw your announcement about ${companyName}.`
     }
     return `I came across ${companyName}'s website.`
   }
@@ -636,29 +715,29 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   // Add variation based on priority to prevent repetition
   const variations = {
     linkedin: [
-      `I saw a post online about ${companyName}.`,
-      `I came across a LinkedIn update about ${companyName}.`,
-      `I noticed an update about ${companyName} online.`,
+      hasSpecificAnchor ? `I saw a post online about ${signalAnchor}.` : `I saw a post online from ${companyName}.`,
+      hasSpecificAnchor ? `I came across a LinkedIn update about ${signalAnchor}.` : `I came across ${companyName}'s LinkedIn page.`,
+      hasSpecificAnchor ? `I noticed an update about ${signalAnchor} online.` : `I noticed an update from ${companyName} online.`,
     ],
     sec: [
-      `I saw a filing about ${companyName}.`,
+      hasSpecificAnchor ? `I saw a filing about ${signalAnchor}.` : `I saw a filing tied to ${companyName}.`,
       `I came across an SEC filing for ${companyName}.`,
-      `I noticed a recent filing about ${companyName}.`,
+      hasSpecificAnchor ? `I noticed a recent filing about ${signalAnchor}.` : `I noticed a recent filing tied to ${companyName}.`,
     ],
     web_official: [
-      `I saw your announcement about ${companyName}.`,
-      `I came across your recent announcement.`,
-      `I noticed your update about ${companyName}.`,
+      hasSpecificAnchor ? `I saw your announcement about ${signalAnchor}.` : `I saw your announcement about ${companyName}.`,
+      hasSpecificAnchor ? `I came across your recent announcement about ${signalAnchor}.` : `I came across your recent announcement.`,
+      hasSpecificAnchor ? `I noticed your update about ${signalAnchor}.` : `I noticed your update about ${companyName}.`,
     ],
     web: [
-      `I saw an article about ${companyName}.`,
-      `I came across a piece about ${companyName}.`,
-      `I noticed an article about ${companyName}.`,
+      hasSpecificAnchor ? `I saw an article about ${signalAnchor}.` : `I came across ${companyName}'s website.`,
+      hasSpecificAnchor ? `I came across a piece about ${signalAnchor}.` : `I came across ${companyName}'s web presence.`,
+      hasSpecificAnchor ? `I noticed an article about ${signalAnchor}.` : `I noticed ${companyName} online.`,
     ],
     news: [
-      `I saw a report about ${companyName}.`,
-      `I came across a news item about ${companyName}.`,
-      `I noticed a report about ${companyName}.`,
+      hasSpecificAnchor ? `I saw a report about ${signalAnchor}.` : `I saw a report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I came across a news item about ${signalAnchor}.` : `I came across a news item tied to ${companyName}.`,
+      hasSpecificAnchor ? `I noticed a report about ${signalAnchor}.` : `I noticed a report tied to ${companyName}.`,
     ],
   }
 
@@ -1601,6 +1680,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const genericOpening = /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i.test(firstSentence)
   const unsupportedLeadershipAngle = context.signalFamily !== 'leadership_change' &&
     /\b(new leader|new cfo|new coo|new ceo|new president|new facilities director|new energy manager)\b/i.test(lower)
+  const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
@@ -1609,7 +1689,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -2396,7 +2476,7 @@ Decision rules:
 - Load is one angle, not the default angle. Use it only when the account is operationally heavy or the research result clearly points to load, production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
-- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", "I saw your announcement about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
+- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual event in the same sentence, like "I saw the report that Lambda is moving into Aligned's DFW-04 data center in Plano."
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
@@ -2484,7 +2564,7 @@ Decision rules:
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
-- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
+- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual business fact in the same sentence, or use "I came across [company]'s website..." for website-only fallback.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
 - Use short sentences and contractions. Sound plainspoken, not polished.
