@@ -80,6 +80,12 @@ export default async function handler(req, res) {
   // Handle CORS
   if (cors(req, res)) return;
 
+  console.log('[phone-webhook] Received webhook call:', {
+    method: req.method,
+    hasBody: !!req.body,
+    bodyKeys: req.body ? Object.keys(req.body) : []
+  });
+
   // Only accept POST requests from Apollo
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -138,8 +144,23 @@ export default async function handler(req, res) {
           .eq('metadata->>apollo_person_id', personId)
           .maybeSingle();
 
+        console.log('[phone-webhook] Contact lookup result:', {
+          personId,
+          foundContact: !!contactRow,
+          contactId: contactRow?.id,
+          phonesCount: phones.length
+        });
+
         if (contactRow?.id) {
           const { update, unique, extras } = mapPhonesToContactUpdate(phones);
+          
+          console.log('[phone-webhook] Phone mapping result:', {
+            contactId: contactRow.id,
+            update,
+            unique,
+            extras
+          });
+          
           const existingMetadata = (contactRow.metadata && typeof contactRow.metadata === 'object') ? contactRow.metadata : {};
           update.metadata = {
             ...existingMetadata,
@@ -149,8 +170,16 @@ export default async function handler(req, res) {
 
           if (Object.keys(update).length > 0) {
             update.updatedAt = new Date().toISOString();
-            await supabaseAdmin.from('contacts').update(update).eq('id', contactRow.id);
+            const { error: updateError } = await supabaseAdmin.from('contacts').update(update).eq('id', contactRow.id);
+            
+            console.log('[phone-webhook] Contact update result:', {
+              contactId: contactRow.id,
+              success: !updateError,
+              error: updateError?.message
+            });
           }
+        } else {
+          console.log('[phone-webhook] No contact found with apollo_person_id:', personId);
         }
       } catch (dbErr) {
         console.error('[phone-webhook] Supabase operations failed:', dbErr);
