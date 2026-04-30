@@ -89,6 +89,7 @@ type IndustryCluster =
   | 'retail'
   | 'restaurant'
   | 'education_nonprofit'
+  | 'religious'
   | 'technology'
   | 'energy_intensive'
   | 'office_services'
@@ -556,32 +557,8 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
 }
 
 function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null) {
-  const companyName = cleanText(account.name) || 'the company'
-  const signalAnchor = cleanText(deriveSignalAnchor(account, candidate))
-
-  if (!candidate) {
-    return `I saw a report about ${companyName}.`
-  }
-
-  if (candidate.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate)) {
-    if (isOfficialCompanyAnnouncement(account, candidate)) {
-      return `I saw your announcement about ${companyName}.`
-    }
-    return 'I came across your website.'
-  }
-
-  if (isUsefulSignalAnchor(signalAnchor) && signalAnchor.toLowerCase() !== companyName.toLowerCase()) {
-    const connector =
-      candidate.sourceKind === 'news'
-        ? 'report'
-        : candidate.sourceKind === 'sec'
-          ? 'filing'
-          : candidate.sourceKind === 'linkedin'
-            ? 'post'
-            : 'article'
-    return `I saw a ${connector} about ${companyName}, and it was ${lowercaseFirst(signalAnchor)}.`
-  }
-
+  // Simplified version - just use buildSourceLead
+  // The signal anchor approach was creating nonsensical output
   return buildSourceLead(account, candidate)
 }
 
@@ -703,6 +680,12 @@ function hasStrongNewLocationEvidence(text: string) {
 
 function inferSignalPriority(text: string, fallbackPriority: number) {
   const lower = cleanText(text).toLowerCase()
+  
+  // Filter out religious content first
+  if (/(rosh hashanah|yom kippur|passover|hanukkah|easter|christmas|prayer|sermon|worship service|spiritual|faith|blessing)/.test(lower)) {
+    return fallbackPriority
+  }
+  
   if (/(acquir|merger|takeover|buyout)/.test(lower)) return 1
   if (hasStrongNewLocationEvidence(lower)) return 2
   if (/(cfo|chief financial officer|coo|chief operating officer|vp of finance|vice president of finance|facilities director|energy manager|promoted|hired)/.test(lower)) return 3
@@ -768,6 +751,7 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   retail: ['store', 'seasonal', 'traffic', 'lighting', 'hvac', 'refrigeration', 'multi-site'],
   restaurant: ['kitchen', 'hvac', 'refrigeration', 'prep', 'hours', 'multi-unit', 'equipment'],
   education_nonprofit: ['campus', 'occupancy', 'events', 'hvac', 'controls', 'building', 'schedule'],
+  religious: ['worship', 'sanctuary', 'events', 'hvac', 'weekend', 'seasonal', 'occupancy'],
   technology: ['cooling', 'server', 'fit-out', 'occupancy', 'equipment', 'space', 'data'],
   energy_intensive: ['4cp', 'process', 'motor', 'equipment', 'peak', 'load', 'maintenance'],
   office_services: ['occupancy', 'lease', 'hvac', 'conference', 'equipment', 'hours', 'space'],
@@ -783,7 +767,8 @@ const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
   banking: ['bank', 'banking', 'credit union', 'financial services'],
   retail: ['retail', 'store', 'shopping', 'showroom'],
   restaurant: ['restaurant', 'restaurants', 'hospitality', 'dining', 'cafe', 'food service'],
-  education_nonprofit: ['school', 'education', 'campus', 'nonprofit', 'church', 'university', 'college'],
+  education_nonprofit: ['school', 'education', 'campus', 'nonprofit', 'university', 'college'],
+  religious: ['church', 'synagogue', 'mosque', 'temple', 'congregation', 'parish', 'worship', 'ministry'],
   technology: ['technology', 'tech', 'software', 'saas', 'data center'],
   energy_intensive: ['energy-intensive', 'heavy site', 'industrial gas', 'refinery', 'mining', 'quarry'],
   office_services: ['office', 'professional services', 'consulting', 'legal', 'accounting'],
@@ -879,15 +864,21 @@ function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) 
     return companyName || 'this account'
   }
 
+  // Try to extract a clean signal anchor by removing company name prefix
   if (companyName) {
     const stripped = title.replace(new RegExp(`^${escapeRegExp(companyName)}[\\s\\-:–—|,]+`, 'i'), '')
     const cleaned = cleanText(stripped)
-    if (cleaned && cleaned.length < title.length) {
-      return shortenText(cleaned, 110)
+    if (cleaned && cleaned.length < title.length && cleaned.length >= 10) {
+      const shortened = shortenText(cleaned, 110)
+      // Validate the shortened anchor is actually useful
+      if (isUsefulSignalAnchor(shortened)) {
+        return shortened
+      }
     }
   }
 
-  return shortenText(title, 110)
+  // If we can't extract a good anchor, just use company name
+  return companyName || 'this account'
 }
 
 function isUsefulSignalAnchor(value: string) {
@@ -896,7 +887,11 @@ function isUsefulSignalAnchor(value: string) {
   if (/^(deals|news|updates?|press|latest)\s*[:\-]/i.test(text)) return false
   if (/\b(the business press|newswire|google news|linkedin|sec|announcement|report)\b/i.test(text)) return false
   if (/[|]/.test(text)) return false
-  return text.split(/\s+/).length <= 12
+  if (/\b(rosh hashanah|yom kippur|passover|hanukkah|easter|christmas)\b/i.test(text)) return false
+  if (/\b(we have work to do|opinion|editorial|commentary|letter to the editor)\b/i.test(text)) return false
+  const wordCount = text.split(/\s+/).length
+  if (wordCount > 12 || wordCount < 3) return false
+  return true
 }
 
 function inferIndustryCluster(account: AccountRow): IndustryCluster {
@@ -912,7 +907,8 @@ function inferIndustryCluster(account: AccountRow): IndustryCluster {
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(restaurant|dining|cafe|hospitality|hotel|food service)/.test(text)) return 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience)/.test(text)) return 'retail'
-  if (/(school|education|university|college|nonprofit|church|foundation|charity|municipal)/.test(text)) return 'education_nonprofit'
+  if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
+  if (/(school|education|university|college|nonprofit|foundation|charity|municipal)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
   if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency)/.test(text)) return 'office_services'
   return 'unknown'
@@ -966,10 +962,10 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
       return {
         label: 'New location / facility / construction',
         angle: 'New meter timing, lease timing, construction power, and ramp-up risk.',
-        question: `Are you planning the electricity piece for the ${texasLocation} site now, or is that still early?`,
+        question: `Are you planning the electricity piece for the new site now, or is that still early?`,
         openers: [
           sourceLead,
-          `When a company is adding a Texas site, the electricity piece usually needs to get handled before move-in, not after.`,
+          `When a company is adding a new site, the electricity piece usually needs to get handled before move-in, not after.`,
           `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
         ],
         focus: ['new meter timing', 'lease or buildout timing', 'ramp-up load'],
@@ -1025,14 +1021,14 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
     case 'funding':
       return {
         label: 'Funding / IPO',
-        angle: 'Fresh capital, tighter cost scrutiny, a new facility, and the next growth phase.',
-        question: 'Has the electricity side been mapped against the new facility and production ramp, or is that still getting sorted out?',
+        angle: 'Fresh capital, tighter cost scrutiny, and the next growth phase.',
+        question: 'Has the electricity side been mapped against the growth plan, or is that still getting sorted out?',
         openers: [
           sourceLead,
-          `A Series C plus a new manufacturing buildout usually means the power plan needs to be thought through before the next round of spending starts.`,
-          `That is the kind of moment where I want to understand how the new facility and production ramp are being handled on the power side.`,
+          `Fresh capital usually means new space, new equipment, or both, and the power plan needs to be thought through before the next round of spending starts.`,
+          `That is the kind of moment where I want to understand how the growth is being handled on the power side.`,
         ],
-        focus: ['cost scrutiny', 'growth planning', 'budget visibility', 'facility buildout', 'production ramp'],
+        focus: ['cost scrutiny', 'growth planning', 'budget visibility', 'facility expansion', 'equipment additions'],
       }
     case 'industry_context':
     default:
@@ -1150,6 +1146,18 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           `That is the sort of setup where usage patterns matter more than the contract headline.`,
         ],
         focus: ['tight budgets', 'campus timing', 'stewardship', 'seasonal occupancy', 'controls', 'scheduling'],
+      }
+    case 'religious':
+      return {
+        label: 'Religious organization',
+        angle: 'Event-driven usage, weekend peaks, large sanctuary HVAC, and seasonal patterns around holidays.',
+        question: 'Do you know which services or events are driving the peaks, and whether scheduling or controls could help manage the load?',
+        openers: [
+          `Religious organizations usually have a different usage pattern than most businesses — weekend-heavy, event-driven, and seasonal around holidays.`,
+          `The power side often comes down to large HVAC spaces that sit mostly empty during the week but spike on weekends.`,
+          `That is the kind of setup where timing and controls matter more than the rate.`,
+        ],
+        focus: ['event-driven usage', 'weekend peaks', 'sanctuary HVAC', 'seasonal patterns', 'occupancy timing', 'controls'],
       }
     case 'technology':
       return {
@@ -1399,8 +1407,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
-  const signalAnchor = deriveSignalAnchor(account, candidate)
-  const sourceLead = buildSignalAwareLead(account, candidate)
+  const companyName = cleanText(account.name) || 'the company'
+  const sourceLead = buildSourceLead(account, candidate)
   const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [sourceLead],
@@ -1475,6 +1483,9 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     education_nonprofit: [
       'Schools and nonprofits usually feel it in occupancy, events, and HVAC schedules.',
     ],
+    religious: [
+      'Religious organizations usually see weekend peaks and event-driven usage that is different from most businesses.',
+    ],
     technology: [
       'Tech sites often add load through cooling, fit-outs, and server spaces.',
     ],
@@ -1495,7 +1506,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const industryLine = pickVariant(industryLineByCluster[context.industryCluster], variantSeed) || industryLineByCluster[context.industryCluster][0]
   const signalLine = pickVariant(signalLineBySignal[context.signalFamily], variantSeed) || signalLineBySignal[context.signalFamily][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
-  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'unknown'].includes(context.industryCluster)
+  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'religious', 'unknown'].includes(context.industryCluster)
   const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
   const primaryLine = context.signalFamily === 'industry_context'
     ? (shouldUseMarketLine ? marketLine : industryLine)
@@ -1509,21 +1520,9 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
         primaryLine,
         `${stripTrailingQuestionMark(question)}?`,
       ].join(' ')
-    case 'contrast':
-      return [
-        `I saw the update about ${signalAnchor}. The practical question is what it changes on the power side.`,
-        opener,
-        primaryLine,
-        question,
-      ].join(' ')
-    case 'curiosity':
-      return [
-        `I saw the update about ${signalAnchor}. What I wanted to understand is the operational side of it.`,
-        opener,
-        primaryLine,
-        question,
-      ].join(' ')
     case 'observation':
+    case 'contrast':
+    case 'curiosity':
     default:
       return [opener, primaryLine, question].join(' ')
   }
