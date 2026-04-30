@@ -165,7 +165,8 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
 
     // Sync Logic
     useEffect(() => {
-        if (contact && !isEditing && !suppressHydrationRef.current) {
+        const isEnriched = lastEnrichedContactId === id
+        if (contact && (!isEditing || isEnriched) && !suppressHydrationRef.current) {
             const c = contact as any
             const first = c.firstName ?? (contact.name || '').split(/\s+/)[0] ?? ''
             const last = c.lastName ?? (contact.name || '').split(/\s+/).slice(1).join(' ') ?? ''
@@ -204,7 +205,7 @@ export function useContactDossierState(id: string, taskIdFromUrl?: string | null
                 setEditMills(formatMillValue((contact as any)?.mills ?? (contact as any)?.metadata?.mills))
             }
         }
-    }, [contact, account, isEditing])
+    }, [contact, account, isEditing, lastEnrichedContactId, id])
 
     useEffect(() => {
         setCurrentTaskIndex((prev) => Math.min(prev, Math.max(0, visiblePendingTasks.length - 1)))
