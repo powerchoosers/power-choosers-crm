@@ -437,7 +437,7 @@ function candidateMentionsAccountEntity(account: AccountRow, item: ResearchHit) 
 }
 
 function isAccountRelevantCandidate(account: AccountRow, item: ResearchHit) {
-  if (item.sourceKind === 'sec') return true
+  if (item.sourceKind === 'sec') return candidateMentionsAccountEntity(account, item)
   if (isCompanyWebsiteHit(account, item)) return true
 
   const host = getHostname(item.url)
@@ -720,9 +720,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
       hasSpecificAnchor ? `I noticed an update about ${signalAnchor} online.` : `I noticed an update from ${companyName} online.`,
     ],
     sec: [
-      hasSpecificAnchor ? `I saw a filing about ${signalAnchor}.` : `I saw a filing tied to ${companyName}.`,
-      `I came across an SEC filing for ${companyName}.`,
-      hasSpecificAnchor ? `I noticed a recent filing about ${signalAnchor}.` : `I noticed a recent filing tied to ${companyName}.`,
+      hasSpecificAnchor ? `I saw a public company report about ${signalAnchor}.` : `I saw a public company report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I came across a public company report about ${signalAnchor}.` : `I came across a public company report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I noticed a recent public company report about ${signalAnchor}.` : `I noticed a recent public company report tied to ${companyName}.`,
     ],
     web_official: [
       hasSpecificAnchor ? `I saw your announcement about ${signalAnchor}.` : `I saw your announcement about ${companyName}.`,
@@ -992,6 +992,7 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /business update is one thing/i,
   /practical question is what it changes on the power side/i,
   /new leader usually/i,
+  /filing tied to/i,
   /responsible for electricity/i,
   /support ticket/i,
   /i was looking at/i,
@@ -1680,6 +1681,9 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const genericOpening = /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i.test(firstSentence)
   const unsupportedLeadershipAngle = context.signalFamily !== 'leadership_change' &&
     /\b(new leader|new cfo|new coo|new ceo|new president|new facilities director|new energy manager)\b/i.test(lower)
+  const unsupportedAcquisitionAngle = context.signalFamily !== 'acquisition' &&
+    /\b(ownership changes|ownership change|got inherited|what got inherited|inherited on the electricity side)\b/i.test(lower)
+  const filingJargon = /\b(sec filing|public filing|recent filing|filing)\b/i.test(lower)
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
@@ -1689,7 +1693,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -2306,6 +2310,12 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
     return null
   }
 
+  const sourceHost = getHostname(sourceUrl)
+  const sourceIsSec = sourceHost === 'sec.gov' || sourceHost.endsWith('.sec.gov')
+  if (/\b(sec filing|filing tied|filing about|recent filing|public filing)\b/i.test(talkTrack) && !sourceIsSec) {
+    return null
+  }
+
   // Validate talk track length (50-200 words)
   const talkTrackWordCount = talkTrack.split(/\s+/).filter(Boolean).length
   if (talkTrackWordCount < 50 || talkTrackWordCount > 200) {
@@ -2470,6 +2480,8 @@ Decision rules:
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
 - Talk Track must be 2-4 short sentences maximum. Use conversational language.
+- If the signal comes from a filing, translate it into plain English. Do not assume the rep knows SEC jargon. Say "public company report" or explain what changed in everyday words.
+- Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack signal + market + industry in the same response.
@@ -2559,6 +2571,8 @@ Decision rules:
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track should be 2-4 short sentences maximum. Use conversational language.
+- If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
+- Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack market + industry + load all at once.
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
