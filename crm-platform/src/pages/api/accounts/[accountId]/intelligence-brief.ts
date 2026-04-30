@@ -40,7 +40,7 @@ class TalkTrackCache {
     this.cleanExpired()
     
     const tokens = this.tokenize(talkTrack)
-    if (tokens.length === 0) return false
+    if (tokens.size === 0) return false
 
     for (const cached of this.cache.values()) {
       const similarity = this.calculateSimilarity(tokens, this.tokenize(cached.talkTrack))
