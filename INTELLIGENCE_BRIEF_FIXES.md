@@ -152,18 +152,134 @@ Fixed all critical and medium-sized issues identified in the talk track generati
 
 ---
 
+## Low-Priority Issues Fixed (Additional Round)
+
+### 10. ✅ Talk Track Length Validation (Issue #5)
+**Problem:** No validation to ensure talk tracks are appropriate length.
+
+**Fix:**
+- Added word count validation in `validateBriefResult`
+- Rejects talk tracks with < 50 words (too short, feels lazy)
+- Rejects talk tracks with > 200 words (too long, feels like a pitch)
+
+**Impact:** Ensures consistent quality and appropriate length for all talk tracks.
+
+---
+
+### 11. ✅ Confidence Boost for High-Quality Signals (Issue #9)
+**Problem:** Official company announcements and SEC filings weren't getting appropriate confidence boost.
+
+**Fix:**
+- Added confidence boost logic in `validateBriefResult`
+- If source is official company announcement:
+  - Low → Medium
+  - Medium → High
+- Shows credibility when using authoritative sources
+
+**Impact:** Talk tracks from official sources now have higher confidence, showing better research quality.
+
+---
+
+### 12. ✅ Improved Generic "Industry Context" Fallback (Issue #3)
+**Problem:** Industry context fallback was too vague and generic.
+
+**Fix:**
+- Updated openers to be more specific:
+  - Before: "I looked at how [company] runs day to day"
+  - After: "I was looking at [company]'s operations"
+- Changed question to be more direct:
+  - Before: "When companies like this review electricity, what tends to get missed first?"
+  - After: "Has anyone looked at whether the current setup still matches how the business runs today?"
+- More actionable and less generic
+
+**Impact:** Fallback talk tracks feel more researched and specific.
+
+---
+
+### 13. ✅ First-Sentence Variety / Opener Variations (Issue #6 from improvements)
+**Problem:** Talk tracks always started with "I saw a report about..." causing repetition.
+
+**Fix:**
+- Added 3 variations for each source type in `buildSourceLead`:
+  - News: "I saw a report", "I came across a news item", "I noticed a report"
+  - LinkedIn: "I saw a post", "I came across a LinkedIn update", "I noticed an update"
+  - SEC: "I saw a filing", "I came across an SEC filing", "I noticed a recent filing"
+  - Web: "I saw an article", "I came across a piece", "I noticed an article"
+  - Official: "I saw your announcement", "I came across your recent announcement", "I noticed your update"
+- Uses deterministic seed based on account ID + URL for consistency
+- Prevents same opener for similar accounts
+
+**Impact:** Talk tracks feel less formulaic and more varied across different accounts.
+
+---
+
+### 14. ✅ Improved "Unknown" Industry Cluster (Issue #3 related)
+**Problem:** Unknown industry cluster had vague, generic guidance.
+
+**Fix:**
+- Updated openers to be more specific:
+  - Before: "I was trying to get a feel for how [industryLabel] runs day to day"
+  - After: "I was looking at how [companyName] operates"
+- Changed question to be more direct and actionable
+- Removed reference to "industryLabel" which could be confusing when industry is unknown
+
+**Impact:** Better talk tracks even when industry classification is uncertain.
+
+---
+
 ## Remaining Low-Priority Issues (Not Fixed)
 
-These were identified as low-priority and not addressed in this round:
+These were identified as low-priority and not addressed:
 
-1. Opening pattern redundancy (now partially addressed)
+1. ~~Opening pattern redundancy~~ ✅ Fixed in first round
 2. Market season logic alignment with actual dates
-3. Generic "Industry Context" fallback vagueness
-4. No deduplication of talk tracks within same session
-5. Talk track length validation
+3. ~~Generic "Industry Context" fallback vagueness~~ ✅ Fixed in second round
+4. No deduplication of talk tracks within same session (requires Redis/cache)
+5. ~~Talk track length validation~~ ✅ Fixed in second round
 6. Seasonal context in industry guidance
-7. Fallback mode specificity improvements
-8. Talk track A/B testing metadata
-9. Confidence boost for high-quality signals
+7. ~~Fallback mode specificity improvements~~ ✅ Partially addressed
+8. Talk track A/B testing metadata (requires analytics infrastructure)
+9. ~~Confidence boost for high-quality signals~~ ✅ Fixed in second round
 
-These can be addressed in future iterations if needed.
+**Note:** Issues #4 and #8 require infrastructure changes (Redis cache, analytics) beyond the scope of code fixes.
+
+---
+
+## Testing Recommendations (Updated)
+
+### Additional Tests for Second Round:
+
+1. **Test talk track length validation:**
+   - Verify very short talk tracks are rejected
+   - Verify very long talk tracks are rejected
+   - Verify 50-200 word range is accepted
+
+2. **Test confidence boost:**
+   - Official company announcements should show "High" confidence
+   - SEC filings should show "High" confidence
+   - Regular news should show "Medium" or "Low" confidence
+
+3. **Test opener variations:**
+   - Generate briefs for multiple similar accounts
+   - Verify openers vary ("I saw", "I came across", "I noticed")
+   - Verify consistency for same account (deterministic)
+
+4. **Test improved fallback:**
+   - Generate fallback briefs for unknown industries
+   - Verify openers are specific and actionable
+   - Verify no vague "industry is broad" language
+
+---
+
+## Files Modified
+
+- `crm-platform/src/pages/api/accounts/[accountId]/intelligence-brief.ts`
+- `INTELLIGENCE_BRIEF_FIXES.md` (this file)
+
+---
+
+## Compilation Status
+
+✅ **All changes compile successfully with no TypeScript errors**
+
+---

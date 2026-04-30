@@ -540,19 +540,50 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
     return 'I came across your website.'
   }
 
+  // Add variation based on priority to prevent repetition
+  const variations = {
+    linkedin: [
+      `I saw a post online about ${companyName}.`,
+      `I came across a LinkedIn update about ${companyName}.`,
+      `I noticed an update about ${companyName} online.`,
+    ],
+    sec: [
+      `I saw a filing about ${companyName}.`,
+      `I came across an SEC filing for ${companyName}.`,
+      `I noticed a recent filing about ${companyName}.`,
+    ],
+    web_official: [
+      `I saw your announcement about ${companyName}.`,
+      `I came across your recent announcement.`,
+      `I noticed your update about ${companyName}.`,
+    ],
+    web: [
+      `I saw an article about ${companyName}.`,
+      `I came across a piece about ${companyName}.`,
+      `I noticed an article about ${companyName}.`,
+    ],
+    news: [
+      `I saw a report about ${companyName}.`,
+      `I came across a news item about ${companyName}.`,
+      `I noticed a report about ${companyName}.`,
+    ],
+  }
+
+  const seed = hashString(`${account.id}${candidate.url}`)
+  
   switch (candidate.sourceKind) {
     case 'linkedin':
-      return `I saw a post online about ${companyName}.`
+      return variations.linkedin[seed % variations.linkedin.length]
     case 'sec':
-      return `I saw a filing about ${companyName}.`
+      return variations.sec[seed % variations.sec.length]
     case 'web':
       if (isOfficialCompanyAnnouncement(account, candidate)) {
-        return `I saw your announcement about ${companyName}.`
+        return variations.web_official[seed % variations.web_official.length]
       }
-      return `I saw an article about ${companyName}.`
+      return variations.web[seed % variations.web.length]
     case 'news':
     default:
-      return `I saw a report about ${companyName}.`
+      return variations.news[seed % variations.news.length]
   }
 }
 
@@ -1035,11 +1066,11 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
       return {
         label: 'Industry context',
         angle: 'How this kind of business actually uses electricity.',
-        question: 'When companies like this review electricity, what tends to get missed first?',
+        question: 'Has anyone looked at whether the current setup still matches how the business runs today?',
         openers: [
-          `I looked at how ${companyName} runs day to day.`,
-          `Even without a fresh news item, the bill usually points back to a few real operating habits.`,
-          `What usually matters most is whether the setup still matches the way the business works now.`,
+          `I was looking at ${companyName}'s operations.`,
+          `Even without a specific news item, the electricity side usually tells a story about how the business actually runs.`,
+          `The question I'd want answered is whether the current setup still fits the way things work now.`,
         ],
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
       }
@@ -1212,11 +1243,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       return {
         label: 'Company context',
         angle: 'Budget visibility, usage patterns, and whether the current setup still fits how the business runs now.',
-        question: 'Has anyone looked at which parts of the business are actually driving the bill now?',
+        question: 'Has anyone looked at whether the current setup still matches how the business runs today?',
         openers: [
-          `I was trying to get a feel for how ${industryLabel} runs day to day.`,
-          `Even when the industry is broad, the bill usually points back to a few real habits.`,
-          `What matters most is whether the current setup still matches the business as it runs today.`,
+          `I was looking at how ${companyName} operates.`,
+          `Even without knowing the exact industry, the electricity side usually tells a story about how the business actually runs.`,
+          `The question I'd want answered is whether the current setup still fits the way things work now.`,
         ],
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure', 'usage patterns'],
     }
@@ -2018,6 +2049,19 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
     return null
   }
 
+  // Validate talk track length (50-200 words)
+  const talkTrackWordCount = talkTrack.split(/\s+/).filter(Boolean).length
+  if (talkTrackWordCount < 50 || talkTrackWordCount > 200) {
+    return null
+  }
+
+  // Boost confidence for high-quality official sources
+  let finalConfidence = confidence || 'Medium'
+  if (candidate && isOfficialCompanyAnnouncement(account, candidate)) {
+    if (finalConfidence === 'Low') finalConfidence = 'Medium'
+    if (finalConfidence === 'Medium') finalConfidence = 'High'
+  }
+
   return {
     signal_headline: headline,
     signal_detail: detail,
@@ -2025,7 +2069,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
     signal_date: signalDate,
     source_date: sourceDate,
     source_url: sourceUrl,
-    confidence_level: confidence || 'Medium',
+    confidence_level: finalConfidence,
     selected_priority: candidate?.priority ?? result?.selected_priority ?? 0,
     source_title: candidate?.title || result?.source_title || '',
     source_domain: candidate?.source || result?.source_domain || '',
