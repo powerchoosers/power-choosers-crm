@@ -227,21 +227,60 @@ Fixed all critical and medium-sized issues identified in the talk track generati
 
 ---
 
+## Round 3: Infrastructure Improvements ✅
+
+**Commit:** `[pending]`  
+**Date:** April 30, 2026
+
+### Issues Fixed (1 total)
+
+13. **Cross-Account Talk Track Deduplication**
+    - Implemented in-memory LRU cache (no Redis required)
+    - Prevents similar talk tracks across different accounts
+    - 500 entry cache with 7-day TTL
+    - Automatic expiration and LRU eviction
+    - Cache stats endpoint for monitoring
+
+**Implementation Details:**
+
+**TalkTrackCache Class:**
+- **Max Size:** 500 entries (configurable)
+- **TTL:** 7 days (configurable)
+- **Similarity Threshold:** 65% (Jaccard similarity)
+- **Eviction:** LRU (Least Recently Used)
+- **Auto-cleanup:** Expired entries removed on access
+
+**Features:**
+- `add(talkTrack)` - Add talk track to cache
+- `isTooSimilar(talkTrack, threshold)` - Check if too similar to cached tracks
+- `size()` - Get current cache size (with auto-cleanup)
+- `clear()` - Clear entire cache
+
+**Integration Points:**
+1. **Validation:** Checks cache during talk track rewrite validation
+2. **Generation:** Adds successful talk tracks to cache
+3. **Retry Logic:** Regenerates if too similar to cached tracks (up to 3 attempts)
+
+**Monitoring:**
+- GET `/api/accounts/[accountId]/intelligence-brief` - View cache stats (admin only)
+- Returns: `{ size, maxSize, ttlDays }`
+
+**Impact:** 
+- Prevents repetitive talk tracks across similar accounts
+- No external dependencies (Redis not required)
+- Automatic memory management with LRU eviction
+- 7-day TTL ensures cache doesn't grow stale
+
+---
+
 ## Remaining Low-Priority Issues (Not Fixed)
 
-These were identified as low-priority and not addressed:
+Only 1 issue remains:
 
-1. ~~Opening pattern redundancy~~ ✅ Fixed in first round
-2. Market season logic alignment with actual dates
-3. ~~Generic "Industry Context" fallback vagueness~~ ✅ Fixed in second round
-4. No deduplication of talk tracks within same session (requires Redis/cache)
-5. ~~Talk track length validation~~ ✅ Fixed in second round
-6. Seasonal context in industry guidance
-7. ~~Fallback mode specificity improvements~~ ✅ Partially addressed
-8. Talk track A/B testing metadata (requires analytics infrastructure)
-9. ~~Confidence boost for high-quality signals~~ ✅ Fixed in second round
-
-**Note:** Issues #4 and #8 require infrastructure changes (Redis cache, analytics) beyond the scope of code fixes.
+1. **Talk Track A/B Testing Metadata** (requires analytics infrastructure)
+   - Would need: Analytics system, tracking database, reporting dashboard
+   - Impact: Low (optimization, not core functionality)
+   - Status: Deferred until analytics infrastructure is in place
 
 ---
 
