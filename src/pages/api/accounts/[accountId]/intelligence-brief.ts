@@ -206,6 +206,23 @@ function stripXml(value: string): string {
   ).replace(/\s+/g, ' ').trim()
 }
 
+function countCjkCharacters(value: string) {
+  return (cleanText(value).match(/[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af]/g) || []).length
+}
+
+function isLikelyNonEnglishText(...values: Array<string | null | undefined>) {
+  const text = values.map(cleanText).filter(Boolean).join(' ')
+  if (!text) return false
+
+  const cjkCount = countCjkCharacters(text)
+  if (cjkCount < 4) return false
+
+  const latinCount = (text.match(/[A-Za-z]/g) || []).length
+  if (latinCount === 0) return true
+
+  return cjkCount / Math.max(cjkCount + latinCount, 1) >= 0.15
+}
+
 function parseRssItems(
   xml: string,
   bucket: { priority: number; label: string; query: string },
@@ -232,6 +249,7 @@ function parseRssItems(
     const source = getTag('source') || defaultSource
 
     if (!title || !url) continue
+    if (isLikelyNonEnglishText(title, description)) continue
 
     const publishedAt = pubDate ? new Date(pubDate) : null
     items.push({
@@ -795,6 +813,10 @@ function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) 
     return companyName || 'this account'
   }
 
+  if (isLikelyNonEnglishText(title)) {
+    return companyName || 'this account'
+  }
+
   if (looksLikeCommercialListingPage(title, candidate?.snippet || '', candidate?.snippet || '', candidate?.url || '')) {
     return companyName || 'this account'
   }
@@ -1291,6 +1313,7 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
 function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const text = cleanText(talkTrack)
   if (!text) return true
+  if (isLikelyNonEnglishText(text)) return true
 
   const lower = text.toLowerCase()
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
@@ -1298,136 +1321,104 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const sentenceCount = text.split(/[.!?]+/).map(cleanText).filter(Boolean).length
   const mentionsSignal = TALK_TRACK_SIGNAL_KEYWORDS[context.signalFamily].some((keyword) => lower.includes(keyword.toLowerCase()))
   const mentionsIndustry = TALK_TRACK_INDUSTRY_KEYWORDS[context.industryCluster].some((keyword) => lower.includes(keyword.toLowerCase()))
+  const mentionsMarket = context.marketFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
   const mentionsAtLeastOneFocus = context.ercotFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
   const genericOpening = /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i.test(firstSentence)
+  const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
+  const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
+  const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || sentenceCount < 2 || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || sentenceCount < 2 || overstuffed || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
-  const companyName = cleanText(account.name) || 'the company'
   const signalAnchor = deriveSignalAnchor(account, candidate)
   const sourceLead = buildSourceLead(account, candidate)
-  const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
-  const locationText = location || 'Texas'
   const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
       sourceLead,
-      `The deal news on ${companyName} is exactly the kind of thing that makes me ask what got inherited on the power side.`,
-      `When ownership changes, the electricity setup is usually the first thing that deserves a clean look.`,
+      `That kind of change usually means somebody has to sort out what got inherited on the power side.`,
     ],
     new_location: [
       sourceLead,
-      `When a company adds a ${locationText} location, the power setup usually needs to be thought through before move-in.`,
-      `That is the kind of change where the new meter and ramp-up deserve attention early.`,
+      `When a new location is coming online, the electricity setup needs to be handled before move-in, not after.`,
     ],
     leadership_change: [
       sourceLead,
-      `Fresh eyes usually mean somebody has to explain what the power side looks like in plain English.`,
-      `That is the first thing I'd want a new CFO or facilities lead to have in front of them.`,
+      `A new leader usually means the power setup gets a fresh look, or should.`,
     ],
     growth: [
       sourceLead,
-      `Headcount, capex, or a bigger footprint usually changes the bill before it shows up anywhere obvious.`,
-      `That is why I'd want to know whether the current setup still matches how the site is growing.`,
+      `Growth like that usually changes the bill before anyone notices it in operations.`,
     ],
     restructuring: [
       sourceLead,
-      `When a company consolidates or closes a site, the power side can keep carrying costs that no longer make sense.`,
-      `That is usually the point where I'd want to know whether the footprint change has already been cleaned up on the power side.`,
+      `When a site gets consolidated or closed, the first question is whether the power costs were cleaned up too.`,
     ],
     contract_win: [
       sourceLead,
-      `New work can change the load story faster than people expect.`,
-      `That is the kind of change that can leave the old utility setup out of step pretty quickly.`,
+      `A new customer or project can change how the site runs pretty fast.`,
     ],
     funding: [
       sourceLead,
-      `A raise like that usually means someone is going to ask whether the new capital lines up with the facility and production plan.`,
-      `That is where I'd want to understand the load growth, not just the headline funding number.`,
+      `That usually means somebody needs to map the new money against the facility plan.`,
     ],
     industry_context: [
       sourceLead,
-      `I looked at how ${companyName} runs day to day.`,
-      `Even without a fresh news item, the bill usually points back to a few real operating habits.`,
-      `What matters is whether the setup still matches the way the business works day to day.`,
+      `What usually matters next is whether the way they run the business still matches the bill.`,
     ],
   }
 
   const opener = pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
   const industryLineByCluster: Record<IndustryCluster, string[]> = {
     manufacturing: [
-      'In manufacturing, the thing that usually bites is not the rate, it is the usage pattern and where the peaks come from.',
-      'If the operation runs in shifts, the bill can punish the wrong kind of peak pretty fast.',
-      'I’d want to know which processes, schedules, or equipment are driving the spikes.',
+      'In manufacturing, the spikes usually come from processes, schedules, or equipment, not the rate.',
     ],
     logistics: [
-      'Warehouses can look simple on paper, but dock activity, HVAC, and automation usually tell a different story.',
-      'A lot of the cost pressure comes from how the site is used, not just how it is priced.',
-      'I’d want to know which part of the operation is creating the peaks.',
+      'Warehouses usually move on dock activity, HVAC, and automation.',
     ],
     food_storage: [
-      'Cold storage is different because refrigeration never really turns off.',
-      'When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly in the bill.',
-      'That is the kind of operation where I’d want to know what is driving the peaks on-site.',
+      'Cold storage is all about refrigeration, defrost cycles, and door openings.',
     ],
     healthcare: [
-      'Healthcare is one of those sectors where the building never really gets to sleep.',
-      'With 24/7 operations, the part I care about is reliability first and budget predictability second.',
-      'The power side matters because the load is tied to occupancy, HVAC, and backup readiness.',
+      'Healthcare usually cares most about 24/7 reliability and steady base load.',
     ],
     banking: [
-      'A lot of banks and branch groups end up looking at one site at a time and missing the bigger picture.',
-      'Branch footprints can hide more in the usage pattern than people expect.',
-      'The first question I usually have is whether the group is tracking the real drivers or just the invoice total.',
+      'Banks usually need a portfolio view, not a surprise at one branch at a time.',
     ],
     retail: [
-      'Retail usually swings more than people expect once the seasons and traffic patterns change.',
-      'A lot of stores look steady until occupancy, weather, or operating hours start moving the bill around.',
-      'If there are multiple locations, the timing can get messy fast if nobody is looking at the whole picture.',
+      'Retail usually swings with seasons, traffic, and store hours.',
     ],
     restaurant: [
-      'Restaurants are tough because kitchen load, HVAC, and refrigeration can move the bill even when sales look flat.',
-      'The power side often gets overlooked until a location starts behaving differently in the summer.',
-      'If there are multiple units, consistency matters because each site can drift in a different direction.',
+      'Restaurants swing with kitchen load, HVAC, and refrigeration.',
     ],
     education_nonprofit: [
-      'For schools and nonprofits, the power side usually comes down to budget discipline and timing.',
-      'Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.',
-      'That is the sort of setup where usage patterns matter more than the contract headline.',
+      'Schools and nonprofits usually feel it in occupancy, events, and HVAC schedules.',
     ],
     technology: [
-      'Tech companies can add load quietly through fit-outs, cooling, and space changes.',
-      'A lot of the cost shows up after the growth is already live instead of before it starts.',
-      'That is why I’d want to know which systems are driving the peaks now.',
+      'Tech sites often add load through cooling, fit-outs, and server spaces.',
     ],
     energy_intensive: [
-      'When a site carries heavy load, the peak side of the bill can matter as much as the rate.',
-      'That is usually where process timing and equipment choices start to matter a lot more.',
-      'If the plant or site is energy intensive, I’d want to know which pieces are driving the peaks and whether anything can be smoothed on-site.',
+      'Heavy sites usually care about where the peaks come from and how to smooth them.',
     ],
     office_services: [
-      'Office businesses usually feel quiet until a lease, occupancy change, or growth step changes the load.',
-      'The power side can stay untouched for years even when the business around it has changed a lot.',
-      'That is the kind of thing I’d want to check before it gets swallowed by the rest of the budget.',
+      'Office accounts usually care more about budget predictability, comfort, and timing than raw load.',
     ],
     multi_site: [
-      'Multi-site groups can leave leverage on the table when each location gets treated like a separate decision.',
-      'The bigger issue is usually whether someone is looking at the whole footprint instead of just one meter at a time.',
-      'Portfolio timing matters because one site can hide the real usage pattern.',
+      'Multi-site groups usually need a portfolio view so one location does not hide the real pattern.',
     ],
     unknown: [
-      'Even when the industry is broad, the bill usually shows up in the same few places.',
-      'What matters most is whether the current setup still matches the business as it runs today.',
-      'That is the part I’d want to understand before anything else.',
+      'The main thing is whether the way they run the business still matches the bill.',
     ],
   }
 
   const industryLine = pickVariant(industryLineByCluster[context.industryCluster], variantSeed) || industryLineByCluster[context.industryCluster][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
   const loadSensitiveCluster = ['manufacturing', 'logistics', 'food_storage', 'healthcare', 'energy_intensive'].includes(context.industryCluster)
-  const primaryLine = loadSensitiveCluster ? industryLine : marketLine
+  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'unknown'].includes(context.industryCluster)
+  const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
+  const primaryLine = loadSensitiveCluster ? industryLine : shouldUseMarketLine ? marketLine : industryLine
   const question = context.question
 
   switch (context.openingPattern) {
@@ -1439,14 +1430,14 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       ].join(' ')
     case 'contrast':
       return [
-        `The business update is one thing, but the market context is usually where the practical questions show up.`,
+        `The business update is one thing, but the practical question is what it changes on the power side.`,
         opener,
         primaryLine,
         question,
       ].join(' ')
     case 'curiosity':
       return [
-        `I saw the update about ${signalAnchor}. What I wanted to understand is how that changes the power side.`,
+        `I saw the update about ${signalAnchor}. What I wanted to understand is the operational side of it.`,
         opener,
         primaryLine,
         question,
@@ -1587,6 +1578,10 @@ function extractPagePreview(html: string, fallbackTitle: string, url: string, so
 
   const bodyText = extractBodyText(html)
   if (sourceKind === 'linkedin' && /(sign in|join linkedin|authwall|create account)/i.test(bodyText)) {
+    return null
+  }
+
+  if (sourceKind !== 'sec' && isLikelyNonEnglishText(title, description, bodyText)) {
     return null
   }
 
@@ -1939,6 +1934,10 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
     return null
   }
 
+  if (isLikelyNonEnglishText(headline, detail, talkTrack, sourceUrl, result?.source_title || '', result?.source_domain || '')) {
+    return null
+  }
+
   return {
     signal_headline: headline,
     signal_detail: detail,
@@ -1966,8 +1965,8 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
 
   const signalDate = formatDateForDb(candidate?.publishedAt || null, candidate?.publishedAt || null) || new Date().toISOString().slice(0, 10)
   const sourceDate = formatDateForDb(candidate?.publishedAt || null, candidate?.publishedAt || null) || signalDate
-  const snippet = cleanText(candidate?.snippet || '')
-  const headline = cleanText(candidate?.title || '') || `${companyName} update`
+  const snippet = isLikelyNonEnglishText(candidate?.snippet || '') ? '' : cleanText(candidate?.snippet || '')
+  const headline = (isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')) || `${companyName} update`
   const detailParts = [
     snippet || `I saw an update about ${signalAnchor}.`,
     `That is the kind of change that can matter on the power side because it usually shifts how the site is being used.`,
@@ -2061,9 +2060,9 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
     research_results: selectedCandidates.map((item) => ({
       priority: item.priority,
       bucket: item.label,
-      title: item.title,
+      title: isLikelyNonEnglishText(item.title) ? `${cleanText(account.name) || 'Company'} update` : item.title,
       url: item.url,
-      snippet: item.snippet,
+      snippet: isLikelyNonEnglishText(item.snippet) ? '' : item.snippet,
       published_at: item.publishedAt,
       source: item.source,
       source_kind: item.sourceKind,
@@ -2088,13 +2087,15 @@ Decision rules:
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
 - Talk Track should sound like a real person who actually researched this company, not a script.
-- Talk Track must be 3-5 short sentences maximum. Use conversational language.
+- Talk Track must be 2-4 short sentences maximum. Use conversational language.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
+- Pick ONE dominant angle per talk track. Do not stack signal + market + industry in the same response.
 - Load is one angle, not the default angle. Use it only when the account is operationally heavy or the research result clearly points to load, production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
-- Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead.
+- Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
 - Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", "I saw your announcement about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
+- Write in English only. If any source text is not English, ignore it and do not echo it back.
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
@@ -2106,6 +2107,7 @@ Decision rules:
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
+- If market context is secondary, keep it to one short clause or leave it out.
 
 Talk Track angle selection (choose ONE based on the actual signal):
 
@@ -2172,12 +2174,14 @@ Decision rules:
 - Signal Detail should describe: company overview (what they do, where they operate, how they use power), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
 - Talk Track should sound like you actually researched this specific company.
-- Talk Track should be 3-5 short sentences maximum. Use conversational language.
+- Talk Track should be 2-4 short sentences maximum. Use conversational language.
 - Use plain language. Avoid corporate fluff.
+- Pick ONE dominant angle per talk track. Do not stack market + industry + load all at once.
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
-- Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead.
+- Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
 - Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
+- Write in English only. If any source text is not English, ignore it and do not echo it back.
 - If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
 - Use short sentences and contractions. Sound plainspoken, not polished.
 - Prefer "bill" or "power side" over "utility side".
@@ -2192,6 +2196,7 @@ Decision rules:
 - Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
+- If market context is secondary, keep it to one short clause or leave it out.
 
 Talk Track angle selection for fallback mode (choose based on what you found):
 
