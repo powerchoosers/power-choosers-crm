@@ -72,7 +72,7 @@ npm run typecheck
 
 Turbo dev is fine here and often preferred. Only use `npm run dev` if you are specifically checking webpack-only behavior.
 
-TypeScript must stay clean before shipping changes.
+TypeScript must stay clean before shipping changes. Run `npm run typecheck` after code edits. Only run `npm run build` when Lewis explicitly asks for deploy-level verification or when you are chasing a build-only problem that typecheck cannot catch.
 
 ## Image Renders
 
