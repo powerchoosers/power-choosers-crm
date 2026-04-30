@@ -26,6 +26,13 @@ import { useUIStore } from '@/store/uiStore';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { getFreshSupabaseAccessToken } from '@/lib/auth/supabase-session';
+import {
+  formatPhoneBucketLabel,
+  inferPhoneBucketFromText,
+  normalizePhoneKey,
+  type ContactAdditionalPhone,
+  type ContactPhoneBucket
+} from '@/lib/contact-signals';
 import { formatHeadcountLabel, headcountMetadata, parseHeadcount } from '@/lib/headcount';
 
 interface OrgIntelligenceProps {
@@ -167,6 +174,39 @@ function assignRevealedPhonesToContactFields(phones: RevealedPhone[], existingPh
   }
 
   return { patch, extras };
+}
+
+function buildAdditionalPhonesForCache(phones: RevealedPhone[]): ContactAdditionalPhone[] {
+  const out: ContactAdditionalPhone[] = [];
+  const seen = new Set<string>();
+  const bucketCounts: Record<ContactPhoneBucket, number> = {
+    mobile: 0,
+    workDirectPhone: 0,
+    otherPhone: 0,
+    companyPhone: 0
+  };
+
+  phones.forEach((phone) => {
+    const rawNumber = phoneDisplayNumber(phone);
+    const formatted = formatPhoneNumber(rawNumber);
+    const number = formatted || rawNumber.trim();
+    const digits = normalizePhoneKey(number);
+    if (!digits || seen.has(digits)) return;
+    seen.add(digits);
+
+    const bucket = inferPhoneBucketFromText(phone.type, number);
+    bucketCounts[bucket] += 1;
+    out.push({
+      number,
+      type: phone.type,
+      label: formatPhoneBucketLabel(bucket, bucketCounts[bucket]),
+      bucket,
+      signalKind: 'phone',
+      signalDerived: true
+    });
+  });
+
+  return out;
 }
 
 async function getApolloBearerToken(forceRefresh = false): Promise<string> {
@@ -1166,12 +1206,14 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
   const syncContactCachesImmediately = (
     crmId: string,
     phonePatch: Record<string, unknown>,
-    metadataPatch?: Record<string, unknown>
+    metadataPatch?: Record<string, unknown>,
+    additionalPhones?: ContactAdditionalPhone[]
   ) => {
     const mergedPatch = {
       ...phonePatch,
       ...(phonePatch.workPhone !== undefined ? { workDirectPhone: phonePatch.workPhone } : {}),
-      ...(metadataPatch ? { metadata: metadataPatch } : {})
+      ...(metadataPatch ? { metadata: metadataPatch } : {}),
+      ...(additionalPhones?.length ? { additionalPhones } : {})
     } as Record<string, unknown>;
 
     queryClient.setQueriesData(
@@ -1427,6 +1469,10 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
         }
       };
 
+      let immediatePhonePatch: Record<string, unknown> = assignedImmediatePhones.patch;
+      let immediateMetadataPatch: Record<string, unknown> = contactBaseData.metadata as Record<string, unknown>;
+      let immediateAdditionalPhones = buildAdditionalPhonesForCache(assignedImmediatePhones.extras);
+
       if (crmId) {
         const { data: currentContact } = await supabase
           .from('contacts')
@@ -1447,6 +1493,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
           // Preserve communicationSignals if they exist (from Seamless AI import)
           ...(existingMetadata.communicationSignals ? { communicationSignals: existingMetadata.communicationSignals } : {})
         };
+
+        immediateMetadataPatch = mergedMetadata;
 
         const updateData = hasExistingName
           ? { ...contactBaseData, metadata: mergedMetadata }
@@ -1489,6 +1537,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               apollo_revealed_phones: immediatePhones,
               apollo_overflow_phones: reassignedPhones.extras
             };
+            immediatePhonePatch = reassignedPhones.patch;
+            immediateMetadataPatch = contactData.metadata as Record<string, unknown>;
+            immediateAdditionalPhones = buildAdditionalPhonesForCache(reassignedPhones.extras);
           }
         }
 
@@ -1518,6 +1569,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               apollo_revealed_phones: immediatePhones,
               apollo_overflow_phones: reassignedPhones.extras
             };
+            immediatePhonePatch = reassignedPhones.patch;
+            immediateMetadataPatch = contactData.metadata as Record<string, unknown>;
+            immediateAdditionalPhones = buildAdditionalPhonesForCache(reassignedPhones.extras);
           }
         }
 
@@ -1548,6 +1602,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               apollo_revealed_phones: immediatePhones,
               apollo_overflow_phones: reassignedPhones.extras
             };
+            immediatePhonePatch = reassignedPhones.patch;
+            immediateMetadataPatch = contactData.metadata as Record<string, unknown>;
+            immediateAdditionalPhones = buildAdditionalPhonesForCache(reassignedPhones.extras);
           }
         }
 
@@ -1578,6 +1635,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
               apollo_revealed_phones: immediatePhones,
               apollo_overflow_phones: reassignedPhones.extras
             };
+            immediatePhonePatch = reassignedPhones.patch;
+            immediateMetadataPatch = contactData.metadata as Record<string, unknown>;
+            immediateAdditionalPhones = buildAdditionalPhonesForCache(reassignedPhones.extras);
           }
         }
 
@@ -1608,8 +1668,9 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
       if (crmId) {
         syncContactCachesImmediately(
           crmId,
-          assignedImmediatePhones.patch,
-          contactBaseData.metadata as Record<string, unknown>
+          immediatePhonePatch,
+          immediateMetadataPatch,
+          immediateAdditionalPhones.length > 0 ? immediateAdditionalPhones : undefined
         );
       }
 
@@ -1756,7 +1817,8 @@ export default function OrgIntelligence({ domain: initialDomain, companyName, we
                 syncContactCachesImmediately(
                   crmId,
                   assignedIncomingPhones.patch,
-                  metadataPatch
+                  metadataPatch,
+                  buildAdditionalPhonesForCache(assignedIncomingPhones.extras)
                 );
                 setData(prev => {
                   const existing = prev.find(p => p.id === person.id)?.phones || [];
