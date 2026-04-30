@@ -823,12 +823,12 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
     default:
       return {
         label: 'Industry context',
-        angle: 'The strongest ERCOT issue for this business type.',
+        angle: 'How this kind of business actually uses electricity.',
         question: 'When companies like this review electricity, what tends to get missed first?',
         openers: [
-          `I was looking at ${companyName} from an industry angle.`,
-          `Even without a fresh news item, the electricity side still tends to show up in the same few places for companies like this.`,
-          `What usually matters most is whether the setup still matches how the business actually runs.`,
+          `I took a look at how ${companyName} actually runs its operation.`,
+          `Even without a fresh news item, the electricity side usually shows up in the same few places for companies like this.`,
+          `What usually matters most is whether the setup still matches the way the business works day to day.`,
         ],
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
       }
@@ -1106,9 +1106,9 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       `That is where I would want to understand the load growth, not just the headline funding number.`,
     ],
     industry_context: [
-      `I was looking at ${companyName} from an industry angle.`,
+      `I took a look at how ${companyName} actually runs its operation.`,
       `Even without a fresh news item, the electricity side usually shows up in the same few places for companies like this.`,
-      `What matters is whether the setup still matches how the business actually runs.`,
+      `What matters is whether the setup still matches the way the business works day to day.`,
     ],
   }
 
@@ -1719,7 +1719,7 @@ Decision rules:
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
 - Source Date should be the publication date of the report, article, post, or filing in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
-- Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the industry angle, the opening style, and the question to ask.
+- Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, the opening style, and the question to ask.
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
@@ -1787,7 +1787,7 @@ FALLBACK MODE: No recent news signals were found. Generate an intelligence brief
 Decision rules:
 - ALWAYS set "usable_signal" to true in fallback mode.
 - Create a headline that positions the company within their industry context.
-- Signal Detail should describe: company overview (services, team size, location), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
+- Signal Detail should describe: company overview (what they do, where they operate, how they use power), any hiring/growth indicators from their website, and relevant industry trends affecting their sector.
 - Talk Track must be UNIQUE based on what you learned about the company. Do NOT use templates.
 - Talk Track should sound like you actually researched this specific company.
 - Talk Track should be 3-5 short sentences maximum. Use conversational language.
@@ -1797,7 +1797,7 @@ Decision rules:
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
 - Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article.
-- Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on the industry angle and the company's operating footprint.
+- Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on the company's operating footprint and how the business actually uses power.
 - Rotate the first sentence shape. Do not always open with the same setup.
 - Make it sound like a Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
 - Do not imply the electricity agreement creates demand spikes. Spikes come from usage, scheduling, and equipment; the contract only affects the cost exposure.
