@@ -10,7 +10,6 @@ import {
   getSortedRowModel,
   ColumnDef,
   SortingState,
-  ColumnFiltersState,
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
@@ -70,6 +69,7 @@ import { ClickToCallButton } from '@/components/calls/ClickToCallButton'
 import { cn } from '@/lib/utils'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
+import { usePersistentColumnFilters } from '@/hooks/usePersistentColumnFilters'
 import { toast } from 'sonner'
 import { isActiveLoadAccount, isContractExpired, isCustomerStatus } from '@/lib/status-filters'
 
@@ -81,11 +81,12 @@ export default function AccountsPage() {
   const searchParams = useSearchParams()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
   const { getOwner, isLoading: ownerDirectoryLoading } = useOwnerDirectory()
-  const scrollKey = (pathname ?? '/network/accounts') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
 
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [columnFilters, setColumnFilters, columnFilterSignature] = usePersistentColumnFilters(pathname ?? '/network/accounts')
+  const baseScrollKey = (pathname ?? '/network/accounts') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+  const scrollKey = columnFilterSignature ? `${baseScrollKey}#filters=${columnFilterSignature}` : baseScrollKey
 
   // Debounce search query to avoid excessive API calls
   useEffect(() => {
