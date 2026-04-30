@@ -944,13 +944,13 @@ export function NodeIngestion() {
                                 className="w-full text-left bg-zinc-900 border border-white/5 hover:border-[#002FA7]/50 rounded-lg p-3 transition-colors group"
                               >
                                 <div className="flex items-start gap-3">
-                                  <div className="w-10 h-10 rounded overflow-hidden bg-black/60 shrink-0 border border-white/10 flex items-center justify-center">
-                                    {org.logoUrl ? (
-                                      <img src={org.logoUrl} alt={org.name} className="w-full h-full object-contain" />
-                                    ) : (
-                                      <Building2 className="w-5 h-5 text-zinc-700" />
-                                    )}
-                                  </div>
+                                  <CompanyIcon
+                                    logoUrl={org.logoUrl}
+                                    domain={org.domain}
+                                    name={org.name}
+                                    size={40}
+                                    roundedClassName="rounded-lg"
+                                  />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between">
                                       <h4 className="text-sm font-semibold truncate group-hover:text-blue-400 transition-colors">
