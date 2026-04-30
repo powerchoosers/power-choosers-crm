@@ -27,6 +27,8 @@ export default async function handler(req, res) {
   try {
     const { personId } = req.query || {};
     
+    console.log('[phone-retrieve] Polling for personId:', personId);
+    
     if (!personId) {
       res.writeHead(400, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Missing personId parameter' }));
@@ -36,7 +38,10 @@ export default async function handler(req, res) {
     // Check if we have data in the store (asynchronous Firestore check)
     const phoneData = await getPhoneData(personId);
     
+    console.log('[phone-retrieve] Cache lookup result:', { personId, found: !!phoneData, phonesCount: phoneData?.phones?.length || 0 });
+    
     if (phoneData) {
+      console.log('[phone-retrieve] Returning phones from cache:', { personId, phonesCount: phoneData.phones.length });
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         ready: true, 
@@ -52,6 +57,14 @@ export default async function handler(req, res) {
           .eq('metadata->>apollo_person_id', personId)
           .maybeSingle();
         
+        console.log('[phone-retrieve] Contact record lookup:', { 
+          personId, 
+          foundContact: !!contact,
+          contactId: contact?.id,
+          hasPhones: !!(contact?.mobile || contact?.workPhone || contact?.otherPhone),
+          updatedAt: contact?.updatedAt
+        });
+        
         if (contact) {
           const updatedAt = new Date(contact.updatedAt);
           const now = new Date();
@@ -61,6 +74,14 @@ export default async function handler(req, res) {
           const hasPhones = !!(contact.mobile || contact.workPhone || contact.otherPhone);
           const recentlyUpdated = ageSeconds < 120;
           
+          console.log('[phone-retrieve] Contact freshness check:', {
+            personId,
+            contactId: contact.id,
+            hasPhones,
+            recentlyUpdated,
+            ageSeconds: Math.round(ageSeconds)
+          });
+          
           if (hasPhones && recentlyUpdated) {
             // Extract phones from contact record
             const phones = [];
@@ -68,6 +89,7 @@ export default async function handler(req, res) {
             if (contact.workPhone) phones.push({ sanitized_number: contact.workPhone, type: 'work_direct' });
             if (contact.otherPhone) phones.push({ sanitized_number: contact.otherPhone, type: 'other' });
             
+            console.log('[phone-retrieve] Returning phones from contact record:', { personId, phonesCount: phones.length });
             res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ 
               ready: true, 
@@ -82,6 +104,7 @@ export default async function handler(req, res) {
       }
       
       // Not found yet (or expired)
+      console.log('[phone-retrieve] Phones not ready yet:', personId);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ 
         ready: false
@@ -89,6 +112,7 @@ export default async function handler(req, res) {
     }
     
   } catch (error) {
+    console.error('[phone-retrieve] Error:', error);
     res.writeHead(500, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ 
       error: 'Internal server error', 
