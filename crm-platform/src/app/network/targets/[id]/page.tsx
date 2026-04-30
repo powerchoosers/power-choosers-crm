@@ -11,7 +11,6 @@ import {
   getFilteredRowModel,
   ColumnDef,
   SortingState,
-  ColumnFiltersState,
   PaginationState,
   RowSelectionState,
 } from '@tanstack/react-table'
@@ -40,6 +39,7 @@ import { useTarget } from '@/hooks/useTargets'
 import { useOwnerDirectory } from '@/hooks/useOwnerDirectory'
 import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
+import { usePersistentColumnFilters } from '@/hooks/usePersistentColumnFilters'
 import { useDebounce } from '@/hooks/useDebounce'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -93,7 +93,7 @@ export default function TargetDetailPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [columnFilters, setColumnFilters, columnFilterSignature] = usePersistentColumnFilters(pathname ?? `/network/targets/${id}`)
   const [globalFilter, setGlobalFilter] = useState('')
 
   // Use state-preserving table state (must be before useTableScrollRestore so pageIndex is defined)
@@ -107,7 +107,8 @@ export default function TargetDetailPage() {
     pageSize: PAGE_SIZE
   })
 
-  const scrollKey = (pathname ?? `/network/targets/${id}`) + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+  const baseScrollKey = (pathname ?? `/network/targets/${id}`) + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+  const scrollKey = columnFilterSignature ? `${baseScrollKey}#filters=${columnFilterSignature}` : baseScrollKey
 
   // Sync the local globalFilter state with the URL search query if needed
   useEffect(() => {
