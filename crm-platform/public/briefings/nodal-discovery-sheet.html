@@ -103,21 +103,18 @@
       gap: 0.16in;
     }
 
-    .monogram {
+    .brand-mark {
       width: 0.54in;
       height: 0.54in;
-      border-radius: 16px;
-      display: grid;
-      place-items: center;
-      border: 1px solid rgba(153, 194, 255, 0.35);
-      background:
-        linear-gradient(135deg, rgba(0, 47, 167, 0.2), rgba(255, 255, 255, 0.04));
-      color: #e5edff;
-      font-family: 'JetBrains Mono', monospace;
-      font-weight: 700;
-      letter-spacing: 0.15em;
-      text-indent: 0.15em;
-      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      display: block;
+      border-radius: 0;
+    }
+
+    .brand-mark img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
     }
 
     .brand-copy {
@@ -473,6 +470,12 @@
       margin-top: 0.05in;
     }
 
+    .objection-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.08in;
+    }
+
     .close-step {
       padding: 0.08in 0.11in;
       border-radius: 14px;
@@ -558,6 +561,10 @@
         width: auto;
       }
 
+      .page-inner {
+        min-height: calc(11in - 0.6in - 0.08in);
+      }
+
       .page {
         padding: 0;
       }
@@ -582,7 +589,7 @@
       <div class="page-inner">
         <header class="header-band">
           <div class="brand">
-            <div class="monogram">NP</div>
+            <img class="brand-mark" src="../images/nodalpoint-webicon.png" alt="Nodal Point logo" />
             <div class="brand-copy">
               <div class="eyebrow">Nodal Point // Texas Commercial Energy</div>
               <h1 class="title">Discovery Questions</h1>
@@ -699,7 +706,7 @@
       <div class="page-inner">
         <header class="header-band">
           <div class="brand">
-            <div class="monogram">NP</div>
+            <img class="brand-mark" src="../images/nodalpoint-webicon.png" alt="Nodal Point logo" />
             <div class="brand-copy">
               <div class="eyebrow">Nodal Point // Transition And Close</div>
               <h1 class="title">Move from discovery to a real next step</h1>
@@ -746,8 +753,37 @@
                 "I just want to see whether the setup deserves a second look."
               </div>
             </div>
+
+            <div class="tip-box">
+              <div class="tip-label">If they push back</div>
+              <div class="tip-text">
+                <strong>Already have a broker:</strong> "Totally fine. I just want to see whether the setup still deserves a look."<br />
+                <strong>Send info:</strong> "Happy to, but I’d rather know what matters before I send the wrong thing."<br />
+                <strong>Too early:</strong> "Fair. The earlier look is usually where you have more options."
+              </div>
+            </div>
           </aside>
         </div>
+
+        <section class="section">
+          <div class="section-inner">
+            <div class="section-title">
+              <h2>Objection pivots</h2>
+              <div class="count">Short, clean, human</div>
+            </div>
+            <div class="objection-grid">
+              <div class="close-step">
+                <strong>Already have a broker.</strong> "Totally fine. I’m not trying to replace anyone. I just want to see if the setup deserves a second look."
+              </div>
+              <div class="close-step">
+                <strong>Send me info.</strong> "Happy to, but I’d rather know what matters before I send the wrong thing."
+              </div>
+              <div class="close-step">
+                <strong>Too early.</strong> "Fair. Usually the earlier look is where you still have options."
+              </div>
+            </div>
+          </div>
+        </section>
 
         <div class="footer">
           <div><strong>Nodal Point</strong> close sheet</div>

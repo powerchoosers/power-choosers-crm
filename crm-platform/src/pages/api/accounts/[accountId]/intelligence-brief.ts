@@ -570,7 +570,7 @@ function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null
     return 'I came across your website.'
   }
 
-  if (signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase()) {
+  if (isUsefulSignalAnchor(signalAnchor) && signalAnchor.toLowerCase() !== companyName.toLowerCase()) {
     const connector =
       candidate.sourceKind === 'news'
         ? 'report'
@@ -732,6 +732,8 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /the part i would want to understand/i,
   /before the spending picks up again/i,
   /cost review/i,
+  /business update is one thing/i,
+  /practical question is what it changes on the power side/i,
   /responsible for electricity/i,
   /support ticket/i,
   /i was looking at/i,
@@ -886,6 +888,15 @@ function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) 
   }
 
   return shortenText(title, 110)
+}
+
+function isUsefulSignalAnchor(value: string) {
+  const text = cleanText(value)
+  if (!text) return false
+  if (/^(deals|news|updates?|press|latest)\s*[:\-]/i.test(text)) return false
+  if (/\b(the business press|newswire|google news|linkedin|sec|announcement|report)\b/i.test(text)) return false
+  if (/[|]/.test(text)) return false
+  return text.split(/\s+/).length <= 12
 }
 
 function inferIndustryCluster(account: AccountRow): IndustryCluster {
@@ -1401,7 +1412,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     funding: [sourceLead],
     industry_context: [
       sourceLead,
-      `What usually matters next is whether the way they run the business still matches the bill.`,
+      `The real question is whether the setup still matches how they run the business today.`,
     ],
   }
 
@@ -1500,7 +1511,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       ].join(' ')
     case 'contrast':
       return [
-        `The business update is one thing, but the practical question is what it changes on the power side.`,
+        `I saw the update about ${signalAnchor}. The practical question is what it changes on the power side.`,
         opener,
         primaryLine,
         question,
@@ -2038,7 +2049,7 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   const snippet = isLikelyNonEnglishText(candidate?.snippet || '') ? '' : cleanText(candidate?.snippet || '')
   const headline = (isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')) || `${companyName} update`
   const detailParts = [
-    snippet || `I saw an update about ${companyName}${signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase() ? `, ${lowercaseFirst(signalAnchor)}` : ''}.`,
+    snippet || `I saw an update about ${companyName}.`,
     `That is the kind of change that can matter on the power side because it usually shifts how the site is being used.`,
     context.question,
   ]
@@ -2440,7 +2451,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const lastRefreshAt = account.intelligence_brief_last_refreshed_at
-    if (lastRefreshAt) {
+    if (lastRefreshAt && !privileged) {
       const age = Date.now() - new Date(lastRefreshAt).getTime()
       if (Number.isFinite(age) && age < COOLDOWN_MS) {
         const retryAfterMinutes = Math.max(1, Math.ceil((COOLDOWN_MS - age) / (60 * 1000)))
