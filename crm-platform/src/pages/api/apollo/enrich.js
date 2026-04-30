@@ -151,6 +151,15 @@ export default async function handler(req, res) {
           const qs = `webhook_url=${encodeURIComponent(webhookUrl)}`;
           url = `${url}?${qs}`;
         }
+        
+        console.log('[apollo/enrich] Calling Apollo API:', {
+          url,
+          matchBody,
+          revealEmails,
+          revealPhones,
+          hasWebhook: !!webhookUrl
+        });
+        
         const resp = await fetchWithRetry(url, {
           method: 'POST',
           headers: {
@@ -168,8 +177,24 @@ export default async function handler(req, res) {
 
         const data = await resp.json();
         
+        // Debug logging to diagnose phone reveal issues
+        console.log('[apollo/enrich] Apollo API response for person:', {
+          hasPersonData: !!data.person,
+          personId: data.person?.id,
+          phoneNumbers: data.person?.phone_numbers,
+          phoneNumbersCount: data.person?.phone_numbers?.length || 0,
+          email: data.person?.email
+        });
+        
         if (data.person) {
           const mappedContact = mapApolloContactToLushaFormat(data.person);
+          
+          console.log('[apollo/enrich] Mapped contact:', {
+            name: mappedContact.fullName,
+            phones: mappedContact.phones,
+            phonesCount: mappedContact.phones?.length || 0
+          });
+          
           enrichedContacts.push(mappedContact);
           
           // 💰 CREDIT OPTIMIZATION: Auto-save to Apollo contacts
