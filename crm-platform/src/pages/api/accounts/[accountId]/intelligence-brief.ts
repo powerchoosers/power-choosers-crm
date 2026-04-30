@@ -2118,7 +2118,7 @@ function serializeAccount(account: AccountRow) {
   }
 }
 
-function validateBriefResult(result: BriefResult, candidate: ResearchHit | null) {
+function validateBriefResult(result: BriefResult, candidate: ResearchHit | null, account: AccountRow) {
   const usable = Boolean(result?.usable_signal)
   const headline = cleanText(result?.signal_headline)
   const detail = cleanText(result?.signal_detail)
@@ -2540,7 +2540,7 @@ ${JSON.stringify(researchPayload, null, 2)}`
   }
 
   const bestCandidate = findCandidateForResult(parsed, selectedCandidates)
-  const validated = validateBriefResult(parsed, bestCandidate)
+  const validated = validateBriefResult(parsed, bestCandidate, account)
   return validated
 }
 
