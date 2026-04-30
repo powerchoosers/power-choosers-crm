@@ -275,13 +275,34 @@ function CompanyIconInner({
           {!isLoaded && (
             <motion.div
               key="skeleton"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.15 }}
-              className="absolute inset-0 bg-white/5 flex items-center justify-center"
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ 
+                opacity: 1, 
+                scale: 1,
+                transition: { duration: 0.2, ease: 'easeOut' }
+              }}
+              exit={{ 
+                opacity: 0, 
+                scale: 1.02,
+                filter: 'blur(4px)',
+                transition: { duration: 0.25, ease: [0.23, 1, 0.32, 1] }
+              }}
+              className="absolute inset-0 bg-gradient-to-br from-white/8 to-white/3 flex items-center justify-center"
             >
-              <Building2 size={size * 0.4} className="text-zinc-700" />
+              <motion.div
+                initial={{ opacity: 0.4 }}
+                animate={{ 
+                  opacity: [0.4, 0.7, 0.4],
+                  scale: [1, 1.05, 1]
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut'
+                }}
+              >
+                <Building2 size={size * 0.4} className="text-zinc-600" />
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -293,10 +314,19 @@ function CompanyIconInner({
               {...imgCommon}
               loading="lazy"
               decoding="async"
-              initial={{ opacity: 0, scale: 1.04, filter: 'blur(6px)' }}
-              animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, scale: 0.98, filter: 'blur(4px)' }}
-              transition={{ duration: 0.28, ease: [0.23, 1, 0.32, 1] }}
+              initial={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
+              animate={{ 
+                opacity: 1, 
+                scale: 1, 
+                filter: 'blur(0px)',
+                transition: { duration: 0.35, ease: [0.23, 1, 0.32, 1] }
+              }}
+              exit={{ 
+                opacity: 0, 
+                scale: 0.98, 
+                filter: 'blur(4px)',
+                transition: { duration: 0.2 }
+              }}
               className={cn('w-full h-full object-cover', roundedClassName)}
             />
           )}

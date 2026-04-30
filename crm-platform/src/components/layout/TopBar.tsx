@@ -53,19 +53,26 @@ function CallBarIcon({ logoUrl, domain, name, contactName, photoUrl, isAccountOn
   const clearbitUrl = domain ? `https://logo.clearbit.com/${domain.replace(/^https?:\/\//i, '').split('/')[0].toLowerCase()}` : null
   const [src, setSrc] = useState<string | null>(logoUrl || clearbitUrl)
   const [failed, setFailed] = useState(false)
+  const [isLoaded, setIsLoaded] = useState(false)
 
   // Reset whenever the call changes (key prop handles this, but also guard here)
   useEffect(() => {
     setSrc(logoUrl || clearbitUrl)
     setFailed(false)
+    setIsLoaded(false)
   }, [logoUrl, domain]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleError = () => {
     if (src === logoUrl && clearbitUrl && src !== clearbitUrl) {
       setSrc(clearbitUrl)
+      setIsLoaded(false)
     } else {
       setFailed(true)
     }
+  }
+
+  const handleLoad = () => {
+    setIsLoaded(true)
   }
 
   const shouldShowContactAvatar = !isAccountOnly && !!(contactName || photoUrl)
@@ -84,19 +91,60 @@ function CallBarIcon({ logoUrl, domain, name, contactName, photoUrl, isAccountOn
 
   if (failed || !src) {
     return (
-      <div className="w-8 h-8 rounded-[14px] nodal-glass bg-zinc-900/80 border border-white/20 flex items-center justify-center shrink-0">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        transition={{ duration: 0.2 }}
+        className="w-8 h-8 rounded-[14px] nodal-glass bg-zinc-900/80 border border-white/20 flex items-center justify-center shrink-0"
+      >
         <Building2 size={16} className="text-zinc-400" />
-      </div>
+      </motion.div>
     )
   }
 
   return (
-    <img
-      src={src}
-      alt={name}
-      onError={handleError}
-      className="w-8 h-8 rounded-[14px] object-cover border border-white/20 shrink-0 bg-zinc-900/80"
-    />
+    <div className="relative w-8 h-8 rounded-[14px] overflow-hidden shrink-0">
+      <AnimatePresence mode="wait">
+        {!isLoaded && (
+          <motion.div
+            key="skeleton"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, filter: 'blur(4px)' }}
+            transition={{ duration: 0.2 }}
+            className="absolute inset-0 nodal-glass bg-gradient-to-br from-white/8 to-white/3 border border-white/20 flex items-center justify-center"
+          >
+            <motion.div
+              animate={{ 
+                opacity: [0.4, 0.7, 0.4],
+                scale: [1, 1.1, 1]
+              }}
+              transition={{ 
+                duration: 2,
+                repeat: Infinity,
+                ease: 'easeInOut'
+              }}
+            >
+              <Building2 size={14} className="text-zinc-600" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <motion.img
+        src={src}
+        alt={name}
+        onError={handleError}
+        onLoad={handleLoad}
+        initial={{ opacity: 0, scale: 1.05, filter: 'blur(8px)' }}
+        animate={{ 
+          opacity: isLoaded ? 1 : 0, 
+          scale: isLoaded ? 1 : 1.05, 
+          filter: isLoaded ? 'blur(0px)' : 'blur(8px)'
+        }}
+        transition={{ duration: 0.35, ease: [0.23, 1, 0.32, 1] }}
+        className="w-8 h-8 rounded-[14px] object-cover border border-white/20 bg-zinc-900/80"
+      />
+    </div>
   )
 }
 
