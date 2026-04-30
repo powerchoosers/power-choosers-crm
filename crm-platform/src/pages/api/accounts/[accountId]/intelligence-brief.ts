@@ -37,6 +37,11 @@ type ResearchHit = {
   sourceKind: ResearchSourceKind
 }
 
+type RankedResearchHit = ResearchHit & {
+  __index: number
+  __sourceTrust: number
+}
+
 type BriefResult = {
   usable_signal: boolean
   signal_headline?: string
@@ -228,15 +233,78 @@ function parseRssItems(
   return items
 }
 
-function dedupeAndSort(items: ResearchHit[]) {
+const PRESS_RELEASE_HOSTS = new Set([
+  'prnewswire.com',
+  'businesswire.com',
+  'globenewswire.com',
+  'accessnewswire.com',
+  'newsfilecorp.com',
+  'einpresswire.com',
+])
+
+function isPressReleaseStyleUrl(value: string) {
+  const url = cleanText(value)
+  if (!url) return false
+
+  const host = getHostname(url)
+  const lower = url.toLowerCase()
+  const pressReleasePath = /(newsroom|press[-_]?release|press[-_]?room|press|release|announcement|announcements|updates?|blog|stories?|media|ir\/|investors?\/)/i
+
+  if (host && PRESS_RELEASE_HOSTS.has(host)) return true
+  return pressReleasePath.test(lower)
+}
+
+function isOfficialCompanyAnnouncement(account: AccountRow, item: ResearchHit) {
+  const url = cleanText(item.url)
+  if (!url) return false
+
+  const lower = url.toLowerCase()
+  const host = getHostname(url)
+  if (!host) return false
+  if (item.sourceKind === 'sec' || host === 'sec.gov' || host.endsWith('.sec.gov')) return true
+
+  if (item.sourceKind === 'web' && isCompanyWebsiteHit(account, item)) {
+    return /(newsroom|press[-_]?release|press[-_]?room|press|release|announcement|announcements|updates?|blog|stories?|media|ir\/|investors?\/|\/news\/)/i.test(lower)
+  }
+
+  return PRESS_RELEASE_HOSTS.has(host) || isPressReleaseStyleUrl(url)
+}
+
+function getSourceTrustRank(account: AccountRow, item: ResearchHit) {
+  const url = cleanText(item.url)
+  const host = getHostname(url)
+
+  if (!host) return 0
+  if (item.sourceKind === 'sec' || host === 'sec.gov' || host.endsWith('.sec.gov')) return 60
+
+  if (isOfficialCompanyAnnouncement(account, item)) {
+    if (item.sourceKind === 'web' && isCompanyWebsiteHit(account, item)) {
+      return 50
+    }
+    return 45
+  }
+
+  if (item.sourceKind === 'linkedin' || host.includes('linkedin.com')) return 35
+  if (item.sourceKind === 'news') return 30
+  return 15
+}
+
+function dedupeAndSort(items: ResearchHit[], account?: AccountRow | null) {
   const seen = new Set<string>()
   return items
     .slice()
+    .map((item, index) => ({
+      ...item,
+      __index: index,
+      __sourceTrust: account ? getSourceTrustRank(account, item) : 0,
+    } as RankedResearchHit))
     .sort((a, b) => {
       if (a.priority !== b.priority) return a.priority - b.priority
+      if (a.__sourceTrust !== b.__sourceTrust) return b.__sourceTrust - a.__sourceTrust
       const left = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
       const right = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
-      return right - left
+      if (left !== right) return right - left
+      return a.__index - b.__index
     })
     .filter((item) => {
       const key = `${item.url || item.title}`.toLowerCase()
@@ -244,6 +312,7 @@ function dedupeAndSort(items: ResearchHit[]) {
       seen.add(key)
       return true
     })
+    .map(({ __index, __sourceTrust, ...item }) => item)
 }
 
 function toTitleCase(value: string) {
@@ -428,6 +497,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   if (!candidate) return `I came across an update about ${companyName}.`
 
   if (candidate.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate)) {
+    if (isOfficialCompanyAnnouncement(account, candidate)) {
+      return `I saw your announcement about ${companyName}.`
+    }
     return 'I came across your website.'
   }
 
@@ -437,6 +509,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
     case 'sec':
       return `I saw a filing about ${companyName}.`
     case 'web':
+      if (isOfficialCompanyAnnouncement(account, candidate)) {
+        return `I saw your announcement about ${companyName}.`
+      }
       return `I saw an article about ${companyName}.`
     case 'news':
     default:
@@ -1314,7 +1389,12 @@ function extractPagePreview(html: string, fallbackTitle: string, url: string, so
   }
 }
 
-async function fetchBingRssHits(buckets: Array<{ priority: number; label: string; query: string }>, sourceKind: ResearchSourceKind, maxItemsPerBucket = 4) {
+async function fetchBingRssHits(
+  buckets: Array<{ priority: number; label: string; query: string }>,
+  sourceKind: ResearchSourceKind,
+  maxItemsPerBucket = 4,
+  account?: AccountRow,
+) {
   const headers = { 'User-Agent': WEB_USER_AGENT }
 
   const results = await Promise.all(buckets.map(async (bucket) => {
@@ -1329,10 +1409,15 @@ async function fetchBingRssHits(buckets: Array<{ priority: number; label: string
     }
   }))
 
-  return dedupeAndSort(results.flat())
+  return dedupeAndSort(results.flat(), account)
 }
 
-async function fetchBingNewsHits(buckets: Array<{ priority: number; label: string; query: string }>, sourceKind: ResearchSourceKind, maxItemsPerBucket = 4) {
+async function fetchBingNewsHits(
+  buckets: Array<{ priority: number; label: string; query: string }>,
+  sourceKind: ResearchSourceKind,
+  maxItemsPerBucket = 4,
+  account?: AccountRow,
+) {
   const headers = { 'User-Agent': WEB_USER_AGENT }
 
   const results = await Promise.all(buckets.map(async (bucket) => {
@@ -1347,7 +1432,7 @@ async function fetchBingNewsHits(buckets: Array<{ priority: number; label: strin
     }
   }))
 
-  return dedupeAndSort(results.flat())
+  return dedupeAndSort(results.flat(), account)
 }
 
 async function fetchPageHit(url: string, bucket: { priority: number; label: string; query: string }, sourceKind: ResearchSourceKind, titleFallback: string) {
@@ -1529,11 +1614,11 @@ async function fetchSecFilingHits(account: AccountRow) {
     }
   }))
 
-  return dedupeAndSort(candidates.filter(Boolean) as ResearchHit[])
+  return dedupeAndSort(candidates.filter(Boolean) as ResearchHit[], account)
 }
 
 async function fetchSecSearchHits(account: AccountRow) {
-  return fetchBingRssHits(buildSecBuckets(account).slice(0, 4), 'sec', 3)
+  return fetchBingRssHits(buildSecBuckets(account).slice(0, 4), 'sec', 3, account)
 }
 
 async function fetchLinkedInHits(account: AccountRow) {
@@ -1556,13 +1641,13 @@ async function fetchLinkedInHits(account: AccountRow) {
     }
   }
 
-  const searchHits = await fetchBingRssHits(buildLinkedInBuckets(account), 'linkedin', 3)
+  const searchHits = await fetchBingRssHits(buildLinkedInBuckets(account), 'linkedin', 3, account)
   hits.push(...searchHits)
-  return dedupeAndSort(hits)
+  return dedupeAndSort(hits, account)
 }
 
 async function fetchGeneralWebHits(account: AccountRow) {
-  return fetchBingRssHits(buildSearchBuckets(account, true), 'web', 4)
+  return fetchBingRssHits(buildSearchBuckets(account, true), 'web', 4, account)
 }
 
 async function collectResearchCandidates(account: AccountRow) {
@@ -1580,9 +1665,9 @@ async function collectResearchCandidates(account: AccountRow) {
           return [] as ResearchHit[]
         }
       }))
-      return dedupeAndSort(rssResults.flat())
+      return dedupeAndSort(rssResults.flat(), account)
     })(),
-    fetchBingNewsHits(buckets, 'news', 4),
+    fetchBingNewsHits(buckets, 'news', 4, account),
     fetchGeneralWebHits(account),
     fetchLinkedInHits(account),
     fetchSecSearchHits(account),
@@ -1593,7 +1678,7 @@ async function collectResearchCandidates(account: AccountRow) {
     result.status === 'fulfilled' ? result.value : []
   )) as [ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[], ResearchHit[]]
 
-  return dedupeAndSort([...newsHits, ...bingNewsHits, ...webHits, ...linkedInHits, ...secSearchHits, ...secFilingHits])
+  return dedupeAndSort([...newsHits, ...bingNewsHits, ...webHits, ...linkedInHits, ...secSearchHits, ...secFilingHits], account)
 }
 
 function serializeAccount(account: AccountRow) {
@@ -1678,7 +1763,7 @@ async function fetchIndustryTrends(account: AccountRow): Promise<ResearchHit[]> 
   ]
 
   try {
-    return await fetchBingNewsHits(trendBuckets, 'news', 3)
+    return await fetchBingNewsHits(trendBuckets, 'news', 3, account)
   } catch (error) {
     console.warn('[Intelligence Brief] Industry trends fetch failed:', error)
     return []
@@ -1723,6 +1808,8 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
       published_at: item.publishedAt,
       source: item.source,
       source_kind: item.sourceKind,
+      source_trust: getSourceTrustRank(account, item),
+      official_source: isOfficialCompanyAnnouncement(account, item),
     })),
   }
 
@@ -1735,7 +1822,8 @@ Use ONLY the research payload below. It may include Google News, broad web searc
 Decision rules:
 - Pick ONE signal only.
 - Use the highest-priority signal supported by the research results.
-- If a SEC filing or LinkedIn result confirms the same event, prefer it over a generic web snippet.
+- If a SEC filing, official company page, company newsroom page, or press-release wire result confirms the same event, prefer it over a republished news story or generic web snippet.
+- If both a republished article and an original company announcement are available, use the original announcement date when you can verify it from the source. Do not invent an earlier date.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
@@ -1743,11 +1831,11 @@ Decision rules:
 - Talk Track must be 3-5 short sentences maximum. Use conversational language.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
-- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
+- Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", "I saw your announcement about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
 - Signal Date should be the event or article date in YYYY-MM-DD if available; otherwise use the closest approximate date from the research results.
-- Source Date should be the publication date of the report, article, post, or filing in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
+- Source Date should be the publication date of the report, article, post, filing, or company announcement in YYYY-MM-DD if available; otherwise use the closest approximate published date from the research results.
 - Use the talk_track_context block below as the real sales angle. It already tells you the signal family, the ERCOT angle, the operating context, the opening style, and the question to ask.
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
@@ -1822,12 +1910,13 @@ Decision rules:
 - Talk Track should be 3-5 short sentences maximum. Use conversational language.
 - Use plain language. Avoid corporate fluff.
 - Use human source language in the opener. Say "I saw a report about...", "I saw an article about...", "I saw a post online about...", or "I came across your website..." instead of "I saw the note..." or "I was looking at...".
+- If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
 - Use short sentences and contractions. Sound plainspoken, not polished.
 - Prefer "bill" or "power side" over "utility side".
 - Confidence Level should be "Medium" for fallback briefs.
 - Source URL should be the company website or the most relevant industry trend article.
 - Signal Date should be today's date in YYYY-MM-DD format.
-- Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article.
+- Source Date should be today's date in YYYY-MM-DD format if you used the company website or trend article, or the page's publish date if the source includes one.
 - Use the talk_track_context block below as the real sales angle. If there is no fresh news, lean harder on how the business actually uses power day to day.
 - Rotate the first sentence shape. Do not always open with the same setup.
 - Make it sound like a plainspoken Texas commercial electricity rep who has done the homework on the business, not a generic broker script.
