@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useParams, useSearchParams, useRouter } from 'next/navigation'
 import { LoadingOrb } from '@/components/ui/LoadingOrb'
 import { Button } from '@/components/ui/button'
@@ -21,15 +22,19 @@ export default function AccountDossierPage() {
 
   const state = useAccountDossierState(id, taskIdFromUrl)
   const deleteAccount = useDeleteAccount()
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = () => {
+    if (isDeleting) return
+    setIsDeleting(true)
     state.lockWithoutSaving()
     deleteAccount.mutate(id, {
       onSuccess: () => router.back(),
+      onError: () => setIsDeleting(false),
     })
   }
 
-  if (state.isLoading) {
+  if (state.isLoading || isDeleting) {
     return (
       <div className="flex flex-col h-[calc(100vh-8rem)] items-center justify-center space-y-4 animate-in fade-in duration-500">
         <LoadingOrb label="LOADING ASSET DATA..." />

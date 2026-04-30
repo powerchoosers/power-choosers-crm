@@ -409,6 +409,30 @@ function getHostname(value: string) {
   }
 }
 
+function isLikelyBadSourceUrl(value: string) {
+  const url = cleanText(value)
+  if (!url) return true
+
+  const hostname = getHostname(url)
+  if (!hostname) return true
+
+  if (
+    hostname === 'support.google.com' ||
+    hostname === 'accounts.google.com' ||
+    hostname === 'translate.google.com' ||
+    hostname === 'translate.googleusercontent.com' ||
+    hostname === 'www.google.com'
+  ) {
+    return true
+  }
+
+  if (/\/translate\/answer\/\d+/i.test(url)) {
+    return true
+  }
+
+  return false
+}
+
 function normalizeUrlForMatch(value: string) {
   const raw = cleanText(value)
   if (!raw) return ''
@@ -509,6 +533,11 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /doesn't always match/i,
   /most companies/i,
   /rate looks fine/i,
+  /worth a quick look/i,
+  /the part i would want to understand/i,
+  /before the spending picks up again/i,
+  /cost review/i,
+  /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i,
 ]
 
 const TALK_TRACK_SIGNAL_KEYWORDS: Record<SignalFamily, string[]> = {
@@ -623,6 +652,7 @@ function inferIndustryCluster(account: AccountRow): IndustryCluster {
   const text = cleanText(`${account.industry || ''} ${account.name || ''}`).toLowerCase()
   if (!text) return 'unknown'
   if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
+  if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component)/.test(text)) return 'manufacturing'
   if (/(logistics|warehouse|distribution|fulfillment|freight|trucking|supply chain|transport|shipping)/.test(text)) return 'logistics'
@@ -743,14 +773,14 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
     case 'funding':
       return {
         label: 'Funding / IPO',
-        angle: 'Fresh capital, tighter cost scrutiny, and the next growth phase.',
-        question: 'Has electricity been part of the cost review yet, or not really?',
+        angle: 'Fresh capital, tighter cost scrutiny, a new facility, and the next growth phase.',
+        question: 'Has the electricity side been mapped against the new facility and production ramp, or is that still getting sorted out?',
         openers: [
           `I saw the funding / IPO note on ${signalAnchor}.`,
-          `Right after a raise, leadership usually gets more serious about cost visibility before the next growth phase.`,
-          `That usually makes the utility side worth a quick look before the next round of spending starts.`,
+          `A Series C plus a new manufacturing buildout usually means the power plan needs to be thought through before the next round of spending starts.`,
+          `That is the kind of moment where I want to understand how the new facility and production ramp are being handled on the utility side.`,
         ],
-        focus: ['cost scrutiny', 'growth planning', 'budget visibility'],
+        focus: ['cost scrutiny', 'growth planning', 'budget visibility', 'facility buildout', 'production ramp'],
       }
     case 'industry_context':
     default:
@@ -981,13 +1011,15 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   if (!text) return true
 
   const lower = text.toLowerCase()
+  const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
   const genericHits = TALK_TRACK_GENERIC_PATTERNS.filter((pattern) => pattern.test(lower)).length
   const sentenceCount = text.split(/[.!?]+/).map(cleanText).filter(Boolean).length
   const mentionsSignal = TALK_TRACK_SIGNAL_KEYWORDS[context.signalFamily].some((keyword) => lower.includes(keyword.toLowerCase()))
   const mentionsIndustry = TALK_TRACK_INDUSTRY_KEYWORDS[context.industryCluster].some((keyword) => lower.includes(keyword.toLowerCase()))
   const mentionsAtLeastOneFocus = context.ercotFocus.some((phrase) => lower.includes(phrase.toLowerCase()))
+  const genericOpening = /^(that|this|it)\s+(makes|is|was|would|can|usually|tends)\b/i.test(firstSentence)
 
-  return genericHits > 0 || sentenceCount < 2 || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || sentenceCount < 2 || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -1029,8 +1061,8 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     ],
     funding: [
       `I saw the funding or IPO note on ${signalAnchor}.`,
-      `Fresh capital usually comes with tighter cost scrutiny before the next growth phase.`,
-      `That makes the utility side worth a quick look before the spending picks up again.`,
+      `A raise like that usually means someone is going to ask whether the new capital lines up with the facility and production plan.`,
+      `That is where I would want to understand the load growth, not just the headline funding number.`,
     ],
     industry_context: [
       `I was looking at ${companyName} from an industry angle.`,
@@ -1513,7 +1545,13 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null)
   const headline = cleanText(result?.signal_headline)
   const detail = cleanText(result?.signal_detail)
   const talkTrack = cleanText(result?.talk_track)
-  const sourceUrl = candidate?.url || cleanText(result?.source_url) || ''
+  const candidateUrl = cleanText(candidate?.url)
+  const resultUrl = cleanText(result?.source_url)
+  const sourceUrl = !isLikelyBadSourceUrl(candidateUrl)
+    ? candidateUrl
+    : !isLikelyBadSourceUrl(resultUrl)
+      ? resultUrl
+      : ''
   const signalDate = formatDateForDb(result?.signal_date, candidate?.publishedAt || null)
   const confidence = toTitleCase(cleanText(result?.confidence_level))
 
@@ -1661,7 +1699,7 @@ IF SIGNAL = Leadership change (CFO, COO, Facilities Director):
 IF SIGNAL = Funding round/IPO/capital raise:
 - Focus on budget scrutiny and cost visibility before scaling
 - Question: Are they tightening up costs before the next growth phase?
-- Example: "I saw you guys just closed a Series B. Most companies at that stage start tightening up on costs that were flying under the radar before. Has electricity come up in those conversations yet, or not really?"
+- Example: "I saw you guys just closed a Series B. If that capital is going toward a new facility or a bigger production ramp, the thing I would want to understand is how the electricity side is being mapped against that buildout. Has that been reviewed yet, or is it still getting sorted out?"
 
 IF SIGNAL = Contract win/new customer/major project:
 - Focus on load increase and whether current agreement can handle it
