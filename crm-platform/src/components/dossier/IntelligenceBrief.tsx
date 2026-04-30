@@ -376,7 +376,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
           )}>
             <div className="rounded-2xl border border-white/8 bg-white/[0.02] p-4">
               <div className="text-[10px] font-mono uppercase tracking-[0.22em] text-zinc-500 mb-2">
-                Reported
+                Published / announced
               </div>
               <p className="text-sm font-medium text-zinc-100">
                 {getHumanDate(brief.reportedAt) || 'Not set'}
