@@ -741,9 +741,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
       hasSpecificAnchor ? `I noticed an article about ${signalAnchor}.` : `I noticed ${companyName} online.`,
     ],
     news: [
-      hasSpecificAnchor ? `I saw a report about ${signalAnchor}.` : `I saw a report tied to ${companyName}.`,
-      hasSpecificAnchor ? `I came across a news item about ${signalAnchor}.` : `I came across a news item tied to ${companyName}.`,
-      hasSpecificAnchor ? `I noticed a report about ${signalAnchor}.` : `I noticed a report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I saw a report about ${signalAnchor}.` : `I came across an update about ${companyName}.`,
+      hasSpecificAnchor ? `I came across a news item about ${signalAnchor}.` : `I came across an update about ${companyName}.`,
+      hasSpecificAnchor ? `I noticed a report about ${signalAnchor}.` : `I noticed an update about ${companyName}.`,
     ],
   }
 
@@ -1360,8 +1360,8 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         angle: 'How this kind of business actually uses electricity.',
         question: 'Has anyone looked at whether the current setup still matches how the business runs today?',
         openers: [
-          `I was looking at ${companyName}'s operations.`,
-          `Even without a specific news item, the electricity side usually tells a story about how the business actually runs.`,
+          `What stands out in ${companyName}'s operations is how the business likely uses power day to day.`,
+          `Even without a news item, the electricity side usually tells a story about how the business actually runs.`,
           `The question I'd want answered is whether the current setup still fits the way things work now.`,
         ],
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
@@ -1751,7 +1751,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     contract_win: [sourceLead],
     funding: [sourceLead],
     industry_context: [
-      `${sourceLead} What stood out is how the operation likely uses power day to day.`,
+      `${sourceLead} What stands out is how the operation likely uses power day to day.`,
       `I came across ${companyName}'s footprint and wanted to ask a practical power question.`,
     ],
   }
