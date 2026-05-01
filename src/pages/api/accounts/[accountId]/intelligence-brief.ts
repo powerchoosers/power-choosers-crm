@@ -1017,6 +1017,30 @@ function hasLeadershipChangeEvidence(text: string) {
   return leadershipRole && changeVerb
 }
 
+function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null): { isMultiSite: boolean; locationCount: number | null; regions: string[] } {
+  const text = `${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const lower = text.toLowerCase()
+  
+  // Extract location count if mentioned
+  const locationMatch = /(\d+)\s*(?:schools?|locations?|sites?|campuses|stores?|branches?|facilities|restaurants?|units?|buildings?)/i.exec(text)
+  const locationCount = locationMatch ? parseInt(locationMatch[1], 10) : null
+  
+  // Extract regions/states mentioned
+  const statePattern = /(texas|california|florida|new york|ohio|louisiana|georgia|illinois|pennsylvania|north carolina|michigan|virginia|washington|arizona|massachusetts|tennessee|indiana|missouri|maryland|wisconsin|colorado|minnesota|south carolina|alabama|kentucky|oregon|oklahoma|connecticut|iowa|mississippi|arkansas|kansas|utah|nevada|new mexico|west virginia|nebraska|idaho|hawaii|maine|new hampshire|rhode island|montana|delaware|south dakota|north dakota|alaska|vermont|wyoming)/gi
+  const states = text.match(statePattern) || []
+  const uniqueStates = Array.from(new Set(states.map(s => s.toLowerCase())))
+  
+  const isMultiSite = (locationCount !== null && locationCount >= 10) || 
+                      uniqueStates.length >= 2 ||
+                      /(multi[-\s]?site|portfolio|network|chain|across \d+ (?:states?|regions?)|nationwide)/i.test(lower)
+  
+  return {
+    isMultiSite,
+    locationCount,
+    regions: uniqueStates,
+  }
+}
+
 function inferSignalPriority(text: string, fallbackPriority: number) {
   const lower = cleanText(text).toLowerCase()
   
@@ -1398,15 +1422,13 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
       }
     case 'industry_context':
     default:
+      // Instead of generic template, this will be replaced with AI-generated content
+      // The AI generation happens in buildManualTalkTrack when signalFamily is 'industry_context'
       return {
         label: 'Industry context',
         angle: 'How this kind of business actually uses electricity.',
-        question: 'Has anyone looked at whether the current setup still matches how the business runs today?',
-        openers: [
-          `What stands out in ${companyName}'s operations is how the business likely uses power day to day.`,
-          `Even without a news item, the electricity side usually tells a story about how the business actually runs.`,
-          `The question I'd want answered is whether the current setup still fits the way things work now.`,
-        ],
+        question: '', // Will be AI-generated
+        openers: [], // Will be AI-generated
         focus: ['budget visibility', 'operating fit', 'ERCOT exposure'],
       }
   }
@@ -1466,6 +1488,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['24/7 uptime', 'reliability', 'occupancy', 'backup systems', 'HVAC', 'base load'],
       }
     case 'banking':
+      const bankingMultiSite = detectMultiSiteScale(account, null)
+      
+      if (bankingMultiSite.isMultiSite && bankingMultiSite.locationCount && bankingMultiSite.locationCount >= 5) {
+        const locationDesc = bankingMultiSite.locationCount >= 20 
+          ? `${bankingMultiSite.locationCount}+ branches`
+          : `${bankingMultiSite.locationCount} branches`
+        const regionDesc = bankingMultiSite.regions.length > 1 
+          ? ` across ${bankingMultiSite.regions.length} states`
+          : ''
+        
+        return {
+          label: 'Banking / financial services network',
+          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each branch handling it independently?`,
+          openers: [
+            `Banks with ${locationDesc} usually need a portfolio view rather than managing each branch separately.`,
+            `With that kind of footprint${regionDesc}, there's usually opportunity to bring consistency to how branches are contracted and how usage is tracked.`,
+            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or branch-by-branch.`,
+          ],
+          focus: ['portfolio management', 'multi-branch coordination', 'budget predictability', 'operational consistency', 'HVAC'],
+        }
+      }
+      
       return {
         label: 'Banking / financial services',
         angle: 'Branch hours, occupancy, HVAC, ATMs, and IT closets drive the load more than one big bill number.',
@@ -1478,6 +1523,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['branch portfolio', 'usage drivers', 'budget predictability', 'HVAC', 'IT closets'],
       }
     case 'retail':
+      const retailMultiSite = detectMultiSiteScale(account, null)
+      
+      if (retailMultiSite.isMultiSite && retailMultiSite.locationCount && retailMultiSite.locationCount >= 10) {
+        const locationDesc = retailMultiSite.locationCount >= 50 
+          ? `${retailMultiSite.locationCount}+ stores`
+          : `${retailMultiSite.locationCount} stores`
+        const regionDesc = retailMultiSite.regions.length > 1 
+          ? ` across ${retailMultiSite.regions.length} states`
+          : ''
+        
+        return {
+          label: 'Retail chain',
+          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each region handling it independently?`,
+          openers: [
+            `Retail chains with ${locationDesc} usually benefit from a portfolio view rather than managing each store separately.`,
+            `With that kind of footprint${regionDesc}, there's usually opportunity to bring consistency to how stores are contracted and how usage is tracked.`,
+            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or location-by-location.`,
+          ],
+          focus: ['portfolio management', 'multi-store coordination', 'seasonal swings', 'operational consistency', 'centralized procurement'],
+        }
+      }
+      
       return {
         label: 'Retail',
         angle: 'Store hours, traffic swings, lighting, HVAC, and refrigeration create seasonal load changes.',
@@ -1490,6 +1558,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['seasonal swings', 'occupancy changes', 'multi-site timing', 'lighting', 'HVAC', 'refrigeration'],
       }
     case 'restaurant':
+      const restaurantMultiSite = detectMultiSiteScale(account, null)
+      
+      if (restaurantMultiSite.isMultiSite && restaurantMultiSite.locationCount && restaurantMultiSite.locationCount >= 5) {
+        const locationDesc = restaurantMultiSite.locationCount >= 20 
+          ? `${restaurantMultiSite.locationCount}+ locations`
+          : `${restaurantMultiSite.locationCount} locations`
+        const regionDesc = restaurantMultiSite.regions.length > 1 
+          ? ` across ${restaurantMultiSite.regions.length} states`
+          : ''
+        
+        return {
+          label: 'Restaurant chain',
+          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each location handling it independently?`,
+          openers: [
+            `Restaurant groups with ${locationDesc} usually need a portfolio view to ensure consistency across units.`,
+            `With that kind of footprint${regionDesc}, there's usually opportunity to bring consistency to how locations are contracted and how usage is tracked.`,
+            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or unit-by-unit.`,
+          ],
+          focus: ['portfolio management', 'multi-unit coordination', 'kitchen load', 'operational consistency', 'HVAC'],
+        }
+      }
+      
       return {
         label: 'Restaurant / hospitality',
         angle: 'Kitchen load, HVAC, refrigeration, and prep schedules drive the bill more than the rate does.',
@@ -1502,6 +1593,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency', 'refrigeration', 'equipment'],
       }
     case 'education_nonprofit':
+      const multiSiteInfo = detectMultiSiteScale(account, null)
+      
+      if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
+        const locationDesc = multiSiteInfo.locationCount >= 100 
+          ? `${multiSiteInfo.locationCount}+ locations`
+          : `${multiSiteInfo.locationCount} locations`
+        const regionDesc = multiSiteInfo.regions.length > 1 
+          ? ` across ${multiSiteInfo.regions.length} states`
+          : ''
+        
+        return {
+          label: 'Education / nonprofit network',
+          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each region handling it independently?`,
+          openers: [
+            `Multi-site education groups with ${locationDesc} usually need a portfolio view to ensure consistency across the network.`,
+            `With that kind of footprint${regionDesc}, there's usually an opportunity to bring consistency to how sites are contracted and how usage is tracked.`,
+            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or site-by-site.`,
+          ],
+          focus: ['portfolio management', 'multi-site coordination', 'operational consistency', 'centralized procurement', 'network visibility'],
+        }
+      }
+      
       return {
         label: 'Education / nonprofit',
         angle: 'Campus occupancy, events, HVAC schedules, and building controls drive the load more than the invoice total.',
@@ -1744,6 +1858,117 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
       'dealership',
     ],
     seed,
+  }
+}
+
+async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext): Promise<string | null> {
+  const companyName = cleanText(account.name) || 'the company'
+  const industry = cleanText(account.industry) || 'business'
+  const city = cleanText(account.city) || ''
+  const state = cleanText(account.state) || ''
+  const location = [city, state].filter(Boolean).join(', ') || 'Texas'
+  
+  const multiSiteInfo = detectMultiSiteScale(account, candidate)
+  const multiSiteContext = multiSiteInfo.isMultiSite && multiSiteInfo.locationCount
+    ? `This is a multi-site organization with ${multiSiteInfo.locationCount} locations${multiSiteInfo.regions.length > 1 ? ` across ${multiSiteInfo.regions.length} states` : ''}.`
+    : ''
+  
+  const prompt = `You are a Texas electricity broker crafting a talk track opener for a sales call. The talk track should be conversational, specific, and lead to a natural question about their electricity setup.
+
+COMPANY CONTEXT:
+- Company: ${companyName}
+- Industry: ${industry}
+- Location: ${location}
+${multiSiteContext}
+
+REQUIREMENTS:
+1. Be conversational and natural - sound like a human, not a template
+2. Focus on electricity usage patterns specific to their industry
+3. ${multiSiteInfo.isMultiSite ? 'Focus on portfolio-level electricity management across multiple locations' : 'Focus on how their specific type of business uses electricity'}
+4. End with a specific, actionable question about their electricity setup
+5. Keep it to 2-3 sentences (50-80 words)
+6. DO NOT use generic phrases like:
+   - "current setup"
+   - "how the business runs today"
+   - "whether the bill matches the facility"
+   - "autopilot"
+   - "site by site"
+7. Be specific to their industry and situation
+8. The question should be about something concrete they can answer
+
+EXAMPLES OF GOOD TALK TRACKS:
+- For a manufacturing company: "I work with manufacturers in Texas, and one thing that comes up a lot is demand spikes from equipment start-ups and shift changes. Those peaks can drive up the 4CP charges pretty fast. Have you looked at which processes or equipment are creating your biggest spikes?"
+- For a multi-location retail chain: "I work with retail groups in Texas, and with 50+ stores, the electricity piece usually works better when it's managed as a portfolio rather than store-by-store. Are your locations being managed centrally, or is each store handling its own contract?"
+- For a warehouse: "I work with logistics companies in Texas, and 24/7 warehouse operations usually have a different electricity story than office buildings—dock doors, automation, HVAC all running around the clock. Have you looked at which parts of your operation are driving the peaks?"
+
+Generate a talk track opener for ${companyName}:`
+
+  try {
+    const openrouterKey = process.env.OPENROUTER_API_KEY
+    if (!openrouterKey) {
+      console.warn('[Intelligence Brief] OPENROUTER_API_KEY not set, skipping AI talk track generation')
+      return null
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openrouterKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://powerchoosers.com',
+        'X-Title': 'Power Choosers CRM',
+      },
+      body: JSON.stringify({
+        model: 'anthropic/claude-3.5-sonnet',
+        messages: [
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 200,
+      }),
+    })
+
+    if (!response.ok) {
+      console.warn('[Intelligence Brief] AI talk track generation failed:', response.status, response.statusText)
+      return null
+    }
+
+    const data = await response.json()
+    const talkTrack = cleanText(data?.choices?.[0]?.message?.content || '')
+    
+    if (!talkTrack) {
+      console.warn('[Intelligence Brief] AI talk track generation returned empty content')
+      return null
+    }
+
+    // Validate the AI-generated talk track
+    const wordCount = talkTrack.split(/\s+/).filter(Boolean).length
+    if (wordCount < 30 || wordCount > 120) {
+      console.warn('[Intelligence Brief] AI talk track word count out of range:', wordCount)
+      return null
+    }
+
+    // Check for forbidden phrases
+    const forbiddenPatterns = [
+      /current setup/i,
+      /how the business runs today/i,
+      /whether the bill matches/i,
+      /autopilot/i,
+      /site by site/i,
+    ]
+    
+    if (forbiddenPatterns.some(pattern => pattern.test(talkTrack))) {
+      console.warn('[Intelligence Brief] AI talk track contains forbidden phrases')
+      return null
+    }
+
+    return talkTrack
+  } catch (error) {
+    console.error('[Intelligence Brief] AI talk track generation error:', error)
+    return null
   }
 }
 
@@ -3000,6 +3225,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (!validated) {
       outcomeStatus = 'empty'
+      
+      // Even with no signals, generate an AI talk track based on company context
+      console.info('[Intelligence Brief] No signals found, generating AI talk track from company context')
+      const fallbackContext = buildTalkTrackContext(account, null, true)
+      const aiTalkTrack = await generateAITalkTrack(account, null, fallbackContext)
+      
+      if (aiTalkTrack) {
+        // Create a minimal brief with just the AI talk track
+        validated = {
+          signal_headline: 'Industry Context',
+          signal_detail: `No recent news signals found. Talk track generated based on ${account.industry || 'business'} industry context.`,
+          talk_track: aiTalkTrack,
+          signal_date: null,
+          source_date: null,
+          source_url: null,
+          confidence_level: 'Low',
+        }
+        outcomeStatus = 'ready'
+        console.info('[Intelligence Brief] Generated AI talk track for empty signal case')
+      }
     }
 
     const talkTrackCandidate = generatedBrief ? findCandidateForResult(generatedBrief as BriefResult, rescueCandidates) : rescueCandidates[0] || null
@@ -3011,17 +3256,37 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         talkTrackCache.isTooSimilar(validated.talk_track || '')
 
       if (shouldRewrite) {
-        let rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 0)
-
-        // Check against cache and previous talk track
-        if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
-            talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
-          rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 1)
+        let rewrittenTalkTrack: string | null = null
+        
+        // If this is an industry_context fallback, try AI generation first
+        if (talkTrackRewriteContext.signalFamily === 'industry_context') {
+          rewrittenTalkTrack = await generateAITalkTrack(account, talkTrackCandidate, talkTrackRewriteContext)
+          
+          // Validate AI-generated talk track
+          if (rewrittenTalkTrack) {
+            if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext) ||
+                (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
+                talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
+              console.warn('[Intelligence Brief] AI-generated talk track failed validation, falling back to manual')
+              rewrittenTalkTrack = null
+            }
+          }
         }
+        
+        // Fall back to manual generation if AI failed or not applicable
+        if (!rewrittenTalkTrack) {
+          rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 0)
 
-        if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
-            talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
-          rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 2)
+          // Check against cache and previous talk track
+          if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
+              talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
+            rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 1)
+          }
+
+          if ((previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
+              talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
+            rewrittenTalkTrack = buildManualTalkTrack(account, talkTrackCandidate, talkTrackRewriteContext, 2)
+          }
         }
 
         validated = {
