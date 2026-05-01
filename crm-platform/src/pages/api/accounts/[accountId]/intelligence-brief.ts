@@ -3243,9 +3243,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           signal_headline: 'Industry Context',
           signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
           talk_track: aiTalkTrack,
-          signal_date: null,
-          source_date: null,
-          source_url: null,
           confidence_level: 'Low',
         }
         outcomeStatus = 'ready'
