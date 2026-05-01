@@ -1,6 +1,7 @@
 import { cors } from '../_cors.js';
 import logger from '../_logger.js';
 import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
+import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context';
 
 function extractJsonObject(raw) {
   if (!raw || typeof raw !== 'string') return null;
@@ -551,6 +552,15 @@ export default async function handler(req, res) {
           ''
         )
         : '';
+      const intelligenceBriefContext = buildIntelligenceBriefContext({
+        intelligenceBriefHeadline: contact?.intelligence_brief_headline || contact?.intelligenceBriefHeadline || null,
+        intelligenceBriefDetail: contact?.intelligence_brief_detail || contact?.intelligenceBriefDetail || null,
+        intelligenceBriefTalkTrack: contact?.intelligence_brief_talk_track || contact?.intelligenceBriefTalkTrack || null,
+        intelligenceBriefSignalDate: contact?.intelligence_brief_signal_date || contact?.intelligenceBriefSignalDate || null,
+        intelligenceBriefReportedAt: contact?.intelligence_brief_reported_at || contact?.intelligenceBriefReportedAt || null,
+        intelligenceBriefConfidenceLevel: contact?.intelligence_brief_confidence_level || contact?.intelligenceBriefConfidenceLevel || null,
+        intelligenceBriefStatus: contact?.intelligence_brief_status || contact?.intelligenceBriefStatus || null,
+      });
 
       const dataVectors = [
         `- TARGET_IDENTITY: ${contact?.name || 'Unknown'} (${contactIndustry}) at ${companyName}`,
@@ -585,6 +595,7 @@ export default async function handler(req, res) {
         contact?.website && `- WEBSITE: ${contact.website}`,
         contact?.domain && `- DOMAIN: ${contact.domain}`,
         wantsLiveSignals && `- LIVE_MARKET_SIGNAL: ${liveSignalContext || 'No live signal available.'}`,
+        intelligenceBriefContext || null,
         recentSignal ? `- RECENT_SIGNAL: ${recentSignal}` : null,
         vectors.includes('transcripts') && `- PREVIOUS_DIALOG: ${callContext || 'No usable call transcripts.'}`,
         contact?.metadata && `- EXTENDED_METADATA: ${JSON.stringify(contact.metadata)}`
@@ -640,7 +651,12 @@ export default async function handler(req, res) {
             - Never use unexplained acronyms like 4CP, ESI ID, pass-through, or nodal adder in cold outreach. If a Texas utility name is clearly known, you may say Oncor, CenterPoint, AEP Texas, TNMP, or LP&L once in plain English.
             - Name one primary cost lane in plain business language and only add the second lane if it genuinely sharpens the diagnosis. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". The concept stays constant, the exact words must not.
             - If a technical term is necessary, define it in the same sentence in plain English.
-          12. CTA RULE:
+          12. INTELLIGENCE BRIEF RULE:
+            - If INTELLIGENCE BRIEF is present and looks usable, you may use one specific fact naturally.
+            - If the brief is missing, low confidence, empty, or fallback-like, ignore it and lean on account, notes, and call context instead.
+            - Never say "I saw a report about..." unless the event itself is named in the same sentence.
+            - Never mention the source URL in the email body.
+          13. CTA RULE:
             - First touch: ask for a low-friction reply with a concrete offer, not a bill request and not a generic meeting ask.
             - Early-sequence offer options: a quick benchmark, a one-page snapshot, a short call, or a simple routing reply.
             - First-touch and no-reply branches must NOT ask for a utility bill, statement, or invoice.
@@ -648,23 +664,23 @@ export default async function handler(req, res) {
             - Use PRESENT conditional or an affirmative CTA. Good examples: "Reply and I'll send the one-page snapshot." "Open to a 15-minute call next week?" "Am I barking up the right tree on this?" NEVER past conditional: "if you sent it, I could reply."
             - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?", "Want me to take a look?" These are indirect and passive.
             - Do not stack more than one question. One CTA only.
-          13. VOICE RULE:
+          14. VOICE RULE:
             - Use first-person peer language from Lewis ("I", "I can", "I review"), not corporate team language.
             - Avoid openers like "our firm", "we help businesses", or "at Nodal Point, we...".
             - You may mention Nodal Point once for identity, but keep the voice consultative and person-to-person.
-          14. SOURCE TRUTH IS HARD RULE:
+          15. SOURCE TRUTH IS HARD RULE:
             - NEVER mention LinkedIn, the contact's LinkedIn profile, or say you found/saw them on LinkedIn in any email copy, regardless of source_label.
             - LinkedIn data is a research signal only — use it to understand the contact's role and company background, but do NOT surface it in the email.
             - If source_label=website, you may reference the company website or public company info once.
             - If source_label=public_company_info, use generic market/industry research wording only.
             - Never claim a source that is not supported by SOURCE_TRUTH.
-          15. COMPANY NAME RULE:
+          16. COMPANY NAME RULE:
             - Use COMPANY_OUTREACH_NAME in copy, not the full legal entity name.
             - Strip legal suffixes like Inc, LLC, Ltd, Corp and ignore DBA phrasing unless the STRATEGY explicitly requires the legal name.
             - Preserve operating-company relationship language when it identifies the actual recipient entity, such as "Haag, a Salas O'Brien Company" or "Jarvis Press, An RRD Company." Do not strip the parent-company phrase out of that name.
             - If PARENT_COMPANY exists, use it as context once at most. Do not confuse the parent with the operating site.
             - No normal human writes "Eduardo E. Lozano & Co., Inc. dba eelco" in a cold email opener. Do not do that.
-          16. FIELD USAGE QUALITY RULE:
+          17. FIELD USAGE QUALITY RULE:
             - If ROLE is known, tailor one phrase to that role's business priorities.
             - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
             - If LOCATION is known, anchor the observation to that place naturally. Prefer the site address or operating location over the corporate HQ when both exist. If a Texas utility territory is known, use it once as a location cue, not jargon.
@@ -673,21 +689,21 @@ export default async function handler(req, res) {
             - If company description, employee count, recent signal, or notes are available, use at most one of them naturally. Do not stack all of them into one sentence.
             - If CALL_CONTEXT is present, use only human conversation or substantive call notes. Ignore no-answer calls, voicemail menus, extension trees, and IVR noise.
             - If COMPANY_RESEARCH exists, use one concrete fact from it. Do not say you "looked at LinkedIn" or "noticed on the website" unless that source mention directly adds credibility.
-          17. ENERGY INTEL RULES:
+          18. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, utility territory, TDU, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
             - If the site is in Texas and utility territory is known, you may reference the territory once naturally.
             - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
             - Never state certainty about exact contract month/day unless explicitly provided as verified in STRATEGY text.
-          18. OPEN TRACKING RULE:
+          19. OPEN TRACKING RULE:
             - NEVER disclose that the recipient opened, viewed, or looked at a previous email. Open signals route which sequence branch fires — they must never appear in copy.
             - Forbidden phrases: "since you opened my email", "I noticed you looked at my message", "you viewed my last note", "my note seemed to hit home", "I saw you opened", "since you read my message", or any variation.
             - Reference prior contact by CONTENT only: "following up on my note about [company's] electricity costs" or "circling back on the forensic review I mentioned."
-          19. CTA TENSE RULE:
+          20. CTA TENSE RULE:
             - All CTAs must use present conditional, never past conditional.
             - CORRECT: "Reply and I'll send the snapshot." or "If you send the statement later, I'll verify the hard numbers." WRONG: "If you sent it over, I could reply."
             - Use "I'll" or "I can" — never "I could" in a CTA.
-          20. ANTI-FILLER RULE:
+          21. ANTI-FILLER RULE:
             - Every sentence must earn its place with a specific observation. Delete any sentence that could apply to any company in any industry.
             - BANNED filler: "getting a handle on these details can help with budgeting and future planning", "small billing details can add up", "it helps when you're keeping things moving", "a quick review can show some interesting things", "reviewing historical usage helps spot hidden fees and opportunities."
             - A tight 3-sentence email beats a padded 5-sentence one. If you cannot make a specific observation, use fewer sentences.

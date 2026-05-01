@@ -7,6 +7,7 @@ import { buildUsableCallContextEntries, buildUsableCallContextBlock } from '@/li
 import { getTexasEnergyContext, normalizeCityKey } from '@/lib/texas-territory';
 import { buildSequenceTemplateVariables, renderSequenceTemplate } from '@/lib/sequence-template';
 import { getBurnerFromEmail } from '@/lib/burner-email';
+import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context';
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -430,7 +431,7 @@ export default async function handler(req, res) {
     if (contact.accountId) {
       const { data: acc } = await supabase
         .from('accounts')
-        .select('name, domain, website, linkedin_url, industry, description, employees, revenue, annual_usage, load_factor, city, state, electricity_supplier, current_rate, contract_end_date, address, service_addresses, metadata')
+        .select('name, domain, website, linkedin_url, industry, description, employees, revenue, annual_usage, load_factor, city, state, electricity_supplier, current_rate, contract_end_date, address, service_addresses, metadata, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_confidence_level, intelligence_brief_status')
         .eq('id', contact.accountId)
         .maybeSingle();
       account = acc || null;
@@ -502,6 +503,15 @@ export default async function handler(req, res) {
       },
     ]);
     const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
+    const briefContext = buildIntelligenceBriefContext({
+      intelligenceBriefHeadline: account?.intelligence_brief_headline || null,
+      intelligenceBriefDetail: account?.intelligence_brief_detail || null,
+      intelligenceBriefTalkTrack: account?.intelligence_brief_talk_track || null,
+      intelligenceBriefSignalDate: account?.intelligence_brief_signal_date || null,
+      intelligenceBriefReportedAt: account?.intelligence_brief_reported_at || null,
+      intelligenceBriefConfidenceLevel: account?.intelligence_brief_confidence_level || null,
+      intelligenceBriefStatus: account?.intelligence_brief_status || null,
+    });
 
     const { data: sequence } = await supabase
       .from('sequences')
@@ -561,6 +571,7 @@ export default async function handler(req, res) {
       `Organization role: ${organizationRole}`,
       `Hierarchy summary: ${hierarchySummary}`,
       noteContext ? `Dossier notes:\n${noteContext}` : null,
+      briefContext ? `Intelligence brief:\n${briefContext}` : null,
       usableCallContext ? `Transmission log:\n${usableCallContext}` : null,
       contact.notes ? `Contact notes: ${contact.notes.slice(0, 250)}` : null
     ].filter(Boolean).join('\n');
@@ -645,7 +656,14 @@ export default async function handler(req, res) {
           liveSignals: liveSignalContext || null,
           call_context: usableCallContext || null,
           transcript: usableCalls[0]?.transcriptSnippet || null,
-          notes: noteContext || null
+          notes: noteContext || null,
+          intelligence_brief_headline: account?.intelligence_brief_headline || null,
+          intelligence_brief_detail: account?.intelligence_brief_detail || null,
+          intelligence_brief_talk_track: account?.intelligence_brief_talk_track || null,
+          intelligence_brief_signal_date: account?.intelligence_brief_signal_date || null,
+          intelligence_brief_reported_at: account?.intelligence_brief_reported_at || null,
+          intelligence_brief_confidence_level: account?.intelligence_brief_confidence_level || null,
+          intelligence_brief_status: account?.intelligence_brief_status || null
         }
       })
     });

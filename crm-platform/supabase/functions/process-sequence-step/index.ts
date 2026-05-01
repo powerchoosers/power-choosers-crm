@@ -14,6 +14,7 @@ import { buildUsableCallContextEntries, buildUsableCallContextBlock } from '../l
 import { getTexasEnergyContext } from '../lib/texas-territory.ts'
 import { getBurnerFromEmail } from '../lib/burner-email.ts'
 import { buildSequenceTemplateVariables, renderSequenceTemplate } from '../lib/sequence-template.ts'
+import { buildIntelligenceBriefContext } from '../lib/intelligence-brief-context.ts'
 
 const sql = postgres(Deno.env.get('SUPABASE_DB_URL')!)
 
@@ -787,6 +788,13 @@ async function handleGeneration(execution, job) {
            a.electricity_supplier as account_supplier,
            a.current_rate as account_current_rate,
            a.contract_end_date as account_contract_end_date,
+           a.intelligence_brief_headline as account_intelligence_brief_headline,
+           a.intelligence_brief_detail as account_intelligence_brief_detail,
+           a.intelligence_brief_talk_track as account_intelligence_brief_talk_track,
+           a.intelligence_brief_signal_date as account_intelligence_brief_signal_date,
+           a.intelligence_brief_reported_at as account_intelligence_brief_reported_at,
+           a.intelligence_brief_confidence_level as account_intelligence_brief_confidence_level,
+           a.intelligence_brief_status as account_intelligence_brief_status,
            COALESCE(
              s.bgvector->'settings'->>'senderEmail',
              s.metadata->>'sender_email',
@@ -867,7 +875,7 @@ async function handleGeneration(execution, job) {
         metadata?.sequenceStage ||
         detectReplyStage(metadata?.prompt || metadata?.label || metadata?.name || '', metadata?.body || metadata?.aiBody || '')
     );
-    const researchFacts = [
+    let researchFacts = [
         member.account_description ? `Company summary: ${member.account_description}` : null,
         member.account_industry ? `Industry: ${member.account_industry}` : null,
         member.account_employees ? `Scale: ${member.account_employees}` : null,
@@ -885,6 +893,9 @@ async function handleGeneration(execution, job) {
         `Organization role: ${organizationRole}`,
         `Hierarchy summary: ${hierarchySummary}`
     ].filter(Boolean).join('\n');
+    if (briefContext) {
+        researchFacts += `\nIntelligence brief:\n${briefContext}`;
+    }
 
     const callRows = member.contact_id
         ? await sql`
@@ -923,6 +934,15 @@ async function handleGeneration(execution, job) {
         : null;
 
     const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
+    const briefContext = buildIntelligenceBriefContext({
+        intelligenceBriefHeadline: member.account_intelligence_brief_headline || null,
+        intelligenceBriefDetail: member.account_intelligence_brief_detail || null,
+        intelligenceBriefTalkTrack: member.account_intelligence_brief_talk_track || null,
+        intelligenceBriefSignalDate: member.account_intelligence_brief_signal_date || null,
+        intelligenceBriefReportedAt: member.account_intelligence_brief_reported_at || null,
+        intelligenceBriefConfidenceLevel: member.account_intelligence_brief_confidence_level || null,
+        intelligenceBriefStatus: member.account_intelligence_brief_status || null,
+    });
     const contractEndYear = member.account_contract_end_date
         ? new Date(member.account_contract_end_date).getUTCFullYear()
         : null;
@@ -951,18 +971,18 @@ async function handleGeneration(execution, job) {
                 name: `${member.firstName} ${member.lastName}`,
                 email: member.contact_email,
                 company: member.company_name,
-                    website: member.account_website || website || null,
-                    linkedin_url: member.account_linkedin_url || linkedInUrl || null,
-                    company_description: member.account_description || null,
-                    employees: member.account_employees || null,
-                    revenue: member.account_revenue || null,
-                    annual_usage: member.account_annual_usage || null,
-                    load_factor: member.account_load_factor || null,
-                    research_summary: researchFacts || null,
-                    title: member.contact_title || null,
-                    industry: member.account_industry || null,
-                    electricity_supplier: member.account_supplier || null,
-                    current_rate: member.account_current_rate || null,
+                website: member.account_website || website || null,
+                linkedin_url: member.account_linkedin_url || linkedInUrl || null,
+                company_description: member.account_description || null,
+                employees: member.account_employees || null,
+                revenue: member.account_revenue || null,
+                annual_usage: member.account_annual_usage || null,
+                load_factor: member.account_load_factor || null,
+                research_summary: researchFacts || null,
+                title: member.contact_title || null,
+                industry: member.account_industry || null,
+                electricity_supplier: member.account_supplier || null,
+                current_rate: member.account_current_rate || null,
                 contract_end_date: member.account_contract_end_date || null,
                 contract_end_year: Number.isFinite(contractEndYear) ? contractEndYear : null,
                 city: accountCity || contactCity || null,
@@ -998,7 +1018,14 @@ async function handleGeneration(execution, job) {
                 liveSignals: liveSignalContext || null,
                 call_context: callContext || null,
                 transcript: usableCalls[0]?.transcriptSnippet || null,
-                notes: noteContext || null
+                notes: noteContext || null,
+                intelligence_brief_headline: member.account_intelligence_brief_headline || null,
+                intelligence_brief_detail: member.account_intelligence_brief_detail || null,
+                intelligence_brief_talk_track: member.account_intelligence_brief_talk_track || null,
+                intelligence_brief_signal_date: member.account_intelligence_brief_signal_date || null,
+                intelligence_brief_reported_at: member.account_intelligence_brief_reported_at || null,
+                intelligence_brief_confidence_level: member.account_intelligence_brief_confidence_level || null,
+                intelligence_brief_status: member.account_intelligence_brief_status || null
             }
         })
     })
