@@ -7,10 +7,10 @@ import { type Deal, type DealStage, type CreateDealInput, type UpdateDealInput }
 import { buildOwnerScopeValues } from '@/lib/owner-scope'
 
 const PAGE_SIZE = 50
-const QUERY_BUSTER = 'v1'
+export const DEALS_QUERY_BUSTER = 'v1'
 
 interface DealsFilters {
-  stage?: DealStage | 'ALL'
+  stage?: DealStage | DealStage[] | 'ALL'
   accountId?: string
   search?: string
 }
@@ -23,7 +23,7 @@ export function useDeals(filters?: DealsFilters) {
   const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useInfiniteQuery({
-    queryKey: ['deals', QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role, filters],
+    queryKey: ['deals', DEALS_QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role, filters],
     initialPageParam: 0,
     queryFn: async ({ pageParam = 0 }) => {
       if (loading || !user) return { deals: [], nextCursor: null }
@@ -37,7 +37,8 @@ export function useDeals(filters?: DealsFilters) {
       }
 
       if (filters?.stage && filters.stage !== 'ALL') {
-        query = query.eq('stage', filters.stage)
+        const stages = Array.isArray(filters.stage) ? filters.stage : [filters.stage]
+        query = stages.length > 1 ? query.in('stage', stages) : query.eq('stage', stages[0])
       }
 
       if (filters?.accountId) {
@@ -94,7 +95,7 @@ export function useDealsCount(filters?: DealsFilters) {
   const ownerScopeValues = buildOwnerScopeValues(user)
 
   return useQuery({
-    queryKey: ['deals-count', QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role, filters],
+    queryKey: ['deals-count', DEALS_QUERY_BUSTER, user?.id ?? user?.email ?? 'guest', role, filters],
     queryFn: async () => {
       if (loading || !user) return 0
 
@@ -107,7 +108,8 @@ export function useDealsCount(filters?: DealsFilters) {
       }
 
       if (filters?.stage && filters.stage !== 'ALL') {
-        query = query.eq('stage', filters.stage)
+        const stages = Array.isArray(filters.stage) ? filters.stage : [filters.stage]
+        query = stages.length > 1 ? query.in('stage', stages) : query.eq('stage', stages[0])
       }
 
       if (filters?.accountId) {
@@ -135,7 +137,7 @@ export function useDealsByAccount(accountId?: string) {
   const { user, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['deals-by-account', QUERY_BUSTER, accountId],
+    queryKey: ['deals-by-account', DEALS_QUERY_BUSTER, accountId],
     queryFn: async () => {
       if (!accountId) return []
       const { data, error } = await supabase
@@ -183,7 +185,7 @@ export function useDealsByContact(contactId?: string) {
   const { user, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['deals-by-contact', QUERY_BUSTER, contactId],
+    queryKey: ['deals-by-contact', DEALS_QUERY_BUSTER, contactId],
     queryFn: async () => {
       if (!contactId) return []
       const { data, error } = await supabase
@@ -231,7 +233,7 @@ export function useDeal(id: string | undefined) {
   const { user, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['deal', QUERY_BUSTER, id],
+    queryKey: ['deal', DEALS_QUERY_BUSTER, id],
     queryFn: async () => {
       if (!id) return null
       const { data, error } = await supabase
@@ -293,11 +295,11 @@ export function useCreateDeal() {
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
       if (data?.id) {
-        queryClient.invalidateQueries({ queryKey: ['deal', QUERY_BUSTER, data.id] })
+        queryClient.invalidateQueries({ queryKey: ['deal', DEALS_QUERY_BUSTER, data.id] })
       }
       if (data?.accountId) {
         await ensureFreshSupabaseSession()
-        queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+        queryClient.invalidateQueries({ queryKey: ['deals-by-account', DEALS_QUERY_BUSTER, data.accountId] })
         queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
 
         // Sync to account
@@ -316,7 +318,7 @@ export function useCreateDeal() {
           queryClient.invalidateQueries({ queryKey: ['accounts'] })
         }
       }
-      if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', QUERY_BUSTER, data.contactId] })
+      if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', DEALS_QUERY_BUSTER, data.contactId] })
     },
     onError: (error) => {
       console.error('Error creating deal:', error)
@@ -332,6 +334,66 @@ export function useUpdateDeal() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    onMutate: async ({ id, ...updates }) => {
+      await queryClient.cancelQueries({ queryKey: ['deals'] })
+      await queryClient.cancelQueries({ queryKey: ['deal', DEALS_QUERY_BUSTER, id] })
+      await queryClient.cancelQueries({ queryKey: ['deals-by-account'] })
+      await queryClient.cancelQueries({ queryKey: ['deals-by-contact'] })
+
+      const previousDeal = queryClient.getQueryData<Deal>(['deal', DEALS_QUERY_BUSTER, id])
+      const previousDealsQueries = queryClient.getQueriesData<{ pages: Array<{ deals: Deal[]; nextCursor: number | null }>; pageParams: unknown[] }>({
+        queryKey: ['deals', DEALS_QUERY_BUSTER],
+      })
+      const previousAccountDeals = queryClient.getQueriesData<Deal[]>({
+        queryKey: ['deals-by-account', DEALS_QUERY_BUSTER],
+      })
+      const previousContactDeals = queryClient.getQueriesData<Deal[]>({
+        queryKey: ['deals-by-contact', DEALS_QUERY_BUSTER],
+      })
+
+      const applyUpdates = (deal: Deal): Deal => ({
+        ...deal,
+        ...updates,
+        contactId: updates.contactId === null ? undefined : (updates.contactId ?? deal.contactId),
+        updatedAt: new Date().toISOString(),
+      })
+
+      queryClient.setQueryData<Deal | null>(['deal', DEALS_QUERY_BUSTER, id], (current) => {
+        if (!current) return current ?? null
+        return applyUpdates(current)
+      })
+
+      queryClient.setQueriesData<{ pages: Array<{ deals: Deal[]; nextCursor: number | null }>; pageParams: unknown[] }>(
+        { queryKey: ['deals', DEALS_QUERY_BUSTER] },
+        (current) => {
+          if (!current) return current
+          return {
+            ...current,
+            pages: current.pages.map((page) => ({
+              ...page,
+              deals: page.deals.map((deal) => (deal.id === id ? applyUpdates(deal) : deal)),
+            })),
+          }
+        }
+      )
+
+      queryClient.setQueriesData<Deal[]>(
+        { queryKey: ['deals-by-account', DEALS_QUERY_BUSTER] },
+        (current) => current?.map((deal) => (deal.id === id ? applyUpdates(deal) : deal)) ?? current
+      )
+
+      queryClient.setQueriesData<Deal[]>(
+        { queryKey: ['deals-by-contact', DEALS_QUERY_BUSTER] },
+        (current) => current?.map((deal) => (deal.id === id ? applyUpdates(deal) : deal)) ?? current
+      )
+
+      return {
+        previousDeal,
+        previousDealsQueries,
+        previousAccountDeals,
+        previousContactDeals,
+      }
+    },
     mutationFn: async ({ id, ...updates }: UpdateDealInput) => {
       await ensureFreshSupabaseSession()
       const { data, error } = await supabase
@@ -356,16 +418,39 @@ export function useUpdateDeal() {
 
       return data as Deal
     },
+    onError: (error, _variables, context) => {
+      if (context?.previousDeal) {
+        queryClient.setQueryData(['deal', DEALS_QUERY_BUSTER, context.previousDeal.id], context.previousDeal)
+      }
+      if (context?.previousDealsQueries) {
+        context.previousDealsQueries.forEach(([key, value]) => {
+          queryClient.setQueryData(key, value)
+        })
+      }
+      if (context?.previousAccountDeals) {
+        context.previousAccountDeals.forEach(([key, value]) => {
+          queryClient.setQueryData(key, value)
+        })
+      }
+      if (context?.previousContactDeals) {
+        context.previousContactDeals.forEach(([key, value]) => {
+          queryClient.setQueryData(key, value)
+        })
+      }
+
+      console.error('Error updating deal:', error)
+      toast.error('Failed to update contract')
+    },
     onSuccess: async (data) => {
       queryClient.invalidateQueries({ queryKey: ['deals'] })
       if (data?.id) {
-        queryClient.invalidateQueries({ queryKey: ['deal', QUERY_BUSTER, data.id] })
+        queryClient.invalidateQueries({ queryKey: ['deal', DEALS_QUERY_BUSTER, data.id] })
       }
       queryClient.invalidateQueries({ queryKey: ['deal'] })
       queryClient.invalidateQueries({ queryKey: ['accounts'] })
       if (data?.accountId) {
         await ensureFreshSupabaseSession()
-        queryClient.invalidateQueries({ queryKey: ['deals-by-account', QUERY_BUSTER, data.accountId] })
+        queryClient.invalidateQueries({ queryKey: ['deals-by-account', DEALS_QUERY_BUSTER, data.accountId] })
         queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
 
         // Sync to account
@@ -382,17 +467,13 @@ export function useUpdateDeal() {
           queryClient.invalidateQueries({ queryKey: ['account', data.accountId] })
         }
       }
-      if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', QUERY_BUSTER, data.contactId] })
+      if (data?.contactId) queryClient.invalidateQueries({ queryKey: ['deals-by-contact', DEALS_QUERY_BUSTER, data.contactId] })
 
       if (data?.stage === 'SECURED') {
         toast.success('Contract secured — account promoted to Customer')
       } else {
         toast.success('Contract updated')
       }
-    },
-    onError: (error) => {
-      console.error('Error updating deal:', error)
-      toast.error('Failed to update contract')
     },
   })
 }
@@ -433,7 +514,7 @@ export function useDealsStats() {
   const { user, role, loading } = useAuth()
 
   return useQuery({
-    queryKey: ['deals-stats', QUERY_BUSTER, user?.email, role],
+    queryKey: ['deals-stats', DEALS_QUERY_BUSTER, user?.email, role],
     queryFn: async () => {
       if (loading || !user) return null
 
