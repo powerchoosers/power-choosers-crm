@@ -3243,7 +3243,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           signal_headline: 'Industry Context',
           signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
           talk_track: aiTalkTrack,
+          signal_date: new Date().toISOString().slice(0, 10),
+          source_date: new Date().toISOString().slice(0, 10),
+          source_url: account.domain ? `https://${cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
           confidence_level: 'Low',
+          selected_priority: 9,
+          source_title: 'Industry Context',
+          source_domain: account.domain || '',
         }
         outcomeStatus = 'ready'
         usedFallback = true
