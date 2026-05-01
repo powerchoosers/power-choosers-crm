@@ -167,6 +167,14 @@ const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url'
 const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
 const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 
+function normalizeLocationTerms(values?: string[]) {
+  return (values ?? []).map((value) => String(value).trim()).filter(Boolean)
+}
+
+function normalizeStatusTerms(values?: string[]) {
+  return (values ?? []).map((value) => String(value).trim()).filter(Boolean)
+}
+
 function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
   const city = data.city || ''
   const state = data.state || ''
@@ -301,6 +309,9 @@ export function useSearchAccounts(queryTerm: string) {
 export function useAccounts(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
   const ownerScopeValues = buildOwnerScopeValues(user)
+  const locationTerms = normalizeLocationTerms(filters?.location)
+  const statusTerms = normalizeStatusTerms(filters?.status)
+  const industryTerms = (filters?.industry ?? []).map((value) => String(value).trim()).filter(Boolean)
 
   return useInfiniteQuery({
     queryKey: ['accounts', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
@@ -310,28 +321,36 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         if (!enabled || loading) return { accounts: [], nextCursor: null };
         if (!user && !loading) return { accounts: [], nextCursor: null };
 
-        let query = supabase.from('accounts').select(ACCOUNT_LIST_SELECT);
+        const from = pageParam * PAGE_SIZE;
 
         if (listId) {
-          // Fetch targetIds from list_members first due to lack of FK for inner join
-          const { data: memberData, error: memberError } = await supabase
-            .from('list_members')
-            .select('targetId')
-            .eq('listId', listId)
-            .in('targetType', ['accounts', 'account', 'companies', 'company']);
+          const { data, error } = await supabase.rpc('get_accounts_by_list', {
+            p_list_id: listId,
+            p_limit: PAGE_SIZE,
+            p_offset: from,
+            p_search: searchQuery ?? null,
+            p_industries: industryTerms.length > 0 ? industryTerms : null,
+            p_statuses: statusTerms.length > 0 ? statusTerms : null,
+            p_locations: locationTerms.length > 0 ? locationTerms : null,
+            p_owner_ids: role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null,
+          });
 
-          if (memberError) {
-            console.error("Error fetching list members:", memberError);
-            return { accounts: [], nextCursor: null };
+          if (error) {
+            if (error.message?.includes('Abort') || error.message === 'FetchUserError: Request was aborted') {
+              throw error;
+            }
+            console.error("Supabase error fetching accounts:", error);
+            throw error;
           }
 
-          const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
-          if (targetIds.length === 0) {
-            return { accounts: [], nextCursor: null };
-          }
-
-          query = query.in('id', targetIds);
+          const accounts = (data ?? []).map((row: any) => mapAccountRow(row)) as Account[];
+          return {
+            accounts,
+            nextCursor: accounts.length === PAGE_SIZE ? pageParam + 1 : null,
+          };
         }
+
+        let query = supabase.from('accounts').select(ACCOUNT_LIST_SELECT);
 
         // Apply ownership filter for non-admin users
         if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
@@ -343,21 +362,20 @@ export function useAccounts(searchQuery?: string, filters?: AccountFilters, list
         }
 
         // Apply column filters
-        if (filters?.industry && filters.industry.length > 0) {
-          query = query.in('industry', filters.industry);
+        if (industryTerms.length > 0) {
+          query = query.in('industry', industryTerms);
         }
-        if (filters?.status && filters.status.length > 0) {
-          const statusConditions = buildAccountStatusClauses(filters.status)
+        if (statusTerms.length > 0) {
+          const statusConditions = buildAccountStatusClauses(statusTerms)
           if (statusConditions.length > 0) {
             query = query.or(statusConditions.join(','))
           }
         }
-        if (filters?.location && filters.location.length > 0) {
-          const locConditions = filters.location.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
+        if (locationTerms.length > 0) {
+          const locConditions = locationTerms.map(loc => `city.ilike.%${loc}%,state.ilike.%${loc}%,address.ilike.%${loc}%`).join(',');
           query = query.or(locConditions);
         }
 
-        const from = pageParam * PAGE_SIZE;
         const to = from + PAGE_SIZE - 1;
 
         const { data, error } = await query
@@ -527,6 +545,9 @@ export function useAccountBillIntelligence(accountId: string | undefined) {
 export function useAccountsCount(searchQuery?: string, filters?: AccountFilters, listId?: string, enabled = true) {
   const { user, role, loading } = useAuth()
   const ownerScopeValues = buildOwnerScopeValues(user)
+  const locationTerms = normalizeLocationTerms(filters?.location)
+  const statusTerms = normalizeStatusTerms(filters?.status)
+  const industryTerms = (filters?.industry ?? []).map((value) => String(value).trim()).filter(Boolean)
 
   return useQuery({
     queryKey: ['accounts-count', user?.id ?? user?.email ?? 'guest', role ?? 'unknown', searchQuery, filters, listId],
@@ -537,39 +558,22 @@ export function useAccountsCount(searchQuery?: string, filters?: AccountFilters,
       let query = supabase.from('accounts').select('id', { count: 'exact', head: true })
 
       if (listId) {
-        // Use RPC to get count for large lists to avoid URL length limits
         const { data: countData, error: countError } = await supabase
-          .rpc('get_accounts_count_by_list', { p_list_id: listId });
+          .rpc('get_accounts_count_by_list', {
+            p_list_id: listId,
+            p_search: searchQuery ?? null,
+            p_industries: industryTerms.length > 0 ? industryTerms : null,
+            p_statuses: statusTerms.length > 0 ? statusTerms : null,
+            p_locations: locationTerms.length > 0 ? locationTerms : null,
+            p_owner_ids: role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0 ? ownerScopeValues : null,
+          });
 
         if (countError) {
           console.error("Error fetching list members count via RPC:", countError);
           return 0;
         }
-        
-        // If there are NO other filters, we can return this count directly.
-        const hasOtherFilters = !!searchQuery || (filters?.status && filters.status.length > 0) || (filters?.industry && filters.industry.length > 0) || (filters?.location && filters.location.length > 0);
-        
-        if (!hasOtherFilters) {
-          return Number(countData || 0);
-        }
 
-        // Fetch targetIds from list_members first
-        const { data: memberData, error: memberError } = await supabase
-          .from('list_members')
-          .select('targetId')
-          .eq('listId', listId)
-          .in('targetType', ['accounts', 'account', 'companies', 'company'])
-          .limit(1000); // Temporary cap for filtered large lists to prevent crash
-
-        if (memberError) {
-          console.error("Error fetching list members for count:", memberError);
-          return 0;
-        }
-
-        const targetIds = memberData?.map(m => m.targetId).filter(Boolean) || [];
-        if (targetIds.length === 0) return 0;
-
-        query = query.in('id', targetIds);
+        return Number(countData || 0);
       }
 
       // Admin and dev see all accounts; others filtered by ownerId
