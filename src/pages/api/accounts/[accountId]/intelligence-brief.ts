@@ -1719,7 +1719,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         openers: [
           `I work with businesses in Texas and wanted to ask about your electricity setup.`,
           `The electricity side often gets overlooked until there's a problem or a surprise in the bill.`,
-          `The question I have is whether you're managing it proactively or if it's just running on autopilot.`,
+          `What I want to understand is whether it's being managed proactively or not.`,
         ],
         focus: ['budget visibility', 'proactive management', 'ERCOT exposure', 'usage patterns'],
     }
@@ -1908,16 +1908,17 @@ REQUIREMENTS:
 1. Be conversational and natural - sound like a human, not a template
 2. Focus on electricity usage patterns specific to their industry
 3. ${multiSiteInfo.isMultiSite ? 'Focus on portfolio-level electricity management across multiple locations' : 'Focus on how their specific type of business uses electricity'}
-4. End with a specific, actionable question about their electricity setup
-5. Keep it to 2-3 sentences (50-80 words)
-6. DO NOT use generic phrases like:
-   - "current setup"
-   - "how the business runs today"
-   - "whether the bill matches the facility"
-   - "autopilot"
-   - "site by site"
-7. Be specific to their industry and situation
-8. The question should be about something concrete they can answer
+4. End with one specific, actionable question about their electricity setup
+5. Do not repeat that same question earlier in the opener
+6. Keep it to 2-3 sentences (50-80 words)
+7. DO NOT use generic phrases like:
+  - "current setup"
+  - "how the business runs today"
+  - "whether the bill matches the facility"
+  - "autopilot"
+  - "site by site"
+8. Be specific to their industry and situation
+9. The question should be about something concrete they can answer
 
 EXAMPLES OF GOOD TALK TRACKS:
 - For a manufacturing company: "I work with manufacturers in Texas, and one thing that comes up a lot is demand spikes from equipment start-ups and shift changes. Those peaks can drive up transmission fees pretty fast. Have you looked at which processes or equipment are creating your biggest spikes?"
