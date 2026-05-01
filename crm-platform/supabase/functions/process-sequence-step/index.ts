@@ -445,10 +445,12 @@ function buildReplyStageDirective(stage: string): string {
     const directives: Record<string, string> = {
         first_touch: [
             '- FIRST TOUCH: 50-80 words, 2 short paragraphs.',
-            '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget drift or renewal timing; facilities/operations/warehouse/logistics/manufacturing = demand spikes, delivery charges, load timing, or summer rate pressure; purchasing/contracts/procurement/asset management = renewal timing or vendor fit; owner/CEO/president/GM/VP = leverage or timing; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
+            '- Pick exactly one reply lane: real event, renewal/timing, budget variance, operations/load, routing/owner, or market timing. Do not blend lanes.',
+            '- Lane selection by role/title: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/warehouse/logistics/manufacturing = load timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement/asset management = renewal timing, vendor fit, or contract cleanup; owner/CEO/president/GM/VP = leverage, timing, or a simple cost check; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship, comfort, reliability, or predictability.',
+            '- Do not choose delivery charges or demand charges unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
             '- Start with one concrete company, role, city, or operating fact.',
-            '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a short read, a rate-vs-delivery read, or a simple yes/no reply.',
-            '- First-touch tone should be direct but calm. First-touch CTA must stay low-friction. Good patterns: "Reply and I\'ll send the short read." "Okay if I send the rate-vs-delivery read?" "Am I barking up the right tree on this?"',
+            '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page snapshot, short read, simple yes/no reply, or routing reply.',
+            '- First-touch tone should be direct but calm. First-touch CTA must be easy to answer. Good patterns: "Want me to send the one-page snapshot?" "Reply yes and I\'ll send the short read." "Does this sit with you or someone else?" "Am I barking up the right tree on this?"',
             '- Never ask for a utility bill, statement, or invoice in first touch.',
             '- If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
             '- If the site is in Texas and utility territory is known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. Do not use market shorthand.',
@@ -457,12 +459,12 @@ function buildReplyStageDirective(stage: string): string {
         ].join('\n'),
         follow_up: [
             '- FOLLOW-UP: 45-75 words, 2-3 short paragraphs.',
-            '- Add one new fact or angle. Reference prior contact by topic only, never opens or clicks.',
-            '- Reinforce one concrete output that does not require document sharing yet: a short read, a rate-vs-delivery read, a short call, or a routing reply.',
+            '- Add one new fact or angle. Reference prior contact by topic only, never opens or clicks. Do not repeat the same lane from the prior note if the prompt gives a new signal.',
+            '- Reinforce one concrete output that does not require document sharing yet: a one-page snapshot, a short read, a short call, or a routing reply.',
             '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
             '- If the account is a subsidiary, keep the operating company and parent company separate. Anchor the note to the site or local location, not the corporate HQ unless that is the actual site.',
             '- If the site is in Texas and utility territory is known, use the plain name once naturally. Keep it as a location cue, not jargon.',
-            '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the short read." "Want the rate-vs-delivery read?" "Is this worth a quick look?"',
+            '- Use one direct CTA only. Good patterns: "Want me to send the one-page snapshot?" "Reply yes and I\'ll send the short read." "Is this worth checking before renewal?"',
             '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
             '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: "rate vs delivery", "demand adds cost", "timing check".',
         ].join('\n'),
@@ -493,28 +495,49 @@ function buildReplyStageDirective(stage: string): string {
 function pickValueLane(member: any): string {
     const title = String(member?.contact_title || '').toLowerCase();
     const industry = String(member?.account_industry || '').toLowerCase();
+    const combined = `${title} ${industry}`;
 
     if (/(cfo|controller|finance|accounting|accounts|vp finance|director finance|chief financial)/.test(title)) {
-        return 'budget variance or renewal timing';
+        return 'whether the bill is drifting because of price, timing, or contract structure';
     }
 
     if (/(purchasing|procurement|contracts|asset management|buyer|materials management|purchasing manager)/.test(title)) {
-        return 'renewal timing or vendor coordination';
+        return 'whether renewal timing and supplier terms are being reviewed early enough';
     }
 
-    if (/(facility|facilities|operations|plant|maintenance|logistics|warehouse|production|engineering|supply chain|operations manager|plant manager)/.test(title) || /(manufacturing|logistics|warehouse|distribution|food|cold storage|hospitality|retail|industrial)/.test(industry)) {
-        return 'demand spikes or delivery charges';
+    if (/(restaurant|food service|coffee|hospitality)/.test(combined)) {
+        return 'kitchen load, refrigeration, and summer cooling hours';
+    }
+
+    if (/(school|childcare|academy|education|daycare)/.test(combined)) {
+        return 'classroom occupancy, lighting, and cooling during peak hours';
+    }
+
+    if (/(health|clinic|medical|dental|home health|healthcare)/.test(combined)) {
+        return 'reliability, comfort cooling, and steady daily operating hours';
+    }
+
+    if (/(cold storage|refrigerat|warehouse|logistics|distribution|freight|3pl)/.test(combined)) {
+        return 'dock activity, refrigeration if applicable, and peak usage timing';
+    }
+
+    if (/(manufacturing|industrial|plant|production|fabrication|machine|aerospace)/.test(combined)) {
+        return 'equipment start times, production schedules, and demand peaks';
+    }
+
+    if (/(facility|facilities|operations|plant|maintenance|logistics|warehouse|production|engineering|supply chain|operations manager|plant manager)/.test(title)) {
+        return 'how the site actually uses power during busy periods';
     }
 
     if (/(owner|ceo|president|principal|founder|general manager|gm|managing director)/.test(title)) {
-        return 'timing or leverage before renewal';
+        return 'whether there is leverage before the next renewal';
     }
 
-    if (/(school|church|nonprofit|health|hospital|education|government|municipal)/.test(industry) || /(school|church|nonprofit|health|hospital|education|director|superintendent|pastor|principal|administrator)/.test(title)) {
-        return 'stewardship and predictability';
+    if (/(church|nonprofit|government|municipal)/.test(combined) || /(director|superintendent|pastor|principal|administrator)/.test(title)) {
+        return 'stewardship, predictable bills, and avoiding surprise increases';
     }
 
-    return 'delivery charges';
+    return 'whether the current electricity setup is still priced and timed correctly';
 }
 
 function buildContextualFallbackBody(member: any, replyStage: string, location?: string | null, utilityTerritory?: string | null): string {
@@ -530,18 +553,18 @@ function buildContextualFallbackBody(member: any, replyStage: string, location?:
     const valueLane = pickValueLane(member);
 
     if (stage === 'no_reply') {
-        return `${opener}I think I have the right person. For ${companyPhrase}, the first place I'd check is ${valueLane}.\n\nReply yes and I'll send the short read.`;
+        return `${opener}I think I have the right person for ${companyPhrase}. The angle I would check first is ${valueLane}.\n\nReply yes and I'll send the short read.`;
     }
 
     if (stage === 'follow_up') {
-        return `${opener}I was looking back at ${companyPhrase}. The next place I'd check is ${valueLane}.\n\nReply and I'll send the rate-vs-delivery read.`;
+        return `${opener}Following up on ${companyPhrase}. The angle that seems worth checking first is ${valueLane}.\n\nWant me to send the one-page snapshot?`;
     }
 
     if (stage === 'first_touch') {
-        return `${opener}I was looking at ${companyPhrase}. The first place I'd check is ${valueLane}.\n\nIf useful, I'll send a short read.`;
+        return `${opener}${companyPhrase} stood out because of ${valueLane}. That usually tells you whether the cost issue is price, usage timing, or contract structure.\n\nWant me to send the one-page snapshot?`;
     }
 
-    return `${opener}I was looking at ${companyPhrase}. The first place I'd check is ${valueLane}.\n\nI can send the short read first, and if you want hard numbers after that, I can review the latest statement.`;
+    return `${opener}${companyPhrase} stood out because of ${valueLane}. I can send the short read first, and if it matters, we can confirm the hard numbers later.`;
 }
 
 const CRON_SECRET = Deno.env.get('SUPABASE_CRON_SECRET') || 'nodal-cron-2026'

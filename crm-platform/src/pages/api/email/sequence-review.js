@@ -248,10 +248,12 @@ function buildReplyFirstDirective(stage) {
   const map = {
     first_touch: [
       'REPLY-FIRST NOTE: Keep the body at 50-80 words in 2 short paragraphs.',
-      'Pick one primary value lane based on the role: controller/CFO = budget drift or renewal timing; facilities/operations/real estate = demand spikes, delivery charges, load timing, or summer rate pressure; owner/GM = leverage or timing. Use one lane only.',
+      'Pick exactly one reply lane: real event, renewal/timing, budget variance, operations/load, routing/owner, or market timing. Do not blend lanes.',
+      'Lane selection by role: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/real estate/warehouse/logistics/manufacturing = load timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement = renewal timing, vendor fit, or contract cleanup; owner/GM = leverage, timing, or simple cost check; school/church/nonprofit/healthcare = stewardship, comfort, reliability, or predictability.',
+      'Do not choose delivery charges or demand charges unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
       'Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
-      'Use one concrete company or location fact and make the payoff explicit without asking for a bill: a short read, a rate-vs-delivery read, or a simple yes/no reply.',
-      'First-touch tone should be direct but calm. Prefer a low-friction CTA like "Reply and I\'ll send the short read." or "Okay if I send the rate-vs-delivery read?" Never ask for a bill in first touch.',
+      'Use one concrete company, event, role, city, or location fact and make the payoff explicit without asking for a bill: a one-page snapshot, short read, simple yes/no reply, or routing reply.',
+      'First-touch tone should be direct but calm. Prefer a low-friction CTA like "Want me to send the one-page snapshot?", "Reply yes and I\'ll send the short read.", "Does this sit with you or someone else?", or "Am I barking up the right tree on this?" Never ask for a bill in first touch.',
       'If the account is a subsidiary, use the operating company name and mention the parent only once if it helps orientation. If the account is outside Texas, position Nodal Point as helping nationwide accounts in deregulated markets, not Texas-only.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.',
       'Subject line: 1-4 words, plain, specific, and value-led. Finance examples: budget drift, fixed cost check. Ops examples: load timing, delivery gap. Purchasing examples: renewal timing, vendor fit. Owner examples: simple cost check, timing before renewal.',
@@ -259,8 +261,8 @@ function buildReplyFirstDirective(stage) {
     ].join('\n'),
     follow_up: [
       'REPLY-FIRST NOTE: Keep the body at 45-75 words.',
-      'Add one new fact or angle. Reference prior contact by topic only, never opens or clicks.',
-      'Reinforce one concrete output that does not require document sharing yet: a short read, a rate-vs-delivery read, a short call, or a routing reply.',
+      'Add one new fact or angle. Reference prior contact by topic only, never opens or clicks. Do not repeat the same lane from the prior note if the prompt gives a new signal.',
+      'Reinforce one concrete output that does not require document sharing yet: a one-page snapshot, a short read, a short call, or a routing reply.',
       'Follow-up tone should be more diagnostic and a little more direct than first touch. Prefer one direct CTA only, and do not ask for a bill unless this is clearly a later, high-intent step.',
       'If the account is a subsidiary, keep the operating company and parent company separate. Anchor the note to the site or local location, not the corporate HQ unless that is the actual site.',
       'If the site is in Texas and a single TDU is clearly known, use the plain name once naturally. Keep it as a location cue, not jargon.',

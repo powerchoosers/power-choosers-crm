@@ -239,9 +239,12 @@ function cleanSequenceCopy(input) {
     .replace(/\bWould that be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a short read. ")
     .replace(/\bWould that quick review be helpful\?\s*/gi, "If that's worth a look, reply and I'll send a short read. ")
     .replace(/\bWould you be open to me reviewing it\?\s*/gi, "If you'd like, I'll send a short read first. ")
-    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "If useful, I'll send a rate-vs-delivery read first. ")
-    .replace(/\bWant me to take a look\?\s*/gi, "If useful, I'll send a rate-vs-delivery read first. ")
-    .replace(/\bWorth a quick check\?\s*/gi, "If useful, I'll send a rate-vs-delivery read first. ")
+    .replace(/\bWould you be open to me taking a look(?: if you sent it over)?\?\s*/gi, "Want me to send the one-page snapshot? ")
+    .replace(/\bWant me to take a look\?\s*/gi, "Want me to send the one-page snapshot? ")
+    .replace(/\bWorth a quick check\?\s*/gi, "Want me to send the one-page snapshot? ")
+    .replace(/\bWould you be open to a 15-minute call next week\?\s*/gi, "Want me to send the one-page snapshot? ")
+    .replace(/\bWould you be open to a quick call next week\?\s*/gi, "Want me to send the one-page snapshot? ")
+    .replace(/\bWould you be open to a short call next week\?\s*/gi, "Want me to send the one-page snapshot? ")
     .replace(/\bI can reply with a quick 2-3 point forensic snapshot\b/gi, "I'll send a short read")
     .replace(/\bI can reply with 2-3 observations\b/gi, "I'll send a short read")
     .replace(/\b2-3 specific observations\b/gi, "a short read")
@@ -295,7 +298,7 @@ function enforceStageSpecificCTA(input, replyStage) {
     }
   } else if (stage === 'follow_up') {
     for (const pattern of billAskPatterns) {
-      text = text.replace(pattern, "reply and I'll send a rate-vs-delivery read");
+      text = text.replace(pattern, "reply and I'll send the one-page snapshot");
     }
   } else if (stage === 'no_reply') {
     for (const pattern of billAskPatterns) {
@@ -339,21 +342,23 @@ function buildReplyStageDirective(stage) {
   const directives = {
     first_touch: [
       '- FIRST TOUCH: 50-80 words, 2 short paragraphs.',
-      '- Pick one primary value lane based on the role/title: controller/CFO/accounting = budget drift or renewal timing; facilities/operations/real estate/warehouse/logistics/manufacturing = demand spikes, delivery charges, load timing, or summer rate pressure; purchasing/contracts/procurement/asset management = renewal timing or vendor fit; owner/CEO/president/GM/VP = leverage or timing; mission-driven orgs (church, school, nonprofit, healthcare) = stewardship and predictability. Use one lane only.',
+      '- Pick exactly one reply lane: real event, renewal/timing, budget variance, operations/load, routing/owner, or market timing. Do not blend lanes.',
+      '- Lane selection by role/title: controller/CFO/accounting = budget variance, trust in current price, renewal timing, or budget surprise; facilities/operations/warehouse/logistics/manufacturing = load timing, demand peaks, uptime, or site usage; purchasing/contracts/procurement/asset management = renewal timing, vendor fit, or contract cleanup; owner/CEO/president/GM/VP = leverage, timing, or a simple cost check; school/church/nonprofit/healthcare = stewardship, predictability, comfort, or reliability.',
+      '- Do not choose "delivery charges" or "demand charges" unless the company has a physical site, usage pattern, TDU context, or industry profile that makes that angle believable. For small offices, professional services, schools, clinics, and light retail, use budget predictability, renewal timing, cooling, comfort, or who owns the review.',
       '- Use one concrete research fact from the company description, website, public news, or LinkedIn headline/about when available. LinkedIn is a research signal only and must never be mentioned in the email.',
-      '- Start with one concrete company, role, city, or operating fact. Make the first sentence sound like a real observation, not a template. Avoid the phrase "the useful question is."',
-      '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a short read, a rate-vs-delivery read, or a simple yes/no reply.',
-      '- First-touch tone should be direct but calm. First-touch CTA must stay low-friction. Good patterns: "Reply and I\'ll send the short read." "Okay if I send the rate-vs-delivery read?" "Am I barking up the right tree on this?"',
+      '- Start with one concrete company, role, city, operating, or event fact. Make the first sentence sound like a real observation, not a template. Avoid the phrase "the useful question is."',
+      '- Make the payoff explicit without asking for a bill. Offer one low-friction next step only: a one-page snapshot, a short read, a yes/no reply, or a routing reply.',
+      '- First-touch tone should be direct but calm. First-touch CTA must be easy to answer. Good patterns: "Want me to send the one-page snapshot?" "Reply yes and I\'ll send the short read." "Does this sit with you or someone else?" "Am I barking up the right tree on this?"',
       '- Never ask for a utility bill, statement, or invoice in first touch.',
       '- Subject line should match the persona and stage: finance = budget drift / timing / fixed cost; operations = load timing / delivery gap / demand; purchasing = renewal timing / vendor fit; owner = timing / leverage / simple check. Examples: budget drift, fixed cost check, load timing, delivery gap, renewal timing, simple cost check.',
       '- Never mention LinkedIn, a profile, or how the person was found.',
     ].join('\n'),
     follow_up: [
       '- FOLLOW-UP: 45-75 words, 2-3 short paragraphs.',
-      '- Add one new fact or angle. Reference prior contact by topic only, never opens/clicks.',
-      '- Reinforce one concrete output that does not require document sharing yet: a short read, a rate-vs-delivery read, a short call, or a routing reply.',
+      '- Add one new fact or angle. Reference prior contact by topic only, never opens/clicks. Do not repeat the same lane from the prior note if the prompt gives a new signal.',
+      '- Reinforce one concrete output that does not require document sharing yet: a one-page snapshot, a short read, a short call, or a routing reply.',
       '- Follow-up tone should be more diagnostic and a little more direct than first touch.',
-      '- Use one direct CTA only. Good patterns: "Reply and I\'ll send the short read." "Want the rate-vs-delivery read?" "Is this worth a quick look?"',
+      '- Use one direct CTA only. Good patterns: "Want me to send the one-page snapshot?" "Reply yes and I\'ll send the short read." "Is this worth checking before renewal?"',
       '- Do not ask for a bill unless this is explicitly a later, high-intent step.',
       '- Subject line should sound slightly more diagnostic than Day 1, not generic. Examples: rate vs delivery, demand adds cost, timing check.',
     ].join('\n'),
@@ -651,36 +656,48 @@ export default async function handler(req, res) {
             - Never use unexplained acronyms like 4CP, ESI ID, pass-through, or nodal adder in cold outreach. If a Texas utility name is clearly known, you may say Oncor, CenterPoint, AEP Texas, TNMP, or LP&L once in plain English.
             - Name one primary cost lane in plain business language and only add the second lane if it genuinely sharpens the diagnosis. PHRASE VARIATION IS REQUIRED: never repeat the exact same wording across sends. Rotate between these options — supply side: "supply rate" / "energy rate" / "cost per kWh" / "kilowatt-hour charge" / "what they pay per unit of electricity". Demand/delivery side: "delivery charges" / "demand charges" / "transmission costs" / "capacity charges" / "peak-usage billing" / "the fixed side of the bill". The concept stays constant, the exact words must not.
             - If a technical term is necessary, define it in the same sentence in plain English.
-          12. INTELLIGENCE BRIEF RULE:
+          12. EMAIL LANE SELECTION RULE:
+            - Before writing, choose exactly one lane and commit to it:
+              real_event: verified opening, acquisition, leadership change, expansion, funding, or facility move.
+              renewal_timing: contract timing, vendor review, getting ahead of market movement.
+              budget_variance: unexpected bill movement, trust in current price, summer budget pressure.
+              operations_load: demand peaks, refrigeration, production schedules, HVAC, lighting, uptime, or multi-site usage.
+              routing_owner: finding who owns electricity review when the contact may not be the buyer.
+              market_timing: ERCOT/summer/scarcity/volatility only when the market signal is current and relevant.
+            - If there is a verified real event, that wins. If not, use the best role/business lane. If the data is thin, use routing_owner or renewal_timing instead of pretending there is a news event.
+            - One lane only. Do not mention market conditions unless market_timing is the chosen lane or it directly supports the chosen event.
+            - The email must answer this in plain English: "Why am I emailing this person today, and what can they reply with?"
+          13. INTELLIGENCE BRIEF RULE:
             - If INTELLIGENCE BRIEF is present and looks usable, you may use one specific fact naturally.
             - If the brief is missing, low confidence, empty, or fallback-like, ignore it and lean on account, notes, and call context instead.
             - Never say "I saw a report about..." unless the event itself is named in the same sentence.
             - Never mention the source URL in the email body.
-          13. CTA RULE:
+          14. CTA RULE:
             - First touch: ask for a low-friction reply with a concrete offer, not a bill request and not a generic meeting ask.
-            - Early-sequence offer options: a quick benchmark, a one-page snapshot, a short call, or a simple routing reply.
+            - Early-sequence offer options: a quick benchmark, a one-page snapshot, a short read, or a simple routing reply.
             - First-touch and no-reply branches must NOT ask for a utility bill, statement, or invoice.
             - Later/high-intent branches may optionally ask for the latest statement only to confirm hard numbers after interest is established.
-            - Use PRESENT conditional or an affirmative CTA. Good examples: "Reply and I'll send the one-page snapshot." "Open to a 15-minute call next week?" "Am I barking up the right tree on this?" NEVER past conditional: "if you sent it, I could reply."
+            - Use PRESENT conditional or an affirmative CTA. Good examples: "Want me to send the one-page snapshot?" "Reply yes and I'll send the short read." "Does this sit with you or someone else?" "Am I barking up the right tree on this?" NEVER past conditional: "if you sent it, I could reply."
+            - Avoid meeting asks in first touch unless the strategy explicitly says the prospect is already high-intent. A one-line reply is easier than a calendar commitment.
             - FORBIDDEN CTA forms: "Would you be open to me reviewing it?", "Could I do that for you?", "Would you be open to me taking a look if you sent it over?", "Want me to take a look?" These are indirect and passive.
             - Do not stack more than one question. One CTA only.
-          14. VOICE RULE:
+          15. VOICE RULE:
             - Use first-person peer language from Lewis ("I", "I can", "I review"), not corporate team language.
             - Avoid openers like "our firm", "we help businesses", or "at Nodal Point, we...".
             - You may mention Nodal Point once for identity, but keep the voice consultative and person-to-person.
-          15. SOURCE TRUTH IS HARD RULE:
+          16. SOURCE TRUTH IS HARD RULE:
             - NEVER mention LinkedIn, the contact's LinkedIn profile, or say you found/saw them on LinkedIn in any email copy, regardless of source_label.
             - LinkedIn data is a research signal only — use it to understand the contact's role and company background, but do NOT surface it in the email.
             - If source_label=website, you may reference the company website or public company info once.
             - If source_label=public_company_info, use generic market/industry research wording only.
             - Never claim a source that is not supported by SOURCE_TRUTH.
-          16. COMPANY NAME RULE:
+          17. COMPANY NAME RULE:
             - Use COMPANY_OUTREACH_NAME in copy, not the full legal entity name.
             - Strip legal suffixes like Inc, LLC, Ltd, Corp and ignore DBA phrasing unless the STRATEGY explicitly requires the legal name.
             - Preserve operating-company relationship language when it identifies the actual recipient entity, such as "Haag, a Salas O'Brien Company" or "Jarvis Press, An RRD Company." Do not strip the parent-company phrase out of that name.
             - If PARENT_COMPANY exists, use it as context once at most. Do not confuse the parent with the operating site.
             - No normal human writes "Eduardo E. Lozano & Co., Inc. dba eelco" in a cold email opener. Do not do that.
-          17. FIELD USAGE QUALITY RULE:
+          18. FIELD USAGE QUALITY RULE:
             - If ROLE is known, tailor one phrase to that role's business priorities.
             - If INDUSTRY is known, use the exact industry naturally once (avoid generic "many businesses").
             - If LOCATION is known, anchor the observation to that place naturally. Prefer the site address or operating location over the corporate HQ when both exist. If a Texas utility territory is known, use it once as a location cue, not jargon.
@@ -689,23 +706,24 @@ export default async function handler(req, res) {
             - If company description, employee count, recent signal, or notes are available, use at most one of them naturally. Do not stack all of them into one sentence.
             - If CALL_CONTEXT is present, use only human conversation or substantive call notes. Ignore no-answer calls, voicemail menus, extension trees, and IVR noise.
             - If COMPANY_RESEARCH exists, use one concrete fact from it. Do not say you "looked at LinkedIn" or "noticed on the website" unless that source mention directly adds credibility.
-          18. ENERGY INTEL RULES:
+          19. ENERGY INTEL RULES:
             - If VECTOR_STATE says energy_enabled=false, do not mention specific supplier, rate, utility territory, TDU, or contract timing details.
             - If energy is enabled and supplier is known, you may reference supplier once naturally.
             - If the site is in Texas and utility territory is known, you may reference the territory once naturally.
             - Treat contract end month/day as potentially unreliable. Use renewal YEAR framing only (e.g., "before your 2027 renewal"), not exact month/day claims.
             - Never state certainty about exact contract month/day unless explicitly provided as verified in STRATEGY text.
-          19. OPEN TRACKING RULE:
+          20. OPEN TRACKING RULE:
             - NEVER disclose that the recipient opened, viewed, or looked at a previous email. Open signals route which sequence branch fires — they must never appear in copy.
             - Forbidden phrases: "since you opened my email", "I noticed you looked at my message", "you viewed my last note", "my note seemed to hit home", "I saw you opened", "since you read my message", or any variation.
             - Reference prior contact by CONTENT only: "following up on my note about [company's] electricity costs" or "circling back on the forensic review I mentioned."
-          20. CTA TENSE RULE:
+          21. CTA TENSE RULE:
             - All CTAs must use present conditional, never past conditional.
             - CORRECT: "Reply and I'll send the snapshot." or "If you send the statement later, I'll verify the hard numbers." WRONG: "If you sent it over, I could reply."
             - Use "I'll" or "I can" — never "I could" in a CTA.
-          21. ANTI-FILLER RULE:
+          22. ANTI-FILLER RULE:
             - Every sentence must earn its place with a specific observation. Delete any sentence that could apply to any company in any industry.
             - BANNED filler: "getting a handle on these details can help with budgeting and future planning", "small billing details can add up", "it helps when you're keeping things moving", "a quick review can show some interesting things", "reviewing historical usage helps spot hidden fees and opportunities."
+            - BANNED weak fallback openers: "I was looking at", "I was looking back at", "the first place I'd check is", "the next place I'd check is", "what stands out is how the operation uses power day to day."
             - A tight 3-sentence email beats a padded 5-sentence one. If you cannot make a specific observation, use fewer sentences.
 
           REPLY-FIRST OVERRIDE (${replyStage}):
@@ -930,7 +948,7 @@ export default async function handler(req, res) {
       - Highlight the financial variance, market volatility, or technical risk.
       - NO CITATIONS OR LINKS: Forbid external URLs or bracketed sources.
       - TEXAS/ERCOT SPECIFIC: Avoid UK or non-US energy market references.
-      - Use plain English for energy costs. Never repeat the exact same phrasing for cost buckets across sends. Vary between: supply rate / energy rate / cost per kWh // delivery charges / demand charges / transmission costs / peak-usage billing. The two cost buckets must appear; the exact words must rotate.
+      - Use plain English for energy costs. Never repeat the exact same phrasing for cost buckets across sends. Vary between: supply rate / energy rate / cost per kWh // delivery charges / demand charges / transmission costs / peak-usage billing. Do not force both cost buckets into every email; choose the one that fits the lane.
       
       INSTRUCTIONS:
       - Rewrite the draft to be more impactful and aligned with the Nodal Point philosophy.
