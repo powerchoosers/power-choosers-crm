@@ -699,7 +699,11 @@ function isCompanyWebsiteHit(account: AccountRow, candidate: ResearchHit | null)
 
 function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
-  if (!candidate) return `I came across an update about ${companyName}.`
+  if (!candidate) {
+    return cleanText(account.domain)
+      ? `I was looking at ${companyName}'s website.`
+      : `I came across an update about ${companyName}.`
+  }
   const signalAnchor = deriveSignalAnchor(account, candidate)
   const hasSpecificAnchor = signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase()
   const candidateText = `${candidate.title || ''} ${candidate.snippet || ''}`
@@ -818,6 +822,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   if (/\b(glass|mirror|shower door|shower doors|window|windows|fabricat|showroom|installation|installer|shop floor)\b/.test(text)) {
     return 'For a shop and showroom business like this, the question is whether the showroom, fabrication equipment, and climate control are all being treated as one operational picture.'
+  }
+
+  if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/.test(text)) {
+    return 'For a wholesale distributor like this, the useful check is whether branch activity, inventory, shop equipment, and any climate-controlled space are what is really driving the bill.'
   }
 
   if (/\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
@@ -1419,11 +1427,11 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
       return {
         label: 'Growth / capex / headcount',
         angle: 'Growing load, added equipment, and budget creep before the bills catch up.',
-        question: 'Has anyone checked whether the current setup still matches the way the site is growing?',
+        question: 'Has anyone checked what part of the operation is driving the extra usage as it grows?',
         openers: [
           sourceLead,
           `When headcount or capex starts moving, the electricity side usually changes before anyone notices it in the budget.`,
-          `The thing I’d want to understand is whether the current setup still fits the way the operation is scaling.`,
+          `The thing I’d want to understand is what part of the operation is driving the extra usage.`,
         ],
         focus: ['load growth', 'equipment additions', 'budget creep'],
       }
@@ -1758,11 +1766,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       return {
         label: 'Company context',
         angle: 'Budget visibility, usage patterns, and proactive electricity management.',
-        question: 'Are you managing your electricity proactively, or is it just running on autopilot?',
+        question: 'What parts of the operation are actually driving the bill?',
         openers: [
-          `I work with businesses in Texas and wanted to ask about your electricity setup.`,
+          `I was looking at your website and wanted to understand what is driving the bill.`,
           `The electricity side often gets overlooked until there's a problem or a surprise in the bill.`,
-          `What I want to understand is whether it's being managed proactively or not.`,
+          `What I want to understand is what parts of the operation are driving it.`,
         ],
         focus: ['budget visibility', 'proactive management', 'ERCOT exposure', 'usage patterns'],
     }
@@ -1802,7 +1810,7 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
           marketQuestion: 'Have you looked at how the account behaves once the summer peak window shows up?',
           marketOpeners: [
             'We are moving into the ERCOT summer window, and that is when peak-hour behavior starts to matter a lot more.',
-            'This is usually the time of year when a Texas account finds out whether the setup is built for summer or just looked fine in spring.',
+            'This is usually the time of year when a Texas account finds out whether the bill is ready for summer or just looked fine in spring.',
             'If the site has real load behind it, I would want to know how it handles the hotter months before the bills start moving.',
           ],
           marketFocus: ['summer volatility', 'transmission fees', 'peak-hour exposure', 'cooling load', 'budget risk'],
@@ -1813,10 +1821,10 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
     return {
       marketSeason: season,
       marketLabel: 'ERCOT winter reliability',
-      marketAngle: 'Cold-weather exposure, morning and evening swings, and whether the setup is resilient enough for a snap.',
+      marketAngle: 'Cold-weather exposure, morning and evening swings, and whether the bill is resilient enough for a snap.',
       marketQuestion: 'Have you looked at how the account holds up when winter weather pushes usage around?',
       marketOpeners: [
-        'Winter is when a lot of Texas accounts find out whether the setup is actually steady or just looked steady.',
+        'Winter is when a lot of Texas accounts find out whether the bill is actually steady or just looked steady.',
         'The question in the cold months is usually more about reliability and exposure than about one big load number.',
         'If a cold snap hits, I would want to know what part of the bill or building gets stressed first.',
       ],
@@ -1828,10 +1836,10 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
     return {
       marketSeason: season,
       marketLabel: 'Fall planning window',
-      marketAngle: 'Budget reset, year-end planning, and whether the current setup still makes sense before winter.',
+      marketAngle: 'Budget reset, year-end planning, and whether the bill still makes sense before winter.',
       marketQuestion: 'Have you looked at whether this is the right time to reset the budget or leave it alone?',
       marketOpeners: [
-        'Fall is usually when companies decide whether the current setup deserves another look before year-end.',
+        'Fall is usually when companies decide whether the bill deserves another look before year-end.',
         'That is often the quiet window to clean up the power side before winter or the next contract cycle shows up.',
         'For a lot of accounts, the bigger question now is whether they want to lock in the budget story before the next season changes it.',
       ],
@@ -1848,7 +1856,7 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
       ? [
           'We are in the shoulder season, which is usually the best time to get ahead of summer instead of reacting to it.',
           'For smaller offices and service businesses, this is less about a heavy-load conversation and more about budget predictability and cooling.',
-          'The question I would want answered now is whether the account is ready for the hotter months or still running on autopilot.',
+          'The question I would want answered now is whether the account is ready for the hotter months or still getting by on old assumptions.',
         ]
       : [
           'We are in the shoulder season, which is usually the best time to get ahead of ERCOT summer exposure instead of reacting to it.',
@@ -2935,8 +2943,8 @@ IF SIGNAL = Funding round/IPO/capital raise:
 
 IF SIGNAL = Contract win/new customer/major project:
 - Focus on load increase and whether current agreement can handle it
-- Question: Will the current setup handle the new load without surprises?
-- Example: "I saw you landed the [customer/project] contract. That's going to change your load profile pretty significantly. Have you looked at whether your current electricity setup can handle that without creating surprises, or is that still down the road?"
+- Question: Will the power plan handle the new load without surprises?
+- Example: "I saw you landed the [customer/project] contract. That's going to change your load pretty significantly. Have you looked at whether the power plan can handle that without creating surprises, or is that still down the road?"
 
 IF SIGNAL = Restructuring/closure/consolidation:
 - Focus on stranded costs and agreement flexibility
@@ -3020,8 +3028,8 @@ IF COMPANY = Actively hiring/growing team:
 - Example: "I saw you're actively hiring right now. Usually when headcount is moving like that, the electricity side starts behaving differently, but nobody notices until costs start creeping up. Has that been pretty stable for you guys, or are you seeing some movement?"
 
 IF COMPANY = Long-established (20+ years):
-- Focus on whether they've reviewed their setup recently or it's just been running
-- Example: "I noticed you've been around for [X] years in [city]. Most established companies have electricity agreements that have just been rolling over without much review. When's the last time you guys actually looked at whether the setup still makes sense, or has it just been running?"
+- Focus on whether they've reviewed the bill recently or it's just been running
+- Example: "I noticed you've been around for [X] years in [city]. Most established companies have electricity agreements that have just been rolling over without much review. When's the last time you guys actually looked at the bill, or has it just been running?"
 
 IF COMPANY = Industry facing digital transformation:
 - Focus on new technology load and whether they've thought about electricity impact
