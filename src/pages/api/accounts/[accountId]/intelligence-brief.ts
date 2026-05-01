@@ -1275,7 +1275,7 @@ function inferIndustryCluster(account: AccountRow): IndustryCluster {
   if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
   if (/(school|education|university|college|nonprofit|foundation|charity|municipal)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
-  if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency)/.test(text)) return 'office_services'
+  if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency|design|engineering|architect)/.test(text)) return 'office_services'
   return 'unknown'
 }
 
@@ -2045,7 +2045,9 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     contract_win: [sourceLead],
     funding: [sourceLead],
     industry_context: [
-      `I work with ${context.industryLabel} companies in Texas, and wanted to ask about your electricity setup.`,
+      context.industryLabel && context.industryLabel !== 'Company context'
+        ? `I work with ${context.industryLabel.toLowerCase()} companies in Texas, and wanted to ask about your electricity setup.`
+        : `I work with businesses in Texas and wanted to ask about your electricity setup.`,
     ],
   }
 
