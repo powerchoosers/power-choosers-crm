@@ -2126,7 +2126,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Multi-site groups usually need a portfolio view so one location does not hide the real pattern.',
     ],
     unknown: [
-      'The question I have is whether your electricity is being managed proactively or if it's just running on autopilot.',
+      'The question I have is whether your electricity is being managed proactively or if it\'s just running on autopilot.',
     ],
   }
 
