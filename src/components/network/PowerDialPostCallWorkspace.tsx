@@ -48,6 +48,7 @@ import { useProtocols } from '@/hooks/useProtocols'
 import { useTargets } from '@/hooks/useTargets'
 import { useTasks, type Task } from '@/hooks/useTasks'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
+import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context'
 import { isUnknownAnsweredBy, isVoicemailAnsweredBy } from '@/lib/voice-outcomes'
 import { cn } from '@/lib/utils'
 import { useComposeStore } from '@/store/composeStore'
@@ -394,6 +395,8 @@ export function PowerDialPostCallWorkspace({ snapshot, onContinueDialing }: Powe
     ].filter(Boolean) as Array<{ label: string; notes?: string | null }>)
 
     const contextForAi = noteSources.length > 0 ? formatForensicNoteClipboard(noteSources) : undefined
+    const briefContext = buildIntelligenceBriefContext(account as any)
+    const combinedContext = [contextForAi, briefContext].filter(Boolean).join('\n\n') || undefined
 
     return {
       contactName: entityName || undefined,
@@ -404,9 +407,9 @@ export function PowerDialPostCallWorkspace({ snapshot, onContinueDialing }: Powe
       accountDescription: account?.description || undefined,
       contactId: resolvedContactId || undefined,
       accountId: resolvedAccountId || undefined,
-      contextForAi,
+      contextForAi: combinedContext,
     }
-  }, [account?.description, account?.industry, companyName, contact, entityName, entityTitle, noteDraft, resolvedAccountId, resolvedContactId, snapshot])
+  }, [account, account?.description, account?.industry, companyName, contact, entityName, entityTitle, noteDraft, resolvedAccountId, resolvedContactId, snapshot])
 
   const selectedDisposition = useMemo(
     () => DISPOSITIONS.find((item) => item.id === selectedDispositionId) ?? null,
