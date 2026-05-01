@@ -15,6 +15,7 @@ import { format } from 'date-fns'
 import { useComposeStore } from '@/store/composeStore'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
 import { buildUsableCallContextBlock } from '@/lib/call-context'
+import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context'
 import { IntelligenceBrief } from '@/components/dossier/IntelligenceBrief'
 
 // Modular Components
@@ -121,6 +122,11 @@ export default function ContactDossierPage() {
     )
     if (recentCallContext) {
       contextForAi += contextForAi ? '\\n\\n' + recentCallContext : recentCallContext
+    }
+
+    const briefContext = buildIntelligenceBriefContext(s.account as any)
+    if (briefContext) {
+      contextForAi += contextForAi ? '\\n\\n' + briefContext : briefContext
     }
 
     return {
