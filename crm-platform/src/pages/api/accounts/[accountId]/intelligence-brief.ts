@@ -726,9 +726,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
       hasSpecificAnchor ? `I noticed an update about ${signalAnchor} online.` : `I noticed an update from ${companyName} online.`,
     ],
     sec: [
-      hasSpecificAnchor ? `I saw a public company report about ${signalAnchor}.` : `I saw a public company report tied to ${companyName}.`,
-      hasSpecificAnchor ? `I came across a public company report about ${signalAnchor}.` : `I came across a public company report tied to ${companyName}.`,
-      hasSpecificAnchor ? `I noticed a recent public company report about ${signalAnchor}.` : `I noticed a recent public company report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in a public company report.` : `I saw a public company report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I came across ${companyName} ${buildEventClause(signalAnchor)} in a public company report.` : `I came across a public company report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I noticed ${companyName} ${buildEventClause(signalAnchor)} in a recent public company report.` : `I noticed a recent public company report tied to ${companyName}.`,
     ],
     web_official: [
       hasSpecificAnchor ? `I saw your announcement about ${signalAnchor}.` : `I saw your announcement about ${companyName}.`,
@@ -741,9 +741,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
       hasSpecificAnchor ? `I noticed an article about ${signalAnchor}.` : `I noticed ${companyName} online.`,
     ],
     news: [
-      hasSpecificAnchor ? `I saw a report about ${signalAnchor}.` : `I came across an update about ${companyName}.`,
-      hasSpecificAnchor ? `I came across a news item about ${signalAnchor}.` : `I came across an update about ${companyName}.`,
-      hasSpecificAnchor ? `I noticed a report about ${signalAnchor}.` : `I noticed an update about ${companyName}.`,
+      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in a recent report.` : `I came across an update about ${companyName}.`,
+      hasSpecificAnchor ? `I saw the report on ${companyName}'s ${cleanText(signalAnchor).toLowerCase()}.` : `I came across an update about ${companyName}.`,
+      hasSpecificAnchor ? `I noticed ${companyName} ${buildEventClause(signalAnchor)} in the news.` : `I noticed an update about ${companyName}.`,
     ],
   }
 
@@ -763,6 +763,15 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
     default:
       return variations.news[seed % variations.news.length]
   }
+}
+
+function buildEventClause(anchor: string) {
+  const text = cleanText(anchor).toLowerCase()
+  if (!text) return 'announcing an update'
+  if (/^(launching|rolling out|opening|expanding|announcing|introducing|starting|adding|rolling|building|developing|producing|hiring|promoting|appointing|named)\b/.test(text)) {
+    return text
+  }
+  return `announcing ${text}`
 }
 
 function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null) {
@@ -811,6 +820,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
     return 'For a shop and showroom business like this, the question is whether the showroom, fabrication equipment, and climate control are all being treated as one operational picture.'
   }
 
+  if (/\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
+    return 'For a trailer manufacturer like this, the useful check is whether production, welding, assembly, paint, and test work are all being accounted for as one operating picture.'
+  }
+
   if (/\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
     return 'For a program-based nonprofit or education organization like this, the useful check is whether office space, events, classrooms, and support operations still line up with the bill.'
   }
@@ -847,6 +860,9 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
   }
 
   if (context.industryCluster === 'logistics') {
+    if (/\b(trailer|trailers|heavy haul|heavy-duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))) {
+      return 'For a trailer manufacturer, the useful check is whether production, welding, assembly, paint, and test work are all being treated as one operating picture.'
+    }
     return `For a logistics account, the useful check is where the operation is creating cost pressure: dock activity, HVAC, automation, longer hours, or a few peaks that make the bill look worse than expected.`
   }
 
@@ -2877,6 +2893,8 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
 - Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual event in the same sentence, like "I saw the report that Lambda is moving into Aligned's DFW-04 data center in Plano."
+- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual event in the same sentence, like "I saw Kalyn Siebert rolling out a new extendable trailer in a recent report."
+- If you cannot name the actual event, do not force a news-style opener. Use a plain website or company update opener instead.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - Confidence Level must be exactly High, Medium, or Low.
 - Source URL must be one of the supplied URLs.
@@ -2971,6 +2989,8 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
 - Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual business fact in the same sentence, or use "I came across [company]'s website..." for website-only fallback.
+- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual business fact in the same sentence, or use "I came across [company]'s website..." for website-only fallback.
+- If the sentence cannot name the event clearly, do not use a report-style opener.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - If the company site has an announcement or news page, treat that as the original source and use its publish date when available.
 - Use short sentences and contractions. Sound plainspoken, not polished.
