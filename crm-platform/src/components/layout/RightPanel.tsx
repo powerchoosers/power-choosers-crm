@@ -299,7 +299,7 @@ export function RightPanel() {
           />
         ) : rightPanelMode !== 'DEFAULT' ? (
           <NodeIngestion key="ingest" />
-        ) : isContractsPage ? (
+        ) : isContractsPage && contractId ? (
           <ContractDossierPanel
             key={`contract-dossier-${contractId || 'empty'}`}
             deal={selectedContract ?? null}
