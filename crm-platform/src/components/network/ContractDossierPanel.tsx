@@ -3,7 +3,6 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowUpRight,
-  Building2,
   Clock3,
   FileSignature,
   MapPin,
@@ -99,6 +98,10 @@ export function ContractDossierPanel({
     ? PIPELINE_STAGES.indexOf(deal.stage as (typeof PIPELINE_STAGES)[number])
     : -1
 
+  if (!deal && !isLoading && !isError) {
+    return null
+  }
+
   return (
     <motion.div
       initial={{ x: 24, opacity: 0 }}
@@ -110,37 +113,16 @@ export function ContractDossierPanel({
         panelTheme.shell
       )}
     >
-      <div className={cn(panelTheme.header, 'px-4')}>
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-300">
-            <Building2 className="h-4 w-4" />
+      <div className={panelTheme.header}>
+        <div className={panelTheme.headerTitleWrap}>
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[#002FA7]/60 bg-[#002FA7]/40">
+            <ArrowUpRight className="h-4 w-4 text-white" />
           </div>
-          <div className="min-w-0">
-            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
-              Contract Dossier
-            </div>
-            <div className="truncate text-sm text-zinc-200">
-              {deal ? 'Selected preview' : 'Preview is idle'}
-            </div>
-          </div>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-zinc-300">
+            CONTRACT_DOSSIER
+          </span>
         </div>
-        <div className="flex items-center gap-2">
-          {deal && priorityMeta && (
-          <span
-            className={cn(
-              'inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-widest',
-              priorityMeta.tone === 'rose' && 'border-rose-500/30 bg-rose-500/10 text-rose-300',
-              priorityMeta.tone === 'amber' && 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-              priorityMeta.tone === 'emerald' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
-              priorityMeta.tone === 'blue' && 'border-[#002FA7]/30 bg-[#002FA7]/10 text-blue-200',
-              priorityMeta.tone === 'zinc' && 'border-white/10 bg-white/[0.03] text-zinc-400'
-            )}
-            >
-              {priorityMeta.label}
-            </span>
-          )}
-          <ForensicClose onClick={onClose} size={16} />
-        </div>
+        <ForensicClose onClick={onClose} size={16} />
       </div>
 
       <div className={panelTheme.body}>
@@ -180,36 +162,7 @@ export function ContractDossierPanel({
                 </p>
               </div>
             </motion.div>
-          ) : !deal ? (
-            <motion.div
-              key="empty"
-              initial={{ opacity: 0, x: 24, filter: 'blur(8px)' }}
-              animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, x: 24, filter: 'blur(8px)' }}
-              transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
-              className="space-y-4"
-            >
-              <div className="rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-5">
-                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/[0.03] text-zinc-400">
-                  <Sparkles className="h-4 w-4" />
-                </div>
-                <div className="text-sm text-zinc-200">Select a contract from the list to inspect it here.</div>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  Click any row in the contracts table and the dossier will populate immediately.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/5 bg-black/20 p-4">
-                <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Right panel motion
-                </div>
-                <p className="mt-2 text-xs leading-5 text-zinc-500">
-                  This panel uses the same fade and slide motion as the other right-panel modals, so it feels like part of the same system.
-                </p>
-              </div>
-            </motion.div>
-          ) : (
+          ) : deal ? (
             <motion.div
               key={deal.id}
               initial={{ opacity: 0, x: 24, filter: 'blur(8px)' }}
@@ -453,7 +406,7 @@ export function ContractDossierPanel({
                 </div>
               </div>
             </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
     </motion.div>
