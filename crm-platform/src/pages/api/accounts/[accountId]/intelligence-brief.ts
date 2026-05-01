@@ -1476,6 +1476,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load', 'defrost cycles', 'controls'],
       }
     case 'healthcare':
+      const healthcareMultiSite = detectMultiSiteScale(account, null)
+      
+      if (healthcareMultiSite.isMultiSite && healthcareMultiSite.locationCount && healthcareMultiSite.locationCount >= 5) {
+        const locationDesc = healthcareMultiSite.locationCount >= 20 
+          ? `${healthcareMultiSite.locationCount}+ clinics`
+          : `${healthcareMultiSite.locationCount} clinics`
+        const regionDesc = healthcareMultiSite.regions.length > 1 
+          ? ` across ${healthcareMultiSite.regions.length} states`
+          : ''
+        
+        return {
+          label: 'Healthcare network',
+          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each clinic handling it independently?`,
+          openers: [
+            `Healthcare groups with ${locationDesc} usually need a portfolio view to ensure consistency and reliability across all locations.`,
+            `With that kind of footprint${regionDesc}, there's usually opportunity to bring consistency to how clinics are contracted and how usage is tracked.`,
+            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or location-by-location.`,
+          ],
+          focus: ['portfolio management', 'multi-clinic coordination', 'reliability', 'operational consistency', 'budget predictability'],
+        }
+      }
+      
       return {
         label: 'Healthcare',
         angle: '24/7 uptime, occupancy, HVAC, and backup systems keep the load steady all day.',
@@ -1691,14 +1714,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     default:
       return {
         label: 'Company context',
-        angle: 'Budget visibility, usage patterns, and whether the current setup still fits how the business runs now.',
-        question: 'Has anyone looked at whether the current setup still matches how the business runs today?',
+        angle: 'Budget visibility, usage patterns, and proactive electricity management.',
+        question: 'Are you managing your electricity proactively, or is it just running on autopilot?',
         openers: [
-          `I was looking at how ${companyName} operates.`,
-          `Even without knowing the exact industry, the electricity side usually tells a story about how the business actually runs.`,
-          `The question I'd want answered is whether the current setup still fits the way things work now.`,
+          `I work with businesses in Texas and wanted to ask about your electricity setup.`,
+          `The electricity side often gets overlooked until there's a problem or a surprise in the bill.`,
+          `The question I have is whether you're managing it proactively or if it's just running on autopilot.`,
         ],
-        focus: ['budget visibility', 'operating fit', 'ERCOT exposure', 'usage patterns'],
+        focus: ['budget visibility', 'proactive management', 'ERCOT exposure', 'usage patterns'],
     }
   }
 }
@@ -2022,8 +2045,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     contract_win: [sourceLead],
     funding: [sourceLead],
     industry_context: [
-      `${sourceLead} What stands out is how the operation likely uses power day to day.`,
-      `I came across ${companyName}'s footprint and wanted to ask a practical power question.`,
+      `I work with ${industryLabel} companies in Texas, and wanted to ask about your electricity setup.`,
     ],
   }
 
@@ -2104,7 +2126,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Multi-site groups usually need a portfolio view so one location does not hide the real pattern.',
     ],
     unknown: [
-      'The main thing is whether the way they run the business still matches the bill.',
+      'The question I have is whether your electricity is being managed proactively or if it's just running on autopilot.',
     ],
   }
 
