@@ -3227,15 +3227,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       outcomeStatus = 'empty'
       
       // Even with no signals, generate an AI talk track based on company context
-      console.info('[Intelligence Brief] No signals found, generating AI talk track from company context')
+      console.info('[Intelligence Brief] No signals found, generating AI talk track from company context:', {
+        accountId,
+        accountName: account.name,
+        industry: account.industry,
+      })
+      
       const fallbackContext = buildTalkTrackContext(account, null, true)
       const aiTalkTrack = await generateAITalkTrack(account, null, fallbackContext)
       
       if (aiTalkTrack) {
         // Create a minimal brief with just the AI talk track
+        const industryLabel = cleanText(account.industry) || 'this business'
         validated = {
           signal_headline: 'Industry Context',
-          signal_detail: `No recent news signals found. Talk track generated based on ${account.industry || 'business'} industry context.`,
+          signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
           talk_track: aiTalkTrack,
           signal_date: null,
           source_date: null,
@@ -3243,7 +3249,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           confidence_level: 'Low',
         }
         outcomeStatus = 'ready'
-        console.info('[Intelligence Brief] Generated AI talk track for empty signal case')
+        usedFallback = true
+        console.info('[Intelligence Brief] Successfully generated AI talk track for empty signal case:', {
+          accountId,
+          talkTrackLength: aiTalkTrack.length,
+        })
+      } else {
+        console.warn('[Intelligence Brief] AI talk track generation failed for empty signal case:', {
+          accountId,
+          accountName: account.name,
+        })
       }
     }
 
