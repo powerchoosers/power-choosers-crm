@@ -893,7 +893,7 @@ function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | nul
   }
 
   if (context.industryCluster === 'education_nonprofit') {
-    return 'Has anyone looked at whether the setup still fits the way the organization uses the space, or has it mostly just been left alone?'
+    return 'Has anyone looked at whether the classrooms, offices, and event areas are being billed the right way, or has it mostly just been left alone?'
   }
 
   return context.question
@@ -2176,7 +2176,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Multi-site groups usually need a portfolio view so one location does not hide the real pattern.',
     ],
     unknown: [
-      'What I want to understand is whether the setup still fits the way the organization actually uses the space.',
+      'What I want to understand is whether anyone has reviewed the bill lately or if it has just been left alone.',
     ],
   }
 
