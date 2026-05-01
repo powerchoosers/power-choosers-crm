@@ -792,6 +792,7 @@ async function handleGeneration(execution, job) {
            c.state as contact_state,
            c."linkedinUrl" as contact_linkedin_url,
            c.notes as contact_notes,
+           c.metadata as contact_metadata,
            a.id as account_id,
            a.name as company_name,
            a.domain as account_domain,
