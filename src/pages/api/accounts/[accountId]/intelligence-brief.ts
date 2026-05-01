@@ -804,8 +804,27 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
   return /\b(multi[-\s]?unit|multi[-\s]?site|multiple locations|locations across|several locations|portfolio|stores?|branches|restaurant group)\b/.test(text)
 }
 
+function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+
+  if (/\b(glass|mirror|shower door|shower doors|window|windows|fabricat|showroom|installation|installer|shop floor)\b/.test(text)) {
+    return 'For a shop and showroom business like this, the question is whether the showroom, fabrication equipment, and climate control are all being treated as one operational picture.'
+  }
+
+  if (/\b(office|professional services|consulting|accounting|law|legal|agency|design|engineering|architect)\b/.test(text)) {
+    return 'For an office-style business, the useful check is usually whether the building costs still fit how the space is being used day to day.'
+  }
+
+  return ''
+}
+
 function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const multiLocation = hasMultiLocationEvidence(account, candidate)
+  const businessSpecificLine = buildBusinessSpecificFallbackLine(account, candidate)
+
+  if (businessSpecificLine) {
+    return businessSpecificLine
+  }
 
   if (context.industryCluster === 'restaurant' && multiLocation) {
     return `For a multi-location restaurant group, the useful check is whether the stores are being looked at together, because kitchen equipment, HVAC, refrigeration, and hours can make one location look fine while another is quietly carrying the cost.`
@@ -1387,14 +1406,14 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
     case 'restructuring':
       return {
         label: 'Restructuring / closure / consolidation',
-        angle: 'Stranded capacity, unused sites, and cleanup after a footprint change.',
-        question: 'Have you looked at whether the power side can be cleaned up with the footprint change?',
+        angle: 'Unused meters, leftover contracts, and cleanup after a closure or consolidation.',
+        question: 'Have you looked at whether any old meters or contracts still need cleanup after the change?',
         openers: [
           sourceLead,
           `When a company closes or merges sites, the power side can keep carrying costs that no longer make sense.`,
-          `That’s usually the point where I want to know whether the footprint change has already been worked through on the power side.`,
+          `That is usually the point where I want to know whether any old meters or contracts still need cleanup.`,
         ],
-        focus: ['stranded capacity', 'unused sites', 'footprint cleanup'],
+        focus: ['stranded capacity', 'unused sites', 'meter cleanup', 'contract cleanup'],
       }
     case 'contract_win':
       return {
@@ -1919,6 +1938,9 @@ REQUIREMENTS:
   - "site by site"
 8. Be specific to their industry and situation
 9. The question should be about something concrete they can answer
+10. If the source is only the company website, do not invent a move, closure, acquisition, or footprint change. Talk about the business as it actually operates.
+11. If you mention a change in location or footprint, it must come from the source itself.
+12. Use one angle only. No "industry + market + footprint" mashups.
 
 EXAMPLES OF GOOD TALK TRACKS:
 - For a manufacturing company: "I work with manufacturers in Texas, and one thing that comes up a lot is demand spikes from equipment start-ups and shift changes. Those peaks can drive up transmission fees pretty fast. Have you looked at which processes or equipment are creating your biggest spikes?"
@@ -2015,6 +2037,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(new leader|new cfo|new coo|new ceo|new president|new facilities director|new energy manager)\b/i.test(lower)
   const unsupportedAcquisitionAngle = context.signalFamily !== 'acquisition' &&
     /\b(ownership changes|ownership change|got inherited|what got inherited|inherited on the electricity side)\b/i.test(lower)
+  const unsupportedFootprintAngle = context.signalFamily !== 'restructuring' &&
+    /\b(footprint change|stranded power costs|unused meters|leftover contracts|meter cleanup|contract cleanup)\b/i.test(lower)
   const filingJargon = /\b(sec filing|public filing|recent filing|filing)\b/i.test(lower)
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
@@ -2025,7 +2049,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -2933,6 +2957,7 @@ Decision rules:
 - Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
 - When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
 - If the opening is outside Texas, do not build the talk track around move-in timing or new-site planning. Use a different angle.
+- If the source is just the company website, do not pretend it is a news event or a footprint change. Use a real business fact from the site and one plain electricity angle.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack market + industry + load all at once.
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
