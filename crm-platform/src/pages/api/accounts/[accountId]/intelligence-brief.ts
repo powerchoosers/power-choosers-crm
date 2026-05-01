@@ -3258,10 +3258,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           talkTrackLength: aiTalkTrack.length,
         })
       } else {
-        console.warn('[Intelligence Brief] AI talk track generation failed for empty signal case:', {
+        // AI generation failed, use manual template as last resort
+        console.warn('[Intelligence Brief] AI talk track generation failed, using manual template fallback:', {
           accountId,
           accountName: account.name,
         })
+        
+        const manualTalkTrack = buildManualTalkTrack(account, null, fallbackContext, 0)
+        const industryLabel = cleanText(account.industry) || 'this business'
+        
+        validated = {
+          signal_headline: 'Industry Context',
+          signal_detail: `No recent news signals found. Generated talk track based on ${industryLabel} industry patterns and electricity usage.`,
+          talk_track: manualTalkTrack,
+          signal_date: new Date().toISOString().slice(0, 10),
+          source_date: new Date().toISOString().slice(0, 10),
+          source_url: account.domain ? `https://${cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '')}` : '',
+          confidence_level: 'Low',
+          selected_priority: 9,
+          source_title: 'Industry Context',
+          source_domain: account.domain || '',
+        }
+        outcomeStatus = 'ready'
+        usedFallback = true
+        console.info('[Intelligence Brief] Using manual template fallback for empty signal case')
       }
     }
 
