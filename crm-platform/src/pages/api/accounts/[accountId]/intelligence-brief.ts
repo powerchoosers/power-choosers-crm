@@ -938,6 +938,27 @@ function hasStrongNewLocationEvidence(text: string) {
   return openingVerb && siteNoun && !genericDirectory
 }
 
+function isTexasRelevantLocationSignal(text: string) {
+  const lower = cleanText(text).toLowerCase()
+  if (!lower) return false
+  if (/\btexas\b|\bercot\b|\bretail choice\b|\bderegulated\b|\bcompetitive market\b|\bchoose (?:their|your) electricity provider\b|\bopen market\b/.test(lower)) {
+    return true
+  }
+  return false
+}
+
+function isAlreadyOpenLocationSignal(text: string) {
+  const lower = cleanText(text).toLowerCase()
+  if (!lower) return false
+  return /\b(opened|now open|already open|has opened|have opened|is open|opened in|opened at|serving customers|began serving|begins serving|started serving)\b/.test(lower)
+}
+
+function isFutureOpenLocationSignal(text: string) {
+  const lower = cleanText(text).toLowerCase()
+  if (!lower) return false
+  return /\b(will open|plans? to open|scheduled to open|set to open|coming soon|opening soon|to open|expected to open|is set to open)\b/.test(lower)
+}
+
 function hasLeadershipChangeEvidence(text: string) {
   const lower = cleanText(text).toLowerCase()
   if (!lower) return false
@@ -1197,6 +1218,10 @@ function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false
   const inferredPriority = inferSignalPriority(text, 9)
   const priority = inferredPriority === 9 ? candidate.priority : inferredPriority
 
+  if (priority === 2 && !isTexasRelevantLocationSignal(text)) {
+    return 'industry_context'
+  }
+
   if (priority === 3 && !hasLeadershipChangeEvidence(text)) {
     return 'industry_context'
   }
@@ -1227,6 +1252,9 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   const location = [cleanText(account.city), cleanText(account.state)].filter(Boolean).join(', ')
   const texasLocation = location || 'Texas'
   const sourceLead = buildSourceLead(account, candidate)
+  const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
+  const futureOpen = isFutureOpenLocationSignal(candidateText)
 
   switch (signalFamily) {
     case 'acquisition':
@@ -1248,8 +1276,14 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         question: `Are you planning the electricity piece for the new site now, or is that still early?`,
         openers: [
           sourceLead,
-          `When a company is adding a new site, the electricity piece usually needs to get handled before move-in, not after.`,
-          `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
+          alreadyOpen
+            ? `It looks like the new site is already open, so the question now is whether the power setup actually matches how it is operating today.`
+            : futureOpen
+              ? `If the new site is still coming, the electricity piece usually needs to get handled before move-in, not after.`
+              : `The electricity piece usually needs to get handled before move-in, not after.`,
+          alreadyOpen
+            ? `I would want to know whether the meter, billing, and ramp-up were already lined up when the site opened.`
+            : `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
         ],
         focus: ['new meter timing', 'lease or buildout timing', 'ramp-up load'],
       }
@@ -1723,8 +1757,8 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
     ],
     new_location: [
-      `That is the kind of change where the electricity setup needs to be handled before move-in, not after.`,
-      `The power piece should already be thought through before the new site is live.`,
+      `That is the kind of change where the electricity setup should already be in place if the site is open.`,
+      `If the site is already live, the power piece should be matching how it is actually being used now.`,
     ],
     leadership_change: [
       `A new leader usually means the power setup gets a fresh look, or should.`,
@@ -2315,6 +2349,12 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   if (/\b(sec filing|filing tied|filing about|recent filing|public filing)\b/i.test(talkTrack) && !sourceIsSec) {
     return null
   }
+  if (candidate?.priority === 2 && !isTexasRelevantLocationSignal(`${candidate?.title || ''} ${candidate?.snippet || ''} ${detail} ${talkTrack}`)) {
+    return null
+  }
+  if (!isTexasRelevantLocationSignal(`${candidate?.title || ''} ${candidate?.snippet || ''} ${detail}`) && /\b(move-?in|new site|new location|new store|opening soon|opening|launching|launches)\b/i.test(talkTrack)) {
+    return null
+  }
 
   // Validate talk track length (50-200 words)
   const talkTrackWordCount = talkTrack.split(/\s+/).filter(Boolean).length
@@ -2430,6 +2470,7 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
   const talkTrackContext = buildTalkTrackContext(account, primaryCandidate, isFallbackMode)
   const talkTrackContextJson = JSON.stringify(talkTrackContext, null, 2)
   const researchPayload = {
+    current_date: new Date().toISOString().slice(0, 10),
     account: {
       name: account.name || '',
       industry: account.industry || '',
@@ -2475,6 +2516,8 @@ Decision rules:
 - If a SEC filing, official company page, company newsroom page, or press-release wire result confirms the same event, prefer it over a republished news story or generic web snippet.
 - If both a republished article and an original company announcement are available, use the original announcement date when you can verify it from the source. Do not invent an earlier date.
 - Only use a leadership-change signal when the source names a real person or role change. If you cannot name who changed roles and roughly when it happened, do not use the leadership angle.
+- Compare the current date to the source date. If the source says a location is already open, already moved in, or already serving customers, write it that way. If it is still upcoming, keep it future tense.
+- For new-location signals, only use the opening as a sales angle if the location is in Texas or the source clearly says the area is deregulated / competitive. If it is outside Texas and not clearly a deregulated market, do not use the move-in angle.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
@@ -2482,6 +2525,7 @@ Decision rules:
 - Talk Track must be 2-4 short sentences maximum. Use conversational language.
 - If the signal comes from a filing, translate it into plain English. Do not assume the rep knows SEC jargon. Say "public company report" or explain what changed in everyday words.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
+- When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack signal + market + industry in the same response.
@@ -2509,7 +2553,7 @@ Talk Track angle selection (choose ONE based on the actual signal):
 IF SIGNAL = New location/facility/expansion:
 - Focus on timing and planning ahead, not reactive decisions
 - Question: Are they thinking about the electricity setup NOW or waiting until they move in?
-- Example: "I saw you're opening a new location in [city]. Most companies wait until they're in the building to think about the electricity setup, and by then they're reacting instead of planning. How far ahead are you on that, or is it still on the back burner?"
+- Example: "I saw the report that your new location in [city] opened. Most companies wait until they're in the building to think about the electricity setup, and by then they're reacting instead of planning. Is the power side already lined up, or is that still getting sorted out?"
 
 IF SIGNAL = Acquisition/merger/being acquired:
 - Focus on inherited agreements and hidden exposure
@@ -2573,6 +2617,7 @@ Decision rules:
 - Talk Track should be 2-4 short sentences maximum. Use conversational language.
 - If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
+- When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack market + industry + load all at once.
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
