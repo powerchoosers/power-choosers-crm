@@ -811,6 +811,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
     return 'For a shop and showroom business like this, the question is whether the showroom, fabrication equipment, and climate control are all being treated as one operational picture.'
   }
 
+  if (/\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
+    return 'For a program-based nonprofit or education organization like this, the useful check is whether office space, events, classrooms, and support operations still line up with the bill.'
+  }
+
   if (/\b(office|professional services|consulting|accounting|law|legal|agency|design|engineering|architect)\b/.test(text)) {
     return 'For an office-style business, the useful check is usually whether the building costs still fit how the space is being used day to day.'
   }
@@ -870,6 +874,10 @@ function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | nul
 
   if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
     return 'Has anyone mapped where the peaks are coming from, or is that still hidden inside the monthly bill?'
+  }
+
+  if (context.industryCluster === 'education_nonprofit') {
+    return 'Has anyone looked at whether the setup still fits the way the organization uses the space, or has it mostly just been left alone?'
   }
 
   return context.question
@@ -2039,6 +2047,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(ownership changes|ownership change|got inherited|what got inherited|inherited on the electricity side)\b/i.test(lower)
   const unsupportedFootprintAngle = context.signalFamily !== 'restructuring' &&
     /\b(footprint change|stranded power costs|unused meters|leftover contracts|meter cleanup|contract cleanup)\b/i.test(lower)
+  const repeatedQuestionEcho = /\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b[\s\S]{0,140}\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b/i.test(lower)
   const filingJargon = /\b(sec filing|public filing|recent filing|filing)\b/i.test(lower)
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
@@ -2049,7 +2058,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -2070,9 +2079,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     contract_win: [sourceLead],
     funding: [sourceLead],
     industry_context: [
-      context.industryLabel && context.industryLabel !== 'Company context'
-        ? `I work with ${context.industryLabel.toLowerCase()} companies in Texas, and wanted to ask about your electricity setup.`
-        : `I work with businesses in Texas and wanted to ask about your electricity setup.`,
+      sourceLead,
     ],
   }
 
@@ -2135,7 +2142,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Restaurants swing with kitchen load, HVAC, and refrigeration.',
     ],
     education_nonprofit: [
-      'Schools and nonprofits usually feel it in occupancy, events, and HVAC schedules.',
+      'Schools and nonprofits usually feel it in occupancy, events, classrooms, and HVAC schedules.',
     ],
     religious: [
       'Religious organizations usually see weekend peaks and event-driven usage that is different from most businesses.',
@@ -2153,7 +2160,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Multi-site groups usually need a portfolio view so one location does not hide the real pattern.',
     ],
     unknown: [
-      'The question I have is whether your electricity is being managed proactively or if it\'s just running on autopilot.',
+      'What I want to understand is whether the setup still fits the way the organization actually uses the space.',
     ],
   }
 
