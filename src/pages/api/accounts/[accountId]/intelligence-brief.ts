@@ -771,6 +771,34 @@ function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null
   return buildSourceLead(account, candidate)
 }
 
+function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen: boolean) {
+  const prefix = alreadyOpen
+    ? 'Since the site is already open'
+    : 'When a new site is coming online'
+
+  switch (industryCluster) {
+    case 'education_nonprofit':
+      return `${prefix}, the real question is whether occupancy, HVAC, lighting, and classroom schedules are already lined up with the way the building is actually being used.`
+    case 'healthcare':
+      return `${prefix}, the real question is whether occupancy, HVAC, and daily operating hours are already lined up with the way the location is actually being used.`
+    case 'restaurant':
+      return `${prefix}, the real question is whether kitchen load, HVAC, and refrigeration are already lined up with the way the location is actually being used.`
+    case 'retail':
+      return `${prefix}, the real question is whether lighting, HVAC, and store traffic are already lined up with the way the location is actually being used.`
+    case 'logistics':
+      return `${prefix}, the real question is whether dock activity, HVAC, and automation are already lined up with the way the location is actually being used.`
+    case 'office_services':
+      return `${prefix}, the real question is whether occupancy, HVAC, and lease timing are already lined up with the way the location is actually being used.`
+    case 'food_storage':
+      return `${prefix}, the real question is whether refrigeration, compressors, and operating hours are already lined up with the way the location is actually being used.`
+    case 'manufacturing':
+    case 'energy_intensive':
+      return `${prefix}, the real question is which processes, schedules, or equipment are now driving the peak side of the bill.`
+    default:
+      return `${prefix}, the real question is whether the meter, billing, and operating load are already lined up with how the site is actually running.`
+  }
+}
+
 function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | null) {
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   return /\b(multi[-\s]?unit|multi[-\s]?site|multiple locations|locations across|several locations|portfolio|stores?|branches|restaurant group)\b/.test(text)
@@ -942,6 +970,16 @@ function hasStrongNewLocationEvidence(text: string) {
   const siteNoun = /(\blocation\b|\bsite\b|\bfacility\b|\bwarehouse\b|\bplant\b|\boffice\b|\bbranch\b|\bcampus\b|\bbuilding\b)/i.test(lower)
 
   return openingVerb && siteNoun && !genericDirectory
+}
+
+function hasAcquisitionEvidence(text: string) {
+  const lower = cleanText(text).toLowerCase()
+  if (!lower) return false
+
+  const acquisitionVerb = /(\bacquired\b|\bacquisition\b|\bmerger\b|\bmerged\b|\btakeover\b|\bbuyout\b|\bsold to\b|\bpurchased by\b|\bbeing acquired\b|\bchange in ownership\b|\bnew owner\b|\bnew ownership\b)/i.test(lower)
+  const transactionContext = /(\bcompany\b|\bbusiness\b|\bbrand\b|\bchain\b|\brestaurant\b|\bstores?\b|\blocations?\b|\bgroup\b|\bcorporate structure\b|\bownership\b)/i.test(lower)
+
+  return acquisitionVerb && transactionContext
 }
 
 function isTexasRelevantLocationSignal(text: string) {
@@ -1228,6 +1266,10 @@ function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false
     return 'industry_context'
   }
 
+  if (priority === 1 && !hasAcquisitionEvidence(text)) {
+    return 'industry_context'
+  }
+
   if (priority === 3 && !hasLeadershipChangeEvidence(text)) {
     return 'industry_context'
   }
@@ -1261,6 +1303,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
   const futureOpen = isFutureOpenLocationSignal(candidateText)
+  const openingIndustryLine = buildOpeningIndustryLine(inferIndustryCluster(account), alreadyOpen)
 
   switch (signalFamily) {
     case 'acquisition':
@@ -1279,17 +1322,17 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
       return {
         label: 'New location / facility / construction',
         angle: 'New meter timing, lease timing, construction power, and ramp-up risk.',
-        question: `Are you planning the electricity piece for the new site now, or is that still early?`,
+        question: alreadyOpen
+          ? 'Has anyone looked at whether the new site is actually set up the way it should be now that it is live?'
+          : 'Are you planning the electricity piece for the new site now, or is that still early?',
         openers: [
           sourceLead,
-          alreadyOpen
-            ? `It looks like the new site is already open, so the question now is whether the power setup actually matches how it is operating today.`
-            : futureOpen
-              ? `If the new site is still coming, the electricity piece usually needs to get handled before move-in, not after.`
-              : `The electricity piece usually needs to get handled before move-in, not after.`,
-          alreadyOpen
-            ? `I would want to know whether the meter, billing, and ramp-up were already lined up when the site opened.`
-            : `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
+          openingIndustryLine,
+          futureOpen
+            ? `If the site is still coming, the electricity piece usually needs to be handled before move-in, not after.`
+            : alreadyOpen
+              ? `I would want to know whether the meter, billing, and operating load were already lined up when the site opened.`
+              : `The part I’d want to sanity-check first is whether the new meter and ramp-up are being planned ahead of time.`,
         ],
         focus: ['new meter timing', 'lease or buildout timing', 'ramp-up load'],
       }
@@ -1741,6 +1784,9 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const sourceLead = buildSourceLead(account, candidate)
   const fallbackIndustryLine = buildFallbackIndustryLine(account, candidate, context)
   const fallbackQuestion = buildFallbackQuestion(account, candidate, context)
+  const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
+  const openingIndustryLine = buildOpeningIndustryLine(context.industryCluster, alreadyOpen)
   const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [sourceLead],
@@ -1763,8 +1809,10 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
     ],
     new_location: [
-      `That is the kind of change where the electricity setup should already be in place if the site is open.`,
-      `If the site is already live, the power piece should be matching how it is actually being used now.`,
+      openingIndustryLine,
+      alreadyOpen
+        ? `If the site is already live, the power piece should already match how it is being used now.`
+        : `That is the kind of change where the electricity setup should already be in place before the site goes live.`,
     ],
     leadership_change: [
       `A new leader usually means the power setup gets a fresh look, or should.`,
@@ -2352,7 +2400,12 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
 
   const sourceHost = getHostname(sourceUrl)
   const sourceIsSec = sourceHost === 'sec.gov' || sourceHost.endsWith('.sec.gov')
+  const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const outputText = `${headline} ${detail} ${talkTrack}`
   if (/\b(sec filing|filing tied|filing about|recent filing|public filing)\b/i.test(talkTrack) && !sourceIsSec) {
+    return null
+  }
+  if (/\b(acquisition|acquired|merger|buyout|takeover|ownership change|new owner|new ownership|inherited)\b/i.test(outputText) && !hasAcquisitionEvidence(candidateText)) {
     return null
   }
   if (candidate?.priority === 2 && !isTexasRelevantLocationSignal(`${candidate?.title || ''} ${candidate?.snippet || ''} ${detail} ${talkTrack}`)) {
@@ -2521,6 +2574,7 @@ Decision rules:
 - Use the highest-priority signal supported by the research results.
 - If a SEC filing, official company page, company newsroom page, or press-release wire result confirms the same event, prefer it over a republished news story or generic web snippet.
 - If both a republished article and an original company announcement are available, use the original announcement date when you can verify it from the source. Do not invent an earlier date.
+- Only use an acquisition/ownership signal when the source explicitly says the business was acquired, sold, merged, or taken over. Company history pages and family-origin stories are not acquisition signals.
 - Only use a leadership-change signal when the source names a real person or role change. If you cannot name who changed roles and roughly when it happened, do not use the leadership angle.
 - Compare the current date to the source date. If the source says a location is already open, already moved in, or already serving customers, write it that way. If it is still upcoming, keep it future tense.
 - For new-location signals, only use the opening as a sales angle if the location is in Texas or the source clearly says the area is deregulated / competitive. If it is outside Texas and not clearly a deregulated market, do not use the move-in angle.
@@ -2532,6 +2586,7 @@ Decision rules:
 - Talk Track must be 2-4 short sentences maximum. Use conversational language.
 - If the signal comes from a filing, translate it into plain English. Do not assume the rep knows SEC jargon. Say "public company report" or explain what changed in everyday words.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
+- Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
 - When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
 - If the opening is outside Texas, do not build the talk track around move-in timing or new-site planning. Use a different angle.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
@@ -2625,6 +2680,7 @@ Decision rules:
 - Talk Track should be 2-4 short sentences maximum. Use conversational language.
 - If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
+- Do not use ownership-change language unless the source clearly shows a real transaction. A family history page is not an acquisition.
 - When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
 - If the opening is outside Texas, do not build the talk track around move-in timing or new-site planning. Use a different angle.
 - Use plain language. Avoid corporate fluff.
