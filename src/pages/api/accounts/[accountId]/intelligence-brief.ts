@@ -821,23 +821,23 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
   if (/\b(glass|mirror|shower door|shower doors|window|windows|fabricat|showroom|installation|installer|shop floor)\b/.test(text)) {
-    return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are being billed as one operating picture.'
+    return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are all showing up on the bill the way they should.'
   }
 
   if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/.test(text)) {
-    return 'For a wholesale distributor like this, the useful check is whether branch traffic, inventory turns, shop equipment, and any climate-controlled space are what is really driving the bill.'
+    return 'For a wholesale distributor like this, the useful check is whether branch traffic, inventory turns, shop equipment, and any climate-controlled space are what is really pushing the bill.'
   }
 
   if (/\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
-    return 'For a trailer manufacturer like this, the useful check is whether production, welding, assembly, paint, and test work are all being accounted for as one operating picture.'
+    return 'For a trailer manufacturer like this, the useful check is whether production, welding, assembly, paint, and test work are all landing in the bill the way they should.'
   }
 
   if (/\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
-    return 'For a program-based nonprofit or education organization like this, the useful check is whether classrooms, offices, events, and support spaces are what is really driving the bill.'
+    return 'For a program-based nonprofit or education organization like this, the useful check is whether classrooms, offices, events, and support spaces are what is actually driving the bill.'
   }
 
   if (/\b(office|professional services|consulting|accounting|law|legal|agency|design|engineering|architect)\b/.test(text)) {
-    return 'For an office-style business, the useful check is usually whether occupancy, HVAC, and lease timing are still the main cost drivers.'
+    return 'For an office-style business, the useful check is usually whether occupancy, HVAC, and lease timing are really the main cost drivers.'
   }
 
   return ''
@@ -856,7 +856,7 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
   }
 
   if (context.industryCluster === 'restaurant') {
-    return `For a restaurant, the useful check is whether the bill lines up with how the kitchen, HVAC, refrigeration, and daily hours actually run, not just whether the rate looks reasonable.`
+    return `For a restaurant, the useful check is whether the bill lines up with how the kitchen, HVAC, refrigeration, and daily hours actually run.`
   }
 
   if (context.industryCluster === 'retail' && multiLocation) {
@@ -864,48 +864,56 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
   }
 
   if (context.industryCluster === 'office_services' || context.industryCluster === 'banking') {
-    return `For an office-style account, the useful check is usually budget predictability, HVAC, lease timing, and whether the bill still matches how the space is being used.`
+    return `For an office-style account, the useful check is usually budget predictability, HVAC, lease timing, and whether the bill is matching the way the space is actually being used.`
   }
 
   if (context.industryCluster === 'logistics') {
     if (/\b(trailer|trailers|heavy haul|heavy-duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))) {
-      return 'For a trailer manufacturer, the useful check is whether production, welding, assembly, paint, and test work are all being treated as one operating picture.'
+      return 'For a trailer manufacturer, the useful check is whether production, welding, assembly, paint, and test work are all landing in the bill the way they should.'
     }
-    return `For a logistics account, the useful check is where the operation is creating cost pressure: dock activity, HVAC, automation, longer hours, or a few peaks that make the bill look worse than expected.`
+    return `For a logistics account, the useful check is where the operation is creating cost pressure: dock activity, HVAC, automation, longer hours, or peaks that move the bill.`
   }
 
   if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
-    return `For a heavier site, the useful check is which processes, schedules, or equipment are creating the peaks, because those spikes come from how the site runs, not from the agreement itself.`
+    return `For a heavier site, the useful check is which processes, schedules, or equipment are creating the peaks.`
   }
 
   if (context.industryCluster === 'food_storage') {
-    return `For a food or cold-storage operation, the useful check is refrigeration, defrost cycles, doors, compressors, and whether small operating habits are quietly moving the bill.`
+    return `For a food or cold-storage operation, the useful check is refrigeration, defrost cycles, doors, compressors, and whether small habits are moving the bill.`
   }
 
-  return `The useful check is whether the bill still matches how the business actually runs today, especially if nobody has looked at the setup in a while.`
+  return `The useful check is whether the bill still lines up with how the business is actually being run.`
 }
 
 function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const multiLocation = hasMultiLocationEvidence(account, candidate)
 
   if (multiLocation) {
-    return 'Has anyone compared the locations side by side, or is electricity still being handled one location at a time?'
+    return 'Have you compared the sites side by side, or is each one still being handled separately?'
   }
 
   if (context.industryCluster === 'restaurant') {
-    return 'Has anyone looked at the bill against the way the kitchen and dining room actually run, or is it mostly just getting paid each month?'
+    return 'Has anyone looked at the bill against the way the kitchen and dining room actually run?'
+  }
+
+  if (context.industryCluster === 'retail') {
+    return 'Has anyone checked whether store hours, traffic, or HVAC are what is moving the bill?'
+  }
+
+  if (context.industryCluster === 'office_services' || context.industryCluster === 'banking') {
+    return 'Has anyone checked whether occupancy, HVAC, or lease timing are driving the bill?'
   }
 
   if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))) {
-    return 'Has anyone looked at whether branch traffic, inventory turns, or shop equipment are really driving the bill, or is that still just a guess?'
+    return 'Has anyone looked at whether branch traffic, inventory turns, or shop equipment are really driving the bill?'
   }
 
   if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
-    return 'Has anyone mapped where the peaks are coming from, or is that still hidden inside the monthly bill?'
+    return 'Has anyone mapped where the peaks are coming from?'
   }
 
   if (context.industryCluster === 'education_nonprofit') {
-    return 'Has anyone looked at whether the classrooms, offices, and event areas are being billed the right way, or has it mostly just been left alone?'
+    return 'Has anyone looked at whether the classrooms, offices, and event areas are being billed the right way?'
   }
 
   return context.question
