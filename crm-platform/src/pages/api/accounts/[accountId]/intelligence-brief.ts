@@ -821,11 +821,11 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
   if (/\b(glass|mirror|shower door|shower doors|window|windows|fabricat|showroom|installation|installer|shop floor)\b/.test(text)) {
-    return 'For a shop and showroom business like this, the question is whether the showroom, fabrication equipment, and climate control are all being treated as one operational picture.'
+    return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are being billed as one operating picture.'
   }
 
   if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/.test(text)) {
-    return 'For a wholesale distributor like this, the useful check is whether branch activity, inventory, shop equipment, and any climate-controlled space are what is really driving the bill.'
+    return 'For a wholesale distributor like this, the useful check is whether branch traffic, inventory turns, shop equipment, and any climate-controlled space are what is really driving the bill.'
   }
 
   if (/\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
@@ -833,11 +833,11 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
   }
 
   if (/\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
-    return 'For a program-based nonprofit or education organization like this, the useful check is whether office space, events, classrooms, and support operations still line up with the bill.'
+    return 'For a program-based nonprofit or education organization like this, the useful check is whether classrooms, offices, events, and support spaces are what is really driving the bill.'
   }
 
   if (/\b(office|professional services|consulting|accounting|law|legal|agency|design|engineering|architect)\b/.test(text)) {
-    return 'For an office-style business, the useful check is usually whether the building costs still fit how the space is being used day to day.'
+    return 'For an office-style business, the useful check is usually whether occupancy, HVAC, and lease timing are still the main cost drivers.'
   }
 
   return ''
@@ -894,6 +894,10 @@ function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | nul
 
   if (context.industryCluster === 'restaurant') {
     return 'Has anyone looked at the bill against the way the kitchen and dining room actually run, or is it mostly just getting paid each month?'
+  }
+
+  if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))) {
+    return 'Has anyone looked at whether branch traffic, inventory turns, or shop equipment are really driving the bill, or is that still just a guess?'
   }
 
   if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
@@ -1768,9 +1772,9 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         angle: 'Budget visibility, usage patterns, and proactive electricity management.',
         question: 'What parts of the operation are actually driving the bill?',
         openers: [
-          `I was looking at your website and wanted to understand what is driving the bill.`,
-          `The electricity side often gets overlooked until there's a problem or a surprise in the bill.`,
-          `What I want to understand is what parts of the operation are driving it.`,
+          `I was looking at your website and wanted to understand what is really driving the bill.`,
+          `The bill usually tells the story faster than the website does.`,
+          `What I want to understand is which parts of the operation are actually moving it.`,
         ],
         focus: ['budget visibility', 'proactive management', 'ERCOT exposure', 'usage patterns'],
     }
