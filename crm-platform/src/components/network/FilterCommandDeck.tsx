@@ -21,6 +21,8 @@ export default function FilterCommandDeck({
   columnFilters,
   onFilterChange
 }: FilterDeckProps) {
+  const primaryStatusFilterId = type === 'deals' ? 'stage' : 'status';
+
   // Helper to check if a value is active for a column
   const isActive = (columnId: string, value: any) => {
     const filter = columnFilters.find(f => f.id === columnId);
@@ -79,7 +81,7 @@ export default function FilterCommandDeck({
   };
 
   const clearFilters = () => {
-    onFilterChange('status', undefined);
+    onFilterChange(primaryStatusFilterId, undefined);
     onFilterChange('industry', undefined);
     onFilterChange('location', undefined);
     onFilterChange('title', undefined);
@@ -142,8 +144,8 @@ export default function FilterCommandDeck({
                   <FilterChip
                     key={status}
                     label={status.replace('_', ' ')}
-                    active={isActive('status', status)}
-                    onClick={() => toggleFilter('status', status)}
+                    active={isActive(primaryStatusFilterId, status)}
+                    onClick={() => toggleFilter(primaryStatusFilterId, status)}
                   />
                 ))}
               </div>

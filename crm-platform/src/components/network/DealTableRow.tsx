@@ -6,24 +6,21 @@ import { flexRender, Row } from '@tanstack/react-table'
 import { TableCell } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { Deal } from '@/types/deals'
-import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime'
 
 interface DealTableRowProps {
     row: Row<Deal>
     index: number
-    router: AppRouterInstance
-    saveScroll: () => void
-    columnOrder?: string[]
     isSelected: boolean
+    isPreviewActive?: boolean
+    onSelect: (deal: Deal) => void
 }
 
 export const DealTableRow = memo(function DealTableRow({
     row,
     index,
-    router,
-    saveScroll,
-    columnOrder,
-    isSelected
+    isSelected,
+    isPreviewActive,
+    onSelect,
 }: DealTableRowProps) {
     return (
         <motion.tr
@@ -38,13 +35,15 @@ export const DealTableRow = memo(function DealTableRow({
             data-state={isSelected && "selected"}
             className={cn(
                 "border-b border-white/5 transition-colors group cursor-pointer relative z-10",
+                isPreviewActive
+                    ? "bg-[#002FA7]/8 hover:bg-[#002FA7]/12"
+                    : undefined,
                 isSelected
                     ? "bg-[#002FA7]/5 hover:bg-[#002FA7]/10"
                     : "hover:bg-white/[0.02]"
             )}
             onClick={() => {
-                saveScroll()
-                router.push(`/network/contracts/${row.original.id}`)
+                onSelect(row.original)
             }}
         >
             {row.getVisibleCells().map((cell) => (
@@ -57,6 +56,7 @@ export const DealTableRow = memo(function DealTableRow({
 }, (prev, next) => {
     return prev.row.id === next.row.id &&
         prev.index === next.index &&
-        prev.columnOrder === next.columnOrder &&
-        prev.isSelected === next.isSelected
+        prev.isSelected === next.isSelected &&
+        prev.isPreviewActive === next.isPreviewActive &&
+        prev.onSelect === next.onSelect
 })

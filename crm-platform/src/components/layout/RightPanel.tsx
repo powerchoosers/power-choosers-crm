@@ -4,17 +4,19 @@ import {
   Zap, CheckCircle, Play, DollarSign, Mic, ChevronRight, Plus, AlertCircle, ChevronUp
 } from 'lucide-react'
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useParams, usePathname } from 'next/navigation'
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { format } from 'date-fns'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useContact } from '@/hooks/useContacts'
 import { useAccountContacts } from '@/hooks/useContacts'
 import { useAccount } from '@/hooks/useAccounts'
 import { useTasks } from '@/hooks/useTasks'
+import { useDeal } from '@/hooks/useDeals'
 import { cn } from '@/lib/utils'
 import { useMemo } from 'react'
 import { useMarketPulse } from '@/hooks/useMarketPulse'
 import { useUIStore } from '@/store/uiStore'
+import { ContractDossierPanel } from '@/components/network/ContractDossierPanel'
 import { NodeIngestion } from '../right-panel/NodeIngestion'
 import { TaskCreationPanel } from '../right-panel/TaskCreationPanel'
 import { DealCreationPanel } from '../right-panel/DealCreationPanel'
@@ -45,19 +47,34 @@ import { useWeather } from '@/hooks/useWeather'
 import { isTodayOrOverdue } from '@/lib/task-date'
 
 export function RightPanel() {
-  const { rightPanelMode, setRightPanelMode, setTaskContext, ingestionContext, rightPanelMinimized, toggleRightPanel } = useUIStore()
+  const {
+    rightPanelMode,
+    setRightPanelMode,
+    setTaskContext,
+    setDealContext,
+    setSignatureRequestContext,
+    setPortalAccessContext,
+    ingestionContext,
+    rightPanelMinimized,
+    toggleRightPanel,
+  } = useUIStore()
   const pathname = usePathname()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const params = useParams()
 
   // State detection
   const isContactPage = pathname?.includes('/contacts/') || false
   const isAccountPage = pathname?.includes('/accounts/') || false
+  const isContractsPage = pathname === '/network/contracts'
   const isActiveContext = isContactPage || isAccountPage
   const entityId = params?.id as string
+  const contractId = isContractsPage ? searchParams?.get('contractId') : null
 
   const { data: contact, refetch: refetchContact } = useContact(isContactPage ? entityId : '')
   const { data: account, refetch: refetchAccount } = useAccount(isAccountPage ? entityId : (contact?.accountId || ''))
   const { data: accountContacts } = useAccountContacts(isAccountPage ? entityId : '')
+  const { data: selectedContract, isLoading: isContractLoading, isError: isContractError } = useDeal(contractId ?? undefined)
 
   const [isReady, setIsReady] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
@@ -142,6 +159,31 @@ export function RightPanel() {
   const handleScrollToTop = useCallback(() => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [])
+
+  const contractScrollKey = useMemo(() => {
+    if (!isContractsPage) return ''
+    const paramsCopy = new URLSearchParams(searchParams?.toString() ?? '')
+    paramsCopy.delete('contractId')
+    const query = paramsCopy.toString()
+    return `${pathname}${query ? `?${query}` : ''}`
+  }, [isContractsPage, pathname, searchParams])
+
+  const saveContractsScroll = useCallback(() => {
+    if (!isContractsPage || typeof window === 'undefined' || !contractScrollKey) return
+    const container = document.querySelector<HTMLElement>('[data-contracts-scroll-container="true"]')
+    if (!container) return
+    try {
+      sessionStorage.setItem(`np_table_scroll_${contractScrollKey}`, String(container.scrollTop))
+    } catch (_) {}
+  }, [contractScrollKey, isContractsPage])
+
+  const handleClearContractSelection = useCallback(() => {
+    if (!isContractsPage) return
+    const paramsCopy = new URLSearchParams(searchParams?.toString() ?? '')
+    paramsCopy.delete('contractId')
+    const nextPath = paramsCopy.toString() ? `${pathname}?${paramsCopy.toString()}` : pathname
+    router.replace(nextPath, { scroll: false })
+  }, [isContractsPage, pathname, router, searchParams])
 
   const scrollMapIntoView = useCallback((mapNode: HTMLDivElement | null) => {
     const container = scrollContainerRef.current
@@ -257,6 +299,59 @@ export function RightPanel() {
           />
         ) : rightPanelMode !== 'DEFAULT' ? (
           <NodeIngestion key="ingest" />
+        ) : isContractsPage ? (
+          <ContractDossierPanel
+            key={`contract-dossier-${contractId || 'empty'}`}
+            deal={selectedContract ?? null}
+            isLoading={isContractLoading}
+            isError={isContractError}
+            onClose={handleClearContractSelection}
+            onOpenFullDossier={(deal) => {
+              saveContractsScroll()
+              router.push(`/network/contracts/${deal.id}`)
+            }}
+            onEditContract={(deal) => {
+              setDealContext({
+                mode: 'edit',
+                dealId: deal.id,
+                accountId: deal.accountId,
+                accountName: deal.account?.name || deal.accountId,
+                accountLogoUrl: deal.account?.logoUrl ?? deal.account?.logo_url,
+                accountDomain: deal.account?.domain,
+                contactId: deal.contactId,
+                defaultTitle: deal.title,
+                stage: deal.stage,
+                amount: deal.amount,
+                annualUsage: deal.annualUsage,
+                mills: deal.mills,
+                contractLength: deal.contractLength,
+                closeDate: deal.closeDate,
+                probability: deal.probability,
+                yearlyCommission: deal.yearlyCommission,
+              })
+              setRightPanelMode('CREATE_DEAL')
+            }}
+            onCreateSignatureRequest={(deal) => {
+              setSignatureRequestContext({
+                accountId: deal.accountId,
+                dealId: deal.id,
+                requestKind: 'CONTRACT',
+              })
+              setRightPanelMode('CREATE_SIGNATURE_REQUEST')
+            }}
+            onSendPortalAccess={(deal) => {
+              saveContractsScroll()
+              setPortalAccessContext({
+                accountId: deal.accountId,
+                accountName: deal.account?.name,
+              })
+              setRightPanelMode('SEND_PORTAL_ACCESS')
+            }}
+            onViewAccount={(accountId) => {
+              saveContractsScroll()
+              router.push(`/network/accounts/${accountId}`)
+            }}
+          />
         ) : (
           <motion.div
             key="default"

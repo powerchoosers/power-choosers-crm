@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   flexRender,
   getCoreRowModel,
@@ -28,7 +29,8 @@ import {
   MoreHorizontal,
   Mail,
   Search,
-  ShieldCheck
+  ShieldCheck,
+  Eye
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -68,6 +70,13 @@ import {
 import { toast } from 'sonner'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { useUIStore } from '@/store/uiStore'
+import {
+  getDealPriorityMeta,
+  matchesPriorityFocus,
+  sortDealsByPriority,
+  type PriorityFocus,
+} from '@/lib/deal-priority'
+import { DEALS_QUERY_BUSTER } from '@/hooks/useDeals'
 
 const PAGE_SIZE = 50
 
@@ -135,6 +144,65 @@ function fmtUsage(val?: number) {
 function fmtMills(val?: number) {
   if (val === undefined || val === null) return '—'
   return val.toFixed(2)
+}
+
+const PRIORITY_FOCUS_OPTIONS: Array<{
+  id: PriorityFocus
+  label: string
+  description: string
+}> = [
+  { id: 'all', label: 'All Contracts', description: 'Full pipeline, sorted by urgency' },
+  { id: 'urgent', label: 'Needs Attention', description: 'Overdue, closing soon, signature, stale' },
+  { id: 'overdue', label: 'Overdue', description: 'Close date already passed' },
+  { id: 'closing_soon', label: 'Closing Soon', description: 'Close date in the next 30 days' },
+  { id: 'signature_pending', label: 'Signature Pending', description: 'Requests waiting on execution' },
+  { id: 'stale', label: 'Stale', description: 'No recent updates' },
+  { id: 'secured', label: 'Secured', description: 'Won contracts' },
+  { id: 'terminated', label: 'Terminated', description: 'Exited contracts' },
+]
+
+function PriorityRailButton({
+  label,
+  description,
+  count,
+  active,
+  onClick,
+}: {
+  label: string
+  description: string
+  count: number
+  active: boolean
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'w-full rounded-2xl border p-3 text-left transition-all',
+        active
+          ? 'border-[#002FA7] bg-[#002FA7]/10 text-white shadow-[0_0_20px_-12px_rgba(0,47,167,0.55)]'
+          : 'border-white/5 bg-white/[0.02] text-zinc-400 hover:border-white/10 hover:text-zinc-200'
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-sm">{label}</div>
+          <div className="mt-1 text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+            {description}
+          </div>
+        </div>
+        <div className={cn(
+          'rounded-lg border px-2 py-1 font-mono text-[10px] tabular-nums',
+          active
+            ? 'border-[#002FA7]/40 bg-[#002FA7]/20 text-white'
+            : 'border-white/10 bg-black/20 text-zinc-300'
+        )}>
+          {String(count).padStart(2, '0')}
+        </div>
+      </div>
+    </button>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -395,8 +463,14 @@ export default function ContractsPage() {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const queryClient = useQueryClient()
   const { pageIndex, setPage, searchQuery, setSearch, pagination } = useTableState({ pageSize: PAGE_SIZE })
-  const scrollKey = (pathname ?? '/network/contracts') + (searchParams?.toString() ? `?${searchParams.toString()}` : '')
+  const scrollKey = useMemo(() => {
+    const paramsCopy = new URLSearchParams(searchParams?.toString() ?? '')
+    paramsCopy.delete('contractId')
+    const query = paramsCopy.toString()
+    return `${pathname ?? '/network/contracts'}${query ? `?${query}` : ''}`
+  }, [pathname, searchParams])
 
   const [globalFilter, setGlobalFilter] = useState(searchQuery)
   const [debouncedFilter, setDebouncedFilter] = useState(searchQuery)
@@ -413,21 +487,18 @@ export default function ContractsPage() {
 
   const dealFilters = useMemo(() => {
     return {
-      stage: (columnFilters.find(f => f.id === 'stage')?.value as DealStage[]) || undefined,
+      stages: (columnFilters.find(f => f.id === 'stage')?.value as DealStage[]) || undefined,
       search: debouncedFilter.length >= 2 ? debouncedFilter : undefined,
     };
   }, [columnFilters, debouncedFilter]);
 
-  // useDeals hook currently only supports single stage, but we can wrap it or just use the first element
-  const effectiveStage = Array.isArray(dealFilters.stage) ? dealFilters.stage[0] as DealStage : undefined;
-
   const { data, isLoading: queryLoading, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useDeals({
-    stage: effectiveStage,
+    stage: dealFilters.stages,
     search: dealFilters.search,
   })
 
   const { data: totalDeals } = useDealsCount({
-    stage: effectiveStage,
+    stage: dealFilters.stages,
     search: dealFilters.search,
   })
 
@@ -436,13 +507,15 @@ export default function ContractsPage() {
   const updateDeal = useUpdateDeal()
   const deleteDeal = useDeleteDeal()
 
-  const { setRightPanelMode, setDealContext, setPortalAccessContext } = useUIStore()
+  const { setRightPanelMode, setDealContext, setPortalAccessContext, setSignatureRequestContext } = useUIStore()
 
   const [sorting, setSorting] = useState<SortingState>([])
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({})
   const [isMounted, setIsMounted] = useState(false)
   const [isDestructModalOpen, setIsDestructModalOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [priorityFocus, setPriorityFocus] = useState<PriorityFocus>('all')
+  const selectedDealId = searchParams?.get('contractId') ?? null
   const [editDeal, setEditDeal] = useState<Deal | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState<DealFormState>(EMPTY_FORM)
@@ -451,11 +524,46 @@ export default function ContractsPage() {
     setIsMounted(true)
   }, [])
 
-  const deals = useMemo(() => data?.pages.flatMap(page => page.deals) || [], [data])
+  const queryDeals = useMemo(() => data?.pages.flatMap(page => page.deals) || [], [data])
+  const sortedDeals = useMemo(() => sortDealsByPriority(queryDeals), [queryDeals])
+  const visibleDeals = useMemo(
+    () => sortedDeals.filter((deal) => matchesPriorityFocus(deal, priorityFocus)),
+    [priorityFocus, sortedDeals]
+  )
   const isLoading = queryLoading || !isMounted
   const { scrollContainerRef, saveScroll } = useTableScrollRestore(scrollKey, pageIndex, !isLoading)
+  const openContractPreview = useCallback((deal: Deal) => {
+    const paramsCopy = new URLSearchParams(searchParams?.toString() ?? '')
+    paramsCopy.set('contractId', deal.id)
+    queryClient.setQueryData(['deal', DEALS_QUERY_BUSTER, deal.id], deal)
+    router.replace(`${pathname ?? '/network/contracts'}?${paramsCopy.toString()}`, { scroll: false })
+  }, [pathname, queryClient, router, searchParams])
 
-  const effectiveTotalRecords = totalDeals ?? deals.length
+  const priorityCounts = useMemo(() => {
+    const counts = {
+      all: queryDeals.length,
+      urgent: 0,
+      overdue: 0,
+      closing_soon: 0,
+      signature_pending: 0,
+      stale: 0,
+      active: 0,
+      secured: 0,
+      terminated: 0,
+    }
+
+    queryDeals.forEach((deal) => {
+      const meta = getDealPriorityMeta(deal)
+      counts[meta.bucket] += 1
+      if (['overdue', 'signature_pending', 'closing_soon', 'stale'].includes(meta.bucket)) {
+        counts.urgent += 1
+      }
+    })
+
+    return counts
+  }, [queryDeals])
+
+  const effectiveTotalRecords = visibleDeals.length
   const totalPages = Math.max(1, Math.ceil(effectiveTotalRecords / PAGE_SIZE))
   const displayTotalPages = totalDeals == null && hasNextPage
     ? Math.max(totalPages, pagination.pageIndex + 2)
@@ -479,10 +587,10 @@ export default function ContractsPage() {
 
   useEffect(() => {
     const needed = (pagination.pageIndex + 2) * PAGE_SIZE
-    if (hasNextPage && !isFetchingNextPage && deals.length < needed) {
+    if (hasNextPage && !isFetchingNextPage && queryDeals.length < needed) {
       fetchNextPage()
     }
-  }, [pagination.pageIndex, deals.length, hasNextPage, isFetchingNextPage, fetchNextPage])
+  }, [pagination.pageIndex, queryDeals.length, hasNextPage, isFetchingNextPage, fetchNextPage])
 
   const selectedCount = Object.keys(rowSelection).length
 
@@ -631,6 +739,12 @@ export default function ContractsPage() {
       {
         accessorKey: 'stage',
         header: 'Stage',
+        filterFn: (row, id, value) => {
+          if (!value || value.length === 0) return true
+          const currentStage = row.getValue(id) as string
+          if (!currentStage) return false
+          return Array.isArray(value) ? value.includes(currentStage) : currentStage === value
+        },
         cell: ({ row }) => <StageBadge stage={row.original.stage} />
       },
       {
@@ -663,6 +777,13 @@ export default function ContractsPage() {
         cell: ({ row }) => (
           <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
             <button
+              onClick={() => openContractPreview(row.original)}
+              className="p-1.5 rounded hover:bg-white/5 text-zinc-600 hover:text-zinc-300 transition-colors"
+              title="Preview"
+            >
+              <Eye className="w-3 h-3" />
+            </button>
+            <button
               onClick={() => openEdit(row.original)}
               className="p-1.5 rounded hover:bg-white/5 text-zinc-600 hover:text-zinc-300 transition-colors"
               title="Edit"
@@ -686,7 +807,10 @@ export default function ContractsPage() {
                 <DropdownMenuSeparator className="bg-white/10" />
                 <DropdownMenuItem
                   className="hover:bg-white/5 cursor-pointer"
-                  onClick={() => router.push(`/network/accounts/${row.original.accountId}`)}
+                  onClick={() => {
+                    saveScroll()
+                    router.push(`/network/accounts/${row.original.accountId}`)
+                  }}
                 >View Account</DropdownMenuItem>
                 <DropdownMenuItem
                   className="hover:bg-white/5 cursor-pointer flex items-center gap-2"
@@ -715,7 +839,7 @@ export default function ContractsPage() {
   }, [pagination.pageIndex, rowSelection])
 
   const table = useReactTable({
-    data: deals,
+    data: visibleDeals,
     columns,
     getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
@@ -744,8 +868,8 @@ export default function ContractsPage() {
     },
   })
 
-  const filteredRowCount = deals.length
-  const showingStart = filteredRowCount === 0 ? 0 : pagination.pageIndex * PAGE_SIZE + 1
+  const filteredRowCount = visibleDeals.length
+  const showingStart = filteredRowCount === 0 ? 0 : Math.min(filteredRowCount, pagination.pageIndex * PAGE_SIZE + 1)
   const showingEnd = Math.min(filteredRowCount, (pagination.pageIndex + 1) * PAGE_SIZE)
 
   return (
@@ -809,92 +933,151 @@ export default function ContractsPage() {
         onFilterChange={handleFilterChange}
       />
 
-      <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative">
-        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll">
-          <Table>
-            <TableHeader className="sticky top-0 z-20 border-b border-white/5">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
-                  {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              ))}
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <ForensicTableSkeleton columns={columns.length} rows={12} type="deal" />
-              ) : deals.length ? (
-                <AnimatePresence mode="popLayout">
-                  {table.getRowModel().rows.map((row, index) => (
-                    <DealTableRow
-                      key={row.id}
-                      row={row}
-                      index={index}
-                      router={router}
-                      saveScroll={saveScroll}
-                      isSelected={row.getIsSelected()}
-                    />
-                  ))}
-                </AnimatePresence>
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
-                    No contracts found.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
+      <div className="grid flex-1 min-h-0 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
+        <motion.aside
+          initial={{ opacity: 0, x: -16, filter: 'blur(8px)' }}
+          animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
+          transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+          className="rounded-2xl nodal-module-glass border border-white/5 p-4 flex flex-col gap-4 min-h-0 overflow-hidden"
+        >
+          <div className="space-y-1">
+            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
+              Work Queue
+            </div>
+            <h3 className="text-sm text-zinc-100">Sort by urgency, not age.</h3>
+            <p className="text-xs leading-5 text-zinc-500">
+              Use these lanes to move quickly between contracts that need action and contracts that can wait.
+            </p>
+          </div>
 
-        <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
-              <span>Sync_Block {showingStart}–{showingEnd}</span>
-              <div className="h-1 w-1 rounded-full bg-black/40" />
-              <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+              <div className="font-mono text-lg text-zinc-100 tabular-nums">{String(priorityCounts.urgent).padStart(2, '0')}</div>
+              <div className="mt-1 text-[9px] font-mono uppercase tracking-widest text-zinc-600">Urgent</div>
+            </div>
+            <div className="rounded-2xl border border-white/5 bg-white/[0.02] p-3">
+              <div className="font-mono text-lg text-emerald-400 tabular-nums">{String(priorityCounts.secured).padStart(2, '0')}</div>
+              <div className="mt-1 text-[9px] font-mono uppercase tracking-widest text-zinc-600">Secured</div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
-              disabled={pagination.pageIndex === 0}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-              aria-label="Previous page"
-              title="Previous Page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-              {(pagination.pageIndex + 1).toString().padStart(2, '0')}
+
+          <div className="space-y-2 overflow-y-auto pr-1 custom-scrollbar min-h-0">
+            {PRIORITY_FOCUS_OPTIONS.map((option) => (
+              <PriorityRailButton
+                key={option.id}
+                label={option.label}
+                description={option.description}
+                count={priorityCounts[option.id] ?? 0}
+                active={priorityFocus === option.id}
+                onClick={() => {
+                  setPriorityFocus(option.id)
+                  setPage(0)
+                }}
+              />
+            ))}
+          </div>
+
+          <div className="rounded-2xl border border-white/5 bg-black/20 p-3">
+            <div className="text-[10px] font-mono uppercase tracking-[0.25em] text-zinc-500">
+              Queue Rules
             </div>
-            <button
-              onClick={async () => {
-                const nextPageIndex = pagination.pageIndex + 1
-                if (nextPageIndex >= displayTotalPages) return
+            <p className="mt-2 text-xs leading-5 text-zinc-500">
+              Sorted by urgency, then close date, then value. Click a row to load the dossier in the right panel.
+            </p>
+          </div>
+        </motion.aside>
 
-                const needed = (nextPageIndex + 1) * PAGE_SIZE
-                if (deals.length < needed && hasNextPage && !isFetchingNextPage) {
-                  await fetchNextPage()
-                }
+        <div className="flex-1 nodal-void-card overflow-hidden flex flex-col relative min-h-0">
+          <div
+            ref={scrollContainerRef}
+            data-contracts-scroll-container="true"
+            className="flex-1 min-h-0 overflow-y-auto relative scroll-smooth scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent np-scroll"
+          >
+            <Table>
+              <TableHeader className="sticky top-0 z-20 border-b border-white/5">
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id} className="border-none hover:bg-transparent">
+                    {headerGroup.headers.map((header) => (
+                      <TableHead key={header.id} className="text-[10px] font-mono text-zinc-500 uppercase tracking-[0.2em] py-3">
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(
+                            header.column.columnDef.header,
+                            header.getContext()
+                          )}
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <ForensicTableSkeleton columns={columns.length} rows={12} type="deal" />
+                ) : visibleDeals.length ? (
+                  <AnimatePresence mode="popLayout">
+                    {table.getRowModel().rows.map((row, index) => (
+                      <DealTableRow
+                        key={row.id}
+                        row={row}
+                        index={index}
+                        isSelected={row.getIsSelected()}
+                        isPreviewActive={selectedDealId === row.original.id}
+                        onSelect={openContractPreview}
+                      />
+                    ))}
+                  </AnimatePresence>
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center text-zinc-500">
+                      No contracts found.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
 
-                setPage(nextPageIndex)
-              }}
-              disabled={pagination.pageIndex + 1 >= displayTotalPages}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-              aria-label="Next page"
-              title="Next Page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
+          <div className="flex-none border-t border-white/5 nodal-recessed p-4 flex items-center justify-between z-10">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 text-[10px] font-mono text-zinc-600 uppercase tracking-widest">
+                <span>Sync_Block {showingStart}–{showingEnd}</span>
+                <div className="h-1 w-1 rounded-full bg-black/40" />
+                <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
+                disabled={pagination.pageIndex === 0}
+                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                aria-label="Previous page"
+                title="Previous Page"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </button>
+              <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
+                {(pagination.pageIndex + 1).toString().padStart(2, '0')}
+              </div>
+              <button
+                onClick={async () => {
+                  const nextPageIndex = pagination.pageIndex + 1
+                  if (nextPageIndex >= displayTotalPages) return
+
+                  const needed = (nextPageIndex + 1) * PAGE_SIZE
+                  if (queryDeals.length < needed && hasNextPage && !isFetchingNextPage) {
+                    await fetchNextPage()
+                  }
+
+                  setPage(nextPageIndex)
+                }}
+                disabled={pagination.pageIndex + 1 >= displayTotalPages}
+                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
+                aria-label="Next page"
+                title="Next Page"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
