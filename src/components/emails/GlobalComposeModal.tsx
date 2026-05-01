@@ -5,6 +5,7 @@ import { ComposeModal, type ComposeContext } from '@/components/emails/ComposeMo
 import { useComposeStore } from '@/store/composeStore'
 import { supabase } from '@/lib/supabase'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
+import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context'
 
 type ContactRow = {
   id: string
@@ -19,11 +20,25 @@ type ContactRow = {
     name?: string | null
     industry?: string | null
     description?: string | null
+    intelligence_brief_headline?: string | null
+    intelligence_brief_detail?: string | null
+    intelligence_brief_talk_track?: string | null
+    intelligence_brief_signal_date?: string | null
+    intelligence_brief_reported_at?: string | null
+    intelligence_brief_confidence_level?: string | null
+    intelligence_brief_status?: string | null
   } | {
     id?: string | null
     name?: string | null
     industry?: string | null
     description?: string | null
+    intelligence_brief_headline?: string | null
+    intelligence_brief_detail?: string | null
+    intelligence_brief_talk_track?: string | null
+    intelligence_brief_signal_date?: string | null
+    intelligence_brief_reported_at?: string | null
+    intelligence_brief_confidence_level?: string | null
+    intelligence_brief_status?: string | null
   }[] | null
 }
 
@@ -67,7 +82,14 @@ export function GlobalComposeModal() {
               id,
               name,
               industry,
-              description
+              description,
+              intelligence_brief_headline,
+              intelligence_brief_detail,
+              intelligence_brief_talk_track,
+              intelligence_brief_signal_date,
+              intelligence_brief_reported_at,
+              intelligence_brief_confidence_level,
+              intelligence_brief_status
             )
           `)
           .ilike('email', email)
@@ -100,6 +122,11 @@ export function GlobalComposeModal() {
           contactId: contact.id,
           accountId: account?.id || contact.accountId || undefined,
           contextForAi: context?.contextForAi || noteContext,
+        }
+
+        const briefContext = buildIntelligenceBriefContext(account as any)
+        if (briefContext) {
+          nextContext.contextForAi = [nextContext.contextForAi, briefContext].filter(Boolean).join('\n\n')
         }
 
         setComposeContext(nextContext)

@@ -11,6 +11,7 @@ import { useUIStore } from '@/store/uiStore'
 import { useUpdateAccount } from '@/hooks/useAccounts'
 import { buildForensicNoteEntries, formatForensicNoteClipboard } from '@/lib/forensic-notes'
 import { buildUsableCallContextBlock } from '@/lib/call-context'
+import { buildIntelligenceBriefContext } from '@/lib/intelligence-brief-context'
 
 const StakeholderMap = dynamic(
     () => import('@/components/accounts/StakeholderMap').then((mod) => mod.StakeholderMap),
@@ -97,6 +98,11 @@ export const AccountNetworkPanel = memo(function AccountNetworkPanel({
 
         if (recentCallContext) {
             contextForAi += contextForAi ? '\n\n' + recentCallContext : recentCallContext
+        }
+
+        const briefContext = buildIntelligenceBriefContext(account)
+        if (briefContext) {
+            contextForAi += contextForAi ? '\n\n' + briefContext : briefContext
         }
 
         return {
