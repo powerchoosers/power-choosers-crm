@@ -1118,7 +1118,7 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   education_nonprofit: ['campus', 'occupancy', 'events', 'hvac', 'controls', 'building', 'schedule'],
   religious: ['worship', 'sanctuary', 'events', 'hvac', 'weekend', 'seasonal', 'occupancy'],
   technology: ['cooling', 'server', 'fit-out', 'occupancy', 'equipment', 'space', 'data'],
-  energy_intensive: ['4cp', 'process', 'motor', 'equipment', 'peak', 'load', 'maintenance'],
+  energy_intensive: ['transmission fees', 'process', 'motor', 'equipment', 'peak', 'load', 'maintenance'],
   office_services: ['occupancy', 'lease', 'hvac', 'conference', 'equipment', 'hours', 'space'],
   multi_site: ['portfolio', 'site', 'occupancy', 'hours', 'equipment', 'load', 'meter'],
   unknown: ['usage', 'occupancy', 'equipment', 'load'],
@@ -1442,14 +1442,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'manufacturing':
       return {
         label: 'Manufacturing / industrial',
-        angle: 'Demand spikes driven by process timing, shift changes, and equipment start-up, plus 4CP exposure.',
+        angle: 'Demand spikes driven by process timing, shift changes, and equipment start-up, plus transmission fee exposure.',
         question: 'Has anyone mapped which processes or equipment are creating the spikes, and whether anything on-site could smooth them out?',
         openers: [
           `In manufacturing, the thing that usually bites is not the rate, it is the usage pattern and where the peaks come from.`,
           `If the operation runs in shifts, the electricity bill can punish the wrong kind of peak pretty fast.`,
           `The part I’d sanity-check first is which processes, schedules, or equipment are driving the spikes.`,
         ],
-        focus: ['demand spikes', '4CP', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
+        focus: ['demand spikes', 'transmission fees', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
       }
     case 'logistics':
       return {
@@ -1654,14 +1654,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'energy_intensive':
       return {
         label: 'Energy-intensive industrial',
-        angle: '4CP exposure, process load, large motors, and the equipment driving the peaks.',
+        angle: 'Transmission fee exposure, process load, large motors, and the equipment driving the peaks.',
         question: 'Have you mapped which processes or motors are creating the peaks, and whether controls or maintenance could smooth them out?',
         openers: [
           `When a site carries heavy load, the peak side of the bill can matter as much as the rate.`,
           `That is usually where process timing and equipment choices start to matter a lot more.`,
           `If the plant or site is energy intensive, I’d want to know which pieces are driving the peaks and whether anything can be smoothed on-site.`,
         ],
-        focus: ['4CP', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices', 'maintenance'],
+        focus: ['transmission fees', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices', 'maintenance'],
       }
     case 'office_services':
       return {
@@ -1732,14 +1732,14 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
       : {
           marketSeason: season,
           marketLabel: 'ERCOT summer peak season',
-          marketAngle: 'Summer volatility, 4CP, and whether the site is ready for hotter-weather peaks.',
+          marketAngle: 'Summer volatility, transmission fees, and whether the site is ready for hotter-weather peaks.',
           marketQuestion: 'Have you looked at how the account behaves once the summer peak window shows up?',
           marketOpeners: [
             'We are moving into the ERCOT summer window, and that is when peak-hour behavior starts to matter a lot more.',
             'This is usually the time of year when a Texas account finds out whether the setup is built for summer or just looked fine in spring.',
             'If the site has real load behind it, I would want to know how it handles the hotter months before the bills start moving.',
           ],
-          marketFocus: ['summer volatility', '4CP', 'peak-hour exposure', 'cooling load', 'budget risk'],
+          marketFocus: ['summer volatility', 'transmission fees', 'peak-hour exposure', 'cooling load', 'budget risk'],
         }
   }
 
@@ -1897,7 +1897,7 @@ REQUIREMENTS:
 8. The question should be about something concrete they can answer
 
 EXAMPLES OF GOOD TALK TRACKS:
-- For a manufacturing company: "I work with manufacturers in Texas, and one thing that comes up a lot is demand spikes from equipment start-ups and shift changes. Those peaks can drive up the 4CP charges pretty fast. Have you looked at which processes or equipment are creating your biggest spikes?"
+- For a manufacturing company: "I work with manufacturers in Texas, and one thing that comes up a lot is demand spikes from equipment start-ups and shift changes. Those peaks can drive up transmission fees pretty fast. Have you looked at which processes or equipment are creating your biggest spikes?"
 - For a multi-location retail chain: "I work with retail groups in Texas, and with 50+ stores, the electricity piece usually works better when it's managed as a portfolio rather than store-by-store. Are your locations being managed centrally, or is each store handling its own contract?"
 - For a warehouse: "I work with logistics companies in Texas, and 24/7 warehouse operations usually have a different electricity story than office buildings—dock doors, automation, HVAC all running around the clock. Have you looked at which parts of your operation are driving the peaks?"
 
@@ -2731,7 +2731,7 @@ async function fetchIndustryTrends(account: AccountRow): Promise<ResearchHit[]> 
     {
       priority: 9,
       label: 'Industry Trends',
-      query: `${industry} Texas ERCOT commercial energy demand expansion facilities hiring 4CP`,
+      query: `${industry} Texas ERCOT commercial energy demand expansion facilities hiring transmission`,
     },
   ]
 
