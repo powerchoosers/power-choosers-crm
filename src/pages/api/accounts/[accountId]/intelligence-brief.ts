@@ -2045,7 +2045,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     contract_win: [sourceLead],
     funding: [sourceLead],
     industry_context: [
-      `I work with ${industryLabel} companies in Texas, and wanted to ask about your electricity setup.`,
+      `I work with ${context.industryLabel} companies in Texas, and wanted to ask about your electricity setup.`,
     ],
   }
 
