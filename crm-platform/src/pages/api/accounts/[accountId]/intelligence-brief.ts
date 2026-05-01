@@ -702,6 +702,12 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   if (!candidate) return `I came across an update about ${companyName}.`
   const signalAnchor = deriveSignalAnchor(account, candidate)
   const hasSpecificAnchor = signalAnchor && signalAnchor.toLowerCase() !== companyName.toLowerCase()
+  const candidateText = `${candidate.title || ''} ${candidate.snippet || ''}`
+  const blockedOpening = hasStrongNewLocationEvidence(candidateText) && !isTexasRelevantLocationSignal(candidateText)
+
+  if (blockedOpening) {
+    return `I came across an update about ${companyName}.`
+  }
 
   if (candidate.sourceKind === 'web' && isCompanyWebsiteHit(account, candidate)) {
     if (isOfficialCompanyAnnouncement(account, candidate)) {
@@ -2518,6 +2524,7 @@ Decision rules:
 - Only use a leadership-change signal when the source names a real person or role change. If you cannot name who changed roles and roughly when it happened, do not use the leadership angle.
 - Compare the current date to the source date. If the source says a location is already open, already moved in, or already serving customers, write it that way. If it is still upcoming, keep it future tense.
 - For new-location signals, only use the opening as a sales angle if the location is in Texas or the source clearly says the area is deregulated / competitive. If it is outside Texas and not clearly a deregulated market, do not use the move-in angle.
+- If it is an out-of-state opening, do not use new_location at all. Fall back to industry_context or a different signal.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
@@ -2526,6 +2533,7 @@ Decision rules:
 - If the signal comes from a filing, translate it into plain English. Do not assume the rep knows SEC jargon. Say "public company report" or explain what changed in everyday words.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
+- If the opening is outside Texas, do not build the talk track around move-in timing or new-site planning. Use a different angle.
 - Talk Track should make the prospect THINK about their specific situation, not pitch at them.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack signal + market + industry in the same response.
@@ -2618,6 +2626,7 @@ Decision rules:
 - If the source is a filing, translate it into plain English. Do not use SEC jargon unless it makes the sentence clearer.
 - Do not use the word "filing" in the talk track unless there is no clearer way to say it.
 - When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
+- If the opening is outside Texas, do not build the talk track around move-in timing or new-site planning. Use a different angle.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack market + industry + load all at once.
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
