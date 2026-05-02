@@ -2137,9 +2137,9 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     if (cluster === context.industryCluster) return false
     return labels.some((label) => lower.includes(label.toLowerCase()))
   })
-  const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 3 || marketFeelsBoltedOn
+  const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 35 || overstuffed || mismatchedIndustryLabel || (!mentionsSignal && !mentionsIndustry && !mentionsAtLeastOneFocus)
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -2167,33 +2167,33 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const opener = pickVariant(openerBySignal[context.signalFamily], variantSeed) || openerBySignal[context.signalFamily][0]
   const signalLineBySignal: Record<SignalFamily, string[]> = {
     acquisition: [
-      `That usually means somebody has to sort out what got inherited on the power side.`,
+      `After an acquisition, somebody usually has to sort out what got inherited on the power side.`,
       `When ownership changes, the electricity setup is often the piece nobody fully cleans up right away.`,
     ],
     new_location: [
       openingIndustryLine,
       alreadyOpen
         ? `If the site is already live, the power piece should already match how it is being used now.`
-        : `That is the kind of change where the electricity setup should already be in place before the site goes live.`,
+        : `For a new site, the electricity setup should already be in place before it goes live.`,
     ],
     leadership_change: [
       `A new leader usually means the power setup gets a fresh look, or should.`,
       `Fresh eyes tend to surface questions the old team never had time to ask.`,
     ],
     growth: [
-      `Growth like that usually changes the bill before anyone notices it in operations.`,
-      `Once headcount or capex starts moving, the bill can move with it.`,
+      `When a business is growing, that usually changes the bill before anyone notices it in operations.`,
+      `Usually when headcount or capex starts moving, the bill moves with it.`,
     ],
     restructuring: [
-      `That is usually when stranded power costs show up if nobody cleans it up.`,
+      `During a footprint change, stranded power costs often show up if nobody cleans them up.`,
       `When a site gets consolidated or closed, the first question is whether the power costs were cleaned up too.`,
     ],
     contract_win: [
-      `That can change the load faster than people expect.`,
+      `A major contract win can change the load faster than people expect.`,
       `A new customer or project can change how the site runs pretty fast.`,
     ],
     funding: [
-      `That usually means somebody needs to map the new money against the facility plan.`,
+      `After a funding round, somebody usually needs to map the new money against the facility plan.`,
       `Fresh capital can turn into new space, new equipment, or both.`,
     ],
     industry_context: [
@@ -3443,18 +3443,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (shouldRewrite) {
         let rewrittenTalkTrack: string | null = null
         
-        // If this is an industry_context fallback, try AI generation first
-        if (talkTrackRewriteContext.signalFamily === 'industry_context') {
-          rewrittenTalkTrack = await generateAITalkTrack(account, talkTrackCandidate, talkTrackRewriteContext)
-          
-          // Validate AI-generated talk track
-          if (rewrittenTalkTrack) {
-            if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext) ||
-                (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
-                talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
-              console.warn('[Intelligence Brief] AI-generated talk track failed validation, falling back to manual')
-              rewrittenTalkTrack = null
-            }
+        // Always try AI generation first for rewrites
+        rewrittenTalkTrack = await generateAITalkTrack(account, talkTrackCandidate, talkTrackRewriteContext)
+        
+        // Validate AI-generated talk track
+        if (rewrittenTalkTrack) {
+          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext) ||
+              (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
+              talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
+            console.warn('[Intelligence Brief] AI-generated talk track failed validation, falling back to manual')
+            rewrittenTalkTrack = null
           }
         }
         
