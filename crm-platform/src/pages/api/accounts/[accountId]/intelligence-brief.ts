@@ -2832,8 +2832,6 @@ function buildRescueBrief(account: AccountRow, candidate: ResearchHit | null, co
   const headline = (isLikelyNonEnglishText(candidate?.title || '') ? '' : cleanText(candidate?.title || '')) || `${companyName} update`
   const detailParts = [
     snippet || `I saw an update about ${companyName}.`,
-    `That is the kind of change that can matter on the power side because it usually shifts how the site is being used.`,
-    context.question,
   ]
   const talkTrack = buildManualTalkTrack(account, candidate, context, 0)
 
