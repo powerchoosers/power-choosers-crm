@@ -734,9 +734,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
       hasSpecificAnchor ? `I noticed an update about ${signalAnchor} online.` : `I noticed an update from ${companyName} online.`,
     ],
     sec: [
-      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in a public company report.` : `I saw a public company report tied to ${companyName}.`,
-      hasSpecificAnchor ? `I came across ${companyName} ${buildEventClause(signalAnchor)} in a public company report.` : `I came across a public company report tied to ${companyName}.`,
-      hasSpecificAnchor ? `I noticed ${companyName} ${buildEventClause(signalAnchor)} in a recent public company report.` : `I noticed a recent public company report tied to ${companyName}.`,
+      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in a public filing.` : `I was reviewing some recent updates for ${companyName}.`,
+      hasSpecificAnchor ? `I came across ${companyName} ${buildEventClause(signalAnchor)} in a recent filing.` : `I came across some recent updates for ${companyName}.`,
+      hasSpecificAnchor ? `I noticed ${companyName} ${buildEventClause(signalAnchor)} in a public report.` : `I noticed some recent updates for ${companyName}.`,
     ],
     web_official: [
       hasSpecificAnchor ? `I saw your announcement about ${signalAnchor}.` : `I saw your announcement about ${companyName}.`,
@@ -749,8 +749,8 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
       hasSpecificAnchor ? `I noticed an article about ${signalAnchor}.` : `I noticed ${companyName} online.`,
     ],
     news: [
-      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in a recent report.` : `I came across an update about ${companyName}.`,
-      hasSpecificAnchor ? `I saw the report on ${companyName}'s ${cleanText(signalAnchor).toLowerCase()}.` : `I came across an update about ${companyName}.`,
+      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in the news recently.` : `I came across an update about ${companyName}.`,
+      hasSpecificAnchor ? `I saw the recent report on ${companyName} ${buildEventClause(signalAnchor)}.` : `I was reading an update on ${companyName}.`,
       hasSpecificAnchor ? `I noticed ${companyName} ${buildEventClause(signalAnchor)} in the news.` : `I noticed an update about ${companyName}.`,
     ],
   }
@@ -1332,7 +1332,7 @@ function inferIndustryCluster(account: AccountRow): IndustryCluster {
   if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
-  if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component)/.test(text)) return 'manufacturing'
+  if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text)) return 'manufacturing'
   if (/(logistics|warehouse|distribution|fulfillment|freight|trucking|supply chain|transport|shipping)/.test(text)) return 'logistics'
   if (/(cold storage|refrigerat|freezer|food|beverage|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
   if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
@@ -2218,7 +2218,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Multi-site groups usually need a portfolio view so one location does not hide the real pattern.',
     ],
     unknown: [
-      'What I want to understand is whether anyone has reviewed the bill lately or if it has just been left alone.',
+      'What I usually try to understand first is what parts of the operation actually drive the bill, instead of just looking at the rate.',
     ],
   }
 
