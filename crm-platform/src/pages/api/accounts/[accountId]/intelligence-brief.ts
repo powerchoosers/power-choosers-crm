@@ -36,7 +36,7 @@ class TalkTrackCache {
     }
   }
 
-  isTooSimilar(talkTrack: string, threshold = 0.65): boolean {
+  isTooSimilar(talkTrack: string, threshold = 0.50): boolean {
     this.cleanExpired()
     
     const tokens = this.tokenize(talkTrack)
@@ -107,6 +107,10 @@ type AccountRow = {
   city: string | null
   state: string | null
   ownerId: string | null
+  employees?: number | null
+  description?: string | null
+  revenue?: string | null
+  annual_usage?: string | null
   intelligence_brief_headline: string | null
   intelligence_brief_detail: string | null
   intelligence_brief_talk_track: string | null
@@ -225,7 +229,7 @@ type TalkTrackContext = {
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
-const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, employees, description, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 const SIGNAL_KEYWORDS = [
   'acquisition',
   'acquired',
@@ -893,27 +897,27 @@ function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | nul
   }
 
   if (context.industryCluster === 'restaurant') {
-    return 'Has anyone looked at the bill against the way the kitchen and dining room actually run?'
+    return 'Have you looked at the bill against the way the kitchen and dining room actually run?'
   }
 
   if (context.industryCluster === 'retail') {
-    return 'Has anyone checked whether store hours, traffic, or HVAC are what is moving the bill?'
+    return 'Have you checked whether store hours, traffic, or HVAC are what is moving the bill?'
   }
 
   if (context.industryCluster === 'office_services' || context.industryCluster === 'banking') {
-    return 'Has anyone checked whether occupancy, HVAC, or lease timing are driving the bill?'
+    return 'Have you checked whether occupancy, HVAC, or lease timing are driving the bill?'
   }
 
   if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))) {
-    return 'Has anyone looked at whether branch traffic, inventory turns, or shop equipment are really driving the bill?'
+    return 'Have you looked at whether branch traffic, inventory turns, or shop equipment are really driving the bill?'
   }
 
   if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
-    return 'Has anyone mapped where the peaks are coming from?'
+    return 'Have you looked at where the peaks are coming from and how that maps to your transmission charges?'
   }
 
   if (context.industryCluster === 'education_nonprofit') {
-    return 'Has anyone looked at whether the classrooms, offices, and event areas are being billed the right way?'
+    return 'Have you looked at whether the classrooms, offices, and event areas are being billed the right way?'
   }
 
   return context.question
@@ -1506,23 +1510,23 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       return {
         label: 'Manufacturing / industrial',
         angle: 'Demand spikes driven by process timing, shift changes, and equipment start-up, plus transmission fee exposure.',
-        question: 'Has anyone mapped which processes or equipment are creating the spikes, and whether anything on-site could smooth them out?',
+        question: 'Have you looked at which processes or equipment are driving your peaks, and whether anything on-site could smooth them out?',
         openers: [
-          `In manufacturing, the thing that usually bites is not the rate, it is the usage pattern and where the peaks come from.`,
-          `If the operation runs in shifts, the electricity bill can punish the wrong kind of peak pretty fast.`,
-          `The part I’d sanity-check first is which processes, schedules, or equipment are driving the spikes.`,
+          `In manufacturing, the thing that usually catches people off guard is not the rate — it is transmission exposure from peaks during the summer.`,
+          `If the operation runs in shifts, the way it pulls power during peak hours can quietly inflate the transmission side of the bill.`,
+          `The part I’d want to understand first is which processes or equipment are driving the spikes and whether the site is aware of its transmission exposure.`,
         ],
-        focus: ['demand spikes', 'transmission fees', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
+        focus: ['demand spikes', 'transmission exposure', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
       }
     case 'logistics':
       return {
         label: 'Logistics / warehouse / distribution',
         angle: '24/7 warehouse usage, dock activity, automation, and HVAC drive the bill more than the headline rate.',
-        question: 'Has anyone looked at which parts of the warehouse operation are creating the peaks, and whether scheduling or controls could smooth them out?',
+        question: 'Have you looked at which parts of the operation are creating the peaks, and whether scheduling or controls could smooth them out?',
         openers: [
-          `Warehouses can look simple on paper, but dock activity, HVAC, and automation usually tell a different story.`,
-          `A lot of the cost pressure comes from how the site is used, not just how it is priced.`,
-          `I’d want to know which part of the operation is creating the peaks.`,
+          `Warehouses can look straightforward on the surface, but if there is heavy automation or 24/7 dock activity, the transmission exposure from summer peaks can be a real blind spot.`,
+          `A lot of warehouse accounts are focused on the rate but not paying attention to when their load hits — and that timing is what drives the transmission side.`,
+          `I’d want to know which parts of the operation are pulling the hardest during peak hours.`,
         ],
         focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings', 'scheduling', 'controls'],
       }
@@ -1743,9 +1747,9 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         angle: 'Transmission fee exposure, process load, large motors, and the equipment driving the peaks.',
         question: 'Have you mapped which processes or motors are creating the peaks, and whether controls or maintenance could smooth them out?',
         openers: [
-          `When a site carries heavy load, the peak side of the bill can matter as much as the rate.`,
-          `That is usually where process timing and equipment choices start to matter a lot more.`,
-          `If the plant or site is energy intensive, I’d want to know which pieces are driving the peaks and whether anything can be smoothed on-site.`,
+          `When a site carries heavy load, transmission exposure from summer peaks can hit harder than the rate itself.`,
+          `That is usually where process timing and equipment choices start to drive the transmission side of the bill more than the commodity.`,
+          `For an energy-intensive operation, the first thing I’d want to understand is where the peak demand is coming from and how that maps to transmission charges.`,
         ],
         focus: ['transmission fees', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices', 'maintenance'],
       }
@@ -1959,32 +1963,42 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
     ? `This is a multi-site organization with ${multiSiteInfo.locationCount} locations${multiSiteInfo.regions.length > 1 ? ` across ${multiSiteInfo.regions.length} states` : ''}.`
     : ''
   
+  const employeesContext = account.employees ? `- Employee Size: ${account.employees}` : ''
+  const revenueContext = account.revenue ? `- Revenue: ${account.revenue}` : ''
+  const descriptionContext = account.description ? `- Description: ${account.description}` : ''
+  const usageContext = account.annual_usage ? `- Annual Usage: ${account.annual_usage} kWh` : ''
+  
   const prompt = `You are a Texas electricity broker crafting a talk track opener for a sales call. The talk track should be conversational, specific, and lead to a natural question about their electricity setup.
 
 COMPANY CONTEXT:
 - Company: ${companyName}
 - Industry: ${industry}
 - Location: ${location}
-${multiSiteContext}
+${[employeesContext, revenueContext, descriptionContext, usageContext, multiSiteContext].filter(Boolean).join('\n')}
+
+MARKET CONTEXT:
+- Market angle: ${context.marketAngle}
+- Season: ${context.marketLabel}
 
 REQUIREMENTS:
 1. Be conversational and natural - sound like a human, not a template
-2. Focus on electricity usage patterns specific to their industry
-3. ${multiSiteInfo.isMultiSite ? 'Focus on portfolio-level electricity management across multiple locations' : 'Focus on how their specific type of business uses electricity'}
-4. End with one specific, actionable question about their electricity setup
-5. Do not repeat that same question earlier in the opener
-6. Keep it to 2-3 sentences (50-80 words)
-7. DO NOT use generic phrases like:
+2. Focus on electricity cost drivers specific to their industry — not just usage patterns but what actually shows up on the bill
+3. In Texas (ERCOT), the biggest hidden cost for commercial accounts is often transmission exposure — charges tied to how much power a business pulls during the highest grid demand hours in summer. Never say 4CP. Instead say transmission exposure or peak-hour transmission charges. Mention this naturally when it applies (manufacturing, logistics, cold storage, energy-intensive sites).
+4. ${multiSiteInfo.isMultiSite ? 'Focus on portfolio-level electricity management across multiple locations' : 'Focus on how their specific type of business uses electricity and where the cost pressure actually comes from'}
+5. End with one specific, easy-to-answer question about their operation — not their electricity setup
+6. Do not repeat that same question earlier in the opener
+7. Keep it to 2-3 sentences (50-80 words)
+8. DO NOT use generic phrases like:
   - "current setup"
   - "how the business runs today"
   - "whether the bill matches the facility"
   - "autopilot"
   - "site by site"
-8. Be specific to their industry and situation
-9. The question should be about something concrete they can answer
-10. If the source is only the company website, do not invent a move, closure, acquisition, or footprint change. Talk about the business as it actually operates.
-11. If you mention a change in location or footprint, it must come from the source itself.
-12. Use one angle only. No "industry + market + footprint" mashups.
+9. Be specific to their industry and situation
+10. The question should be about something concrete they can answer
+11. If the source is only the company website, do not invent a move, closure, acquisition, or footprint change. Talk about the business as it actually operates.
+12. If you mention a change in location or footprint, it must come from the source itself.
+13. Use one angle only. No "industry + market + footprint" mashups.
 
 EXAMPLES OF GOOD TALK TRACKS:
 - For a manufacturing company: "I work with manufacturers in Texas, and one thing that comes up a lot is demand spikes from equipment start-ups and shift changes. Those peaks can drive up transmission fees pretty fast. Have you looked at which processes or equipment are creating your biggest spikes?"
@@ -2048,6 +2062,14 @@ Generate a talk track opener for ${companyName}:`
       /whether the bill matches/i,
       /autopilot/i,
       /site by site/i,
+      /load profile/i,
+      /energy load/i,
+      /operating footprint/i,
+      /industry angle/i,
+      /utility side/i,
+      /responsible for electricity/i,
+      /i was looking at/i,
+      /i took a look at/i,
     ]
     
     if (forbiddenPatterns.some(pattern => pattern.test(talkTrack))) {
@@ -2157,10 +2179,10 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   }
   const industryLineByCluster: Record<IndustryCluster, string[]> = {
     manufacturing: [
-      'In manufacturing, the spikes usually come from processes, schedules, or equipment, not the rate.',
+      'In manufacturing, the real cost driver is usually transmission exposure from peaks — processes, schedules, or equipment creating spikes during peak hours.',
     ],
     logistics: [
-      'Warehouses usually move on dock activity, HVAC, and automation.',
+      'Warehouse accounts are usually exposed to transmission charges from 24/7 dock activity, HVAC, and automation hitting during peak hours.',
     ],
     food_storage: [
       'Cold storage is all about refrigeration, defrost cycles, and door openings.',
@@ -2187,7 +2209,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Tech sites often add load through cooling, fit-outs, and server spaces.',
     ],
     energy_intensive: [
-      'Heavy sites usually care about where the peaks come from and how to smooth them.',
+      'Heavy sites are usually carrying significant transmission exposure from peaks — and the question is whether anyone has mapped where those peaks are actually coming from.',
     ],
     office_services: [
       'Office accounts usually care more about budget predictability, comfort, and timing than raw load.',
@@ -2854,6 +2876,10 @@ async function runOpenRouterResearch(account: AccountRow, candidates: ResearchHi
       linkedin_url: account.linkedin_url || '',
       city: account.city || '',
       state: account.state || '',
+      employees: account.employees || null,
+      revenue: account.revenue || '',
+      description: account.description || '',
+      annual_usage: account.annual_usage || '',
     },
     priorities: [
       '1. Recent acquisitions or being acquired (last 24 months)',
