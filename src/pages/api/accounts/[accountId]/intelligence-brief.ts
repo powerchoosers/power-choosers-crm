@@ -3155,7 +3155,7 @@ ${JSON.stringify(researchPayload, null, 2)}`
       'X-Title': 'Nodal Point Intelligence Brief',
     },
     body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
+      model: 'google/gemini-flash-latest',
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: fullPrompt },
