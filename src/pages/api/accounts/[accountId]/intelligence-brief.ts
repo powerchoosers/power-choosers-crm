@@ -63,13 +63,14 @@ class TalkTrackCache {
   }
 
   private tokenize(text: string): Set<string> {
+    const STOP_WORDS = new Set(['the', 'and', 'for', 'are', 'you', 'that', 'this', 'with', 'from', 'have', 'has', 'what', 'your', 'about', 'just', 'been', 'usually', 'when', 'like', 'some', 'they', 'their', 'there', 'was', 'were', 'will', 'would', 'can', 'could', 'should', 'but', 'not', 'out', 'how', 'any', 'get', 'got'])
     return new Set(
       text
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, ' ')
         .split(' ')
         .map(token => token.trim())
-        .filter(token => token.length > 2)
+        .filter(token => token.length > 2 && !STOP_WORDS.has(token))
     )
   }
 
@@ -445,7 +446,15 @@ function isAccountRelevantCandidate(account: AccountRow, item: ResearchHit) {
   if (isCompanyWebsiteHit(account, item)) return true
 
   const host = getHostname(item.url)
-  const accountDomain = cleanText(account.domain).replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase()
+  const rawDomain = cleanText(account.domain)
+  let accountDomain = rawDomain.replace(/^https?:\/\//i, '').replace(/^www\./i, '').toLowerCase()
+  try {
+    if (rawDomain) {
+      accountDomain = new URL(rawDomain.startsWith('http') ? rawDomain : `https://${rawDomain}`).hostname.replace(/^www\./i, '').toLowerCase()
+    }
+  } catch (e) {
+    // Use fallback string replacement if URL parsing fails
+  }
   const accountLinkedInUrl = cleanText(account.linkedin_url)
   if (accountDomain && host === accountDomain) return true
   if (item.sourceKind === 'linkedin' && accountLinkedInUrl && normalizeUrlForMatch(item.url).includes(normalizeUrlForMatch(accountLinkedInUrl))) return true
@@ -1244,6 +1253,7 @@ function stripTrailingQuestionMark(value: string) {
 }
 
 function tokenizeTalkTrack(value: string) {
+  const STOP_WORDS = new Set(['the', 'and', 'for', 'are', 'you', 'that', 'this', 'with', 'from', 'have', 'has', 'what', 'your', 'about', 'just', 'been', 'usually', 'when', 'like', 'some', 'they', 'their', 'there', 'was', 'were', 'will', 'would', 'can', 'could', 'should', 'but', 'not', 'out', 'how', 'any', 'get', 'got'])
   return Array.from(
     new Set(
       cleanText(value)
@@ -1251,7 +1261,7 @@ function tokenizeTalkTrack(value: string) {
         .replace(/[^a-z0-9]+/g, ' ')
         .split(' ')
         .map((token) => token.trim())
-        .filter((token) => token.length > 2)
+        .filter((token) => token.length > 2 && !STOP_WORDS.has(token))
     )
   )
 }
@@ -2963,7 +2973,6 @@ Decision rules:
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, prefer budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset is the better lead. Keep the market note to one short clause or one short sentence.
 - Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual event in the same sentence, like "I saw the report that Lambda is moving into Aligned's DFW-04 data center in Plano."
-- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual event in the same sentence, like "I saw Kalyn Siebert rolling out a new extendable trailer in a recent report."
 - If you cannot name the actual event, do not force a news-style opener. Use a plain website or company update opener instead.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
 - Confidence Level must be exactly High, Medium, or Low.
@@ -3058,7 +3067,6 @@ Decision rules:
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
 - Use the market season fields in talk_track_context to decide whether summer volatility, winter reliability, or a shoulder-season budget reset should lead. Keep the market note brief if you use it.
-- Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual business fact in the same sentence, or use "I came across [company]'s website..." for website-only fallback.
 - Use human source language in the opener, but complete the thought. Do not write "I saw a report about [company]" and then move on. Name the actual business fact in the same sentence, or use "I came across [company]'s website..." for website-only fallback.
 - If the sentence cannot name the event clearly, do not use a report-style opener.
 - Write in English only. If any source text is not English, ignore it and do not echo it back.
