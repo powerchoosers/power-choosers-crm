@@ -1119,7 +1119,7 @@ function inferSignalPriority(text: string, fallbackPriority: number) {
   if (/(acquir|merger|takeover|buyout)/.test(lower)) return 1
   if (hasStrongNewLocationEvidence(lower)) return 2
   if (hasLeadershipChangeEvidence(lower)) return 3
-  if (/(expansion|capital expenditure|capex|headcount|growth|future site|buildout|build-out)/.test(lower)) return 4
+  if (/(expansion|capital expenditure|capex|headcount|growth|future site|buildout|build-out|initiative|program|launching)/.test(lower)) return 4
   if (/(restructuring|closure|consolidation|downsizing|layoff|shutdown)/.test(lower)) return 5
   if (/(contract award|government contract|customer win|major customer|new customer)/.test(lower)) return 6
   if (/(funding round|series [abcde]|ipo|initial public offering|going public)/.test(lower)) return 7
@@ -1296,20 +1296,38 @@ function deriveSignalAnchor(account: AccountRow, candidate: ResearchHit | null) 
     return companyName || 'this account'
   }
 
-  // Try to extract a clean signal anchor by removing company name prefix
+  // Clean common news site suffixes and separators
+  let cleanedTitle = title
+    .replace(/\s+[|:\-–—]\s+.*$/, '') // Strip everything after a separator near the end
+    .replace(/\s+(Bloomberg|Reuters|CNBC|Forbes|Wall Street Journal|WSJ|Business Wire|PR Newswire|LinkedIn|Google News).*$/i, '')
+    .trim()
+
+  // Try to extract a clean signal anchor by removing company name prefix or suffix
   if (companyName) {
-    const stripped = title.replace(new RegExp(`^${escapeRegExp(companyName)}[\\s\\-:–—|,]+`, 'i'), '')
+    const escapedName = escapeRegExp(companyName)
+    // Try removing from start
+    let stripped = cleanedTitle.replace(new RegExp(`^${escapedName}[\\s\\-:–—|,]+`, 'i'), '')
+    // If nothing changed, try removing from end
+    if (stripped === cleanedTitle) {
+      stripped = cleanedTitle.replace(new RegExp(`[\\s\\-:–—|,]+${escapedName}$`, 'i'), '')
+    }
+    
     const cleaned = cleanText(stripped)
-    if (cleaned && cleaned.length < title.length && cleaned.length >= 10) {
+    // If we extracted something reasonably long, use it
+    if (cleaned && cleaned.length >= 8) {
       const shortened = shortenText(cleaned, 110)
-      // Validate the shortened anchor is actually useful
       if (isUsefulSignalAnchor(shortened)) {
         return shortened
       }
     }
   }
 
-  // If we can't extract a good anchor, just use company name
+  // If we have a decent cleaned title (even with company name in it), check if it's useful
+  if (cleanedTitle && cleanedTitle.length >= 10 && isUsefulSignalAnchor(cleanedTitle)) {
+    return shortenText(cleanedTitle, 110)
+  }
+
+  // Final fallback
   return companyName || 'this account'
 }
 
@@ -1976,6 +1994,9 @@ COMPANY CONTEXT:
 - Location: ${location}
 ${[employeesContext, revenueContext, descriptionContext, usageContext, multiSiteContext].filter(Boolean).join('\n')}
 
+SIGNAL CONTEXT:
+${candidate ? `- Headline: ${candidate.title}\n- Snippet: ${candidate.snippet}\n- Source: ${candidate.source}` : 'No specific news signal found. Use general business context.'}
+
 MARKET CONTEXT:
 - Market angle: ${context.marketAngle}
 - Season: ${context.marketLabel}
@@ -1994,7 +2015,9 @@ REQUIREMENTS:
   - "whether the bill matches the facility"
   - "autopilot"
   - "site by site"
-9. Be specific to their industry and situation
+  - "I noticed an update about ${companyName}" (unless you specify WHAT the update is)
+  - "I came across some news" (unless you specify WHAT the news is)
+9. Be specific to their industry and situation. If a SIGNAL CONTEXT is provided, your first sentence MUST name the specific event (e.g., "I saw your announcement about the Drive Sames 4 Education program" or "I saw you're expanding South Texas community initiatives").
 10. The question should be about something concrete they can answer
 11. If the source is only the company website, do not invent a move, closure, acquisition, or footprint change. Talk about the business as it actually operates.
 12. If you mention a change in location or footprint, it must come from the source itself.
@@ -2215,7 +2238,8 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       'Office accounts usually care more about budget predictability, comfort, and timing than raw load.',
     ],
     multi_site: [
-      'Multi-site groups usually need a portfolio view so one location does not hide the real pattern.',
+      'With multiple locations, the electricity story usually works better when managed as a portfolio so you can see patterns that do not show up site-by-site.',
+      'Managing power location-by-location usually leads to inconsistent contracts and hidden cost creep across the footprint.',
     ],
     unknown: [
       'What I usually try to understand first is what parts of the operation actually drive the bill, instead of just looking at the rate.',
