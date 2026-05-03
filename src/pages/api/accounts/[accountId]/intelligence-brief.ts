@@ -1505,7 +1505,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         openers: [
           `In manufacturing, the thing that usually catches people off guard is not the rate — it is transmission exposure from peaks during the summer.`,
           `If the operation runs in shifts, the way it pulls power during peak hours can quietly inflate the transmission side of the bill.`,
-          `The part I’d want to understand first is which processes or equipment are driving the spikes and whether the site is aware of its transmission exposure.`,
+          `Process timing and equipment choices are what usually drive the transmission side of the bill more than the commodity.`,
         ],
         focus: ['demand spikes', 'transmission exposure', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
       }
@@ -1516,8 +1516,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at which parts of the operation are driving the peaks, and whether you are carrying a demand ratchet from the summer?',
         openers: [
           `Warehouses can look straightforward on the surface, but if there is heavy automation or 24/7 dock activity, the transmission exposure from summer peaks can be a real blind spot.`,
-          `A lot of warehouse accounts are focused on the rate but not paying attention to when their load hits — and that timing is what drives the transmission side.`,
-          `I’d want to know which parts of the operation are pulling the hardest during peak hours.`,
+          `A lot of warehouse accounts focus on the rate but don't track when their load hits — and that timing is what drives the transmission side.`,
+          `High-volume operations often pull the hardest during peak hours without realizing it is setting a billing floor.`,
         ],
         focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings', 'transmission exposure', 'demand ratchets'],
       }
@@ -1528,8 +1528,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at which cooling systems are causing your spikes, and whether you are carrying a locked-in peak charge?',
         openers: [
           `Cold storage is different because refrigeration never really turns off.`,
-          `When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly as a 12-month demand ratchet.`,
-          `That is the kind of operation where I’d want to know what is driving the peaks on-site.`,
+          `When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly as a 12-month locked-in peak charge.`,
+          `The real cost driver in food storage is usually the peaks created by the refrigeration cycles themselves.`,
         ],
         focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load', 'defrost cycles', 'demand ratchets'],
       }
@@ -1727,8 +1727,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you looked at whether the server cooling or office expansion has triggered a new demand ratchet floor?',
         openers: [
           `Tech companies can add load quietly through fit-outs, cooling, and server spaces.`,
-          `A lot of the cost shows up as a permanent demand ratchet floor after the growth is already live.`,
-          `That is why I’d want to know which systems are driving the billing floor now.`,
+          `A lot of the cost shows up as a permanent billing floor after the growth is already live.`,
+          `IT load and server cooling are the first things that change the billing floor once a footprint starts growing.`,
         ],
         focus: ['fit-outs', 'growth', 'cooling', 'office load', 'server rooms', 'demand ratchets'],
       }
@@ -1739,8 +1739,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         question: 'Have you mapped which processes or motors are creating the peaks, and whether controls or maintenance could smooth them out?',
         openers: [
           `When a site carries heavy load, transmission exposure from summer peaks can hit harder than the rate itself.`,
-          `That is usually where process timing and equipment choices start to drive the transmission side of the bill more than the commodity.`,
-          `For an energy-intensive operation, the first thing I’d want to understand is where the peak demand is coming from and how that maps to transmission charges.`,
+          `Process timing and equipment choices are what usually drive the transmission side of the bill more than the commodity.`,
+          `For an energy-intensive operation, the biggest question is whether the peak demand is coming from production ramps or equipment startup.`,
         ],
         focus: ['transmission fees', 'process load', 'peak exposure', 'large motors', 'equipment', 'site practices', 'maintenance'],
       }
@@ -2170,26 +2170,35 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const industryLine = pickVariant(context.industryOpeners, variantSeed) || context.industryOpeners[0]
   const signalLine = pickVariant(signalLineBySignal[context.signalFamily], variantSeed) || signalLineBySignal[context.signalFamily][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
+  
   const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'religious', 'unknown'].includes(context.industryCluster)
   const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
-  const primaryLine = context.signalFamily === 'industry_context'
+  
+  const forensicObservation = context.signalFamily === 'industry_context'
     ? (shouldUseMarketLine ? marketLine : industryLine)
     : signalLine
+    
   const question = context.signalFamily === 'industry_context' ? fallbackQuestion : context.question
 
-  switch (context.openingPattern) {
-    case 'question':
-      return [
-        opener,
-        primaryLine,
-        `${stripTrailingQuestionMark(question)}?`,
-      ].join(' ')
-    case 'observation':
-    case 'contrast':
-    case 'curiosity':
-    default:
-      return [opener, primaryLine, question].join(' ')
+  // Create a more cohesive flow
+  let fullTrack = ''
+  
+  if (context.signalFamily === 'industry_context') {
+    // Lead with the forensic observation directly, then the source, then the question
+    // This feels more peer-to-peer than "I saw your website"
+    const observationalOpener = [
+      `I was reviewing the operational footprint for ${companyName}.`,
+      `I caught the update about ${companyName} online.`,
+      `I was looking into the setup at ${companyName}.`
+    ][hashString(variantSeed) % 3]
+
+    fullTrack = `${observationalOpener} ${forensicObservation} ${question}`
+  } else {
+    // Signal-led flow
+    fullTrack = `${opener} ${forensicObservation} ${question}`
   }
+
+  return fullTrack.replace(/\s+/g, ' ').trim()
 }
 
 function extractHtmlAttribute(tag: string, attribute: string) {
