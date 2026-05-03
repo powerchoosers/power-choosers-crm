@@ -899,6 +899,17 @@ async function handleGeneration(execution, job) {
         metadata?.sequenceStage ||
         detectReplyStage(metadata?.prompt || metadata?.label || metadata?.name || '', metadata?.body || metadata?.aiBody || '')
     );
+
+    const briefContext = buildIntelligenceBriefContext({
+        intelligenceBriefHeadline: member.account_intelligence_brief_headline || null,
+        intelligenceBriefDetail: member.account_intelligence_brief_detail || null,
+        intelligenceBriefTalkTrack: member.account_intelligence_brief_talk_track || null,
+        intelligenceBriefSignalDate: member.account_intelligence_brief_signal_date || null,
+        intelligenceBriefReportedAt: member.account_intelligence_brief_reported_at || null,
+        intelligenceBriefConfidenceLevel: member.account_intelligence_brief_confidence_level || null,
+        intelligenceBriefStatus: member.account_intelligence_brief_status || null,
+    });
+
     let researchFacts = [
         member.account_description ? `Company summary: ${member.account_description}` : null,
         member.account_industry ? `Industry: ${member.account_industry}` : null,
@@ -917,6 +928,7 @@ async function handleGeneration(execution, job) {
         `Organization role: ${organizationRole}`,
         `Hierarchy summary: ${hierarchySummary}`
     ].filter(Boolean).join('\n');
+
     if (briefContext) {
         researchFacts += `\nIntelligence brief:\n${briefContext}`;
     }
@@ -958,15 +970,7 @@ async function handleGeneration(execution, job) {
         : null;
 
     const noteContext = noteEntries.length > 0 ? formatForensicNoteClipboard(noteEntries) : '';
-    const briefContext = buildIntelligenceBriefContext({
-        intelligenceBriefHeadline: member.account_intelligence_brief_headline || null,
-        intelligenceBriefDetail: member.account_intelligence_brief_detail || null,
-        intelligenceBriefTalkTrack: member.account_intelligence_brief_talk_track || null,
-        intelligenceBriefSignalDate: member.account_intelligence_brief_signal_date || null,
-        intelligenceBriefReportedAt: member.account_intelligence_brief_reported_at || null,
-        intelligenceBriefConfidenceLevel: member.account_intelligence_brief_confidence_level || null,
-        intelligenceBriefStatus: member.account_intelligence_brief_status || null,
-    });
+
     const contractEndYear = member.account_contract_end_date
         ? new Date(member.account_contract_end_date).getUTCFullYear()
         : null;

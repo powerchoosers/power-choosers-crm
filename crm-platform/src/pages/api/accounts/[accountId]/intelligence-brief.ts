@@ -1990,9 +1990,10 @@ REQUIREMENTS:
    - Load Mismatch: When the operating schedule changes but the contract doesn't.
 4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
 5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the broadcast schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
-6. NO REPETITION: Do not repeat the core question or the opening observation.
-7. LENGTH: 2-3 sentences max. 50-80 words.
-8. FORBIDDEN PHRASES: "current setup", "how the business runs today", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website".
+6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
+7. NO REPETITION: Do not repeat the core question or the opening observation.
+8. LENGTH: 2-3 sentences max. 50-80 words.
+9. FORBIDDEN PHRASES: "staple", "long-standing", "fixture", "current setup", "how the business runs today", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website".
 
 Generate a forensic, peer-to-peer opener for ${companyName}:`
 
@@ -2059,6 +2060,8 @@ Generate a forensic, peer-to-peer opener for ${companyName}:`
       /responsible for electricity/i,
       /i was looking at/i,
       /i took a look at/i,
+      /staple/i,
+      /long-standing/i,
     ]
     
     if (forbiddenPatterns.some(pattern => pattern.test(talkTrack))) {
