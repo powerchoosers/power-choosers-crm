@@ -1317,8 +1317,8 @@ function isUsefulSignalAnchor(value: string) {
   return true
 }
 
-function inferIndustryCluster(account: AccountRow): IndustryCluster {
-  const text = cleanText(`${account.industry || ''} ${account.name || ''}`).toLowerCase()
+function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
+  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   if (!text) return 'unknown'
   if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
@@ -1385,7 +1385,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
   const futureOpen = isFutureOpenLocationSignal(candidateText)
-  const openingIndustryLine = buildOpeningIndustryLine(inferIndustryCluster(account), alreadyOpen)
+  const openingIndustryLine = buildOpeningIndustryLine(inferIndustryCluster(account, candidate), alreadyOpen)
 
   switch (signalFamily) {
     case 'acquisition':
@@ -1759,27 +1759,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'multi_site':
       return {
         label: 'Multi-site / portfolio',
-        angle: 'Portfolio timing, site-by-site usage differences, and whether one location is masking the real load story.',
-        question: 'Do you look at usage patterns site by site, or is it mostly one bucket across the portfolio?',
+        angle: 'Forensic audit of consolidated billing floors and hidden demand ratchets across a portfolio.',
+        question: 'Has anyone mapped the portfolio to see if one site is carrying a stealth demand ratchet that is dragging down the group budget?',
         openers: [
-          `Multi-site groups can leave leverage on the table when each location gets treated like a separate decision.`,
-          `The bigger issue is usually whether someone is looking at the whole footprint instead of just one meter at a time.`,
-          `Portfolio timing matters because one site can hide the real usage pattern.`,
+          `Multi-site footprints usually have a blind spot where one location quietly sets a peak demand floor that penalizes the whole portfolio.`,
+          `The main liability with a distributed footprint is usually transmission exposure — an unmanaged peak at one site becomes a permanent cost for the group.`,
+          `Managing a portfolio site-by-site usually masks the stealth billing floors that drive up the blended cost.`,
         ],
-        focus: ['portfolio timing', 'site-by-site blind spots', 'usage patterns', 'operating differences'],
+        focus: ['stealth billing floors', 'portfolio liability', 'consolidated demand ratchets', 'transmission exposure'],
       }
     case 'unknown':
     default:
       return {
         label: 'Company context',
-        angle: 'Budget visibility, usage patterns, and proactive electricity management.',
-        question: 'What parts of the operation are actually driving the bill?',
+        angle: 'Forensic audit of billing floors, transmission exposure, and peak demand liability.',
+        question: 'Has anyone mapped the operation to see exactly which processes or schedules are driving the peak demand charges?',
         openers: [
-          `I was looking at your website and wanted to understand what is really driving the bill.`,
-          `The bill usually tells the story faster than the website does.`,
-          `What I want to understand is which parts of the operation are actually moving it.`,
+          `The biggest liability in ERCOT right now is transmission exposure, where one operational spike creates a permanent demand ratchet on the bill.`,
+          `I was reviewing the footprint, and the primary question is whether the billing floor is actually matched to the operational reality.`,
+          `Most companies look at the rate, but the real cost creep comes from stealth demand ratchets that stay on the bill long after a peak event.`,
         ],
-        focus: ['budget visibility', 'proactive management', 'ERCOT exposure', 'usage patterns'],
+        focus: ['transmission exposure', 'stealth demand ratchets', 'billing floors', 'operational peaks'],
     }
   }
 }
@@ -1879,7 +1879,7 @@ function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
 function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | null, isFallbackMode: boolean): TalkTrackContext {
   const seed = [account.id, candidate?.url || candidate?.title || '', isFallbackMode ? 'fallback' : 'signal'].join('|')
   const signalFamily = inferSignalFamily(candidate, isFallbackMode)
-  const industryCluster = inferIndustryCluster(account)
+  const industryCluster = inferIndustryCluster(account, candidate)
   const signalGuidance = buildSignalGuidance(signalFamily, account, candidate)
   const industryGuidance = buildIndustryGuidance(industryCluster, account)
   const marketGuidance = buildMarketGuidance(industryCluster)
