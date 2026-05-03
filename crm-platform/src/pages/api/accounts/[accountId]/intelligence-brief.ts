@@ -1525,7 +1525,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       return {
         label: 'Food / cold storage',
         angle: 'Refrigeration load, freezer power, and defrost cycles drive cost through demand ratchets.',
-        question: 'Have you looked at which cooling systems are causing your spikes, and whether you are carrying a demand ratchet floor?',
+        question: 'Have you looked at which cooling systems are causing your spikes, and whether you are carrying a locked-in peak charge?',
         openers: [
           `Cold storage is different because refrigeration never really turns off.`,
           `When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly as a 12-month demand ratchet.`,
@@ -1691,7 +1691,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           openers: [
             `For a portfolio with ${locationDesc}, the biggest liability is usually a demand ratchet at one site that inflates the whole group bill.`,
             `With that kind of footprint${regionDesc}, the budget risk isn't the rate — it is the hidden billing floors masking themselves in the consolidated total.`,
-            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet from a one-time event.`,
+            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a phantom demand charge from a one-time event.`,
           ],
           focus: ['billing floors', 'demand ratchets', 'portfolio liability', 'budget erosion', 'hidden spikes'],
         }
@@ -1700,9 +1700,9 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       return {
         label: 'Education / nonprofit',
         angle: 'Diagnostic check for demand ratchets triggered by seasonal occupancy or special event spikes.',
-        question: 'Has anyone audited the bill to see if a single summer event triggered a demand ratchet that is still eroding the budget today?',
+        question: 'Has anyone audited the bill to see if a single summer event triggered a locked-in peak charge that is still eroding the budget today?',
         openers: [
-          `In the non-profit sector, the stealth liability is almost always the demand ratchet — a billing floor that keeps the price high long after an event ends.`,
+          `In the non-profit sector, the stealth liability is almost always phantom demand — a billing floor that keeps the price high long after an event ends.`,
           `Most campus budgets are designed for steady load, but seasonal spikes can trigger a ratchet that stays on the bill for a full 12 months.`,
           `I was curious if anyone has checked the current billing floor against your actual off-peak usage.`,
         ],
@@ -1712,11 +1712,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       return {
         label: 'Religious organization',
         angle: 'Sanctuary HVAC spikes and weekend peaks create stealth billing floors that erode mission funds.',
-        question: 'Has anyone checked if a single hot weekend service triggered a demand ratchet that is currently inflating your monthly bill?',
+        question: 'Has anyone checked if a single hot weekend service triggered a locked-in peak charge that is currently inflating your monthly bill?',
         openers: [
-          `Religious organizations are uniquely exposed to demand ratchets because the entire week of low usage is billed against one single weekend peak.`,
+          `Religious organizations are uniquely exposed to phantom demand charges because the entire week of low usage is billed against one single weekend peak.`,
           `The stealth liability in a sanctuary is that one hot Sunday service can set a billing floor for the next 11 months.`,
-          `I was looking at the usage profile and I'm curious if the demand ratchet on the bill matches the actual sanctuary peak.`,
+          `I was looking at the usage profile and I'm curious if the locked-in peak charge on the bill matches the actual sanctuary peak.`,
         ],
         focus: ['stealth liability', 'billing floors', 'mission fund erosion', 'sanctuary HVAC', 'demand ratchets', 'weekend peaks'],
       }
@@ -1747,8 +1747,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'office_services':
       return {
         label: 'Office / professional services',
-        angle: 'Occupancy changes and HVAC create demand ratchets that stay on the bill for a full year.',
-        question: 'Have you looked at whether the summer cooling load triggered a demand ratchet that is still on the bill today?',
+        angle: 'Occupancy changes and HVAC create phantom demand charges that stay on the bill for a full year.',
+        question: 'Have you looked at whether the summer cooling load triggered a locked-in peak charge that is still on the bill today?',
         openers: [
           `Office businesses usually feel quiet until a lease or occupancy change changes the billing floor.`,
           `The electricity side can carry a demand ratchet for years even when the business around it has changed a lot.`,
@@ -1985,7 +1985,7 @@ REQUIREMENTS:
 1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
 2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
 3. FORENSIC PAIN POINT: Connect the technical detail directly to a liability:
-   - Demand Ratchets: 80% billing floors that punish businesses for one-time spikes.
+   - Phantom Demand / Locked-in Peak Charges: 80% billing floors (often called demand ratchets) that punish businesses for one-time spikes.
    - Transmission Exposure: The hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
    - Load Mismatch: When the operating schedule changes but the contract doesn't.
 4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
