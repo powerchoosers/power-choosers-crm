@@ -1723,39 +1723,39 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         
         return {
           label: 'Education / nonprofit network',
-          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets across the portfolio, or is it handled site-by-site?`,
+          angle: `Forensic audit of billing floors across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}, is a single campus spike triggering a demand ratchet that affects the whole portfolio budget?`,
           openers: [
-            `Multi-site education groups with ${locationDesc} usually need a portfolio view to ensure consistency across the network.`,
-            `With that kind of footprint${regionDesc}, it is easy for one campus to trigger a demand ratchet that affects the entire group budget.`,
-            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or site-by-site.`,
+            `For a portfolio with ${locationDesc}, the biggest liability is usually a demand ratchet at one site that inflates the whole group bill.`,
+            `With that kind of footprint${regionDesc}, the budget risk isn't the rate — it is the hidden billing floors masking themselves in the consolidated total.`,
+            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet from a one-time event.`,
           ],
-          focus: ['portfolio management', 'multi-site coordination', 'demand ratchets', 'centralized procurement', 'network visibility'],
+          focus: ['billing floors', 'demand ratchets', 'portfolio liability', 'budget erosion', 'hidden spikes'],
         }
       }
       
       return {
         label: 'Education / nonprofit',
-        angle: 'Campus occupancy and HVAC schedules create demand ratchets that punish non-profit budgets.',
-        question: 'Have you looked at whether seasonal occupancy or events are triggering demand ratchets on your bill?',
+        angle: 'Diagnostic check for demand ratchets triggered by seasonal occupancy or special event spikes.',
+        question: 'Has anyone audited the bill to see if a single summer event triggered a demand ratchet that is still eroding the budget today?',
         openers: [
-          `For schools and nonprofits, the power side usually comes down to budget discipline and timing.`,
-          `Campus operations can change with occupancy and events, triggering demand ratchets that stay on the bill for a full year.`,
-          `That is the sort of setup where usage patterns matter more than the contract headline.`,
+          `In the non-profit sector, the stealth liability is almost always the demand ratchet — a billing floor that keeps the price high long after an event ends.`,
+          `Most campus budgets are designed for steady load, but seasonal spikes can trigger a ratchet that stays on the bill for a full 12 months.`,
+          `I was curious if anyone has checked the current billing floor against your actual off-peak usage.`,
         ],
-        focus: ['tight budgets', 'campus timing', 'stewardship', 'seasonal occupancy', 'demand ratchets', 'budget floors'],
+        focus: ['stealth liability', 'billing floors', 'budget erosion', 'seasonal spikes', 'demand ratchets', 'mission fund protection'],
       }
     case 'religious':
       return {
         label: 'Religious organization',
-        angle: 'Weekend peaks and sanctuary HVAC create demand ratchets that impact mission funds.',
-        question: 'Have you looked at whether weekend services or special events are triggering demand ratchets on your bill?',
+        angle: 'Sanctuary HVAC spikes and weekend peaks create stealth billing floors that erode mission funds.',
+        question: 'Has anyone checked if a single hot weekend service triggered a demand ratchet that is currently inflating your monthly bill?',
         openers: [
-          `Religious organizations usually have a different usage pattern than most businesses — weekend-heavy and event-driven.`,
-          `The power side often comes down to large HVAC spaces that trigger a demand ratchet for the entire year during one hot service.`,
-          `That is the kind of setup where timing and demand floors matter more than the rate.`,
+          `Religious organizations are uniquely exposed to demand ratchets because the entire week of low usage is billed against one single weekend peak.`,
+          `The stealth liability in a sanctuary is that one hot Sunday service can set a billing floor for the next 11 months.`,
+          `I was looking at the usage profile and I'm curious if the demand ratchet on the bill matches the actual sanctuary peak.`,
         ],
-        focus: ['event-driven usage', 'weekend peaks', 'sanctuary HVAC', 'seasonal patterns', 'occupancy timing', 'demand ratchets'],
+        focus: ['stealth liability', 'billing floors', 'mission fund erosion', 'sanctuary HVAC', 'demand ratchets', 'weekend peaks'],
       }
     case 'technology':
       return {
