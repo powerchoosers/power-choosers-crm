@@ -738,29 +738,29 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
   // Add variation based on priority to prevent repetition
   const variations = {
     linkedin: [
-      hasSpecificAnchor ? `I saw a post online about ${signalAnchor}.` : `I saw a post online from ${companyName}.`,
-      hasSpecificAnchor ? `I came across a LinkedIn update about ${signalAnchor}.` : `I came across ${companyName}'s LinkedIn page.`,
-      hasSpecificAnchor ? `I noticed an update about ${signalAnchor} online.` : `I noticed an update from ${companyName} online.`,
+      hasSpecificAnchor ? `I saw a post from ${companyName} about ${signalAnchor}.` : `I was curious about the update ${companyName} posted on LinkedIn.`,
+      hasSpecificAnchor ? `I caught the LinkedIn update about ${signalAnchor}.` : `I was looking at the recent activity on ${companyName}'s LinkedIn page.`,
+      hasSpecificAnchor ? `I noticed ${companyName} shared an update about ${signalAnchor}.` : `I was curious about some of the recent activity from ${companyName} online.`,
     ],
     sec: [
-      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in a public filing.` : `I was reviewing some recent updates for ${companyName}.`,
-      hasSpecificAnchor ? `I came across ${companyName} ${buildEventClause(signalAnchor)} in a recent filing.` : `I came across some recent updates for ${companyName}.`,
-      hasSpecificAnchor ? `I noticed ${companyName} ${buildEventClause(signalAnchor)} in a public report.` : `I noticed some recent updates for ${companyName}.`,
+      hasSpecificAnchor ? `I saw the note about ${signalAnchor} in a recent public filing.` : `I was reviewing some of the recent operational updates for ${companyName}.`,
+      hasSpecificAnchor ? `I noticed ${companyName} mentioned ${signalAnchor} in a public report.` : `I was curious about how the recent filings for ${companyName} are landing.`,
+      hasSpecificAnchor ? `I caught the update about ${signalAnchor} in one of the public filings.` : `I was looking into the recent reporting for ${companyName}.`,
     ],
     web_official: [
-      hasSpecificAnchor ? `I saw your announcement about ${signalAnchor}.` : `I saw your announcement about ${companyName}.`,
-      hasSpecificAnchor ? `I came across your recent announcement about ${signalAnchor}.` : `I came across your recent announcement.`,
-      hasSpecificAnchor ? `I noticed your update about ${signalAnchor}.` : `I noticed your update about ${companyName}.`,
+      hasSpecificAnchor ? `I saw the announcement about ${signalAnchor}.` : `I was curious about the update on ${companyName}'s newsroom.`,
+      hasSpecificAnchor ? `I caught the recent announcement about ${signalAnchor}.` : `I was looking at the recent updates from ${companyName}.`,
+      hasSpecificAnchor ? `I noticed the update about ${signalAnchor}.` : `I was curious about the news from ${companyName}.`,
     ],
     web: [
-      hasSpecificAnchor ? `I saw an article about ${signalAnchor}.` : `I came across ${companyName}'s website.`,
-      hasSpecificAnchor ? `I came across a piece about ${signalAnchor}.` : `I came across ${companyName}'s web presence.`,
-      hasSpecificAnchor ? `I noticed an article about ${signalAnchor}.` : `I noticed ${companyName} online.`,
+      hasSpecificAnchor ? `I saw the piece about ${signalAnchor}.` : `I was looking at ${companyName}'s current footprint.`,
+      hasSpecificAnchor ? `I caught an article about ${signalAnchor}.` : `I was curious about the operational setup at ${companyName}.`,
+      hasSpecificAnchor ? `I noticed the piece on ${signalAnchor}.` : `I was looking into ${companyName} online.`,
     ],
     news: [
-      hasSpecificAnchor ? `I saw ${companyName} ${buildEventClause(signalAnchor)} in the news recently.` : `I came across an update about ${companyName}.`,
-      hasSpecificAnchor ? `I saw the recent report on ${companyName} ${buildEventClause(signalAnchor)}.` : `I was reading an update on ${companyName}.`,
-      hasSpecificAnchor ? `I noticed ${companyName} ${buildEventClause(signalAnchor)} in the news.` : `I noticed an update about ${companyName}.`,
+      hasSpecificAnchor ? `I saw the report about ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the recent update on ${companyName}.`,
+      hasSpecificAnchor ? `I caught the news about ${companyName} ${buildEventClause(signalAnchor)}.` : `I was looking at the recent reporting on ${companyName}.`,
+      hasSpecificAnchor ? `I noticed the update about ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the news around ${companyName} lately.`,
     ],
   }
 
@@ -799,30 +799,31 @@ function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null
 
 function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen: boolean) {
   const prefix = alreadyOpen
-    ? 'Since the site is already open'
-    : 'When a new site is coming online'
+    ? 'Since the site is already live'
+    : 'Since you have a new site coming online'
 
   switch (industryCluster) {
     case 'education_nonprofit':
-      return `${prefix}, the real question is whether occupancy, HVAC, lighting, and classroom schedules are already lined up with the way the building is actually being used.`
+      return `${prefix}, the useful check is whether the seasonal occupancy and HVAC load are actually landing on the bill the way the budget expects.`
     case 'healthcare':
-      return `${prefix}, the real question is whether occupancy, HVAC, and daily operating hours are already lined up with the way the location is actually being used.`
+      return `${prefix}, the useful check is whether the 24/7 technical load and HVAC are creating demand ratchets that keep the floor too high.`
     case 'restaurant':
-      return `${prefix}, the real question is whether kitchen load, HVAC, and refrigeration are already lined up with the way the location is actually being used.`
+      return `${prefix}, the useful check is whether the kitchen load and HVAC are hitting during peak hours and driving up transmission charges.`
     case 'retail':
-      return `${prefix}, the real question is whether lighting, HVAC, and store traffic are already lined up with the way the location is actually being used.`
+      return `${prefix}, the useful check is whether the lighting and HVAC load are creating spikes that move the bill before you notice it.`
     case 'logistics':
-      return `${prefix}, the real question is whether dock activity, HVAC, and automation are already lined up with the way the location is actually being used.`
+      return `${prefix}, the useful check is whether dock activity and automation are driving peaks that hit your transmission fees.`
     case 'office_services':
-      return `${prefix}, the real question is whether occupancy, HVAC, and lease timing are already lined up with the way the location is actually being used.`
+      return `${prefix}, the useful check is whether occupancy and HVAC are creating demand ratchets during the summer shoulder months.`
     case 'food_storage':
-      return `${prefix}, the real question is whether refrigeration, compressors, and operating hours are already lined up with the way the location is actually being used.`
+      return `${prefix}, the useful check is whether refrigeration and defrost cycles are creating spikes that hit the transmission side of the bill.`
     case 'manufacturing':
     case 'energy_intensive':
-      return `${prefix}, the real question is which processes, schedules, or equipment are now driving the peak side of the bill.`
+      return `${prefix}, the real question is which processes or equipment start-ups are driving your peak transmission exposure.`
     default:
-      return `${prefix}, the real question is whether the meter, billing, and operating load are already lined up with how the site is actually running.`
+      return `${prefix}, the useful check is whether the billing load actually matches the way the business is running now.`
   }
+}
 }
 
 function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | null) {
@@ -1549,26 +1550,26 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'logistics':
       return {
         label: 'Logistics / warehouse / distribution',
-        angle: '24/7 warehouse usage, dock activity, automation, and HVAC drive the bill more than the headline rate.',
-        question: 'Have you looked at which parts of the operation are creating the peaks, and whether scheduling or controls could smooth them out?',
+        angle: '24/7 warehouse usage, dock activity, automation, and HVAC drive the bill through transmission exposure.',
+        question: 'Have you looked at which parts of the operation are driving the peaks, and whether you are carrying a demand ratchet from the summer?',
         openers: [
           `Warehouses can look straightforward on the surface, but if there is heavy automation or 24/7 dock activity, the transmission exposure from summer peaks can be a real blind spot.`,
           `A lot of warehouse accounts are focused on the rate but not paying attention to when their load hits — and that timing is what drives the transmission side.`,
           `I’d want to know which parts of the operation are pulling the hardest during peak hours.`,
         ],
-        focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings', 'scheduling', 'controls'],
+        focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings', 'transmission exposure', 'demand ratchets'],
       }
     case 'food_storage':
       return {
         label: 'Food / cold storage',
-        angle: 'Refrigeration load, freezer power, defrost cycles, and door openings drive the cost more than the rate.',
-        question: 'Have you looked at which cooling systems or operating habits are causing the peaks, and whether controls or maintenance could help?',
+        angle: 'Refrigeration load, freezer power, and defrost cycles drive cost through demand ratchets.',
+        question: 'Have you looked at which cooling systems are causing your spikes, and whether you are carrying a demand ratchet floor?',
         openers: [
           `Cold storage is different because refrigeration never really turns off.`,
-          `When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly in the bill.`,
+          `When the load is tied to freezers, coolers, and defrost cycles, a small miss can show up quickly as a 12-month demand ratchet.`,
           `That is the kind of operation where I’d want to know what is driving the peaks on-site.`,
         ],
-        focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load', 'defrost cycles', 'controls'],
+        focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load', 'defrost cycles', 'demand ratchets'],
       }
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, null)
@@ -1654,26 +1655,26 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Retail chain',
           angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each region handling it independently?`,
+          question: `With ${locationDesc}${regionDesc}, are you seeing demand ratchets at specific locations, or is the portfolio masking them?`,
           openers: [
             `Retail chains with ${locationDesc} usually benefit from a portfolio view rather than managing each store separately.`,
-            `With that kind of footprint${regionDesc}, there's usually opportunity to bring consistency to how stores are contracted and how usage is tracked.`,
+            `With that kind of footprint${regionDesc}, one location can easily carry a demand ratchet that hides in the group total.`,
             `The question I'd want answered is whether your ${locationDesc} are being managed centrally or location-by-location.`,
           ],
-          focus: ['portfolio management', 'multi-store coordination', 'seasonal swings', 'operational consistency', 'centralized procurement'],
+          focus: ['portfolio management', 'multi-store coordination', 'seasonal swings', 'demand ratchets', 'centralized procurement'],
         }
       }
       
       return {
         label: 'Retail',
-        angle: 'Store hours, traffic swings, lighting, HVAC, and refrigeration create seasonal load changes.',
-        question: 'Have you looked at which store behaviors are creating the peaks, and whether controls or equipment changes could smooth them out?',
+        angle: 'Store hours, traffic swings, and HVAC create seasonal load changes and demand ratchets.',
+        question: 'Have you looked at whether store traffic peaks are triggering demand ratchets on the bill?',
         openers: [
           `Retail usually swings more than people expect once the seasons and traffic patterns change.`,
-          `A lot of stores look steady until occupancy, weather, or operating hours start moving the bill around.`,
+          `A lot of stores look steady until occupancy or weather start moving the bill around and triggering a new billing floor.`,
           `If there are multiple locations, the timing can get messy fast if nobody is looking at the whole picture.`,
         ],
-        focus: ['seasonal swings', 'occupancy changes', 'multi-site timing', 'lighting', 'HVAC', 'refrigeration'],
+        focus: ['seasonal swings', 'occupancy changes', 'multi-site timing', 'lighting', 'HVAC', 'demand ratchets'],
       }
     case 'restaurant':
       const restaurantMultiSite = detectMultiSiteScale(account, null)
@@ -1689,26 +1690,26 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Restaurant chain',
           angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each location handling it independently?`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or is it one big bucket?`,
           openers: [
             `Restaurant groups with ${locationDesc} usually need a portfolio view to ensure consistency across units.`,
-            `With that kind of footprint${regionDesc}, there's usually opportunity to bring consistency to how locations are contracted and how usage is tracked.`,
+            `With that kind of footprint${regionDesc}, one unit's kitchen spike can trigger a demand ratchet that impacts the whole group budget.`,
             `The question I'd want answered is whether your ${locationDesc} are being managed centrally or unit-by-unit.`,
           ],
-          focus: ['portfolio management', 'multi-unit coordination', 'kitchen load', 'operational consistency', 'HVAC'],
+          focus: ['portfolio management', 'multi-unit coordination', 'kitchen load', 'demand ratchets', 'HVAC'],
         }
       }
       
       return {
         label: 'Restaurant / hospitality',
-        angle: 'Kitchen load, HVAC, refrigeration, and prep schedules drive the bill more than the rate does.',
-        question: 'Have you looked at which kitchen or HVAC loads are creating the spikes, and whether equipment or operating changes could help?',
+        angle: 'Kitchen load and HVAC spikes drive the bill through transmission exposure.',
+        question: 'Have you looked at whether your kitchen or HVAC load is triggering demand ratchets in the summer?',
         openers: [
-          `Restaurants are tough because kitchen load, HVAC, and refrigeration can move the bill even when sales look flat.`,
-          `The power side often gets overlooked until a location starts behaving differently in the summer.`,
+          `Restaurants are tough because kitchen load and HVAC can move the bill even when sales look flat.`,
+          `The power side often gets overlooked until a location triggers a demand ratchet that sticks for the rest of the year.`,
           `If there are multiple units, consistency matters because each site can drift in a different direction.`,
         ],
-        focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency', 'refrigeration', 'equipment'],
+        focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency', 'demand ratchets', 'transmission exposure'],
       }
     case 'education_nonprofit':
       const multiSiteInfo = detectMultiSiteScale(account, null)
@@ -1724,50 +1725,50 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Education / nonprofit network',
           angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you managing electricity as a portfolio, or is each region handling it independently?`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets across the portfolio, or is it handled site-by-site?`,
           openers: [
             `Multi-site education groups with ${locationDesc} usually need a portfolio view to ensure consistency across the network.`,
-            `With that kind of footprint${regionDesc}, there's usually an opportunity to bring consistency to how sites are contracted and how usage is tracked.`,
+            `With that kind of footprint${regionDesc}, it is easy for one campus to trigger a demand ratchet that affects the entire group budget.`,
             `The question I'd want answered is whether your ${locationDesc} are being managed centrally or site-by-site.`,
           ],
-          focus: ['portfolio management', 'multi-site coordination', 'operational consistency', 'centralized procurement', 'network visibility'],
+          focus: ['portfolio management', 'multi-site coordination', 'demand ratchets', 'centralized procurement', 'network visibility'],
         }
       }
       
       return {
         label: 'Education / nonprofit',
-        angle: 'Campus occupancy, events, HVAC schedules, and building controls drive the load more than the invoice total.',
-        question: 'Do you know which buildings or schedules are driving the load, and whether smarter controls or occupancy planning could help?',
+        angle: 'Campus occupancy and HVAC schedules create demand ratchets that punish non-profit budgets.',
+        question: 'Have you looked at whether seasonal occupancy or events are triggering demand ratchets on your bill?',
         openers: [
           `For schools and nonprofits, the power side usually comes down to budget discipline and timing.`,
-          `Campus operations can change with occupancy, events, and seasonal usage even when the footprint looks stable.`,
+          `Campus operations can change with occupancy and events, triggering demand ratchets that stay on the bill for a full year.`,
           `That is the sort of setup where usage patterns matter more than the contract headline.`,
         ],
-        focus: ['tight budgets', 'campus timing', 'stewardship', 'seasonal occupancy', 'controls', 'scheduling'],
+        focus: ['tight budgets', 'campus timing', 'stewardship', 'seasonal occupancy', 'demand ratchets', 'budget floors'],
       }
     case 'religious':
       return {
         label: 'Religious organization',
-        angle: 'Event-driven usage, weekend peaks, large sanctuary HVAC, and seasonal patterns around holidays.',
-        question: 'Do you know which services or events are driving the peaks, and whether scheduling or controls could help manage the load?',
+        angle: 'Weekend peaks and sanctuary HVAC create demand ratchets that impact mission funds.',
+        question: 'Have you looked at whether weekend services or special events are triggering demand ratchets on your bill?',
         openers: [
-          `Religious organizations usually have a different usage pattern than most businesses — weekend-heavy, event-driven, and seasonal around holidays.`,
-          `The power side often comes down to large HVAC spaces that sit mostly empty during the week but spike on weekends.`,
-          `That is the kind of setup where timing and controls matter more than the rate.`,
+          `Religious organizations usually have a different usage pattern than most businesses — weekend-heavy and event-driven.`,
+          `The power side often comes down to large HVAC spaces that trigger a demand ratchet for the entire year during one hot service.`,
+          `That is the kind of setup where timing and demand floors matter more than the rate.`,
         ],
-        focus: ['event-driven usage', 'weekend peaks', 'sanctuary HVAC', 'seasonal patterns', 'occupancy timing', 'controls'],
+        focus: ['event-driven usage', 'weekend peaks', 'sanctuary HVAC', 'seasonal patterns', 'occupancy timing', 'demand ratchets'],
       }
     case 'technology':
       return {
         label: 'Technology / data-heavy office',
-        angle: 'Cooling, server rooms, fit-outs, and occupancy changes drive the load faster than people expect.',
-        question: 'Have you looked at which rooms or systems are causing the peaks, and whether cooling or space planning could reduce waste?',
+        angle: 'Cooling and server spaces change the billing floor faster than the growth plan expects.',
+        question: 'Have you looked at whether the server cooling or office expansion has triggered a new demand ratchet floor?',
         openers: [
-          `Tech companies can add load quietly through fit-outs, cooling, and space changes.`,
-          `A lot of the cost shows up after the growth is already live instead of before it starts.`,
-          `That is why I’d want to know which systems are driving the peaks now.`,
+          `Tech companies can add load quietly through fit-outs, cooling, and server spaces.`,
+          `A lot of the cost shows up as a permanent demand ratchet floor after the growth is already live.`,
+          `That is why I’d want to know which systems are driving the billing floor now.`,
         ],
-        focus: ['fit-outs', 'growth', 'cooling', 'office load', 'server rooms', 'space planning'],
+        focus: ['fit-outs', 'growth', 'cooling', 'office load', 'server rooms', 'demand ratchets'],
       }
     case 'energy_intensive':
       return {
@@ -1784,14 +1785,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'office_services':
       return {
         label: 'Office / professional services',
-        angle: 'Occupancy, lease changes, conference rooms, HVAC, and equipment usually drive the waste.',
-        question: 'Has anyone looked at which parts of the building are actually driving the bill now, and whether occupancy or controls could trim waste?',
+        angle: 'Occupancy changes and HVAC create demand ratchets that stay on the bill for a full year.',
+        question: 'Have you looked at whether the summer cooling load triggered a demand ratchet that is still on the bill today?',
         openers: [
-          `Office businesses usually feel quiet until a lease, occupancy change, or growth step changes the load.`,
-          `The electricity side can stay untouched for years even when the business around it has changed a lot.`,
+          `Office businesses usually feel quiet until a lease or occupancy change changes the billing floor.`,
+          `The electricity side can carry a demand ratchet for years even when the business around it has changed a lot.`,
           `That is the kind of thing I’d want to check before it gets swallowed by the rest of the budget.`,
         ],
-        focus: ['occupancy', 'new leases', 'conference load', 'budget control', 'HVAC', 'equipment'],
+        focus: ['occupancy', 'new leases', 'conference load', 'budget control', 'HVAC', 'demand ratchets'],
       }
     case 'multi_site':
       return {
@@ -1996,7 +1997,14 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
   const descriptionContext = account.description ? `- Description: ${account.description}` : ''
   const usageContext = account.annual_usage ? `- Annual Usage: ${account.annual_usage} kWh` : ''
   
-  const prompt = `You are a Texas electricity broker crafting a talk track opener for a sales call. The talk track should be conversational, specific, and lead to a natural question about their electricity setup.
+  const prompt = `You are a forensic energy analyst and strategist. You are crafting a talk track opener for a peer-to-peer conversation with a C-level executive or operations lead.
+
+VOICE:
+- Conversational, peer-to-peer, and undeniably expert. 
+- Avoid "broker-speak" or sounding like you're selling a service. 
+- Sound like someone who is looking at a diagnostic report and has identified a specific anomaly or liability.
+- Do not use "I came across your website" or "I was looking at the operational footprint."
+- Use "I was curious about..." or "I noticed a detail in the recent [Source] update regarding..."
 
 COMPANY CONTEXT:
 - Company: ${companyName}
@@ -2012,33 +2020,26 @@ MARKET CONTEXT:
 - Season: ${context.marketLabel}
 
 REQUIREMENTS:
-1. Be conversational and natural - sound like a human, not a template
-2. Focus on electricity cost drivers specific to their industry — not just usage patterns but what actually shows up on the bill
-3. In Texas (ERCOT), the biggest hidden cost for commercial accounts is often transmission exposure — charges tied to how much power a business pulls during the highest grid demand hours in summer. Never say 4CP. Instead say transmission exposure or peak-hour transmission charges. Mention this naturally when it applies (manufacturing, logistics, cold storage, energy-intensive sites).
-4. ${multiSiteInfo.isMultiSite ? 'Focus on portfolio-level electricity management across multiple locations' : 'Focus on how their specific type of business uses electricity and where the cost pressure actually comes from'}
-5. End with one specific, easy-to-answer question about their operation — not their electricity setup
-6. Do not repeat that same question earlier in the opener
-7. Keep it to 2-3 sentences (50-80 words)
-8. DO NOT use generic phrases like:
-  - "current setup"
-  - "how the business runs today"
-  - "whether the bill matches the facility"
-  - "autopilot"
-  - "site by site"
-  - "I noticed an update about ${companyName}" (unless you specify WHAT the update is)
-  - "I came across some news" (unless you specify WHAT the news is)
-9. Be specific to their industry and situation. If a SIGNAL CONTEXT is provided, your first sentence MUST name the specific event (e.g., "I saw your announcement about the Drive Sames 4 Education program" or "I saw you're expanding South Texas community initiatives").
-10. The question should be about something concrete they can answer
-11. If the source is only the company website, do not invent a move, closure, acquisition, or footprint change. Talk about the business as it actually operates.
-12. If you mention a change in location or footprint, it must come from the source itself.
-13. Use one angle only. No "industry + market + footprint" mashups.
+1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event (e.g., "I caught the update about the new Haslet campus expansion" or "I saw the note about the AVS acquisition").
+2. THE PIVOT: Connect that signal directly to a "forensic" energy pain point:
+   - Demand Ratchets: 80% billing floors that punish businesses for one-time spikes.
+   - Transmission Exposure: The hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
+   - Load Mismatch: When the operating schedule changes but the contract doesn't.
+3. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." These cost money and people don't want to hear about them early. Focus on the liability in the bill itself.
+4. PORTFOLIO VIEW: ${multiSiteInfo.isMultiSite ? 'For multi-site accounts, focus on how one location can mask a demand ratchet that affects the whole portfolio.' : 'Focus on the specific operational peaks for their industry.'}
+5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the fabrication ramp-up is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
+6. NO REPETITION: Do not repeat the core question or the opening observation.
+7. LENGTH: 2-3 sentences max. 50-80 words.
+8. FORBIDDEN PHRASES:
+   - "current setup"
+   - "how the business runs today"
+   - "autopilot"
+   - "site by site"
+   - "I was looking at the operational footprint"
+   - "I came across your website"
+   - "I noticed an update" (without naming the specific update)
 
-EXAMPLES OF GOOD TALK TRACKS:
-- For a manufacturing company: "I work with manufacturers in Texas, and one thing that comes up a lot is demand spikes from equipment start-ups and shift changes. Those peaks can drive up transmission fees pretty fast. Have you looked at which processes or equipment are creating your biggest spikes?"
-- For a multi-location retail chain: "I work with retail groups in Texas, and with 50+ stores, the electricity piece usually works better when it's managed as a portfolio rather than store-by-store. Are your locations being managed centrally, or is each store handling its own contract?"
-- For a warehouse: "I work with logistics companies in Texas, and 24/7 warehouse operations usually have a different electricity story than office buildings—dock doors, automation, HVAC all running around the clock. Have you looked at which parts of your operation are driving the peaks?"
-
-Generate a talk track opener for ${companyName}:`
+Generate a forensic, peer-to-peer opener for ${companyName}:`
 
   try {
     const openrouterKey = process.env.OPENROUTER_API_KEY
@@ -2212,47 +2213,47 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   }
   const industryLineByCluster: Record<IndustryCluster, string[]> = {
     manufacturing: [
-      'In manufacturing, the real cost driver is usually transmission exposure from peaks — processes, schedules, or equipment creating spikes during peak hours.',
+      'In manufacturing, the real cost driver is usually transmission exposure from peaks — specifically equipment start-ups creating spikes that hit during the transmission fee window.',
     ],
     logistics: [
-      'Warehouse accounts are usually exposed to transmission charges from 24/7 dock activity, HVAC, and automation hitting during peak hours.',
+      'Warehouse accounts are usually carrying a lot of transmission exposure from 24/7 dock activity and automation hitting the grid during peak hours.',
     ],
     food_storage: [
-      'Cold storage is all about refrigeration, defrost cycles, and door openings.',
+      'Cold storage is usually punished by refrigeration and defrost cycles hitting the bill right when the grid is most expensive.',
     ],
     healthcare: [
-      'Healthcare usually cares most about 24/7 reliability and steady base load.',
+      'Healthcare accounts are sensitive to demand ratchets because the 24/7 base load creates a high billing floor that never resets.',
     ],
     banking: [
-      'Banks usually need a portfolio view, not a surprise at one branch at a time.',
+      'Banks usually need a portfolio view to see if one branch is carrying a demand ratchet that is hidden in the group bill.',
     ],
     retail: [
-      'Retail usually swings with seasons, traffic, and store hours.',
+      'Retail usually sees cost creep when lighting and HVAC load create peaks that move the bill before anyone notice it.',
     ],
     restaurant: [
-      'Restaurants swing with kitchen load, HVAC, and refrigeration.',
+      'Restaurants usually deal with kitchen load and HVAC spikes that drive up the transmission side of the bill in the summer.',
     ],
     education_nonprofit: [
-      'Schools and nonprofits usually feel it in occupancy, events, classrooms, and HVAC schedules.',
+      'Schools and nonprofits often have demand ratchets triggered by seasonal occupancy or event schedules that do not match the bill.',
     ],
     religious: [
-      'Religious organizations usually see weekend peaks and event-driven usage that is different from most businesses.',
+      'Religious organizations usually see weekend peaks and event-driven usage that can trigger a demand ratchet for the entire year.',
     ],
     technology: [
-      'Tech sites often add load through cooling, fit-outs, and server spaces.',
+      'Tech sites often add load through cooling and server spaces that change the billing floor faster than the growth plan expects.',
     ],
     energy_intensive: [
-      'Heavy sites are usually carrying significant transmission exposure from peaks — and the question is whether anyone has mapped where those peaks are actually coming from.',
+      'Heavy sites are usually carrying significant transmission exposure from peaks — and the question is whether anyone has mapped where those spikes are actually coming from.',
     ],
     office_services: [
-      'Office accounts usually care more about budget predictability, comfort, and timing than raw load.',
+      'Office accounts usually care more about budget predictability and whether a demand ratchet from the summer is still carrying over into the winter.',
     ],
     multi_site: [
-      'With multiple locations, the electricity story usually works better when managed as a portfolio so you can see patterns that do not show up site-by-site.',
-      'Managing power location-by-location usually leads to inconsistent contracts and hidden cost creep across the footprint.',
+      'With multiple locations, the electricity story usually works better when managed as a portfolio so you can spot demand ratchets that do not show up site-by-site.',
+      'Managing power location-by-location usually leads to hidden cost creep and demand ratchets that no one is tracking across the footprint.',
     ],
     unknown: [
-      'What I usually try to understand first is what parts of the operation actually drive the bill, instead of just looking at the rate.',
+      'What I usually want to understand is what part of the operation is actually driving the peak side of the bill, instead of just looking at the rate.',
     ],
   }
 
