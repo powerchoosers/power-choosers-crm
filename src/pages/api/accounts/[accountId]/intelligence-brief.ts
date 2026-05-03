@@ -864,35 +864,17 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
     return businessSpecificLine
   }
 
-  if (context.industryCluster === 'restaurant' && multiLocation) {
-    return `For a multi-location restaurant group, the useful check is whether the stores are being looked at together, because kitchen equipment, HVAC, refrigeration, and hours can make one location look fine while another is quietly carrying the cost.`
-  }
-
-  if (context.industryCluster === 'restaurant') {
-    return `For a restaurant, the useful check is whether the bill lines up with how the kitchen, HVAC, refrigeration, and daily hours actually run.`
-  }
-
-  if (context.industryCluster === 'retail' && multiLocation) {
-    return `For a multi-location retail group, the useful check is whether the stores are being reviewed together, because hours, traffic, lighting, and HVAC can hide different cost patterns by location.`
-  }
-
-  if (context.industryCluster === 'office_services' || context.industryCluster === 'banking') {
-    return `For an office-style account, the useful check is usually budget predictability, HVAC, lease timing, and whether the bill is matching the way the space is actually being used.`
-  }
-
-  if (context.industryCluster === 'logistics') {
-    if (/\b(trailer|trailers|heavy haul|heavy-duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))) {
-      return 'For a trailer manufacturer, the useful check is whether production, welding, assembly, paint, and test work are all landing in the bill the way they should.'
+  if (multiLocation) {
+    if (context.industryCluster === 'restaurant') {
+      return `For a multi-location restaurant group, the useful check is whether the stores are being looked at together, because kitchen equipment, HVAC, refrigeration, and hours can make one location look fine while another is quietly carrying the cost.`
     }
-    return `For a logistics account, the useful check is where the operation is creating cost pressure: dock activity, HVAC, automation, longer hours, or peaks that move the bill.`
+    if (context.industryCluster === 'retail') {
+      return `For a multi-location retail group, the useful check is whether the stores are being reviewed together, because hours, traffic, lighting, and HVAC can hide different cost patterns by location.`
+    }
   }
 
-  if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
-    return `For a heavier site, the useful check is which processes, schedules, or equipment are creating the peaks.`
-  }
-
-  if (context.industryCluster === 'food_storage') {
-    return `For a food or cold-storage operation, the useful check is refrigeration, defrost cycles, doors, compressors, and whether small habits are moving the bill.`
+  if (context.industryOpeners && context.industryOpeners.length > 0) {
+    return context.industryOpeners[0]
   }
 
   return `The useful check is whether the bill still lines up with how the business is actually being run.`
@@ -900,36 +882,17 @@ function buildFallbackIndustryLine(account: AccountRow, candidate: ResearchHit |
 
 function buildFallbackQuestion(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext) {
   const multiLocation = hasMultiLocationEvidence(account, candidate)
-
   if (multiLocation) {
-    return 'Have you compared the sites side by side, or is each one still being handled separately?'
+    if (context.industryCluster === 'restaurant' || context.industryCluster === 'retail') {
+       return 'Have you compared the sites side by side, or is each one still being handled separately?'
+    }
   }
 
-  if (context.industryCluster === 'restaurant') {
-    return 'Have you looked at the bill against the way the kitchen and dining room actually run?'
+  if (context.question) {
+    return context.question
   }
 
-  if (context.industryCluster === 'retail') {
-    return 'Have you checked whether store hours, traffic, or HVAC are what is moving the bill?'
-  }
-
-  if (context.industryCluster === 'office_services' || context.industryCluster === 'banking') {
-    return 'Have you checked whether occupancy, HVAC, or lease timing are driving the bill?'
-  }
-
-  if (/\b(wholesale|distributor|distribution|bearing|hydraulic|hydraulics|industrial hose|power transmission|fluid power)\b/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))) {
-    return 'Have you looked at whether branch traffic, inventory turns, or shop equipment are really driving the bill?'
-  }
-
-  if (context.industryCluster === 'manufacturing' || context.industryCluster === 'energy_intensive') {
-    return 'Have you looked at where the peaks are coming from and how that maps to your transmission charges?'
-  }
-
-  if (context.industryCluster === 'education_nonprofit') {
-    return 'Have you looked at whether the classrooms, offices, and event areas are being billed the right way?'
-  }
-
-  return context.question
+  return 'Have you looked at whether the bill still lines up with how the business is actually being run?'
 }
 
 function isLikelyBadSourceUrl(value: string) {
@@ -2203,53 +2166,8 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
       fallbackIndustryLine,
     ],
   }
-  const industryLineByCluster: Record<IndustryCluster, string[]> = {
-    manufacturing: [
-      'In manufacturing, the real cost driver is usually transmission exposure from peaks — specifically equipment start-ups creating spikes that hit during the transmission fee window.',
-    ],
-    logistics: [
-      'Warehouse accounts are usually carrying a lot of transmission exposure from 24/7 dock activity and automation hitting the grid during peak hours.',
-    ],
-    food_storage: [
-      'Cold storage is usually punished by refrigeration and defrost cycles hitting the bill right when the grid is most expensive.',
-    ],
-    healthcare: [
-      'Healthcare accounts are sensitive to demand ratchets because the 24/7 base load creates a high billing floor that never resets.',
-    ],
-    banking: [
-      'Banks usually need a portfolio view to see if one branch is carrying a demand ratchet that is hidden in the group bill.',
-    ],
-    retail: [
-      'Retail usually sees cost creep when lighting and HVAC load create peaks that move the bill before anyone notice it.',
-    ],
-    restaurant: [
-      'Restaurants usually deal with kitchen load and HVAC spikes that drive up the transmission side of the bill in the summer.',
-    ],
-    education_nonprofit: [
-      'Schools and nonprofits often have demand ratchets triggered by seasonal occupancy or event schedules that do not match the bill.',
-    ],
-    religious: [
-      'Religious organizations usually see weekend peaks and event-driven usage that can trigger a demand ratchet for the entire year.',
-    ],
-    technology: [
-      'Tech sites often add load through cooling and server spaces that change the billing floor faster than the growth plan expects.',
-    ],
-    energy_intensive: [
-      'Heavy sites are usually carrying significant transmission exposure from peaks — and the question is whether anyone has mapped where those spikes are actually coming from.',
-    ],
-    office_services: [
-      'Office accounts usually care more about budget predictability and whether a demand ratchet from the summer is still carrying over into the winter.',
-    ],
-    multi_site: [
-      'With multiple locations, the electricity story usually works better when managed as a portfolio so you can spot demand ratchets that do not show up site-by-site.',
-      'Managing power location-by-location usually leads to hidden cost creep and demand ratchets that no one is tracking across the footprint.',
-    ],
-    unknown: [
-      'What I usually want to understand is what part of the operation is actually driving the peak side of the bill, instead of just looking at the rate.',
-    ],
-  }
 
-  const industryLine = pickVariant(industryLineByCluster[context.industryCluster], variantSeed) || industryLineByCluster[context.industryCluster][0]
+  const industryLine = pickVariant(context.industryOpeners, variantSeed) || context.industryOpeners[0]
   const signalLine = pickVariant(signalLineBySignal[context.signalFamily], variantSeed) || signalLineBySignal[context.signalFamily][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
   const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'religious', 'unknown'].includes(context.industryCluster)
