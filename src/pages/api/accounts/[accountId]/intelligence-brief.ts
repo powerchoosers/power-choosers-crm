@@ -804,26 +804,25 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
 
   switch (industryCluster) {
     case 'education_nonprofit':
-      return `${prefix}, the useful check is whether the seasonal occupancy and HVAC load are actually landing on the bill the way the budget expects.`
+      return `${prefix}, the main factor for the budget is usually how the seasonal occupancy and HVAC load are landing on the bill.`
     case 'healthcare':
-      return `${prefix}, the useful check is whether the 24/7 technical load and HVAC are creating demand ratchets that keep the floor too high.`
+      return `${prefix}, the critical detail is how the 24/7 technical load and HVAC are affecting the base billing floor.`
     case 'restaurant':
-      return `${prefix}, the useful check is whether the kitchen load and HVAC are hitting during peak hours and driving up transmission charges.`
+      return `${prefix}, the biggest risk is usually kitchen load and HVAC hitting during peak hours and driving up transmission fees.`
     case 'retail':
-      return `${prefix}, the useful check is whether the lighting and HVAC load are creating spikes that move the bill before you notice it.`
+      return `${prefix}, the hidden cost is often lighting and HVAC load creating spikes that move the bill before you notice it.`
     case 'logistics':
-      return `${prefix}, the useful check is whether dock activity and automation are driving peaks that hit your transmission fees.`
+      return `${prefix}, the focus is usually on dock activity and automation driving peaks that hit the transmission side of the bill.`
     case 'office_services':
-      return `${prefix}, the useful check is whether occupancy and HVAC are creating demand ratchets during the summer shoulder months.`
+      return `${prefix}, the concern is usually occupancy and HVAC creating demand ratchets during the summer shoulder months.`
     case 'food_storage':
-      return `${prefix}, the useful check is whether refrigeration and defrost cycles are creating spikes that hit the transmission side of the bill.`
+      return `${prefix}, the volatility usually comes from refrigeration and defrost cycles creating spikes that hit the transmission side.`
     case 'manufacturing':
     case 'energy_intensive':
-      return `${prefix}, the real question is which processes or equipment start-ups are driving your peak transmission exposure.`
+      return `${prefix}, the primary driver is usually which processes or equipment start-ups are creating peak transmission exposure.`
     default:
-      return `${prefix}, the useful check is whether the billing load actually matches the way the business is running now.`
+      return `${prefix}, the useful check is how the billing load actually matches the way the business is running now.`
   }
-}
 }
 
 function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | null) {
@@ -2020,24 +2019,17 @@ MARKET CONTEXT:
 - Season: ${context.marketLabel}
 
 REQUIREMENTS:
-1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event (e.g., "I caught the update about the new Haslet campus expansion" or "I saw the note about the AVS acquisition").
-2. THE PIVOT: Connect that signal directly to a "forensic" energy pain point:
+1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
+2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
+3. FORENSIC PAIN POINT: Connect the technical detail directly to a liability:
    - Demand Ratchets: 80% billing floors that punish businesses for one-time spikes.
    - Transmission Exposure: The hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
    - Load Mismatch: When the operating schedule changes but the contract doesn't.
-3. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." These cost money and people don't want to hear about them early. Focus on the liability in the bill itself.
-4. PORTFOLIO VIEW: ${multiSiteInfo.isMultiSite ? 'For multi-site accounts, focus on how one location can mask a demand ratchet that affects the whole portfolio.' : 'Focus on the specific operational peaks for their industry.'}
-5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the fabrication ramp-up is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
+4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
+5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the broadcast schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
 6. NO REPETITION: Do not repeat the core question or the opening observation.
 7. LENGTH: 2-3 sentences max. 50-80 words.
-8. FORBIDDEN PHRASES:
-   - "current setup"
-   - "how the business runs today"
-   - "autopilot"
-   - "site by site"
-   - "I was looking at the operational footprint"
-   - "I came across your website"
-   - "I noticed an update" (without naming the specific update)
+8. FORBIDDEN PHRASES: "current setup", "how the business runs today", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website".
 
 Generate a forensic, peer-to-peer opener for ${companyName}:`
 
