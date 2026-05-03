@@ -639,7 +639,7 @@ export default async function handler(req, res) {
             - If the site is in Texas and a single TDU is clearly known, use that plain name once naturally: Oncor, CenterPoint, AEP Texas, TNMP, or LP&L. If the city is mixed or ambiguous, do not force a utility name.
             - CRITICAL: City + industry alone is NOT a hook. "For logistics companies in Houston, costs can shift quite a bit" tells the recipient nothing specific about them and reads as a template. Use one fact from: account description, company scale, revenue, a known operational characteristic of that specific industry in that market, the parent/subsidiary structure, the site address, or a recent signal. If no specific data exists, make an observation about that industry's energy profile (e.g., "cold storage facilities in Dallas run 24/7 baseload which concentrates demand charge exposure" or "rail service yards carry high fixed-load hours that push peak billing hard") — never a generic "costs can shift" statement.
             - Avoid vague openers: "energy costs are tough", "costs can shift quite a bit", "utility charges are complex", "getting good value for electricity can be tricky."
-            - Do not start with "I noticed on the website", "Came across your", "Reviewing", or "many organizations in your sector". Those sound templated.
+            - FORBIDDEN OPENERS: Do not start with "I noticed on the website", "I came across your website", "Reviewing your website", "I was looking at your site", "Came across your", "Reviewing", or "many organizations in your sector". These sound templated and robotic.
           10. SUBJECT RULE:
             - Subject line must be 1–4 words.
             - Vary the angle: use the account city OR company name as an anchor, OR lead with a cost-specific question, OR reference renewal/contract timing, OR use a "I noticed something" hook.
@@ -668,7 +668,8 @@ export default async function handler(req, res) {
             - One lane only. Do not mention market conditions unless market_timing is the chosen lane or it directly supports the chosen event.
             - The email must answer this in plain English: "Why am I emailing this person today, and what can they reply with?"
           13. INTELLIGENCE BRIEF RULE:
-            - If INTELLIGENCE BRIEF is present and looks usable, you may use one specific fact naturally.
+            - If INTELLIGENCE BRIEF is present and contains a "Talk Track", you SHOULD prioritize using the insight or phrasing from that Talk Track as it contains specific forensic reasoning for that account.
+            - However, ensure the Talk Track follows the other rules (no "I noticed on your website" etc.). If the Talk Track contains forbidden openers, strip the filler and keep the diagnostic insight.
             - If the brief is missing, low confidence, empty, or fallback-like, ignore it and lean on account, notes, and call context instead.
             - Never say "I saw a report about..." unless the event itself is named in the same sentence.
             - Never mention the source URL in the email body.
