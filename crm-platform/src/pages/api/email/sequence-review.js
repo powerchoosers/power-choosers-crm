@@ -795,6 +795,8 @@ export default async function handler(req, res) {
       senderDomain,
       previewGeneratedAt: nowIso,
       reviewAccepted: false,
+      manualReview: true,
+      generatedBy: 'sequence-review',
       emailRecordId: executionMeta.emailRecordId || `seq_exec_${execution.id}`,
     };
 
@@ -822,6 +824,8 @@ export default async function handler(req, res) {
       sequenceId: execution.sequence_id,
       memberId: execution.member_id,
       reviewAccepted: false,
+      manualReview: true,
+      generatedBy: 'sequence-review',
       previewGeneratedAt: nowIso,
       emailRecordId: targetEmailId,
       status: 'pending_send',
