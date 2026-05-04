@@ -834,6 +834,10 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
+  if (/\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)) {
+    return 'For a school district like this, the useful check is whether the campus calendar, HVAC, athletics, and classroom technology are all showing up on the bill the way they should.'
+  }
+
   if (/\b(cooling|coolers?|heating|heaters?|hvac|evaporative|portable ac|air conditioning)\b/.test(text)) {
     return 'For a cooling and heating business like this, the useful check is whether seasonal demand and equipment usage are creating a predictable summer spike or just a choppy bill.'
   }
@@ -1523,6 +1527,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
 function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   const industryLabel = cleanText(account.industry) || companyName
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
   switch (industryCluster) {
     case 'manufacturing':
@@ -1765,6 +1770,42 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
     case 'education_nonprofit':
       const multiSiteInfo = detectMultiSiteScale(account, candidate)
+      const isSchoolDistrict = /\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)
+
+      if (isSchoolDistrict) {
+        if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
+          const locationDesc = multiSiteInfo.locationCount >= 100
+            ? `${multiSiteInfo.locationCount}+ campuses`
+            : `${multiSiteInfo.locationCount} campuses`
+          const regionDesc = multiSiteInfo.regions.length > 1
+            ? ` across ${multiSiteInfo.regions.length} states`
+            : ''
+
+          return {
+            label: 'School district network',
+            angle: `District-wide billing floor audit across ${locationDesc}${regionDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, is one campus creating a peak that shows up on the whole district bill?`,
+            openers: [
+              `For a district with ${locationDesc}${regionDesc}, the useful question is whether one campus peak is still setting the floor for the whole budget.`,
+              `School districts usually have a mix of old buildings, new buildings, and heavy summer HVAC, so the bill can look flatter than it really is.`,
+              `The campus calendar, athletics, and classroom technology all matter here because they change how the district uses power.`,
+            ],
+            focus: ['campus calendar', 'HVAC', 'athletics', 'classroom technology', 'billing floors', 'district budget'],
+          }
+        }
+
+        return {
+          label: 'School district',
+          angle: 'Campus calendar, HVAC, and classroom technology driving a district-wide billing floor.',
+          question: 'Has anyone checked whether the summer cooling load or school calendar is still setting a higher billing floor than it should?',
+          openers: [
+            `School districts have a different pattern than a normal office because the calendar, athletics, cafeterias, and device charging all push the bill in different directions.`,
+            `The thing I would watch is whether one hot campus month is still showing up in the district bill long after school is back in session.`,
+            `For a district, the power side is usually about campus timing and HVAC more than anything else.`,
+          ],
+          focus: ['campus calendar', 'summer HVAC', 'athletics', 'cafeterias', 'device charging', 'district budget'],
+        }
+      }
       
       if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
         const locationDesc = multiSiteInfo.locationCount >= 100 
@@ -2106,6 +2147,7 @@ REQUIREMENTS:
 4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
 5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
+   - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
 9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website".
