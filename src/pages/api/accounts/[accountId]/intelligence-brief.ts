@@ -1072,7 +1072,7 @@ function detectMultiSiteScale(account: AccountRow, candidate: ResearchHit | null
   
   const isMultiSite = (locationCount !== null && locationCount >= 10) || 
                       uniqueStates.length >= 2 ||
-                      /(multi[-\s]?site|portfolio|network|chain|across \d+ (?:states?|regions?)|nationwide)/i.test(lower)
+      /\b(multi[-\s]?site|portfolio|network|(?<!supply\s)chain|across \d+ (?:states?|regions?)|nationwide)\b/i.test(lower)
   
   return {
     isMultiSite,
@@ -1322,7 +1322,8 @@ function isUsefulSignalAnchor(value: string) {
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
   const text = cleanText(`${account.industry || ''} ${account.name || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   if (!text) return 'unknown'
-  if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
+  // Move multi_site to bottom of priority list to favor industry-specific guidance
+  // if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text)) return 'manufacturing'
@@ -1336,6 +1337,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(school|education|university|college|nonprofit|foundation|charity|municipal|government|civic|public sector)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
   if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency|design|engineering|architect)/.test(text)) return 'office_services'
+  if (/\b(multi[-\s]?site|portfolio|branch(?:es)?|(?<!supply\s)chain|holdings)\b/i.test(text)) return 'multi_site'
   return 'unknown'
 }
 
@@ -1520,6 +1522,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
   switch (industryCluster) {
     case 'manufacturing':
+      const manufacturingMultiSite = detectMultiSiteScale(account, candidate)
+      
+      if (manufacturingMultiSite.isMultiSite && manufacturingMultiSite.locationCount && manufacturingMultiSite.locationCount >= 3) {
+        const locationDesc = manufacturingMultiSite.locationCount >= 10 
+          ? `${manufacturingMultiSite.locationCount}+ facilities`
+          : `${manufacturingMultiSite.locationCount} facilities`
+        const regionDesc = manufacturingMultiSite.regions.length > 1 
+          ? ` across ${manufacturingMultiSite.regions.length} states`
+          : ''
+          
+        return {
+          label: 'Manufacturing network',
+          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you managing the portfolio as a group, or is each site handling its own transmission exposure?`,
+          openers: [
+            `Manufacturing groups with ${locationDesc} usually have a significant blind spot in how consolidated transmission fees are hitting the budget.`,
+            `With that kind of footprint${regionDesc}, the liability isn't just one plant — it's the combined peak demand across the whole portfolio.`,
+            `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet that is dragging down the group budget.`,
+          ],
+          focus: ['portfolio transmission', 'consolidated demand ratchets', 'multi-site coordination', 'billing floors', 'load factor'],
+        }
+      }
+      
       return {
         label: 'Manufacturing / industrial',
         angle: 'Demand spikes driven by process timing, shift changes, and equipment start-up, plus transmission fee exposure.',
@@ -1532,6 +1557,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['demand spikes', 'transmission exposure', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
       }
     case 'logistics':
+      const logisticsMultiSite = detectMultiSiteScale(account, candidate)
+      
+      if (logisticsMultiSite.isMultiSite && logisticsMultiSite.locationCount && logisticsMultiSite.locationCount >= 3) {
+        const locationDesc = logisticsMultiSite.locationCount >= 10 
+          ? `${logisticsMultiSite.locationCount}+ distribution centers`
+          : `${logisticsMultiSite.locationCount} distribution centers`
+        const regionDesc = logisticsMultiSite.regions.length > 1 
+          ? ` across ${logisticsMultiSite.regions.length} states`
+          : ''
+          
+        return {
+          label: 'Logistics network',
+          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or is the portfolio masking them?`,
+          openers: [
+            `Logistics groups with ${locationDesc} usually have different demand ratchets hiding in each facility's bill.`,
+            `With that kind of footprint${regionDesc}, one warehouse's summer peak can set a billing floor that the whole group carries for a year.`,
+            `The diagnostic check I'd want to run is whether the transmission exposure is being managed across all ${locationDesc} or just location-by-location.`,
+          ],
+          focus: ['portfolio demand ratchets', 'consolidated transmission', 'warehouse coordination', 'billing floors', '24/7 load'],
+        }
+      }
+      
       return {
         label: 'Logistics / warehouse / distribution',
         angle: '24/7 warehouse usage, dock activity, automation, and HVAC drive the bill through transmission exposure.',
