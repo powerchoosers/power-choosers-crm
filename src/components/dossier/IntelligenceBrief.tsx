@@ -363,7 +363,7 @@ export function IntelligenceBrief({ account, className }: IntelligenceBriefProps
 
           {/* Talk Track */}
           <section className={cn(
-            'rounded-2xl border border-[#002FA7]/20 bg-gradient-to-br from-[#002FA7]/10 to-[#002FA7]/5 p-5',
+            'rounded-2xl border border-[#002FA7]/20 bg-[#002FA7]/5 p-5',
             'animate-in fade-in slide-in-from-top-2 duration-500 delay-200'
           )}>
             <div className="flex items-center gap-2 mb-3">
