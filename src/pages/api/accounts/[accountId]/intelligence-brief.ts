@@ -759,9 +759,9 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
       hasSpecificAnchor ? `I noticed the piece on ${signalAnchor}.` : `I was looking into ${companyName} online.`,
     ],
     news: [
-      hasSpecificAnchor ? `I saw the report about ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the recent update on ${companyName}.`,
-      hasSpecificAnchor ? `I caught the news about ${companyName} ${buildEventClause(signalAnchor)}.` : `I was looking at the recent reporting on ${companyName}.`,
-      hasSpecificAnchor ? `I noticed the update about ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the news around ${companyName} lately.`,
+      hasSpecificAnchor ? `I saw the update that ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the recent update on ${companyName}.`,
+      hasSpecificAnchor ? `I caught the update that ${companyName} ${buildEventClause(signalAnchor)}.` : `I was looking at the recent reporting on ${companyName}.`,
+      hasSpecificAnchor ? `I noticed the update that ${companyName} ${buildEventClause(signalAnchor)}.` : `I was curious about the news around ${companyName} lately.`,
     ],
   }
 
@@ -786,10 +786,31 @@ function buildSourceLead(account: AccountRow, candidate: ResearchHit | null) {
 function buildEventClause(anchor: string) {
   const text = cleanText(anchor).toLowerCase()
   if (!text) return 'announcing an update'
-  if (/^(launching|rolling out|opening|expanding|announcing|introducing|starting|adding|rolling|building|developing|producing|hiring|promoting|appointing|named)\b/.test(text)) {
-    return text
+  if (/\b(specialist team|specialists?|clinical footprint|clinical team|physician team|doctor team)\b/.test(text)) {
+    return 'is expanding its specialist team and clinical footprint'
   }
-  return `announcing ${text}`
+  if (/^expands?\b/.test(text)) {
+    return `is ${text.replace(/^expands?\b\s*/, 'expanding ')}`
+  }
+  if (/^adds?\b/.test(text)) {
+    return `is ${text.replace(/^adds?\b\s*/, 'adding ')}`
+  }
+  if (/^hiring\b/.test(text)) {
+    return `is ${text.replace(/^hiring\b\s*/, 'hiring ')}`
+  }
+  if (/^promotes?\b/.test(text)) {
+    return `is ${text.replace(/^promotes?\b\s*/, 'promoting ')}`
+  }
+  if (/^names?\b/.test(text)) {
+    return `is ${text.replace(/^names?\b\s*/, 'naming ')}`
+  }
+  if (/^announces?\b/.test(text)) {
+    return `is ${text.replace(/^announces?\b\s*/, 'announcing ')}`
+  }
+  if (/^(launching|rolling out|opening|expanding|announcing|introducing|starting|adding|rolling|building|developing|producing|hiring|promoting|appointing|named)\b/.test(text)) {
+    return `is ${text}`
+  }
+  return `is updating ${text}`
 }
 
 function buildSignalAwareLead(account: AccountRow, candidate: ResearchHit | null) {
@@ -1357,6 +1378,9 @@ function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false
   const priority = inferredPriority === 9 ? candidate.priority : inferredPriority
 
   if (priority === 2 && !isTexasRelevantLocationSignal(text)) {
+    if (/(specialist team|specialists?|clinical footprint|clinical team|physician|ophthalmology|retina|medical practice|practice expansion|staff expansion|hiring)/i.test(text)) {
+      return 'growth'
+    }
     return 'industry_context'
   }
 
@@ -1402,6 +1426,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   const texasLocation = location || 'Texas'
   const sourceLead = buildSourceLead(account, candidate)
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
+  const text = `${candidate?.title || ''} ${candidate?.snippet || ''}`.toLowerCase()
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
   const futureOpen = isFutureOpenLocationSignal(candidateText)
   const openingIndustryLine = buildOpeningIndustryLine(inferIndustryCluster(account, candidate), alreadyOpen)
@@ -1450,6 +1475,20 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         focus: ['fresh-eyes review', 'budget authority', 'facility ownership'],
       }
     case 'growth':
+      const isMedicalGrowth = /(ophthalmology|retina|medical practice|clinic|physician|specialist|surgical|diagnostic imaging|clinical footprint|eye care)/i.test(text)
+      if (isMedicalGrowth) {
+        return {
+          label: 'Clinical growth',
+          angle: 'Specialist hiring, patient volume, and imaging or surgical equipment adding load across the clinic network.',
+          question: 'Has anyone checked whether the busier locations are starting to change the load pattern on the power side?',
+          openers: [
+            `For a specialty medical practice, the thing I would watch is whether the busier clinics are quietly changing the load pattern across the network.`,
+            `When a practice adds specialists, the patient flow and imaging footprint usually change before the budget line does.`,
+            `With 15 locations, the useful question is which sites are carrying the heaviest clinical load and whether the power side has kept up.`,
+          ],
+          focus: ['specialist hiring', 'patient volume', 'diagnostic imaging', 'surgical equipment', 'multi-site consistency'],
+        }
+      }
       return {
         label: 'Growth / capex / headcount',
         angle: 'Growing load, added equipment, and budget creep before the bills catch up.',
