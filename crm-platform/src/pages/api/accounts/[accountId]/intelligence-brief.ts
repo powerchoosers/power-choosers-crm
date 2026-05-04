@@ -1170,7 +1170,7 @@ const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
   healthcare: ['healthcare', 'hospital', 'clinic', 'medical', 'senior living', 'assisted living', 'nursing'],
   banking: ['bank', 'banking', 'credit union', 'financial services'],
   retail: ['retail', 'store', 'shopping', 'showroom'],
-  restaurant: ['restaurant', 'restaurants', 'hospitality', 'dining', 'cafe', 'food service'],
+  restaurant: ['restaurant', 'restaurants', 'hospitality', 'dining', 'cafe', 'food service', 'venue', 'wedding', 'event space', 'lodging', 'hotel', 'motel'],
   education_nonprofit: ['school', 'education', 'campus', 'nonprofit', 'university', 'college'],
   religious: ['church', 'synagogue', 'mosque', 'temple', 'congregation', 'parish', 'worship', 'ministry'],
   technology: ['technology', 'tech', 'software', 'saas', 'data center'],
@@ -1328,7 +1328,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(cold storage|refrigerat|freezer|food|beverage|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
   if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
-  if (/(restaurant|dining|cafe|hospitality|hotel|food service)/.test(text)) return 'restaurant'
+  if (/(restaurant|dining|cafe|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
   if (/(school|education|university|college|nonprofit|foundation|charity|municipal|government|civic|public sector)/.test(text)) return 'education_nonprofit'
@@ -1662,8 +1662,24 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
       
+      const isHospitality = /(hospitality|hotel|lodging|venue|wedding|event space|banquet|resort)/i.test(cleanText(`${account.name} ${account.industry} ${candidate?.title}`))
+
+      if (isHospitality) {
+        return {
+          label: 'Hospitality / Event Venues',
+          angle: '24/7 base load, lodging HVAC, and extreme event peaks driving demand ratchets.',
+          question: 'Have you looked at which parts of the building are driving the base load, and whether there is any safe way to trim waste without hurting reliability?',
+          openers: [
+            `Hospitality and event venues are unique because the load never really gets to sleep, especially with on-site lodging.`,
+            `With 24/7 operations, the part I care about is reliability first and budget predictability second.`,
+            `The power side matters here because the base load from HVAC and lodging is usually much higher than people realize.`,
+          ],
+          focus: ['24/7 base load', 'lodging HVAC', 'event peaks', 'demand ratchets', 'reliability', 'portfolio coordination'],
+        }
+      }
+
       return {
-        label: 'Restaurant / hospitality',
+        label: 'Restaurant / food service',
         angle: 'Kitchen load and HVAC spikes drive the bill through transmission exposure.',
         question: 'Have you looked at whether your kitchen or HVAC load is triggering demand ratchets in the summer?',
         openers: [
