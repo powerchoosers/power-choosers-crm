@@ -1292,7 +1292,10 @@ async function handleSend(execution, job) {
         ? fromEmail.split('@')[1]
         : null;
 
-    if (metadata?.previewGeneratedAt && metadata?.reviewAccepted !== true && metadata?.reviewAccepted !== 'true') {
+    const isManualReviewDraft = metadata?.manualReview === true
+        || metadata?.manualReview === 'true'
+        || metadata?.generatedBy === 'sequence-review';
+    if (isManualReviewDraft && metadata?.previewGeneratedAt && metadata?.reviewAccepted !== true && metadata?.reviewAccepted !== 'true') {
         await sql`
       UPDATE sequence_executions
       SET status = 'pending_send',
