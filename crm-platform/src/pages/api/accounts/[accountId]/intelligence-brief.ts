@@ -834,6 +834,10 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
+  if (/\b(cooling|coolers?|heating|heaters?|hvac|evaporative|portable ac|air conditioning)\b/.test(text)) {
+    return 'For a cooling and heating business like this, the useful check is whether seasonal demand and equipment usage are creating a predictable summer spike or just a choppy bill.'
+  }
+
   if (/\b(glass|mirror|shower door|shower doors|window|windows|fabricat|showroom|installation|installer|shop floor)\b/.test(text)) {
     return 'For a shop and showroom business like this, the useful check is whether the showroom, fabrication equipment, and climate control are all showing up on the bill the way they should.'
   }
@@ -2911,6 +2915,29 @@ async function fetchCompanyWebsiteInfo(account: AccountRow): Promise<ResearchHit
   }
 }
 
+function buildCompanyProfileFallbackHit(account: AccountRow): ResearchHit | null {
+  const domain = cleanText(account.domain)
+  const description = cleanText(account.description)
+
+  if (!domain && !description) return null
+
+  const url = domain
+    ? (domain.startsWith('http') ? domain : `https://${domain.replace(/^www\./i, '')}`)
+    : ''
+
+  return {
+    priority: 8,
+    label: 'Company Profile',
+    query: `${cleanText(account.name) || 'company'} profile`,
+    title: `${cleanText(account.name) || 'Company'} profile`,
+    url,
+    snippet: description || `Public company information for ${cleanText(account.name) || 'this business'}.`,
+    publishedAt: new Date().toISOString().slice(0, 10),
+    source: domain ? getHostname(url) || domain.replace(/^https?:\/\//i, '') : 'company profile',
+    sourceKind: 'web',
+  }
+}
+
 async function fetchIndustryTrends(account: AccountRow): Promise<ResearchHit[]> {
   const industry = cleanText(account.industry)
   if (!industry) return []
@@ -3373,6 +3400,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const websiteInfo = await fetchCompanyWebsiteInfo(account)
         if (websiteInfo) {
           fallbackCandidates.push(websiteInfo)
+        }
+        
+        if (fallbackCandidates.length === 0) {
+          const profileFallback = buildCompanyProfileFallbackHit(account)
+          if (profileFallback) {
+            fallbackCandidates.push(profileFallback)
+          }
         }
         
         // Fetch industry trends
