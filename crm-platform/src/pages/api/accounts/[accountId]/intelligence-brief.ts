@@ -193,6 +193,7 @@ type IndustryCluster =
   | 'energy_intensive'
   | 'office_services'
   | 'multi_site'
+  | 'public_sector'
   | 'unknown'
 
 type MarketSeason = 'spring_shoulder' | 'summer_peak' | 'fall_reset' | 'winter_reliability'
@@ -1194,6 +1195,7 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   energy_intensive: ['transmission fees', 'process', 'motor', 'equipment', 'peak', 'load', 'maintenance'],
   office_services: ['occupancy', 'lease', 'hvac', 'conference', 'equipment', 'hours', 'space'],
   multi_site: ['portfolio', 'site', 'occupancy', 'hours', 'equipment', 'load', 'meter'],
+  public_sector: ['public safety', 'utility infrastructure', 'administrative', 'municipal', 'critical services', 'budget', 'civic'],
   unknown: ['usage', 'occupancy', 'equipment', 'load'],
 }
 
@@ -1211,6 +1213,7 @@ const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
   energy_intensive: ['energy-intensive', 'heavy site', 'industrial gas', 'refinery', 'mining', 'quarry'],
   office_services: ['office', 'professional services', 'consulting', 'legal', 'accounting'],
   multi_site: ['multi-site', 'portfolio', 'branch', 'chain'],
+  public_sector: ['city', 'municipal', 'government', 'public sector', 'civic', 'utility'],
   unknown: [],
 }
 
@@ -1366,7 +1369,8 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
   if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
-  if (/(school|education|university|college|nonprofit|foundation|charity|municipal|government|civic|public sector)/.test(text)) return 'education_nonprofit'
+  if (/(municipal|government|city|county|public sector|civic|public works|public safety|utility infrastructure)/.test(text)) return 'public_sector'
+  if (/(school|education|university|college|nonprofit|foundation|charity)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
   if (/(office|professional services|law|legal|consulting|accounting|marketing|real estate|staffing|agency|design|engineering|architect)/.test(text)) return 'office_services'
   if (/\b(multi[-\s]?site|portfolio|branch(?:es)?|(?<!supply\s)chain|holdings)\b/i.test(text)) return 'multi_site'
@@ -1898,6 +1902,41 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         ],
         focus: ['stealth liability', 'billing floors', 'budget erosion', 'seasonal spikes', 'demand ratchets', 'mission fund protection'],
       }
+    case 'public_sector':
+      const publicSectorMultiSite = detectMultiSiteScale(account, candidate)
+
+      if (publicSectorMultiSite.isMultiSite && publicSectorMultiSite.locationCount && publicSectorMultiSite.locationCount >= 3) {
+        const locationDesc = publicSectorMultiSite.locationCount >= 10
+          ? `${publicSectorMultiSite.locationCount}+ facilities`
+          : `${publicSectorMultiSite.locationCount} facilities`
+        const regionDesc = publicSectorMultiSite.regions.length > 1
+          ? ` across ${publicSectorMultiSite.regions.length} states`
+          : ''
+
+        return {
+          label: 'Public sector network',
+          angle: `Municipal budget protection across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking which public facilities are driving the peaks, or is it all still rolled up together?`,
+          openers: [
+            `For a city portfolio like this, the real question is which public facilities are setting the billing floor for the whole budget.`,
+            `Administrative offices, public safety, and utility buildings usually behave very differently on the power side, so one site can distort the total fast.`,
+            `When a municipality has this many facilities, I want to know whether the summer peaks are being tracked by building or just buried in the consolidated bill.`,
+          ],
+          focus: ['public facilities', 'budget protection', 'summer cooling load', 'public safety', 'utility infrastructure', 'billing floors'],
+        }
+      }
+
+      return {
+        label: 'Public sector',
+        angle: 'Mission-critical public facilities, summer cooling load, and budget erosion from peak demand.',
+        question: 'Have you looked at which city buildings are creating the highest peaks, or is everything still sitting in one bucket?',
+        openers: [
+          `City facilities have a different profile because public safety, utility infrastructure, and administrative offices do not all use power the same way.`,
+          `The part I would watch is whether one summer peak is still setting the floor for the whole municipal budget.`,
+          `For a city, the power side is usually about which buildings are carrying the critical load, not just the average bill.`,
+        ],
+        focus: ['public safety', 'utility infrastructure', 'administrative offices', 'summer cooling', 'budget protection'],
+      }
     case 'religious':
       return {
         label: 'Religious organization',
@@ -2008,7 +2047,7 @@ function getMarketSeason(date = new Date()): MarketSeason {
 
 function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
   const season = getMarketSeason()
-  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'unknown'].includes(industryCluster)
+  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'public_sector', 'unknown'].includes(industryCluster)
 
   if (season === 'summer_peak') {
     return lowIntensityCluster
@@ -2398,7 +2437,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const signalLine = pickVariant(signalLineBySignal[context.signalFamily], variantSeed) || signalLineBySignal[context.signalFamily][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
   
-  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'religious', 'unknown'].includes(context.industryCluster)
+  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'public_sector', 'religious', 'unknown'].includes(context.industryCluster)
   const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
   
   const forensicObservation = context.signalFamily === 'industry_context'
