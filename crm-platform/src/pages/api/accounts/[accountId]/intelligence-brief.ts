@@ -1144,6 +1144,7 @@ const TALK_TRACK_SIGNAL_KEYWORDS: Record<SignalFamily, string[]> = {
   restructuring: ['restructuring', 'closure', 'consolidation', 'downsizing', 'shutdown', 'footprint'],
   contract_win: ['contract', 'customer', 'project', 'new work', 'win', 'deal', 'load'],
   funding: ['funding', 'series', 'ipo', 'capital', 'raise', 'investor'],
+  technical_load: ['technical', 'load', 'electrification', 'heat pump', 'ev charging', 'data center', 'server', 'compute', 'ai'],
   industry_context: ['budget', 'load', 'site', 'agreement', 'cost', 'Texas'],
 }
 
@@ -1513,7 +1514,7 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
   }
 }
 
-function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow) {
+function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   const industryLabel = cleanText(account.industry) || companyName
 
@@ -1555,7 +1556,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load', 'defrost cycles', 'demand ratchets'],
       }
     case 'healthcare':
-      const healthcareMultiSite = detectMultiSiteScale(account, null)
+      const healthcareMultiSite = detectMultiSiteScale(account, candidate)
       
       if (healthcareMultiSite.isMultiSite && healthcareMultiSite.locationCount && healthcareMultiSite.locationCount >= 5) {
         const locationDesc = healthcareMultiSite.locationCount >= 20 
@@ -1590,7 +1591,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['24/7 uptime', 'reliability', 'occupancy', 'backup systems', 'HVAC', 'base load'],
       }
     case 'banking':
-      const bankingMultiSite = detectMultiSiteScale(account, null)
+      const bankingMultiSite = detectMultiSiteScale(account, candidate)
       
       if (bankingMultiSite.isMultiSite && bankingMultiSite.locationCount && bankingMultiSite.locationCount >= 5) {
         const locationDesc = bankingMultiSite.locationCount >= 20 
@@ -1625,7 +1626,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['branch portfolio', 'usage drivers', 'budget predictability', 'HVAC', 'IT closets'],
       }
     case 'retail':
-      const retailMultiSite = detectMultiSiteScale(account, null)
+      const retailMultiSite = detectMultiSiteScale(account, candidate)
       
       if (retailMultiSite.isMultiSite && retailMultiSite.locationCount && retailMultiSite.locationCount >= 10) {
         const locationDesc = retailMultiSite.locationCount >= 50 
@@ -1660,7 +1661,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['seasonal swings', 'occupancy changes', 'multi-site timing', 'lighting', 'HVAC', 'demand ratchets'],
       }
     case 'restaurant':
-      const restaurantMultiSite = detectMultiSiteScale(account, null)
+      const restaurantMultiSite = detectMultiSiteScale(account, candidate)
       
       if (restaurantMultiSite.isMultiSite && restaurantMultiSite.locationCount && restaurantMultiSite.locationCount >= 5) {
         const locationDesc = restaurantMultiSite.locationCount >= 20 
@@ -1683,7 +1684,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
       
-      const isHospitality = /(hospitality|hotel|lodging|venue|wedding|event space|banquet|resort)/i.test(cleanText(`${account.name} ${account.industry} ${candidate?.title}`))
+      const isHospitality = /(hospitality|hotel|lodging|venue|wedding|event space|banquet|resort)/i.test(cleanText(`${account.name} ${account.industry} ${candidate?.title || ''}`))
 
       if (isHospitality) {
         return {
@@ -1711,7 +1712,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['kitchen load', 'HVAC', 'hours of operation', 'multi-unit consistency', 'demand ratchets', 'transmission exposure'],
       }
     case 'education_nonprofit':
-      const multiSiteInfo = detectMultiSiteScale(account, null)
+      const multiSiteInfo = detectMultiSiteScale(account, candidate)
       
       if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
         const locationDesc = multiSiteInfo.locationCount >= 100 
@@ -1918,7 +1919,7 @@ function buildTalkTrackContext(account: AccountRow, candidate: ResearchHit | nul
   const signalFamily = inferSignalFamily(candidate, isFallbackMode)
   const industryCluster = inferIndustryCluster(account, candidate)
   const signalGuidance = buildSignalGuidance(signalFamily, account, candidate)
-  const industryGuidance = buildIndustryGuidance(industryCluster, account)
+  const industryGuidance = buildIndustryGuidance(industryCluster, account, candidate)
   const marketGuidance = buildMarketGuidance(industryCluster)
   const openingPattern = pickVariant(['observation', 'contrast', 'curiosity'] as const, seed) || 'observation'
   const openingStyleMap: Record<TalkTrackContext['openingPattern'], string> = {
@@ -2166,6 +2167,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     restructuring: [sourceLead],
     contract_win: [sourceLead],
     funding: [sourceLead],
+    technical_load: [sourceLead],
     industry_context: [
       sourceLead,
     ],
@@ -2202,6 +2204,10 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     funding: [
       `After a funding round, somebody usually needs to map the new money against the facility plan.`,
       `Fresh capital can turn into new space, new equipment, or both.`,
+    ],
+    technical_load: [
+      `Deploying new technical load like this usually changes the load factor faster than the billing structure can keep up with.`,
+      `Moving processes over to the electric side is a good move, but it usually creates a hidden liability on the billing floor.`,
     ],
     industry_context: [
       fallbackIndustryLine,
