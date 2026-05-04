@@ -1535,11 +1535,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Manufacturing network',
           angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you managing the portfolio as a group, or is each site handling its own transmission exposure?`,
+          question: `With ${locationDesc}${regionDesc}, are you managing the portfolio as a group, or is each site carrying its own hidden transmission liability?`,
           openers: [
-            `Manufacturing groups with ${locationDesc} usually have a significant blind spot in how consolidated transmission fees are hitting the budget.`,
-            `With that kind of footprint${regionDesc}, the liability isn't just one plant — it's the combined peak demand across the whole portfolio.`,
-            `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet that is dragging down the group budget.`,
+            `Manufacturing groups with ${locationDesc} usually have a significant blind spot in how local transmission fees at a single site are hitting the group budget.`,
+            `With that kind of footprint${regionDesc}, a spike at one plant can set a local billing floor that stays on the books for a year.`,
+            `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a stealth demand ratchet that is dragging down the total budget.`,
           ],
           focus: ['portfolio transmission', 'consolidated demand ratchets', 'multi-site coordination', 'billing floors', 'load factor'],
         }
@@ -1570,11 +1570,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Logistics network',
           angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or is the portfolio masking them?`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or are they hiding in the group-level budget?`,
           openers: [
-            `Logistics groups with ${locationDesc} usually have different demand ratchets hiding in each facility's bill.`,
-            `With that kind of footprint${regionDesc}, one warehouse's summer peak can set a billing floor that the whole group carries for a year.`,
-            `The diagnostic check I'd want to run is whether the transmission exposure is being managed across all ${locationDesc} or just location-by-location.`,
+            `Logistics groups with ${locationDesc} usually have different demand ratchets hiding in each specific facility's bill.`,
+            `With that kind of footprint${regionDesc}, one warehouse's summer peak can set a local billing floor that the group has to carry for 11 months.`,
+            `The diagnostic check I'd want to run is whether the transmission exposure is being managed across all ${locationDesc} or if a few sites are dragging down the total budget.`,
           ],
           focus: ['portfolio demand ratchets', 'consolidated transmission', 'warehouse coordination', 'billing floors', '24/7 load'],
         }
@@ -1617,11 +1617,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         return {
           label: 'Healthcare network',
           angle: `Portfolio-level reliability requirements masking consolidated demand ratchets across ${locationDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking the transmission exposure on that base load, or is the portfolio masking the peaks?`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking the transmission exposure on that base load, or is the portfolio budget masking the peaks?`,
           openers: [
-            `Healthcare groups with ${locationDesc} usually have a significant blind spot because the 24/7 base load masks the very peaks that set the group's billing floor.`,
-            `With that kind of footprint${regionDesc}, the liability isn't just one site — it's how the consolidated transmission exposure is hitting the group budget.`,
-            `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet that is dragging down the group budget.`,
+            `Healthcare groups with ${locationDesc} usually have a significant blind spot because the 24/7 base load masks the very peaks that set a specific facility's billing floor.`,
+            `With that kind of footprint${regionDesc}, the liability isn't just one site — it's how a single site's peak can set a local ratchet that hits the group budget.`,
+            `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a stealth demand ratchet that is dragging down the total budget.`,
           ],
           focus: ['base load masking', 'portfolio transmission', 'reliability', 'demand ratchets', 'billing floors'],
         }
@@ -1872,9 +1872,9 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         angle: 'Forensic audit of consolidated billing floors and hidden demand ratchets across a portfolio.',
         question: 'Has anyone mapped the portfolio to see if one site is carrying a stealth demand ratchet that is dragging down the group budget?',
         openers: [
-          `Multi-site footprints usually have a blind spot where one location quietly sets a peak demand floor that penalizes the whole portfolio.`,
-          `The main liability with a distributed footprint is usually transmission exposure — an unmanaged peak at one site becomes a permanent cost for the group.`,
-          `Managing a portfolio site-by-site usually masks the stealth billing floors that drive up the blended cost.`,
+          `Multi-site footprints usually have a blind spot where one location quietly sets a local peak demand floor that penalizes the total portfolio budget.`,
+          `The part I care about is whether any of the sites in your group are carrying a stealth demand ratchet that is dragging down the total budget.`,
+          `With multiple locations, the forensic check is whether a few specific meters are setting a billing floor that you're stuck with for the rest of the year.`,
         ],
         focus: ['stealth billing floors', 'portfolio liability', 'consolidated demand ratchets', 'transmission exposure'],
       }
