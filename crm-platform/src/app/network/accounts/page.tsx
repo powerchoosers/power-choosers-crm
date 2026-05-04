@@ -71,6 +71,7 @@ import { useTableState } from '@/hooks/useTableState'
 import { useTableScrollRestore } from '@/hooks/useTableScrollRestore'
 import { usePersistentColumnFilters } from '@/hooks/usePersistentColumnFilters'
 import { toast } from 'sonner'
+import { ForensicPagination } from '@/components/ui/ForensicPagination'
 import { isActiveLoadAccount, isContractExpired, isCustomerStatus } from '@/lib/status-filters'
 
 const PAGE_SIZE = 50
@@ -738,39 +739,16 @@ export default function AccountsPage() {
               <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage(Math.max(0, pagination.pageIndex - 1))}
-              disabled={pagination.pageIndex === 0}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-              aria-label="Previous page"
-              title="Previous Page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-              {(pagination.pageIndex + 1).toString().padStart(2, '0')}
-            </div>
-            <button
-              onClick={async () => {
-                const nextPageIndex = pagination.pageIndex + 1
-                if (nextPageIndex >= displayTotalPages) return
-
-                const needed = (nextPageIndex + 1) * PAGE_SIZE
-                if (accounts.length < needed && hasNextPage && !isFetchingNextPage) {
-                  await fetchNextPage()
-                }
-
-                setPage(nextPageIndex)
-              }}
-              disabled={pagination.pageIndex + 1 >= displayTotalPages || (!hasNextPage && accounts.length < (pagination.pageIndex + 2) * PAGE_SIZE)}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-              aria-label="Next page"
-              title="Next Page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+          <ForensicPagination
+            currentPage={pagination.pageIndex + 1}
+            totalPages={displayTotalPages}
+            onPageChange={(page) => {
+              const nextPageIndex = page - 1
+              setPage(nextPageIndex)
+            }}
+            hasNextPage={hasNextPage}
+            isFetchingNextPage={isFetchingNextPage}
+          />
         </div>
       </div>
 
