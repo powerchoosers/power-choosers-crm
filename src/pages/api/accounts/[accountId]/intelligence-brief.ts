@@ -863,6 +863,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
     return 'For a food production plant like this, the useful check is whether refrigeration, ovens, and bake-line start-ups are what is actually driving the bill.'
   }
 
+  if (/(spill control|sorbent|sorbents|spill kits|secondary containment|spill response|environmental response|drums|granulars|containment)/.test(text)) {
+    return 'For a spill-control manufacturer like this, the useful check is whether mixing, packaging, warehouse climate control, and distribution activity are what is really driving the bill.'
+  }
+
   if (/(freight forwarder|nvocc|cargo|shipping|trucking|transport|logistics|warehouse|distribution|fulfillment|auto logistics)/.test(text)) {
     return 'For a logistics business like this, the useful check is whether dock activity, office load, warehouse support space, and any terminal-adjacent facilities are what is really driving the bill.'
   }
@@ -1636,6 +1640,43 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
             `For a dessert or bakery plant, the power side usually comes down to which lines are creating the peaks, not the average usage.`,
           ],
           focus: ['refrigeration', 'oven start-up', 'bake lines', 'production timing', 'demand ratchets', 'billing floors'],
+        }
+      }
+
+      if (/(spill control|sorbent|sorbents|spill kits|secondary containment|spill response|environmental response|drums|granulars|containment)/.test(text)) {
+        const spillMultiSite = detectMultiSiteScale(account, candidate)
+
+        if (spillMultiSite.isMultiSite && spillMultiSite.locationCount && spillMultiSite.locationCount >= 3) {
+          const locationDesc = spillMultiSite.locationCount >= 10
+            ? `${spillMultiSite.locationCount}+ facilities`
+            : `${spillMultiSite.locationCount} facilities`
+          const regionDesc = spillMultiSite.regions.length > 1
+            ? ` across ${spillMultiSite.regions.length} states`
+            : ''
+
+          return {
+            label: 'Environmental products network',
+            angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you tracking which plant or warehouse is creating the peaks, or is it all blended together?`,
+            openers: [
+              `Environmental products businesses like this usually have a hidden blind spot in how mixing, packaging, and warehouse support are showing up on the bill.`,
+              `With that kind of footprint${regionDesc}, one facility's climate control or packaging load can set a billing floor that sticks around.`,
+              `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet from warehouse climate control or production support load.`,
+            ],
+            focus: ['mixing', 'packaging', 'warehouse climate control', 'distribution', 'billing floors', 'demand ratchets'],
+          }
+        }
+
+        return {
+          label: 'Environmental products manufacturing',
+          angle: 'Mixing, packaging, warehouse climate control, and distribution support driving the billing floor.',
+          question: 'Have you looked at which part of the operation is creating the peaks, or is that still buried in the bill?',
+          openers: [
+            `For a spill-control manufacturer, the power side is usually about mixing, packaging, warehouse climate control, and how the product moves out the door.`,
+            `The thing I would watch is whether the support load is setting a billing floor that is bigger than it looks on paper.`,
+            `For CEP, the useful question is which part of the plant or warehouse is actually driving the peaks, not the average bill.`,
+          ],
+          focus: ['mixing', 'packaging', 'warehouse climate control', 'distribution', 'billing floors', 'demand ratchets'],
         }
       }
 
@@ -3238,6 +3279,7 @@ Decision rules:
 - Rotate the first sentence shape. Do not always open the same way.
 - Make the talk track specific to the signal and the industry, not just the company name.
 - Do not mention an industry that is not the account's actual industry. If you use an industry reference, it must match the account.
+- If the company description or source text names specific products or services, use those exact nouns in the first sentence when they matter. Do not replace them with generic words like "operation" or "footprint."
 - Do not imply the electricity agreement creates demand spikes. Spikes come from how the site is being used; contract structure only changes how those spikes show up on the bill.
 - Do not echo page titles, inventory copy, catalog language, or storefront language back into the talk track.
 - Avoid the phrases listed in talk_track_context. If the response starts sounding generic, rewrite it.
@@ -3318,6 +3360,7 @@ Decision rules:
 - If the source is just the company website, do not pretend it is a news event or a footprint change. Use a real business fact from the site and one plain electricity angle.
 - For hotel, resort, restaurant, venue, or clinic openings, stay on the opening itself. Do not pivot into side hires like chef appointments unless the hire is the actual signal. Name the property and the city in the first sentence if you can.
 - Use plain language. Avoid corporate fluff.
+- If the company description or source text names specific products or services, use those exact nouns in the first sentence when they matter. Do not replace them with generic words like "operation" or "footprint."
 - Pick ONE dominant angle per talk track. Do not stack market + industry + load all at once.
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
 - For office, dental, medical, retail, restaurant, and other low-intensity accounts, lead with budget predictability, seasonal volatility, comfort, lease timing, billing clarity, or ERCOT price exposure.
