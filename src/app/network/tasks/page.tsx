@@ -42,6 +42,7 @@ import { PriorityBadge, priorityColorClasses } from '@/components/ui/PriorityBad
 import { format, formatDistanceToNow, subMonths, isAfter } from 'date-fns'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useTableState } from '@/hooks/useTableState'
+import { ForensicPagination } from '@/components/ui/ForensicPagination'
 import { TaskTableRow } from '@/components/network/TaskTableRow'
 import BulkActionDeck from '@/components/network/BulkActionDeck'
 import DestructModal from '@/components/network/DestructModal'
@@ -453,37 +454,13 @@ export default function TasksPage() {
                 <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{effectiveTotalRecords}</span></span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(Math.max(0, pageIndex - 1))}
-                disabled={pageIndex === 0}
-                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                aria-label="Previous page"
-              >
-                <ChevronLeft className="h-3.5 w-3.5" />
-              </button>
-              <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-                {(pageIndex + 1).toString().padStart(2, '0')}
-              </div>
-              <button
-                onClick={async () => {
-                  const nextPageIndex = pageIndex + 1
-                  if (nextPageIndex >= displayTotalPages) return
-
-                  const needed = (nextPageIndex + 1) * PAGE_SIZE
-                  if (tasks.length < needed && hasNextPage && !isFetchingNextPage) {
-                    await fetchNextPage()
-                  }
-
-                  setPage(nextPageIndex)
-                }}
-                disabled={pageIndex + 1 >= displayTotalPages}
-                className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
-                aria-label="Next page"
-              >
-                <ChevronRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
+            <ForensicPagination
+              currentPage={pageIndex + 1}
+              totalPages={displayTotalPages}
+              onPageChange={(page) => setPage(page - 1)}
+              hasNextPage={hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+            />
           </div>
         </div>
       ) : (
