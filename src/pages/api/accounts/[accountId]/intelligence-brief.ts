@@ -859,6 +859,10 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
+  if (/(food production|food manufacturing|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
+    return 'For a food production plant like this, the useful check is whether refrigeration, ovens, and bake-line start-ups are what is actually driving the bill.'
+  }
+
   if (/(freight forwarder|nvocc|cargo|shipping|trucking|transport|logistics|warehouse|distribution|fulfillment|auto logistics)/.test(text)) {
     return 'For a logistics business like this, the useful check is whether dock activity, office load, warehouse support space, and any terminal-adjacent facilities are what is really driving the bill.'
   }
@@ -1598,6 +1602,43 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
   switch (industryCluster) {
     case 'manufacturing':
+      if (/(food production|food manufacturing|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
+        const foodMultiSite = detectMultiSiteScale(account, candidate)
+
+        if (foodMultiSite.isMultiSite && foodMultiSite.locationCount && foodMultiSite.locationCount >= 3) {
+          const locationDesc = foodMultiSite.locationCount >= 10
+            ? `${foodMultiSite.locationCount}+ production sites`
+            : `${foodMultiSite.locationCount} production sites`
+          const regionDesc = foodMultiSite.regions.length > 1
+            ? ` across ${foodMultiSite.regions.length} states`
+            : ''
+
+          return {
+            label: 'Food production network',
+            angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you tracking which plant is setting the peaks, or is it all getting rolled into one bill?`,
+            openers: [
+              `Food production groups with ${locationDesc} usually have a hidden blind spot in how refrigeration and bake-line start-ups are hitting the total budget.`,
+              `With that kind of footprint${regionDesc}, one plant's cooling load can set a billing floor that sticks for the rest of the year.`,
+              `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a demand ratchet from refrigeration or oven start-up.`,
+            ],
+            focus: ['refrigeration', 'bake-line start-up', 'production cycles', 'demand ratchets', 'billing floors', 'portfolio management'],
+          }
+        }
+
+        return {
+          label: 'Food production / bakery',
+          angle: 'Refrigeration, ovens, bake-line start-ups, and production timing driving the billing floor.',
+          question: 'Have you mapped which equipment or production cycles are creating the peaks, or is that still buried in the bill?',
+          openers: [
+            `Food production is different because refrigeration, ovens, and bake-line start-ups can move the bill long before anyone notices it in operations.`,
+            `The part I would watch is whether the cooling load or start-up sequence is setting a billing floor that sticks around all year.`,
+            `For a dessert or bakery plant, the power side usually comes down to which lines are creating the peaks, not the average usage.`,
+          ],
+          focus: ['refrigeration', 'oven start-up', 'bake lines', 'production timing', 'demand ratchets', 'billing floors'],
+        }
+      }
+
       const manufacturingMultiSite = detectMultiSiteScale(account, candidate)
       
       if (manufacturingMultiSite.isMultiSite && manufacturingMultiSite.locationCount && manufacturingMultiSite.locationCount >= 3) {
@@ -2361,6 +2402,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(footprint change|stranded power costs|unused meters|leftover contracts|meter cleanup|contract cleanup)\b/i.test(lower)
   const repeatedQuestionEcho = /\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b[\s\S]{0,140}\b(proactively|autopilot|current setup|electricity setup|how the business runs today)\b/i.test(lower)
   const filingJargon = /\b(sec filing|public filing|recent filing|filing)\b/i.test(lower)
+  const footprintOpener = /reviewing the operational footprint|operational footprint for/i.test(lower)
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
@@ -2370,7 +2412,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || incompleteReportOpener || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
