@@ -76,7 +76,7 @@ export function ForensicPagination({
 
   return (
     <motion.div
-      className={cn("flex items-center gap-1 group/pagination", className)}
+      className={cn("relative flex items-center gap-1 group/pagination", className)}
       animate={{ x: isLoading ? -2 : 0 }}
       transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
     >
@@ -173,23 +173,20 @@ export function ForensicPagination({
         <ChevronRight className="h-4 w-4" />
       </motion.button>
 
-      {/* Loading State Slot: keeps the footer width stable while data loads */}
-      <div className="relative ml-1 flex h-8 w-4 items-center justify-center shrink-0">
-        <AnimatePresence initial={false} mode="wait">
-          {isLoading && (
-            <motion.div
-              key="pagination-loading-dot"
-              initial={{ opacity: 0, scale: 0.65, x: -2 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.65, x: 2 }}
-              transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <div className="h-1 w-1 rounded-full bg-[#002FA7] animate-ping" />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
+      <AnimatePresence initial={false}>
+        {isLoading && (
+          <motion.div
+            key="pagination-loading-dot"
+            initial={{ opacity: 0, scale: 0.65, x: -2 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 0.65, x: 2 }}
+            transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+            className="pointer-events-none absolute right-0 top-1/2 ml-2 -translate-y-1/2 translate-x-full"
+          >
+            <div className="h-1 w-1 rounded-full bg-[#002FA7] animate-ping" />
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   )
 }
