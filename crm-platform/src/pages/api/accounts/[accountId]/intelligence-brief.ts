@@ -789,6 +789,9 @@ function buildEventClause(anchor: string) {
   if (/\b(specialist team|specialists?|clinical footprint|clinical team|physician team|doctor team)\b/.test(text)) {
     return 'is expanding its specialist team and clinical footprint'
   }
+  if (/prepares? for .*opening/.test(text)) {
+    return 'is preparing for an opening'
+  }
   if (/^expands?\b/.test(text)) {
     return `is ${text.replace(/^expands?\b\s*/, 'expanding ')}`
   }
@@ -1036,7 +1039,7 @@ function hasStrongNewLocationEvidence(text: string) {
 
   const genericDirectory = /(\blocations?\b|\bour locations\b|\boffice locations\b|\bfind us\b|\bcontact us\b|\bheadquarters\b|\blocation page\b|\bbranch locator\b)/i.test(lower)
   const openingVerb = /(\bopened\b|\bopening\b|\bopens\b|\blaunch\b|\blaunches\b|\bgroundbreaking\b|\blease signed\b|\bsigned a lease\b|\bconstruction\b|\brelocation\b|\brelocating\b|\bmove[- ]?in\b|\bbuildout\b|\bnew location\b|\bnew site\b|\bnew facility\b|\bnew office\b|\bnew branch\b)/i.test(lower)
-  const siteNoun = /(\blocation\b|\bsite\b|\bfacility\b|\bwarehouse\b|\bplant\b|\boffice\b|\bbranch\b|\bcampus\b|\bbuilding\b)/i.test(lower)
+  const siteNoun = /(\blocation\b|\bsite\b|\bfacility\b|\bwarehouse\b|\bplant\b|\boffice\b|\bbranch\b|\bcampus\b|\bbuilding\b|\bhotel\b|\bresort\b|\bmotel\b|\binn\b|\blogding\b|\bboutique property\b|\bhospitality\b|\brestaurant\b|\bcafe\b|\bbar\b|\bvenue\b|\bevent space\b|\bbanquet hall\b|\bclinic\b|\bmedical practice\b)/i.test(lower)
 
   return openingVerb && siteNoun && !genericDirectory
 }
@@ -1445,6 +1448,23 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
         focus: ['inherited contracts', 'duplicate sites or meters', 'utility cleanup after the deal'],
       }
     case 'new_location':
+      const isHospitalityOpening = /\b(hotel|resort|lodging|motel|inn|boutique property|hospitality|guest rooms|event space|banquet|caravan court)\b/i.test(text)
+      if (isHospitalityOpening) {
+        return {
+          label: 'Hospitality opening',
+          angle: 'New hotel capacity, guest-room load, kitchens, laundry, and HVAC all landing before opening day.',
+          question: alreadyOpen
+            ? 'Has the power side been lined up for the property now that it is live?'
+            : 'Are you getting the hotel power plan lined up now, or is that still in development?',
+          openers: [
+            sourceLead,
+            `A new hotel is a different kind of load because guest rooms, kitchens, laundry, and HVAC all start shaping the bill before opening day.`,
+            `With a 24/7 property, I would want to know whether the power plan is being lined up now or still waiting on the buildout.`,
+          ],
+          focus: ['hotel opening', 'guest-room load', 'kitchens', 'laundry', 'HVAC', '24/7 operations'],
+        }
+      }
+
       return {
         label: 'New location / facility / construction',
         angle: 'New meter timing, lease timing, construction power, and ramp-up risk.',
@@ -3104,6 +3124,7 @@ Decision rules:
 - Compare the current date to the source date. If the source says a location is already open, already moved in, or already serving customers, write it that way. If it is still upcoming, keep it future tense.
 - For new-location signals, only use the opening as a sales angle if the location is in Texas or the source clearly says the area is deregulated / competitive. If it is outside Texas and not clearly a deregulated market, do not use the move-in angle.
 - If it is an out-of-state opening, do not use new_location at all. Fall back to industry_context or a different signal.
+- For hotel, resort, restaurant, venue, or clinic openings, stay on the opening itself. Do not pivot into side hires like chef appointments unless the hire is the actual signal. Name the property and the city in the first sentence if you can.
 - If there is no clear, usable signal, set "usable_signal" to false and leave the other fields empty.
 - Signal Detail must be 2 to 4 sentences.
 - Talk Track must be UNIQUE to the specific signal found. Do NOT use generic templates.
@@ -3210,6 +3231,7 @@ Decision rules:
 - When a location is already open, write in the past tense or present perfect. Do not talk as if the move is still pending.
 - If the opening is outside Texas, do not build the talk track around move-in timing or new-site planning. Use a different angle.
 - If the source is just the company website, do not pretend it is a news event or a footprint change. Use a real business fact from the site and one plain electricity angle.
+- For hotel, resort, restaurant, venue, or clinic openings, stay on the opening itself. Do not pivot into side hires like chef appointments unless the hire is the actual signal. Name the property and the city in the first sentence if you can.
 - Use plain language. Avoid corporate fluff.
 - Pick ONE dominant angle per talk track. Do not stack market + industry + load all at once.
 - Load is one angle, not the default angle. Use it only when the company is operationally heavy or the site clearly depends on production, refrigeration, or 24/7 usage.
