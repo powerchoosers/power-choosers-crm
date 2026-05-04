@@ -859,6 +859,10 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
+  if (/(freight forwarder|nvocc|cargo|shipping|trucking|transport|logistics|warehouse|distribution|fulfillment|auto logistics)/.test(text)) {
+    return 'For a logistics business like this, the useful check is whether dock activity, office load, warehouse support space, and any terminal-adjacent facilities are what is really driving the bill.'
+  }
+
   if (/\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)) {
     return 'For a school district like this, the useful check is whether the campus calendar, HVAC, athletics, and classroom technology are all showing up on the bill the way they should.'
   }
@@ -1361,8 +1365,8 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   // if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
-  if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text)) return 'manufacturing'
-  if (/(logistics|warehouse|distribution|fulfillment|freight|trucking|supply chain|transport|shipping|wholesale)/.test(text)) return 'logistics'
+  if (/(logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
+  if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
   if (/(restaurant|dining|cafe|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
