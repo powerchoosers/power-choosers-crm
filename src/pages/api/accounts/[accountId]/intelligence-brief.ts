@@ -173,6 +173,7 @@ type SignalFamily =
   | 'new_location'
   | 'leadership_change'
   | 'growth'
+  | 'technical_load'
   | 'restructuring'
   | 'contract_win'
   | 'funding'
@@ -1356,6 +1357,13 @@ function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false
     return 'industry_context'
   }
 
+  if (priority === 4) {
+    if (/(heat pump|electrification|decarbonization|ev charging|charging station|data center|server|ai compute|bitcoin|mining|technical testing|lab|pilot plant|research|prototype|fabrication)/i.test(text)) {
+      return 'technical_load'
+    }
+    return 'growth'
+  }
+
   switch (priority) {
     case 1:
       return 'acquisition'
@@ -1364,7 +1372,7 @@ function inferSignalFamily(candidate: ResearchHit | null, isFallbackMode = false
     case 3:
       return 'leadership_change'
     case 4:
-      return 'growth'
+      return 'growth' // Fallback for priority 4 if the regex above didn't catch technical_load
     case 5:
       return 'restructuring'
     case 6:
@@ -1441,6 +1449,19 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
           `The thing I’d want to understand is what part of the operation is driving the extra usage.`,
         ],
         focus: ['load growth', 'equipment additions', 'budget creep'],
+      }
+    case 'technical_load':
+      return {
+        label: 'Technical Load / Electrification',
+        angle: 'New technical equipment, testing cycles, and the shift from gas to electric creating demand ratchets.',
+        question: 'Has anyone audited whether this new technical load is triggering demand ratchets during testing or peak windows?',
+        openers: [
+          sourceLead,
+          `Deploying new technical load like this usually changes the load factor faster than the billing structure can keep up with.`,
+          `The forensic question is whether the testing or deployment schedule is creating peaks that the current contract wasn't built for.`,
+          `Moving processes over to the electric side is a good move, but it usually creates a hidden liability on the billing floor.`,
+        ],
+        focus: ['electrification risk', 'technical testing spikes', 'demand ratchets', 'load factor shift', 'billing floor impact'],
       }
     case 'restructuring':
       return {
@@ -2001,11 +2022,12 @@ REQUIREMENTS:
 1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
 2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
 3. FORENSIC PAIN POINT: Connect the technical detail directly to a liability:
+   - Electrification / Load Factor Shift: The risk of moving thermal or manual load to electric without restructuring the bill.
    - Phantom Demand / Locked-in Peak Charges: 80% billing floors (often called demand ratchets) that punish businesses for one-time spikes.
    - Transmission Exposure: The hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
    - Load Mismatch: When the operating schedule changes but the contract doesn't.
 4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
-5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the broadcast schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
+5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
