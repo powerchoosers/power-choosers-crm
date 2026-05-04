@@ -30,6 +30,7 @@ export function ForensicPagination({
   const [isHovered, setIsHovered] = useState(false)
   const [scrubPage, setScrubPage] = useState(currentPage)
   const trackRef = useRef<HTMLDivElement>(null)
+  const isLoading = Boolean(isFetchingNextPage)
 
   // Sync scrub page with current page when not hovering
   useEffect(() => {
@@ -74,16 +75,22 @@ export function ForensicPagination({
   const progress = totalPages <= 1 ? 100 : ((displayPage - 1) / (totalPages - 1)) * 100
 
   return (
-    <div className={cn("flex items-center gap-1 group/pagination", className)}>
+    <motion.div
+      className={cn("flex items-center gap-1 group/pagination", className)}
+      animate={{ x: isLoading ? -2 : 0 }}
+      transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+    >
       {/* Prev Button */}
-      <button
+      <motion.button
         onClick={handlePrev}
         disabled={currentPage <= 1 || isFetchingNextPage}
         className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-20 disabled:cursor-not-allowed transition-opacity"
         aria-label="Previous page"
+        animate={{ x: isLoading ? -1 : 0, opacity: isLoading ? 0.85 : 1 }}
+        transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
       >
         <ChevronLeft className="h-4 w-4" />
-      </button>
+      </motion.button>
 
       {/* The Scrubber Instrument */}
       <div 
@@ -155,25 +162,34 @@ export function ForensicPagination({
       </div>
 
       {/* Next Button */}
-      <button
+      <motion.button
         onClick={handleNext}
         disabled={(currentPage >= totalPages && !hasNextPage) || isFetchingNextPage}
         className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-20 disabled:cursor-not-allowed transition-opacity"
         aria-label="Next page"
+        animate={{ x: isLoading ? 1 : 0, opacity: isLoading ? 0.85 : 1 }}
+        transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
       >
         <ChevronRight className="h-4 w-4" />
-      </button>
-      
-      {/* Loading State Overlay */}
-      {isFetchingNextPage && (
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="ml-2"
-        >
-          <div className="w-1 h-1 rounded-full bg-[#002FA7] animate-ping" />
-        </motion.div>
-      )}
-    </div>
+      </motion.button>
+
+      {/* Loading State Slot: keeps the footer width stable while data loads */}
+      <div className="relative ml-1 flex h-8 w-4 items-center justify-center shrink-0">
+        <AnimatePresence initial={false} mode="wait">
+          {isLoading && (
+            <motion.div
+              key="pagination-loading-dot"
+              initial={{ opacity: 0, scale: 0.65, x: -2 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.65, x: 2 }}
+              transition={{ duration: 0.24, ease: [0.23, 1, 0.32, 1] }}
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <div className="h-1 w-1 rounded-full bg-[#002FA7] animate-ping" />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+    </motion.div>
   )
 }
