@@ -9,6 +9,7 @@ import { extractEmailAddress } from '@/hooks/useEmailIdentityMap'
 import { ContactAvatar } from '@/components/ui/ContactAvatar'
 import { CompanyIcon } from '@/components/ui/CompanyIcon'
 import { cn } from '@/lib/utils'
+import { ForensicPagination } from '@/components/ui/ForensicPagination'
 
 interface EmailListProps {
   filter: EmailListFilter
@@ -980,47 +981,13 @@ export function EmailList({
             <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalForActiveFilter}</span></span>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
-            disabled={currentPage === 1}
-            className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Previous page"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </button>
-          <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-            {currentPage.toString().padStart(2, '0')}
-          </div>
-          <button
-            onClick={async () => {
-              const nextPage = currentPage + 1
-              const needed = nextPage * itemsPerPage
-
-              // If we need more items to potentially fill the next page, fetch them
-              if (
-                fetchNextPage &&
-                hasNextPage &&
-                !isFetchingNextPage &&
-                filteredEmails.length < needed
-              ) {
-                await fetchNextPage()
-              }
-
-              // Only change page if the next page actually has items 
-              // or if we have more pages coming from the server (though we might hit an empty page)
-              // For a better experience, we only advance if filteredEmails has enough items
-              if (nextPage <= totalPages) {
-                handlePageChange(nextPage)
-              }
-            }}
-            disabled={(currentPage >= totalPages && !hasNextPage) || isFetchingNextPage}
-            className="icon-button-forensic w-8 h-8 disabled:opacity-30 disabled:cursor-not-allowed"
-            aria-label="Next page"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </button>
-        </div>
+        <ForensicPagination
+          currentPage={currentPage}
+          totalPages={totalPages}
+          onPageChange={handlePageChange}
+          hasNextPage={hasNextPage}
+          isFetchingNextPage={isFetchingNextPage}
+        />
       </div>
     </div>
   )
