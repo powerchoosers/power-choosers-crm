@@ -79,6 +79,7 @@ import { useUIStore } from '@/store/uiStore'
 import { buildPowerDialTargets } from '@/lib/powerDialer'
 import { usePowerDialerStore } from '@/store/powerDialerStore'
 import { isActiveLoadAccount, isContractExpired, isCustomerStatus, normalizeStatusToken } from '@/lib/status-filters'
+import { ForensicPagination } from '@/components/ui/ForensicPagination'
 
 const PAGE_SIZE = 50
 const CONTACT_TARGET_TYPES = ['people', 'contact', 'contacts'] as const
@@ -1078,27 +1079,13 @@ export default function TargetDetailPage() {
               <span className="text-zinc-500">Total_Nodes: <span className="text-zinc-400 tabular-nums">{totalRecords || data.length}</span></span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setPage(Math.max(0, pageIndex - 1))}
-              disabled={pageIndex === 0}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-              title="Previous Page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <div className="min-w-8 text-center text-[10px] font-mono text-zinc-500 tabular-nums">
-              {(pageIndex + 1).toString().padStart(2, '0')}
-            </div>
-            <button
-              onClick={() => setPage(pageIndex + 1)}
-              disabled={(pageIndex + 1) * pageSize >= totalRecords}
-              className="icon-button-forensic w-8 h-8 flex items-center justify-center disabled:opacity-30 disabled:pointer-events-none"
-              title="Next Page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
+          <ForensicPagination
+            currentPage={pageIndex + 1}
+            totalPages={pageCount}
+            onPageChange={(page) => setPage(page - 1)}
+            hasNextPage={query.hasNextPage}
+            isFetchingNextPage={query.isFetchingNextPage}
+          />
         </div>
       </div>
 
