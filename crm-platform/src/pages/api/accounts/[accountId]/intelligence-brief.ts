@@ -859,6 +859,10 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
   const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
+  if (/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) {
+    return 'For a residential care nonprofit like this, the useful check is whether the homes, counseling spaces, and support services are what is actually driving the bill.'
+  }
+
   if (/(food production|food manufacturing|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
     return 'For a food production plant like this, the useful check is whether refrigeration, ovens, and bake-line start-ups are what is actually driving the bill.'
   }
@@ -1381,6 +1385,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
   if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
+  if (/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) return 'education_nonprofit'
   if (/(municipal|government|city|county|public sector|civic|public works|public safety|utility infrastructure)/.test(text)) return 'public_sector'
   if (/(school|education|university|college|nonprofit|foundation|charity)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
@@ -1919,7 +1924,44 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
     case 'education_nonprofit':
       const multiSiteInfo = detectMultiSiteScale(account, candidate)
-      const isSchoolDistrict = /\b(isd|independent school district|school district|public school|charter school|campus)\b/.test(text)
+      const isSchoolDistrict = /\b(isd|independent school district|school district|public school|charter school)\b/.test(text) && !/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)
+
+      const isResidentialCare = /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)
+
+      if (isResidentialCare) {
+        if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 3) {
+          const locationDesc = multiSiteInfo.locationCount >= 10
+            ? `${multiSiteInfo.locationCount}+ programs`
+            : `${multiSiteInfo.locationCount} programs`
+          const regionDesc = multiSiteInfo.regions.length > 1
+            ? ` across ${multiSiteInfo.regions.length} states`
+            : ''
+
+          return {
+            label: 'Residential care network',
+            angle: `Campus and program-level budget protection across ${locationDesc}${regionDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you tracking which houses or programs are creating the peaks, or is it all rolled into one bill?`,
+            openers: [
+              `For a residential care campus like this, the useful question is whether the houses, counseling spaces, and support services are setting the billing floor.`,
+              `With that kind of footprint${regionDesc}, one busy residential building can quietly drive the year-round budget more than people expect.`,
+              `The part I would want to understand is which program spaces are carrying the heaviest load on the power side.`,
+            ],
+            focus: ['residential care', 'counseling spaces', 'program load', 'billing floors', 'budget protection'],
+          }
+        }
+
+        return {
+          label: 'Residential care nonprofit',
+          angle: '24/7 residential care, counseling spaces, and support programs driving the bill.',
+          question: 'Have you looked at which residential or counseling spaces are driving the highest peaks, or is that still buried in the bill?',
+          openers: [
+            `Residential care facilities are different because the homes, counseling spaces, and support services keep the load on longer than a normal office.`,
+            `The thing I would watch is whether the 24/7 care load is setting a billing floor that stays in place all year.`,
+            `For Sunny Glen, the useful question is which parts of the campus are actually driving the peaks, not the average usage.`,
+          ],
+          focus: ['residential care', 'counseling spaces', '24/7 load', 'billing floors', 'program support'],
+        }
+      }
 
       if (isSchoolDistrict) {
         if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
