@@ -187,6 +187,9 @@ type IndustryCluster =
   | 'banking'
   | 'retail'
   | 'restaurant'
+  | 'school_district'
+  | 'higher_education'
+  | 'residential_care'
   | 'education_nonprofit'
   | 'religious'
   | 'technology'
@@ -829,6 +832,14 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     : 'Since you have a new site coming online'
 
   switch (industryCluster) {
+    case 'school_district':
+      return `${prefix}, the main factor is usually how campus calendars, athletics, cafeteria load, and classroom HVAC are showing up on the bill.`
+    case 'higher_education':
+      return `${prefix}, the main factor is usually how residence halls, classrooms, labs, and dining load are showing up on the bill.`
+    case 'residential_care':
+      return `${prefix}, the main factor is usually how the 24/7 residential care spaces, counseling areas, and support programs are showing up on the bill.`
+    case 'public_sector':
+      return `${prefix}, the main factor is usually how administrative offices, public safety, and utility buildings are showing up on the bill.`
     case 'education_nonprofit':
       return `${prefix}, the main factor for the budget is usually how the seasonal occupancy and HVAC load are landing on the bill.`
     case 'healthcare':
@@ -857,7 +868,7 @@ function hasMultiLocationEvidence(account: AccountRow, candidate: ResearchHit | 
 }
 
 function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: ResearchHit | null) {
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
 
   if (/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) {
     return 'For a residential care nonprofit like this, the useful check is whether the homes, counseling spaces, and support services are what is actually driving the bill.'
@@ -1205,6 +1216,9 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   banking: ['branch', 'occupancy', 'hvac', 'it', 'atms', 'portfolio', 'hours'],
   retail: ['store', 'seasonal', 'traffic', 'lighting', 'hvac', 'refrigeration', 'multi-site'],
   restaurant: ['kitchen', 'hvac', 'refrigeration', 'prep', 'hours', 'multi-unit', 'equipment'],
+  school_district: ['campus', 'calendar', 'athletics', 'cafeteria', 'classroom', 'student', 'school'],
+  higher_education: ['campus', 'student housing', 'residence hall', 'research', 'dorm', 'university', 'college'],
+  residential_care: ['residential', 'counseling', 'independent living', 'foster care', 'adoption', 'house', 'program'],
   education_nonprofit: ['campus', 'occupancy', 'events', 'hvac', 'controls', 'building', 'schedule'],
   religious: ['worship', 'sanctuary', 'events', 'hvac', 'weekend', 'seasonal', 'occupancy'],
   technology: ['cooling', 'server', 'fit-out', 'occupancy', 'equipment', 'space', 'data'],
@@ -1223,6 +1237,9 @@ const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
   banking: ['bank', 'banking', 'credit union', 'financial services'],
   retail: ['retail', 'store', 'shopping', 'showroom'],
   restaurant: ['restaurant', 'restaurants', 'hospitality', 'dining', 'cafe', 'food service', 'venue', 'wedding', 'event space', 'lodging', 'hotel', 'motel'],
+  school_district: ['school district', 'isd', 'independent school district', 'public school', 'k-12', 'campus'],
+  higher_education: ['college', 'university', 'higher education', 'community college', 'campus'],
+  residential_care: ["children's home", 'foster care', 'adoption', 'residential services', 'independent living', 'counseling center', 'residential care'],
   education_nonprofit: ['school', 'education', 'campus', 'nonprofit', 'university', 'college'],
   religious: ['church', 'synagogue', 'mosque', 'temple', 'congregation', 'parish', 'worship', 'ministry'],
   technology: ['technology', 'tech', 'software', 'saas', 'data center'],
@@ -1371,7 +1388,7 @@ function isUsefulSignalAnchor(value: string) {
 }
 
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
-  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
   if (!text) return 'unknown'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
   // if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
@@ -1385,7 +1402,9 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
   if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
-  if (/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) return 'education_nonprofit'
+  if (/(primary\/secondary education|school district|independent school district|isd|public school|charter school|k-12|school board|high school|middle school|elementary school|\bschools?\b)/.test(text)) return 'school_district'
+  if (/(college|university|higher education|community college|student housing|dorm|residence hall|campus ministry)/.test(text)) return 'higher_education'
+  if (/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)) return 'residential_care'
   if (/(municipal|government|city|county|public sector|civic|public works|public safety|utility infrastructure)/.test(text)) return 'public_sector'
   if (/(school|education|university|college|nonprofit|foundation|charity)/.test(text)) return 'education_nonprofit'
   if (/(technology|software|saas|data center|it services|cloud|digital)/.test(text)) return 'technology'
@@ -1607,7 +1626,8 @@ function buildSignalGuidance(signalFamily: SignalFamily, account: AccountRow, ca
 function buildIndustryGuidance(industryCluster: IndustryCluster, account: AccountRow, candidate: ResearchHit | null) {
   const companyName = cleanText(account.name) || 'the company'
   const industryLabel = cleanText(account.industry) || companyName
-  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const text = cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const multiSiteInfo = detectMultiSiteScale(account, candidate)
 
   switch (industryCluster) {
     case 'manufacturing':
@@ -1766,6 +1786,105 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         ],
         focus: ['refrigeration', 'freezer load', 'summer peaks', 'temperature-sensitive load', 'defrost cycles', 'demand ratchets'],
       }
+    case 'school_district':
+      if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
+        const locationDesc = multiSiteInfo.locationCount >= 100
+          ? `${multiSiteInfo.locationCount}+ campuses`
+          : `${multiSiteInfo.locationCount} campuses`
+        const regionDesc = multiSiteInfo.regions.length > 1
+          ? ` across ${multiSiteInfo.regions.length} states`
+          : ''
+
+        return {
+          label: 'School district network',
+          angle: `District-wide billing floor audit across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, is one campus creating a peak that shows up on the whole district bill?`,
+          openers: [
+            `For a district with ${locationDesc}${regionDesc}, the useful question is whether one campus peak is still setting the floor for the whole budget.`,
+            `School districts usually have a mix of old buildings, new buildings, and heavy summer HVAC, so the bill can look flatter than it really is.`,
+            `The campus calendar, athletics, and classroom technology all matter here because they change how the district uses power.`,
+          ],
+          focus: ['campus calendar', 'HVAC', 'athletics', 'classroom technology', 'billing floors', 'district budget'],
+        }
+      }
+
+      return {
+        label: 'School district',
+        angle: 'Campus calendar, HVAC, athletics, and classroom technology driving district-wide billing floors.',
+        question: 'Has anyone checked whether the summer cooling load or school calendar is still setting a higher billing floor than it should?',
+        openers: [
+          `School districts have a different pattern than a normal office because the calendar, athletics, cafeterias, and device charging all push the bill in different directions.`,
+          `The thing I would watch is whether one hot campus month is still showing up in the district bill long after school is back in session.`,
+          `For a district, the power side is usually about campus timing and HVAC more than anything else.`,
+        ],
+        focus: ['campus calendar', 'summer HVAC', 'athletics', 'cafeterias', 'device charging', 'district budget'],
+      }
+    case 'higher_education':
+      if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 3) {
+        const locationDesc = multiSiteInfo.locationCount >= 10
+          ? `${multiSiteInfo.locationCount}+ buildings`
+          : `${multiSiteInfo.locationCount} buildings`
+        const regionDesc = multiSiteInfo.regions.length > 1
+          ? ` across ${multiSiteInfo.regions.length} states`
+          : ''
+
+        return {
+          label: 'Higher education network',
+          angle: `Campus-wide load management across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are the residence halls, labs, and dining spaces being tracked together or still handled separately?`,
+          openers: [
+            `For a college or university with ${locationDesc}${regionDesc}, the useful question is which buildings are setting the billing floor for the whole campus.`,
+            `Higher-ed footprints tend to hide peaks because residence halls, labs, and dining do not all move at the same time.`,
+            `The thing I would watch is whether one building is quietly driving the total campus exposure.`,
+          ],
+          focus: ['campus load', 'student housing', 'labs', 'occupancy swings', 'billing floors', 'dining'],
+        }
+      }
+
+      return {
+        label: 'Higher education',
+        angle: 'Campus load, student housing, labs, and occupancy swings driving the billing floor.',
+        question: 'Has anyone looked at which buildings are setting the peak, or are the residence halls and labs all getting lumped together?',
+        openers: [
+          `Colleges and universities usually have a very different load profile because residence halls, classrooms, labs, and dining all peak on different schedules.`,
+          `The part I would watch is whether student housing or lab spaces are setting the billing floor for the whole campus.`,
+          `For a campus like this, the useful question is which buildings are really carrying the load, not just the average bill.`,
+        ],
+        focus: ['campus load', 'student housing', 'labs', 'occupancy swings', 'billing floors', 'dining'],
+      }
+    case 'residential_care':
+      if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 3) {
+        const locationDesc = multiSiteInfo.locationCount >= 10
+          ? `${multiSiteInfo.locationCount}+ programs`
+          : `${multiSiteInfo.locationCount} programs`
+        const regionDesc = multiSiteInfo.regions.length > 1
+          ? ` across ${multiSiteInfo.regions.length} states`
+          : ''
+
+        return {
+          label: 'Residential care network',
+          angle: `Campus and program-level budget protection across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking which homes or programs are creating the peaks, or is it all rolled into one bill?`,
+          openers: [
+            `For a residential care campus like this, the useful question is whether the homes, counseling spaces, and support services are setting the billing floor.`,
+            `With that kind of footprint${regionDesc}, one busy residential building can quietly drive the year-round budget more than people expect.`,
+            `The part I would want to understand is which program spaces are carrying the heaviest load on the power side.`,
+          ],
+          focus: ['residential care', 'counseling spaces', 'program load', 'billing floors', 'budget protection'],
+        }
+      }
+
+      return {
+        label: 'Residential care',
+        angle: '24/7 homes, counseling spaces, and support programs driving the year-round billing floor.',
+        question: 'Have you looked at which residential buildings or program spaces are driving the highest peaks?',
+        openers: [
+          `Residential care facilities are different because the homes, counseling spaces, and support services keep the load on longer than a normal office.`,
+          `The thing I would watch is whether the 24/7 care load is setting a billing floor that stays in place all year.`,
+          `For a children’s home or residential campus, the useful question is which parts of the property are actually driving the peaks.`,
+        ],
+        focus: ['residential care', 'counseling spaces', '24/7 load', 'billing floors', 'program support'],
+      }
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
       
@@ -1923,83 +2042,8 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         focus: ['coincident peaks', 'service rushes', 'kitchen equipment', 'demand ratchets', 'billing floors', 'HVAC load'],
       }
     case 'education_nonprofit':
-      const multiSiteInfo = detectMultiSiteScale(account, candidate)
-      const isSchoolDistrict = /\b(isd|independent school district|school district|public school|charter school)\b/.test(text) && !/(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)
-
-      const isResidentialCare = /(children'?s home|foster care|adoption assistance|residential services|independent living center|counseling center|youth services|human services|group home|residential care)/.test(text)
-
-      if (isResidentialCare) {
-        if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 3) {
-          const locationDesc = multiSiteInfo.locationCount >= 10
-            ? `${multiSiteInfo.locationCount}+ programs`
-            : `${multiSiteInfo.locationCount} programs`
-          const regionDesc = multiSiteInfo.regions.length > 1
-            ? ` across ${multiSiteInfo.regions.length} states`
-            : ''
-
-          return {
-            label: 'Residential care network',
-            angle: `Campus and program-level budget protection across ${locationDesc}${regionDesc}.`,
-            question: `With ${locationDesc}${regionDesc}, are you tracking which houses or programs are creating the peaks, or is it all rolled into one bill?`,
-            openers: [
-              `For a residential care campus like this, the useful question is whether the houses, counseling spaces, and support services are setting the billing floor.`,
-              `With that kind of footprint${regionDesc}, one busy residential building can quietly drive the year-round budget more than people expect.`,
-              `The part I would want to understand is which program spaces are carrying the heaviest load on the power side.`,
-            ],
-            focus: ['residential care', 'counseling spaces', 'program load', 'billing floors', 'budget protection'],
-          }
-        }
-
-        return {
-          label: 'Residential care nonprofit',
-          angle: '24/7 residential care, counseling spaces, and support programs driving the bill.',
-          question: 'Have you looked at which residential or counseling spaces are driving the highest peaks, or is that still buried in the bill?',
-          openers: [
-            `Residential care facilities are different because the homes, counseling spaces, and support services keep the load on longer than a normal office.`,
-            `The thing I would watch is whether the 24/7 care load is setting a billing floor that stays in place all year.`,
-            `For Sunny Glen, the useful question is which parts of the campus are actually driving the peaks, not the average usage.`,
-          ],
-          focus: ['residential care', 'counseling spaces', '24/7 load', 'billing floors', 'program support'],
-        }
-      }
-
-      if (isSchoolDistrict) {
-        if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
-          const locationDesc = multiSiteInfo.locationCount >= 100
-            ? `${multiSiteInfo.locationCount}+ campuses`
-            : `${multiSiteInfo.locationCount} campuses`
-          const regionDesc = multiSiteInfo.regions.length > 1
-            ? ` across ${multiSiteInfo.regions.length} states`
-            : ''
-
-          return {
-            label: 'School district network',
-            angle: `District-wide billing floor audit across ${locationDesc}${regionDesc}.`,
-            question: `With ${locationDesc}${regionDesc}, is one campus creating a peak that shows up on the whole district bill?`,
-            openers: [
-              `For a district with ${locationDesc}${regionDesc}, the useful question is whether one campus peak is still setting the floor for the whole budget.`,
-              `School districts usually have a mix of old buildings, new buildings, and heavy summer HVAC, so the bill can look flatter than it really is.`,
-              `The campus calendar, athletics, and classroom technology all matter here because they change how the district uses power.`,
-            ],
-            focus: ['campus calendar', 'HVAC', 'athletics', 'classroom technology', 'billing floors', 'district budget'],
-          }
-        }
-
-        return {
-          label: 'School district',
-          angle: 'Campus calendar, HVAC, and classroom technology driving a district-wide billing floor.',
-          question: 'Has anyone checked whether the summer cooling load or school calendar is still setting a higher billing floor than it should?',
-          openers: [
-            `School districts have a different pattern than a normal office because the calendar, athletics, cafeterias, and device charging all push the bill in different directions.`,
-            `The thing I would watch is whether one hot campus month is still showing up in the district bill long after school is back in session.`,
-            `For a district, the power side is usually about campus timing and HVAC more than anything else.`,
-          ],
-          focus: ['campus calendar', 'summer HVAC', 'athletics', 'cafeterias', 'device charging', 'district budget'],
-        }
-      }
-      
       if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
-        const locationDesc = multiSiteInfo.locationCount >= 100 
+        const locationDesc = multiSiteInfo.locationCount >= 100
           ? `${multiSiteInfo.locationCount}+ locations`
           : `${multiSiteInfo.locationCount} locations`
         const regionDesc = multiSiteInfo.regions.length > 1 
@@ -2175,7 +2219,19 @@ function getMarketSeason(date = new Date()): MarketSeason {
 
 function buildMarketGuidance(industryCluster: IndustryCluster): MarketGuidance {
   const season = getMarketSeason()
-  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'public_sector', 'unknown'].includes(industryCluster)
+  const lowIntensityCluster = [
+    'office_services',
+    'banking',
+    'retail',
+    'restaurant',
+    'education_nonprofit',
+    'school_district',
+    'higher_education',
+    'residential_care',
+    'religious',
+    'public_sector',
+    'unknown',
+  ].includes(industryCluster)
 
   if (season === 'summer_peak') {
     return lowIntensityCluster
@@ -2566,7 +2622,19 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const signalLine = pickVariant(signalLineBySignal[context.signalFamily], variantSeed) || signalLineBySignal[context.signalFamily][0]
   const marketLine = pickVariant(context.marketOpeners, variantSeed) || context.marketOpeners[0]
   
-  const lowIntensityCluster = ['office_services', 'banking', 'retail', 'restaurant', 'education_nonprofit', 'public_sector', 'religious', 'unknown'].includes(context.industryCluster)
+  const lowIntensityCluster = [
+    'office_services',
+    'banking',
+    'retail',
+    'restaurant',
+    'education_nonprofit',
+    'school_district',
+    'higher_education',
+    'residential_care',
+    'religious',
+    'public_sector',
+    'unknown',
+  ].includes(context.industryCluster)
   const shouldUseMarketLine = context.marketSeason !== 'spring_shoulder' && (lowIntensityCluster || context.signalFamily === 'industry_context')
   
   const forensicObservation = context.signalFamily === 'industry_context'
