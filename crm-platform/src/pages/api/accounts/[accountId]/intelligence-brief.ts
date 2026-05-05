@@ -2430,6 +2430,7 @@ REQUIREMENTS:
 5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
+   - For healthcare accounts, use clinical language like patient care, imaging, surgical units, labs, or 24/7 care. Do not use restaurant language like kitchen peaks, service rushes, fryers, or game-day wording unless the source explicitly says that.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
 9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
@@ -2543,6 +2544,12 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const filingJargon = /\b(sec filing|public filing|recent filing|filing)\b/i.test(lower)
   const footprintOpener = /reviewing the operational footprint|operational footprint for/i.test(lower)
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
+  const healthcareRestaurantJargon = context.industryCluster === 'healthcare' &&
+    /\b(coincident kitchen peak|service rushes?|game[-\s]?day|fryers?|grills?|restaurant|restaurant brand|kitchen peak)\b/i.test(lower)
+  const schoolManufacturingJargon = context.industryCluster === 'school_district' &&
+    /\b(shift(?:s)?|production|startup|bake line|machine startup|factory)\b/i.test(lower)
+  const residentialRestaurantJargon = context.industryCluster === 'residential_care' &&
+    /\b(coincident kitchen peak|service rushes?|fryers?|grills?|restaurant)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
@@ -2551,7 +2558,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || schoolManufacturingJargon || residentialRestaurantJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
