@@ -300,14 +300,20 @@ function decodeHtmlEntities(value: string): string {
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&#160;/g, ' ')
 }
 
 function stripXml(value: string): string {
-  return decodeHtmlEntities(
+  const decoded = decodeHtmlEntities(
     String(value || '')
       .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-      .replace(/<[^>]+>/g, ' ')
-  ).replace(/\s+/g, ' ').trim()
+  )
+
+  return decoded
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function countCjkCharacters(value: string) {
@@ -1394,7 +1400,7 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   // if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
   if (/(defense|space|aerospace|rocket|aviation|aircraft|missile|orbital|satellite)/.test(text)) return 'manufacturing'
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
-  if (/(logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
+  if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
   if (/(restaurant|dining|cafe|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
@@ -1630,6 +1636,52 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
   const multiSiteInfo = detectMultiSiteScale(account, candidate)
 
   switch (industryCluster) {
+    case 'multi_site':
+      if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
+        const locationDesc = multiSiteInfo.locationCount >= 100
+          ? `${multiSiteInfo.locationCount}+ sites`
+          : `${multiSiteInfo.locationCount} sites`
+        const regionDesc = multiSiteInfo.regions.length > 1
+          ? ` across ${multiSiteInfo.regions.length} states`
+          : ''
+        const acquisitionHeavy = /\b(acquisition|acquisitions|acquired|acquired through|rolled up|rollup|distribution|building materials|wholesale|lumber)\b/.test(text)
+
+        return {
+          label: acquisitionHeavy ? 'Acquisition-led network' : 'Multi-site portfolio',
+          angle: acquisitionHeavy
+            ? `Acquisition-led branch network across ${locationDesc}${regionDesc}, with each meter carrying its own peak history.`
+            : `Portfolio-level comparison of locked-in peak charges across ${locationDesc}${regionDesc}.`,
+          question: acquisitionHeavy
+            ? `With ${locationDesc}${regionDesc}, are the acquired branches being checked one by one for their own locked-in peak charge?`
+            : `With ${locationDesc}${regionDesc}, are you comparing which sites have their own locked-in peak charge, or is the portfolio view still too blended?`,
+          openers: acquisitionHeavy
+            ? [
+                `For a network like this, the useful question is which acquired branches or yards are carrying their own locked-in peak charge.`,
+                `Acquisition-heavy footprints tend to hide different peak histories in each branch, even when the company looks unified on paper.`,
+                `The thing I would watch is whether the newest locations are being checked against their own meter history instead of averaged into the portfolio.`,
+              ]
+            : [
+                `For a portfolio like this, the useful question is which sites have their own locked-in peak charge and which ones do not.`,
+                `Large multi-site footprints tend to hide peak history because each meter can behave differently even inside the same company.`,
+                `The thing I would watch is whether one site is carrying a peak history that should really be handled on its own meter.`,
+              ],
+          focus: acquisitionHeavy
+            ? ['acquired branches', 'meter history', 'portfolio comparison', 'locked-in peak charges', 'site-level review']
+            : ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
+        }
+      }
+
+      return {
+        label: 'Multi-site portfolio',
+        angle: 'Portfolio-level comparison of locked-in peak charges across multiple sites.',
+        question: 'Are you comparing the sites one by one, or is everything still being handled as one bucket?',
+        openers: [
+          'For a multi-site portfolio like this, the useful question is which sites have their own locked-in peak charge and which ones do not.',
+          'Large multi-site footprints tend to hide peak history because each meter can behave differently even inside the same company.',
+          'The thing I would watch is whether one site is carrying a peak history that should really be handled on its own meter.',
+        ],
+        focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
+      }
     case 'manufacturing':
       if (/(food production|food manufacturing|bakery|dessert|cake|cheesecake|pie|frozen food|refrigerat|freezer|cold chain|bakehouse|baking line|production kitchen)/.test(text)) {
         const foodMultiSite = detectMultiSiteScale(account, candidate)
@@ -1741,6 +1793,7 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
     case 'logistics':
       const logisticsMultiSite = detectMultiSiteScale(account, candidate)
+      const logisticsAcquisitionHeavy = /\b(acquisition|acquisitions|acquired|rollup|distribution|building materials|wholesale|lumber|yards?|branches?)\b/i.test(text)
       
       if (logisticsMultiSite.isMultiSite && logisticsMultiSite.locationCount && logisticsMultiSite.locationCount >= 3) {
         const locationDesc = logisticsMultiSite.locationCount >= 10 
@@ -1750,17 +1803,29 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           ? ` across ${logisticsMultiSite.regions.length} states`
           : ''
           
-        return {
-          label: 'Logistics network',
-          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or are they hiding in the group-level budget?`,
-          openers: [
-            `Logistics groups with ${locationDesc} usually have different demand ratchets hiding in each specific facility's bill.`,
-            `With that kind of footprint${regionDesc}, one warehouse's summer peak can set a local billing floor that the group has to carry for 11 months.`,
-            `The diagnostic check I'd want to run is whether the transmission exposure is being managed across all ${locationDesc} or if a few sites are dragging down the total budget.`,
-          ],
-          focus: ['portfolio demand ratchets', 'consolidated transmission', 'warehouse coordination', 'billing floors', '24/7 load'],
-        }
+        return logisticsAcquisitionHeavy
+          ? {
+              label: 'Distribution network',
+              angle: `Acquisition-led distribution portfolio across ${locationDesc}${regionDesc}, with each branch carrying its own locked-in peak charge.`,
+              question: `With ${locationDesc}${regionDesc}, are the acquired branches being checked one by one for their own locked-in peak charge?`,
+              openers: [
+                `Distribution networks like this usually hide different peak histories in each acquired branch or yard.`,
+                `When a company grows by acquisition, the main question is whether the new locations have been reviewed on their own meters or just blended into the portfolio.`,
+                `The part I would watch is whether one branch's summer spike is still sitting on that branch's meter instead of being cleaned up.`,
+              ],
+              focus: ['acquired branches', 'meter history', 'locked-in peak charges', 'portfolio comparison', 'branch-level review'],
+            }
+          : {
+              label: 'Logistics network',
+              angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
+              question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or are they hiding in the group budget?`,
+              openers: [
+                `Logistics groups with ${locationDesc} usually have different locked-in peak charges hiding in each specific facility's bill.`,
+                `With that kind of footprint${regionDesc}, one warehouse's summer peak can leave its own peak charge sitting on that meter.`,
+                `The diagnostic check I'd want to run is whether the site-level exposure is being managed across all ${locationDesc} or if a few sites are dragging down the total budget.`,
+              ],
+              focus: ['portfolio demand ratchets', 'consolidated transmission', 'warehouse coordination', 'billing floors', '24/7 load'],
+            }
       }
       
       return {
@@ -2569,6 +2634,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   const candidateText = `${candidate?.title || ''} ${candidate?.snippet || ''}`
   const alreadyOpen = isAlreadyOpenLocationSignal(candidateText)
   const openingIndustryLine = buildOpeningIndustryLine(context.industryCluster, alreadyOpen)
+  const multiSiteInfo = detectMultiSiteScale(account, candidate)
   const variantSeed = `${context.seed}|${attempt}`
   const openerBySignal: Record<SignalFamily, string[]> = {
     acquisition: [sourceLead],
@@ -2656,11 +2722,18 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
   if (context.signalFamily === 'industry_context') {
     // Lead with the forensic observation directly, then the source, then the question
     // This feels more peer-to-peer than "I saw your website"
-    const observationalOpener = [
-      `I was reviewing the operational footprint for ${companyName}.`,
-      `I caught the update about ${companyName} online.`,
-      `I was looking into the setup at ${companyName}.`
-    ][hashString(variantSeed) % 3]
+    const observationalOpenerOptions = multiSiteInfo.isMultiSite
+      ? [
+          `I was looking at ${companyName}'s branch network.`,
+          `I was reviewing ${companyName}'s locations across the portfolio.`,
+          `I was looking into how ${companyName} is managing all those sites.`,
+        ]
+      : [
+          `I caught the update about ${companyName} online.`,
+          `I was looking into the setup at ${companyName}.`,
+          `I was reviewing the company profile for ${companyName}.`,
+        ]
+    const observationalOpener = observationalOpenerOptions[hashString(variantSeed) % observationalOpenerOptions.length]
 
     fullTrack = `${observationalOpener} ${forensicObservation} ${question}`
   } else {
