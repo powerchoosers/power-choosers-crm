@@ -1797,12 +1797,12 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
         return {
           label: 'School district network',
-          angle: `District-wide billing floor audit across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, is one campus creating a peak that shows up on the whole district bill?`,
+          angle: `District-wide comparison of locked-in peak charges across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you comparing which campuses have their own locked-in peak charge, or is everything still being handled as one bucket?`,
           openers: [
-            `For a district with ${locationDesc}${regionDesc}, the useful question is whether one campus peak is still setting the floor for the whole budget.`,
-            `School districts usually have a mix of old buildings, new buildings, and heavy summer HVAC, so the bill can look flatter than it really is.`,
-            `The campus calendar, athletics, and classroom technology all matter here because they change how the district uses power.`,
+            `For a district with ${locationDesc}${regionDesc}, the useful question is which campuses have their own locked-in peak charge and which ones do not.`,
+            `School districts usually have a mix of old buildings, new buildings, and heavy summer HVAC, so each campus can carry its own peak history.`,
+            `The campus calendar, athletics, and classroom technology all matter here because they change how each campus uses power.`,
           ],
           focus: ['campus calendar', 'HVAC', 'athletics', 'classroom technology', 'billing floors', 'district budget'],
         }
@@ -1810,11 +1810,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
       return {
         label: 'School district',
-        angle: 'Campus calendar, HVAC, athletics, and classroom technology driving district-wide billing floors.',
-        question: 'Has anyone checked whether the summer cooling load or school calendar is still setting a higher billing floor than it should?',
+        angle: 'Campus calendar, HVAC, athletics, and classroom technology driving locked-in peak charges at the meter level.',
+        question: 'Has anyone checked whether the summer cooling load or school calendar left this campus with a locked-in peak charge?',
         openers: [
           `School districts have a different pattern than a normal office because the calendar, athletics, cafeterias, and device charging all push the bill in different directions.`,
-          `The thing I would watch is whether one hot campus month is still showing up in the district bill long after school is back in session.`,
+          `The thing I would watch is whether one hot campus month is still showing up as a locked-in peak charge long after school is back in session.`,
           `For a district, the power side is usually about campus timing and HVAC more than anything else.`,
         ],
         focus: ['campus calendar', 'summer HVAC', 'athletics', 'cafeterias', 'device charging', 'district budget'],
@@ -1830,12 +1830,12 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
         return {
           label: 'Higher education network',
-          angle: `Campus-wide load management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are the residence halls, labs, and dining spaces being tracked together or still handled separately?`,
+          angle: `Campus-by-campus comparison of locked-in peak charges across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are the residence halls, labs, and dining spaces being checked meter by meter, or still handled as one campus story?`,
           openers: [
-            `For a college or university with ${locationDesc}${regionDesc}, the useful question is which buildings are setting the billing floor for the whole campus.`,
+            `For a college or university with ${locationDesc}${regionDesc}, the useful question is which buildings have their own locked-in peak charge.`,
             `Higher-ed footprints tend to hide peaks because residence halls, labs, and dining do not all move at the same time.`,
-            `The thing I would watch is whether one building is quietly driving the total campus exposure.`,
+            `The thing I would watch is whether one building has a peak history that is still sitting on that meter.`,
           ],
           focus: ['campus load', 'student housing', 'labs', 'occupancy swings', 'billing floors', 'dining'],
         }
@@ -1863,11 +1863,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
         return {
           label: 'Residential care network',
-          angle: `Campus and program-level budget protection across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking which homes or programs are creating the peaks, or is it all rolled into one bill?`,
+          angle: `Campus and program-level comparison of locked-in peak charges across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking which homes or programs have their own locked-in peak charge, or is it all still being handled together?`,
           openers: [
-            `For a residential care campus like this, the useful question is whether the homes, counseling spaces, and support services are setting the billing floor.`,
-            `With that kind of footprint${regionDesc}, one busy residential building can quietly drive the year-round budget more than people expect.`,
+            `For a residential care campus like this, the useful question is whether the homes, counseling spaces, and support services are carrying their own locked-in peak charges.`,
+            `With that kind of footprint${regionDesc}, each residential building can have its own peak history on the meter.`,
             `The part I would want to understand is which program spaces are carrying the heaviest load on the power side.`,
           ],
           focus: ['residential care', 'counseling spaces', 'program load', 'billing floors', 'budget protection'],
@@ -1876,11 +1876,11 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
       return {
         label: 'Residential care',
-        angle: '24/7 homes, counseling spaces, and support programs driving the year-round billing floor.',
-        question: 'Have you looked at which residential buildings or program spaces are driving the highest peaks?',
+        angle: '24/7 homes, counseling spaces, and support programs leaving their own locked-in peak charges on the meter.',
+        question: 'Have you looked at which residential buildings or program spaces left this site with a locked-in peak charge?',
         openers: [
           `Residential care facilities are different because the homes, counseling spaces, and support services keep the load on longer than a normal office.`,
-          `The thing I would watch is whether the 24/7 care load is setting a billing floor that stays in place all year.`,
+          `The thing I would watch is whether the 24/7 care load left a locked-in peak charge that stays in place all year.`,
           `For a children’s home or residential campus, the useful question is which parts of the property are actually driving the peaks.`,
         ],
         focus: ['residential care', 'counseling spaces', '24/7 load', 'billing floors', 'program support'],
@@ -1898,27 +1898,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           
         return {
           label: 'Healthcare network',
-          angle: `Portfolio-level reliability requirements masking consolidated demand ratchets across ${locationDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking the transmission exposure on that base load, or is the portfolio budget masking the peaks?`,
+          angle: `Portfolio-level comparison of locked-in peak charges across ${locationDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking which sites have their own locked-in peak charge, or is the portfolio view still too blended?`,
           openers: [
-            `Healthcare groups with ${locationDesc} usually have a significant blind spot because the 24/7 base load masks the very peaks that set a specific facility's billing floor.`,
-            `With that kind of footprint${regionDesc}, the liability isn't just one site — it's how a single site's peak can set a local ratchet that hits the group budget.`,
-            `The forensic check I'd want to run is whether any of those ${locationDesc} are carrying a stealth demand ratchet that is dragging down the total budget.`,
+            `Healthcare groups with ${locationDesc} usually have a significant blind spot because the 24/7 base load can hide the peak history on each individual meter.`,
+            `With that kind of footprint${regionDesc}, the liability is site-specific: one facility can carry its own locked-in peak charge even when the rest look fine.`,
+            `The forensic check I'd want to run is whether any of those ${locationDesc} have a hidden peak charge sitting on the meter.`,
           ],
-          focus: ['base load masking', 'portfolio transmission', 'reliability', 'demand ratchets', 'billing floors'],
+          focus: ['base load masking', 'portfolio comparison', 'reliability', 'locked-in peak charges', 'meter-level exposure'],
         }
       }
       
       return {
         label: 'Healthcare / Senior Living',
-        angle: 'Base load masking where 24/7 reliability requirements hide stealth demand ratchets.',
-        question: 'Are you tracking the peak exposure on that 24/7 base load, or is the reliability requirement masking the ratchets?',
+        angle: 'Base load masking where 24/7 reliability requirements hide a locked-in peak charge on the meter.',
+        question: 'Are you tracking the peak exposure on that 24/7 base load, or is the reliability requirement hiding the locked-in charge?',
         openers: [
-          `Healthcare facilities that never sleep have a unique liability because the constant base load often masks stealth demand ratchets.`,
-          `Because your buildings never stop, the part I care about is that the base load hides the very peaks that set your billing floor.`,
-          `In a 24/7 environment, you're often paying for capacity you aren't actually using because the 'always-on' load makes peaks hard to spot.`,
+          `Healthcare facilities that never sleep have a unique liability because the constant base load can hide a locked-in peak charge on the meter.`,
+          `Because your buildings never stop, the part I care about is whether the base load is hiding the peak history that set the charge.`,
+          `In a 24/7 environment, you're often paying for capacity you aren't actually using because the always-on load makes the peak hard to spot.`,
         ],
-        focus: ['base load masking', 'peak transparency', 'reliability liability', 'demand ratchets', 'billing floors', 'capacity mismatch'],
+        focus: ['base load masking', 'peak transparency', 'reliability liability', 'locked-in peak charges', 'billing floors', 'capacity mismatch'],
       }
     case 'banking':
       const bankingMultiSite = detectMultiSiteScale(account, candidate)
@@ -2052,27 +2052,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         
         return {
           label: 'Education / nonprofit network',
-          angle: `Forensic audit of billing floors across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}, is a single campus spike triggering a demand ratchet that affects the whole portfolio budget?`,
+          angle: `Forensic comparison of locked-in peak charges across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}, which campuses or programs have their own locked-in peak charge, and which ones do not?`,
           openers: [
-            `For a portfolio with ${locationDesc}, the biggest liability is usually a demand ratchet at one site that inflates the whole group bill.`,
-            `With that kind of footprint${regionDesc}, the budget risk isn't the rate — it is the hidden billing floors masking themselves in the consolidated total.`,
-            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a phantom demand charge from a one-time event.`,
+            `For a portfolio with ${locationDesc}, the useful check is which sites have their own locked-in peak charge and which ones do not.`,
+            `With that kind of footprint${regionDesc}, the budget risk is that some campuses look fine until you compare the meter history side by side.`,
+            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a one-time peak charge from a summer event.`,
           ],
-          focus: ['billing floors', 'demand ratchets', 'portfolio liability', 'budget erosion', 'hidden spikes'],
+          focus: ['billing floors', 'locked-in peak charges', 'portfolio comparison', 'budget erosion', 'hidden spikes'],
         }
       }
       
       return {
         label: 'Education / nonprofit',
-        angle: 'Diagnostic check for demand ratchets triggered by seasonal occupancy or special event spikes.',
-        question: 'Has anyone audited the bill to see if a single summer event triggered a locked-in peak charge that is still eroding the budget today?',
+        angle: 'Diagnostic check for a locked-in peak charge caused by seasonal occupancy or special event spikes.',
+        question: 'Has anyone audited the bill to see if a single summer event left this site with a locked-in peak charge?',
         openers: [
-          `In the non-profit sector, the stealth liability is almost always phantom demand — a billing floor that keeps the price high long after an event ends.`,
-          `Most campus budgets are designed for steady load, but seasonal spikes can trigger a ratchet that stays on the bill for a full 12 months.`,
+          `In the non-profit sector, the stealth liability is usually a locked-in peak charge that keeps the site paying for one hot month long after the event ends.`,
+          `Most campus budgets are designed for steady load, but seasonal spikes can leave a site with a peak charge for a full 12 months.`,
           `I was curious if anyone has checked the current billing floor against your actual off-peak usage.`,
         ],
-        focus: ['stealth liability', 'billing floors', 'budget erosion', 'seasonal spikes', 'demand ratchets', 'mission fund protection'],
+        focus: ['stealth liability', 'billing floors', 'budget erosion', 'seasonal spikes', 'locked-in peak charges', 'mission fund protection'],
       }
     case 'public_sector':
       const publicSectorMultiSite = detectMultiSiteScale(account, candidate)
@@ -2087,24 +2087,24 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
         return {
           label: 'Public sector network',
-          angle: `Municipal budget protection across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking which public facilities are driving the peaks, or is it all still rolled up together?`,
+          angle: `Municipal comparison of locked-in peak charges across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you tracking which public facilities have their own locked-in peak charge, or is it still one rolled-up view?`,
           openers: [
-            `For a city portfolio like this, the real question is which public facilities are setting the billing floor for the whole budget.`,
-            `Administrative offices, public safety, and utility buildings usually behave very differently on the power side, so one site can distort the total fast.`,
+            `For a city portfolio like this, the real question is which public facilities have their own locked-in peak charge.`,
+            `Administrative offices, public safety, and utility buildings usually behave very differently on the power side, so each site needs to be checked on its own meter history.`,
             `When a municipality has this many facilities, I want to know whether the summer peaks are being tracked by building or just buried in the consolidated bill.`,
           ],
           focus: ['public facilities', 'budget protection', 'summer cooling load', 'public safety', 'utility infrastructure', 'billing floors'],
         }
       }
-
+      
       return {
         label: 'Public sector',
-        angle: 'Mission-critical public facilities, summer cooling load, and budget erosion from peak demand.',
-        question: 'Have you looked at which city buildings are creating the highest peaks, or is everything still sitting in one bucket?',
+        angle: 'Mission-critical public facilities, summer cooling load, and a locked-in peak charge at the meter.',
+        question: 'Have you looked at which city buildings left the highest locked-in peak charge, or is everything still sitting in one bucket?',
         openers: [
           `City facilities have a different profile because public safety, utility infrastructure, and administrative offices do not all use power the same way.`,
-          `The part I would watch is whether one summer peak is still setting the floor for the whole municipal budget.`,
+          `The part I would watch is whether one summer peak left a locked-in charge on a specific meter.`,
           `For a city, the power side is usually about which buildings are carrying the critical load, not just the average bill.`,
         ],
         focus: ['public safety', 'utility infrastructure', 'administrative offices', 'summer cooling', 'budget protection'],
@@ -2435,7 +2435,7 @@ REQUIREMENTS:
 9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 10. FORENSIC AUTHORITY: Never sound like you are selling a service. Sound like you are reporting a diagnostic finding. Use "liability," "exposure," "billing floor," and "ratchet" instead of "costs," "bills," or "savings."
 11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the forensic insight immediately.
-12. MULTI-SITE: If the organization has multiple locations, you MUST mention the "portfolio" or "group budget" and the risk of "masked peaks" where one site penalizes the whole group.
+12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
 
 Generate a forensic, peer-to-peer opener for ${companyName}:`
 
