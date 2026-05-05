@@ -1669,7 +1669,7 @@ Output rules:
 
     const firstName = userProfile?.firstName || 'Trey';
     const currentUserEmail = typeof userProfile?.email === 'string' ? userProfile.email.trim() : '';
-    const publicResearchPattern = /\b(search the web|search the internet|internet|online|website|official site|linkedin|owner|owners?|owns|ceo|president|founder|headquarters|hq|address|subsidiary|parent company|revenue|headcount|employee count|employees?|company size|founded|founding|market cap|who works at|who is|who runs|runs the company|leadership|decision maker|decision-makers?|alternate phone|other number|office number|direct phone|public phone|company phone|number on the internet|contact info|check online)\b/i;
+    const publicResearchPattern = /\b(search the web|search the internet|internet|online|website|official site|linkedin|owner|owners?|owns|ceo|president|founder|headquarters|hq|address|subsidiary|parent company|revenue|headcount|employee count|employees?|company size|founded|founding|market cap|who runs|runs the company|leadership|decision maker|decision-makers?|alternate phone|other number|office number|direct phone|public phone|company phone|number on the internet|contact info|check online)\b/i;
     const internalOnlyPattern = /\b(most recent call|recent call|last call|call transcript|transcript|voicemail|he told me|she told me|what did he say|what did she say|email he told me|email he gave me|my inbox|recent email|contract end|contract expiration|bill|invoice|document|file|task|notes?)\b/i;
     const noResultPattern = /(did not find|could not find|unable to locate|found zero|no matching|no contacts|not readily available|i don['’]t find|i searched the database|not in crm|limited to apollo|could not locate|can only return contract details|need a keyword|please specify|keyword|need more context|not enough information|can['’]t verify|cannot verify|no record|no records)/i;
     const shouldEscalateToWebFallback = (assistantText) => {
@@ -4382,6 +4382,57 @@ Only use public-facing facts. Separate verified facts from inferences. Keep it c
     }
 
     console.log(`[AI Router] Routing decision - targetModel: ${targetModel}, provider: ${provider}`);
+
+    const shouldUseWebResearch = webEnabled
+      && !jsonMode
+      && !!perplexityApiKey
+      && provider !== 'perplexity'
+      && publicResearchPattern.test(String(prompt || ''))
+      && !internalOnlyPattern.test(String(prompt || ''));
+
+    if (shouldUseWebResearch) {
+      try {
+        routingDiagnostics.push({
+          model: perplexityModel,
+          provider: 'perplexity',
+          status: 'attempting',
+          reason: 'DIRECT_PUBLIC_RESEARCH',
+          timestamp: new Date().toISOString()
+        });
+
+        const content = await callPerplexity(perplexityModel, routingDiagnostics, {
+          mode: 'web_fallback',
+          reason: 'direct_public_research',
+        });
+
+        routingDiagnostics.push({
+          model: perplexityModel,
+          provider: 'perplexity',
+          status: 'success',
+          reason: 'DIRECT_PUBLIC_RESEARCH',
+          timestamp: new Date().toISOString()
+        });
+
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          content,
+          provider: 'perplexity',
+          model: perplexityModel,
+          diagnostics: routingDiagnostics
+        }));
+        return;
+      } catch (error) {
+        console.error('[Perplexity Direct Research] Error:', error);
+        routingDiagnostics.push({
+          model: perplexityModel,
+          provider: 'perplexity',
+          status: 'failed',
+          reason: 'DIRECT_PUBLIC_RESEARCH',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
 
     // 2. Execute Routing
     if (provider === 'openrouter') {
