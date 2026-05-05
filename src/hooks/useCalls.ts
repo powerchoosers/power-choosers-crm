@@ -248,7 +248,19 @@ type FinishedCallDetail = {
   phoneNumber?: string | null
 }
 
-const POST_CALL_REFRESH_DELAYS_MS = [0, 1200, 3000, 6000, 10000]
+const POST_CALL_REFRESH_DELAYS_MS = [
+  0,
+  1200,
+  3000,
+  6000,
+  10000,
+  20000,
+  30000,
+  45000,
+  60000,
+  90000,
+  120000,
+]
 
 const PAGE_SIZE = 50
 
