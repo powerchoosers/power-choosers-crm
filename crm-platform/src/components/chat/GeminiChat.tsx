@@ -8,10 +8,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 import { useGeminiStore } from '@/store/geminiStore'
 import { usePathname, useParams, useRouter } from 'next/navigation'
 import { useAuth } from '@/context/AuthContext'
-import { useContact, useUpdateContact } from '@/hooks/useContacts'
+import { useContact, useCreateContact, useUpdateContact } from '@/hooks/useContacts'
 import { useAccount, useUpdateAccount, useUpsertAccount } from '@/hooks/useAccounts'
 import { useApolloNews, type ApolloNewsSignal } from '@/hooks/useApolloNews'
 import { supabase } from '@/lib/supabase'
@@ -81,6 +82,7 @@ type IdentityCardData = {
   name: string
   title?: string
   company?: string
+  accountId?: string
   industry?: string
   status?: 'active' | 'risk'
   initials?: string
@@ -689,19 +691,88 @@ function FlightCheckBlock({
 
 function IdentityCardView({ card }: { card: IdentityCardData }) {
   const router = useRouter()
+  const { mutateAsync: createContact } = useCreateContact()
   const { mutateAsync: updateAccount } = useUpdateAccount()
-  const [isEnriching, setIsEnriching] = useState(false)
-  const [enriched, setEnriched] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
 
   const path = card.type === 'contact' ? '/network/contacts' : '/network/accounts'
   const initials = card.initials ?? (card.name.split(/\s+/).map((n) => n[0]).join('').slice(0, 2).toUpperCase() || '?')
   const secondLine = card.subtitle ?? (card.contractEndDate ? `Contract: ${card.contractEndDate}` : (typeof card.contactCount === 'number' ? `${card.contactCount} contacts` : null))
+  const isContactCard = card.type === 'contact'
 
-  const handleEnrich = async (e: React.MouseEvent) => {
+  const splitName = (fullName: string) => {
+    const parts = fullName.trim().split(/\s+/).filter(Boolean)
+    if (parts.length <= 1) {
+      return { firstName: fullName.trim(), lastName: '' }
+    }
+    return {
+      firstName: parts[0] || fullName.trim(),
+      lastName: parts.slice(1).join(' '),
+    }
+  }
+
+  const handlePrimaryAction = async (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (!card.discoveredPhone || card.type !== 'account' || isEnriching || enriched) return
+    if (isSaving || saved) return
 
-    setIsEnriching(true)
+    if (isContactCard) {
+      if (card.id) {
+        router.push(`/network/contacts/${card.id}`)
+        return
+      }
+
+      const fullName = String(card.name || '').trim()
+      if (!fullName) {
+        toast.error('Missing contact name', {
+          description: 'I need a name before I can add this person to the CRM.',
+        })
+        return
+      }
+
+      setIsSaving(true)
+      try {
+        const { firstName, lastName } = splitName(fullName)
+        const savedContact = await createContact({
+          name: fullName,
+          firstName,
+          lastName,
+          title: card.title || '',
+          email: '',
+          phone: card.discoveredPhone || '',
+          company: card.company || '',
+          companyPhone: card.discoveredPhone || '',
+          accountId: card.accountId || undefined,
+          status: 'Lead',
+          metadata: {
+            source: 'gemini_chat_identity_card',
+            discoveredSource: card.discoveredSource || null,
+            sourceReliability: card.sourceReliability || null,
+            cardType: card.type,
+          },
+        } as any)
+
+        setSaved(true)
+        toast.success('Contact added', {
+          description: `${fullName} was saved to the CRM.`,
+        })
+        if (savedContact?.id) {
+          router.push(`/network/contacts/${savedContact.id}`)
+        }
+      } catch (err) {
+        console.error('Contact add failed:', err)
+        toast.error('Could not add contact', {
+          description: err instanceof Error ? err.message : 'The insert did not complete.',
+        })
+      } finally {
+        setIsSaving(false)
+      }
+      return
+    }
+
+    if (!card.discoveredPhone) return
+
+    setIsSaving(true)
     try {
       const updates: any = { companyPhone: card.discoveredPhone }
       updates.metadata = {
@@ -716,11 +787,17 @@ function IdentityCardView({ card }: { card: IdentityCardData }) {
         ]
       }
       await updateAccount({ id: card.id, ...updates })
-      setEnriched(true)
+      setSaved(true)
+      toast.success('Phone saved', {
+        description: 'The company phone was written to the account record.',
+      })
     } catch (err) {
-      console.error('Enrichment failed:', err)
+      console.error('Save action failed:', err)
+      toast.error('Could not save phone', {
+        description: err instanceof Error ? err.message : 'The update did not complete.',
+      })
     } finally {
-      setIsEnriching(false)
+      setIsSaving(false)
     }
   }
 
@@ -736,7 +813,9 @@ function IdentityCardView({ card }: { card: IdentityCardData }) {
       initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
       className="w-full max-w-md bg-zinc-950/80 nodal-monolith-edge backdrop-blur-xl rounded-2xl overflow-hidden hover:border-[#002FA7]/50 transition-colors cursor-pointer group"
-      onClick={() => router.push(`${path}/${card.id}`)}
+      onClick={() => {
+        if (card.id) router.push(`${path}/${card.id}`)
+      }}
     >
       <div className="p-4 flex items-center gap-4">
         <div className="shrink-0 w-14 h-14 rounded-[14px] bg-black/40 border border-white/10 flex items-center justify-center overflow-hidden">
@@ -755,55 +834,70 @@ function IdentityCardView({ card }: { card: IdentityCardData }) {
         </div>
       </div>
 
-      {card.discoveredPhone && (
+      {(isContactCard || card.discoveredPhone) && (
         <div className="mx-4 mb-4 p-3 rounded-xl bg-[#002FA7]/5 border border-[#002FA7]/20 flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] font-bold">Forensic Discovery</span>
+            <span className="text-[9px] font-mono text-[#002FA7] uppercase tracking-[0.2em] font-bold">
+              {isContactCard ? 'Contact Intake' : 'Forensic Discovery'}
+            </span>
             <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-widest bg-black/40 px-1.5 py-0.5 rounded border border-white/5">
-              Source: {card.discoveredSource || 'Deep Web'}
+              {isContactCard
+                ? (card.id ? 'In CRM' : 'Not in CRM')
+                : `Source: ${card.discoveredSource || 'Deep Web'}`}
             </span>
           </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-lg bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
-                <Phone size={12} />
+          {isContactCard ? (
+            <div className="flex flex-wrap items-center gap-2 text-[10px] font-mono text-zinc-300">
+              <span className="truncate">{card.title || 'No title'}</span>
+              <span className="text-zinc-600">·</span>
+              <span className="truncate">{card.company || 'No company'}</span>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-[#002FA7]/20 flex items-center justify-center text-[#002FA7]">
+                  <Phone size={12} />
+                </div>
+                <span className="text-sm font-mono font-bold text-white tabular-nums truncate">
+                  {card.discoveredPhone}
+                </span>
               </div>
-              <span className="text-sm font-mono font-bold text-white tabular-nums truncate">
-                {card.discoveredPhone}
-              </span>
-            </div>
 
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 rounded-lg hover:bg-white/5 text-zinc-400"
-                onClick={handleCopy}
-              >
-                <Copy size={12} />
-              </Button>
-              <Button
-                size="sm"
-                className={cn(
-                  "h-7 font-mono text-[9px] uppercase tracking-widest px-3 transition-all",
-                  enriched
-                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                    : "bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
-                )}
-                onClick={handleEnrich}
-                disabled={isEnriching || enriched}
-              >
-                {isEnriching ? <Loader2 size={10} className="animate-spin" /> : enriched ? "ENRICHED" : "ENRICH"}
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 rounded-lg hover:bg-white/5 text-zinc-400"
+                  onClick={handleCopy}
+                >
+                  <Copy size={12} />
+                </Button>
+              </div>
             </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              className={cn(
+                "h-7 font-mono text-[9px] uppercase tracking-widest px-3 transition-all",
+                saved
+                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                  : "bg-[#002FA7] hover:bg-[#002FA7]/90 text-white shadow-[0_0_10px_rgba(0,47,167,0.3)]"
+              )}
+              onClick={handlePrimaryAction}
+              disabled={isSaving || saved}
+            >
+              {isSaving ? <Loader2 size={10} className="animate-spin" /> : saved ? (isContactCard ? "ADDED" : "SAVED") : isContactCard ? (card.id ? "OPEN CONTACT" : "ADD CONTACT") : "SAVE PHONE"}
+            </Button>
           </div>
         </div>
       )}
 
       <div className="px-4 py-2 border-t border-white/5 group-hover:bg-[#002FA7]/10 transition-colors flex flex-col gap-0.5">
         {secondLine && <span className="text-[10px] font-mono text-zinc-500 truncate">{secondLine}</span>}
-        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Open dossier →</span>
+        <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">{isContactCard ? 'Open contact →' : 'Open dossier →'}</span>
       </div>
     </motion.div>
   )
