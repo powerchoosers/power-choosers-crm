@@ -110,6 +110,8 @@ type AccountRow = {
   ownerId: string | null
   employees?: number | null
   description?: string | null
+  metadata?: Record<string, unknown> | null
+  service_addresses?: unknown
   revenue?: string | null
   annual_usage?: string | null
   intelligence_brief_headline: string | null
@@ -187,6 +189,8 @@ type IndustryCluster =
   | 'banking'
   | 'retail'
   | 'restaurant'
+  | 'hotel_owner'
+  | 'hospitality_group'
   | 'school_district'
   | 'higher_education'
   | 'residential_care'
@@ -235,7 +239,7 @@ type TalkTrackContext = {
 
 const FALLBACK_MESSAGE = 'No recent signals found for this account. Try again later or check the source manually.'
 const COOLDOWN_MS = 60 * 60 * 1000
-const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, employees, description, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
+const ACCOUNT_SELECT = 'id, name, industry, domain, linkedin_url, city, state, ownerId, employees, description, metadata, service_addresses, revenue, annual_usage, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 const SIGNAL_KEYWORDS = [
   'acquisition',
   'acquired',
@@ -291,6 +295,38 @@ const SEC_FILING_FORMS = new Set([
 
 function cleanText(value: unknown): string {
   return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : ''
+}
+
+function getAccountNotes(account: AccountRow) {
+  const metadata = account.metadata && typeof account.metadata === 'object' ? account.metadata : null
+  const candidates = [
+    metadata && 'notes' in metadata ? (metadata as Record<string, unknown>).notes : null,
+    metadata && 'note' in metadata ? (metadata as Record<string, unknown>).note : null,
+    metadata && 'accountNotes' in metadata ? (metadata as Record<string, unknown>).accountNotes : null,
+    metadata && 'summary' in metadata ? (metadata as Record<string, unknown>).summary : null,
+  ]
+
+  return candidates.map(cleanText).filter(Boolean).join(' ').toLowerCase()
+}
+
+function getVerifiedLocationCount(account: AccountRow) {
+  const serviceAddresses = Array.isArray(account.service_addresses) ? account.service_addresses.length : 0
+  const metadata = account.metadata && typeof account.metadata === 'object' ? account.metadata as Record<string, unknown> : null
+  const meters = Array.isArray(metadata?.meters) ? metadata.meters.length : 0
+  const count = Math.max(serviceAddresses, meters)
+  return count > 0 ? count : null
+}
+
+function looksLikeHotelProperty(text: string) {
+  return /\b(hotel|hotels|resort|resorts|motel|inn|lodging|boutique property|boutique hotel|boutique resort|guest rooms?|suite(?:s)?|hilton|marriott|hyatt|best western|holiday inn|hampton inn|courtyard|residence inn|doubletree|embassy suites|fairfield inn|aloft|homewood suites|springhill suites|wyndham|sonesta|westin|radisson|omni|renaissance|four seasons|intercontinental|candlewood|drury inn|la quinta|quality inn|comfort inn|quality suites|marriott)\b/i.test(text)
+}
+
+function looksLikeHospitalityGroup(text: string, verifiedLocationCount: number | null, notes: string) {
+  return Boolean(
+    verifiedLocationCount && verifiedLocationCount > 1 ||
+    /\b(hotel management|hospitality group|owns and operates|operates over|manages \d+|portfolio of hotels|multiple properties|properties across|hotels across|resorts across|collection|brand portfolio|lifestyle company|full-service hospitality|development and management|management company)\b/i.test(text) ||
+    /\b(hotel management|hospitality group|owns and operates|multiple properties|portfolio|collection|management company|develops? and manages?|operates over \d+)/i.test(notes)
+  )
 }
 
 function decodeHtmlEntities(value: string): string {
@@ -838,6 +874,10 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     : 'Since you have a new site coming online'
 
   switch (industryCluster) {
+    case 'hotel_owner':
+      return `${prefix}, the main factor is usually guest-room load, laundry, kitchen service, and HVAC landing on that hotel meter.`
+    case 'hospitality_group':
+      return `${prefix}, the main factor is usually how each hotel or property is carrying its own guest-room, laundry, and HVAC load.`
     case 'school_district':
       return `${prefix}, the main factor is usually how campus calendars, athletics, cafeteria load, and classroom HVAC are showing up on the bill.`
     case 'higher_education':
@@ -910,6 +950,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   if (/\b(trailer|trailers|heavy haul|heavy-duty|heavy duty|gooseneck|lowboy|transportation equipment|vehicle recovery|commercial trailer|truck equipment)\b/.test(text)) {
     return 'For a trailer manufacturer like this, the useful check is whether production, welding, assembly, paint, and test work are all landing in the bill the way they should.'
+  }
+
+  if (/\b(hotel|hotels|resort|resorts|motel|inn|lodging|guest rooms?|lobby|laundry|brand flag|hospitality property)\b/.test(text)) {
+    return 'For a hotel property like this, the useful check is whether guest rooms, laundry, kitchen service, and HVAC are what is actually driving the bill.'
   }
 
   if (/\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
@@ -1222,6 +1266,8 @@ const TALK_TRACK_INDUSTRY_KEYWORDS: Record<IndustryCluster, string[]> = {
   banking: ['branch', 'occupancy', 'hvac', 'it', 'atms', 'portfolio', 'hours'],
   retail: ['store', 'seasonal', 'traffic', 'lighting', 'hvac', 'refrigeration', 'multi-site'],
   restaurant: ['kitchen', 'hvac', 'refrigeration', 'prep', 'hours', 'multi-unit', 'equipment'],
+  hotel_owner: ['hotel', 'guest rooms', 'lobby', 'laundry', 'kitchen', 'hvac', 'property'],
+  hospitality_group: ['portfolio', 'hotels', 'properties', 'management company', 'hospitality group', 'multi-property'],
   school_district: ['campus', 'calendar', 'athletics', 'cafeteria', 'classroom', 'student', 'school'],
   higher_education: ['campus', 'student housing', 'residence hall', 'research', 'dorm', 'university', 'college'],
   residential_care: ['residential', 'counseling', 'independent living', 'foster care', 'adoption', 'house', 'program'],
@@ -1243,6 +1289,8 @@ const TALK_TRACK_INDUSTRY_LABELS: Record<IndustryCluster, string[]> = {
   banking: ['bank', 'banking', 'credit union', 'financial services'],
   retail: ['retail', 'store', 'shopping', 'showroom'],
   restaurant: ['restaurant', 'restaurants', 'hospitality', 'dining', 'cafe', 'food service', 'venue', 'wedding', 'event space', 'lodging', 'hotel', 'motel'],
+  hotel_owner: ['hotel', 'hotels', 'resort', 'resorts', 'motel', 'inn', 'lodging', 'guest rooms', 'brand flag'],
+  hospitality_group: ['hospitality group', 'hotel management', 'portfolio of hotels', 'management company', 'multiple properties', 'brands'],
   school_district: ['school district', 'isd', 'independent school district', 'public school', 'k-12', 'campus'],
   higher_education: ['college', 'university', 'higher education', 'community college', 'campus'],
   residential_care: ["children's home", 'foster care', 'adoption', 'residential services', 'independent living', 'counseling center', 'residential care'],
@@ -1394,7 +1442,9 @@ function isUsefulSignalAnchor(value: string) {
 }
 
 function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null): IndustryCluster {
-  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const notes = getAccountNotes(account)
+  const text = cleanText(`${account.industry || ''} ${account.name || ''} ${account.description || ''} ${notes} ${candidate?.title || ''} ${candidate?.snippet || ''}`).toLowerCase()
+  const verifiedLocationCount = getVerifiedLocationCount(account)
   if (!text) return 'unknown'
   // Move multi_site to bottom of priority list to favor industry-specific guidance
   // if (/(multi[-\s]?site|portfolio|branch(?:es)?|chain|group|holdings)/.test(text)) return 'multi_site'
@@ -1402,7 +1452,11 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   if (/(oil|gas|energy|mining|quarry|cement|refinery|industrial gas|midstream|upstream|downstream)/.test(text)) return 'energy_intensive'
   if (/(building materials|lumber|wholesale distribution|specialty building materials|distributor|distribution center|distribution centers|distribution network|logistics|warehouse|distribution|fulfillment|freight|nvo?cc|trucking|supply chain|transport|shipping|cargo|auto logistics|freight forwarder)/.test(text)) return 'logistics'
   if (/(manufactur|industrial|fabricat|machine|plastics?|chemical|metal|steel|packag|production|component|construction|epc|builder|contractor)/.test(text) && !/(freight forwarder|nvo?cc|logistics|warehouse|distribution|fulfillment|trucking|transport|shipping|cargo|auto logistics)/.test(text)) return 'manufacturing'
-  if (/(restaurant|dining|cafe|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return 'restaurant'
+  const hotelProperty = looksLikeHotelProperty(text)
+  const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
+  if (hospitalityGroup) return 'hospitality_group'
+  if (hotelProperty && (verifiedLocationCount === null || verifiedLocationCount <= 1)) return 'hotel_owner'
+  if (/(restaurant|dining|cafe|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return hotelProperty ? 'hotel_owner' : 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
   if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
@@ -1950,6 +2004,41 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         ],
         focus: ['residential care', 'counseling spaces', '24/7 load', 'billing floors', 'program support'],
       }
+    case 'hotel_owner':
+      const hotelMultiSite = detectMultiSiteScale(account, candidate)
+
+      if (hotelMultiSite.isMultiSite && hotelMultiSite.locationCount && hotelMultiSite.locationCount >= 3) {
+        const locationDesc = hotelMultiSite.locationCount >= 10
+          ? `${hotelMultiSite.locationCount}+ hotels`
+          : `${hotelMultiSite.locationCount} hotels`
+        const regionDesc = hotelMultiSite.regions.length > 1
+          ? ` across ${hotelMultiSite.regions.length} states`
+          : ''
+
+        return {
+          label: 'Hotel portfolio',
+          angle: `Property-by-property comparison of guest-room, laundry, and HVAC load across ${locationDesc}${regionDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you checking each hotel on its own meter, or is the portfolio still being treated like one property?`,
+          openers: [
+            `For a hotel portfolio like this, the useful question is which property has its own locked-in peak charge.`,
+            `Even within the same brand, each hotel can carry a different peak history because the guest rooms, laundry, and HVAC are not identical.`,
+            `The thing I would watch is whether one property is still carrying a summer spike on its own meter.`,
+          ],
+          focus: ['property comparison', 'guest rooms', 'laundry', 'HVAC', 'portfolio view', 'locked-in peak charges'],
+        }
+      }
+
+      return {
+        label: 'Hotel property',
+        angle: 'Guest rooms, laundry, kitchen service, and HVAC driving the load on a single hotel meter.',
+        question: 'Have you looked at whether the room load or laundry is what is actually driving the peak on that hotel meter?',
+        openers: [
+          `A single hotel property is different from an event space because the guest rooms, laundry, kitchen, and HVAC all keep the meter busy in a steady way.`,
+          `The thing I would watch is whether the hotel load is setting a locked-in peak charge on that meter from the hotter months.`,
+          `For a branded hotel owner, the useful question is which part of the property is actually driving the peak, not the average usage.`,
+        ],
+        focus: ['guest rooms', 'laundry', 'kitchen service', 'HVAC', 'hotel meter', 'locked-in peak charges'],
+      }
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
       
@@ -2105,6 +2194,30 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
           `The real cost driver for restaurant groups is the peak floor set by the kitchen equipment, not the energy rate itself.`,
         ],
         focus: ['coincident peaks', 'service rushes', 'kitchen equipment', 'demand ratchets', 'billing floors', 'HVAC load'],
+      }
+    case 'hotel_owner':
+      return {
+        label: 'Hotel property',
+        angle: 'Guest rooms, laundry, kitchen service, and HVAC driving the load on a single hotel meter.',
+        question: 'Have you looked at whether the room load or laundry is what is actually driving the peak on that hotel meter?',
+        openers: [
+          `A single hotel property is different from an event space because the guest rooms, laundry, kitchen, and HVAC all keep the meter busy in a steady way.`,
+          `The thing I would watch is whether the hotel load is setting a locked-in peak charge on that meter from the hotter months.`,
+          `For a branded hotel owner, the useful question is which part of the property is actually driving the peak, not the average usage.`,
+        ],
+        focus: ['guest rooms', 'laundry', 'kitchen service', 'HVAC', 'hotel meter', 'locked-in peak charges'],
+      }
+    case 'hospitality_group':
+      return {
+        label: 'Hospitality group',
+        angle: 'Property-by-property comparison of guest-room, laundry, and HVAC load across the portfolio.',
+        question: 'Are you comparing each hotel on its own meter, or is the portfolio still being treated like one blended property?',
+        openers: [
+          `Hospitality groups usually need a property-by-property view because each hotel can carry its own peak history.`,
+          `The useful question is which property is carrying the heaviest guest-room and laundry load on its own meter.`,
+          `With a portfolio like this, one hotel’s summer peak should not be hidden inside the group total.`,
+        ],
+        focus: ['property comparison', 'guest rooms', 'laundry', 'HVAC', 'portfolio view', 'locked-in peak charges'],
       }
     case 'education_nonprofit':
       if (multiSiteInfo.isMultiSite && multiSiteInfo.locationCount && multiSiteInfo.locationCount >= 10) {
@@ -2496,6 +2609,7 @@ REQUIREMENTS:
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
    - For healthcare accounts, use clinical language like patient care, imaging, surgical units, labs, or 24/7 care. Do not use restaurant language like kitchen peaks, service rushes, fryers, or game-day wording unless the source explicitly says that.
+   - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
 9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
@@ -2615,6 +2729,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(shift(?:s)?|production|startup|bake line|machine startup|factory)\b/i.test(lower)
   const residentialRestaurantJargon = context.industryCluster === 'residential_care' &&
     /\b(coincident kitchen peak|service rushes?|fryers?|grills?|restaurant)\b/i.test(lower)
+  const hotelEventSpaceJargon = context.industryCluster === 'hotel_owner' &&
+    /\b(event space|banquet space|banquet hall|wedding venue|concert venue|conference venue|game[-\s]?day)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
@@ -2623,7 +2739,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || schoolManufacturingJargon || residentialRestaurantJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
