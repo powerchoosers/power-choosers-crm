@@ -135,7 +135,7 @@ export function LandingSections() {
       />
 
       {/* ACT 2: THE REALITY (The Problem) */}
-      <section className="bg-[#F5F5F7] flex items-center justify-center px-6 py-20">
+      <section className="bg-[#F5F5F7] flex items-center justify-center px-6 py-16 md:py-20">
         <div className="max-w-6xl w-full grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
           <div className="order-2 md:order-1">
             <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter mb-6 reveal-on-scroll text-zinc-900">
@@ -182,9 +182,9 @@ export function LandingSections() {
       </section>
 
       {/* WHY IT MATTERS */}
-      <section className="py-24 bg-[#F5F5F7] border-t border-zinc-100 relative">
+      <section className="py-16 md:py-24 bg-[#F5F5F7] border-t border-zinc-100 relative">
         <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="max-w-4xl mb-14 reveal-on-scroll">
+          <div className="max-w-4xl mb-10 md:mb-14 reveal-on-scroll">
             <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">WHY IT MATTERS</p>
             <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">The numbers get expensive fast.</h2>
             <p className="text-lg text-zinc-600 leading-relaxed mt-5 max-w-2xl">
@@ -240,11 +240,11 @@ export function LandingSections() {
       </section>
 
       {/* FORENSIC PROTOCOL: HOW IT WORKS */}
-      <section className="bg-white flex items-center justify-center px-6 py-24 border-t border-zinc-100">
+      <section className="bg-white flex items-center justify-center px-6 py-16 md:py-24 border-t border-zinc-100">
         <div className="max-w-5xl w-full mx-auto">
 
           {/* Header */}
-          <div className="mb-16 reveal-on-scroll">
+          <div className="mb-10 md:mb-16 reveal-on-scroll">
             <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">PROCESS</p>
             <h2 className="text-4xl md:text-5xl font-semibold tracking-tighter text-zinc-900">Review. Compare. Negotiate.</h2>
           </div>
@@ -294,7 +294,7 @@ export function LandingSections() {
       <WhoWeServeSection compact />
 
       {/* FINAL CTA */}
-      <section className="py-32 bg-[#F5F5F7] border-t border-zinc-100 relative overflow-hidden">
+      <section className="py-16 md:py-32 bg-[#F5F5F7] border-t border-zinc-100 relative overflow-hidden">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-3xl pointer-events-none" />
         <div className="relative z-10 max-w-2xl px-6 mx-auto text-center reveal-on-scroll">
           <p className="font-mono text-[10px] text-[#002FA7] uppercase tracking-[0.3em] mb-3">NEXT STEP</p>
