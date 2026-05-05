@@ -1705,14 +1705,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       
       return {
         label: 'Manufacturing / industrial',
-        angle: 'Demand spikes driven by process timing, shift changes, and equipment start-up, plus transmission fee exposure.',
-        question: 'Have you looked at which processes or equipment are driving your peaks, and whether anything on-site could smooth them out?',
+        angle: 'Forensic machine startup cycles and shift-driven demand peaks setting billing floors.',
+        question: 'Have you mapped your equipment startup sequences yet to see if they are setting a billing floor for the whole year?',
         openers: [
-          `In manufacturing, the thing that usually catches people off guard is not the rate — it is transmission exposure from peaks during the summer.`,
-          `If the operation runs in shifts, the way it pulls power during peak hours can quietly inflate the transmission side of the bill.`,
-          `Process timing and equipment choices are what usually drive the transmission side of the bill more than the commodity.`,
+          `In a manufacturing setup like yours, the biggest forensic signal is usually the machine startup sequence and how it hits the billing floor.`,
+          `If your production lines ramp up simultaneously, you're likely setting a demand peak that you pay for long after the shift ends.`,
+          `The diagnostic check I'd want to run is whether your equipment timing is creating an artificial liability in the transmission side of the bill.`,
         ],
-        focus: ['demand spikes', 'transmission exposure', 'production ramps', 'shift changes', 'equipment', 'operations', 'site practices'],
+        focus: ['startup sequences', 'production ramps', 'shift-driven peaks', 'billing floors', 'demand ratchets', 'transmission liability'],
       }
     case 'logistics':
       const logisticsMultiSite = detectMultiSiteScale(account, candidate)
@@ -1740,14 +1740,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       
       return {
         label: 'Logistics / warehouse / distribution',
-        angle: '24/7 warehouse usage, dock activity, automation, and HVAC drive the bill through transmission exposure.',
-        question: 'Have you looked at which parts of the operation are driving the peaks, and whether you are carrying a demand ratchet from the summer?',
+        angle: 'Thermal liability from dock doors and automation setting stealth demand ratchets.',
+        question: 'Have you looked at the correlation between your dock activity and your peak demand charges lately?',
         openers: [
-          `Warehouses can look straightforward on the surface, but if there is heavy automation or 24/7 dock activity, the transmission exposure from summer peaks can be a real blind spot.`,
-          `A lot of warehouse accounts focus on the rate but don't track when their load hits — and that timing is what drives the transmission side.`,
-          `High-volume operations often pull the hardest during peak hours without realizing it is setting a billing floor.`,
+          `In high-volume logistics, the biggest forensic driver is usually Thermal Liability—where dock doors and HVAC fight each other during peaks.`,
+          `If your automation or dock cycles spike during high-heat hours, you're setting a demand ratchet that follows you into the slow season.`,
+          `A lot of warehouse groups focus on the usage, but the real leak is usually the peak floor set by dock timing and climate control.`,
         ],
-        focus: ['24/7 load', 'dock doors', 'automation', 'throughput swings', 'transmission exposure', 'demand ratchets'],
+        focus: ['thermal liability', 'dock door timing', 'automation peaks', 'HVAC load', 'demand ratchets', 'billing floors'],
       }
     case 'food_storage':
       return {
@@ -1787,14 +1787,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       
       return {
         label: 'Healthcare / Senior Living',
-        angle: '24/7 healthcare base load and mission-critical reliability masking stealth demand ratchets.',
-        question: 'Are you tracking the transmission exposure on that base load yet, or is the 24/7 requirement making it hard to see the peaks?',
+        angle: 'Base load masking where 24/7 reliability requirements hide stealth demand ratchets.',
+        question: 'Are you tracking the peak exposure on that 24/7 base load, or is the reliability requirement masking the ratchets?',
         openers: [
           `Healthcare facilities that never sleep have a unique liability because the constant base load often masks stealth demand ratchets.`,
-          `With 24/7 operations, the part I care about is that the base load usually hides the very peaks that set your billing floor for the year.`,
-          `The power side matters here because the mission-critical load is constant, which makes transmission exposure almost impossible to spot without a forensic look.`,
+          `Because your buildings never stop, the part I care about is that the base load hides the very peaks that set your billing floor.`,
+          `In a 24/7 environment, you're often paying for capacity you aren't actually using because the 'always-on' load makes peaks hard to spot.`,
         ],
-        focus: ['base load masking', 'transmission exposure', 'reliability', 'demand ratchets', 'backup systems'],
+        focus: ['base load masking', 'peak transparency', 'reliability liability', 'demand ratchets', 'billing floors', 'capacity mismatch'],
       }
     case 'banking':
       const bankingMultiSite = detectMultiSiteScale(account, candidate)
@@ -1857,14 +1857,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       
       return {
         label: 'Retail',
-        angle: 'Seasonal HVAC swings and occupancy changes driving stealth transmission exposure.',
-        question: 'Are you guys tracking the transmission exposure on those seasonal HVAC peaks, or is the bill just on autopilot?',
+        angle: 'Portfolio masking where individual site peaks drag down the total group budget.',
+        question: 'Are you seeing demand ratchets at specific stores, or is the group budget masking those local peaks?',
         openers: [
-          `Retail operations are sensitive because the summer cooling load usually sets a billing floor that sticks around all year.`,
-          `The part I care about is whether your seasonal peaks are triggering a demand ratchet that is dragging down the group budget.`,
-          `With retail footprints, the lighting and HVAC load usually masks a lot of hidden transmission exposure.`,
+          `Retail operations are sensitive because the summer cooling load at one site can set a billing floor that the whole group carries.`,
+          `The biggest liability in a retail footprint is Portfolio Masking, where a few 'dirty' sites are setting the floor for the entire budget.`,
+          `With retail footprints, the lighting and HVAC load usually masks a lot of hidden transmission exposure at the meter level.`,
         ],
-        focus: ['seasonal swings', 'demand ratchets', 'transmission exposure', 'billing floors', 'occupancy'],
+        focus: ['portfolio masking', 'meter-level ratchets', 'group budget liability', 'billing floors', 'occupancy swings'],
       }
     case 'restaurant':
       const restaurantMultiSite = detectMultiSiteScale(account, candidate)
@@ -1879,14 +1879,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         
         return {
           label: 'Restaurant chain',
-          angle: `Portfolio-level electricity management across ${locationDesc}${regionDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking demand ratchets site-by-site, or is it one big bucket?`,
+          angle: 'Coincident kitchen peaks and portfolio masking dragging down the total group budget.',
+          question: `With ${locationDesc}${regionDesc}, are you tracking the coincident peaks site-by-site, or is it one big bucket?`,
           openers: [
-            `Restaurant groups with ${locationDesc} usually need a portfolio view to ensure consistency across units.`,
-            `With that kind of footprint${regionDesc}, one unit's kitchen spike can trigger a demand ratchet that impacts the whole group budget.`,
-            `The question I'd want answered is whether your ${locationDesc} are being managed centrally or unit-by-unit.`,
+            `Restaurant groups with ${locationDesc} usually have a significant blind spot in how kitchen service rushes are setting local demand ratchets.`,
+            `With that kind of footprint${regionDesc}, one unit's kitchen spike can trigger a billing floor that the whole group has to carry.`,
+            `The diagnostic check I'd want to run is whether any of those ${locationDesc} are carrying a stealth demand ratchet from service peaks.`,
           ],
-          focus: ['portfolio management', 'multi-unit coordination', 'kitchen load', 'demand ratchets', 'HVAC'],
+          focus: ['coincident peaks', 'service rushes', 'kitchen load', 'demand ratchets', 'portfolio masking', 'billing floors'],
         }
       }
       
@@ -1895,27 +1895,27 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       if (isHospitality) {
         return {
           label: 'Hospitality / Event Venues',
-          angle: '24/7 base load, lodging HVAC, and extreme event peaks driving demand ratchets.',
-          question: 'Have you looked at which parts of the building are driving the base load, and whether there is any safe way to trim waste without hurting reliability?',
+          angle: '24/7 base load and lodging HVAC driving demand ratchets.',
+          question: 'Are you tracking the peak exposure on that 24/7 base load, or is the lodging HVAC masking the ratchets?',
           openers: [
             `Hospitality and event venues are unique because the load never really gets to sleep, especially with on-site lodging.`,
-            `With 24/7 operations, the part I care about is reliability first and budget predictability second.`,
-            `The power side matters here because the base load from HVAC and lodging is usually much higher than people realize.`,
+            `With 24/7 operations, the part I care about is how the base load hides the very peaks that set your billing floor.`,
+            `The power side matters here because the constant load from HVAC and lodging can quietly set a demand ratchet that lasts for months.`,
           ],
-          focus: ['24/7 base load', 'lodging HVAC', 'event peaks', 'demand ratchets', 'reliability', 'portfolio coordination'],
+          focus: ['24/7 base load', 'lodging HVAC', 'event peaks', 'demand ratchets', 'billing floors', 'capacity mismatch'],
         }
       }
 
       return {
         label: 'Restaurant / Dining',
-        angle: 'High-intensity kitchen and HVAC load driving extreme transmission exposure and demand ratchets.',
-        question: 'Has anyone looked at whether the kitchen start-up or evening cooling peaks are triggering a demand ratchet yet?',
+        angle: 'Kitchen coincident peaks from service rushes setting high billing floors.',
+        question: 'Have you looked at whether your game-day or service rushes are setting a demand ratchet that lasts all year?',
         openers: [
-          `Restaurants have a unique liability because the kitchen and HVAC load peaks exactly when ERCOT prices are most volatile.`,
-          `The part I care about is that the evening dining peaks usually set a billing floor that you carry for the next 11 months.`,
-          `With high-intensity hospitality, the power side matters because the load factor is usually much worse than the rate suggests.`,
+          `In a high-intensity brand like this, your forensic driver is the Coincident Kitchen Peak during service rushes.`,
+          `If your fryers, grills, and HVAC all peak during a rush, you're setting a demand ratchet that follows you into the slow months.`,
+          `The real cost driver for restaurant groups is the peak floor set by the kitchen equipment, not the energy rate itself.`,
         ],
-        focus: ['kitchen load', 'HVAC', 'evening peaks', 'demand ratchets', 'transmission exposure', 'billing floors'],
+        focus: ['coincident peaks', 'service rushes', 'kitchen equipment', 'demand ratchets', 'billing floors', 'HVAC load'],
       }
     case 'education_nonprofit':
       const multiSiteInfo = detectMultiSiteScale(account, candidate)
@@ -2334,7 +2334,7 @@ REQUIREMENTS:
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
-9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website".
+9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
 10. FORENSIC AUTHORITY: Never sound like you are selling a service. Sound like you are reporting a diagnostic finding. Use "liability," "exposure," "billing floor," and "ratchet" instead of "costs," "bills," or "savings."
 11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the forensic insight immediately.
 12. MULTI-SITE: If the organization has multiple locations, you MUST mention the "portfolio" or "group budget" and the risk of "masked peaks" where one site penalizes the whole group.
