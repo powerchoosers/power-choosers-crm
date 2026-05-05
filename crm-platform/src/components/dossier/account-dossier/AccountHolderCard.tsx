@@ -114,6 +114,7 @@ export function AccountHolderCard({
       account: accountName,
       title: holder.title,
       contactId: holder.id,
+      accountId,
     })
   }
 

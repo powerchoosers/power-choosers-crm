@@ -84,7 +84,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
   const [metadata, setMetadata] = useState<VoiceMetadata | null>(null)
 
   const { user } = useAuth()
-  const { setStatus, setActive, setCallHealth, setPhoneNumber } = useCallStore()
+  const { setStatus, setActive, setCallHealth, setPhoneNumber, phoneNumber } = useCallStore()
 
   const tokenRefreshTimer = useRef<NodeJS.Timeout | null>(null)
   const deviceRef = useRef<Device | null>(null)
@@ -1281,6 +1281,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       stopPowerDialRingback()
       clearPowerDialWinnerSubscription()
       currentCall.disconnect()
+      emitCallFinished(metadata, phoneNumber)
       if (deviceRef.current?.audio) {
         try {
           deviceRef.current.audio.outgoing(true)
@@ -1296,7 +1297,7 @@ export function VoiceProvider({ children }: { children: React.ReactNode }) {
       setPhoneNumber('')
       setCallHealth('good')
     }
-  }, [clearPowerDialWinnerSubscription, currentCall, setActive, setCallHealth, setPhoneNumber, setStatus])
+  }, [clearPowerDialWinnerSubscription, currentCall, emitCallFinished, metadata, phoneNumber, setActive, setCallHealth, setPhoneNumber, setStatus])
 
   const sendDigits = useCallback((digits: string) => {
     if (currentCall) {
