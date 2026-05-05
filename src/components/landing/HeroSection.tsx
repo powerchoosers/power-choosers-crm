@@ -16,10 +16,10 @@ const SIGNAL_POINTS = [
 export function HeroSection() {
   return (
     <section
-      className="min-h-screen flex flex-col items-center justify-center px-6 relative overflow-hidden pt-20 md:pt-32"
+      className="min-h-[100svh] flex flex-col items-center justify-start px-6 relative overflow-hidden pt-28 pb-16 sm:pt-32 sm:pb-20 md:min-h-screen md:justify-center md:py-0 md:pt-32"
       aria-label="Hero"
     >
-      <div className="max-w-7xl mx-auto text-center z-10">
+      <div className="max-w-7xl mx-auto text-center z-10 w-full">
         <h1 className="mx-auto max-w-7xl text-5xl sm:text-6xl md:text-7xl lg:text-[5.5rem] font-bold tracking-[-0.07em] leading-[1.02] mb-6 text-zinc-900 break-words">
           <span className="word-reveal" style={{ animationDelay: '0ms' }}>Commercial</span>
           {' '}
@@ -40,7 +40,7 @@ export function HeroSection() {
         <p className="text-lg md:text-xl text-zinc-600 font-normal tracking-tight leading-8 mb-10 max-w-2xl mx-auto">
           We help Texas businesses review their bill, compare supplier offers through our supplier partnerships, negotiate competitive rates, handle the paperwork, and recommend the plan that fits the business.
         </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8 sm:mb-0">
           <Link
             href="/bill-debugger"
             className="animate-subtle-pulse inline-flex items-center gap-2 px-6 md:px-8 py-4 bg-[#002FA7] text-white rounded-full text-base md:text-lg font-medium hover:scale-105 hover:bg-blue-800 transition-all duration-300 shadow-lg shadow-blue-900/20 group whitespace-nowrap"
