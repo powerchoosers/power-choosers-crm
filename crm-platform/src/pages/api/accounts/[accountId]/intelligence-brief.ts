@@ -1456,9 +1456,9 @@ function inferIndustryCluster(account: AccountRow, candidate: ResearchHit | null
   const hospitalityGroup = looksLikeHospitalityGroup(text, verifiedLocationCount, notes)
   if (hospitalityGroup) return 'hospitality_group'
   if (hotelProperty && (verifiedLocationCount === null || verifiedLocationCount <= 1)) return 'hotel_owner'
+  if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|alzheimer'?s?|memory care|retirement living|continuum of care|skilled nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
   if (/(restaurant|dining|cafe|grill|bar\b|pub\b|eatery|hospitality|hotel|lodging|venue|wedding|event space|banquet)/.test(text)) return hotelProperty ? 'hotel_owner' : 'restaurant'
   if (/(retail|store|shopping|franchise|dealer|showroom|convenience|recreation|fitness|gym|entertainment|amusement|automotive|auto)/.test(text)) return 'retail'
-  if (/(healthcare|hospital|clinic|medical|senior living|assisted living|nursing|pharma|pharmacy)/.test(text)) return 'healthcare'
   if (/(bank|credit union|financial|wealth|insurance|lending)/.test(text)) return 'banking'
   if (/(cold storage|refrigerat|freezer|food (?:storage|process|production|distribut|wholesale)|beverage (?:storage|process|production|distribut|wholesale)|grocery|produce|dairy|meat|bakery)/.test(text)) return 'food_storage'
   if (/(church|synagogue|mosque|temple|congregation|parish|worship|ministry|religious|faith)/.test(text)) return 'religious'
