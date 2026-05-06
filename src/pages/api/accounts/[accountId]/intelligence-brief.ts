@@ -318,7 +318,7 @@ function getVerifiedLocationCount(account: AccountRow) {
 }
 
 function looksLikeHotelProperty(text: string) {
-  return /\b(hotel|hotels|resort|resorts|motel|inn|lodging|boutique property|boutique hotel|boutique resort|guest rooms?|suite(?:s)?|hilton|marriott|hyatt|best western|holiday inn|hampton inn|courtyard|residence inn|doubletree|embassy suites|fairfield inn|aloft|homewood suites|springhill suites|wyndham|sonesta|westin|radisson|omni|renaissance|four seasons|intercontinental|candlewood|drury inn|la quinta|quality inn|comfort inn|quality suites|marriott)\b/i.test(text)
+  return /\b(hotel|hotels|resort|resorts|motel|inn|lodging|boutique property|boutique hotel|boutique resort|guest rooms?|hilton|marriott|hyatt|best western|holiday inn|hampton inn|courtyard|residence inn|doubletree|embassy suites|fairfield inn|aloft|homewood suites|springhill suites|wyndham|sonesta|westin|radisson|omni|renaissance|four seasons|intercontinental|candlewood|drury inn|la quinta|quality inn|comfort inn|quality suites|marriott)\b/i.test(text)
 }
 
 function looksLikeHospitalityGroup(text: string, verifiedLocationCount: number | null, notes: string) {
@@ -1240,6 +1240,7 @@ const TALK_TRACK_GENERIC_PATTERNS = [
   /responsible for electricity/i,
   /support ticket/i,
   /i was looking at/i,
+  /i was looking into the setup/i,
   /i took a look at/i,
   /utility side/i,
   /(?:i saw (?:a|the) note|the note about)/i,
@@ -2140,41 +2141,41 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         if (isClinic) {
           return {
             label: 'Medical Practice / Clinical Network',
-            angle: `Portfolio-level comparison of locked-in peak charges across ${locationDesc}.`,
-            question: `With ${locationDesc}${regionDesc}, are you tracking which specific clinics are setting the highest demand ratchets, or is it all blended together?`,
+            angle: `Clinic-by-clinic comparison of where the biggest usage spikes are happening across ${locationDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you comparing the clinics separately to see which meters are creating the biggest peak charges, or is it all blended together?`,
             openers: [
-              `Medical networks with ${locationDesc} usually have a hidden blind spot in how specific imaging or surgical equipment is setting a billing floor at the local meter.`,
-              `With a clinical footprint like this, the liability is usually site-specific: one location can carry a heavy demand ratchet while the rest look fine.`,
-              `The diagnostic check I'd want to run is whether your newest ${isClinic ? 'clinics' : 'sites'} are carrying a peak history that doesn't match their current patient load.`,
+              `Medical networks with ${locationDesc} can look normal in the group total while one clinic is creating the biggest peak charge on its own meter.`,
+              `With a clinical footprint like this, the useful check is which clinics use the most power during patient hours and which ones do not.`,
+              `The question I would ask is whether newer clinics are creating usage spikes that do not match their current patient volume.`,
             ],
-            focus: ['clinical peaks', 'equipment startup', 'portfolio comparison', 'demand ratchets', 'billing floors', 'site-specific exposure'],
+            focus: ['clinical peaks', 'equipment startup', 'portfolio comparison', 'peak charges', 'site-specific exposure'],
           }
         }
 
         return {
           label: 'Healthcare network',
-          angle: `Portfolio-level comparison of locked-in peak charges across ${locationDesc}.`,
-          question: `With ${locationDesc}${regionDesc}, are you tracking which sites have their own locked-in peak charge, or is the portfolio view still too blended?`,
+          angle: `Facility-by-facility comparison of where the biggest usage spikes are happening across ${locationDesc}.`,
+          question: `With ${locationDesc}${regionDesc}, are you checking which facilities create the biggest peak charges, or is the portfolio view still too blended?`,
           openers: [
-            `Healthcare groups with ${locationDesc} usually have a significant blind spot because the 24/7 base load can hide the peak history on each individual meter.`,
-            `With that kind of footprint${regionDesc}, the liability is site-specific: one facility can carry its own locked-in peak charge even when the rest look fine.`,
-            `The forensic check I'd want to run is whether any of those ${locationDesc} have a hidden peak charge sitting on the meter.`,
+            `Healthcare groups with ${locationDesc} can look fine in the group total while one facility is creating the biggest peak charge on its own meter.`,
+            `With that kind of footprint${regionDesc}, the useful check is which facilities are driving the highest usage moments and which ones are not.`,
+            `The question I would ask is whether any of those ${locationDesc} have a peak charge sitting on the bill that no one is watching.`,
           ],
-          focus: ['base load masking', 'portfolio comparison', 'reliability', 'locked-in peak charges', 'meter-level exposure'],
+          focus: ['portfolio comparison', 'reliability', 'peak charges', 'meter-level exposure'],
         }
       }
       
       if (isClinic) {
         return {
           label: 'Medical Practice / Clinic',
-          angle: 'Operating peak synchronization where patient volume and HVAC peaks set a locked-in billing floor.',
-          question: 'Are you tracking which equipment cycles are setting the peak, or is the daily patient schedule creating a stealth demand ratchet?',
+          angle: 'Patient schedule, treatment-room equipment, lighting, and HVAC creating the highest usage moments at the clinic.',
+          question: 'Have you looked at whether patient hours, treatment-room equipment, or HVAC are what create the highest spike on that meter?',
           openers: [
-            `Clinical environments are different because high-draw imaging or surgical equipment usually peaks right when the HVAC load is highest.`,
-            `The part I would watch is whether your operating peaks are setting a demand ratchet that follows you through the slower months.`,
-            `For a medical practice, the power side usually comes down to whether the equipment startup is synchronized with the rest of the facility peak.`,
+            `Clinical environments are different because patient comfort, treatment-room equipment, lighting, and HVAC can all hit the meter during the same business hours.`,
+            `The part I would watch is whether patient hours and cooling load are creating the highest usage spike on that clinic meter.`,
+            `For a medical practice, the power side usually comes down to which part of the clinic creates the biggest usage moment of the month.`,
           ],
-          focus: ['operating peaks', 'equipment synchronization', 'demand ratchets', 'billing floors', 'patient schedule load'],
+          focus: ['patient hours', 'treatment-room equipment', 'HVAC', 'peak charges', 'clinic meter'],
         }
       }
 
@@ -2194,14 +2195,14 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
 
       return {
         label: isSeniorLiving ? 'Healthcare / Senior Living' : 'Healthcare facility',
-        angle: 'Base load masking where 24/7 reliability requirements hide a locked-in peak charge on the meter.',
-        question: 'Are you tracking the peak exposure on that 24/7 base load, or is the reliability requirement hiding the locked-in charge?',
+        angle: '24/7 reliability needs and clinical equipment creating peak charges that can stay on the bill.',
+        question: 'Are you checking which systems create the highest usage moments, or is the 24/7 reliability requirement making that hard to see?',
         openers: [
-          `Healthcare facilities that never sleep have a unique liability because the constant base load can hide a locked-in peak charge on the meter.`,
-          `Because your buildings never stop, the part I care about is whether the base load is hiding the peak history that set the charge.`,
-          `In a 24/7 environment, you're often paying for capacity you aren't actually using because the always-on load makes the peak hard to spot.`,
+          `Healthcare facilities that run around the clock can hide the highest usage moments inside the normal rhythm of patient care.`,
+          `Because the building never really stops, the part I would separate is normal patient-care usage from the specific spikes that set the highest charge.`,
+          `In a 24/7 environment, the useful question is which systems create the top usage moments on the meter.`,
         ],
-        focus: ['base load masking', 'peak transparency', 'reliability liability', 'locked-in peak charges', 'billing floors', 'capacity mismatch'],
+        focus: ['patient-care usage', 'peak charges', 'reliability', 'clinical equipment', 'capacity mismatch'],
       }
     case 'banking':
       const bankingMultiSite = detectMultiSiteScale(account, candidate)
@@ -2833,12 +2834,15 @@ Generate a plain-English, peer-to-peer opener for ${companyName}:`
   }
 }
 
-function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
+function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext, account?: AccountRow) {
   const text = cleanText(talkTrack)
   if (!text) return true
   if (isLikelyNonEnglishText(text)) return true
 
   const lower = text.toLowerCase()
+  const accountText = account
+    ? cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${getAccountNotes(account)}`).toLowerCase()
+    : ''
   const wordCount = text.split(/\s+/).filter(Boolean).length
   const firstSentence = cleanText(text.split(/[.!?]+/)[0] || '')
   const genericHits = TALK_TRACK_GENERIC_PATTERNS.filter((pattern) => pattern.test(lower)).length
@@ -2870,6 +2874,9 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(coincident kitchen peak|service rushes?|fryers?|grills?|restaurant)\b/i.test(lower)
   const hotelEventSpaceJargon = context.industryCluster === 'hotel_owner' &&
     /\b(event space|banquet space|banquet hall|wedding venue|concert venue|conference venue|game[-\s]?day)\b/i.test(lower)
+  const accountIsHealthcare = /\b(healthcare|hospital|clinic|medical|medical practice|acupunctur|functional wellness|doctor|dental|ophthalmology|retina|therapy|patient|wellness care)\b/i.test(accountText)
+  const accountHealthcareHotelJargon = accountIsHealthcare &&
+    /\b(hotel load|hotel meter|guest rooms?|room load|laundry|lodging|motel|resort|hotel property)\b/i.test(lower)
   const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets|forensic signal|forensic driver|thermal liability|artificial liability|peak demand charges|transmission side|correlation)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
@@ -2879,7 +2886,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || accountHealthcareHotelJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -4200,7 +4207,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const talkTrackRewriteContext = buildTalkTrackContext(account, talkTrackCandidate, false)
     const previousTalkTrack = cleanText(account.intelligence_brief_talk_track || '')
     if (validated) {
-      const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext) ||
+      const shouldRewrite = talkTrackNeedsRewrite(validated.talk_track || '', talkTrackRewriteContext, account) ||
         (previousTalkTrack && talkTrackIsTooSimilarToPrevious(validated.talk_track || '', previousTalkTrack)) ||
         talkTrackCache.isTooSimilar(validated.talk_track || '')
 
@@ -4212,7 +4219,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         
         // Validate AI-generated talk track
         if (rewrittenTalkTrack) {
-          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext) ||
+          if (talkTrackNeedsRewrite(rewrittenTalkTrack, talkTrackRewriteContext, account) ||
               (previousTalkTrack && talkTrackIsTooSimilarToPrevious(rewrittenTalkTrack, previousTalkTrack)) ||
               talkTrackCache.isTooSimilar(rewrittenTalkTrack)) {
             console.warn('[Intelligence Brief] AI-generated talk track failed validation, falling back to manual')
