@@ -673,6 +673,16 @@ async function processJob(job) {
         const existingBody = String(execution.metadata?.body || execution.metadata?.aiBody || '').trim();
         if (!existingBody || hasUnresolvedTemplateVariables(existingBody)) {
             const generatedPatch = await handleGeneration(execution, job);
+            const generatedBody = String(generatedPatch?.body || generatedPatch?.aiBody || '').trim();
+            if (!generatedBody || hasUnresolvedTemplateVariables(generatedBody)) {
+                throw new Error('AI generation produced an empty or unresolved email body');
+            }
+            await sql`
+              UPDATE sequence_executions
+              SET metadata = util.normalize_execution_metadata(metadata) || ${JSON.stringify(generatedPatch)}::jsonb,
+                  updated_at = NOW()
+              WHERE id = ${execution.id}
+            `;
             const patchedExecution = {
                 ...execution,
                 metadata: {
