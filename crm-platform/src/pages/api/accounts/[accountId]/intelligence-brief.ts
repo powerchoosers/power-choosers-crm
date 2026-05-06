@@ -889,7 +889,7 @@ function buildOpeningIndustryLine(industryCluster: IndustryCluster, alreadyOpen:
     case 'education_nonprofit':
       return `${prefix}, the main factor for the budget is usually how the seasonal occupancy and HVAC load are landing on the bill.`
     case 'healthcare':
-      return `${prefix}, the critical detail is how the 24/7 technical load and HVAC are affecting the base billing floor.`
+      return `${prefix}, the critical detail is how the clinical load, HVAC, and equipment timing are affecting the billing floor on that meter.`
     case 'restaurant':
       return `${prefix}, the biggest risk is usually kitchen load and HVAC hitting during peak hours and driving up transmission fees.`
     case 'retail':
@@ -954,6 +954,10 @@ function buildBusinessSpecificFallbackLine(account: AccountRow, candidate: Resea
 
   if (/\b(hotel|hotels|resort|resorts|motel|inn|lodging|guest rooms?|lobby|laundry|brand flag|hospitality property)\b/.test(text)) {
     return 'For a hotel property like this, the useful check is whether guest rooms, laundry, kitchen service, and HVAC are what is actually driving the bill.'
+  }
+
+  if (/\b(mental health|behavioral health|behavioral healthcare|idd|intellectual and developmental disabilities|developmental disabilities|community mental health|community center|crisis center|crisis hotline|outpatient adult|outpatient youth|substance use|early childhood intervention|care coordination|peer support)\b/.test(text)) {
+    return 'For a behavioral health network like this, the useful check is whether the clinics, crisis services, counseling space, and administrative sites are carrying very different peak histories on their own meters.'
   }
 
   if (/\b(education|nonprofit|non-profit|exchange program|exchange programs|stem|scholarship|student|students|programs?)\b/.test(text)) {
@@ -2042,14 +2046,30 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
       const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic|imaging|ortho|pediatric|wellness|doctor)/i.test(text)
+      const isBehavioralHealth = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(text)
+      const isSeniorLiving = /(senior living|assisted living|memory care|skilled nursing|retirement living|continuum of care|nursing home|alzheimer'?s? care|independent living cottages?|apartments?)/i.test(text)
       
       if (healthcareMultiSite.isMultiSite && healthcareMultiSite.locationCount && healthcareMultiSite.locationCount >= 3) {
         const locationDesc = healthcareMultiSite.locationCount >= 10 
-          ? `${healthcareMultiSite.locationCount}+ ${isClinic ? 'clinics' : 'communities'}`
-          : `${healthcareMultiSite.locationCount} ${isClinic ? 'clinics' : 'communities'}`
+          ? `${healthcareMultiSite.locationCount}+ ${isBehavioralHealth ? 'care sites' : isClinic ? 'clinics' : isSeniorLiving ? 'care communities' : 'care sites'}`
+          : `${healthcareMultiSite.locationCount} ${isBehavioralHealth ? 'care sites' : isClinic ? 'clinics' : isSeniorLiving ? 'care communities' : 'care sites'}`
         const regionDesc = healthcareMultiSite.regions.length > 1 
           ? ` across ${healthcareMultiSite.regions.length} states`
           : ''
+
+        if (isBehavioralHealth) {
+          return {
+            label: 'Behavioral health network',
+            angle: `Portfolio-level comparison of meter-level peak history across ${locationDesc}${regionDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you comparing the clinics, crisis sites, and admin buildings meter by meter, or is the portfolio still too blended to see where the locked-in peak charges are sitting?`,
+            openers: [
+              `A regional behavioral health network like this usually has very different load profiles between clinics, crisis services, and administrative sites, so the meter history matters more than the average.`,
+              `With ${locationDesc}${regionDesc}, the useful check is which sites are carrying their own locked-in peak charge and which ones are not.`,
+              `The part I would want to isolate is whether the crisis centers, outpatient sites, or support buildings are the ones carrying the highest billing floor on their own meters.`,
+            ],
+            focus: ['behavioral health network', 'crisis services', 'outpatient sites', 'administrative buildings', 'meter-level peak history', 'locked-in peak charges'],
+          }
+        }
           
         if (isClinic) {
           return {
@@ -2092,8 +2112,22 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
 
+      if (isBehavioralHealth) {
+        return {
+          label: 'Behavioral health / community care',
+          angle: 'Different care programs and support buildings leaving different peak histories on their own meters.',
+          question: 'Have you looked at whether the crisis, counseling, or administrative spaces are the ones leaving a locked-in peak charge on that meter?',
+          openers: [
+            `Behavioral health facilities are different because the crisis, counseling, and support programs do not all use power the same way.`,
+            `The useful check is whether the site’s peak is really coming from clinical activity, support space, or simple HVAC overlap.`,
+            `For a community care operation like this, the question is which part of the property is actually setting the billing floor on that meter.`,
+          ],
+          focus: ['behavioral health', 'crisis services', 'counseling space', 'support buildings', 'meter-level peaks', 'billing floors'],
+        }
+      }
+
       return {
-        label: 'Healthcare / Senior Living',
+        label: isSeniorLiving ? 'Healthcare / Senior Living' : 'Healthcare facility',
         angle: 'Base load masking where 24/7 reliability requirements hide a locked-in peak charge on the meter.',
         question: 'Are you tracking the peak exposure on that 24/7 base load, or is the reliability requirement hiding the locked-in charge?',
         openers: [
@@ -2603,6 +2637,10 @@ async function generateAITalkTrack(account: AccountRow, candidate: ResearchHit |
   const descriptionContext = account.description ? `- Description: ${account.description}` : ''
   const usageContext = account.annual_usage ? `- Annual Usage: ${account.annual_usage} kWh` : ''
   
+  const behavioralHealthContext = /(mental health|behavioral health|behavioral healthcare|idd|intellectual\/developmental disabilities|intellectual and developmental disabilities|developmental disabilities|community center|community mental health|crisis center|crisis hotline|substance use|recovery program|peer support|care coordination|licensed therapy|early childhood intervention|trauma-informed)/i.test(cleanText(`${account.name || ''} ${account.industry || ''} ${account.description || ''} ${candidate?.title || ''} ${candidate?.snippet || ''}`))
+    ? '- For behavioral health, IDD, and community-care networks, use distributed care language like clinics, crisis services, counseling, care coordination, community programs, and administrative sites. Do not use senior-living, lodging, or hospital-inpatient language unless the source explicitly says those settings exist.\n'
+    : ''
+
   const prompt = `You are a forensic energy analyst and strategist. You are crafting a talk track opener for a peer-to-peer conversation with a C-level executive or operations lead.
 
 VOICE:
@@ -2638,6 +2676,7 @@ REQUIREMENTS:
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
    - For healthcare accounts, distinguish between 24/7 facilities (hospitals, senior living) and daytime operations (clinics, medical practices). Do not use "24/7," "never sleeps," or "always-on" for clinics or outpatient sites unless the source explicitly confirms it. Instead, focus on operating peaks, equipment synchronization, and patient volume cycles. Use clinical language like patient care, imaging, surgical units, and labs.
+${behavioralHealthContext}   - For multi-site care organizations, keep the comparison portfolio-wide but the liability meter-specific. Say each site can carry its own locked-in peak charge rather than implying one site changes every other site.
    - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
@@ -2754,6 +2793,8 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   const incompleteReportOpener = /^i\s+(?:saw|noticed|came across)\s+(?:a|the)?\s*(?:report|article|news item|piece|update|post online)\s+(?:about|on)\s+[^.!?]{2,80}\.\s*(?:that|this|it)\s+(?:is|was|would|can|usually|tends|makes)\b/i.test(text)
   const healthcareRestaurantJargon = context.industryCluster === 'healthcare' &&
     /\b(coincident kitchen peak|service rushes?|game[-\s]?day|fryers?|grills?|restaurant|restaurant brand|kitchen peak)\b/i.test(lower)
+  const healthcareHospitalityJargon = context.industryCluster === 'healthcare' &&
+    /\b(lodging hvac|guest rooms?|hotel|motel|resort|banquet|event venue|wedding venue)\b/i.test(lower)
   const schoolManufacturingJargon = context.industryCluster === 'school_district' &&
     /\b(shift(?:s)?|production|startup|bake line|machine startup|factory)\b/i.test(lower)
   const residentialRestaurantJargon = context.industryCluster === 'residential_care' &&
@@ -2768,7 +2809,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
