@@ -163,7 +163,7 @@ export interface AccountFilters {
 }
 
 const PAGE_SIZE = 50
-const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url'
+const ACCOUNT_SEARCH_SELECT = 'id, name, industry, domain, logo_url, phone'
 const ACCOUNT_LIST_SELECT = 'id, name, industry, domain, logo_url, phone, contract_end_date, employees, revenue, city, state, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata'
 const ACCOUNT_DETAIL_SELECT = 'id, name, industry, domain, description, logo_url, phone, contract_end_date, employees, revenue, city, state, latitude, longitude, service_addresses, address, updatedAt, ownerId, linkedin_url, load_factor, annual_usage, electricity_supplier, current_rate, status, metadata, primaryContactId, website, intelligence_brief_headline, intelligence_brief_detail, intelligence_brief_talk_track, intelligence_brief_signal_date, intelligence_brief_reported_at, intelligence_brief_source_url, intelligence_brief_confidence_level, intelligence_brief_last_refreshed_at, intelligence_brief_status'
 
@@ -173,6 +173,19 @@ function normalizeLocationTerms(values?: string[]) {
 
 function normalizeStatusTerms(values?: string[]) {
   return (values ?? []).map((value) => String(value).trim()).filter(Boolean)
+}
+
+function normalizeSearchPhoneDigits(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '')
+}
+
+function accountMatchesPhoneDigits(account: { phone?: string | null }, searchDigits: string) {
+  if (searchDigits.length < 7) return false
+  const digits = normalizeSearchPhoneDigits(account.phone)
+  if (!digits) return false
+  const last10 = digits.slice(-10)
+  const queryLast10 = searchDigits.slice(-10)
+  return digits.includes(searchDigits) || searchDigits.includes(digits) || last10 === queryLast10
 }
 
 function mapAccountRow(data: any, metersOverride?: Account['meters']): Account {
@@ -267,6 +280,8 @@ export function useSearchAccounts(queryTerm: string) {
       if (loading || !user) return []
 
       try {
+        const searchDigits = normalizeSearchPhoneDigits(queryTerm)
+        const phoneTail = searchDigits.length >= 7 ? searchDigits.slice(-4) : ''
         let query = supabase.from('accounts').select(ACCOUNT_SEARCH_SELECT);
 
         // Admin and dev see all accounts; others filtered by ownerId
@@ -286,12 +301,40 @@ export function useSearchAccounts(queryTerm: string) {
           return [];
         }
 
-        return data.map(item => ({
+        const byId = new Map<string, any>()
+        for (const item of data || []) {
+          byId.set(item.id, item)
+        }
+
+        if (phoneTail) {
+          let phoneQuery = supabase.from('accounts').select(ACCOUNT_SEARCH_SELECT)
+
+          if (role !== 'admin' && role !== 'dev' && ownerScopeValues.length > 0) {
+            phoneQuery = phoneQuery.in('ownerId', ownerScopeValues);
+          }
+
+          const { data: phoneData, error: phoneError } = await phoneQuery
+            .ilike('phone', `%${phoneTail}%`)
+            .limit(25)
+
+          if (!phoneError) {
+            for (const item of phoneData || []) {
+              if (accountMatchesPhoneDigits(item, searchDigits)) {
+                byId.set(item.id, item)
+              }
+            }
+          } else if (!phoneError.message?.includes('Abort') && phoneError.message !== 'FetchUserError: Request was aborted') {
+            console.error("Account phone search error:", phoneError)
+          }
+        }
+
+        return Array.from(byId.values()).slice(0, 10).map(item => ({
           id: item.id,
           name: item.name || 'Unknown Account',
           industry: item.industry || '',
           domain: item.domain || '',
           logoUrl: item.logo_url || '',
+          companyPhone: item.phone || '',
         }));
       } catch (error: any) {
         if (error?.name === 'AbortError' || error?.message?.includes('Abort') || error?.message === 'FetchUserError: Request was aborted') {
