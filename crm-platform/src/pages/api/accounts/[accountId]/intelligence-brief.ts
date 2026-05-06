@@ -2041,15 +2041,30 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
       }
     case 'healthcare':
       const healthcareMultiSite = detectMultiSiteScale(account, candidate)
+      const isClinic = /(clinic|practice|eye|vision|optics|dental|dentist|optometry|ophthalmology|retina|medical practice|surgical center|outpatient|diagnostic|imaging|ortho|pediatric|wellness|doctor)/i.test(text)
       
       if (healthcareMultiSite.isMultiSite && healthcareMultiSite.locationCount && healthcareMultiSite.locationCount >= 3) {
         const locationDesc = healthcareMultiSite.locationCount >= 10 
-          ? `${healthcareMultiSite.locationCount}+ communities`
-          : `${healthcareMultiSite.locationCount} communities`
+          ? `${healthcareMultiSite.locationCount}+ ${isClinic ? 'clinics' : 'communities'}`
+          : `${healthcareMultiSite.locationCount} ${isClinic ? 'clinics' : 'communities'}`
         const regionDesc = healthcareMultiSite.regions.length > 1 
           ? ` across ${healthcareMultiSite.regions.length} states`
           : ''
           
+        if (isClinic) {
+          return {
+            label: 'Medical Practice / Clinical Network',
+            angle: `Portfolio-level comparison of locked-in peak charges across ${locationDesc}.`,
+            question: `With ${locationDesc}${regionDesc}, are you tracking which specific clinics are setting the highest demand ratchets, or is it all blended together?`,
+            openers: [
+              `Medical networks with ${locationDesc} usually have a hidden blind spot in how specific imaging or surgical equipment is setting a billing floor at the local meter.`,
+              `With a clinical footprint like this, the liability is usually site-specific: one location can carry a heavy demand ratchet while the rest look fine.`,
+              `The diagnostic check I'd want to run is whether your newest ${isClinic ? 'clinics' : 'sites'} are carrying a peak history that doesn't match their current patient load.`,
+            ],
+            focus: ['clinical peaks', 'equipment startup', 'portfolio comparison', 'demand ratchets', 'billing floors', 'site-specific exposure'],
+          }
+        }
+
         return {
           label: 'Healthcare network',
           angle: `Portfolio-level comparison of locked-in peak charges across ${locationDesc}.`,
@@ -2063,6 +2078,20 @@ function buildIndustryGuidance(industryCluster: IndustryCluster, account: Accoun
         }
       }
       
+      if (isClinic) {
+        return {
+          label: 'Medical Practice / Clinic',
+          angle: 'Operating peak synchronization where patient volume and HVAC peaks set a locked-in billing floor.',
+          question: 'Are you tracking which equipment cycles are setting the peak, or is the daily patient schedule creating a stealth demand ratchet?',
+          openers: [
+            `Clinical environments are different because high-draw imaging or surgical equipment usually peaks right when the HVAC load is highest.`,
+            `The part I would watch is whether your operating peaks are setting a demand ratchet that follows you through the slower months.`,
+            `For a medical practice, the power side usually comes down to whether the equipment startup is synchronized with the rest of the facility peak.`,
+          ],
+          focus: ['operating peaks', 'equipment synchronization', 'demand ratchets', 'billing floors', 'patient schedule load'],
+        }
+      }
+
       return {
         label: 'Healthcare / Senior Living',
         angle: 'Base load masking where 24/7 reliability requirements hide a locked-in peak charge on the meter.',
@@ -2608,7 +2637,7 @@ REQUIREMENTS:
 5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
-   - For healthcare accounts, use clinical language like patient care, imaging, surgical units, labs, or 24/7 care. Do not use restaurant language like kitchen peaks, service rushes, fryers, or game-day wording unless the source explicitly says that.
+   - For healthcare accounts, distinguish between 24/7 facilities (hospitals, senior living) and daytime operations (clinics, medical practices). Do not use "24/7," "never sleeps," or "always-on" for clinics or outpatient sites unless the source explicitly confirms it. Instead, focus on operating peaks, equipment synchronization, and patient volume cycles. Use clinical language like patient care, imaging, surgical units, and labs.
    - For a single hotel property or branded hotel owner, use hotel-property language like guest rooms, laundry, lobby, kitchen service, and HVAC. Do not talk like it is an event venue unless the source explicitly says convention space, banquet space, or event space is the main business.
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
