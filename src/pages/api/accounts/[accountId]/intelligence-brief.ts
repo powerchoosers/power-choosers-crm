@@ -1318,6 +1318,19 @@ function hashString(value: string) {
   return Math.abs(hash)
 }
 
+function simplifyTalkTrackLanguage(value: string) {
+  return cleanText(value)
+    .replace(/\bload factor\b/gi, 'usage pattern')
+    .replace(/\bbase load\b/gi, 'steady usage')
+    .replace(/\bdemand ratchets?\b/gi, 'peak charges that stick on the bill')
+    .replace(/\bdemand ratchet\b/gi, 'peak charge that sticks on the bill')
+    .replace(/\bbilling floor\b/gi, 'peak charge on the bill')
+    .replace(/\blocked-in peak charges?\b/gi, 'peak charges that stick on the bill')
+    .replace(/\blocked-in peak charge\b/gi, 'peak charge that sticks on the bill')
+    .replace(/\bpeak exposure\b/gi, 'peak-charge exposure')
+    .replace(/\bbranch operations\b/gi, 'multi-site operations')
+}
+
 function pickVariant<T>(items: T[], seed: string) {
   if (!items.length) return null
   return items[hashString(seed) % items.length]
@@ -2667,12 +2680,12 @@ REQUIREMENTS:
 1. THE OPENER: If a SIGNAL CONTEXT is provided, the first sentence MUST name the specific event OR the specific operational detail mentioned (e.g., "I caught the update about the new Haslet campus expansion" or "I was curious about the technical load mentioned in your recent facility update").
 2. THE PIVOT (TECHNICAL DEPTH): Look closely at the SIGNAL CONTEXT snippet. If it mentions specific operational terms (e.g., "broadcast load," "fabrication line," "sanctuary load," "24/7 automation"), you MUST use these terms. Do not revert to a generic industry template if specific details are available.
 3. FORENSIC PAIN POINT: Connect the technical detail directly to a liability:
-   - Electrification / Load Factor Shift: The risk of moving thermal or manual load to electric without restructuring the bill.
-   - Phantom Demand / Locked-in Peak Charges: 80% billing floors (often called demand ratchets) that punish businesses for one-time spikes.
-   - Transmission Exposure: The hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
-   - Load Mismatch: When the operating schedule changes but the contract doesn't.
+   - Electrification shift: The risk of adding electric equipment and changing usage faster than the bill structure catches up.
+   - One-time peak charges that stick: A single spike can leave a higher peak charge on the bill for months.
+   - Transmission exposure: Hidden charges tied to pulling power during the highest ERCOT grid peaks. (Never say "4CP").
+   - Usage mismatch: When the operating schedule changes but the bill structure still reflects the old pattern.
 4. NO BUILDING CONTROLS: Do not mention building controls, scheduling, or "managing the load." Focus on the liability in the bill itself.
-5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule is triggering a demand ratchet?" or "Are you guys tracking the transmission exposure on that technical load yet?").
+5. THE QUESTION: End with ONE specific, easy-to-answer question about their operations (e.g., "Has anyone looked at whether the testing schedule created a peak charge that is still sitting on the bill?" or "Are you guys tracking the transmission exposure on that technical load yet?").
 6. NON-PROFIT / COMMUNITY: For non-profits, religious groups, or schools, use mission-aligned language like "serving the community" or "supporting your mission" instead of generic business terms.
    - For school districts specifically, talk about campus calendars, athletics, cafeterias, classroom technology, and summer HVAC. Do not use factory language like shifts, production, or startup unless the source explicitly says that.
    - For healthcare accounts, distinguish between 24/7 facilities (hospitals, senior living) and daytime operations (clinics, medical practices). Do not use "24/7," "never sleeps," or "always-on" for clinics or outpatient sites unless the source explicitly confirms it. Instead, focus on operating peaks, equipment synchronization, and patient volume cycles. Use clinical language like patient care, imaging, surgical units, and labs.
@@ -2681,7 +2694,7 @@ ${behavioralHealthContext}   - For multi-site care organizations, keep the compa
 7. NO REPETITION: Do not repeat the core question or the opening observation.
 8. LENGTH: 2-3 sentences max. 50-80 words.
 9. FORBIDDEN PHRASES: "trim waste", "budget predictability", "save money", "improve efficiency", "how the business runs today", "looking at the setup", "staple", "long-standing", "fixture", "current setup", "autopilot", "site by site", "I was looking at the operational footprint", "I came across your website", "rate", "rates", "pricing", "savings", "lower cost", "better price", "consultation", "help you".
-10. FORENSIC AUTHORITY: Never sound like you are selling a service. Sound like you are reporting a diagnostic finding. Use "liability," "exposure," "billing floor," and "ratchet" instead of "costs," "bills," or "savings."
+10. FORENSIC AUTHORITY: Never sound like you are selling a service. Sound like you are reporting a diagnostic finding. Use plain English instead of insider jargon. Prefer phrases like "peak charge that sticks on the bill," "steady usage," and "usage pattern" over "demand ratchet," "base load," and "load factor."
 11. NO BROKER-SPEAK: Never use phrases like "I can help you save," "we look at energy differently," or "I want to be a resource." Lead with the forensic insight immediately.
 12. MULTI-SITE: If the organization has multiple locations, you MUST compare the sites as a portfolio, but keep the charge itself site-specific. Say that each ESID or meter can carry its own locked-in peak charge, and avoid saying one location changes the ratchet for every location.
 
@@ -2721,7 +2734,7 @@ Generate a forensic, peer-to-peer opener for ${companyName}:`
     }
 
     const data = await response.json()
-    const talkTrack = cleanText(data?.choices?.[0]?.message?.content || '')
+    const talkTrack = simplifyTalkTrackLanguage(cleanText(data?.choices?.[0]?.message?.content || ''))
     
     if (!talkTrack) {
       console.warn('[Intelligence Brief] AI talk track generation returned empty content')
@@ -2795,12 +2808,15 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
     /\b(coincident kitchen peak|service rushes?|game[-\s]?day|fryers?|grills?|restaurant|restaurant brand|kitchen peak)\b/i.test(lower)
   const healthcareHospitalityJargon = context.industryCluster === 'healthcare' &&
     /\b(lodging hvac|guest rooms?|hotel|motel|resort|banquet|event venue|wedding venue)\b/i.test(lower)
+  const healthcareBankingJargon = context.industryCluster === 'healthcare' &&
+    /\b(branch operations|branch portfolio|branch it loads?|atms?)\b/i.test(lower)
   const schoolManufacturingJargon = context.industryCluster === 'school_district' &&
     /\b(shift(?:s)?|production|startup|bake line|machine startup|factory)\b/i.test(lower)
   const residentialRestaurantJargon = context.industryCluster === 'residential_care' &&
     /\b(coincident kitchen peak|service rushes?|fryers?|grills?|restaurant)\b/i.test(lower)
   const hotelEventSpaceJargon = context.industryCluster === 'hotel_owner' &&
     /\b(event space|banquet space|banquet hall|wedding venue|concert venue|conference venue|game[-\s]?day)\b/i.test(lower)
+  const unexplainedJargon = /\b(load factor|base load|demand ratchet|demand ratchets)\b/i.test(lower)
   const matchedAngleBuckets = [mentionsSignal, mentionsIndustry, mentionsMarket].filter(Boolean).length
   const marketFeelsBoltedOn = mentionsMarket && (mentionsSignal || mentionsIndustry) && sentenceCount > 3
   const mismatchedIndustryLabel = (Object.entries(TALK_TRACK_INDUSTRY_LABELS) as Array<[IndustryCluster, string[]]>).some(([cluster, labels]) => {
@@ -2809,7 +2825,7 @@ function talkTrackNeedsRewrite(talkTrack: string, context: TalkTrackContext) {
   })
   const overstuffed = matchedAngleBuckets > 2 || sentenceCount > 4 || marketFeelsBoltedOn
 
-  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
+  return genericHits > 0 || genericOpening || unsupportedLeadershipAngle || unsupportedAcquisitionAngle || unsupportedFootprintAngle || repeatedQuestionEcho || filingJargon || footprintOpener || incompleteReportOpener || healthcareRestaurantJargon || healthcareHospitalityJargon || healthcareBankingJargon || schoolManufacturingJargon || residentialRestaurantJargon || hotelEventSpaceJargon || unexplainedJargon || sentenceCount < 2 || wordCount < 25 || overstuffed || mismatchedIndustryLabel
 }
 
 function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null, context: TalkTrackContext, attempt = 0) {
@@ -2927,7 +2943,7 @@ function buildManualTalkTrack(account: AccountRow, candidate: ResearchHit | null
     fullTrack = `${opener} ${forensicObservation} ${question}`
   }
 
-  return fullTrack.replace(/\s+/g, ' ').trim()
+  return simplifyTalkTrackLanguage(fullTrack.replace(/\s+/g, ' ').trim())
 }
 
 function extractHtmlAttribute(tag: string, attribute: string) {
@@ -3400,7 +3416,7 @@ function validateBriefResult(result: BriefResult, candidate: ResearchHit | null,
   const usable = Boolean(result?.usable_signal)
   const headline = cleanText(result?.signal_headline)
   const detail = cleanText(result?.signal_detail)
-  const talkTrack = cleanText(result?.talk_track)
+  const talkTrack = simplifyTalkTrackLanguage(cleanText(result?.talk_track))
   const candidateUrl = cleanText(candidate?.url)
   const resultUrl = cleanText(result?.source_url)
   const sourceUrl = !isLikelyBadSourceUrl(candidateUrl)
